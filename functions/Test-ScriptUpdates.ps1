@@ -48,6 +48,6 @@ function Test-ScriptUpdates()
     {
         $StatusCode = $_.Exception.Response.StatusCode.value__
     }   
-    Write-Verbose "Scripts to update: $($scriptsToUpdate.count)"
+    Write-Host "$($scriptsToUpdate.count) modules are out of date and will be updated."
     return $scriptsToUpdate
 }

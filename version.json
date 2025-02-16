@@ -1,13 +1,13 @@
 {
-    "ConnectToTenant": "3.0.0",
-    "Get-decryptedObject": "3.0.0",
-    "Get-DeviceHash": "3.0.0",
-    "Get-DeviceInfo": "3.0.0",
-    "Get-requiredModules": "3.0.0",
-    "Get-ScriptUpdates": "3.0.0",
-    "Get-USBDriveLetter": "3.0.0",
-    "Register-device": "3.0.0",
-    "registerMe": "3.0.0",
-    "Restart-Device": "3.0.0",
-    "Test-ScriptUpdates": "3.0.0"
+    "ConnectToTenant": "4.0.0",
+    "Get-decryptedObject": "4.0.0",
+    "Get-DeviceHash": "4.0.0",
+    "Get-DeviceInfo": "4.0.0",
+    "Get-requiredModules": "4.0.0",
+    "Get-ScriptUpdates": "4.0.0",
+    "Get-USBDriveLetter": "4.0.0",
+    "Register-device": "4.0.0",
+    "registerMe": "4.0.0",
+    "Restart-Device": "4.0.0",
+    "Test-ScriptUpdates": "4.0.0"
 }
