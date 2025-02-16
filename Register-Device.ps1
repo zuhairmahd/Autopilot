@@ -56,7 +56,7 @@ else
 }
 
 Get-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
-
+exit 
 
 if (-not($NoModuleCheck))
 {

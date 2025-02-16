@@ -11,12 +11,16 @@ function Get-ScriptUpdates()
         [PSCustomObject]$scripts
     )
     # $scriptPath = $PSScriptRoot + '\' + $scriptName
-    $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionUrl -Method Get
-    foreach ($key in $scripts.scripts.PSObject.Properties.Name)
+    $scriptVersionRemote = @{}
+    $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionURL -Method Get
+    foreach ($key in $scripts.PSObject.Properties.Name)
     {
-        if ($scriptVersionRemote.scripts.ContainsKey($key))
-        {
-            Write-Output "For key '$key': in Local versions => '$($scriptVersionRemote[$key])', Remote version => '$($scriptVersionRemote[$key])'"
-        }
+        $localScriptName = $key
+        Write-Host "Checking for updates for $localScriptName"
+        $localScriptVersion = $scripts.$localScriptName
+        Write-Host "Local version: $localScriptVersion"
+        $remoteScriptVersion = $scriptVersionRemote.$localScriptName
+        Write-Host "Remote version: $remoteScriptVersion"
+
     }
 }
