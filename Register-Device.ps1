@@ -6,14 +6,15 @@ param (
     [Parameter(Mandatory = $False)] [String] $GroupTag = 'MSB01',
     [Parameter(Mandatory = $False)] [String] $AssignedUser = '',
     [Parameter(Mandatory = $False)] [switch]$check,
-    [Parameter(Mandatory = $False)] [switch]$NoModuleCheck
+    [Parameter(Mandatory = $False)] [switch]$NoModuleCheck,
+    [Parameter(Mandatory = $False)] [switch]$NoUpdateCheck
 )
 
 #Define variables.
 $maxWaitTime = 30
 $timeInSeconds = 60
 $updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master'
-$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master/remoteversion.json'
+$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master/version.json'
 $localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
 $outputFile = "\device_$serial.csv"
 $functionsFolder = "$PSScriptRoot\functions"
@@ -25,17 +26,6 @@ $modulesToInstall = @(
     'PowerShellGet',
     'WindowsAutoPilotIntune'
 )
-
-Write-Output 'Checking whether the script has sufficient permissions to run.'
-If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-{
-    Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
-    exit 1
-}
-else
-{
-    Write-Output 'The script has sufficient permissions. Continuing.'
-}
 
 
 #import functions.
@@ -55,23 +45,43 @@ else
     exit 1
 }
 
-$devicesToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
-Write-Verbose "$($devicesToUpdate.count) to update"
-if ($devicesToUpdate.count -gt 0)
+
+if (-not($NoUpdateCheck))
 {
-    Write-Host 'Updating scripts.'
-    if (Get-ScriptUpdates -scriptsToUpdate $devicesToUpdate -scriptURI $updateURL)
+    Write-Output 'Checking for script updates.'
+    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions -Verbose
+    Write-Verbose "$($scriptsToUpdate.count) to update"
+    if ($scriptsToUpdate.count -gt 0)
     {
-        Write-Host 'All scripts have been updated.' -ForegroundColor Green
+        Write-Host 'Updating scripts.'
+        if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL)
+        {
+            Write-Host 'All scripts have been updated.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host 'Failed to update scripts.' -ForegroundColor Red
+        }
     }
     else
     {
-        Write-Host 'Failed to update scripts.' -ForegroundColor Red
+        Write-Host 'All scripts are up to date.' -ForegroundColor Green
     }
 }
 else
 {
-    Write-Host 'All scripts are up to date.' -ForegroundColor Green
+    Write-Host 'Skipping script update check.'
+}
+
+Write-Output 'Checking whether the script has sufficient permissions to run.'
+If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+{
+    Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
+    exit 1
+}
+else
+{
+    Write-Output 'The script has sufficient permissions. Continuing.'
 }
 
 if (-not($NoModuleCheck))

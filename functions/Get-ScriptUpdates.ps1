@@ -36,8 +36,10 @@ Function Get-ScriptUpdates()
             Write-Verbose "The script path is $scriptPath"
         }
         Write-Host "Updating $key to version $($scriptsToUpdate[$key])"
-        # Invoke-WebRequest -Uri "$updateURL/$key" -OutFile $scriptPath
+        Invoke-WebRequest -Uri "$updateURL/$key" -OutFile $scriptPath
         $success = $true
     }
+    Write-Verbose "updating script version from $updateURL/version.json"
+    Invoke-WebRequest -Uri "$updateURL/version.json" -OutFile $PSScriptRoot\version.json
     return $success
 }

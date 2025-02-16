@@ -15,24 +15,17 @@ function Test-ScriptUpdates()
     foreach ($key in $scripts.PSObject.Properties.Name)
     {
         $localScriptName = $key
-        Write-Host "Checking for updates for $localScriptName"
+        Write-Verbose "Checking for updates for $localScriptName"
         $localScriptVersion = [System.Version]::new($scripts.$localScriptName)
-        Write-Host "Local version: $localScriptVersion"
+        Write-Verbose "Local version: $localScriptVersion"
         $remoteScriptVersion = [System.Version]::new($scriptVersionRemote.$localScriptName)
-        Write-Host "Remote version: $remoteScriptVersion"
+        Write-Verbose "Remote version: $remoteScriptVersion"
         if ($localScriptVersion -lt $remoteScriptVersion)
         {
-            Write-Host "$localScriptName needs to be updated to version $remoteScriptVersion"
+            Write-Verbose "$localScriptName needs to be updated to version $remoteScriptVersion"
             $scriptsToUpdate.Add($localScriptName, $remoteScriptVersion)
         }
     }
-    Write-Verbose "Scripts to update: $scriptsToUpdate.count"
-    if ($scriptsToUpdate.Count -gt 0)
-    {
-        return $scriptsToUpdate
-    }
-    else
-    {
-        return $null
-    }
+    Write-Verbose "Scripts to update: $($scriptsToUpdate.count)"
+    return $scriptsToUpdate
 }
