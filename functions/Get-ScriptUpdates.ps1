@@ -45,6 +45,7 @@ Function Get-ScriptUpdates()
         {
             $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get
             $StatusCode = $Response.StatusCode
+            Write-Host "The status code is $StatusCode"
             $success = $true
         }
         catch
