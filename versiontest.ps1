@@ -2,7 +2,7 @@
 $jsonContent = Get-Content -Path 'version.json' -Raw | ConvertFrom-Json
 
 # Display the variables one per line
-foreach ($key in $jsonContent.versions.PSObject.Properties.Name)
+foreach ($key in $scriptVersionRemote.versions.PSObject.Properties.Name)
 {
     Write-Host $key
     $value = $jsonContent.versions.$key

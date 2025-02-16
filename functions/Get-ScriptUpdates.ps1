@@ -3,32 +3,20 @@ function Get-ScriptUpdates()
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $false)]
-        [string]$configFile = 'config.json'
+        [Parameter(Mandatory = $True)]
+        [string]$updateURL,
+        [Parameter(Mandatory = $True)]
+        [string]$scriptVersionURL,
+        [Parameter(Mandatory = $True)]
+        [PSCustomObject]$scripts
     )
-
-    $scriptVersion = '1.0.0'
-    $scriptName = 'Register-Device.ps1'
-    $scriptPath = $PSScriptRoot + '\' + $scriptName
-    $scriptUrl = 'https://raw.githubusercontent.com/microsoftgraph/powershell-intune-samples/main/DeviceManagement/Register-Device.ps1'
-    $scriptVersionUrl = 'https://raw.githubusercontent.com/microsoftgraph/powershell-intune-samples/main/DeviceManagement/VERSION'
+    # $scriptPath = $PSScriptRoot + '\' + $scriptName
     $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionUrl -Method Get
-    $scriptVersionRemote = $scriptVersionRemote.Trim()
-
-    if ($scriptVersion -ne $scriptVersionRemote)
+    foreach ($key in $scripts.scripts.PSObject.Properties.Name)
     {
-        Write-Host "A new version of $scriptName is available. Current version is $scriptVersion. The latest version is $scriptVersionRemote." -ForegroundColor Yellow
-        Write-Host 'Do you want to download the latest version?' -ForegroundColor Yellow
-        $response = Read-Host 'Enter Y to download or N to skip'
-        if ($response -eq 'Y')
+        if ($scriptVersionRemote.scripts.ContainsKey($key))
         {
-            Write-Host "Downloading $scriptName from $scriptUrl"
-            Invoke-WebRequest -Uri $scriptUrl -OutFile $scriptPath
-            Write-Host 'Download complete.'
+            Write-Output "For key '$key': in Local versions => '$($scriptVersionRemote[$key])', Remote version => '$($scriptVersionRemote[$key])'"
         }
-    }
-    else
-    {
-        Write-Host "The script $scriptName is up to date." -ForegroundColor Green
     }
 }

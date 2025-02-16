@@ -12,7 +12,9 @@ param (
 #Define variables.
 $maxWaitTime = 30
 $timeInSeconds = 60
-$version = '1.0.0'
+$updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master'
+$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master/version.json'
+$localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
 $outputFile = "\device_$serial.csv"
 $functionsFolder = "$PSScriptRoot\functions"
 $modulesToInstall = @(
@@ -53,6 +55,7 @@ else
     exit 1
 }
 
+Get-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
 
 
 if (-not($NoModuleCheck))
