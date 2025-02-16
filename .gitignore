@@ -1,0 +1,6 @@
+.secrets
+.secrets/*
+.vs/*
+.cache_ggshield
+.cache_ggshield/*
+.gitignore
