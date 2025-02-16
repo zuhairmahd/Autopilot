@@ -17,7 +17,7 @@ $updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main'
 $remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
 $localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
 $outputFile = "\device_$serial.csv"
-$functionsFolder = "$PSScriptRoot\functions"
+$functionsFolder = "$PWD\functions"
 $modulesToInstall = @(
     'Microsoft.Graph.Authentication',
     'Microsoft.Graph.Groups',
