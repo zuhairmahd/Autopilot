@@ -8,7 +8,9 @@ function Test-ScriptUpdates()
         [Parameter(Mandatory = $True)]
         [string]$scriptVersionURL,
         [Parameter(Mandatory = $True)]
-        [PSCustomObject]$scripts
+        [PSCustomObject]$scripts,
+        [Parameter(Mandatory = $True)]
+        [string]$PSScriptRoot
     )
     $scriptsToUpdate = @{}
     $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionURL -Method Get

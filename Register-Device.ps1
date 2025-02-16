@@ -49,7 +49,7 @@ else
 if (-not($NoUpdateCheck))
 {
     Write-Output 'Checking for script updates.'
-    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
+    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions -PSScriptRoot $PSScriptRoot
     Write-Verbose "$($scriptsToUpdate.count) to update"
     if ($scriptsToUpdate.count -gt 0)
     {
