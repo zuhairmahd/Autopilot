@@ -43,7 +43,7 @@ Function Get-ScriptUpdates()
         Write-Host "Fetching from $updateURL"
         try
         {
-            $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get
+            $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get -PassThru
             $StatusCode = $Response.StatusCode
             Write-Host "The status code is $StatusCode"
             $success = $true
@@ -59,7 +59,7 @@ Function Get-ScriptUpdates()
         Write-Verbose "updating script version from $updateURL/version.json"
         try
         {
-            $response = Invoke-WebRequest -Uri "$scriptURI/version.json" -OutFile $PSScriptRoot\version.json -Method Get
+            $response = Invoke-WebRequest -Uri "$scriptURI/version.json" -OutFile $PSScriptRoot\version.json -Method Get -PassThru
             $StatusCode = $Response.StatusCode  
             Write-Verbose "The status code is $StatusCode"
         }

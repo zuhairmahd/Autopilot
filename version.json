@@ -4,10 +4,10 @@
     "Get-DeviceHash": "1.0.0",
     "Get-DeviceInfo": "1.0.0",
     "Get-requiredModules": "1.0.0",
-    "Get-ScriptUpdates": "1.0.0",
+    "Get-ScriptUpdates": "1.0.1",
     "Get-USBDriveLetter": "1.0.0",
     "Register-device": "1.0.0",
-    "registerMe": "1.0.1",
+    "registerMe": "1.0.2",
     "Restart-Device": "1.0.0",
     "Test-ScriptUpdates": "1.0.0"
 }
