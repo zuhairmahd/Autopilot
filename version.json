@@ -7,7 +7,7 @@
     "Get-ScriptUpdates": "1.0.0",
     "Get-USBDriveLetter": "1.0.0",
     "Register-device": "1.0.0",
-    "registerMe": "1.0.1",
+    "registerMe": "1.0.0",
     "Restart-Device": "1.0.0",
     "Test-ScriptUpdates": "1.0.0"
 }
