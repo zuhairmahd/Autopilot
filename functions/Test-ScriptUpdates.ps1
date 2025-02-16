@@ -13,7 +13,9 @@ function Test-ScriptUpdates()
         [string]$PSScriptRoot
     )
     $scriptsToUpdate = @{}
+    $scriptVersionRemote = @{}
     $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionURL -Method Get
+    Write-Host "Checking for $($updateURL.count) modules from $updateURL"
     foreach ($key in $scripts.PSObject.Properties.Name)
     {
         $localScriptName = $key
