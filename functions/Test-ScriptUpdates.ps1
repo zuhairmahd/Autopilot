@@ -26,6 +26,26 @@ function Test-ScriptUpdates()
             $scriptsToUpdate.Add($localScriptName, $remoteScriptVersion)
         }
     }
+    Write-Host "Refreshing updated script version from $scriptVersionURL"
+    try
+    {
+        $response = Invoke-WebRequest -Uri $scriptVersionURL -OutFile $PSScriptRoot\version.json -Method Get -PassThru
+        $StatusCode = $Response.StatusCode  
+        Write-Verbose "The status code is $StatusCode"
+        if ($StatusCode -eq 200)
+        {
+            Write-Host 'The script version file has been refreshed successfully.'
+        }
+        else
+        {
+            Write-Host 'Could not refresh the script version file.'
+            Write-Host "The server returned Status code: $StatusCode"
+        }
+    }
+    catch
+    {
+        $StatusCode = $_.Exception.Response.StatusCode.value__
+    }   
     Write-Verbose "Scripts to update: $($scriptsToUpdate.count)"
     return $scriptsToUpdate
 }

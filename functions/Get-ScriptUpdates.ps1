@@ -4,8 +4,10 @@ Function Get-ScriptUpdates()
     param
     (
         [PSCustomObject]$scriptsToUpdate,
-        [string]$scriptURI
+        [string]$scriptURI,
+        [string]$PSScriptRoot
     )
+    Write-Host $PSScriptRoot
     $functionsList = @(
         'ConnectToTenant',
         'Get-decryptedObject',
@@ -53,20 +55,6 @@ Function Get-ScriptUpdates()
             $StatusCode = $_.Exception.Response.StatusCode.value__
         }
         Write-Host "The status code is $StatusCode"
-    }
-    if ($success)
-    {
-        Write-Verbose "updating script version from $updateURL/version.json"
-        try
-        {
-            $response = Invoke-WebRequest -Uri "$scriptURI/version.json" -OutFile $PSScriptRoot\version.json -Method Get -PassThru
-            $StatusCode = $Response.StatusCode  
-            Write-Verbose "The status code is $StatusCode"
-        }
-        catch
-        {
-            $StatusCode = $_.Exception.Response.StatusCode.value__
-        }   
     }
     return $success
 }
