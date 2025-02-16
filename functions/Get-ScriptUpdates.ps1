@@ -27,19 +27,45 @@ Function Get-ScriptUpdates()
         {
             Write-Verbose "The script $key is a function"
             $scriptPath = $PSScriptRoot + '\functions\' + $key + '.ps1'
+            $updateURL = $scriptURI + '/functions/' + $key + '.ps1'
             Write-Verbose "The script path is $scriptPath"
+            Write-Verbose "The update URL is $updateURL"
         }
         else 
         {
             Write-Verbose "The script $key is a script"
             $scriptPath = $PSScriptRoot + '\' + $key + '.ps1'
+            $updateURL = $scriptURI + '/' + $key + '.ps1'
             Write-Verbose "The script path is $scriptPath"
+            Write-Verbose "The update URL is $updateURL"
         }
-        Write-Host "Updating $key to version $($scriptsToUpdate[$key])"
-        Invoke-WebRequest -Uri "$updateURL/$key" -OutFile $scriptPath
-        $success = $true
+        Write-Host "Updating $key to version $($scriptsToUpdate[$key])." 
+        Write-Host "Fetching from $updateURL"
+        try
+        {
+            $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get
+            $StatusCode = $Response.StatusCode
+            $success = $true
+        }
+        catch
+        {
+            $StatusCode = $_.Exception.Response.StatusCode.value__
+        }
+        Write-Host "The status code is $StatusCode"
     }
-    Write-Verbose "updating script version from $updateURL/version.json"
-    Invoke-WebRequest -Uri "$updateURL/version.json" -OutFile $PSScriptRoot\version.json
+    if ($success)
+    {
+        Write-Verbose "updating script version from $updateURL/version.json"
+        try
+        {
+            $response = Invoke-WebRequest -Uri "$scriptURI/version.json" -OutFile $PSScriptRoot\version.json -Method Get
+            $StatusCode = $Response.StatusCode  
+            Write-Verbose "The status code is $StatusCode"
+        }
+        catch
+        {
+            $StatusCode = $_.Exception.Response.StatusCode.value__
+        }   
+    }
     return $success
 }

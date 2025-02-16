@@ -13,8 +13,8 @@ param (
 #Define variables.
 $maxWaitTime = 30
 $timeInSeconds = 60
-$updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master'
-$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master/version.json'
+$updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/refs/heads/main'
+$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
 $localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
 $outputFile = "\device_$serial.csv"
 $functionsFolder = "$PSScriptRoot\functions"
@@ -49,7 +49,7 @@ else
 if (-not($NoUpdateCheck))
 {
     Write-Output 'Checking for script updates.'
-    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions -Verbose
+    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
     Write-Verbose "$($scriptsToUpdate.count) to update"
     if ($scriptsToUpdate.count -gt 0)
     {
