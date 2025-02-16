@@ -1,70 +1,43 @@
-function Get-ScriptUpdates()
+Function Get-ScriptUpdates()
 {
-    [CmdletBinding()]
+    [cmdletbinding()]
     param
     (
-        [Parameter(Mandatory = $True)]
-        [string]$updateURL,
-        [Parameter(Mandatory = $True)]
-        [string]$scriptVersionURL,
-        [Parameter(Mandatory = $True)]
-        [PSCustomObject]$scripts
+        [PSCustomObject]$scriptsToUpdate,
+        [string]$scriptURI
     )
-    $scriptsToUpdate = @{}
     $functionsList = @(
         'ConnectToTenant',
         'Get-decryptedObject',
         'Get-DeviceHash',
         'Get-DeviceInfo',
         'Get-requiredModules',
+        'Test-ScriptUpdates',
         'Get-ScriptUpdates',
-        'Get-ScriptVersion',
         'Get-USBDriveLetter',
         'Restart-Device'
     )
-    $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionURL -Method Get
-    foreach ($key in $scripts.PSObject.Properties.Name)
+    $success = $false
+    Write-Verbose "The script URI is $scriptURI"
+    Write-Verbose "The scripts to update are $($scriptsToUpdate | ConvertTo-Json -Depth 5)"
+    Write-Host 'Updating scripts ...'
+    foreach ($key in $scriptsToUpdate.Keys)
     {
-        $localScriptName = $key
-        Write-Host "Checking for updates for $localScriptName"
-        $localScriptVersion = $scripts.$localScriptName
-        Write-Host "Local version: $localScriptVersion"
-        $remoteScriptVersion = $scriptVersionRemote.$localScriptName
-        Write-Host "Remote version: $remoteScriptVersion"
-        if ($localScriptVersion -ne $remoteScriptVersion)
+        if ($key -in $functionsList)
         {
-            $scriptsToUpdate.Add($localScriptName, $remoteScriptVersion)
+            Write-Verbose "The script $key is a function"
+            $scriptPath = $PSScriptRoot + '\functions\' + $key + '.ps1'
+            Write-Verbose "The script path is $scriptPath"
         }
-    }
-    if ($scriptsToUpdate.Count -gt 0)
-    {
-        Write-Host 'The following scripts need to be updated:'
-        foreach ($key in $scriptsToUpdate.Keys)
+        else 
         {
-            Write-Host "$key to version $($scriptsToUpdate[$key])"
+            Write-Verbose "The script $key is a script"
+            $scriptPath = $PSScriptRoot + '\' + $key + '.ps1'
+            Write-Verbose "The script path is $scriptPath"
         }
-        Write-Host 'Would you like to update these scripts? (Y/N)'
-        $response = Read-Host
-        if ($response -eq 'Y')
-        {
-            foreach ($key in $scriptsToUpdate.Keys)
-            {
-                if ($key -in $functionsList)
-                {
-                    $scriptPath = $PSScriptRoot + '\functions\' + $key
-                }
-                else 
-                {
-                    $scriptPath = $PSScriptRoot + '\' + $key
-                }
-                Write-Host "Updating $key to version $($scriptsToUpdate[$key])"
-                Write-Host "the path is $scriptPath"
-                # Invoke-WebRequest -Uri "$updateURL/$key" -OutFile $scriptPath
-            }
-        }
+        Write-Host "Updating $key to version $($scriptsToUpdate[$key])"
+        # Invoke-WebRequest -Uri "$updateURL/$key" -OutFile $scriptPath
+        $success = $true
     }
-    else
-    {
-        Write-Host 'All scripts are up to date.'
-    }
+    return $success
 }

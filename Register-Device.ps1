@@ -55,7 +55,18 @@ else
     exit 1
 }
 
-Get-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
+$devicesToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
+if ($devicesToUpdate)
+{
+    if (Get-ScriptUpdates -scriptsToUpdate $devicesToUpdate -scriptURI $updateURL)
+    {
+        Write-Host 'All scripts have been updated.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'Failed to update scripts.' -ForegroundColor Red
+    }
+}
 exit 
 
 if (-not($NoModuleCheck))
