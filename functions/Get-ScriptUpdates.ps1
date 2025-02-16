@@ -10,8 +10,18 @@ function Get-ScriptUpdates()
         [Parameter(Mandatory = $True)]
         [PSCustomObject]$scripts
     )
-    # $scriptPath = $PSScriptRoot + '\' + $scriptName
-    $scriptVersionRemote = @{}
+    $scriptsToUpdate = @{}
+    $functionsList = @(
+        'ConnectToTenant',
+        'Get-decryptedObject',
+        'Get-DeviceHash',
+        'Get-DeviceInfo',
+        'Get-requiredModules',
+        'Get-ScriptUpdates',
+        'Get-ScriptVersion',
+        'Get-USBDriveLetter',
+        'Restart-Device'
+    )
     $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionURL -Method Get
     foreach ($key in $scripts.PSObject.Properties.Name)
     {
@@ -21,6 +31,40 @@ function Get-ScriptUpdates()
         Write-Host "Local version: $localScriptVersion"
         $remoteScriptVersion = $scriptVersionRemote.$localScriptName
         Write-Host "Remote version: $remoteScriptVersion"
-
+        if ($localScriptVersion -ne $remoteScriptVersion)
+        {
+            $scriptsToUpdate.Add($localScriptName, $remoteScriptVersion)
+        }
+    }
+    if ($scriptsToUpdate.Count -gt 0)
+    {
+        Write-Host 'The following scripts need to be updated:'
+        foreach ($key in $scriptsToUpdate.Keys)
+        {
+            Write-Host "$key to version $($scriptsToUpdate[$key])"
+        }
+        Write-Host 'Would you like to update these scripts? (Y/N)'
+        $response = Read-Host
+        if ($response -eq 'Y')
+        {
+            foreach ($key in $scriptsToUpdate.Keys)
+            {
+                if ($key -in $functionsList)
+                {
+                    $scriptPath = $PSScriptRoot + '\functions\' + $key
+                }
+                else 
+                {
+                    $scriptPath = $PSScriptRoot + '\' + $key
+                }
+                Write-Host "Updating $key to version $($scriptsToUpdate[$key])"
+                Write-Host "the path is $scriptPath"
+                # Invoke-WebRequest -Uri "$updateURL/$key" -OutFile $scriptPath
+            }
+        }
+    }
+    else
+    {
+        Write-Host 'All scripts are up to date.'
     }
 }

@@ -13,7 +13,7 @@ param (
 $maxWaitTime = 30
 $timeInSeconds = 60
 $updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master'
-$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master/version.json'
+$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/master/remoteversion.json'
 $localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
 $outputFile = "\device_$serial.csv"
 $functionsFolder = "$PSScriptRoot\functions"
