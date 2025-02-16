@@ -54,7 +54,7 @@ if (-not($NoUpdateCheck))
     if ($scriptsToUpdate.count -gt 0)
     {
         Write-Host 'Updating scripts.'
-        if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -PSScriptRoot $PSScriptRoot -Verbose)
+        if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -PSScriptRoot $PSScriptRoot)
         {
             Write-Host 'All scripts have been updated.' -ForegroundColor Green
         }

@@ -47,14 +47,18 @@ Function Get-ScriptUpdates()
         {
             $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get -PassThru
             $StatusCode = $Response.StatusCode
-            Write-Host "The status code is $StatusCode"
-            $success = $true
+            Write-Verbose "The status code is $StatusCode"
+            if ($StatusCode -eq 200)
+            {
+                $success = $true
+                Write-Host "Successfully updated $key to version $($scriptsToUpdate[$key])."
+            }
         }
         catch
         {
             $StatusCode = $_.Exception.Response.StatusCode.value__
         }
-        Write-Host "The status code is $StatusCode"
+        Write-Verbose "The status code is $StatusCode"
     }
     return $success
 }

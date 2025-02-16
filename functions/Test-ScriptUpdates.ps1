@@ -36,7 +36,7 @@ function Test-ScriptUpdates()
         Write-Verbose "The status code is $StatusCode"
         if ($StatusCode -eq 200)
         {
-            Write-Host 'The script version file has been refreshed successfully.'
+            Write-Host "The script version file in $PSScriptRoot\version.json has been refreshed successfully."
         }
         else
         {
