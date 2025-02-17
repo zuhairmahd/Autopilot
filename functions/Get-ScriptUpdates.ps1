@@ -5,9 +5,10 @@ Function Get-ScriptUpdates()
     (
         [PSCustomObject]$scriptsToUpdate,
         [string]$scriptURI,
-        [string]$PSScriptRoot
+        [string]$ScriptRoot,
+        [string]$scriptVersionURL
     )
-    Write-Host $PSScriptRoot
+    Write-Host $ScriptRoot
     $functionsList = @(
         'ConnectToTenant',
         'Get-decryptedObject',
@@ -28,7 +29,7 @@ Function Get-ScriptUpdates()
         if ($key -in $functionsList)
         {
             Write-Verbose "The script $key is a function"
-            $scriptPath = $PSScriptRoot + '\functions\' + $key + '.ps1'
+            $scriptPath = $ScriptRoot + '\functions\' + $key + '.ps1'
             $updateURL = $scriptURI + '/functions/' + $key + '.ps1'
             Write-Verbose "The script path is $scriptPath"
             Write-Verbose "The update URL is $updateURL"
@@ -36,13 +37,13 @@ Function Get-ScriptUpdates()
         else 
         {
             Write-Verbose "The script $key is a script"
-            $scriptPath = $PSScriptRoot + '\' + $key + '.ps1'
+            $scriptPath = $ScriptRoot + '\' + $key + '.ps1'
             $updateURL = $scriptURI + '/' + $key + '.ps1'
             Write-Verbose "The script path is $scriptPath"
             Write-Verbose "The update URL is $updateURL"
         }
         Write-Host "Updating $key to version $($scriptsToUpdate[$key])." 
-        Write-Host "Fetching from $updateURL"
+        Write-Host "Fetching from $updateURL and copying to $scriptPath"
         try
         {
             $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get -PassThru
@@ -59,6 +60,29 @@ Function Get-ScriptUpdates()
             $StatusCode = $_.Exception.Response.StatusCode.value__
         }
         Write-Verbose "The status code is $StatusCode"
+    }
+    if ($success)
+    {
+        Write-Host "Refreshing updated script version from $scriptVersionURL"
+        try
+        {
+            $response = Invoke-WebRequest -Uri $scriptVersionURL -OutFile $ScriptRoot\version.json -Method Get -PassThru
+            $StatusCode = $Response.StatusCode  
+            Write-Verbose "The status code is $StatusCode"
+            if ($StatusCode -eq 200)
+            {
+                Write-Host "The script version file in $ScriptRoot\version.json has been refreshed successfully."
+            }
+            else
+            {
+                Write-Host 'Could not refresh the script version file.'
+                Write-Host "The server returned Status code: $StatusCode"
+            }
+        }
+        catch
+        {
+            $StatusCode = $_.Exception.Response.StatusCode.value__
+        }   
     }
     return $success
 }

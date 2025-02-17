@@ -7,7 +7,8 @@ param (
     [Parameter(Mandatory = $False)] [String] $AssignedUser = '',
     [Parameter(Mandatory = $False)] [switch]$check,
     [Parameter(Mandatory = $False)] [switch]$NoModuleCheck,
-    [Parameter(Mandatory = $False)] [switch]$NoUpdateCheck
+    [Parameter(Mandatory = $False)] [switch]$NoUpdateCheck,
+    [Parameter(Mandatory = $False)] [switch]$NoAdminCheck
 )
 
 #Define variables.
@@ -48,19 +49,34 @@ else
 
 if (-not($NoUpdateCheck))
 {
-    Write-Output 'Checking for script updates.'
-    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions -PSScriptRoot $PSScriptRoot
+    Write-Host 'Checking for script updates.'
+    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
     Write-Verbose "$($scriptsToUpdate.count) to update"
     if ($scriptsToUpdate.count -gt 0)
     {
-        Write-Host 'Updating scripts.'
-        if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -PSScriptRoot $PSScriptRoot)
+        Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow
+        $response = Read-Host
+        while ($response -notin 'Y', 'N')
         {
-            Write-Host 'All scripts have been updated.' -ForegroundColor Green
+            Write-Host 'Please enter Y or N.' -ForegroundColor Yellow
+            [console]::beep(500, 300)
+            $response = Read-Host
+        }
+        if ($response -eq 'Y')
+        {
+            Write-Host 'Downloading the latest version of the script.'
+            if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -ScriptRoot $PSScriptRoot -scriptVersionURL $remoteVersionURL)
+            {
+                Write-Host 'All scripts have been updated.' -ForegroundColor Green
+            }
+            else
+            {
+                Write-Host 'Failed to update scripts.' -ForegroundColor Red
+            }
         }
         else
         {
-            Write-Host 'Failed to update scripts.' -ForegroundColor Red
+            Write-Host 'Skipping script update.'
         }
     }
     else
@@ -73,15 +89,22 @@ else
     Write-Host 'Skipping script update check.'
 }
 
-Write-Output 'Checking whether the script has sufficient permissions to run.'
-If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+if (-not($NoAdminCheck))
 {
-    Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
-    exit 1
+    Write-Host 'Checking whether the script has sufficient permissions to run.'
+    If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
+        exit 1
+    }
+    else
+    {
+        Write-Host 'The script has sufficient permissions. Continuing.'
+    }
 }
 else
 {
-    Write-Output 'The script has sufficient permissions. Continuing.'
+    Write-Host 'Skipping administrator check.'
 }
 
 if (-not($NoModuleCheck))
@@ -174,19 +197,19 @@ if (-not($check))
         $device = Get-AutopilotImportedDevice -id $imported.id
         $index++
     }
-    Write-Output "The device import status is $($device.state.deviceImportStatus)"
+    Write-Host "The device import status is $($device.state.deviceImportStatus)"
     Write-Verbose "The index count is $index."
     if (($device.state.deviceImportStatus -eq 'unknown') -and ($index -gt $maxWaitTime))
     {
-        Write-Output "The import is taking too long (over $maxWaitTime minutes)." 
-        Write-Output 'Please check the Intune portal or contact an Intune administrator.'
+        Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
+        Write-Host 'Please check the Intune portal or contact an Intune administrator.'
         Get-deviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
 if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
 {
-    Write-Output 'Checking device assignment.'
+    Write-Host 'Checking device assignment.'
     Start-Sleep -Seconds ($timeInSeconds / 12)
     $assignment = Get-AutopilotDevice -serial $serial
     if ($assignment)
@@ -210,12 +233,12 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
             Write-Host "Pass $index of $maxWaitTime"
             Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
         }
-        Write-Output "The device assignment status is $($assignment.deploymentProfileAssignmentStatus)"
-        Write-Output "The device assignment date is $($assignment.deploymentProfileAssignedDateTime)"
+        Write-Host "The device assignment status is $($assignment.deploymentProfileAssignmentStatus)"
+        Write-Host "The device assignment date is $($assignment.deploymentProfileAssignedDateTime)"
         if ((($assignment.deploymentProfileAssignmentStatus -ne 'assignedUnkownSyncState') -or -not($assignment.deploymentProfileAssignedDateTime)) -and ($index -gt $maxWaitTime))
         {
-            Write-Output "The device assignment is taking too long (over $maxWaitTime minutes)."
-            Write-Output 'Please check the Intune portal or contact an Intune administrator.'
+            Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
+            Write-Host 'Please check the Intune portal or contact an Intune administrator.'
             Get-deviceHash -Device $deviceObject -OutputFile $outputFile
             exit 1
         }
@@ -225,14 +248,14 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
             Write-Host 'The device is successfully assigned to a deployment profile.' -ForegroundColor Green
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
-            Write-Output "Elapsed time to complete: $importSeconds seconds"
+            Write-Host "Elapsed time to complete: $importSeconds seconds"
             exit 0
         }
     }
     else
     {
-        Write-Output 'The device cannot be found in Intune.'
-        Write-Output 'Please check the Intune Portal or contact an Intune administrator.'
+        Write-Host 'The device cannot be found in Intune.'
+        Write-Host 'Please check the Intune Portal or contact an Intune administrator.'
         Get-deviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }

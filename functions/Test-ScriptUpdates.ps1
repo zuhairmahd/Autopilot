@@ -8,9 +8,7 @@ function Test-ScriptUpdates()
         [Parameter(Mandatory = $True)]
         [string]$scriptVersionURL,
         [Parameter(Mandatory = $True)]
-        [PSCustomObject]$scripts,
-        [Parameter(Mandatory = $True)]
-        [string]$PSScriptRoot
+        [PSCustomObject]$scripts
     )
     $scriptsToUpdate = @{}
     $scriptVersionRemote = Invoke-RestMethod -Uri $scriptVersionURL -Method Get
@@ -28,26 +26,13 @@ function Test-ScriptUpdates()
             $scriptsToUpdate.Add($localScriptName, $remoteScriptVersion)
         }
     }
-    Write-Host "Refreshing updated script version from $scriptVersionURL"
-    try
+    if ($scriptsToUpdate.count -gt 0)
     {
-        $response = Invoke-WebRequest -Uri $scriptVersionURL -OutFile $PSScriptRoot\version.json -Method Get -PassThru
-        $StatusCode = $Response.StatusCode  
-        Write-Verbose "The status code is $StatusCode"
-        if ($StatusCode -eq 200)
-        {
-            Write-Host "The script version file in $PSScriptRoot\version.json has been refreshed successfully."
-        }
-        else
-        {
-            Write-Host 'Could not refresh the script version file.'
-            Write-Host "The server returned Status code: $StatusCode"
-        }
+        Write-Host "$($scriptsToUpdate.count) modules are out of date and will be updated."
     }
-    catch
+    else 
     {
-        $StatusCode = $_.Exception.Response.StatusCode.value__
-    }   
-    Write-Host "$($scriptsToUpdate.count) modules are out of date and will be updated."
-    return $scriptsToUpdate
+        Write-Host 'All modules are up to date.'
+    }
 }
+return $scriptsToUpdate
