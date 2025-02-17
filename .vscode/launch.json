@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "PowerShell Interactive Session",
+            "type": "PowerShell",
+            "request": "launch",
+            "cwd": "${cwd}"
+        },
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "Launch PowerShell Script",
+            "script": "${file}",
+        }
+    ]
+}

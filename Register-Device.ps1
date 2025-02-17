@@ -1,3 +1,62 @@
+<#PSScriptInfo
+.VERSION 1.0
+.GUID 9c73a06a-4834-4f16-a2fe-b5077101d5c6
+.AUTHOR Zuhair Mahmoud
+.DESCRIPTION Deploys De-Bloat application
+.COMPANYNAME Government Accountability Office
+.COPYRIGHT GPL
+.PROJECTURI https://github.com/zuhairmahd/Autopilot
+.EXTERNALMODULEDEPENDENCIES, Microsoft.Graph.Authentication, Microsoft.Graph.Groups', Microsoft.Graph.Identity.DirectoryManagement, WindowsAutoPilotIntune
+.SYNOPSIS
+Registers one or more devices into Intune and checks for profiles and module requirements.  
+.DESCRIPTION
+    Registers one or more devices into Intune.  The script will check for the required modules, permissions, and import the device into Intune.  The script will check if the device is already in Intune and if it is assigned to a deployment profile.  If the device is not in Intune, the script will import the device and wait until it is recognized.  If the device is in Intune but not assigned to a deployment profile, the script will prompt the user to check the Intune portal.  If the device is assigned to a deployment profile, the script will prompt the user to restart the device.
+.PARAMETER configFile
+    The path to the configuration file.  The default value is '.\.secrets\config.json'.
+.PARAMETER Name
+    The name of the device to register.  The default value is 'localhost'.
+.PARAMETER GroupTag
+    The group tag for the device.  The default value is 'MSB01'.
+.PARAMETER AssignedUser
+    The assigned user for the device.  The default value is null.
+.PARAMETER check
+    A switch to only check the device assignment status.  If used, no devices will be imported. The default value is false.
+.PARAMETER NoModuleCheck
+    A switch to skip the required module check.  The default value is false.
+.PARAMETER NoUpdateCheck
+    A switch to skip the script update check.  The default value is false.
+.PARAMETER NoAdminCheck
+    A switch to skip the administrator check.  The default value is false.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01'
+    Registers the device with the name 'localhost' into Intune.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD'
+    Registers the device with the name 'localhost' into Intune and assigns the user 'JohnD'.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -check
+    Checks the device assignment status for the device with the name 'localhost'.  The device will not be imported.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -NoModuleCheck
+    Registers the device with the name 'localhost' into Intune and skips the required module check.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -NoUpdateCheck
+    Registers the device with the name 'localhost' into Intune and skips the script update check.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -NoAdminCheck
+    Registers the device with the name 'localhost' into Intune and skips the administrator check.
+.NOTES
+  1. Optionally update scripts if newer versions are available.  
+  2. Check whether the script is running with admin rights.  
+  3. Verify required modules are installed.  
+  4. Connect to Microsoft Graph.  
+  5. Gather device info (serial, hardware hash, manufacturer, etc.).  
+  6. Check if the device is already in Intune.  
+  7. If needed, import the device into Intune and wait until it’s recognized.  
+  8. Check deployment profile assignment and display status.  
+  9. If the device is assigned, prompt for restart. Otherwise, advise the user to check the Intune portal.
+#>
+
 
 [CmdletBinding()]
 param (
@@ -19,6 +78,7 @@ $remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main
 $localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
 $outputFile = "\device_$serial.csv"
 $functionsFolder = "$PWD\functions"
+$modulesFolder = "$PWD\modules"
 $modulesToInstall = @(
     'Microsoft.Graph.Authentication',
     'Microsoft.Graph.Groups',
@@ -110,7 +170,7 @@ else
 if (-not($NoModuleCheck))
 {
     Write-Host 'Checkin for installed modules.'
-    $module = Get-RequiredModules -moduleNames $modulesToInstall   
+    $module = Get-RequiredModules -moduleNames $modulesToInstall -ModulesFolder $modulesFolder
     if ($module -eq 0)
     {
         Write-Host 'All required modules are installed.' -ForegroundColor Green
