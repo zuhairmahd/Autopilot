@@ -1,0 +1,219 @@
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>Microsoft.PowerShell.Commands.PSRepositoryItemInfo</T>
+      <T>System.Management.Automation.PSCustomObject</T>
+      <T>System.Object</T>
+    </TN>
+    <MS>
+      <S N="Name">WindowsAutoPilotIntune</S>
+      <S N="Version">5.7</S>
+      <S N="Type">Module</S>
+      <S N="Description">Sample module to manage AutoPilot devices using the Intune Graph API</S>
+      <S N="Author">Windows Autopilot</S>
+      <Obj N="CompanyName" RefId="1">
+        <TN RefId="1">
+          <T>System.Object[]</T>
+          <T>System.Array</T>
+          <T>System.Object</T>
+        </TN>
+        <LST>
+          <S>hdang</S>
+          <S>BrianP</S>
+          <S>marsun</S>
+          <S>zakstacks</S>
+          <S>Nandhini_Prasad</S>
+        </LST>
+      </Obj>
+      <S N="Copyright">(c) 2024 Microsoft. All rights reserved.</S>
+      <DT N="PublishedDate">2024-09-17T15:59:31-04:00</DT>
+      <Nil N="InstalledDate" />
+      <Nil N="UpdatedDate" />
+      <Nil N="LicenseUri" />
+      <Nil N="ProjectUri" />
+      <Nil N="IconUri" />
+      <Obj N="Tags" RefId="2">
+        <TNRef RefId="1" />
+        <LST>
+          <S>PSModule</S>
+        </LST>
+      </Obj>
+      <Obj N="Includes" RefId="3">
+        <TN RefId="2">
+          <T>System.Collections.Hashtable</T>
+          <T>System.Object</T>
+        </TN>
+        <DCT>
+          <En>
+            <S N="Key">Function</S>
+            <Obj N="Value" RefId="4">
+              <TNRef RefId="1" />
+              <LST>
+                <S>BoolToString</S>
+                <S>Connect-MSGraphApp</S>
+                <S>Get-AutopilotDevice</S>
+                <S>Set-AutopilotDevice</S>
+                <S>Remove-AutopilotDevice</S>
+                <S>Get-AutopilotImportedDevice</S>
+                <S>Add-AutopilotImportedDevice</S>
+                <S>Remove-AutopilotImportedDevice</S>
+                <S>Get-AutopilotProfile</S>
+                <S>Get-AutopilotProfileAssignedDevice</S>
+                <S>ConvertTo-AutopilotConfigurationJSON</S>
+                <S>Set-AutopilotProfile</S>
+                <S>New-AutopilotProfile</S>
+                <S>Remove-AutopilotProfile</S>
+                <S>Get-AutopilotProfileAssignments</S>
+                <S>Remove-AutopilotProfileAssignments</S>
+                <S>Set-AutopilotProfileAssignedGroup</S>
+                <S>Get-EnrollmentStatusPage</S>
+                <S>Add-EnrollmentStatusPage</S>
+                <S>Set-EnrollmentStatusPage</S>
+                <S>Remove-EnrollmentStatusPage</S>
+                <S>Invoke-AutopilotSync</S>
+                <S>Get-AutopilotSyncInfo</S>
+                <S>Import-AutopilotCSV</S>
+                <S>Get-AutopilotEvent</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">RoleCapability</S>
+            <Obj N="Value" RefId="5">
+              <TNRef RefId="1" />
+              <LST />
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Command</S>
+            <Obj N="Value" RefId="6">
+              <TNRef RefId="1" />
+              <LST>
+                <S>BoolToString</S>
+                <S>Connect-MSGraphApp</S>
+                <S>Get-AutopilotDevice</S>
+                <S>Set-AutopilotDevice</S>
+                <S>Remove-AutopilotDevice</S>
+                <S>Get-AutopilotImportedDevice</S>
+                <S>Add-AutopilotImportedDevice</S>
+                <S>Remove-AutopilotImportedDevice</S>
+                <S>Get-AutopilotProfile</S>
+                <S>Get-AutopilotProfileAssignedDevice</S>
+                <S>ConvertTo-AutopilotConfigurationJSON</S>
+                <S>Set-AutopilotProfile</S>
+                <S>New-AutopilotProfile</S>
+                <S>Remove-AutopilotProfile</S>
+                <S>Get-AutopilotProfileAssignments</S>
+                <S>Remove-AutopilotProfileAssignments</S>
+                <S>Set-AutopilotProfileAssignedGroup</S>
+                <S>Get-EnrollmentStatusPage</S>
+                <S>Add-EnrollmentStatusPage</S>
+                <S>Set-EnrollmentStatusPage</S>
+                <S>Remove-EnrollmentStatusPage</S>
+                <S>Invoke-AutopilotSync</S>
+                <S>Get-AutopilotSyncInfo</S>
+                <S>Import-AutopilotCSV</S>
+                <S>Get-AutopilotEvent</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">DscResource</S>
+            <Ref N="Value" RefId="5" />
+          </En>
+          <En>
+            <S N="Key">Workflow</S>
+            <Ref N="Value" RefId="5" />
+          </En>
+          <En>
+            <S N="Key">Cmdlet</S>
+            <Ref N="Value" RefId="5" />
+          </En>
+        </DCT>
+      </Obj>
+      <Nil N="PowerShellGetFormatVersion" />
+      <S N="ReleaseNotes">Version 5.7: Updated to use the newly renamed properties of windowsAutopilotDeploymentProfile _x000D__x000A_Version 5.6: Removing the Content_Types xml file_x000D__x000A_Version 5.5: Fix Connect-MSGraphApp function to use -force while invoking ConvertTo-SecureString to ensure backward compatability to older PS versions. _x000D__x000A_Version 5.4: Update Connect-MSGraphApp function to use secure string and fix RequiredModules to include graph auth and groups. _x000D__x000A_Version 5.3: Switching back to using Write-Host and fix esp settting bug.  _x000D__x000A_Version 5.2: Fix \[Content_Types].xml already exists issue.        _x000D__x000A_Version 5.1: Switch from MSGraph to MgGraph._x000D__x000A_Version 5.0: Replaced deprecated orderIdentifier parameter with groupTag parameter._x000D__x000A_Version 4.8: Added Connect-MSGraphApp wrapper to simplify app-based authentication._x000D__x000A_Version 4.7: Fixed a bug._x000D__x000A_Version 4.6: Added Get-AutopilotSyncInfo cmdlet._x000D__x000A_Version 4.5: Enabled skip connectivity check option for Hybrid Azure AD Join VPN support._x000D__x000A_Version 4.4: Removed Set-AutoPilotDeviceAssignedUser function (workaround no longer needed). Added logic to JSON conversion function._x000D__x000A_Version 4.3: Re-added Set-AutoPilotDeviceAssignedUser function to address white glove user assignment issue (temporary workaround)_x000D__x000A_Version 4.2: Bug fix for not-yet-supported property_x000D__x000A_Version 4.0: Reworked *-AutopilotProfile functions, added new Get-AutopilotEvent function, added verbose logging to all functions_x000D__x000A_Version 3.9: Removed logic to install and load dependent modules and instead declared them in the module manifest, for compatibility with Azure Automation_x000D__x000A_Version 3.8: Replaced Set-AutopilotDeviceAssignedUser with more-capable Set-AutopilotDevice method_x000D__x000A_Version 3.7: Fixed but with serial number filter on Get-AutopilotDevice_x000D__x000A_Version 3.6: Added 256 to the default CloudAssignedOobeConfig value to suppress the check for Windows feature updates_x000D__x000A_Version 3.5: Fixed HttpMethod values for DELETE and PATCH to be upper-case_x000D__x000A_Version 3.4: Fixed a bug_x000D__x000A_Version 3.3: Removed duplicate cmdlet_x000D__x000A_Version 3.2: Added Get-AutopilotProfileAssignedDevices cmdlet to get the list of devices with a specific profile_x000D__x000A_Version 3.1: Fixed bugs, added expand logic for Autopilot devices_x000D__x000A_Version 3.0: Modified script to use the Microsoft.Graph.Intune module, added new functions from Damien Van Robaeys_x000D__x000A_Version 2.7: Added support for using GroupTag instead of OrderID for uploading batches of devices_x000D__x000A_Version 2.6: Added the ability to read the OrderID value from a CSV file; fixed "Waiting for 1 of" message_x000D__x000A_Version 2.5: Modified ConvertTo-AutopilotConfigurationJSON to set ZtdCorrelationId to the ID of the profile; added Set-AutoPilotDeviceAssignedUser function (thanks to Oliver Kieselbach)_x000D__x000A_Version 2.4: Modified ConvertTo-AutopilotConfigurationJSON to properly support available AAD user-driven options_x000D__x000A_Version 2.3: Added new Invoke-AutopilotSync method (equivalent to clicking "Sync" in the Intune console)_x000D__x000A_Version 2.2: Added pagination support (thanks to Oliver Kieselbach)_x000D__x000A_Version 2.1: Fixed syntax issue in connect method_x000D__x000A_Version 2.0: Added cmdlet help (and fixed the mistake of using 1.41 as a verion, since 1.41 is considered &gt; 1.5 because 41 is greater than 5)_x000D__x000A_Version 1.4: Added functions to delete a device, to list Autopilot profiles, and to convert Autopilot profiles into JSON._x000D__x000A_Version 1.3: Fixed module manifest to export functions</S>
+      <Obj N="Dependencies" RefId="7">
+        <TNRef RefId="1" />
+        <LST>
+          <Obj RefId="8">
+            <TN RefId="3">
+              <T>System.Collections.Specialized.OrderedDictionary</T>
+              <T>System.Object</T>
+            </TN>
+            <DCT>
+              <En>
+                <S N="Key">Name</S>
+                <S N="Value">Microsoft.Graph.Intune</S>
+              </En>
+              <En>
+                <S N="Key">CanonicalId</S>
+                <S N="Value">nuget:Microsoft.Graph.Intune</S>
+              </En>
+            </DCT>
+          </Obj>
+          <Obj RefId="9">
+            <TNRef RefId="3" />
+            <DCT>
+              <En>
+                <S N="Key">Name</S>
+                <S N="Value">Microsoft.Graph.Groups</S>
+              </En>
+              <En>
+                <S N="Key">CanonicalId</S>
+                <S N="Value">nuget:Microsoft.Graph.Groups</S>
+              </En>
+            </DCT>
+          </Obj>
+          <Obj RefId="10">
+            <TNRef RefId="3" />
+            <DCT>
+              <En>
+                <S N="Key">Name</S>
+                <S N="Value">microsoft.graph.authentication</S>
+              </En>
+              <En>
+                <S N="Key">CanonicalId</S>
+                <S N="Value">nuget:microsoft.graph.authentication</S>
+              </En>
+            </DCT>
+          </Obj>
+        </LST>
+      </Obj>
+      <S N="RepositorySourceLocation">https://www.powershellgallery.com/api/v2</S>
+      <S N="Repository">PSGallery</S>
+      <S N="PackageManagementProvider">NuGet</S>
+      <Obj N="AdditionalMetadata" RefId="11">
+        <TN RefId="4">
+          <T>System.Management.Automation.PSCustomObject</T>
+          <T>System.Object</T>
+        </TN>
+        <MS>
+          <S N="copyright">(c) 2024 Microsoft. All rights reserved.</S>
+          <S N="description">Sample module to manage AutoPilot devices using the Intune Graph API</S>
+          <S N="requireLicenseAcceptance">False</S>
+          <S N="releaseNotes">Version 5.7: Updated to use the newly renamed properties of windowsAutopilotDeploymentProfile _x000D__x000A_Version 5.6: Removing the Content_Types xml file_x000D__x000A_Version 5.5: Fix Connect-MSGraphApp function to use -force while invoking ConvertTo-SecureString to ensure backward compatability to older PS versions. _x000D__x000A_Version 5.4: Update Connect-MSGraphApp function to use secure string and fix RequiredModules to include graph auth and groups. _x000D__x000A_Version 5.3: Switching back to using Write-Host and fix esp settting bug.  _x000D__x000A_Version 5.2: Fix \[Content_Types].xml already exists issue.        _x000D__x000A_Version 5.1: Switch from MSGraph to MgGraph._x000D__x000A_Version 5.0: Replaced deprecated orderIdentifier parameter with groupTag parameter._x000D__x000A_Version 4.8: Added Connect-MSGraphApp wrapper to simplify app-based authentication._x000D__x000A_Version 4.7: Fixed a bug._x000D__x000A_Version 4.6: Added Get-AutopilotSyncInfo cmdlet._x000D__x000A_Version 4.5: Enabled skip connectivity check option for Hybrid Azure AD Join VPN support._x000D__x000A_Version 4.4: Removed Set-AutoPilotDeviceAssignedUser function (workaround no longer needed). Added logic to JSON conversion function._x000D__x000A_Version 4.3: Re-added Set-AutoPilotDeviceAssignedUser function to address white glove user assignment issue (temporary workaround)_x000D__x000A_Version 4.2: Bug fix for not-yet-supported property_x000D__x000A_Version 4.0: Reworked *-AutopilotProfile functions, added new Get-AutopilotEvent function, added verbose logging to all functions_x000D__x000A_Version 3.9: Removed logic to install and load dependent modules and instead declared them in the module manifest, for compatibility with Azure Automation_x000D__x000A_Version 3.8: Replaced Set-AutopilotDeviceAssignedUser with more-capable Set-AutopilotDevice method_x000D__x000A_Version 3.7: Fixed but with serial number filter on Get-AutopilotDevice_x000D__x000A_Version 3.6: Added 256 to the default CloudAssignedOobeConfig value to suppress the check for Windows feature updates_x000D__x000A_Version 3.5: Fixed HttpMethod values for DELETE and PATCH to be upper-case_x000D__x000A_Version 3.4: Fixed a bug_x000D__x000A_Version 3.3: Removed duplicate cmdlet_x000D__x000A_Version 3.2: Added Get-AutopilotProfileAssignedDevices cmdlet to get the list of devices with a specific profile_x000D__x000A_Version 3.1: Fixed bugs, added expand logic for Autopilot devices_x000D__x000A_Version 3.0: Modified script to use the Microsoft.Graph.Intune module, added new functions from Damien Van Robaeys_x000D__x000A_Version 2.7: Added support for using GroupTag instead of OrderID for uploading batches of devices_x000D__x000A_Version 2.6: Added the ability to read the OrderID value from a CSV file; fixed "Waiting for 1 of" message_x000D__x000A_Version 2.5: Modified ConvertTo-AutopilotConfigurationJSON to set ZtdCorrelationId to the ID of the profile; added Set-AutoPilotDeviceAssignedUser function (thanks to Oliver Kieselbach)_x000D__x000A_Version 2.4: Modified ConvertTo-AutopilotConfigurationJSON to properly support available AAD user-driven options_x000D__x000A_Version 2.3: Added new Invoke-AutopilotSync method (equivalent to clicking "Sync" in the Intune console)_x000D__x000A_Version 2.2: Added pagination support (thanks to Oliver Kieselbach)_x000D__x000A_Version 2.1: Fixed syntax issue in connect method_x000D__x000A_Version 2.0: Added cmdlet help (and fixed the mistake of using 1.41 as a verion, since 1.41 is considered &gt; 1.5 because 41 is greater than 5)_x000D__x000A_Version 1.4: Added functions to delete a device, to list Autopilot profiles, and to convert Autopilot profiles into JSON._x000D__x000A_Version 1.3: Fixed module manifest to export functions</S>
+          <S N="isLatestVersion">True</S>
+          <S N="isAbsoluteLatestVersion">True</S>
+          <S N="versionDownloadCount">2857660</S>
+          <S N="downloadCount">15271864</S>
+          <S N="packageSize">18464</S>
+          <S N="published">9/17/2024 3:59:31 PM -04:00</S>
+          <S N="created">9/17/2024 3:59:31 PM -04:00</S>
+          <S N="lastUpdated">2/17/2025 9:40:00 PM -05:00</S>
+          <S N="tags">PSModule PSFunction_BoolToString PSCommand_BoolToString PSFunction_Connect-MSGraphApp PSCommand_Connect-MSGraphApp PSFunction_Get-AutopilotDevice PSCommand_Get-AutopilotDevice PSFunction_Set-AutopilotDevice PSCommand_Set-AutopilotDevice PSFunction_Remove-AutopilotDevice PSCommand_Remove-AutopilotDevice PSFunction_Get-AutopilotImportedDevice PSCommand_Get-AutopilotImportedDevice PSFunction_Add-AutopilotImportedDevice PSCommand_Add-AutopilotImportedDevice PSFunction_Remove-AutopilotImportedDevice PSCommand_Remove-AutopilotImportedDevice PSFunction_Get-AutopilotProfile PSCommand_Get-AutopilotProfile PSFunction_Get-AutopilotProfileAssignedDevice PSCommand_Get-AutopilotProfileAssignedDevice PSFunction_ConvertTo-AutopilotConfigurationJSON PSCommand_ConvertTo-AutopilotConfigurationJSON PSFunction_Set-AutopilotProfile PSCommand_Set-AutopilotProfile PSFunction_New-AutopilotProfile PSCommand_New-AutopilotProfile PSFunction_Remove-AutopilotProfile PSCommand_Remove-AutopilotProfile PSFunction_Get-AutopilotProfileAssignments PSCommand_Get-AutopilotProfileAssignments PSFunction_Remove-AutopilotProfileAssignments PSCommand_Remove-AutopilotProfileAssignments PSFunction_Set-AutopilotProfileAssignedGroup PSCommand_Set-AutopilotProfileAssignedGroup PSFunction_Get-EnrollmentStatusPage PSCommand_Get-EnrollmentStatusPage PSFunction_Add-EnrollmentStatusPage PSCommand_Add-EnrollmentStatusPage PSFunction_Set-EnrollmentStatusPage PSCommand_Set-EnrollmentStatusPage PSFunction_Remove-EnrollmentStatusPage PSCommand_Remove-EnrollmentStatusPage PSFunction_Invoke-AutopilotSync PSCommand_Invoke-AutopilotSync PSFunction_Get-AutopilotSyncInfo PSCommand_Get-AutopilotSyncInfo PSFunction_Import-AutopilotCSV PSCommand_Import-AutopilotCSV PSFunction_Get-AutopilotEvent PSCommand_Get-AutopilotEvent PSIncludes_Function</S>
+          <S N="developmentDependency">False</S>
+          <S N="updated">2025-02-17T21:40:00Z</S>
+          <S N="NormalizedVersion">5.7.0</S>
+          <S N="Authors">Windows Autopilot</S>
+          <S N="IsPrerelease">false</S>
+          <S N="ItemType">Module</S>
+          <S N="FileList">WindowsAutoPilotIntune.nuspec|WindowsAutoPilotIntune.psd1|WindowsAutoPilotIntune.psm1</S>
+          <S N="GUID">7952c22a-a31f-453a-8579-f32ed374126c</S>
+          <S N="CompanyName">Microsoft</S>
+        </MS>
+      </Obj>
+      <S N="InstalledLocation">C:\Users\zuhai\Downloads\Dell\script\modules\WindowsAutoPilotIntune\5.7</S>
+    </MS>
+  </Obj>
+</Objs>
