@@ -24,6 +24,8 @@ Registers one or more devices into Intune and checks for profiles and module req
 .PARAMETER NoModuleCheck
     A switch to skip the required module check.  The default value is false.
 .PARAMETER NoUpdateCheck
+.PARAMETER UpdateOnly
+    A switch to only update the scripts.  The default value is false.  Cannot be used with NoUpdateCheck
     A switch to skip the script update check.  The default value is false.
 .PARAMETER NoAdminCheck
     A switch to skip the administrator check.  The default value is false.
@@ -57,8 +59,7 @@ Registers one or more devices into Intune and checks for profiles and module req
   9. If the device is assigned, prompt for restart. Otherwise, advise the user to check the Intune portal.
 #>
 
-
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Default')]
 param (
     [string]$configFile = '.\.secrets\config.json',
     [Parameter(Mandatory = $False, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True, Position = 0)][alias('DNSHostName', 'ComputerName', 'Computer')] [String[]] $Name = @('localhost'),
@@ -66,7 +67,8 @@ param (
     [Parameter(Mandatory = $False)] [String] $AssignedUser = '',
     [Parameter(Mandatory = $False)] [switch]$check,
     [Parameter(Mandatory = $False)] [switch]$NoModuleCheck,
-    [Parameter(Mandatory = $False)] [switch]$NoUpdateCheck,
+    [Parameter(Mandatory = $False, ParameterSetName = 'NoUpdateCheckSet')] [switch]$NoUpdateCheck,
+    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')] [switch]$UpdateOnly,
     [Parameter(Mandatory = $False)] [switch]$NoAdminCheck
 )
 
