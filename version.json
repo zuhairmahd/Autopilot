@@ -8,8 +8,7 @@
     "Get-ScriptIntegrity": "1.0.0",
     "Get-USBDriveLetter": "1.0.0",
     "Get-SignatureStatus": "1.0.0",
-    "Register-device": "1.0.0",
+    "Register-Device": "1.0.0",
     "Restart-Device": "1.0.0",
-    "Test-ScriptUpdates": "1.0.0",
-    "hashes": "1.0.0"
+    "Test-ScriptUpdates": "1.0.0"
 }
