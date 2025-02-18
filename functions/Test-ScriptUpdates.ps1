@@ -28,11 +28,12 @@ function Test-ScriptUpdates()
     }
     if ($scriptsToUpdate.count -gt 0)
     {
-        Write-Host "$($scriptsToUpdate.count) modules are out of date and will be updated."
+        Write-Host "$($scriptsToUpdate.count) modules are out of date."
     }
     else 
     {
         Write-Host 'All modules are up to date.'
     }
+    return $scriptsToUpdate
 }
-return $scriptsToUpdate
+

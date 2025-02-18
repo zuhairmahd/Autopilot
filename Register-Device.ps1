@@ -69,7 +69,8 @@ param (
     [Parameter(Mandatory = $False)] [switch]$NoModuleCheck,
     [Parameter(Mandatory = $False, ParameterSetName = 'NoUpdateCheckSet')] [switch]$NoUpdateCheck,
     [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')] [switch]$UpdateOnly,
-    [Parameter(Mandatory = $False)] [switch]$NoAdminCheck
+    [Parameter(Mandatory = $False)] [switch]$NoAdminCheck,
+    [Parameter(Mandatory = $False)] [switch]$NoVerify
 )
 
 #Define variables.
@@ -106,6 +107,29 @@ else
 {
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
+}
+
+
+if (-not($NoVerify))
+{
+    Write-Host 'Verifying code signature.'
+    $codeAuthenticity = Get-SignatureStatus -scriptFolders "$PSScriptRoot, $functionsFolder" -verbose
+    Write-Verbose $codeAuthenticity
+    if ($codeAuthenticity)
+    {
+        Write-Host 'The following scripts failed the signature check:' -ForegroundColor Red
+        $codeAuthenticity
+        Write-Host 'Exiting script.' -ForegroundColor Red
+        exit 1
+    }
+    else
+    {
+        Write-Host 'All scripts are signed.' -ForegroundColor Green
+    }
+}
+else
+{
+    Write-Host 'Skipping script integrity check.'
 }
 
 
