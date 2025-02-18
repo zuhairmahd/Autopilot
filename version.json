@@ -5,6 +5,7 @@
     "Get-DeviceInfo": "1.0.0",
     "Get-requiredModules": "1.0.0",
     "Get-ScriptUpdates": "1.0.0",
+    "Get-ScriptIntegrity": "1.0.0",
     "Get-USBDriveLetter": "1.0.0",
     "Get-SignatureStatus": "1.0.0",
     "Register-device": "1.0.0",
