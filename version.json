@@ -14,5 +14,6 @@
     "check.cmd": "1.0.0",
     "GetHash.cmd": "1.0.0",
     "register.cmd": "1.0.0",
-    "update.cmd": "1.0.0"
+    "update.cmd": "1.0.0",
+    "forceupdate.cmd": "1.0.0"
 }
