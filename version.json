@@ -10,5 +10,9 @@
     "Get-SignatureStatus": "1.0.0",
     "Register-Device": "1.0.1",
     "Restart-Device": "1.0.0",
-    "Test-ScriptUpdates": "1.0.0"
+    "Test-ScriptUpdates": "1.0.0",
+    "check.cmd": "1.0.0",
+    "GetHash.cmd": "1.0.0",
+    "register.cmd": "1.0.0",
+    "update.cmd": "1.0.0"
 }
