@@ -1,5 +1,6 @@
 function Send-DeviceCommand
 {
+    [CmdletBinding()]
     param (
         [string]$serialNumber,
         [string]$commandType

@@ -1,9 +1,13 @@
 function Verify-EnrollmentStatus
 {
+    [CmdletBinding()]
     param (
         [string]$serialNumber
     )
     $assignment = Get-AutopilotDevice -serial $serialNumber
+    Start-Sleep -Seconds 5
+    $assignmentJSON = $assignment | ConvertTo-Json -Depth 10
+    Write-Host ($assignmentJSON)
     if ($assignment)
     {
         if ($assignment.assignedUser)
