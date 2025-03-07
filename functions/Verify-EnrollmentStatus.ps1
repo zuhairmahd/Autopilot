@@ -1,148 +1,34 @@
-Function Get-ScriptUpdates()
+function Verify-EnrollmentStatus
 {
-    [cmdletbinding()]
-    param
-    (
-        [PSCustomObject]$scriptsToUpdate,
-        [string]$scriptURI,
-        [string]$ScriptRoot,
-        [string]$scriptVersionURL,
-        [string]$scriptHashURL
+    param (
+        [string]$serialNumber
     )
-    Write-Verbose "Received ScriptRoot: $ScriptRoot"
-    Write-Verbose "Received ScriptURL: $scriptURI"
-    Write-Verbose "Received ScriptVersionURL: $scriptVersionURL"
-    Write-Verbose "Received ScriptHashURL: $scriptHashURL"
-    $functionsList = @(
-        'ConnectToTenant',
-        'Get-decryptedObject',
-        'Get-DeviceHash',
-        'Get-DeviceInfo',
-        'Get-requiredModules',
-        'Get-ScriptIntegrity',
-        'Get-ScriptUpdates',
-        'Get-SignatureStatus',
-        'Get-USBDriveLetter',
-        'Send-DeviceCommand',
-        'Test-ScriptUpdates',
-        'Restart-Device',
-        'Verify-EnrollmentStatus'
-    )
-    $CMDList = @(
-        'check.cmd',
-        'GetHash.cmd',
-        'register.cmd',
-        'update.cmd'
-    )
-    $success = $false
-    $headers = @{ 'Accept' = 'application/octet-stream' }
-
-    Write-Verbose "The script URI is $scriptURI"
-    Write-Verbose "The scripts to update are $($scriptsToUpdate | ConvertTo-Json -Depth 5)"
-    Write-Host 'Updating scripts ...'
-    $index = 0
-    foreach ($key in $scriptsToUpdate.Keys)
+    $assignment = Get-AutopilotDevice -serial $serialNumber
+    if ($assignment)
     {
-        $index++
-        Write-Verbose "Processing script $index of $($scriptsToUpdate.Count)"
-        if ($key -in $functionsList)
+        if ($assignment.assignedUser)
         {
-            Write-Verbose "The script $key is a function"
-            $scriptPath = $ScriptRoot + '\functions\' + $key + '.ps1'
-            $updateURL = $scriptURI + '/functions/' + $key + '.ps1'
-            Write-Verbose "The script path is $scriptPath"
-            Write-Verbose "The update URL is $updateURL"
+            Write-Host "The device is assigned to user $($assignment.assignedUser)." -ForegroundColor Yellow
+            return $true
         }
-        elseif ($key -in $CMDList)
+        else
         {
-            Write-Verbose "The script $key is a CMD script"
-            $scriptPath = $ScriptRoot + '\' + $key
-            $updateURL = $scriptURI + '/' + $key
-            Write-Verbose "The script path is $scriptPath"
-            Write-Verbose "The update URL is $updateURL"
-        }
-        else 
-        {
-            Write-Verbose "The script $key is a script"
-            $scriptPath = $ScriptRoot + '\' + $key + '.ps1'
-            $updateURL = $scriptURI + '/' + $key + '.ps1'
-            Write-Verbose "The script path is $scriptPath"
-            Write-Verbose "The update URL is $updateURL"
-        }
-        Write-Host "Updating $key to version $($scriptsToUpdate[$key])." 
-        Write-Host "Fetching from $updateURL and copying to $scriptPath"
-        try
-        {
-            $response = Invoke-WebRequest -Uri $updateURL -OutFile $scriptPath -Method Get -PassThru -UseBasicParsing -Headers $headers
-            $StatusCode = $Response.StatusCode
-            Write-Verbose "The status code is $StatusCode"
-            if ($StatusCode -eq 200)
-            {
-                $success = $true
-                Write-Host "Successfully updated $key to version $($scriptsToUpdate[$key])."
-            }
-            else
-            {
-                Write-Host "Could not update $key."
-                Write-Host "The server returned Status code: $StatusCode"
-            }
-        }
-        catch
-        {
-            $StatusCode = $_.Exception.Response.StatusCode.value__
-        }
-        Write-Verbose "The status code is $StatusCode"
-    }
-    if ($success)
-    {
-        Write-Host "Refreshing updated script version from $scriptVersionURL"
-        try
-        {
-            $response = Invoke-WebRequest -Uri $scriptVersionURL -OutFile $ScriptRoot\version.json -Method Get -PassThru -UseBasicParsing -Headers $headers
-            $StatusCode = $Response.StatusCode  
-            Write-Verbose "The status code is $StatusCode"
-            if ($StatusCode -eq 200)
-            {
-                Write-Host "The script version file in $ScriptRoot\version.json has been refreshed successfully."
-            }
-            else
-            {
-                Write-Host 'Could not refresh the script version file.'
-                Write-Host "The server returned Status code: $StatusCode"
-            }
-        }
-        catch
-        {
-            $StatusCode = $_.Exception.Response.StatusCode.value__
-        }   
-        Write-Host "Refreshing updated hashes from $scriptHashURL"
-        try
-        {
-            $response = Invoke-WebRequest -Uri $scriptHashURL -OutFile $ScriptRoot\hashes.json -Method Get -PassThru -UseBasicParsing -Headers $headers
-            $StatusCode = $Response.StatusCode
-            Write-Verbose "The status code is $StatusCode"
-            if ($StatusCode -eq 200)
-            {
-                Write-Host "The script hashes file in $ScriptRoot\hashes.json has been refreshed successfully."
-            }
-            else
-            {
-                Write-Host 'Could not refresh the script hashes file.'
-                Write-Host "The server returned Status code: $StatusCode"
-            }
-        }
-        catch
-        {
-            $StatusCode = $_.Exception.Response.StatusCode.value__
+            Write-Host "The device is not assigned to any user." -ForegroundColor Yellow
+            return $false
         }
     }
-    return $success
+    else
+    {
+        Write-Host "The device cannot be found in Intune." -ForegroundColor Red
+        return $false
+    }
 }
+
 # SIG # Begin signature block
 # MII95AYJKoZIhvcNAQcCoII91TCCPdECAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCB19ksVG2FucBRi
-# rrdICzPCESWLU5AlIBIRMu3I9okc+6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCD+nfj50Zr5wiXw
+# ER3rQHBv1/NWknvTfAdUcFlTq9gDhaCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -331,24 +217,24 @@ Function Get-ScriptUpdates()
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMQITMwAB+jXNPi8Gueg9+wAAAAH6NTAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCB+t9Z42eCttTlxdCm1lFBbCf5S
-# tI+Z28jyIeVsMn1nLjANBgkqhkiG9w0BAQEFAASCAYB5bc6wGoJmwCMcWx4RhF0q
-# Ci2l09FVWlxHBC/HS5USHYoGGOY2DYqFD/GpWoGXLGPaQaKsYHHxrGJ9uIvLzNvC
-# s1jrDbhew82HWWzonLF/bLVG6vG65U3Qij1xu1GW/0/GSZ8Q/gqlMJak9m8eiOqK
-# 7I579XJyyUdxosTBhzfVTHDcfHFLjt0tSnLbRh5X3+ocu0f0GKjyTl7r46hzkfcY
-# SH5r8V4y7378NFUo5LOX0NiSoIGV+7YSRXmjLUNETeNcAtlvPml+WFqHtoVqLXLR
-# JfEaiC9fa4w8u+SSoagNx4Qz/wPyES02Egs/+vquA989SGpI88DD144B0k8qAEZ4
-# cctPfdVdajtO1Qm/Ibl/RTIdBXD37YIBajmHCkKBr3Y7CA8kxYPmgZnZxvx3x8lo
-# MIVvWj1WvWZ1RQ3RLbSiC3hICXC3dSDsXr9zbOzFfnR81Y3MLmo86mzaOAn6P6di
-# OLZUSpBJHIBBywDELgoJoBYLSFiqUdqVqBNfpjA/Le+hghgUMIIYEAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCBKTgV0RwXa5b+EbBP5P9kxF1BG
+# gMjq7hqeFSM5og62cjANBgkqhkiG9w0BAQEFAASCAYAygBb7t83j5bgT3KDzbLAW
+# +bc66ieecoiaBgwlC3RcBnNRbc9EAYPLH6KpsEhS6SrdjfrVhkUw6auoZDrvsbma
+# ztmBIZFPaqucfWNnSz9Vx9t7yXaBIu3mYuH4edL8IPdiYnXG6b+3eg6DJnvRFtum
+# MDdFJ7770AquGauXCeWubfiCyWa1dXmMp87/WG8HRbmvqnIwZnxGisOUTMWokYmL
+# tDT++IE8G51R/HLpXlThnxO5oUlsIB2kP95l6aGpRnetUVpEPj2YRGfcSuK1Lh5V
+# mhixPRJtaDDQd+LuHRTs44its7s/a4FH6ULY197eLn5rU3huYDMuRZDy0StWn3i0
+# LTd3Zws7nxbkkzom22ETN2w/+j5h4gnD8I6hR8k+rVA2EEeTMfKxWM3fhreA7ilt
+# S3DxV5cwR418mbJ5Jg6VRqHSuoHtrXsTF9thitTd54R5H/mg6PYJdOhDUSafxWLc
+# UH3HmkL4UTbCdkL5qapEozFhBlW3dub0Dinbygd0QiihghgUMIIYEAYKKwYBBAGC
 # NwMDATGCGAAwghf8BgkqhkiG9w0BBwKgghftMIIX6QIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQg02g1LmaDRl7qPqzTXZyDwtuvL72/62hn+U9DRcVz
-# GBACBmesFe4G6xgTMjAyNTAzMDcwMzQ3NDkuMTk3WjAEgAIB9KCB4aSB3jCB2zEL
+# MTANBglghkgBZQMEAgEFAAQgWgcZdgyB6JlPoff/uQ2OuzGTjO8/Gh9n4GEMUQRP
+# 4OwCBmeXbFoF8RgTMjAyNTAzMDcwMzQ3NTIuMTM3WjAEgAIB9KCB4aSB3jCB2zEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
-# RVNOOkE1MDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJT
+# RVNOOjdEMDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJT
 # QSBUaW1lIFN0YW1waW5nIEF1dGhvcml0eaCCDyEwggeCMIIFaqADAgECAhMzAAAA
 # BeXPD/9mLsmHAAAAAAAFMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4w
 # HAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29m
@@ -390,27 +276,27 @@ Function Get-ScriptUpdates()
 # +mTm8LWVydt4ytxYP/bqjN49D9NZ81coE6aQWm88TwIf4R4YZbOpMKN0CyejaPNN
 # 41LGXHeCUMYmBx3PkP8ADHD1J2Cr/6tjuOOCztfp+o9Nc+ZoIAkpUcA/X2gSMkgH
 # APUvIdtoSAHEUKiBhI6JQivRepyvWcl+JYbYbBh7pmgAXVswggeXMIIFf6ADAgEC
-# AhMzAAAASFV3ch50krf3AAAAAABIMA0GCSqGSIb3DQEBDAUAMGExCzAJBgNVBAYT
+# AhMzAAAAS6GxreFZ/Oc0AAAAAABLMA0GCSqGSIb3DQEBDAUAMGExCzAJBgNVBAYT
 # AlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1p
 # Y3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMB4XDTI0MTEy
-# NjE4NDg1MloXDTI1MTExOTE4NDg1MlowgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
+# NjE4NDg1N1oXDTI1MTExOTE4NDg1N1owgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
 # EwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3Nv
 # ZnQgQ29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJh
-# dGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjpBNTAwLTA1RTAtRDk0NzE1
+# dGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjo3RDAwLTA1RTAtRDk0NzE1
 # MDMGA1UEAxMsTWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRo
-# b3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDLfoD3Z++SVTIY
-# JFnFnPrVlMvaJYlPTronDHe0VuiHANnCKTIq8qJk4weZ+cf1+vIJ7cdl+/gw3AaR
-# gAQT/iDU6vLN6QfFg1YAO6cR7voo2y4QDJPguGjKpGtONxGj9fOavAkDTH4gaTJn
-# uK9mhvIzUqI7TEDV7JoK6Sy0kYsVcWbp2mF4RJ4FliqEm70YNSwLjnKn5qYIZJoQ
-# YKg9ZWYzYabgr9clHsjlZtFepsTYn2hrim8vaeO9dymfk7pmXrQX2O85UQl8k6AK
-# 2B8KKQVuNNnBa37EAWfxxqlO97WOvkzboNZYWHWFOlS3aklvSa+742PSVIyEgraC
-# gkqIMZkVuzF+5QnuyVekXaZ/hz+3ujmyrxsnXUXbXYmQi6enT7comWGpTfRo2WZt
-# +tEzvhl46YmQ9IGREfn+ZRBWr8CHA+x2q1uqg9GTfNUvkQ4HxLSeu4eqDFKj9ViI
-# hQu+Yn/IGitWjufmfBKp2nigC4FFabRe4vShrA7xJtrbOFmJ3jAIRtvu2dufiI7V
-# uGQCPN2bXRjiafbBXevEuhA3998ECz4uwnGfSFF1u+LS7yDZLb8NzxXnuiN4bP/X
-# w3AjKBCGr/lnmSJiCwoMERhXCyLb8KUhAOzXF06EZN0xnwud2A94OTQ7o66oXbii
-# 21Z6KxjnSGV1XizJNCa+P1yFEBqVKQIDAQABo4IByzCCAccwHQYDVR0OBBYEFKa9
-# d/S6631KGfe8umYaOzc8HPdHMB8GA1UdIwQYMBaAFGtpKDo1L0hjQM972K9J6T7Z
+# b3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCdnYqzfzSDLZ8t
+# /IcnBhZ/VS77fz7MIUKa1I9mDjnJRNPdVWovmgU5UbARCbLCIIzZj8J0/YDeyJBD
+# YFTySXAgaHlDw06rUBcryq2eaxoWfShTHSdlOnyzhDUw8GXGYJT1x/q+nGm6k1or
+# uwW2wrYNR86/Q5sr1XYCJlM8yteWaJFvZJGE6vCOPQxni/lEN2qoTrq2ejmpVVMP
+# ngkX9IMCyrlxav40gC15WTU7dZ3o19bQs7u+drzbzON0MtKsqa1vDFsHuqvH2q1S
+# 21zETmed/llmTK5QaRLLhk5WCd9w1n/Do5gHarg6Jv861uSCqAdMdNnI34fnTsIR
+# naEtCGWGu7W1Zd7blHSligBaGALIC61vJzWj1Mb8JxhhmhfPX20d6nB1Jpmm4qIP
+# /FW02uCxJSq9Fe8ziedvlg4m1aCqjWX0Q566/i7VieVsOA3rx1xRXeIbADmsxnw3
+# 6YlZohsqREsZUMjQZ4e6cCfKAlaO02ca7GizIRn7mNvzHNYc47gQCFEC+YgX2SLv
+# w4b6R5Taq43XJ0hfhDwPSPiT60dySjLUIcmDcs2vI878t3WxEl2an9HJCaYPKvV/
+# UZ1Ay9HjkSJc3ZqIXvgGlh1VI7kCpPTBayY7RC0IzJl5a7+DM7FcBhei9h1eJ8Ad
+# ZszVcUGk+LkF+uqU3GAnjYadJC/x2QIDAQABo4IByzCCAccwHQYDVR0OBBYEFCCZ
+# GsUvRVF/zToRWkE3JYWmuHQmMB8GA1UdIwQYMBaAFGtpKDo1L0hjQM972K9J6T7Z
 # PdshMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9w
 # a2lvcHMvY3JsL01pY3Jvc29mdCUyMFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGlu
 # ZyUyMENBJTIwMjAyMC5jcmwweQYIKwYBBQUHAQEEbTBrMGkGCCsGAQUFBzAChl1o
@@ -419,55 +305,55 @@ Function Get-ScriptUpdates()
 # VR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAOBgNVHQ8BAf8EBAMC
 # B4AwZgYDVR0gBF8wXTBRBgwrBgEEAYI3TIN9AQEwQTA/BggrBgEFBQcCARYzaHR0
 # cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRt
-# MAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEATa2L4B40TANMMYgCNXTy+cuK
-# TjDzNZ3dAJ+S4PbAKf78FBwQ79hYihqZ/qIg6GWt/jQ5GAsBSpBYKNZOMtUMArNQ
-# fIlZ42y2tylAP/xBGQ6wwmu0uBmXzg6W3TomTZ56bh90li7ZO4BbiiCg2CAkpvtT
-# vrgYu7FbvvTqTIv/LvXQaCJx+sxvJPsbIAyWUSfIYTdAWlVo63sJ8AkH5pzpifvk
-# LyXmLxq2jTywaeD/pKazEJwXAby8+u04oCGVCZDbD+sDOJ753hbl6XyWOXmCpXVv
-# j2wPoXJdI+T6DPtc9GWtMxSDUKZtVJV2UVgACazx8gODidj6h3aGwOr8Ut/FsO/X
-# 853Q1CYpfHWfW3JEkLc3FslKf2Kl2zH14EBoLeUpTykhn8NZUeXhHsuuKjPx8mUA
-# LW/LglUjZXyJ3yBQ1PiOevpxTot8afXc6rlq9FJ2kgtM6ij2uW7f9at5yIcdwFM9
-# VUm0aCgiXvjvRkQeSUIIAm40LX2qve2kdPgNe/Zt8yb5zDcsJjHhZPtXiW3TnBUY
-# LqCsLnD6fVh6X5QvFbtjLlBIMt3XlvAQnuVEzhoyt3isww9w8t+oGCg4aNh94IdK
-# vUNS1ffxC+Q+XrsT3wDlSlqNSLfooxhsCu5gXKtzpfhx8+4l9rVHJxgZE9nwGKiA
-# bwNXxKFB3bVgmwodJbUxggdGMIIHQgIBATB4MGExCzAJBgNVBAYTAlVTMR4wHAYD
+# MAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEAMb3YbNgyOUIdvrmh8yK25QWz
+# U4kVUvlJmCygDGdnUKokh4ZAMzZu+c7cTlw+hcCH8vbx7zMRbKbLzp1XOXP+/Bvn
+# UKynTgEGBkXPEbKwEezCtNwGZm7fAHHh7fAC8GN0R4dEneZBuyvUwjv/RMa3bRCN
+# 0IuMTsIpjzwOVivH6lDU8o6dxkE6w+1EhKgImb3iCnGXS1gnotzJ6oa0x3lYMuir
+# YOpLFlc54xJR1RncJBKqVqC+2vu31GRaVmBiwVU/bFuYN0o6LVnAPTcu1fMDcn6t
+# s5EbW5chgEMFIoUM3tSDMNXoMIQkMQvN3beZpjnLDb4V8OANLd5oXz+bd+p5zW21
+# v6odGTBUX/qhjSxBhTbwTPqlV1/Dx95x/6/52PrETq6bQb6t6TAFq4fpXTmRo8uB
+# Vj1pkGVljJPDxvi6DyaBZECqlHQws8wM4qDWTk9hTIZrKlK/mvD6J3hR782HLG6W
+# JiEuuVSxv+8zsI86ibPK6ywwjlBloH6/+YEtQtS4gIx4D/1xnP7qVfK7FcPtRO4A
+# HEw2g+Nm37R+6B+RDime4WvUvxR8FweNjEry0QGtQVvZcEIflDXryIp2UdQIIgW+
+# zmUO2b05TulkFPIsiVsgcAYPZjeBuyJkdlhZpYdP0JpYPQiUZTY3hjkum3n/7FnE
+# aVhOV+ZdS+0XXVa3A7kxggdGMIIHQgIBATB4MGExCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
-# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASFV3ch50krf3AAAA
-# AABIMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
+# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAA
+# AABLMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
 # hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTAzMDcwMzQ3
-# NDlaMC8GCSqGSIb3DQEJBDEiBCCRGI6un2yjs1Pw7El/vHciTvSL+fI/sfJRN81T
-# V8JiHjCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEIOoqAVebTwjWn0P0gLwZ
-# 03YfjX3QvDtHZEl38m8i8x1BMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
+# NTJaMC8GCSqGSIb3DQEJBDEiBCDAOkYhtGdmJGBvPJvBDupWjdNxarjMu5AmMorZ
+# 3BLaKTCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
+# CKowMSTh9DWm0OSNAeUABkSnMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
-# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASFV3ch50krf3AAAAAABI
+# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAAAABL
 # MIIDYQYLKoZIhvcNAQkQAhIxggNQMIIDTKGCA0gwggNEMIICLAIBATCCAQmhgeGk
 # gd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQH
 # EwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJTAjBgNV
 # BAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlvbnMxJzAlBgNVBAsTHm5TaGll
-# bGQgVFNTIEVTTjpBNTAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1
+# bGQgVFNTIEVTTjo3RDAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1
 # YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3JpdHmiIwoBATAHBgUrDgMCGgMV
-# AOYSfUGUVzjpxDh59/qJiDRZaMMnoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
+# APV6ws6b5FNHUOmEILADVgzql5kzoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBCwUAAgUA
-# 63TmozAiGA8yMDI1MDMwNzAzMjkzOVoYDzIwMjUwMzA4MDMyOTM5WjB3MD0GCisG
-# AQQBhFkKBAExLzAtMAoCBQDrdOajAgEAMAoCAQACAhVhAgH/MAcCAQACAhMUMAoC
-# BQDrdjgjAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
-# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBACF8h7Tq58hEo/29
-# hv/7y31/PuZS1McePC+Uz7NmQLa5g9DT3JaBNEe9djngwU87NNIDUNvNF7AkitSb
-# GVGdtq6B20i4Eqm3NfoKHnP7u7UIn0gEQvfVtNmyfCIbjMibVFrenWpuRBNRxfwu
-# AzqDxj7ap8nepIx++r/OCXH+eaKLAOVEVvqqdCYjJzKd/rv0CHhQsg0JhNWn7MpP
-# IQD7vLixIWPqAqcFdqFn1iK6L7nbqoBwAT5M8+hfobtp7oFY8wTZju8x7NQqg2zE
-# /6VuDWZjIfX/5nARf+aXexUk+AAYebJQOsJRxaRAl1FmGeXJdb7WvUynL3BOrspX
-# EFB8IC4wDQYJKoZIhvcNAQEBBQAEggIAA1Nn3VcHx7CB86Ob99N7yHTeQAx5HskA
-# 97FRel0hNQqjlLfWBjjZO2dosMg54U4a5gpg0RZLs8T5drXkRn6q8Xbrh0gjt+gx
-# oNPGGkZO2hM7KMBpB+SNi835pS4WCw3kji8dShRHsTJT/EdVEcbBt3PehpkKIui0
-# nu+VhFuc8RgpK9A6Bynm72jMmFszV67x+dz7vkgHUFSJf1PUUTVxMS0cy6G8kgOF
-# /s/mNtMHZISq+uxvK+cf7rs/poPq6p9vSyxmCd5J1xCZcoSt9wRvbAXh/L5T8eEf
-# yslY33qf5v5GKOuVk50jWu22zG56mmDkoN9Py+Iawx3EQtL6srnyeZ0EMlj/YuNo
-# YXZgez6xHHoZrq0sV4CxdRu3iVoAkcFRXxwprmGXkw4iCPMRG7SU8Aq79lA5fhE3
-# chgZiASm3832To6Y1hkZ1J7p9mTcNoouU2+HXxrFauMxoOEi1ieW9bK8c3Bfl7/L
-# LmGJNkDyp5djd965Ufr19O6hqY1Nvaz9dOW80pAE4uYTUTsEuzIRMZVwyN5/w8E0
-# wokE+5D1MC3slTRqnt8cxHz4n3MmJ0kdQ6XqyGahhKTG0XLq8ybN9txCQe+RSNAd
-# 3Dusj0ZrhEGsVU/8VNL8fZENOm6WeYICWo0RQie0fcHs7G8FRPOk34y/4xKkTPI2
-# W66XWvEY834=
+# 63SsLDAiGA8yMDI1MDMwNjIzMjAxMloYDzIwMjUwMzA3MjMyMDEyWjB3MD0GCisG
+# AQQBhFkKBAExLzAtMAoCBQDrdKwsAgEAMAoCAQACAhUrAgH/MAcCAQACAhJlMAoC
+# BQDrdf2sAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
+# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAAVFyMfArCE2Ugm+
+# DR1myJwdWIscptgnjoz84fwB16YgwE8Of4//yGyZGWsVLY4oZNi/GNDrj5js7BMK
+# osHZNyFrOD9uhch1tomPf+pJHNoOtISCRGZtWxrrSyp3xgPlYia6YBylIjej1rp4
+# eKg2g5cFJeEzZw/m5iArFyp/6mq3griKm1bD51335lFcMomT/2ViR4EhfkLIBbSZ
+# WJoEV9GFtza5xSAuD/pnYY2Z+prT/kBEyFvDrA/kqcSskDJJ1CrmPMa6xGR0m+/T
+# 11QIZUyGdye8B7S1nBYKHz4vTl00TE/mRPuEpfm52Pp6XwbdhinS8Jvqu4JydaMU
+# eOPbA+YwDQYJKoZIhvcNAQEBBQAEggIAWeqxqSsTNxGo2vlkEtUZHE5a4XxILZRC
+# 46i0jYzUHYniWDcaYFh819GNLe1uNgQ4Nb/8OMcSUO4Vn22hzG6jtmEqcNhDrkGG
+# +zxQ9n029QAQ99f9v/GcL5gZsVxuHtlhVAVBiEAiCpRuXVGvBN6fZUzO4170MMfc
+# Lyjj/w00Ts0D5+fcyGrpQJnDcY2FBsJKyYMhOithrQeBroyTlf++auVigydGmIjB
+# wTzJ6k/XsU+Wjqd6GiI7M9L7T+oZWU6FFbt0ZuWfECJVnMGK7FkYo3vhZ26IFmhU
+# og6bJurteBFd4sVWip5SXV8Nwwj4Si7bwM3HTMb0HA6ZKTu6gzoMYhcBNX8bu6In
+# ECoUoPJx9jDQkEtnvOx8CjOhbNYss9TtNnt0B2wemb3LZYo9ofvS2bARjp2Qom9A
+# hgHQob0NSu/H75goMDsJuJmH0j4A4uQbcf285BrjmoUg1ECBKFCRjgiHmoRE5yzY
+# VuheFid2UVjOyn8MBiHYquSvQDZHzUoDHWNVvOf1XkPNx74CZk+AuRq88AaYDKvw
+# 9iUsbMY8QfwD4GxueLJ7SnLWZz6WW8hOM0QseiHn9tOH+ZxwYMHw5J0/xQwVNYfR
+# WKWP77qWgb6FHschMf5tQv0qjwVv4j7ym90zUCR1payOMtbtQH42fPCbez2cnMBj
+# ZZYug00v3ak=
 # SIG # End signature block
