@@ -374,6 +374,7 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check)) {
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
             Write-Host "Elapsed time to complete: $importSeconds seconds"
+            Restart-Device
             exit 0
         }
     }
@@ -396,4 +397,4 @@ else {
     Get-deviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
-Restart-Device
+
