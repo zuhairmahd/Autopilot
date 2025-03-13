@@ -1,57 +1,37 @@
-function Get-decryptedObject()
-<#
-.SYNOPSIS
-    A function to decrypt the values in a hash table.
-.DESCRIPTION
-    This function will decrypt the values in a hash table.  The function will iterate through the properties of the hash table and check if the property is in the exclude list.  If the property is in the exclude list, the function will skip the property.  If the property is not in the exclude list, the function will decode the value from base 64 and add the decoded value to a new hash table.
-.EXAMPLE
-    Get-decryptedObject -encryptedObject $data -excludeFields 'password'
-    This will decrypt the values in the data hash table and exclude the password field.
-#>
+function GetUSBDriveLetter ()
 {
     [CmdletBinding()]
-    param (
-        [psObject]$encryptedObject,
-        [string[]]$excludeFields
+    param
+    (
+        [string]$Label = 'WINPE'
     )
-    $decryptedObject = @{}
-    foreach ($prop in $encryptedObject.PSObject.Properties)
+    # Get the volume(s) with a matching FileSystemLabel.
+    $volumes = Get-Volume | Where-Object { $_.FileSystemLabel -eq $Label } -ErrorAction SilentlyContinue
+    # Write-Verbose $volumes
+    Write-Verbose "Found $($volumes.Count) volume(s) with the label '$Label'."
+    if ($volumes)
     {
-        Write-Verbose "The exclude list is $($excludeFields -join ',')"
-        Write-Verbose "Checking if $($prop.Name) is in the exclude list."
-        if ($excludeFields -contains $prop.Name)
+        foreach ($vol in $volumes)
         {
-            Write-Verbose "Skipping $($prop.Name) because it is in the exclude list."
-            Write-Verbose "Adding the raw entry $($prop.Name) with value $($prop.Value) to the decrypted object."            
-            $decryptedObject.Add($prop.Name, $prop.Value)
-            continue
+            Write-Verbose "Volume $vol has label '$($vol.FileSystemLabel)' and drive letter '$($vol.DriveLetter)'."
+            $driveLetter = $vol.DriveLetter
+            Write-Host "The windows installation is at $($driveLetter):\" -ForegroundColor Green
         }
-        Write-Verbose "Decrypting $($prop.Name) with value $($prop.Value)"
-        $propValue = $prop.Value.ToString()
-        #convert the value from base 64 to a regular string.
-        $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($propValue))
-        Write-Verbose "The unencrypted value for $($prop.Name) is $decodedValue"
-        #add the decoded dictionary to the hash table.
-        $decryptedObject.Add($prop.Name, $decodedValue)
-    }
-    if ($decryptedObject)
-    {
-        Write-Verbose "The decoded data is: $($decodedData | ConvertTo-Json)"
-        return $decryptedObject
     }
     else
     {
-        Write-Host 'No values were decrypted.'
-        return $null
+        Write-Host 'Cannot find the Windows installation drive' -ForegroundColor Red
+        Write-Verbose "Cannot find a volume with the label '$Label'."
+        $driveLetter = $null
     }
+    return "$($driveLetter):"
 }
-
 
 # SIG # Begin signature block
 # MII6ggYJKoZIhvcNAQcCoII6czCCOm8CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDKE9SYm5StF5YR
-# RYk8KO7DxdRtO+6nAyaFBJtqBoexaKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDsmRlJgzKA4JkF
+# 0Cvks0RZ9RRlcWngwXsvySmZXYulwKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -240,24 +220,24 @@ function Get-decryptedObject()
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMgITMwABt0wSHXWH4wadXgAAAAG3TDAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCZKTPIjMYk/8kvRQZUvdH96GTa
-# z9sZD3xzWegPlMF4QjANBgkqhkiG9w0BAQEFAASCAYAgTXhradXBFqkYMXucvjjo
-# CqEnmQE4Nmj7E3/P5t3l1IXUifodhLgyHdUPq93Ld1QZe3Cw7Rm4SIUx1NsECo8u
-# 5lGBlsXgbu4sKD+wL4Gisz3oL0bVJ5WTPaOzKvfXhRLd9AY9r5LTmMwUeFjBAlWs
-# +H3ny4U5CnGVwJagJD1IxtNVLYFecebmzzpgbymTSJNIl1+z2aZDsbXuN8wVmvRC
-# OlRqbHbOQSnQm2TbLK1Yiq/0W+cZOrg4v16iwrtN9iPBy9hxl7DDVA6EltJjvdVH
-# Gi9o/W/zKogKexsSSKbRrrXH6fKtv3SYWpZpAcRRGEl3fWXVAmBFE50Fy+A3QhYs
-# lmqu8cLJwbfDgtGH2FykZi4hRCa6HhmgxPtQeB9NW4Zpo0yqQe2b01rsikGWZ7+g
-# zQr8MU6SKy9XHtXW1oP++fDwpUIBiPvlmj5jDmQcJLmJeoFNLAh436Kj5x+T+/LA
-# K57sWnXAqZRwJQJQyDP/qcDk8ICoEDLr6oFZwjVvCPehghSyMIIUrgYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCC3Arkq/YDjbxVRsStxuS/ywCxv
+# LalEbZ5EKJ8ZkrQZmDANBgkqhkiG9w0BAQEFAASCAYBmOywOnw0nh2f1mkhALdcK
+# gIZYQKIaLSQ6NdyCPdh/VkMMcjz4pWi5JPmGXjE1wtypyYHd9Et53wl4vb5piuxa
+# XFe6ZJEnx19utTvUcoE8WXt6Ofn7bA1w7pyEeCyRJL0sMAxBS4oSQ88pThwi4pwd
+# EzhRRHaMFGXJuRPMW/jFWsDIUQ+nlmE7Uo7AN05PZAfNM5qqBdGrr4sfQJUrz+gd
+# Uhl/RnIEr1QqUBEHRTLREUOG1JqlpohtSxfpcccRSUJplj3vyYKrXeQfZ/82dJiW
+# HHxUruMP8v5H0LtV9au/6yY/VYKe3YSql+cXyDdZLk8qGclkAhAqdx9V8wnThYqG
+# HD/oFunjcHEE7tc0rCmBiGiR4f+YusEoeTIWvsvixX553h6t5mPZxui10DuEnY1k
+# 6r/mP0xCVqLyrXeCojvmlX/5P9z3xzdzxhcQduMNZZ282NLCpxXdhbn/sW+eqXjt
+# Y/MNHI4untYTaSe+Z93c5TDjHORm2Gy0euvNc0+ZqV6hghSyMIIUrgYKKwYBBAGC
 # NwMDATGCFJ4wghSaBgkqhkiG9w0BBwKgghSLMIIUhwIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBagYLKoZIhvcNAQkQAQSgggFZBIIBVTCCAVECAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQg1ppa8cV1WGiIFXjWEEMCcaBuMYC3G1Vupw32V/xX
-# 45ACBmeSXPXW3xgTMjAyNTAyMTgwMjU5MjUuNTQ5WjAEgAIB9KCB6aSB5jCB4zEL
+# MTANBglghkgBZQMEAgEFAAQgxjGDFNghGnJyazMV1XY6hRleHyPnDlGNXYiOVhHB
+# w9oCBmeSUMSxrRgTMjAyNTAyMTgwMjU5MzQuNDQ0WjAEgAIB9KCB6aSB5jCB4zEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEtMCsGA1UECxMkTWlj
 # cm9zb2Z0IElyZWxhbmQgT3BlcmF0aW9ucyBMaW1pdGVkMScwJQYDVQQLEx5uU2hp
-# ZWxkIFRTUyBFU046N0ExQS0wNUUwLUQ5NDcxNTAzBgNVBAMTLE1pY3Jvc29mdCBQ
+# ZWxkIFRTUyBFU046NDkxQS0wNUUwLUQ5NDcxNTAzBgNVBAMTLE1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPKTCCB4IwggVqoAMC
 # AQICEzMAAAAF5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UE
 # BhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/
@@ -299,27 +279,27 @@ function Get-decryptedObject()
 # YiarjmBprwP6ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kw
 # o3QLJ6No803jUsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlR
 # wD9faBIySAcA9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB58w
-# ggWHoAMCAQICEzMAAABEeOSzcPx22+oAAAAAAEQwDQYJKoZIhvcNAQEMBQAwYTEL
+# ggWHoAMCAQICEzMAAABDTMx99JiLWtQAAAAAAEMwDQYJKoZIhvcNAQEMBQAwYTEL
 # MAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAG
 # A1UEAxMpTWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAw
-# HhcNMjQwNDE4MTc1OTIxWhcNMjUwNDE3MTc1OTIxWjCB4zELMAkGA1UEBhMCVVMx
+# HhcNMjQwNDE4MTc1OTE5WhcNMjUwNDE3MTc1OTE5WjCB4zELMAkGA1UEBhMCVVMx
 # EzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoT
 # FU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEtMCsGA1UECxMkTWljcm9zb2Z0IElyZWxh
 # bmQgT3BlcmF0aW9ucyBMaW1pdGVkMScwJQYDVQQLEx5uU2hpZWxkIFRTUyBFU046
-# N0ExQS0wNUUwLUQ5NDcxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRp
+# NDkxQS0wNUUwLUQ5NDcxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRp
 # bWUgU3RhbXBpbmcgQXV0aG9yaXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIIC
-# CgKCAgEApDpvHbgoNdrj4NdMU+gquqd66pGqGGayMrvUbI9aRbKFNWhtsYeSFTJ/
-# CV/qxNw1WoJgDRcCkP5S3sbf+ObjBQu9by8akAsOlQV4ADr4Pw9ut9QYxGGu1kZG
-# /zkzkKhDgRI0cC3y4nq+DvhQlmQ8uQZaWc1gbEh3FeTq1q64XXlg+BGSC3SjqiRV
-# 4jN4Uc/zjvnLmtx32cHAOEPVmDRXsdqciAH0oYlITIwq9mBkRRcDhcs79u3/6lwW
-# HQJZJkF5WbD0AFppx527w8jYP2+nxwUEqEo1uof9puRoYfg+9kUEOkr91GAOzL6E
-# GDVx6fAp5ULZVCPLeJrkXn0/48FV0Us6YELWjIQ+r+552HbtQks3VefEzmudt263
-# uImMswObJLsQzmiRQ5GJb0UX7X00YAX8oSI/RCaZpEvPcP5CYDvuDsVwy77WtLkK
-# NkfjfIsVceaHay7itDtqAhGRdMc0fUx22FEgW9KXmgF284lB5UqfdjdS+sDtuA3S
-# n42Ndvwki8RaVyHWjtwqfM1DsT6SzQKE9gGL1PCQGOskDDRRG0FhdqifsK1azy5U
-# b7mLexLyzTmSlBr0gKfN32LKLtcfNN3BUkH4sRy3BqP+83mfdknk27SHdrxqRicI
-# lkqzV1SBNAUzs1a2wFGZd601MOtUoh6KfHkql3yKakB+0uxoYJ0CAwEAAaOCAcsw
-# ggHHMB0GA1UdDgQWBBQgj8PlBePdhVdNFG22ZWGIL9DDrjAfBgNVHSMEGDAWgBRr
+# CgKCAgEAmAqU8Bof2GBrAgcNQX847ddBP371FgDN2zzBao5oEFIAyRaBK/SA+ckj
+# lGlVss1EzRUptZnrKNnL/PnHBPH1ZcE43YqsGw9IwDciagicnNijvGP9Jb2Zor+1
+# RNQwJpcuwTJgUtNd9GGo8UWQNQEkNyY/FhZcFmpI/ghKCqCVsEWVjzHQwqhYXGk7
+# 0ovvCjDWLkRj1Yl2lADC0hq9r9382mp72c2q6FhR7Nq1vb16PZypLxmv2g2tda6G
+# EFoAPjVm7vLJDX5yiqOGoN+z2Z5OVUEzMPsYpd8QkB60I6C8HMwEYZ0UEKa1wIyD
+# ez8+z0ASj3PgYhjYSL6LIl4LDmkTuHhjyU1y3o9L+4ORRSaZxNb3xbVm8Q2koDYk
+# pLUTeGl7PqYkd3m3kI+Qk04CIZWORKqlII6yrgxWJm0p0jrC3pg/rLRfN1dL6r6Z
+# KgvzTimF/KcdmvCjd9zhJ4dizEzMPvwfunzqGa++9CYWya3jTCnCUwbfKEFhMX17
+# hbx3IAVaHKit9oaF74TwkULU8d+tzpZYfLynibmUdzNEk6UHn99jtuUglGvFsUju
+# no9wIcx4PY36RNv81MblDNvb5MM4pxsCxNIoEhnPCmJC4M3ngG73uZACJKBSsrVX
+# MIz3OVrACB7ayOIm3v0yC/xMR/NotYl7sk3gwOgeGqCx/IxTjtkCAwEAAaOCAcsw
+# ggHHMB0GA1UdDgQWBBSBUqpZlOfb5LdXYRMiCUBwsoFQOjAfBgNVHSMEGDAWgBRr
 # aSg6NS9IY0DPe9ivSek+2T3bITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3
 # Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBS
 # U0ElMjBUaW1lc3RhbXBpbmclMjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0w
@@ -328,37 +308,37 @@ function Get-decryptedObject()
 # QSUyMDIwMjAuY3J0MAwGA1UdEwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUH
 # AwgwDgYDVR0PAQH/BAQDAgeAMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEw
 # PwYIKwYBBQUHAgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9j
-# cy9SZXBvc2l0b3J5Lmh0bTAIBgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBABYI
-# tNEMCf4jO326jYFxQAvCMGfmi2RhSc1QzXBYO6jNtC75y46K/fF/IXTkZxJlNPLk
-# NAeRaq2wxaFymTSha1p7/NTZZMDpDJ5RBi0CAFcwYERzii7SoMnPOuCZDjeAsbdn
-# gaXb9xBsI2I2+o0gjBOVxH5dorD+nzYry+c2Bbsl05rU4nNuTN3hLdD4gIH19+JL
-# x5HsTeOF8zE/posUfdy9qIau24D+iP/2Zp+Tpe3QZcyV3zaUMliwlbhIiKgeY2mJ
-# gI97poBt4VOspFIF8sdotea7X5SXP3XVCpQfadh4f1Kfju3E8NAOAY77WLOaIKlr
-# q3Whs1q0rTJAfshoL+/IjWCfJhAaDdcpYT/eQW4V5bRe+eMkcejdPbV/LDfYMHPL
-# pL9T0TWEN37JElETJYpFuyIhuzgR+Bcd2VVqP07ZLF2WrlxdiHtzG+YdUGpqz9op
-# fWJuLM6sjBpb+3jBCNw9Qdrl4AtWzhc8TGcaUC0NjPsYscnLq3wtqbY7+Sick8Ng
-# calEgb88EjYLw0X662KPjgyl+6MMR9LLTW71j3az/xJYUng2bwMiPQq4U9BUYTbV
-# SMdJBFcsAsKQTgrXBI0MtLtepFpNySuZb9G1cdAXG/PFKHFPMY4L9i5lsZWHsvmj
-# KXcup2/2WBAb6+rGRNu+s5u8EoK/gzPVWaqv62YBMYID1DCCA9ACAQEweDBhMQsw
+# cy9SZXBvc2l0b3J5Lmh0bTAIBgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBACPt
+# 7TLaVuEd6c2LHcinmMr4cS91aS/ZgJcYkm4S6j60YOg00aysvpdbDbShsbMW4Ks7
+# RVYM7rxrhghMLlSUV9QjJ2CJPeuXxdcCRr9N9a79VTvBlara55SZ9TJwRVNbmjbA
+# 60K00QNnCPhv0ryGgfnKnBSVGr00yCfo97D6XB8bmhwwHfPT9rLwiMQS73HGUDpz
+# e1pQMp10ZxL1yQn9pxXtLmJal9icpr5ReY8CQcXQ/9B5EmSgfIaqP3sTnUIylTn5
+# Xya5dhiGLMvAKIUVQq7kkQ8e8bWIHqZ/W6xJjK/SzU87U5wlJg8ERS94wpMMk1EC
+# ZHC2Jt79Av7+YOVCotAt0Uc/ywOX42dtIpr1owl4e+PPzST4twXSBOA3PO6JfT5+
+# 0VgMLfEd4WhivjD2DkvMyIQM7poPNTMxCqhrX9NoOsgaEc/ekLAZpUFvfxMnf5Ys
+# RkIKq7JI6gzcrUuM+UUI+Q3YhXn7amP2a0bC0+HDMCPtvKml+Uo6kL7FZSJ6MOlW
+# T0uA6KzYZZzAgLnVCbrjQHiKsHTbSt4s+MnVLs4phAazgV0q5oXG5p0nx1nXqnfg
+# RA87j+wm2nqnH+xnYl8LrGi7PksX65iv2xK15jEtP618Alp/iZig73bmgG7tySxg
+# Q1IXEfDkNqNom/e9o55EbqKEbktFYyoCTOmZ4GxhMYID1DCCA9ACAQEweDBhMQsw
 # CQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYD
 # VQQDEylNaWNyb3NvZnQgUHVibGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAIT
-# MwAAAER45LNw/Hbb6gAAAAAARDANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcN
-# AQkDMQ0GCyqGSIb3DQEJEAEEMC8GCSqGSIb3DQEJBDEiBCC6tSI85CumTB+qW9wF
-# s2jd6VYFZj2DubZPV9zNNB2UJjCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAE
-# IHVlSexp99Q55DMJ76ViYzA+1bRoGAjKaXZdpJ8aX+WWMHwwZaRjMGExCzAJBgNV
+# MwAAAENMzH30mIta1AAAAAAAQzANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcN
+# AQkDMQ0GCyqGSIb3DQEJEAEEMC8GCSqGSIb3DQEJBDEiBCAGqB9ercSWrCgL7b0c
+# axWN4s4o8ysQU/uGT3E9NkRqqDCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAE
+# IBdO/lhkOiIaaFrgdqA0coqhjgRHgdKdtMDrt7lCBcXeMHwwZaRjMGExCzAJBgNV
 # BAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMT
 # KU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAA
-# RHjks3D8dtvqAAAAAABEMCIEIJGTdLevn6sNO8C6r5zeWbRRMkdlpPkSZoljRvFR
-# gOW4MA0GCSqGSIb3DQEBCwUABIICAAbniwR6a5NVp1nh8c4+z53XxsiGDUtB50M2
-# 6WQyu7gQO3IwUwIuOuhMYpXY1vMufHiayMFtduc2OjQzyDAEotP9uDQUVPOYfWQZ
-# Buw+i6Zk8VOIFYTAfpWNFoVjWG8Sw3wpt7riUMt3pQyZyI28TwlQHBBbZ1pDk/Xn
-# SNnU9p05QkBfnhBT04E7kuCUTn72c5IEuieHfb92oecZOF476yWje5+7qx8ZzQkg
-# BMQXTAgXkpFrhCNVVzfo+CGZMFpV5fa9/4ewnYUqurTsvHhMaDVoJog1QpQCUZbU
-# d0cBRV4LzXTorb2ppF2jMGbhJHp9OhXVw2lh//cvMQkNq4tllhDQ3n86WxmVz/ev
-# VO0eIC5VP1AsIDNeajzK2AEo/m7RQN6wjndi6BsYrQ1GUcttCxuuqOBpO1MswmpN
-# wsuyZayEZZIryqhp5p36gLuYEQsLKfhGn7n5jeMU8YfQiBvzlc29JaPPdJBbME+1
-# elHhOU30NsvtoU8iqWh+Mit2z6UQPIA0geIutuBdbEmxbJnZTd54pTHDTWKTYhv3
-# eBSr4ffzZzZ+8qYCgEhKkSpmqHuk7KrKDKs6RfgoXLwEERahBHkT4POJGbijVIuI
-# ydpvzpuZF6nQLMHjBpyEh8lFbdLdjIGsZ6AhE0Og2RYWjGzYf3s5m+tt+oocrLoA
-# nAGZgjQN
+# Q0zMffSYi1rUAAAAAABDMCIEINutiF3rlS1w5GC1nD+VPxae17hOxwtYJ/FoHVbP
+# FL/IMA0GCSqGSIb3DQEBCwUABIICAJPannjQnKKddCIiy4iAOlXbovGWYm7JVfMq
+# qe4Wskofix9SbdFzsR8vpr+GQe85uQkLbJBomrSchOHe+nyRZngdudzpXMJxzK5M
+# Vhkd+cnz2ewZgbtD1P8hYnAOGwch+tTfQIT17v3Su9AdhjuMU8Nu2eAJUEl4McH9
+# 7TH9bs1Ze3zBGN3wMHC6JYYlbzvE9vNB+p8etnTFZGF/9xUn842+eww8F2yIpPes
+# qYlLP1cCMllXXKCvVhlLrPCrMnSPwJJGG3B+XE20x4nsgedTk9tLWll21IzCqocg
+# 4tXqO252vIAyCWqyV6CPxPaEFr5x2MWziSJA6Fdy0DPU3JhL2kT4hlUqwcVw5W00
+# xuW5UyQC9W2DXLm5dgpq78M0+9x1OhB7vJ2KH1XdOUikwRcQ1v/GSCbd1KHo65G8
+# 76HWpu3zr3UHhl8SJ4d2cY+u0zJ3niZw5hxJ+CUv25Y/5l5MjAlGThm1av2FPbwK
+# yeLmWfFXzQmwrGnmdmsKXjHtz8VPAvac65JPxInQjYMVXA2re1w8hj4dEe1sj4eO
+# BV50Shy/x6gRdUT5Mn2gajbqgrDi9iQKS6H86e0B1/bO1IRRGN9rxlhoSbgEAUNe
+# 6HO8Y5sgs4wmTqIaU7EKSDc6KgCwMbsPDKXvLuSEljnzooBz48VefX+eduuCfrvx
+# SLx8UZUl
 # SIG # End signature block
