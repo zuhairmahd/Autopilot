@@ -1,0 +1,104 @@
+{
+  "Scripts": [
+    {
+      "Version": "1.0.0",
+      "Name": "CreateVersionInventory"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "Register-Device"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "test"
+    }
+  ],
+  "Cmds": [
+    {
+      "Version": "1.0.0",
+      "Name": "check"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetHash"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "redeploy"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "register"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "update"
+    }
+  ],
+  "Functions": [
+    {
+      "Version": "1.0.0",
+      "Name": "ConnectToTenant"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetDecryptedObject"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetDeviceBySerialNumber"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetDeviceHash"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetDeviceInfo"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetDevices"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetDevicesByType"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetRequiredModules"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetScriptIntegrity"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetScriptUpdates"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetSignatureStatus"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "GetUSBDriveLetter"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "ListAllDevices"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "RestartDevice"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "SendDeviceCommand"
+    },
+    {
+      "Version": "1.0.0",
+      "Name": "VerifyEnrollmentStatus"
+    }
+  ]
+}
