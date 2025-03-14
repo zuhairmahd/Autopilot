@@ -1,4 +1,4 @@
-function Get-DeviceInfo()
+function GetDeviceInfo()
 {
     [CmdletBinding()]
     param

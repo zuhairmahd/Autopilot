@@ -1,4 +1,4 @@
-function Get-ScriptIntegrity()
+function GetScriptIntegrity()
 {
     [CmdletBinding()]
     param (

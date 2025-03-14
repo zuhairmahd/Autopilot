@@ -1,0 +1,108 @@
+{
+  "Functions": [
+    {
+      "Name": "ConnectToTenant",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetDecryptedObject",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetDeviceHash",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetDeviceInfo",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetDeviceBySerialNumber",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetDevices",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetDevicesByType",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetRequiredModules",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetScriptIntegrity",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetScriptUpdates",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetSignatureStatus",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetUSBDriveLetter",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "ListAllDevices",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "RestartDevice",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "SendDeviceCommand",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "TestScriptUpdates",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "VerifyEnrollmentStatus",
+      "Version": "2.0.0"
+    }
+  ],
+  "Scripts": [
+    {
+      "Name": "Register-Device",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "Package",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "test",
+      "Version": "2.0.0"
+    }
+  ],
+  "Cmds": [
+    {
+      "Name": "check",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "GetHash",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "redeploy",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "update",
+      "Version": "2.0.0"
+    },
+    {
+      "Name": "register",
+      "Version": "2.0.0"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-function Get-requiredModules()
+function GetRequiredModules()
 {
     [CmdletBinding()]
     param(

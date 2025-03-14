@@ -1,4 +1,4 @@
-Function Get-ScriptUpdates()
+Function GetScriptUpdates()
 {
     [cmdletbinding()]
     param

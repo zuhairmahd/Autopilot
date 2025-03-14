@@ -1,4 +1,4 @@
-function Get-SignatureStatus()
+function GetSignatureStatus()
 {
     [CmdletBinding()]
     param

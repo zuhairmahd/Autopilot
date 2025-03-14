@@ -1,24 +1,30 @@
 {
-    "ConnectToTenant": "2.2.2",
-    "GetDecryptedObject": "2.2.2",
-    "GetDeviceHash": "2.2.2",
-    "GetDeviceInfo": "2.2.2",
-    "GetDeviceBySerialNumber": "2.2.2",
-    "GetDevices": "2.2.2",
-    "GetDevicesByType": "2.2.2",
-    "GetRequiredModules": "2.2.2",
-    "GetScriptIntegrity": "2.2.2",
-    "GetScriptUpdates": "2.2.2",
-    "GetSignatureStatus": "2.2.2",
-    "GetUSBDriveLetter": "2.2.2",
-    "ListAllDevices": "2.2.2",
-    "RegisterDevice": "2.2.2",
-    "RestartDevice": "2.2.2",
-    "SendDeviceCommand": "2.2.2",
-    "TestScriptUpdates": "2.2.2",
-    "VerifyEnrollmentStatus": "2.2.2",
-    "check.cmd": "2.2.2",
-    "GetHash.cmd": "2.2.2",
-    "redeploy.cmd": "2.2.2",
-    "update.cmd": "2.2.2"
+    "functions": {
+        "ConnectToTenant": "2.2.2",
+        "GetDecryptedObject": "2.2.2",
+        "GetDeviceHash": "2.2.2",
+        "GetDeviceInfo": "2.2.2",
+        "GetDeviceBySerialNumber": "2.2.2",
+        "GetDevices": "2.2.2",
+        "GetDevicesByType": "2.2.2",
+        "GetRequiredModules": "2.2.2",
+        "GetScriptIntegrity": "2.2.2",
+        "GetScriptUpdates": "2.2.2",
+        "GetSignatureStatus": "2.2.2",
+        "GetUSBDriveLetter": "2.2.2",
+        "ListAllDevices": "2.2.2",
+        "RestartDevice": "2.2.2",
+        "SendDeviceCommand": "2.2.2",
+        "TestScriptUpdates": "2.2.2",
+        "VerifyEnrollmentStatus": "2.2.2"
+    },
+    "scripts": {
+        "Register-Device": "2.2.2"
+    },
+    "cmds": {
+        "check": "2.2.2",
+        "GetHash": "2.2.2",
+        "redeploy": "2.2.2",
+        "update": "2.2.2"
+    }
 }
