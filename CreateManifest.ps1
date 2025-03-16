@@ -1,4 +1,9 @@
-function CreateVersionInventory()
+[CmdletBinding()]
+param(
+    
+)
+
+function CreateManifest()
 {
     [CmdletBinding()]
     param (
@@ -42,12 +47,13 @@ function CreateVersionInventory()
                     Write-Verbose "$($function.BaseName)"
                     if ($function.BaseName -notin $version.Functions.name)
                     {
-                        Write-Verbose "Adding $($function.BaseName) to $inputFile"
-                        #Get the file hash.
+                        Write-Verbose "Computing hash for $($function.BaseName)"
                         $hash = Get-FileHash -Path $function.FullName -Algorithm SHA256
-                        $functions += @{"name" = $function.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                        Write-Verbose "Adding $($function.BaseName) to $inputFile"
+                        $functions += [ordered]@{"name" = $function.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
                     }
                 }
+                Write-Host "Processed $($functions.Count) Functions."
             }
             scripts
             {  
@@ -56,12 +62,13 @@ function CreateVersionInventory()
                     Write-Verbose "$($script.BaseName)"
                     if ($script.BaseName -notin $version.Scripts.name)
                     {
-                        Write-Verbose "Adding $($script.BaseName) to $inputFile"
-                        #Get the file hash.
+Write-Verbose "Computing hash for $($script.BaseName)"                        
                         $hash = Get-FileHash -Path $script.FullName -Algorithm SHA256
-                        $scripts += @{"name" = $script.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                        Write-Verbose "Adding $($script.BaseName) to $inputFile"
+                        $scripts += [ordered]@{"name" = $script.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
                     }
                 }
+                Write-Host "Processed $($scripts.Count)Scripts."
             }
             cmds
             {  
@@ -70,12 +77,13 @@ function CreateVersionInventory()
                     Write-Verbose "$($cmd.BaseName)"
                     if ($cmd.BaseName -notin $version.Cmds.name)
                     {
-                        Write-Verbose "Adding $($cmd.BaseName) to $inputFile"
-                        #Get the file hash.
+Write-Verbose "Computing hash for $($cmd.BaseName)"                        
                         $hash = Get-FileHash -Path $cmd.FullName -Algorithm SHA256
-                        $cmds += @{"name" = $cmd.BaseName; "version" = $versionNumber; "hash" = $hash.Hash}
+                        Write-Verbose "Adding $($cmd.BaseName) to $inputFile"
+                        $cmds += [ordered]@{"name" = $cmd.BaseName; "version" = $versionNumber; "hash" = $hash.Hash}
                     }
                 }
+                Write-Host "Processed $($cmds.Count) Cmds."
             }
             Default
             {
@@ -83,12 +91,11 @@ function CreateVersionInventory()
             }
         }        
     }
-    Write-Host "Functions: $($functions.Count)"
-    Write-Host "Scripts: $($scripts.Count)"
-    Write-Host "Cmds: $($cmds.Count)"
     $combined = @{"Functions" = $functions; "Scripts" = $scripts; "Cmds" = $cmds}    
     return $combined
 }
 
-$outputJSON = CreateVersionInventory -versionNumber "1.0.0" -functionsFolder "$($pwd)\Functions" -inputFile "$($pwd)\version.json" -rootFolder $PSScriptRoot
-$outputJSON | ConvertTo-Json | Set-Content -Path "$($pwd)\version1.json"
+$outputJSON = CreateManifest -versionNumber "1.0.0" -functionsFolder "$($pwd)\Functions" -inputFile "$($pwd)\manifest.json" -rootFolder $PSScriptRoot
+$outputJSON | ConvertTo-Json
+
+# $outputJSON | ConvertTo-Json | Set-Content -Path "$($pwd)\manifest.json"

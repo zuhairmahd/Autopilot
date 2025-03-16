@@ -1,4 +1,4 @@
-function CreateVersionInventory()
+function ReadManifest()
 {
     [CmdletBinding()]
     param (
