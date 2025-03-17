@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.0.0
+.VERSION 1.0
 .GUID 9c73a06a-4834-4f16-a2fe-b5077101d5c6
 .AUTHOR Zuhair Mahmoud
 .DESCRIPTION Deploys De-Bloat application

@@ -1,5 +1,133 @@
 {
-  "Functions": [],
-  "Scripts": [],
-  "Cmds": []
+  "Scripts": [
+    {
+      "name": "CreateRelease",
+      "version": "2.0.0",
+      "hash": "FD63E4B4CAA94F5BAE08427D8B8EDAA38E47A86D52B29718DF8AF5AFCFC7641F"
+    },
+    {
+      "name": "Register-Device",
+      "version": "2.0.0",
+      "hash": "2933163CB70F68B3D3E59A2BD3EBE884BA0D5BCFBAFC93C057427F2B8453D9E1"
+    },
+    {
+      "name": "test",
+      "version": "2.0.0",
+      "hash": "2933163CB70F68B3D3E59A2BD3EBE884BA0D5BCFBAFC93C057427F2B8453D9E1"
+    },
+    {
+      "name": "UpdateManifest",
+      "version": "2.0.0",
+      "hash": "A9BFAF3F338E5FDE265D9C9E557B3709A6334940CBCFD98EA4A80D17B9BF3521"
+    }
+  ],
+  "Cmds": [
+    {
+      "name": "check",
+      "version": "2.0.0",
+      "hash": "43708794C06A156BD43B521AF83447402C4B2EF3486A50B68D8D59ED8FB6B859"
+    },
+    {
+      "name": "GetHash",
+      "version": "2.0.0",
+      "hash": "48DC518E5F96092A9B64A8D1B8FBB64BDB9779E4DD7F28D2B4EA40EEE13AD419"
+    },
+    {
+      "name": "redeploy",
+      "version": "2.0.0",
+      "hash": "9979BB9376FC7A65C46764C81A887B03EB607E5E2BBC445CE2C792037EE1FDE5"
+    },
+    {
+      "name": "register",
+      "version": "2.0.0",
+      "hash": "CF47F20D294239A04D4E4F3E9AF72793BAC16E58B7575F8DDF81C008456FE2BC"
+    },
+    {
+      "name": "update",
+      "version": "2.0.0",
+      "hash": "D9CCCBA997B9AA259625243B6E1A1A4CDD4501B36ECFA2018935FE538407BBE5"
+    }
+  ],
+  "Functions": [
+    {
+      "name": "ConnectToTenant",
+      "version": "2.0.0",
+      "hash": "C75E84D1E9F2CCF010B44619DE4848D65133C22F7F2F8358DE89DA0D2C19A5C2"
+    },
+    {
+      "name": "GetDecryptedObject",
+      "version": "2.0.0",
+      "hash": "CC20E6195FBED218C78002DCC92FBDA2BE09FF8C61E8D62B6D2273ACD4E6B57E"
+    },
+    {
+      "name": "GetDeviceBySerialNumber",
+      "version": "2.0.0",
+      "hash": "062239817EDA31CDB0E6A0E9C13A3F81D3D5CB2AA63DEB771F3CD5848E813C17"
+    },
+    {
+      "name": "GetDeviceHash",
+      "version": "2.0.0",
+      "hash": "2988F3FD221A5A2B3783644122121383FB5E94D0EB831C4202E50C05EDC06B1C"
+    },
+    {
+      "name": "GetDeviceInfo",
+      "version": "2.0.0",
+      "hash": "2865287BF1500C28EB263D4C0A6FE5FCF525EE6C26175C95F28FD0D5C5EC4110"
+    },
+    {
+      "name": "GetDevices",
+      "version": "2.0.0",
+      "hash": "8CA71E49A8468575AFF4B9CB3575DFAB67F8E7F041D26DBB557142FCB50555D3"
+    },
+    {
+      "name": "GetDevicesByType",
+      "version": "2.0.0",
+      "hash": "EAAB43DEEB07A37F2F3B43931844CEE43C3D9C2F40C752DDFF2F177E0D8F9EC4"
+    },
+    {
+      "name": "GetRequiredModules",
+      "version": "2.0.0",
+      "hash": "72BCB79C2629DE94B9DC690633D49B847C06AA339B048BDC854FCAFA44D16364"
+    },
+    {
+      "name": "GetScriptIntegrity",
+      "version": "2.0.0",
+      "hash": "14BA38EA658414D05457FB187146B6D3D3CC02158619A57D5138CF2EEDD2BB7A"
+    },
+    {
+      "name": "GetScriptUpdates",
+      "version": "2.0.0",
+      "hash": "943A36ADEB5154546858F1D127E3AE2975AC4ADD84FF383D4858CAC5BA484D37"
+    },
+    {
+      "name": "GetSignatureStatus",
+      "version": "2.0.0",
+      "hash": "D5E0F957FA9F8EDFFB90273C11024F8B0A714D6FD556C46D906999564369C563"
+    },
+    {
+      "name": "GetUSBDriveLetter",
+      "version": "2.0.0",
+      "hash": "D64F1955BB6A88DC09EC17E0202FE2EE3277A3EAC808C89EED1F1A1B1ABF77E4"
+    },
+    {
+      "name": "ListAllDevices",
+      "version": "2.0.0",
+      "hash": "800186BE935572C47418FE822DC503EFD46443EEEC4733DDA289B58053A9CCB8"
+    },
+    {
+      "name": "RestartDevice",
+      "version": "2.0.0",
+      "hash": "C5B387164176F275E4493D78E87DF2FB347690287F4793B38C49AFF6E00CA1E6"
+    },
+    {
+      "name": "SendDeviceCommand",
+      "version": "2.0.0",
+      "hash": "12FA4D2E7951378849841139441E6BA5AC579C43570167EF8EACD2D08BCE03B5"
+    },
+    {
+      "name": "VerifyEnrollmentStatus",
+      "version": "2.0.0",
+      "hash": "8F60CD5AB90B744E263756BABFE02134D95703D958B55769118D1200C455EB74"
+    }
+  ]
 }
