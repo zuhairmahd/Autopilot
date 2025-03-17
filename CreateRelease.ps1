@@ -30,7 +30,7 @@ param(
     [string]$ReleaseFolder = "$($pwd)\Release",
     [string]$ManifestFile = "$ReleaseFolder\manifest.json",
     [switch]$Sign,
-    [switch]$Copy,
+    [switch]$NoCopy,
     [switch]$SkipFolderCheck
 )
 
@@ -201,11 +201,31 @@ function CreateManifest()
         [string]$ManifestFile
     )
     Write-Verbose "Received the following parameters:"
-    Write-Verbose "versionNumber: $versionNumber"
     Write-Verbose "rootFolder: $rootFolder"
     Write-Verbose "functionsFolder: $functionsFolder"
     Write-Verbose "ManifestFile: $ManifestFile"
+    Write-Verbose "ExclusionsFile: $ExclusionsFile"
     $success = $false
+    if (Test-Path -Path $ExclusionsFile)
+    {
+        $filesToExclude = (Get-Content -Path $ExclusionsFile | ConvertFrom-Json).exclusions
+        Write-Host "Reading $($filesToExclude.Count) exclusions from $($ExclusionsFile)..."
+        if ($filesToExclude.Count -gt 0)
+        {
+            Write-Host "Files to exclude:"
+            $filesToExclude | ForEach-Object { Write-Host $_ }
+        }
+        else 
+        {
+            Write-Host "No exclusions found in $($ExclusionsFile)"
+        }
+    }
+    else
+    {
+        Write-Host "Cannot find the exclusion file $($ExclusionsFile)."
+        $filesToExclude = @()
+    }
+    
     if (Test-Path -Path $ManifestFile)
     {
         Write-Host "Updating $($ManifestFile)..."
@@ -237,16 +257,25 @@ function CreateManifest()
                     if ($function.BaseName -notin $filesToExclude) 
                     {
                         Write-Verbose "Getting the version number for $($function.BaseName)"
-                        $versionNumber = [regex]::Match((Select-String -Path $function.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw), '\d+\.\d+\.\d').Value
-                        if (-not $versionNumber)
+                        $versionString = Select-String -Path $function.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw
+                        if ($versionString)
                         {
-                            Write-Warning "No version number found for $($function.BaseName)."
+                            $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+                        }
+                        else
+                        {
                             $versionNumber = '0.0.0'
                         }
+                        Write-Verbose "The version of $($function.BaseName) is $versionNumber"
                         Write-Verbose "Computing hash for $($function.BaseName)"
                         $hash = Get-FileHash -Path $function.FullName -Algorithm SHA256
+                        Write-Verbose "The hash of $($function.BaseName) is $($hash.Hash)"
                         Write-Verbose "Adding $($function.BaseName) to $manifestFile"
                         $functions += [ordered]@{"name" = $function.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                    }
+                    else 
+                    {
+                        Write-Verbose "Skipping $($function.BaseName)"
                     }
                 }
                 Write-Host "Processed $($functions.Count) Functions."
@@ -259,16 +288,25 @@ function CreateManifest()
                     if ($script.BaseName -notin $filesToExclude)
                     {
                         Write-Verbose "Getting the version number for $($script.BaseName)"
-                        $versionNumber = [regex]::Match((Select-String -Path $script.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw), '\d+\.\d+\.\d').Value
-                        if (-not $versionNumber)
+                        $versionString = Select-String -Path $script.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw
+                        if ($versionString)
                         {
-                            Write-Warning "No version number found for $($script.BaseName)."
+                            $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+                        }
+                        else
+                        {
                             $versionNumber = '0.0.0'
                         }
+                        Write-Verbose "The version of $($script.BaseName) is $versionNumber"
                         Write-Verbose "Computing hash for $($script.BaseName)"                        
                         $hash = Get-FileHash -Path $script.FullName -Algorithm SHA256
+                        Write-Verbose "The hash of $($script.BaseName) is $($hash.Hash)"
                         Write-Verbose "Adding $($script.BaseName) to $manifestFile"
                         $scripts += [ordered]@{"name" = $script.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                    }
+                    else
+                    {
+                        Write-Verbose "Skipping $($script.BaseName)"
                     }
                 }
                 Write-Host "Processed $($scripts.Count)Scripts."
@@ -281,16 +319,25 @@ function CreateManifest()
                     if ($cmd.BaseName -notin $filesToExclude)
                     {
                         Write-Verbose "Getting the version number for $($cmd.BaseName)"
-                        $versionNumber = [regex]::Match((Select-String -Path $cmd.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw), '\d+\.\d+\.\d').Value
-                        if (-not $versionNumber)
+                        $versionString = Select-String -Path $cmd.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw
+                        if ($versionString)
                         {
-                            Write-Warning "No version number found for $($cmd.BaseName)."
+                            $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+                        }
+                        else
+                        {
                             $versionNumber = '0.0.0'
                         }
+                        Write-Verbose "The version of $($cmd.BaseName) is $versionNumber"
                         Write-Verbose "Computing hash for $($cmd.BaseName)"                        
                         $hash = Get-FileHash -Path $cmd.FullName -Algorithm SHA256
+                        Write-Verbose "The hash of $($cmd.BaseName) is $($hash.Hash)"
                         Write-Verbose "Adding $($cmd.BaseName) to $manifestFile"
                         $cmds += [ordered]@{"name" = $cmd.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                    }
+                    else
+                    {
+                        Write-Verbose "Skipping $($cmd.BaseName)"
                     }
                 }
                 Write-Host "Processed $($cmds.Count) Cmds."
@@ -378,13 +425,11 @@ if ($sign)
 }
 else
 {
-    {
-        Write-Host "Skipping signing process."
-    }
+    Write-Host "Skipping signing process."
 }
 
 Write-Host "Creating manifest in $ReleaseFolder"
-if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
+if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile -verbose)
 {
     Write-Host "Manifest created successfully."
 }
@@ -394,14 +439,20 @@ else
     Write-Host "Run the script with the -verbose switch for more information."
 }
 
-
-Write-Host "Copying files and creating release folder."
-if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
+if (-not $NoCopy)
 {
-    Write-Host "Files copied successfully."
+    Write-Host "Copying files and creating release folder."
+    if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
+    {
+        Write-Host "Files copied successfully."
+    }
+    else
+    {
+        Write-Host "Failed to copy files."
+        Write-Host "Run the script with the -verbose switch for more information."
+    }
 }
 else
 {
-    Write-Host "Failed to copy files."
-    Write-Host "Run the script with the -verbose switch for more information."
+    Write-Host "Skipping copy process."
 }
