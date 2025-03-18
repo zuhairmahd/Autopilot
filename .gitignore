@@ -2,3 +2,5 @@
 .secrets/*
 .vscode
 .vscode/*
+release
+release/*
