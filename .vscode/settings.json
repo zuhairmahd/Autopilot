@@ -1,6 +1,6 @@
 {
     "powershell.powerShellAdditionalExePaths": {
-        "PWSH": "C:\\users\\mahmoudz\\code\\Autopilot\\pwsh\\pwsh.exe"
+        "PWSH": "c:\\users\\zuhai\\code\\Autopilot\\pwsh\\pwsh.exe"
     },
     "powershell.powerShellDefaultVersion": "PWSH"
 }

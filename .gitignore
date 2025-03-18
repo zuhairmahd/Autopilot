@@ -1,2 +1,4 @@
 .secrets
 .secrets/*
+.vscode
+.vscode/*
