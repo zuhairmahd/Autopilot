@@ -1,6 +1,42 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
 .secrets
 .secrets/*
 .vscode
 .vscode/*
 release
 release/*
+
+# PowerShell-specific files
+
+# PowerShell data files
+*.psd1
+*.psm1
+
+# PowerShell script logs
+*.log
+
+# PowerShell cache files
+*.cache
+
+# PowerShell compiled files
+*.ps1xml
+
+# Temporary files created during script execution
+*.tmp
+*.bak
+
+# Module build artifacts
+*.nupkg
+*.snupkg
+
+# Local PowerShell modules
+Modules/
