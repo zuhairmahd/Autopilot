@@ -30,8 +30,8 @@ param(
     [string]$ReleaseFolder = "$($pwd)\Release",
     [string]$ManifestFile = "$ReleaseFolder\manifest.json",
     [switch]$Sign,
-    [switch]$NoCopy,
-    [switch]$SkipFolderCheck
+    [switch]$Copy,
+    [switch]$Overwrite
 )
 
 
@@ -368,7 +368,7 @@ function CreateManifest()
 }
 
 ### Main script ###
-if (-not $SkipFolderCheck)
+if ($Overwrite)
 {
     if (-not (Test-Path -Path $ReleaseFolder))
     {
@@ -405,6 +405,18 @@ if (-not $SkipFolderCheck)
 else 
 {
     Write-Host "Skipping folder check."
+    #Just make sure we can release the manifest file.
+    if (-not (Test-Path -Path $ReleaseFolder))
+    {
+        Write-Verbose "Creating $ReleaseFolder"
+        New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
+        Write-Verbose "Creating $releaseFolder\functions"
+        New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
+    }
+    else 
+    {
+        Write-Host "Destination folder $releaseFolder already exists."
+    }
 }
 
 
@@ -429,7 +441,7 @@ else
 }
 
 Write-Host "Creating manifest in $ReleaseFolder"
-if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile -verbose)
+if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
 {
     Write-Host "Manifest created successfully."
 }
@@ -439,7 +451,7 @@ else
     Write-Host "Run the script with the -verbose switch for more information."
 }
 
-if (-not $NoCopy)
+if ($Copy)
 {
     Write-Host "Copying files and creating release folder."
     if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
