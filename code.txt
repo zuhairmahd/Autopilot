@@ -1,4 +1,4 @@
-    Write-Host "Read $($version.functions.Count) functions, $($version.scripts.Count) scripts and $($version.cmds.Count) command files from version.json"
+    Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts and $($manifest.cmds.Count) command files from $manifest"
     foreach ($category in $version.PSObject.Properties)
     {
         Write-Host "Processing $($category.Value.Count) $($category.Name)s"
@@ -215,3 +215,93 @@ $outputJSON | ConvertTo-Json | Set-Content -Path "$($pwd)\version.json"
 # }
 
 # Call the function
+
+
+
+function CopyFiles()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFolder,
+        [Parameter(Mandatory = $false)]
+        [string]$DestinationFolder = "$sourceFolder\Release",
+        [Parameter(Mandatory = $false)]
+        [string]$FunctionsFolder = "$sourceFolder\functions",
+        [string]$exclusionsFile = "$SourceFolder\exclusions.json"
+    )
+    if (Test-Path -Path $exclusionsFile)
+    {
+        $filesToExclude = (Get-Content -Path $exclusionsFile | ConvertFrom-Json).exclusions
+        Write-Host "Reading $($filesToExclude.Count) exclusions from $($exclusionsFile)..."
+    }
+    else
+    {
+        Write-Host "Cannot find the exclusion file $($exclusionsFile)."
+        $filesToExclude = @()
+    }    
+    Write-Verbose "Files to exclude:"
+    $filesToExclude | ForEach-Object { Write-Verbose $_ }
+    Write-Verbose "Received the following parameters:"
+    Write-Verbose "SourceFolder: $SourceFolder"
+    Write-Verbose "DestinationFolder: $DestinationFolder"
+    Write-Verbose "FunctionsFolder: $FunctionsFolder"
+    Write-Verbose "Copying files from $SourceFolder to $DestinationFolder"
+    $success = $false
+
+    $scripts = Get-ChildItem -Path "$SourceFolder\*" -Include *.ps1, *.cmd -Force
+    $functions = Get-ChildItem -Path "$sourceFolder\functions\*" -Include *.ps1 -Force
+    
+    if ($scripts.Count -gt 0)
+    {
+        $filesToCopy = $scripts.FullName
+        Write-Host "Copying $($filesToCopy.Count) files from $SourceFolder to $DestinationFolder"
+        $filesToCopy | ForEach-Object {
+            Write-Verbose "Processing $_"
+            #Asign only the name of the file to a variable called filename by using a regex pattern to remove the parent folder and the file extension. 
+            $filename = [regex]::Match($_, '([^\\]+)(?=\.\w+$)').Value
+            Write-Verbose "Checking if $filename is in the exclusion list."
+            if ($filename -notin $filesToExclude)
+            {
+                Write-Verbose "Copying $filename to $DestinationFolder"
+                Copy-Item -Path $_ -Destination $DestinationFolder -Force
+            }
+            else
+            {
+                Write-Host "Skipping $filename"
+            }
+        }
+        Write-Host "Copy process complete."
+    }
+    else
+    {
+        Write-Host "No scripts found in $SourceFolder"
+        $success = $false
+    }
+    if ($functions.Count -gt 0)
+    {
+        Write-Host "Found $($functions.Count) files in $SourceFolder\functions"
+        $filesToCopy = $functions.FullName
+        Write-Host "Copying $($filesToCopy.Count) files from $FunctionsFolder to $DestinationFolder\functions"
+        $filesToCopy | ForEach-Object {
+            Write-Verbose "Processing $_"
+            # Asign only the name of the file to a variable called filename by using a regex pattern to remove the parent folder and the file extension.
+            $filename = [regex]::Match($_, '([^\\]+)(?=\.\w+$)').Value
+            Write-Verbose "Checking if $filename is in the exclusion list."
+            # if the file is not in the exclusion list, copy it.
+            if ($filename -notin $filesToExclude)
+            {
+                Write-Verbose "Copying $_ to $DestinationFolder\functions"
+                Copy-Item -Path $_ -Destination $DestinationFolder\functions -Force
+            }
+            else
+            {
+                Write-Host "Skipping $filename"
+            }
+        }
+    }
+    Write-Host "Copy process complete."
+    $success = $true
+    return $success
+}
+

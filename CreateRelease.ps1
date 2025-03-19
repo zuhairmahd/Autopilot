@@ -31,7 +31,8 @@ param(
     [string]$ManifestFile = "$ReleaseFolder\manifest.json",
     [switch]$Sign,
     [switch]$Copy,
-    [switch]$Overwrite
+    [switch]$Overwrite,
+    [switch]$NoManifest
 )
 
 
@@ -100,6 +101,7 @@ function SignScripts()
     return $success
 }
 
+
 function CopyFiles()
 {
     [CmdletBinding()]
@@ -110,81 +112,26 @@ function CopyFiles()
         [string]$DestinationFolder = "$sourceFolder\Release",
         [Parameter(Mandatory = $false)]
         [string]$FunctionsFolder = "$sourceFolder\functions",
-        [string]$exclusionsFile = "$SourceFolder\exclusions.json"
+        [Parameter(Mandatory = $true)]
+        [string]$manifestFile = "$DestinationFolder\manifest.json"
     )
-    if (Test-Path -Path $exclusionsFile)
-    {
-        $filesToExclude = (Get-Content -Path $exclusionsFile | ConvertFrom-Json).exclusions
-        Write-Host "Reading $($filesToExclude.Count) exclusions from $($exclusionsFile)..."
-    }
-    else
-    {
-        Write-Host "Cannot find the exclusion file $($exclusionsFile)."
-        $filesToExclude = @()
-    }    
-    Write-Verbose "Files to exclude:"
-    $filesToExclude | ForEach-Object { Write-Verbose $_ }
     Write-Verbose "Received the following parameters:"
     Write-Verbose "SourceFolder: $SourceFolder"
     Write-Verbose "DestinationFolder: $DestinationFolder"
     Write-Verbose "FunctionsFolder: $FunctionsFolder"
-    Write-Verbose "Copying files from $SourceFolder to $DestinationFolder"
+    Write-Verbose "Manifest: $manifest"
     $success = $false
+    # Check if any of the required paths do not exist, set $success to false and return $success.
+    if (-not (Test-Path -Path $DestinationFolder) -or -not (Test-Path -Path $manifestFile) -or -not (Test-Path -Path $FunctionsFolder))
+    {
+        Write-Host "Cannot find one or more required paths: DestinationFolder ($DestinationFolder), ManifestFile ($manifest), or FunctionsFolder ($FunctionsFolder)."
+        return $success
+    }
+    # Get the manifest file and convert it to a hashtable.
+    $manifest = Get-Content -Path $manifestFile | ConvertFrom-Json
+    Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts and $($manifest.cmds.Count) command files from $($manifestFile)."
 
-    $scripts = Get-ChildItem -Path "$SourceFolder\*" -Include *.ps1, *.cmd -Force
-    $functions = Get-ChildItem -Path "$sourceFolder\functions\*" -Include *.ps1 -Force
-    
-    if ($scripts.Count -gt 0)
-    {
-        $filesToCopy = $scripts.FullName
-        Write-Host "Copying $($filesToCopy.Count) files from $SourceFolder to $DestinationFolder"
-        $filesToCopy | ForEach-Object {
-            Write-Verbose "Processing $_"
-            #Asign only the name of the file to a variable called filename by using a regex pattern to remove the parent folder and the file extension. 
-            $filename = [regex]::Match($_, '([^\\]+)(?=\.\w+$)').Value
-            Write-Verbose "Checking if $filename is in the exclusion list."
-            if ($filename -notin $filesToExclude)
-            {
-                Write-Verbose "Copying $filename to $DestinationFolder"
-                Copy-Item -Path $_ -Destination $DestinationFolder -Force
-            }
-            else
-            {
-                Write-Host "Skipping $filename"
-            }
-        }
-        Write-Host "Copy process complete."
-    }
-    else
-    {
-        Write-Host "No scripts found in $SourceFolder"
-        $success = $false
-    }
-    if ($functions.Count -gt 0)
-    {
-        Write-Host "Found $($functions.Count) files in $SourceFolder\functions"
-        $filesToCopy = $functions.FullName
-        Write-Host "Copying $($filesToCopy.Count) files from $FunctionsFolder to $DestinationFolder\functions"
-        $filesToCopy | ForEach-Object {
-            Write-Verbose "Processing $_"
-            # Asign only the name of the file to a variable called filename by using a regex pattern to remove the parent folder and the file extension.
-            $filename = [regex]::Match($_, '([^\\]+)(?=\.\w+$)').Value
-            Write-Verbose "Checking if $filename is in the exclusion list."
-            # if the file is not in the exclusion list, copy it.
-            if ($filename -notin $filesToExclude)
-            {
-                Write-Verbose "Copying $_ to $DestinationFolder\functions"
-                Copy-Item -Path $_ -Destination $DestinationFolder\functions -Force
-            }
-            else
-            {
-                Write-Host "Skipping $filename"
-            }
-        }
-    }
-    Write-Host "Copy process complete."
-    $success = $true
-    return $success
+
 }
 
 function CreateManifest()
@@ -368,6 +315,9 @@ function CreateManifest()
 }
 
 ### Main script ###
+CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -Manifest $ManifestFile
+exit 0
+
 if ($Overwrite)
 {
     if (-not (Test-Path -Path $ReleaseFolder))
@@ -440,15 +390,22 @@ else
     Write-Host "Skipping signing process."
 }
 
-Write-Host "Creating manifest in $ReleaseFolder"
-if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
+if (-not $NoManifest)
 {
-    Write-Host "Manifest created successfully."
+    Write-Host "Creating manifest in $ReleaseFolder"
+    if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
+    {
+        Write-Host "Manifest created successfully."
+    }
+    else
+    {
+        Write-Host "Failed to create manifest."
+        Write-Host "Run the script with the -verbose switch for more information."
+    }
 }
-else
+else 
 {
-    Write-Host "Failed to create manifest."
-    Write-Host "Run the script with the -verbose switch for more information."
+    Write-Host "Skipping manifest creation."
 }
 
 if ($Copy)
