@@ -13,14 +13,21 @@
     Creates a release package
 .DESCRIPTION 
     This script creates a release package by copying files from the source folder to the release folder, signing the scripts, and creating a manifest file.
-.PARAMETER SourceFolder The folder containing the scripts to be copied.
-.PARAMETER ReleaseFolder The folder where the release package will be created.
-.PARAMETER ManifestFile The path to the manifest file.
-.PARAMETER Sign A switch to sign the scripts.
-.PARAMETER Copy A switch to copy the files.
-.PARAMETER SkipFolderCheck A switch to skip the release folder check.
+.PARAMETER SourceFolder The folder containing the scripts to be copied. Defaults to the script root folder.
+.PARAMETER ReleaseFolder The folder where the release package will be created. Defaults to a "Release" folder in the current working directory.
+.PARAMETER ManifestFile The path to the manifest file. Defaults to "manifest.json" in the release folder.
+.PARAMETER Sign A switch to sign the scripts in the specified folders.
+.PARAMETER Copy A switch to copy the files from the source folder to the release folder.
+.PARAMETER Manifest A switch to create or update the manifest file.
+.PARAMETER Overwrite A switch to overwrite the release folder if it already exists.
+.PARAMETER FullRelease A switch to perform all actions: signing, copying, and manifest creation.
 .EXAMPLE
-    .\CreateRelease.ps1 -SourceFolder C:\Scripts -ReleaseFolder C:\Release -ManifestFile C:\Release\manifest.json -Sign
+    .\CreateRelease.ps1 -SourceFolder C:\Scripts -ReleaseFolder C:\Release -ManifestFile C:\Release\manifest.json -Sign -Copy -Manifest
+    Creates a release package by signing the scripts in the specified folders, copying the files from the source folder to the release folder, and creating a manifest file.
+.EXAMPLE
+    .\CreateRelease.ps1 -SourceFolder C:\Scripts -ReleaseFolder C:\Release -ManifestFile C:\Release\manifest.json -FullRelease
+    Creates a release package by signing the scripts in the specified folders, copying the files from the source folder to the release folder, and creating a manifest file.
+    .NOTES
 #>
 
 
@@ -298,10 +305,11 @@ function CreateManifest()
                         if ($versionString)
                         {
                             $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+                            $versionNumber = [System.Version]$versionNumber
                         }
                         else
                         {
-                            $versionNumber = '0.0.0'
+                            $versionNumber = $versionNumber = [System.Version]'0.0.0'
                         }
                         Write-Verbose "The version of $($function.BaseName) is $versionNumber"
                         Write-Verbose "Computing hash for $($function.BaseName)"
@@ -329,10 +337,11 @@ function CreateManifest()
                         if ($versionString)
                         {
                             $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+                            $versionNumber = [System.Version]$versionNumber
                         }
                         else
                         {
-                            $versionNumber = '0.0.0'
+                            $versionNumber = [System.Version]'0.0.0'
                         }
                         Write-Verbose "The version of $($script.BaseName) is $versionNumber"
                         Write-Verbose "Computing hash for $($script.BaseName)"                        
@@ -360,10 +369,11 @@ function CreateManifest()
                         if ($versionString)
                         {
                             $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+                            $versionNumber = [System.Version]$versionNumber
                         }
                         else
                         {
-                            $versionNumber = '0.0.0'
+                            $versionNumber = [System.Version]'0.0.0'
                         }
                         Write-Verbose "The version of $($cmd.BaseName) is $versionNumber"
                         Write-Verbose "Computing hash for $($cmd.BaseName)"                        
@@ -386,7 +396,7 @@ function CreateManifest()
         }        
     }
     $combined = @{'Functions' = $functions; 'Scripts' = $scripts; 'Cmds' = $cmds }    
-    $combined | ConvertTo-Json | Set-Content -Path $ManifestFile -Force    
+    $combined | ConvertTo-Json -Depth 5 | Set-Content -Path $ManifestFile -Force    
     Write-Host "Successfully updated $($ManifestFile)"
     $success = $true
     return $success

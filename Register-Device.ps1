@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.0
+.VERSION 1.0.0
 .GUID 9c73a06a-4834-4f16-a2fe-b5077101d5c6
 .AUTHOR Zuhair Mahmoud
 .DESCRIPTION Deploys De-Bloat application
@@ -304,37 +304,37 @@ if ($Redeploy)
     }
     else
     {
-        $reminderMessage = "Remember to reboot the device after the script completes."
+        $reminderMessage = 'Remember to reboot the device after the script completes.'
     }
     $enrollmentState = VerifyEnrollmentStatus -serialNumber $SerialNumber
     Write-Verbose "The enrollment state is $enrollmentState"
     if (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $false))
     {
         Write-Host "The device with serial number $SerialNumber is not imported or enrolled." -ForegroundColor Yellow
-        Write-Host "Continue to import the device." -ForegroundColor Yellow
+        Write-Host 'Continue to import the device.' -ForegroundColor Yellow
     }
     elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $false))
     {
         Write-Host 'The device is imported in Intune but is not enrolled.' -ForegroundColor Yellow
-        Write-Host "Continue to check assignment." -ForegroundColor Yellow
+        Write-Host 'Continue to check assignment.' -ForegroundColor Yellow
     }
     elseif (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $true))
     {
-        Write-Host "This is not an Autopilot device" -ForegroundColor Red
-        Write-Host "Please contact an Intune administrator." -ForegroundColor Red
+        Write-Host 'This is not an Autopilot device' -ForegroundColor Red
+        Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
     }
     elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $true))
     {
-        Write-Host "The device is enrolled and is registered to a user."
+        Write-Host 'The device is enrolled and is registered to a user.'
         if ($enrollmentState.userName -ne 'unknown')
         {
             Write-Host "The registered user is $($enrollmentState.username)"
-            Write-Host "You must wipe the device to get it ready for another user"
-            Write-Host "Wiping a device is a distructive command.  Make sure you are wiping the correct device."
+            Write-Host 'You must wipe the device to get it ready for another user'
+            Write-Host 'Wiping a device is a distructive command.  Make sure you are wiping the correct device.'
             Write-Host "Device id: $($enrollmentState.id)"
             Write-Host "Device serial number: $SerialNumber"
             Write-Host "Registered user: $($enrollmentState.username) `r`n"
-            Write-Host "Would you still like to send a wipe command to the device? (Y/N)"
+            Write-Host 'Would you still like to send a wipe command to the device? (Y/N)'
             $response = Read-Host
             while ($response -notin 'Y', 'N')
             {
@@ -348,26 +348,26 @@ if ($Redeploy)
                 if ($response -eq $true)
                 {
                     Write-Host "The wipe command has been sent to the device with serial number $SerialNumber."
-                    Write-Host "Please manually sync the device or give the device enough time to sync and reset."
-                    Write-Host "The device will be ready for another user after the wipe is complete."
-                    Write-Host "Please contact an Intune admin if you have any problems."
+                    Write-Host 'Please manually sync the device or give the device enough time to sync and reset.'
+                    Write-Host 'The device will be ready for another user after the wipe is complete.'
+                    Write-Host 'Please contact an Intune admin if you have any problems.'
                 }
                 else
                 {
                     Write-Host "The wipe command failed to send to the device with serial number $SerialNumber."
-                    Write-Host "Please contact an Intune admin."
+                    Write-Host 'Please contact an Intune admin.'
                 }
                 exit 0
             }
             else
             {
-                Write-Host "Aborting script."
+                Write-Host 'Aborting script.'
                 exit 0
             }
         }
         else
         {
-            Write-Host "The user is not registered."
+            Write-Host 'The user is not registered.'
         }
     }
     else
@@ -390,7 +390,7 @@ if ($assignment)
         if ($reminderMessage.Length -gt 0)
         {
             Write-Host $reminderMessage
-            Write-Host "Script complete."
+            Write-Host 'Script complete.'
         }
         else 
         {
