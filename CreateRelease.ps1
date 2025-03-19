@@ -31,9 +31,30 @@ param(
     [string]$ManifestFile = "$ReleaseFolder\manifest.json",
     [switch]$Sign,
     [switch]$Copy,
+    [switch]$Manifest,
     [switch]$Overwrite,
-    [switch]$NoManifest
+    [switch]$FullRelease
 )
+
+$foldersToSign = @(
+    $PSScriptRoot,
+    "$PSScriptRoot\functions"
+)
+#write verbose messages with the passed commandline values.
+Write-Verbose 'Received the following parameters:'
+Write-Verbose "SourceFolder: $SourceFolder"
+Write-Verbose "ReleaseFolder: $ReleaseFolder"
+Write-Verbose "ManifestFile: $ManifestFile"
+Write-Verbose 'The following switches were passed:'
+Write-Verbose "Sign: $Sign"
+Write-Verbose "Copy: $Copy"
+Write-Verbose "Overwrite: $Overwrite"
+Write-Verbose "FullRelease: $FullRelease"
+
+if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease))
+{
+    throw 'At least one of the following switches must be provided: -Copy, -Sign, -Manifest, or -FullRelease.'
+}
 
 
 function SignScripts()
@@ -45,7 +66,7 @@ function SignScripts()
     )
     Write-Verbose "Signing files in $Path"
     $success = $false
-    $files = Get-ChildItem -Path $path -Filter *.ps1 -Recurse
+    $files = Get-ChildItem -Path $path -Filter *.ps1
     if ($files.Count -eq 0)
     {
         Write-Host "No files found in $Path"
@@ -84,7 +105,7 @@ function SignScripts()
         'TimestampDigest'        = 'SHA256'
         files                    = $filesToSign
     }
-    Write-Verbose "Signing the following files:"
+    Write-Verbose 'Signing the following files:'
     $filesToSign | ForEach-Object { Write-Verbose $_ }
     try
     {
@@ -115,12 +136,13 @@ function CopyFiles()
         [Parameter(Mandatory = $true)]
         [string]$manifestFile = "$DestinationFolder\manifest.json"
     )
-    Write-Verbose "Received the following parameters:"
+    Write-Verbose 'Received the following parameters:'
     Write-Verbose "SourceFolder: $SourceFolder"
     Write-Verbose "DestinationFolder: $DestinationFolder"
     Write-Verbose "FunctionsFolder: $FunctionsFolder"
-    Write-Verbose "Manifest: $manifest"
+    Write-Verbose "Manifest: $manifestFile"
     $success = $false
+    $destinationFunctionsFolder = "$DestinationFolder\functions"
     # Check if any of the required paths do not exist, set $success to false and return $success.
     if (-not (Test-Path -Path $DestinationFolder) -or -not (Test-Path -Path $manifestFile) -or -not (Test-Path -Path $FunctionsFolder))
     {
@@ -130,8 +152,76 @@ function CopyFiles()
     # Get the manifest file and convert it to a hashtable.
     $manifest = Get-Content -Path $manifestFile | ConvertFrom-Json
     Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts and $($manifest.cmds.Count) command files from $($manifestFile)."
-
-
+    foreach ($category in $manifest.PSObject.Properties)
+    {
+        Write-Host "Processing $($category.Value.Count) $($category.Name)s"
+        switch ($category.Name) 
+        {
+            functions
+            {
+                foreach ($function in $category.Value)
+                {
+                    Write-Verbose "Copying $($function.name) to $destinationFunctionsFolder"
+                    try
+                    {
+                        Copy-Item -Path "$FunctionsFolder\$($function.name).ps1" -Destination $destinationFunctionsFolder -Force    
+                    }
+                    catch
+                    {
+                        Write-Error "Failed to copy $($function.name) to $destinationFunctionsFolder"
+                        Write-Error $_.Exception.Message
+                        $success = $false
+                        return $success
+                    }
+                }
+                Write-Host "Copied $($category.Value.Count) functions."
+            }
+            scripts
+            {
+                foreach ($script in $category.Value)
+                {
+                    Write-Verbose "Copying $($script.name) to $DestinationFolder"
+                    try
+                    {
+                        Copy-Item -Path "$SourceFolder\$($script.name).ps1" -Destination $DestinationFolder -Force    
+                    }
+                    catch
+                    {
+                        Write-Error "Failed to copy $($script.name) to $DestinationFolder"
+                        Write-Error $_.Exception.Message
+                        $success = $false
+                        return $success
+                    }
+                }
+                Write-Host "Copied $($category.Value.Count) scripts."
+            }
+            cmds
+            {
+                foreach ($cmd in $category.Value)
+                {
+                    Write-Verbose "Copying $($cmd.name) to $DestinationFolder"
+                    try
+                    {
+                        Copy-Item -Path "$SourceFolder\$($cmd.name).cmd" -Destination $DestinationFolder -Force    
+                    }
+                    catch
+                    {
+                        Write-Error "Failed to copy $($cmd.name) to $DestinationFolder"
+                        Write-Error $_.Exception.Message
+                        $success = $false
+                        return $success
+                    }
+                }
+                Write-Host "Copied $($category.Value.Count) command files."
+            }
+            Default
+            {
+                Write-Host 'Unknown category'
+            }
+        }
+    }
+    $success = $true
+    return $success
 }
 
 function CreateManifest()
@@ -147,7 +237,7 @@ function CreateManifest()
         [Parameter(Mandatory = $true)]
         [string]$ManifestFile
     )
-    Write-Verbose "Received the following parameters:"
+    Write-Verbose 'Received the following parameters:'
     Write-Verbose "rootFolder: $rootFolder"
     Write-Verbose "functionsFolder: $functionsFolder"
     Write-Verbose "ManifestFile: $ManifestFile"
@@ -159,8 +249,8 @@ function CreateManifest()
         Write-Host "Reading $($filesToExclude.Count) exclusions from $($ExclusionsFile)..."
         if ($filesToExclude.Count -gt 0)
         {
-            Write-Host "Files to exclude:"
-            $filesToExclude | ForEach-Object { Write-Host $_ }
+            Write-Verbose 'Files to exclude:'
+            $filesToExclude | ForEach-Object { Write-Verbose $_ }
         }
         else 
         {
@@ -181,7 +271,7 @@ function CreateManifest()
     {
         Write-Host "Creating $($ManifestFile)..."
     }
-    $version = @{"Functions" = @(); "Scripts" = @(); "Cmds" = @() }
+    $version = @{'Functions' = @(); 'Scripts' = @(); 'Cmds' = @() }
     $version | ConvertTo-Json | Set-Content -Path $ManifestFile -Force
     $functionFiles = Get-ChildItem -File -Path $functionsFolder -Recurse -Include *.ps1 -Force
     $scriptFiles = Get-ChildItem -Path "$pwd" *.ps1 -Force
@@ -218,7 +308,7 @@ function CreateManifest()
                         $hash = Get-FileHash -Path $function.FullName -Algorithm SHA256
                         Write-Verbose "The hash of $($function.BaseName) is $($hash.Hash)"
                         Write-Verbose "Adding $($function.BaseName) to $manifestFile"
-                        $functions += [ordered]@{"name" = $function.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                        $functions += [ordered]@{'name' = $function.BaseName; 'version' = $versionNumber; 'hash' = $hash.Hash }
                     }
                     else 
                     {
@@ -249,7 +339,7 @@ function CreateManifest()
                         $hash = Get-FileHash -Path $script.FullName -Algorithm SHA256
                         Write-Verbose "The hash of $($script.BaseName) is $($hash.Hash)"
                         Write-Verbose "Adding $($script.BaseName) to $manifestFile"
-                        $scripts += [ordered]@{"name" = $script.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                        $scripts += [ordered]@{'name' = $script.BaseName; 'version' = $versionNumber; 'hash' = $hash.Hash }
                     }
                     else
                     {
@@ -280,7 +370,7 @@ function CreateManifest()
                         $hash = Get-FileHash -Path $cmd.FullName -Algorithm SHA256
                         Write-Verbose "The hash of $($cmd.BaseName) is $($hash.Hash)"
                         Write-Verbose "Adding $($cmd.BaseName) to $manifestFile"
-                        $cmds += [ordered]@{"name" = $cmd.BaseName; "version" = $versionNumber; "hash" = $hash.Hash }
+                        $cmds += [ordered]@{'name' = $cmd.BaseName; 'version' = $versionNumber; 'hash' = $hash.Hash }
                     }
                     else
                     {
@@ -291,34 +381,19 @@ function CreateManifest()
             }
             Default
             {
-                Write-Host "Unknown filetype"
+                Write-Host 'Unknown filetype'
             }
         }        
     }
-    $combined = @{"Functions" = $functions; "Scripts" = $scripts; "Cmds" = $cmds }    
-    try
-    {
-        $combined | ConvertTo-Json | Set-Content -Path $ManifestFile -Force    
-        Write-Host "Successfully updated $($ManifestFile)"
-        if ($copy)
-        {
-            Write-Host "Successfully copied files to $ReleaseFolder"
-        }
-        $success = $true
-    }
-    catch
-    {
-        Write-Error "Failed to write to $($ManifestFile)"
-        $success = $false
-    }
+    $combined = @{'Functions' = $functions; 'Scripts' = $scripts; 'Cmds' = $cmds }    
+    $combined | ConvertTo-Json | Set-Content -Path $ManifestFile -Force    
+    Write-Host "Successfully updated $($ManifestFile)"
+    $success = $true
     return $success
 }
 
 ### Main script ###
-CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -Manifest $ManifestFile
-exit 0
-
-if ($Overwrite)
+if (-not $Overwrite) 
 {
     if (-not (Test-Path -Path $ReleaseFolder))
     {
@@ -330,7 +405,7 @@ if ($Overwrite)
     else 
     {
         Write-Host "Destination folder $releaseFolder already exists."
-        Write-Host "Would you like to delete and start fresh?"
+        Write-Host 'Would you like to delete and start fresh?'
         do
         {
             $response = Read-Host "Enter 'Y' to delete and start fresh or 'N' to exit"
@@ -339,7 +414,7 @@ if ($Overwrite)
         {
             Write-Host "Deleting contents of $releaseFolder..."
             Remove-Item -Path $releaseFolder\* -Recurse -Force
-            Write-Host "Starting fresh..."
+            Write-Host 'Starting fresh...'
             Write-Verbose "Creating $releaseFolder"
             New-Item -Path $releaseFolder -ItemType Directory -Force | Out-Null
             Write-Verbose "Creating $releaseFolder\functions"
@@ -347,15 +422,14 @@ if ($Overwrite)
         }    
         else 
         {
-            Write-Host "Exiting..."
+            Write-Host 'Exiting...'
             exit 0  
         }
     }
 }
 else 
 {
-    Write-Host "Skipping folder check."
-    #Just make sure we can release the manifest file.
+    Write-Host 'Skipping folder check.'
     if (-not (Test-Path -Path $ReleaseFolder))
     {
         Write-Verbose "Creating $ReleaseFolder"
@@ -365,63 +439,64 @@ else
     }
     else 
     {
-        Write-Host "Destination folder $releaseFolder already exists."
+        Write-Host "Found Destination folder $releaseFolder"
     }
 }
 
 
-if ($sign)
+if (($sign) -or ($FullRelease))
 {
-    Write-Host "Signing files in release folder..."
-    Write-Verbose "Signing files in the following folders:"
-    $ReleaseFolder | ForEach-Object { Write-Verbose $_ }
-    if (SignScripts -Path $ReleaseFolder)
+    foreach ($folder in $foldersToSign)
     {
-        Write-Host "Files signed successfully."
-    }
-    else
-    {
-        Write-Host "Failed to sign files in $ReleaseFolder"
-        Write-Host "Run the script with the -verbose switch for more information."
+        $folder | ForEach-Object { Write-Verbose $_ }
+        if (SignScripts -Path $folder)
+        {
+            Write-Host 'Files signed successfully.'
+        }
+        else
+        {
+            Write-Host "Failed to sign files in $ReleaseFolder"
+            Write-Host 'Run the script with the -verbose switch for more information.'
+        }
     }
 }
 else
 {
-    Write-Host "Skipping signing process."
+    Write-Host 'Skipping signing process.'
 }
 
-if (-not $NoManifest)
+if (($Manifest) -or ($FullRelease))
 {
     Write-Host "Creating manifest in $ReleaseFolder"
     if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
     {
-        Write-Host "Manifest created successfully."
+        Write-Host 'Manifest created successfully.'
     }
     else
     {
-        Write-Host "Failed to create manifest."
-        Write-Host "Run the script with the -verbose switch for more information."
+        Write-Host 'Failed to create manifest.'
+        Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
 else 
 {
-    Write-Host "Skipping manifest creation."
+    Write-Host 'Skipping manifest creation.'
 }
 
 if ($Copy)
 {
-    Write-Host "Copying files and creating release folder."
-    if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
+    Write-Host "Copying files from $SourceFolder to $ReleaseFolder"
+    if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -Manifest $ManifestFile)
     {
-        Write-Host "Files copied successfully."
+        Write-Host 'Files copied successfully.'
     }
     else
     {
-        Write-Host "Failed to copy files."
-        Write-Host "Run the script with the -verbose switch for more information."
+        Write-Host 'Failed to copy files.'
+        Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
 else
 {
-    Write-Host "Skipping copy process."
+    Write-Host 'Skipping copy process.'
 }
