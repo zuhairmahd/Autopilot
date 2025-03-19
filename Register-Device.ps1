@@ -118,7 +118,7 @@ else
 if (-not($NoSignatureVerify))
 {
     Write-Host 'Verifying code signature.'
-    $codeAuthenticity = Get-SignatureStatus -scriptFolders @("$PSScriptRoot", "$functionsFolder")
+    $codeAuthenticity = GetSignatureStatus -scriptFolders @("$PSScriptRoot", "$functionsFolder")
     if ($codeAuthenticity.count -gt 0)
     {
         Write-Host "$($codeAuthenticity.count) scripts failed the signature check." -ForegroundColor Red
@@ -144,7 +144,7 @@ else
 if (-not($NoHashVerify))
 {
     Write-Host 'Verifying file integrity.'
-    $fileIntegrity = Get-ScriptIntegrity -scriptFolders @("$PSScriptRoot", "$functionsFolder") -hashFilePath $hashFile
+    $fileIntegrity = GetScriptIntegrity -scriptFolders @("$PSScriptRoot", "$functionsFolder") -hashFilePath $hashFile
     if ($fileIntegrity.count -gt 0)
     {
         Write-Host "$($fileIntegrity.count) scripts failed the integrity check." -ForegroundColor Red
@@ -170,7 +170,7 @@ else
 if (-not($NoUpdateCheck))
 {
     Write-Host 'Checking for script updates.'
-    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
+    $scriptsToUpdate = TestScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
     Write-Verbose "$($scriptsToUpdate.count) to update"
     if ($scriptsToUpdate.count -gt 0)
     {
@@ -185,7 +185,7 @@ if (-not($NoUpdateCheck))
         if ($response -eq 'Y')
         {
             Write-Host 'Downloading the latest version of the script.'
-            if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -ScriptRoot $PSScriptRoot -scriptVersionURL $remoteVersionURL -scriptHashURL $scriptHashURL)
+            if (GetScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -ScriptRoot $PSScriptRoot -scriptVersionURL $remoteVersionURL -scriptHashURL $scriptHashURL)
             {
                 Write-Host 'All scripts have been updated.' -ForegroundColor Green
             }
@@ -203,7 +203,6 @@ if (-not($NoUpdateCheck))
     {
         Write-Host 'All scripts are up to date.' -ForegroundColor Green
     }
-
     if ($UpdateOnly)
     {
         Write-Host 'Update check complete.'
@@ -236,7 +235,7 @@ else
 if (-not($NoModuleCheck))
 {
     Write-Host 'Checkin for installed modules.'
-    $module = Get-RequiredModules -moduleNames $modulesToInstall -ModulesFolder $modulesFolder
+    $module = GetRequiredModules -moduleNames $modulesToInstall -ModulesFolder $modulesFolder
     if ($module -eq 0)
     {
         Write-Host 'All required modules are installed.' -ForegroundColor Green
@@ -252,7 +251,7 @@ else
     Write-Host 'Skipping module check.'
 }
 
-$deviceObject = get-DeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+$deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
 $serial = $deviceObject.serialNumber
 $hash = $deviceObject.hardwareHash
 $make = $deviceObject.manufacturer
@@ -269,7 +268,7 @@ else
 }
 if ($GetDeviceHash)
 {
-    Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 0
 }
 
@@ -394,7 +393,7 @@ if ($assignment)
         }
         else 
         {
-            Restart-Device
+            RestartDevice
         }
         exit 0
     }
@@ -402,7 +401,7 @@ if ($assignment)
     {
         Write-Host 'The device is imported but not assigned to a deployment profile.' -ForegroundColor Yellow
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-        Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
@@ -436,7 +435,7 @@ if (-not($check))
     {
         Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-        Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
@@ -472,7 +471,7 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
         {
             Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
             Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-            Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+            GetDeviceHash -Device $deviceObject -OutputFile $outputFile
             exit 1
         }
         elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
@@ -482,7 +481,7 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
             Write-Host "Elapsed time to complete: $importSeconds seconds"
-            Restart-Device
+            RestartDevice
             exit 0
         }
     }
@@ -490,7 +489,7 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
     {
         Write-Host 'The device cannot be found in Intune.'
         Write-Host 'Please check the Intune Portal or contact an Intune administrator.'
-        Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
@@ -498,14 +497,14 @@ elseif ($device.state.deviceImportStatus -eq 'error')
 {
     Write-Host 'The device import failed with the following error:' -ForegroundColor Red
     Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
-    Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
 else
 {
     Write-Host 'The device import failed with the following error:' -ForegroundColor Red
     Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
-    Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
 
