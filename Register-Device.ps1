@@ -74,31 +74,31 @@ param (
     [Parameter(Mandatory = $False)] [switch]$NoHashVerify,
     [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
     [Parameter(Mandatory = $False)] [switch]$Redeploy,
-    [Parameter(Mandatory = $False)] [string]$SerialNumber = ''
+    [Parameter(Mandatory = $False)] [string]$SerialNumber = '',
+    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github'
 )
 
-#Define variables.
-$hashFile = "$PWD\hashes.json"
-$maxWaitTime = 30
-$timeInSeconds = 60
-$updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main'
-$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
-$scriptHashURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/hashes.json'
-$localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
-$functionsFolder = "$PWD\functions"
-$modulesFolder = "$PWD\pwsh\modules"
-$modulesToInstall = @(
-    'Microsoft.Graph.Authentication',
-    'Microsoft.Graph.Groups',
-    'Microsoft.Graph.Identity.DirectoryManagement',
-    'Microsoft.Graph.DeviceManagement',
-    'PackageManagement',
-    'PowerShellGet',
-    'WindowsAutoPilotIntune'
-)
-
-
+if ($repo -eq 'github')
+{
+    $baseSourceURL = 'https://raw.githubusercontent.com'
+    $baseRepoURL = 'https://github.com'
+    $repoPath = 'zuhairmahd'
+    $repoName = 'autopilot'
+}
+elsif ($repo -eq 'gitlab')
+{
+    $baseSourceURL = 'https://git.gao.gov'
+    $baseRepoURL = 'https://git.gao.gov'
+    $repoPath = 'mahmoudz'
+    $repoName = 'autopilot-deployment'
+}
+else
+{
+    Write-Host 'Invalid repository specified. Exiting script.' -ForegroundColor Red
+    exit 1
+}
 #import functions.
+$functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "Importing functions from $functionsFolder"
@@ -114,6 +114,24 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
+
+#Define variables.
+$maxWaitTime = 30
+$timeInSeconds = 60
+$updateURL = "$baseSourceURL/$repoPath/$repoName/main"
+$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
+$scriptHashURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/hashes.json'
+$localManifest = Get-Content -Path "$PSScriptRoot\manifest.json" -Raw | ConvertFrom-Json
+$modulesFolder = "$PWD\pwsh\modules"
+$modulesToInstall = @(
+    'Microsoft.Graph.Authentication',
+    'Microsoft.Graph.Groups',
+    'Microsoft.Graph.Identity.DirectoryManagement',
+    'Microsoft.Graph.DeviceManagement',
+    'PackageManagement',
+    'PowerShellGet',
+    'WindowsAutoPilotIntune'
+)
 
 if (-not($NoSignatureVerify))
 {
@@ -170,7 +188,7 @@ else
 if (-not($NoUpdateCheck))
 {
     Write-Host 'Checking for script updates.'
-    $scriptsToUpdate = TestScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
+    $remoteManifest = TestScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
     Write-Verbose "$($scriptsToUpdate.count) to update"
     if ($scriptsToUpdate.count -gt 0)
     {

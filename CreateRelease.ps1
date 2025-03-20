@@ -129,7 +129,6 @@ function SignScripts()
     return $success
 }
 
-
 function CopyFiles()
 {
     [CmdletBinding()]
@@ -509,4 +508,16 @@ if ($Copy)
 else
 {
     Write-Host 'Skipping copy process.'
+}
+#Copy the generated manifest to the root folder.
+Write-Host "Copying manifest to $PSScriptRoot"
+try
+{
+    Copy-Item -Path $ManifestFile -Destination $PSScriptRoot -Force    
+}
+catch
+{
+    Write-Error "Failed to copy manifest to $PSScriptRoot"
+    Write-Error $_.Exception.Message
+    exit 1
 }
