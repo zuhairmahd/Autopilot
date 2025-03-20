@@ -1,4 +1,18 @@
 {
+  "Scripts": [
+    {
+      "name": "Register-Device",
+      "version": {
+        "Major": 1,
+        "Minor": 0,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "1EF8EFFA03A070832B211B1A743A1D45B71A6F7527CE7ADF46C68987321DB0B7"
+    }
+  ],
   "Cmds": [
     {
       "name": "check",
@@ -61,21 +75,19 @@
       "hash": "D9CCCBA997B9AA259625243B6E1A1A4CDD4501B36ECFA2018935FE538407BBE5"
     }
   ],
-  "Scripts": [
+  "Functions": [
     {
-      "name": "Register-Device",
+      "name": "CheckForScriptUpdates",
       "version": {
-        "Major": 1,
+        "Major": 0,
         "Minor": 0,
         "Build": 0,
         "Revision": -1,
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "4A0307B3789C079ABF599C445C697631285DFBFD72B11629CF5F69BD2D990427"
-    }
-  ],
-  "Functions": [
+      "hash": "9C16005D223ABEA04DFEE0718B38DB74074AB8D285D11C35EF1DCDD243545EAE"
+    },
     {
       "name": "ConnectToTenant",
       "version": {
@@ -170,7 +182,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "8E461B49B0AF69D0950C4B040A7636CDF0733DED506433DF8DDEC8A14EF875A2"
+      "hash": "DF242F455535F4DC2146EECF20CE1668D2ED92ED59CC2550ACA28E2E74474E36"
     },
     {
       "name": "GetLatestGitlabRelease",
@@ -182,7 +194,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "324E12023939A1FD462853826C2130CD8E04128F6A5F8F64D69809EFF92ACC67"
+      "hash": "20679380C7C9E22AA931251F6BACC3EA94701A21E8E636BA1FB32BE9A234E7C9"
     },
     {
       "name": "GetRequiredModules",
@@ -290,7 +302,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "4AA7412C40E353F63CA96F72A8416F528F1FBF334A85AB84E279A193F05B1B3F"
+      "hash": "5C91BCA92AFC0E58952405B5B20AAC7E123F35755FF5A70AB775C2DFC02D6503"
     },
     {
       "name": "VerifyEnrollmentStatus",
