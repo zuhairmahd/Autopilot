@@ -1,8 +1,8 @@
 <#PSScriptInfo
-.VERSION 1.0.0
-.GUID 9c73a06a-4834-4f16-a2fe-b5077101d5c6
+.VERSION 2.2.0
+.GUID c5b2b9ce-7269-4fe5-a126-3c84a5053d37
 .AUTHOR Zuhair Mahmoud
-.DESCRIPTION Deploys De-Bloat application
+.DESCRIPTION Intune device deployment script
 .COMPANYNAME Government Accountability Office
 .COPYRIGHT GPL
 .PROJECTURI https://github.com/zuhairmahd/Autopilot
@@ -29,6 +29,20 @@ Registers one or more devices into Intune and checks for profiles and module req
     A switch to skip the script update check.  The default value is false.
 .PARAMETER NoAdminCheck
     A switch to skip the administrator check.  The default value is false.
+.PARAMETER NoSignatureVerify
+    A switch to skip the code signature verification.  The default value is false.
+    .PARAMETER NoHashVerify
+    A switch to skip the hash verification.  The default value is false.
+    
+
+.PARAMETER GetDeviceHash
+    A switch to get the device hash.  The default value is false.
+.PARAMETER Redeploy
+    A switch to redeploy the device.  The default value is false.
+.PARAMETER SerialNumber
+    The serial number of the device to verify deployment or prepare for redeployment.  If no serial number is provided, the script will use the serial number of the local device.
+.PARAMETER Repo
+    The repository to use for script updates.  The default value is 'github'.  The options are 'github' or 'gitlab'.
 .EXAMPLE
     Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01'
     Registers the device with the name 'localhost' into Intune.
@@ -47,6 +61,12 @@ Registers one or more devices into Intune and checks for profiles and module req
 .EXAMPLE
     Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -NoAdminCheck
     Registers the device with the name 'localhost' into Intune and skips the administrator check.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -NoSignatureVerify
+    Registers the device with the name 'localhost' into Intune and skips the code signature verification.
+.EXAMPLE
+    Register-Device.ps1 -Name 'localhost' -GroupTag 'MSB01' -AssignedUser 'JohnD' -NoHashVerify
+    Registers the device with the name 'localhost' into Intune and skips the hash verification.
 .NOTES
   1. Optionally update scripts if newer versions are available.  
   2. Check whether the script is running with admin rights.  
@@ -78,25 +98,6 @@ param (
     [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github'
 )
 
-if ($repo -eq 'github')
-{
-    $baseSourceURL = 'https://raw.githubusercontent.com'
-    $baseRepoURL = 'https://github.com'
-    $repoPath = 'zuhairmahd'
-    $repoName = 'autopilot'
-}
-elsif ($repo -eq 'gitlab')
-{
-    $baseSourceURL = 'https://git.gao.gov'
-    $baseRepoURL = 'https://git.gao.gov'
-    $repoPath = 'mahmoudz'
-    $repoName = 'autopilot-deployment'
-}
-else
-{
-    Write-Host 'Invalid repository specified. Exiting script.' -ForegroundColor Red
-    exit 1
-}
 #import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -115,13 +116,42 @@ else
     exit 1
 }
 
+if ($repo -eq 'github')
+{
+    $baseSourceURL = 'https://raw.githubusercontent.com'
+    $repoPath = 'zuhairmahd'
+    $repoName = 'autopilot'
+    $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName" -verbose
+    if ($latestRelease)
+    {
+        Write-Host "The latest release is $latestRelease"
+    }
+    else
+    {
+        Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
+        Write-Host "Defaulting to main branch."
+        $latestRelease = 'main'
+    }
+}
+elsif ($repo -eq 'gitlab')
+{
+    $baseSourceURL = 'https://git.gao.gov'
+    $baseRepoURL = 'https://git.gao.gov'
+    $repoPath = 'mahmoudz'
+    $repoName = 'autopilot-deployment'
+}
+else
+{
+    Write-Host 'Invalid repository specified. Exiting script.' -ForegroundColor Red
+    exit 1
+}
+
 #Define variables.
 $maxWaitTime = 30
 $timeInSeconds = 60
-$updateURL = "$baseSourceURL/$repoPath/$repoName/main"
-$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
-$scriptHashURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/hashes.json'
+$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $localManifest = Get-Content -Path "$PSScriptRoot\manifest.json" -Raw | ConvertFrom-Json
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
 $modulesFolder = "$PWD\pwsh\modules"
 $modulesToInstall = @(
     'Microsoft.Graph.Authentication',
@@ -188,8 +218,11 @@ else
 if (-not($NoUpdateCheck))
 {
     Write-Host 'Checking for script updates.'
-    $remoteManifest = TestScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
-    Write-Verbose "$($scriptsToUpdate.count) to update"
+    $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $updateURL -LocalManifestContent $localManifest 
+#Count the number of scripts whose method is update in the returned $remoteManifest 
+    $scriptsToUpdate = $remoteManifest | Where-Object { $_.method -eq 'update' }
+    Write-Host "The number of scripts to update is $($scriptsToUpdate.count)"
+    exit 0
     if ($scriptsToUpdate.count -gt 0)
     {
         Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow

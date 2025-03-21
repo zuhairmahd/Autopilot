@@ -24,14 +24,20 @@ else
 #define variables.
 $manifest = Get-Content -Path "$pwd\manifest.json" | ConvertFrom-Json 
 $repo = 'zuhairmahd/Autopilot'
-$latestRelease = GetLatestGithubRelease -Repository $repo -verbose
+# $latestRelease = GetLatestGithubRelease -Repository $repo -verbose
+$latestRelease = 'main'
 $repoSourceCodeURL = "https://raw.githubusercontent.com/$repo/$latestRelease"
-$remoteManifestPath = "$sourceCodeURL/manifest.json"
+$remoteManifestPath = "$repoSourceCodeURL/manifest.json"
 #write a verbose log of all the variables.
-Write-Verbose "Manifest: $manifest"
+Write-Verbose "Manifest: $($manifest)"
 Write-Verbose "Latest Release: $latestRelease"
 Write-Verbose "Repo Source Code URL: $repoSourceCodeURL"
 Write-Verbose "Remote Manifest Path: $remoteManifestPath"
 
 $updatedManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest 
+$Global:u = $updatedManifest
+
+
 DownloadScriptUpdates -ScriptsToUpdate $updatedManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot
+
+
