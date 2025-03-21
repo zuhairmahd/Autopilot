@@ -1,0 +1,9 @@
+{
+    "exclusions": [
+        "test",
+        "Test1",
+        "UpdateManifest",
+        "CreateRelease",
+        "updateRelease"
+    ]
+}

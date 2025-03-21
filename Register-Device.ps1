@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 1.0
+.VERSION 1.0.0
 .GUID 9c73a06a-4834-4f16-a2fe-b5077101d5c6
 .AUTHOR Zuhair Mahmoud
 .DESCRIPTION Deploys De-Bloat application
@@ -72,30 +72,33 @@ param (
     [Parameter(Mandatory = $False)] [switch]$NoAdminCheck,
     [Parameter(Mandatory = $False)] [switch]$NoSignatureVerify,
     [Parameter(Mandatory = $False)] [switch]$NoHashVerify,
-    [Parameter(Mandatory = $False)] [switch]$GetDeviceHash
+    [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
+    [Parameter(Mandatory = $False)] [switch]$Redeploy,
+    [Parameter(Mandatory = $False)] [string]$SerialNumber = '',
+    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github'
 )
 
-#Define variables.
-$hashFile = "$PWD\hashes.json"
-$maxWaitTime = 30
-$timeInSeconds = 60
-$updateURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main'
-$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
-$scriptHashURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/hashes.json'
-$localVersions = Get-Content -Path "$PSScriptRoot\version.json" -Raw | ConvertFrom-Json
-$functionsFolder = "$PWD\functions"
-$modulesFolder = "$PWD\modules"
-$modulesToInstall = @(
-    'Microsoft.Graph.Authentication',
-    'Microsoft.Graph.Groups',
-    'Microsoft.Graph.Identity.DirectoryManagement',
-    'PackageManagement',
-    'PowerShellGet',
-    'WindowsAutoPilotIntune'
-)
-
-
+if ($repo -eq 'github')
+{
+    $baseSourceURL = 'https://raw.githubusercontent.com'
+    $baseRepoURL = 'https://github.com'
+    $repoPath = 'zuhairmahd'
+    $repoName = 'autopilot'
+}
+elsif ($repo -eq 'gitlab')
+{
+    $baseSourceURL = 'https://git.gao.gov'
+    $baseRepoURL = 'https://git.gao.gov'
+    $repoPath = 'mahmoudz'
+    $repoName = 'autopilot-deployment'
+}
+else
+{
+    Write-Host 'Invalid repository specified. Exiting script.' -ForegroundColor Red
+    exit 1
+}
 #import functions.
+$functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "Importing functions from $functionsFolder"
@@ -112,10 +115,28 @@ else
     exit 1
 }
 
+#Define variables.
+$maxWaitTime = 30
+$timeInSeconds = 60
+$updateURL = "$baseSourceURL/$repoPath/$repoName/main"
+$remoteVersionURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/version.json'
+$scriptHashURL = 'https://raw.githubusercontent.com/zuhairmahd/Autopilot/main/hashes.json'
+$localManifest = Get-Content -Path "$PSScriptRoot\manifest.json" -Raw | ConvertFrom-Json
+$modulesFolder = "$PWD\pwsh\modules"
+$modulesToInstall = @(
+    'Microsoft.Graph.Authentication',
+    'Microsoft.Graph.Groups',
+    'Microsoft.Graph.Identity.DirectoryManagement',
+    'Microsoft.Graph.DeviceManagement',
+    'PackageManagement',
+    'PowerShellGet',
+    'WindowsAutoPilotIntune'
+)
+
 if (-not($NoSignatureVerify))
 {
     Write-Host 'Verifying code signature.'
-    $codeAuthenticity = Get-SignatureStatus -scriptFolders @("$PSScriptRoot", "$functionsFolder")
+    $codeAuthenticity = GetSignatureStatus -scriptFolders @("$PSScriptRoot", "$functionsFolder")
     if ($codeAuthenticity.count -gt 0)
     {
         Write-Host "$($codeAuthenticity.count) scripts failed the signature check." -ForegroundColor Red
@@ -141,7 +162,7 @@ else
 if (-not($NoHashVerify))
 {
     Write-Host 'Verifying file integrity.'
-    $fileIntegrity = Get-ScriptIntegrity -scriptFolders @("$PSScriptRoot", "$functionsFolder") -hashFilePath $hashFile
+    $fileIntegrity = GetScriptIntegrity -scriptFolders @("$PSScriptRoot", "$functionsFolder") -hashFilePath $hashFile
     if ($fileIntegrity.count -gt 0)
     {
         Write-Host "$($fileIntegrity.count) scripts failed the integrity check." -ForegroundColor Red
@@ -164,11 +185,10 @@ else
     Write-Host 'Skipping integrity verification check.'
 }
 
-
 if (-not($NoUpdateCheck))
 {
     Write-Host 'Checking for script updates.'
-    $scriptsToUpdate = Test-ScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
+    $remoteManifest = TestScriptUpdates -updateURL $updateURL -scriptVersionURL $remoteVersionURL -scripts $localVersions
     Write-Verbose "$($scriptsToUpdate.count) to update"
     if ($scriptsToUpdate.count -gt 0)
     {
@@ -183,7 +203,7 @@ if (-not($NoUpdateCheck))
         if ($response -eq 'Y')
         {
             Write-Host 'Downloading the latest version of the script.'
-            if (Get-ScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -ScriptRoot $PSScriptRoot -scriptVersionURL $remoteVersionURL -scriptHashURL $scriptHashURL)
+            if (GetScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -ScriptRoot $PSScriptRoot -scriptVersionURL $remoteVersionURL -scriptHashURL $scriptHashURL)
             {
                 Write-Host 'All scripts have been updated.' -ForegroundColor Green
             }
@@ -233,7 +253,7 @@ else
 if (-not($NoModuleCheck))
 {
     Write-Host 'Checkin for installed modules.'
-    $module = Get-RequiredModules -moduleNames $modulesToInstall -ModulesFolder $modulesFolder
+    $module = GetRequiredModules -moduleNames $modulesToInstall -ModulesFolder $modulesFolder
     if ($module -eq 0)
     {
         Write-Host 'All required modules are installed.' -ForegroundColor Green
@@ -249,18 +269,24 @@ else
     Write-Host 'Skipping module check.'
 }
 
-
-$deviceObject = get-DeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+$deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
 $serial = $deviceObject.serialNumber
 $hash = $deviceObject.hardwareHash
 $make = $deviceObject.manufacturer
 $model = $deviceObject.model
 $parentDir = (Get-Item -Path $PWD).Parent.FullName
 $outputFile = "$parentDir\device_$serial.csv"
-Write-Host "Processing device with serial number $serial, manufacturer $make, and model $model."
+if (($Redeploy) -and ($SerialNumber -ne ''))
+{
+    Write-Host "Checking redeployment status for device with serial number $serialNumber"
+}
+else
+{
+    Write-Host "Processing device with serial number $serial, manufacturer $make, and model $model."
+}
 if ($GetDeviceHash)
 {
-    Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 0
 }
 
@@ -286,6 +312,88 @@ else
     Get-MgContext | Format-List
 }
 
+if ($Redeploy)
+{
+    if ($SerialNumber -eq '')
+    {
+        Write-Host "Checking redeployment status for this device, serial number $serial."
+        $SerialNumber = $serial
+    }
+    else
+    {
+        $reminderMessage = 'Remember to reboot the device after the script completes.'
+    }
+    $enrollmentState = VerifyEnrollmentStatus -serialNumber $SerialNumber
+    Write-Verbose "The enrollment state is $enrollmentState"
+    if (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $false))
+    {
+        Write-Host "The device with serial number $SerialNumber is not imported or enrolled." -ForegroundColor Yellow
+        Write-Host 'Continue to import the device.' -ForegroundColor Yellow
+    }
+    elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $false))
+    {
+        Write-Host 'The device is imported in Intune but is not enrolled.' -ForegroundColor Yellow
+        Write-Host 'Continue to check assignment.' -ForegroundColor Yellow
+    }
+    elseif (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $true))
+    {
+        Write-Host 'This is not an Autopilot device' -ForegroundColor Red
+        Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
+    }
+    elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $true))
+    {
+        Write-Host 'The device is enrolled and is registered to a user.'
+        if ($enrollmentState.userName -ne 'unknown')
+        {
+            Write-Host "The registered user is $($enrollmentState.username)"
+            Write-Host 'You must wipe the device to get it ready for another user'
+            Write-Host 'Wiping a device is a distructive command.  Make sure you are wiping the correct device.'
+            Write-Host "Device id: $($enrollmentState.id)"
+            Write-Host "Device serial number: $SerialNumber"
+            Write-Host "Registered user: $($enrollmentState.username) `r`n"
+            Write-Host 'Would you still like to send a wipe command to the device? (Y/N)'
+            $response = Read-Host
+            while ($response -notin 'Y', 'N')
+            {
+                Write-Host 'Please enter Y or N.' -ForegroundColor Yellow
+                [console]::beep(500, 300)
+                $response = Read-Host
+            }
+            if ($response -eq 'Y')
+            {
+                $response = SendDeviceCommand -ManagedDeviceId $enrollmentState.id
+                if ($response -eq $true)
+                {
+                    Write-Host "The wipe command has been sent to the device with serial number $SerialNumber."
+                    Write-Host 'Please manually sync the device or give the device enough time to sync and reset.'
+                    Write-Host 'The device will be ready for another user after the wipe is complete.'
+                    Write-Host 'Please contact an Intune admin if you have any problems.'
+                }
+                else
+                {
+                    Write-Host "The wipe command failed to send to the device with serial number $SerialNumber."
+                    Write-Host 'Please contact an Intune admin.'
+                }
+                exit 0
+            }
+            else
+            {
+                Write-Host 'Aborting script.'
+                exit 0
+            }
+        }
+        else
+        {
+            Write-Host 'The user is not registered.'
+        }
+    }
+    else
+    {
+        Write-Host 'Unknown error.' -ForegroundColor Red
+        Write-Host 'Please check the Intune portal or contact an Intune administrator.'
+        exit 1
+    }
+}
 
 #Let us check if the device has already been imported.
 $assignment = Get-AutopilotDevice -serial $serial
@@ -296,14 +404,22 @@ if ($assignment)
     if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
     {
         Write-Host 'The device is assigned to a deployment profile and ready for enrollment.' -ForegroundColor Green
-        Restart-Device
+        if ($reminderMessage.Length -gt 0)
+        {
+            Write-Host $reminderMessage
+            Write-Host 'Script complete.'
+        }
+        else 
+        {
+            RestartDevice
+        }
         exit 0
     }
     else
     {
         Write-Host 'The device is imported but not assigned to a deployment profile.' -ForegroundColor Yellow
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-        Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
@@ -337,7 +453,7 @@ if (-not($check))
     {
         Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-        Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
@@ -354,7 +470,7 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
         {
             Write-Verbose "The device assignment status is $($assignment.deploymentProfileAssignmentStatus)"
             Write-Verbose "The device assignment date is $($assignment.deploymentProfileAssignedDateTime)"
-            if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState') -or ($index -gt $maxWaitTime))   
+            if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState') -or ($index -gt $maxWaitTime))
             {
                 break
             }
@@ -373,16 +489,17 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
         {
             Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
             Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-            Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+            GetDeviceHash -Device $deviceObject -OutputFile $outputFile
             exit 1
         }
-        elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState') 
+        elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
         {
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
             Write-Host 'The device is successfully assigned to a deployment profile.' -ForegroundColor Green
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
             Write-Host "Elapsed time to complete: $importSeconds seconds"
+            RestartDevice
             exit 0
         }
     }
@@ -390,7 +507,7 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
     {
         Write-Host 'The device cannot be found in Intune.'
         Write-Host 'Please check the Intune Portal or contact an Intune administrator.'
-        Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
@@ -398,22 +515,23 @@ elseif ($device.state.deviceImportStatus -eq 'error')
 {
     Write-Host 'The device import failed with the following error:' -ForegroundColor Red
     Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
-    Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
 else
 {
     Write-Host 'The device import failed with the following error:' -ForegroundColor Red
-    Write-Host   "$($device.state.deviceImportStatus)" -ForegroundColor Red
-    Get-deviceHash -Device $deviceObject -OutputFile $outputFile
+    Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
+    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
-Restart-Device
+
+
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCD+uncKDhwYIJ/q
-# +/wqlpswn73g8OaFgQzZvElOUOvFVKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCC7c0VxEcBN7CAT
+# RxMrrL2p0nNbKpvbotknFOLjmJ6Qf6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -444,100 +562,100 @@ Restart-Device
 # uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
 # GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
 # ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAALWadCC
-# c7Ww76WmAAAAAtZpMA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
+# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAIltW2H
+# 9O4MGVt7AAAAAiW1MA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBBT0MgQ0EgMDEwHhcNMjUwMjI3MDg1MDQyWhcNMjUwMzAy
-# MDg1MDQyWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
+# RCBWZXJpZmllZCBDUyBFT0MgQ0EgMDEwHhcNMjUwMzIwMDcxODQ2WhcNMjUwMzIz
+# MDcxODQ2WjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
 # BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
 # Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# 6CaH0/TUVs276Tzkls3Hu7TT4GZWXJd8tAbmSzq0I5BarKXuZl7qfXHQ18b2RpTQ
-# EMULDD2dvqeB4E4y0mbiPttaGtt7CXrVLB9/biJMJdCKiYwglPveFQmdWiItYU49
-# 4+Ha2NbzofFADx/AhATmaqAgUp/K3a0lACLqRSddYAG0hfvO3lf4E/0E5g1o4U0m
-# i1ytCVO2euv3OS8kctDVNOMvI3kuCTvzoPGZjb6Tcr9uZifnhZSGfMrAOFQT3LOA
-# YINs++Wy7bWoaHx6LNaFgiIPXKqhw8E8wcxgnLEOlegugni5CNV66fsKraKQ1Zct
-# WFaMdLQQxCY85QjFgSEyh+uylZK9GIxwiJdgvLNlTf28TzCR9iPQOJozulOkCMM2
-# tggqkEpcasg7uv6sbqYi4CRfMRoPHZfUxVgO+k93jxVlIptUF2vhHTJAN1u0h/1b
-# ul8erMv1TnN67lTqnhc4EqUdmXewJAWWpTboLz4rVjC98vzbb+buSlvo1YWVKAA3
+# scUSMXjqqICcHHPgK5/pZ1ju8OLgZ/ggfyY/7Dq2Un3EIra6jJ2fWmeLZeM7khhT
+# USz9a88Gx9UVezK4FmAoFmyikkd72lOZo0XOW1QHb+G6kV/XSkGqqU2VOMA+xD8y
+# 0HeFJlabykNFUozJRZYB87zHbLXr+jxRA18BjEM6MCM9RAZRNJxDxi5iss7PKTcm
+# +LDAiAEDZA26pkx4Q5qTr4CH+vzqr46F6wRP90CWGWOrQrIcpu6knQieFaMBWM9F
+# vGSUGyvYB8aVIHKQshEaLET0dO3Lagtvy+mJ04fM1rU5yALqj5uEXgnvVwwfJCYn
+# lebgGpWfpKGhtYw5Xw40/WCY6QXoLAy4d/HkpcFsynJePpUqcz3z5L7IuNvbqNvJ
+# MuOoPkTmPJxWUgLwGz3OB6qCkRvdjHfdIItYAidCdQS33RcqKUg+YjkM/fSNMdxk
+# b2FxJhwFXpVCY6xB7xhv/XWGs3+ZC2/smF2x0QHXx/Aok5ZNWCIqa5hkpN6Row03
 # AgMBAAGjggIYMIICFDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDA7BgNV
 # HSUENDAyBgorBgEEAYI3YQEABggrBgEFBQcDAwYaKwYBBAGCN2GBmtGaFtje9WuB
-# vfqFXPmA7xswHQYDVR0OBBYEFBErccuYnPRLqoSMC6/ei2q7DA+AMB8GA1UdIwQY
-# MBaAFOiDxDPX3J8MnHaaCqbU34emXljuMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
+# vfqFXPmA7xswHQYDVR0OBBYEFBFiD+C2LiSGHcgs5btxsOXC0KCEMB8GA1UdIwQY
+# MBaAFHacNnQT0ZB9YV+zAuuA9JlLpT6FMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMElEJTIw
-# VmVyaWZpZWQlMjBDUyUyMEFPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
+# VmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
 # mDCBlTBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
-# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBBT0MlMjBD
+# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBFT0MlMjBD
 # QSUyMDAxLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
 # LmNvbS9vY3NwMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUH
 # AgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0
-# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBABbl9hMGuxz8llq2
-# oPlsgkmqRgLKxRRNoEsHuUx1h7gxB3rRBZze9ENlDMLjc6bw3Doss6Z3z9lRiHAL
-# KO9y/XQLyvAFyi9e6yyFW4aBbprfIMZU20rNxYmer9K5fnQsntlwJZN+DnxquwxN
-# U1DUv+JGQ4Vj1Z1+NzmlGHE6V+E/wVkaLdtbhUdA8TuMB8jzX91VrMBuB2ZAhh+9
-# KvnWK1jN+n9/Ii9eBDCmGpjugANUx8AY/6eCXbvOioBTb9bhp6igWwxb61xd4CCx
-# zakgTs18YfB3k+so0wGNiSg3s2iMXs3IDpMpuTZIiAf+seAqdP8+5OnWAt3+SxVp
-# GCwoxhW7i0Iztl3t8zoONUHX7B1tXUCHo7LqChGC4za4B5xQ38M8dbmx/cBwmT/E
-# a6H0Ibf72FzvNHJ20yRHYILK9FJCcjA7Z9PeZv+cHIjrzEDYQ0IxRQoOMHZW5MU5
-# P1KLid4GIg9HQkjTDuVWeQWIsbqS/w7vZkkFl7iYavoULpszB9SN5LoeBpDnYePZ
-# KS7Zn4eP/78UVjuoKatanKGpb32meTWP+N/L3j25BjxIrOu9uKmaH/XPN2+J3uw2
-# xK0LtK+mtjMIaMq1gFw+xWX2gIXmI78IxCg/bMZblLRiLO0bKnVEvpxvM5AYj5yB
-# 5ECjUhwKZSjBAEe9b/nISWXjXOeJMIIG5zCCBM+gAwIBAgITMwAC1mnQgnO1sO+l
-# pgAAAALWaTANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
+# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAL6SiYa3Dd7rudc3
+# gO4TionwY5bbzp4SFtUWW8v86pJGxyT89GJydCHzwQ+3LC0dTBMpsl4xU94c9Zpq
+# yLQmL7FS0C6ga00GQ6UrL5Xed12CjczkJ+vQPhIfkmcAvA6JrcpVmozsGuOYbB//
+# cjqwkI0WUha9Lh09m9zRqdH9+FIW6w13xbc1dQb++st9D25kfP+Ci0NhO9JVdVOK
+# cmpvHU9+Dyg7j0d7RTF7adt4gjQegnDfah5HAbFi4ZgmCO23dKUI7xi4mTLrm7Tm
+# Z+Hls4y3ZOd5JI23JHFC6tk86VHGxKYnazQM2qAVouQUe37zIxJ3avPSN3BSDsOO
+# wMSc0JjxG/wZTqlDZqxMB8f/aj2hmiqm2j6HzgBM+5sPBC5D/EM3FIlaW2h91wD9
+# 40s/FXPEeJwGmm0A/fRn3ZY8Vh9X2/Y6vF3XW8li4oq9HRXfqN+pJVB2WaikO+ck
+# xnB0FshWMmbd/Kj8lq/Nvs9C/lPzu+7mHSHKTkbJWk/vhPColo/3sqoqiCMG79wW
+# k83LbIPYZ4fK4Y6lG8WVfjDJahPOOqYnaAQ7GxJ0ulV06qtLV+eC2XZFkINYetkc
+# xq4LJ8hyrMMOTCklGZBQkRgWUI7ug08Xtv5wJ0bvpT1su7poqYrlA3s51ZwC7SM/
+# DxuWIS7IbXRx293PB3k1cRGofO7FMIIG5zCCBM+gAwIBAgITMwACJbVth/TuDBlb
+# ewAAAAIltTANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
 # TWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVy
-# aWZpZWQgQ1MgQU9DIENBIDAxMB4XDTI1MDIyNzA4NTA0MloXDTI1MDMwMjA4NTA0
-# MlowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
+# aWZpZWQgQ1MgRU9DIENBIDAxMB4XDTI1MDMyMDA3MTg0NloXDTI1MDMyMzA3MTg0
+# NlowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
 # cmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhh
-# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAOgmh9P0
-# 1FbNu+k85JbNx7u00+BmVlyXfLQG5ks6tCOQWqyl7mZe6n1x0NfG9kaU0BDFCww9
-# nb6ngeBOMtJm4j7bWhrbewl61Swff24iTCXQiomMIJT73hUJnVoiLWFOPePh2tjW
-# 86HxQA8fwIQE5mqgIFKfyt2tJQAi6kUnXWABtIX7zt5X+BP9BOYNaOFNJotcrQlT
-# tnrr9zkvJHLQ1TTjLyN5Lgk786DxmY2+k3K/bmYn54WUhnzKwDhUE9yzgGCDbPvl
-# su21qGh8eizWhYIiD1yqocPBPMHMYJyxDpXoLoJ4uQjVeun7Cq2ikNWXLVhWjHS0
-# EMQmPOUIxYEhMofrspWSvRiMcIiXYLyzZU39vE8wkfYj0DiaM7pTpAjDNrYIKpBK
-# XGrIO7r+rG6mIuAkXzEaDx2X1MVYDvpPd48VZSKbVBdr4R0yQDdbtIf9W7pfHqzL
-# 9U5zeu5U6p4XOBKlHZl3sCQFlqU26C8+K1YwvfL822/m7kpb6NWFlSgANwIDAQAB
+# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBALHFEjF4
+# 6qiAnBxz4Cuf6WdY7vDi4Gf4IH8mP+w6tlJ9xCK2uoydn1pni2XjO5IYU1Es/WvP
+# BsfVFXsyuBZgKBZsopJHe9pTmaNFzltUB2/hupFf10pBqqlNlTjAPsQ/MtB3hSZW
+# m8pDRVKMyUWWAfO8x2y16/o8UQNfAYxDOjAjPUQGUTScQ8YuYrLOzyk3JviwwIgB
+# A2QNuqZMeEOak6+Ah/r86q+OhesET/dAlhljq0KyHKbupJ0InhWjAVjPRbxklBsr
+# 2AfGlSBykLIRGixE9HTty2oLb8vpidOHzNa1OcgC6o+bhF4J71cMHyQmJ5Xm4BqV
+# n6ShobWMOV8ONP1gmOkF6CwMuHfx5KXBbMpyXj6VKnM98+S+yLjb26jbyTLjqD5E
+# 5jycVlIC8Bs9zgeqgpEb3Yx33SCLWAInQnUEt90XKilIPmI5DP30jTHcZG9hcSYc
+# BV6VQmOsQe8Yb/11hrN/mQtv7JhdsdEB18fwKJOWTVgiKmuYZKTekaMNNwIDAQAB
 # o4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDVR0lBDQw
 # MgYKKwYBBAGCN2EBAAYIKwYBBQUHAwMGGisGAQQBgjdhgZrRmhbY3vVrgb36hVz5
-# gO8bMB0GA1UdDgQWBBQRK3HLmJz0S6qEjAuv3otquwwPgDAfBgNVHSMEGDAWgBTo
-# g8Qz19yfDJx2mgqm1N+Hpl5Y7jBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
+# gO8bMB0GA1UdDgQWBBQRYg/gti4khh3ILOW7cbDlwtCghDAfBgNVHSMEGDAWgBR2
+# nDZ0E9GQfWFfswLrgPSZS6U+hTBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
 # Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlm
-# aWVkJTIwQ1MlMjBBT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
+# aWVkJTIwQ1MlMjBFT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
 # ZAYIKwYBBQUHMAKGWGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2Vy
-# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwQU9DJTIwQ0ElMjAw
+# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwRU9DJTIwQ0ElMjAw
 # MS5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
 # b2NzcDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNo
 # dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5o
-# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQAW5fYTBrsc/JZatqD5bIJJ
-# qkYCysUUTaBLB7lMdYe4MQd60QWc3vRDZQzC43Om8Nw6LLOmd8/ZUYhwCyjvcv10
-# C8rwBcovXusshVuGgW6a3yDGVNtKzcWJnq/SuX50LJ7ZcCWTfg58arsMTVNQ1L/i
-# RkOFY9Wdfjc5pRhxOlfhP8FZGi3bW4VHQPE7jAfI81/dVazAbgdmQIYfvSr51itY
-# zfp/fyIvXgQwphqY7oADVMfAGP+ngl27zoqAU2/W4aeooFsMW+tcXeAgsc2pIE7N
-# fGHwd5PrKNMBjYkoN7NojF7NyA6TKbk2SIgH/rHgKnT/PuTp1gLd/ksVaRgsKMYV
-# u4tCM7Zd7fM6DjVB1+wdbV1Ah6Oy6goRguM2uAecUN/DPHW5sf3AcJk/xGuh9CG3
-# +9hc7zRydtMkR2CCyvRSQnIwO2fT3mb/nByI68xA2ENCMUUKDjB2VuTFOT9Si4ne
-# BiIPR0JI0w7lVnkFiLG6kv8O72ZJBZe4mGr6FC6bMwfUjeS6HgaQ52Hj2Sku2Z+H
-# j/+/FFY7qCmrWpyhqW99pnk1j/jfy949uQY8SKzrvbipmh/1zzdvid7sNsStC7Sv
-# prYzCGjKtYBcPsVl9oCF5iO/CMQoP2zGW5S0YiztGyp1RL6cbzOQGI+cgeRAo1Ic
-# CmUowQBHvW/5yEll41zniTCCB1owggVCoAMCAQICEzMAAAAHN4xbodlbjNQAAAAA
-# AAcwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
+# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQC+komGtw3e67nXN4DuE4qJ
+# 8GOW286eEhbVFlvL/OqSRsck/PRicnQh88EPtywtHUwTKbJeMVPeHPWaasi0Ji+x
+# UtAuoGtNBkOlKy+V3nddgo3M5Cfr0D4SH5JnALwOia3KVZqM7BrjmGwf/3I6sJCN
+# FlIWvS4dPZvc0anR/fhSFusNd8W3NXUG/vrLfQ9uZHz/gotDYTvSVXVTinJqbx1P
+# fg8oO49He0Uxe2nbeII0HoJw32oeRwGxYuGYJgjtt3SlCO8YuJky65u05mfh5bOM
+# t2TneSSNtyRxQurZPOlRxsSmJ2s0DNqgFaLkFHt+8yMSd2rz0jdwUg7DjsDEnNCY
+# 8Rv8GU6pQ2asTAfH/2o9oZoqpto+h84ATPubDwQuQ/xDNxSJWltofdcA/eNLPxVz
+# xHicBpptAP30Z92WPFYfV9v2Orxd11vJYuKKvR0V36jfqSVQdlmopDvnJMZwdBbI
+# VjJm3fyo/Javzb7PQv5T87vu5h0hyk5GyVpP74TwqJaP97KqKogjBu/cFpPNy2yD
+# 2GeHyuGOpRvFlX4wyWoTzjqmJ2gEOxsSdLpVdOqrS1fngtl2RZCDWHrZHMauCyfI
+# cqzDDkwpJRmQUJEYFlCO7oNPF7b+cCdG76U9bLu6aKmK5QN7OdWcAu0jPw8bliEu
+# yG10cdvdzwd5NXERqHzuxTCCB1owggVCoAMCAQICEzMAAAAGShr6zwVhanQAAAAA
+# AAYwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
 # c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
 # IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTRaFw0yNjA0MTMx
 # NzMxNTRaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
-# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC398ADKAfFuj6PEDTi
-# E0jxvP4Spta9K711GABrCMJlq7VjnghBqXkCuklaLxwiPRYD6anCLHyJNGC6r0kQ
-# tm9MyjZnVToC0TVOfea+rebLBn1J7FV36s85Ov651roZWDAsDzQuFF/zYC+tLDGZ
-# mkIf+VpPTx2fv4a3RxdhU0ok5GbWFKsCOMNCJnUmKr9KqIOgc3o8aZPmFcqzbYTv
-# 0x4VZgHjLRSU2pbRnYs825ryTStsRF2I1L6dM//GwRJlSetubJdloe9zIQpgrzlY
-# HPdKvoS3xWVt2J3+mMGlwcj4fK2hpQAYTqtJaqaHv9oRl4MNSTP24wo4ZqwiBid6
-# dSTkTRvZT/9tCoO/ep2GP1QlhYAM1gL/eLeLFxbVUQtpT7BOpdPEsAV6UKL+VEdK
-# NpaKkN4T9NsFvTNMKIudz2eY6Nk8qW60w2Gj3XDGjiK1wmgiTZs+i3234BX5TA1o
-# NEhtwRpBoHJyX2lxjBaZ/RsnggWf8KZgxUbV6QIHEHLJE2QWQea4xctfo8xdy94T
-# jqMyv2zILczwkdF11HjNWN38XEGdLkc6ujemDpK24Q+yGunsj8qTVxMbzI5aXxqp
-# /o4l4BXIbiXIn1X5nEKViZpTnK+0pgqTUUsGcQF8NbD5QDNBXS9wunoBXHYVzyfS
-# +mjK52vdLBmZyQm7PtH5Lv0HMwIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTog8Qz19yfDJx2mgqm1N+Hpl5Y
-# 7jBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
+# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBFT0MgQ0Eg
+# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDH48g/9CHdxhnAu8XL
+# q64nh9OneWfsaqzuzyVNXJ+A4lY/VoAHCTb+jF1WN9IdSrgxM9eKUvnuqL98ftid
+# 0Qrgqd3e7lx50XCvZodJOnq+X88vV0Av2x+gO82l0bQ39HzgCFg2kFBOGk7j8GrG
+# YKCXeIhF+GHagVU66JOINVa9cGDvptyOcecQS1fO8BbAm7RsFTuhFGpB53hVcm0g
+# JW35mgpRKOpjnBSWEB3AeH7fUGekE8LMW0pWIunrMS1HI7FF6BqAVT7IuBe++Z3T
+# sgM3RLZMti6JmNPD6Rxg62g2AqvuTQLoT1Z/cfiMdq+TYzGoWm2B8vSAv7NtJv5U
+# E0qJVPSarNckgmZaarDQr4Pcwp+YJ6vd7cJus/4XlG0JvRdoTS5Fwk9kmNbByIMH
+# EEhuQ0XgYvXaGXm/J2AUybNBw26h0rJf//eUsnWrbaugdVLVyC2wuCmNZhmUGWEJ
+# Nxcl5nfG5om9dkH2twsJfXk6BcvbW1RTAkIsTbtXkAZnGQ7eLniaBIKzC06ZZTgA
+# p38H97cq1e/pcFREq4C157PUSmCWhpnBB6P2Xl031SHxbX0FmD0iUuX7EdFfi8OI
+# xYBR//sA17gyhL3wXjmvvogYnSELTYQy4xnEASvBmPSWfRovncTOUxrkkKJE5tvR
+# Sgsd8ZJ00mwyDS6PcMBAN1VZMQIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
+# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBR2nDZ0E9GQfWFfswLrgPSZS6U+
+# hTBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
 # aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
 # gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
 # FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
@@ -546,18 +664,18 @@ Restart-Device
 # AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
 # b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
 # JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAHf+
-# 60si2TAtOng1+H32+tulKwvw3A8iPb5MGdkYvcLx61MZiz4dlTE0b6s15lr5HO72
-# gRwBkkOIaMRbK3Mxq8PoGKHecRYWwhbhoaHiAHif+lE955WsriLUsbuMneQ8tGE0
-# 4dmItRC2asXhXojG1QWO8GeKNpn2gjGxJJA/yIcyM/3amNCscEVYcYNuSbH7I7oh
-# qfdA3diZt197DNK+dCYpuSJOJsmBwnUvRNnsHCawO+b7RdGw858WCfOEtWpl0TJb
-# DDXRt+U54EqqRvdJoI1BPPyeyFpRmGvFVTmo2BiNpoNBCb4/ZISkEXtGiUQLeWWV
-# +4vgA4YK2g1085avH28FlNcBV1MTavQgOTz7nLWQsZMsrOY0WfqRUJzkF10zvGgN
-# ZDhpSgJFdywF5GGxyWTuRVc/7MkY85fCNQlufPYq32IX/wHoUM7huUa4auiAynJe
-# S7AILZnhdx/IyM8OGplgA8YZNQg0y0Vtq7lG0YbUM5YT150JqG248wOAHJ8+LG+H
-# LeyfvNQeAgL9iw5MzFW4xCL9uBqZ6aj9U0pmuxlpLSfOY7EqmD2oN5+Pl8n2Agdd
-# ynYXQ4dxXB7cqcRdrySrMwN+tGX/DAqs1IWfenuDRvjgB3U40OZa3rUwtC8Xngsb
-# raLp9+FMJ6gVP1n2ltSjaDGXJMWDsGbR+A6WdF8YMIIHnjCCBYagAwIBAgITMwAA
+# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAGov
+# CZ/YsHVCNSBrQbvMWRsZ3w0FAsc/Qo4UFY0kVmJO0p+k7RtnZZ+zq/m+ogqMTfZD
+# ozz0bhmRVy9a4QAD52+MtOFLLz1jT/+b9ZNIrBi2JHUTCfvHWTD8WD3fBCmzYLVZ
+# SP7TT/q42sX53gxUnFXUegEgP73lkhbQqSpmimc4DjDm8/hPlwGmtlACU/+8wbIH
+# Qf36kc2jSNP1DyB8ok3MdL2LUOAGaa58Z1b1MHK6ejwYCLMUyEuUizTxvmWKUiQT
+# nPcUwBQCv5eAgjUU1mdvjc4jpB3bM6KNuNh+6uxdQI0cL5FLAkablQvM/KZiCCcn
+# 6SEk6ruhKWo8aluvvSEYF4/D8nv+aZKqnuFOC3SY+KRLWLhqnzH4/fJ6ZhKGcWuB
+# XXvnZMj4Czr0t+Au2GQhO9/tsUcHy+YiFp1kI5LS9MLHcH785VwQws07ZsnQ72KR
+# zUmpHQW+rHucDAxFKHcVWqiyDMFtadWRAmruhYXAxV8Uhifos9Fky3jy7qIxQIUF
+# I912w8D/qTzmYS/7TxTlYJDvJ2PUpVXZMet7/yYseJ6b3B/8LOiGpGe3EzYT/H40
+# fLpMEydI9BGqGE1+46BQMBYRiaUz9kcZo8hvvE699XItD/uXph+iBPd6m3CngY4Z
+# GMfnP6Ab2SkEjHxCtGXo6KWeXFETGiSYx+UvuXXZMIIHnjCCBYagAwIBAgITMwAA
 # AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
 # MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
 # ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
@@ -600,26 +718,26 @@ Restart-Device
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
 # nTiOL60cPqfny+Fq8UiuZzGCFyAwghccAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwAC1mnQgnO1sO+lpgAAAALWaTAN
+# IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMQITMwACJbVth/TuDBlbewAAAAIltTAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCBDIumDVG9VhUKxgerXNekS1BMS
-# K+EqqzPQrZk4Gi4C/DANBgkqhkiG9w0BAQEFAASCAYBwqSqF2YqMSizVH+Bvz5h2
-# 9gsu6NjmbvlIyhE0yrXpToRIYrAaQGreogzJzlNhS64Yzt5VGD6CJdU4zHkKDgwK
-# 9SGB+fIgpGN2804pSbxm53tJWlgpqsIfo8XNMOft7vsImsrvUXABwo8w5mFsUle9
-# L2cL2CSxMlOOMQ9DlxxTedg8IMm95fRW3w2IWoUvZE+90Neq85/5v5Aa1QECuJEV
-# /nkNgU9Cy5I7TtJi7Q6fjJweE2l0KxvZrJbD1GqcL8p/ATHah201uDwNZPWVT4oz
-# wh+uYr/3k++oHdjJnAvJEFgciBEkv20xldtHSBvIhFNPkzj7BsrDVa7OSzGFHP7P
-# OujUjejZKNzbyW/+M5yDR499SxMjQJCkaDUEWnVTisB6S1ms92gyBWhJaZZtoQ11
-# +rbg7b05wTW6TvZ3e/8cpImBzyj48PpOyGyAFLgKswHSUIHhsbNNcOl05u/wuH3j
-# Mp0y+2nhQMLXUUDjsEhv9icBanLsoFaf3gu14T5Oq9OhghSgMIIUnAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCD8/mW/8dB1TWZDiFnBpnwiKcm/
+# LbhtL3W6Ce1YjyF+HzANBgkqhkiG9w0BAQEFAASCAYBYTLF/V79f0iBaDodwIhw2
+# HrbALPvVrs//XclEVEUbnYmvum47EyLjgViUcfq/nakzHUl9hAqRGzc3nOcX7wiL
+# wsjuLmYf0BnGPowLdcALdgjaYM+tC8/OWHPCNcO2tXw9kl1dHTpMU7dBV1ghna6Q
+# UJc1ZDqCust1BNFcZLnpKYrg9d5NTggw1ohBW10LQAvmfJhE7Ybnu6MbWo5gCXV0
+# vvef3qRCdGapVUKQtKnNFqwP0D9PuoJFS7hZ9olwm0UMDx0QRD66+dVaG9/iWX7D
+# TCL5KDBYor5eWHcQaAbrx3J0nHeNsvhywv6T0TArnBzOJptUd71RLvq8lS9biqx7
+# Ubp/lclbf4z9fJ9jFOa+p9r6op9s23XwTvcTxvCT8kUvq0yI1LvRv4c7frpTJMNb
+# qfod+2KaBBxlOJufdmfoX2L3XP+FopIfMhZG+eQtVlRoQhVRyN9SbN9qAv36BV0Q
+# RkjWlno7NTfdXpyzIJFzvaXRb1xXIHbLoDVR2xnJlzehghSgMIIUnAYKKwYBBAGC
 # NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgYmTKVQCr7ZcuGXhr7tuSuhel4pW+aZniByYMLBcG
-# cJkCBme2dZf+ZBgTMjAyNTAyMjgwNTM0MjcuOTIzWjAEgAIB9KCB4KSB3TCB2jEL
+# MTANBglghkgBZQMEAgEFAAQg/ZHDlAjmn7rJ4cNfrjbIaG4c+0QcanQyrzV3mdL2
+# WyYCBmfYFF7NQhgTMjAyNTAzMjAyMjQyNDMuNTE2WjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
-# U046QkI3My05NkZELTc3RUYxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
+# U046M0RBNS05NjNCLUUxRjQxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
 # IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
 # 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
@@ -661,27 +779,27 @@ Restart-Device
 # ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
 # UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
 # 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
-# EzMAAABF33vn5wwJFp4AAAAAAEUwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
+# EzMAAABGF+R1esr92uUAAAAAAEYwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
 # VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
 # cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
-# MTg0ODQ3WhcNMjUxMTE5MTg0ODQ3WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
+# MTg0ODQ5WhcNMjUxMTE5MTg0ODQ5WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
 # Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
 # dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
-# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046QkI3My05NkZELTc3RUYxNTAz
+# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046M0RBNS05NjNCLUUxRjQxNTAz
 # BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
-# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwI7T9DdCYDUnYfj4
-# va+Mk9tdPmx23cLwlHHIA8ZEIuTEgrFV8F5gIAHDzvgdrLpaAfNYt5y+Vtpx5RHb
-# FVJnRgnwWE3FrDKGO1r+kFXcXRCxzajb7rv7n+pBSwhwwKmQeiTA8UZNujosLQ1W
-# 0ojOEL7xMc4l5mzLugA6CL618wL7gaZWwaOGq6RROC7Yv1r18+y1O2mSoEMzM3lV
-# r3PvIj3UTmtbovReZOc7NlPuGPTAwjXtqpS16GU7Df4CrBvC9a5n9M15oqCtWjZE
-# ZlsgfMzA28KvSKqqS/UyRBUwbLEC0kP6d/rOzyy0uxCgP259ntzUF6c+N7XmC5X0
-# 4PFo7OSnKcsJ004j9W4gki6MtRHBlPW1hB3EUlPzMfx7vPVk+/0erh3DKe5UUiZ5
-# 4aC6hclk3qc74OoRcXkRiqheE7fDLMmkGzGziMfii8o1K0fcDUhL1Etff2GL6G0N
-# 3qs/2stJrtm4oyoURJawlTN5yJ85zzcF1XSaM7P595jhFz8gB4QBTvs67wQa5nrM
-# JRHNWTlvqYbImoYYX7yhzmAULFO3essnrvIriGpi1pv4NvoPSsvgoQ70DjVUrDbi
-# f8gwOlIefpcunbGYzCKNZC3rOexU6JGeU0NlZLA9UPaF3pxenjEFqsZWVr3JKf6/
-# sbstAIFsyM2ZOMivlI8pfaWS4W8CAwEAAaOCAcswggHHMB0GA1UdDgQWBBQl0Nvq
-# 9SXQRMmn8B3Grz2HYyuV8jAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
+# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAsJV86I/zDS9QX51f
+# oIOHdH2bptR3VCYnUjU3A86Ryb5iAah+euswWHFdE8je/t6jpyY6aE8eiQTIDWJy
+# +QZk1/R65l9FnTTC3++LuzbQUrgA9rH+p9qlFK8+4vH+69CYmYsSiZ5LwP9WpCx6
+# aUDAwroNaAtAGI3e+d2+b8tb1nax1xPYS+9QWXuQwquf+CwZ8vGjkGZc743sIDjZ
+# ImZvkn3LZCY4fS8XZA5auRLxhOmFNLgt+1xe6pB7yJLA9vl4AT9JRDH5jyaNnyPR
+# cCAPWDF+yiCDRDOTmOp5Lyq8jPbOWyui1eM+PDWKYiNcbx9eWA6bPtfZxwrSjFU2
+# XQeHGIQNHVaie3QLuFXMVMA9QBHDMVmyDkdc+jhZFWPRl+aB/JNe3fbd+T1n59F7
+# sVuEhv64poLRYKRP7IUbMuZzAmx8ngnVtB3taZa2EKk7Ehz9p/5c9gwoCJZ8frrz
+# y1X+fiRv9XdYvy3cGwtlh+lBBCcmSJd2tGMDOK3c6Efj+HTvSP9qFjsVwmKhcrWH
+# QsvZYxC1MG8i4640XXbXkfEE8awn2nSqSnxWOgJPxzWT1B2gD2pN22jiL1e0PGsa
+# Nw1kMtom9811eoTDzbdb/dKb/qvXWkHcFM1K4HG8E4Xa0YVh8JUSFYNrEeuvBz5+
+# P/JfYpBqJKy+oAJlcTbMBGfWsAsCAwEAAaOCAcswggHHMB0GA1UdDgQWBBQRNtDU
+# r3awumenJukTxj/GG6iK8TAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
 # ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
 # b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
 # MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
@@ -690,36 +808,36 @@ Restart-Device
 # EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
 # MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
-# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBAGy9tedaeCT4seFHGLKgQteRiPy0
-# twNtoLqOU80gWazoi0L5DHQGhXiVDMVJb9zu1IU3J5unNxwad9hA6/4jeu/kHgZF
-# z3EEszczT480nzwx69zWtVPuCH//b7h1qNZ0p7YKpamUDu1ZjBWuSmgPhK/GgVLX
-# LO1TQ6ntrjbz8bMJf35HsUFWvCRrbPpX4hhNepUbL0jU3l1YECHoleDhtrnqV5v+
-# rz/lXQxhGyVSjPh+NTg80Xwk8Of/7saYnvMdW28xoelULIYnFqTxPn+1vKJX1Qnl
-# HzBBUtWKVDPU/fMERcU2UF052chin0TCQayP8cABd1jYYILQMatiYJzSLAAdNiPM
-# x/clpoD0w13egpMD9B3bx0qyruz2MQK31KR4ZwoKGLfCwuuayzB2aEDcp3Q+SVGg
-# ngYn8SaTjneUZLohh/Wk9A4LOkZhDBYjFQ1BotbTc9KYUV05JXNaheMSwRiFQuCe
-# ZnTtqwhN+UpTO+lZGzBjxPYTXObQYrY6vsB4jzmgzV2+UkE6J2nczJP6LdijGr2P
-# KPpQ3bVG8dpqnOaY8ahKtQouoTfJPHG25BrrX2whPch8xZBYSWn0NYj/yZKje/cr
-# qJYvUoEALhomQbuBU5+Fv4U/R8xzMUGJgoeHIh8n9OoNN2JEtMOeypI6oTrGVRtK
-# YtHyZmb4a5gUM8TXMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
+# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBABSFuS/oBs1+IMh6K0t92Cl7ivYg
+# vdYmU6Zt9MfxHRxulPDQLtqorcsY2VaujA6t9NILKRtJ7cy2KlYY35Lu4jcxO/JO
+# rTYBQq/cLxpCB3ivkNkQDvf7OUfK4TQvpcsDgfuiuWYtJHztGoFV3+zZNjuheg/Q
+# BMzS4oxvnDnuRH9heZeGbFUpCxQiOYxCwvq+CpzWY7p3Pqr40s9g5DbF364xYcpP
+# iu7+1O/iRWfJGefMhbsRF9HMQyqSS8YjYfzgwji9lMWJIcnyNwEdBIX8V/UGR1YM
+# cmcJ2r0d+Rcai0ohk3gCbCu2Dd2yMcrj+ngnJ5F/EzHabvZDw/e7B5zO6aNFEA64
+# 2je3rb4iw8Z2sdp3pnbyVtwXsDixaw9Z0p3e2R3Txjwd6Fkwmivf918EBES4t14/
+# h2XPPUT+dDbe4e/txuqKtpF2DYnSPYlnfoC/pb5EGR/WEyHwQi1o77l71FFFPgLx
+# SNNFLaq73ayHaghWqhPRx0IEn13kOd8S1nTAs7VD/2JzF4icTQZHOlBNqcf6Ovvy
+# 1yQyKcCF0eB0qHS35H7DUJehRaydcbDmBkh73BZB/N/PUZlL6469TQW3XrHOAbuJ
+# KMft3GmzmXNc5vPRvtUUS9rUXhc0jJWEhjt4ip9xhl5kIkZhZQW9wqW1FUM/n4MV
+# TH3i9I+C5ikH09YyMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
 # ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEXfe+fnDAkWngAAAAAA
-# RTANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCBkrK53z/nrzdi9WYydsdoUM1moOfyreumYRY54tVl4
-# 6DCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
-# iM9F0uvKQRUOfiHf0m5xMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
+# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEYX5HV6yv3a5QAAAAAA
+# RjANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
+# MC8GCSqGSIb3DQEJBDEiBCAAuJkH6AO9aJXAz2otirb4hlGM258J/KMSzEAR7mzZ
+# oDCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIBIndkiaVD4+cUJu9zOL6g5l
+# YdUEek4rk1FZC9z/ForOMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
-# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARd975+cMCRaeAAAAAABFMCIE
-# IJKn/CPNPI8c4Vo/1GueUnF+JASAKR/R/S6VshBxdfMIMA0GCSqGSIb3DQEBCwUA
-# BIICABrNk5+9qM33ed9gb6MIY1IZNRa8GuKMqNO7ONI+RB+0HFyr24o9PNR+RvCg
-# rUD5IR3SWaSEdl4Qw0dlqXaM9EuQon+PJu5mXCaCvgumcTajMBrNUY7iFyi3khA2
-# PdGkrMW3SEf07+JJeyUtYPBeHS2IxITU+1JcOTcVbmUCVdVmJgYJaN1+0iJBNzRr
-# 3rH1wli6Or/FxXmukU0JEV2LPUDcm0UE5/+ol7Raz/EBX8NbDKcjBZ6+Rz3aI3cL
-# 2wU6k7hNcQ+KgY4Qjr5QJ8HRYwIWCdiV6CNPSQbm1cHrxyeML78pGfh3d0p2GY50
-# qwy6k97TrJq/+Vp9P7OLDk+qzWltpaeuihuOK8CGv18U+U8AhtrLzHdlFqYU7ETM
-# JYprwFizRkH4R3IsKyhp/d3KoRn7GzGBwJMlwWbnyQoRfbCCLMSfP2WGD16rCPt2
-# F57N/NVm65kJKCy33pF4R/lwgKw8/fJ78LnFbolnk8836TbnJ1b7+1N5JuPlp9EL
-# eThN79nMczRbDRtiFwxFJh3gpi+RJAZzPxkFyFPK5uzuBZCkEEIX/7CFuDJUygei
-# stph1AS2ymqHogGQUdaYKhHZpGS7RPgK1zTNSX9YF1pYWx2QBwSAlB8mBE8Sn7na
-# 5V6LCmpBbsHY8EFPmhtEvBZ2gfFUWSFDYcx9wYsDZi+bA+zO
+# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARhfkdXrK/drlAAAAAABGMCIE
+# IDRMHLH1wiLeONW4dSjnHl9GXGYOJno8Uo9MB7Ot5lSCMA0GCSqGSIb3DQEBCwUA
+# BIICAGfCd8VQmh1hk2UiVaOrKIxcG4AwPq4ulHxaOQCgRb+C4dXV+Zfu3hBIcmhF
+# H54FFd8HhR7sJN+gPoWLG6qhcrM9K6LZ12xr11ZIYH5nmz4dO5TE0TRaqga0FkB7
+# C16nq+zhAVb6qgcGkpt8ru9VZpe9tRA3Kpqenfwao2o2ZDp8fcZgmrWMWdVEXkl5
+# 28zofcEGP6oPLB6dOvJLyMzTMD0FcYEctnlGRnJJc3HvotaOnteKUDPm9AQakxjH
+# UDDGGdPcK+zGZaIGvY41Wyc4bX94Ce4aL0rO7Vu9oCr3ierQzLYCzhWrMCp4X3G3
+# 88gjmG0iqMea1Zq/A2HIrbmnynEW7l8sDdaD2/rvrQnQvP269R0uCN03ApdyLK+r
+# 39myo82Qe+F8CrZN+q0nJur+gA5GB4lR0I05M2+c8zM6dU2bVFvmKfgfuXvikyfK
+# ktaRLilOTiOWlariFuetmwhqb7Am4B+AYr866MUaVek/QVLD5DJHUmS51mdkG8cW
+# gItAltn9nuSAn/BD4TcUiZy42NQUYYfFTur9xw1b08Ugdku1LFFKm2D3CF8kNCg+
+# SisGaqjOrn+VIbKL8241yjz6hK/QpKEEE2uwQoXl4QmGlR2d4saF5Rd55sExxjJZ
+# p05xw8un6Ew2HKZlZS/C32jcgh7aml5uEqVuSVIt33WmEzQT
 # SIG # End signature block

@@ -1,0 +1,307 @@
+    Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts and $($manifest.cmds.Count) command files from $manifest"
+    foreach ($category in $version.PSObject.Properties)
+    {
+        Write-Host "Processing $($category.Value.Count) $($category.Name)s"
+        switch ($category.Name) 
+        {
+            Functions 
+            { 
+                Write-Verbose "The  category is $($category.Name)"
+                foreach ($function in $category.Value)
+                {
+                    Write-Verbose "Processing function: $($function.Name)"
+                    # If the function exists in the functions file list, add the function name and version to the functions array, otherwise remove it.
+                    Write-Verbose "Checking if $($function.Name) exists in the functions list."
+                    if ($functionFiles.baseName -contains $function.Name)
+                    {
+                        Write-Verbose "Function $($function.Name) exists in the functions list. Adding to array..."
+                        $functions += @{"Name" = $function.Name; "Version" = $function.Version}
+                    }
+                    else 
+                    {
+                        Write-Host "Function $($function.Name) does not exist in the functions list. Removing..."
+                        # Add the function to the removed functions array
+                        $removedFunctions += @{"Name" = $function.Name; "Version" = $function.Version}
+                    }
+                }
+            }
+            Scripts
+            { 
+                Write-Verbose "The  category is $($category.Name)"
+                foreach ($script in $category.Value)
+                {
+                    Write-Verbose "Processing script: $($script.Name)"
+                    # If the script exists in the scripts file list, add the script name and version to the scripts array, otherwise remove it.
+                    Write-Verbose "Checking if $($script.Name) exists in the scripts list."
+                    if ($scriptFiles.baseName -contains $script.Name)
+                    {
+                        Write-Verbose "Script $($script.Name) exists in the scripts list. Adding to array..."
+                        $scripts += @{"Name" = $script.Name; "Version" = $script.Version}
+                    }
+                    else 
+                    {
+                        Write-Host "Script $($script.Name) does not exist in the scripts list. Removing..."
+                        # Add the script to the removed scripts array
+                        $removedScripts += @{"Name" = $script.Name; "Version" = $script.Version}
+                    }
+                }
+            }
+            Cmds 
+            { 
+                Write-Verbose "The  category is $($category.Name)"
+                foreach ($cmd in $category.Value)
+                {
+                    Write-Verbose "Processing cmd: $($cmd.Name)"
+                    # If the cmd exists in the cmds file list, add the cmd name and version to the cmds array, otherwise remove it.
+                    Write-Verbose "Checking if $($cmd.Name) exists in the cmds list."
+                    if ($cmdFiles.baseName -contains $cmd.Name)
+                    {
+                        Write-Verbose "Cmd $($cmd.Name) exists in the cmds list. Adding to array..."
+                        $cmds += @{"Name" = $cmd.Name; "Version" = $cmd.Version}
+                    }
+                    else 
+                    {
+                        Write-Host "Cmd $($cmd.Name) does not exist in the cmds list. Removing..."
+                        # Add the cmd to the removed cmds array
+                        $removedCmds += @{"Name" = $cmd.Name; "Version" = $cmd.Version}
+                    }
+                }
+            }
+            default
+            {
+                Write-Verbose "None of the above." 
+            }
+        }
+    }
+
+
+function CreateVersionInventory()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$versionNumber,
+        [Parameter(Mandatory = $true)]
+        [string]$rootFolder,
+        [Parameter(Mandatory = $false)]
+        [string]$functionsFolder = "$($pwd)\Functions",
+        [Parameter(Mandatory = $false)]
+        [string]$inputFile = "$($pwd)\version.json"
+    )
+    
+    #If the input file does not exist, create it.
+    if (-not (Test-Path -Path $inputFile))
+    {
+        Write-Host "Creating version.json file..."
+        $version = @{"Version" = $versionNumber; "Functions" = @(); "Scripts" = @(); "Cmds" = @()}
+        $version | ConvertTo-Json | Set-Content -Path $inputFile
+    }
+    else
+    {
+        Write-Host "Version.json file already exists."
+    }
+    
+    $version = Get-Content -Raw -Path $inputFile | ConvertFrom-Json
+    $functionFiles = Get-ChildItem -File -Path $functionsFolder -Recurse -Include *.ps1 -Force
+    $scriptFiles = Get-ChildItem -Path "$pwd" *.ps1 -Force
+    $cmdFiles = Get-ChildItem -File -Path "$pwd" *.cmd -Force
+    
+    $functions = @()
+    $scripts = @()
+    $cmds = @()
+    $removedFunctions = @()
+    $removedScripts = @()
+    $removedCmds = @()
+
+    Write-Host "Read $($version.functions.Count) functions, $($version.scripts.Count) scripts and $($version.cmds.Count) command files from version.json"
+    foreach ($category in $version.PSObject.Properties)
+    {
+        Write-Host "Processing $($category.Value.Count) $($category.Name)s"
+        switch ($category.Name) 
+        {
+            Functions 
+            { 
+                Write-Verbose "The  category is $($category.Name)"
+                foreach ($function in $category.Value)
+                {
+                    Write-Verbose "Processing function: $($function.Name)"
+                    # If the function exists in the functions file list, add the function name and version to the functions array, otherwise remove it.
+                    Write-Verbose "Checking if $($function.Name) exists in the functions list."
+                    if ($functionFiles.baseName -contains $function.Name)
+                    {
+                        Write-Verbose "Function $($function.Name) exists in the functions list. Adding to array..."
+                        $functions += @{"Name" = $function.Name; "Version" = $function.Version}
+                    }
+                    else 
+                    {
+                        Write-Host "Function $($function.Name) does not exist in the functions list. Removing..."
+                        # Add the function to the removed functions array
+                        $removedFunctions += @{"Name" = $function.Name; "Version" = $function.Version}
+                    }
+                }
+            }
+            Scripts
+            { 
+                Write-Verbose "The  category is $($category.Name)"
+                foreach ($script in $category.Value)
+                {
+                    Write-Verbose "Processing script: $($script.Name)"
+                    # If the script exists in the scripts file list, add the script name and version to the scripts array, otherwise remove it.
+                    Write-Verbose "Checking if $($script.Name) exists in the scripts list."
+                    if ($scriptFiles.baseName -contains $script.Name)
+                    {
+                        Write-Verbose "Script $($script.Name) exists in the scripts list. Adding to array..."
+                        $scripts += @{"Name" = $script.Name; "Version" = $script.Version}
+                    }
+                    else 
+                    {
+                        Write-Host "Script $($script.Name) does not exist in the scripts list. Removing..."
+                        # Add the script to the removed scripts array
+                        $removedScripts += @{"Name" = $script.Name; "Version" = $script.Version}
+                    }
+                }
+            }
+            Cmds 
+            { 
+                Write-Verbose "The  category is $($category.Name)"
+                foreach ($cmd in $category.Value)
+                {
+                    Write-Verbose "Processing cmd: $($cmd.Name)"
+                    # If the cmd exists in the cmds file list, add the cmd name and version to the cmds array, otherwise remove it.
+                    Write-Verbose "Checking if $($cmd.Name) exists in the cmds list."
+                    if ($cmdFiles.baseName -contains $cmd.Name)
+                    {
+                        Write-Verbose "Cmd $($cmd.Name) exists in the cmds list. Adding to array..."
+                        $cmds += @{"Name" = $cmd.Name; "Version" = $cmd.Version}
+                    }
+                    else 
+                    {
+                        Write-Host "Cmd $($cmd.Name) does not exist in the cmds list. Removing..."
+                        # Add the cmd to the removed cmds array
+                        $removedCmds += @{"Name" = $cmd.Name; "Version" = $cmd.Version}
+                    }
+                }
+            }
+            default
+            {
+                Write-Verbose "None of the above." 
+            }
+        }
+    }
+
+    Write-Host "Added $($functions.Count) functions, $($scripts.Count) scripts and $($cmds.Count) command files."
+    Write-Host "Removed $($removedFunctions.Count) functions, $($removedScripts.Count) scripts and $($removedCmds.Count) command files."
+    Write-Verbose "Writing $($functions.Count) functions, $($scripts.Count) scripts and $($cmds.Count) command files to $outputFile."
+    $combined = @{"Functions" = $functions; "Scripts" = $scripts; "Cmds" = $cmds} 
+    return $combined
+}
+
+# Call the function
+$outputJSON = CreateVersionInventory -versionNumber "1.0.0" -functionsFolder "$($pwd)\Functions" -inputFile "$($pwd)\version.json" -rootFolder $PSScriptRoot
+$outputJSON | ConvertTo-Json | Set-Content -Path "$($pwd)\version.json"
+# Add functions
+# foreach ($file in $functionFiles)
+# {
+#     if ($file.basename -notin $functions.Name)
+#     {
+#         $functions += @{"Name" = $file.BaseName; "Version" = $versionNumber}
+#     }
+# }
+# Write-Host "Added $($functions.Count) functions, $($scripts.Count) scripts and $($cmds.Count) command files."
+# Write-Host "Removed $($removedFunctions.Count) functions, $($removedScripts.Count) scripts and $($removedCmds.Count) command files."
+# Write-Verbose "Writing $($functions.Count) functions, $($scripts.Count) scripts and $($cmds.Count) command files to $outputFile."
+# $combined = @{"Functions" = $functions; "Scripts" = $scripts; "Cmds" = $cmds} 
+# return $combined
+# }
+
+# Call the function
+
+
+
+function CopyFiles()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFolder,
+        [Parameter(Mandatory = $false)]
+        [string]$DestinationFolder = "$sourceFolder\Release",
+        [Parameter(Mandatory = $false)]
+        [string]$FunctionsFolder = "$sourceFolder\functions",
+        [string]$exclusionsFile = "$SourceFolder\exclusions.json"
+    )
+    if (Test-Path -Path $exclusionsFile)
+    {
+        $filesToExclude = (Get-Content -Path $exclusionsFile | ConvertFrom-Json).exclusions
+        Write-Host "Reading $($filesToExclude.Count) exclusions from $($exclusionsFile)..."
+    }
+    else
+    {
+        Write-Host "Cannot find the exclusion file $($exclusionsFile)."
+        $filesToExclude = @()
+    }    
+    Write-Verbose "Files to exclude:"
+    $filesToExclude | ForEach-Object { Write-Verbose $_ }
+    Write-Verbose "Received the following parameters:"
+    Write-Verbose "SourceFolder: $SourceFolder"
+    Write-Verbose "DestinationFolder: $DestinationFolder"
+    Write-Verbose "FunctionsFolder: $FunctionsFolder"
+    Write-Verbose "Copying files from $SourceFolder to $DestinationFolder"
+    $success = $false
+
+    $scripts = Get-ChildItem -Path "$SourceFolder\*" -Include *.ps1, *.cmd -Force
+    $functions = Get-ChildItem -Path "$sourceFolder\functions\*" -Include *.ps1 -Force
+    
+    if ($scripts.Count -gt 0)
+    {
+        $filesToCopy = $scripts.FullName
+        Write-Host "Copying $($filesToCopy.Count) files from $SourceFolder to $DestinationFolder"
+        $filesToCopy | ForEach-Object {
+            Write-Verbose "Processing $_"
+            #Asign only the name of the file to a variable called filename by using a regex pattern to remove the parent folder and the file extension. 
+            $filename = [regex]::Match($_, '([^\\]+)(?=\.\w+$)').Value
+            Write-Verbose "Checking if $filename is in the exclusion list."
+            if ($filename -notin $filesToExclude)
+            {
+                Write-Verbose "Copying $filename to $DestinationFolder"
+                Copy-Item -Path $_ -Destination $DestinationFolder -Force
+            }
+            else
+            {
+                Write-Host "Skipping $filename"
+            }
+        }
+        Write-Host "Copy process complete."
+    }
+    else
+    {
+        Write-Host "No scripts found in $SourceFolder"
+        $success = $false
+    }
+    if ($functions.Count -gt 0)
+    {
+        Write-Host "Found $($functions.Count) files in $SourceFolder\functions"
+        $filesToCopy = $functions.FullName
+        Write-Host "Copying $($filesToCopy.Count) files from $FunctionsFolder to $DestinationFolder\functions"
+        $filesToCopy | ForEach-Object {
+            Write-Verbose "Processing $_"
+            # Asign only the name of the file to a variable called filename by using a regex pattern to remove the parent folder and the file extension.
+            $filename = [regex]::Match($_, '([^\\]+)(?=\.\w+$)').Value
+            Write-Verbose "Checking if $filename is in the exclusion list."
+            # if the file is not in the exclusion list, copy it.
+            if ($filename -notin $filesToExclude)
+            {
+                Write-Verbose "Copying $_ to $DestinationFolder\functions"
+                Copy-Item -Path $_ -Destination $DestinationFolder\functions -Force
+            }
+            else
+            {
+                Write-Host "Skipping $filename"
+            }
+        }
+    }
+    Write-Host "Copy process complete."
+    $success = $true
+    return $success
+}
+
