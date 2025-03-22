@@ -34,10 +34,8 @@ Write-Verbose "Latest Release: $latestRelease"
 Write-Verbose "Repo Source Code URL: $repoSourceCodeURL"
 Write-Verbose "Remote Manifest Path: $remoteManifestPath"
 
-$updatedManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest 
-$Global:u = $updatedManifest
+# $updatedManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest 
+# $Global:u = $updatedManifest
+# DownloadScriptUpdates -ScriptsToUpdate $updatedManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot
 
-
-DownloadScriptUpdates -ScriptsToUpdate $updatedManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot
-
-
+$global:i = GetScriptIntegrity -scriptFolders ($PSScriptRoot, $functionsFolder) -rootFolder $PSScriptRoot

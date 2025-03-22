@@ -5,72 +5,98 @@ function GetScriptIntegrity()
         [Parameter(Mandatory = $true)]
         [string[]]$scriptFolders,
         [Parameter(Mandatory = $true)]
-        [string]$hashFilePath
+        $rootFolder,
+        [Parameter(Mandatory = $false)]
+        [string]$hashFilePath = "$rootFolder\manifest.json"
     )
+
     $unVerifiedScripts = @{}
-    if (-not $hashFilePath) 
-    {
-        $hashFilePath = "$PSScriptRoot\hashes.json"
-    }
     Write-Verbose "Received $scriptFolders to check"
+    Write-Verbose "Received $hashFilePath to check"
+    Write-Verbose "The root folder is $rootFolder"
     Write-Verbose "Checking $($scriptFolders.Count) folders for scripts."
-    $hashes = @{}
+    $hashes = @()
     $jsonContent = Get-Content -Path $hashFilePath | ConvertFrom-Json
-    foreach ($key in $jsonContent.PSObject.Properties.Name)
+    $success  = $false
+    
+    foreach ($category in $jsonContent.PSObject.Properties)
     {
-        $hashes[$key] = $jsonContent.$key
+        Write-Verbose "Processing $($category.Value.count) $($category.Name)"
+        switch ($category.Name)
+        {
+            'Scripts' { $scriptFolder = $rootFolder }
+            'cmds' { $scriptFolder = $rootFolder }
+            'Functions' { $scriptFolder = "$rootFolder\functions" }
+        }
+        foreach ($script in $category.Value)
+        {
+            Write-Verbose "Processing script $($script.Name) with hash $($script.Hash)"
+            $hashes += @{
+                Name = $script.Name
+                Path = $scriptFolder
+                Hash = $script.Hash
+            }
+        }
     }
+
     foreach ($folder in $scriptFolders)
     {
-        Write-Verbose "Checking folder $folder for scripts."
-        $scripts = Get-ChildItem -Path "$folder\*.ps1"
-        Write-Verbose "Checking scripts in $folder for valid hashes."
-        Write-Verbose "Found $($scripts.Count) scripts in $folder."
-        foreach ($script in $scripts)
+        Write-Verbose "Checking integrity for files in $($folder)."
+        $files = Get-ChildItem -Path "$folder\*.ps1", "$folder\*.cmd" -File -Force
+        Write-Verbose "Found $($files.count) files in $($folder)."
+        foreach ($file in $files)
         {
-            if (-not $hashes.ContainsKey($script.Name))
+            Write-Verbose "Processing file $($file.Name)"
+            $script = $hashes | Where-Object { $_.Name -eq $file.BaseName }
+            if ($script)
             {
-                Write-Verbose "No hash found for $scriptName in the hash file."
-                $unVerifiedScripts[$script.Name] = @{
-                    Status = 'Unverified'
-                    Reason = 'No hash can be found'
+                Write-Verbose "Found script $($script.Name) with hash $($script.Hash)"
+                $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
+                if ($hash.Hash -ne $script.Hash)
+                {
+                    Write-Verbose "Hash mismatch for script $($file.Name). Expected: $($script.Hash), Found: $($hash.Hash)"
+                    $unVerifiedScripts[$file.Name] = [ordered] @{
+                        Path = $file.FullName
+                        Hash = $hash.Hash
+                        reason = 'hash mismatch'
+                    }
                 }
-            }
-            $hash = Get-FileHash -Path $script -Algorithm SHA256
-            $hashValue = $hash.Hash
-            if ($hashValue -ne $hashes[$script.Name])
-            {
-                Write-Verbose "The script $($script.Name) has been modified."
-                Write-Verbose "The hash of the script is $hashValue"
-                Write-Verbose "The hash in the hash file is $($hashes[$script.Name])"
-                $unVerifiedScripts[$script.Name] = @{
-                    Status = 'Unverified'
-                    Reason = 'Hash is invalid'
+                else
+                {
+                    Write-Verbose "Hash match for script $($file.Name)."
                 }
             }
             else
             {
-                Write-Verbose "The script $($script.Name) is verified and has not been modified."
+                Write-Verbose "Script $($file.Name) not found in manifest."
+                $unVerifiedScripts[$file.Name] = [ordered] @{
+                    Path = $file.FullName
+                    Hash = 'Not Found in Manifest'
+                    reason = 'not found in manifest'
+                }
             }
         }
-    }
-    if ($unVerifiedScripts.Count -gt 0)
+    }    
+    Write-Verbose "Found $($unVerifiedScripts.count) unverified scripts."
+    if ($unVerifiedScripts.Count -eq 0)
     {
-        Write-Verbose "The following $($unVerifiedScripts.count) scripts are not signed:"
-        Write-Verbose "$unVerifiedScripts"
+        Write-Host "All scripts successfully passed the integrity check." -ForegroundColor Green
+        $success = $true
     }
     else
     {
-        Write-Verbose 'All scripts are verified.'
+        Write-Host "The following scripts failed the integrity check:" -ForegroundColor Red
+        $unVerifiedScripts.GetEnumerator() | ForEach-Object { Write-Host "$($_.Key): $($_.Value.Path) - Hash: $($_.Value.reason)" }
     }
-    Write-Verbose "Returning $($unVerifiedScripts.count) scripts."
-    return $unVerifiedScripts
+    # Write-Verbose "Returning $($unVerifiedScripts.Count) unverified scripts."
+    return $success
+    # return $unVerifiedScripts.Count
 }
 # SIG # Begin signature block
 # MII95AYJKoZIhvcNAQcCoII91TCCPdECAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA6lgAR82TWVyi5
-# n8o74LDBIXSZYlfJ631a+oEkCRZlj6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAYysDv3Ph74fvN
+# TzKuOlsbqAAM8rwfT0/QDowewr3lE6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -101,100 +127,100 @@ function GetScriptIntegrity()
 # uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
 # GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
 # ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAIWNdTb
-# JSskCOoZAAAAAhY1MA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
+# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAMMtJvn
+# rrWgNRokAAAAAwy0MA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBFT0MgQ0EgMDIwHhcNMjUwMzE2MDc0MTQwWhcNMjUwMzE5
-# MDc0MTQwWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
+# RCBWZXJpZmllZCBDUyBBT0MgQ0EgMDEwHhcNMjUwMzIxMDcxNDE1WhcNMjUwMzI0
+# MDcxNDE1WjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
 # BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
 # Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# pu6hJOAq+sF+JW9rzXiUakJkH235E56S7RNMT6nNz2grTqCnsU7fUm9pTyq4IokN
-# EQJEfwMRosWUxL2MHIZt+1R7ZIR10Vxl8Sdc6S63bwPHrHmkmZkpGo4PPQ/QZzQf
-# AiPJaHr+fX/w2qgG3c30ZI/2fqzQhrLfrsHd0dsCBk9mZvvD9ybLmBFtuqO1t3YP
-# JvTgB9VPKTDz8pDys49Lnari55kfONyUNYX5XESV9v7hrrWZvtkVoRu+TGesoTAJ
-# h2DQEg9WA+C8XguHgFshW0IFBBNg/zJw1XzJsPUS1k2RP5Tg5fujHWQc9Yee9GaZ
-# cnxlbe5RCZD+i5dmznNfZ40n8wALJXqXuVJUMLQEWhwuP8Wb1sXY7kzktT4+Evtr
-# yYbTulPM00Z9zP0yW03Xv/o31noiPgmMApeGRKvEuaI96Y+iHSRNwF1JyoWIC4Nx
-# g8cT77RJ/cIQiogkE3CD5Jxt/t8974Z64s4Fu59arYfsi9NBdGHsHOFZOCgM7f8B
+# tBsEz+zbg92T+0waG5eMjJkVWC9CW3VdTvZl7bFz8UrQV4ym1lWDXIuixT/obXOR
+# 10SMyZ8nfRztD3Nxzyx6WF7crrKI6exQTRFkXclbyxiIpYYggA0h2HcVjGn0woEY
+# JLQMGplBHinAUvJnVX5L2QHhw2Z3LEAbmjIcI5cfE96UdOMV2hj6e/Rn15I4qvgi
+# o7viABNWhxNOPDu0tXi7HmoDxJR5Y859WQ+PEs+i1k7GuIdp9Um4l2StLa5zGzfJ
+# rEWvMbVSWN7qFifgxyIYJKPnMlMDJVJWGDgNqclCjypW9UtKcu3YdeXBwmNBkQqQ
+# 9DocbACp2xmmS/2a5++lv4gL8tQpHEVdkqoW7CiY5dsOXAZa1WSOZMaV49Lle+hv
+# jEAcZzjucWB1vOAjJUz9y39wuyzNZMgUpV9N+VrzsNIQMTMOTDEQAuKRPy01Ycig
+# nBSHjqZPYxuyjIqF7i1GzJ6jEDcpvS42e1IrqwfoKX1VRbyn5NxZwmQ0UstvWo0N
 # AgMBAAGjggIYMIICFDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDA7BgNV
 # HSUENDAyBgorBgEEAYI3YQEABggrBgEFBQcDAwYaKwYBBAGCN2GBmtGaFtje9WuB
-# vfqFXPmA7xswHQYDVR0OBBYEFCaHptHwgja7xZRNT70fO07j55hWMB8GA1UdIwQY
-# MBaAFGWfUc6FaH8vikWIqt2nMbseDQBeMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
+# vfqFXPmA7xswHQYDVR0OBBYEFDW4qjO4Q+HRGucAaV+VaeqapYe6MB8GA1UdIwQY
+# MBaAFOiDxDPX3J8MnHaaCqbU34emXljuMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMElEJTIw
-# VmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDIuY3JsMIGlBggrBgEFBQcBAQSB
+# VmVyaWZpZWQlMjBDUyUyMEFPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
 # mDCBlTBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
-# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBFT0MlMjBD
-# QSUyMDAyLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
+# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBBT0MlMjBD
+# QSUyMDAxLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
 # LmNvbS9vY3NwMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUH
 # AgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0
-# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBANHUbB/c+bpFsMFb
-# m2y48UKidh5zOj3bB/1skABivOAmXyJ0KQSEoTnlzRvEur/KZyRw/BCjOWOOw31T
-# R+sIixKZ+rBPDtLx5Cg6XtpJZFv3z0WJAzemua8XzpY/i/yAxe4Cd5SYN5bjeU64
-# eujABTpZ5ICjpwxMXcI+SeLNb3yGPc4aL+7MgIliIs7AFP3YxXkMdgZImbtHU+8j
-# rQm2p84Hf3iVz+lzF3hpACEOKss0savbsE+zy/7G+sL+q2P+rXAXqxh7+8rLkV6F
-# YGOxXv2C+k+DkaDk6HyeihDNTCDnN00okCQ972vfgGKGRaEKaOJMYYhJ2JR6NWVb
-# MZVhSdnuOwYGy63vPYF/Y8DD00RDGQBkZTniUqQ5YdQ5vp2BqExCtYyxhKganKrh
-# gRlZRAiLfERkpp18AToULEBs7iwmCkdKP0Ev/ZyupMDym86dZRfxEG6o7AK1mzWp
-# WF2XYIgG/3hBOopRyaP4xWMESHRXuitm0XN2wj5BJc3PUjeZaQHm4gHxdip4dKh9
-# TScg2kAL+sO7+FNQlgXUbeYOEC3Wq4G9qG4ZaF+UYRz7ZqzVITDBuvEBQp1A6ptw
-# GennuLEyI1usHol9PVOEdB37b5hwiy9HSw7LWkdGLnYPuvxJf8bm/2fXSaWFuojY
-# 9Y+rd8w3b3k33pCHvbUxVkLASvtNMIIG5zCCBM+gAwIBAgITMwACFjXU2yUrJAjq
-# GQAAAAIWNTANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
+# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBACEZW/cvYGkaW6NA
+# ypVO36NtlcPr4ZdnY8lOgk6mhdBz1xjIO7R1xRPmtLhIApomav0Q8CqKZYRrNywX
+# g1la6IG8wfNRbhswGtxSXztJA5fB9NlOyEAEa+73cX4HRc9ilCN/Fd16naercH0k
+# tjkVsHjhouuvCOPgR78EwpXC/KHEEzh8vMsrcuwfBT7URUYRG24qnz11VXyAix2W
+# 90fm8DK4Ob6KefSd46Fii/aLLzabm3LHTOjUR6+bmYWg+8KxA7qfe9zQTa2op6YK
+# OMkuBiJzxmcqpni9BkoM1dewbwsjhfXFEiKRIOgbYT2F/oHTRUtAKhvtp0WAvR4Y
+# GYlr1L5l0swqGoh7cfvieDYrRR9yYF0eeRxy8yAlqemwjM1hZ5FfKBudFVXQlCuO
+# i/I/Nsrx8e7NuDp2xOC9dKnpm02UD3PCcwtY+wmUYGJ7VAQwXPyon7JMZqTVsU54
+# KZtHYPsWFEtDmTZ1VFxMCva12TU3e/b+yxdlzS3Cn2Ov0CDDQQtZPSnI44pfBNDL
+# v3ZerM45bJFRXPhD1ouzf7FHES0oqBnc5NsmbueFwXMzY/s2CKHhQip2ZAMWpoXe
+# ros6Dvn4ABn3Hfe+yzZ3LBCxD/zQ7zdQjEjmQY5AjGuL6UVkHpR4jR6mJ6xTlw8z
+# 2+oF0pWpLFCRxiLBiDsjVWIZUcfFMIIG5zCCBM+gAwIBAgITMwADDLSb5661oDUa
+# JAAAAAMMtDANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
 # TWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVy
-# aWZpZWQgQ1MgRU9DIENBIDAyMB4XDTI1MDMxNjA3NDE0MFoXDTI1MDMxOTA3NDE0
-# MFowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
+# aWZpZWQgQ1MgQU9DIENBIDAxMB4XDTI1MDMyMTA3MTQxNVoXDTI1MDMyNDA3MTQx
+# NVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
 # cmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhh
-# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAKbuoSTg
-# KvrBfiVva814lGpCZB9t+ROeku0TTE+pzc9oK06gp7FO31JvaU8quCKJDRECRH8D
-# EaLFlMS9jByGbftUe2SEddFcZfEnXOkut28Dx6x5pJmZKRqODz0P0Gc0HwIjyWh6
-# /n1/8NqoBt3N9GSP9n6s0Iay367B3dHbAgZPZmb7w/cmy5gRbbqjtbd2Dyb04AfV
-# Tykw8/KQ8rOPS52q4ueZHzjclDWF+VxElfb+4a61mb7ZFaEbvkxnrKEwCYdg0BIP
-# VgPgvF4Lh4BbIVtCBQQTYP8ycNV8ybD1EtZNkT+U4OX7ox1kHPWHnvRmmXJ8ZW3u
-# UQmQ/ouXZs5zX2eNJ/MACyV6l7lSVDC0BFocLj/Fm9bF2O5M5LU+PhL7a8mG07pT
-# zNNGfcz9MltN17/6N9Z6Ij4JjAKXhkSrxLmiPemPoh0kTcBdScqFiAuDcYPHE++0
-# Sf3CEIqIJBNwg+Scbf7fPe+GeuLOBbufWq2H7IvTQXRh7BzhWTgoDO3/AQIDAQAB
+# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBALQbBM/s
+# 24Pdk/tMGhuXjIyZFVgvQlt1XU72Ze2xc/FK0FeMptZVg1yLosU/6G1zkddEjMmf
+# J30c7Q9zcc8selhe3K6yiOnsUE0RZF3JW8sYiKWGIIANIdh3FYxp9MKBGCS0DBqZ
+# QR4pwFLyZ1V+S9kB4cNmdyxAG5oyHCOXHxPelHTjFdoY+nv0Z9eSOKr4IqO74gAT
+# VocTTjw7tLV4ux5qA8SUeWPOfVkPjxLPotZOxriHafVJuJdkrS2ucxs3yaxFrzG1
+# Ulje6hYn4MciGCSj5zJTAyVSVhg4DanJQo8qVvVLSnLt2HXlwcJjQZEKkPQ6HGwA
+# qdsZpkv9mufvpb+IC/LUKRxFXZKqFuwomOXbDlwGWtVkjmTGlePS5Xvob4xAHGc4
+# 7nFgdbzgIyVM/ct/cLsszWTIFKVfTfla87DSEDEzDkwxEALikT8tNWHIoJwUh46m
+# T2MbsoyKhe4tRsyeoxA3Kb0uNntSK6sH6Cl9VUW8p+TcWcJkNFLLb1qNDQIDAQAB
 # o4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDVR0lBDQw
 # MgYKKwYBBAGCN2EBAAYIKwYBBQUHAwMGGisGAQQBgjdhgZrRmhbY3vVrgb36hVz5
-# gO8bMB0GA1UdDgQWBBQmh6bR8II2u8WUTU+9HztO4+eYVjAfBgNVHSMEGDAWgBRl
-# n1HOhWh/L4pFiKrdpzG7Hg0AXjBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
+# gO8bMB0GA1UdDgQWBBQ1uKozuEPh0RrnAGlflWnqmqWHujAfBgNVHSMEGDAWgBTo
+# g8Qz19yfDJx2mgqm1N+Hpl5Y7jBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
 # Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlm
-# aWVkJTIwQ1MlMjBFT0MlMjBDQSUyMDAyLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
+# aWVkJTIwQ1MlMjBBT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
 # ZAYIKwYBBQUHMAKGWGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2Vy
-# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwRU9DJTIwQ0ElMjAw
-# Mi5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
+# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwQU9DJTIwQ0ElMjAw
+# MS5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
 # b2NzcDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNo
 # dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5o
-# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQDR1Gwf3Pm6RbDBW5tsuPFC
-# onYeczo92wf9bJAAYrzgJl8idCkEhKE55c0bxLq/ymckcPwQozljjsN9U0frCIsS
-# mfqwTw7S8eQoOl7aSWRb989FiQM3prmvF86WP4v8gMXuAneUmDeW43lOuHrowAU6
-# WeSAo6cMTF3CPknizW98hj3OGi/uzICJYiLOwBT92MV5DHYGSJm7R1PvI60JtqfO
-# B394lc/pcxd4aQAhDirLNLGr27BPs8v+xvrC/qtj/q1wF6sYe/vKy5FehWBjsV79
-# gvpPg5Gg5Oh8nooQzUwg5zdNKJAkPe9r34BihkWhCmjiTGGISdiUejVlWzGVYUnZ
-# 7jsGBsut7z2Bf2PAw9NEQxkAZGU54lKkOWHUOb6dgahMQrWMsYSoGpyq4YEZWUQI
-# i3xEZKadfAE6FCxAbO4sJgpHSj9BL/2crqTA8pvOnWUX8RBuqOwCtZs1qVhdl2CI
-# Bv94QTqKUcmj+MVjBEh0V7orZtFzdsI+QSXNz1I3mWkB5uIB8XYqeHSofU0nINpA
-# C/rDu/hTUJYF1G3mDhAt1quBvahuGWhflGEc+2as1SEwwbrxAUKdQOqbcBnp57ix
-# MiNbrB6JfT1ThHQd+2+YcIsvR0sOy1pHRi52D7r8SX/G5v9n10mlhbqI2PWPq3fM
-# N295N96Qh721MVZCwEr7TTCCB1owggVCoAMCAQICEzMAAAAF+3pcMhNh310AAAAA
-# AAUwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
+# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQAhGVv3L2BpGlujQMqVTt+j
+# bZXD6+GXZ2PJToJOpoXQc9cYyDu0dcUT5rS4SAKaJmr9EPAqimWEazcsF4NZWuiB
+# vMHzUW4bMBrcUl87SQOXwfTZTshABGvu93F+B0XPYpQjfxXdep2nq3B9JLY5FbB4
+# 4aLrrwjj4Ee/BMKVwvyhxBM4fLzLK3LsHwU+1EVGERtuKp89dVV8gIsdlvdH5vAy
+# uDm+inn0neOhYov2iy82m5tyx0zo1Eevm5mFoPvCsQO6n3vc0E2tqKemCjjJLgYi
+# c8ZnKqZ4vQZKDNXXsG8LI4X1xRIikSDoG2E9hf6B00VLQCob7adFgL0eGBmJa9S+
+# ZdLMKhqIe3H74ng2K0UfcmBdHnkccvMgJanpsIzNYWeRXygbnRVV0JQrjovyPzbK
+# 8fHuzbg6dsTgvXSp6ZtNlA9zwnMLWPsJlGBie1QEMFz8qJ+yTGak1bFOeCmbR2D7
+# FhRLQ5k2dVRcTAr2tdk1N3v2/ssXZc0twp9jr9Agw0ELWT0pyOOKXwTQy792XqzO
+# OWyRUVz4Q9aLs3+xRxEtKKgZ3OTbJm7nhcFzM2P7Ngih4UIqdmQDFqaF3q6LOg75
+# +AAZ9x33vss2dywQsQ/80O83UIxI5kGOQIxri+lFZB6UeI0epiesU5cPM9vqBdKV
+# qSxQkcYiwYg7I1ViGVHHxTCCB1owggVCoAMCAQICEzMAAAAHN4xbodlbjNQAAAAA
+# AAcwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
 # c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
-# IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTNaFw0yNjA0MTMx
-# NzMxNTNaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBFT0MgQ0Eg
-# MDIwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDSGpl8PzKQpMDoINta
-# +yGYGkOgF/su/XfZFW5KpXBA7doAsuS5GedMihGYwajR8gxCu3BHpQcHTrF2o6QB
-# +oHp7G5tdMe7jj524dQJ0TieCMQsFDKW4y5I6cdoR294hu3fU6EwRf/idCSmHj4C
-# HR5HgfaxNGtUqYquU6hCWGJrvdCDZ0eiK1xfW5PW9bcqem30y3voftkdss2ykxku
-# RYFpsoyXoF1pZldik8Z1L6pjzSANo0K8WrR3XRQy7vEd6wipelMNPdDcB47FLKVJ
-# Nz/vg/eiD2Pc656YQVq4XMvnm3Uy+lp0SFCYPy4UzEW/+Jk6PC9x1jXOFqdUsvKm
-# XPXf83NKhTdCOE92oAaFEjCH9gPOjeMJ1UmBZBGtbzc/epYUWTE2IwTaI7gi5iCP
-# tHCx4bC/sj1zE7JoeKEox1P016hKOlI3NWcooZxgy050y0oWqhXsKKbabzgaYhhl
-# MGitH8+j2LCVqxNgoWkZmp1YrJick7YVXygyZaQgrWJqAsuAS3plpHSuT/WNRiyz
-# JOJGpavzhCzdcv9XkpQES1QRB9D/hG2cjT24UVQgYllX2YP/E5SSxah0asJBJ6bo
-# fLbrXEwkAepOoy4MqDCLzGT+Z+WvvKFc8vvdI5Qua7UCq7gjsal7pDA1bZO1AHEz
-# e+1JOZ09bqsrnLSAQPnVGOzIrQIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBRln1HOhWh/L4pFiKrdpzG7Hg0A
-# XjBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
+# IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTRaFw0yNjA0MTMx
+# NzMxNTRaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
+# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
+# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC398ADKAfFuj6PEDTi
+# E0jxvP4Spta9K711GABrCMJlq7VjnghBqXkCuklaLxwiPRYD6anCLHyJNGC6r0kQ
+# tm9MyjZnVToC0TVOfea+rebLBn1J7FV36s85Ov651roZWDAsDzQuFF/zYC+tLDGZ
+# mkIf+VpPTx2fv4a3RxdhU0ok5GbWFKsCOMNCJnUmKr9KqIOgc3o8aZPmFcqzbYTv
+# 0x4VZgHjLRSU2pbRnYs825ryTStsRF2I1L6dM//GwRJlSetubJdloe9zIQpgrzlY
+# HPdKvoS3xWVt2J3+mMGlwcj4fK2hpQAYTqtJaqaHv9oRl4MNSTP24wo4ZqwiBid6
+# dSTkTRvZT/9tCoO/ep2GP1QlhYAM1gL/eLeLFxbVUQtpT7BOpdPEsAV6UKL+VEdK
+# NpaKkN4T9NsFvTNMKIudz2eY6Nk8qW60w2Gj3XDGjiK1wmgiTZs+i3234BX5TA1o
+# NEhtwRpBoHJyX2lxjBaZ/RsnggWf8KZgxUbV6QIHEHLJE2QWQea4xctfo8xdy94T
+# jqMyv2zILczwkdF11HjNWN38XEGdLkc6ujemDpK24Q+yGunsj8qTVxMbzI5aXxqp
+# /o4l4BXIbiXIn1X5nEKViZpTnK+0pgqTUUsGcQF8NbD5QDNBXS9wunoBXHYVzyfS
+# +mjK52vdLBmZyQm7PtH5Lv0HMwIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
+# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTog8Qz19yfDJx2mgqm1N+Hpl5Y
+# 7jBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
 # aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
 # gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
 # FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
@@ -203,18 +229,18 @@ function GetScriptIntegrity()
 # AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
 # b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
 # JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAEVJ
-# YNR3TxfiDkfO9V+sHVKJXymTpc8dP2M+QKa9T+68HOZlECNiTaAphHelehK1Elon
-# +WGMLkOr/ZHs/VhFkcINjIrTO9JEx0TphC2AaOax2HMPScJLqFVVyB+Y1Cxw8nVY
-# fFu8bkRCBhDRkQPUU3Qw49DNZ7XNsflVrR1LG2eh0FVGOfINgSbuw0Ry8kdMbd5f
-# MDJ3TQTkoMKwSXjPk7Sa9erBofY9LTbTQTo/haovCCz82ZS7n4BrwvD/YSfZWQhb
-# s+SKvhSfWMbr62P96G6qAXJQ88KHqRue+TjxuKyL/M+MBWSPuoSuvt9JggILMniz
-# hhQ1VUeB2gWfbFtbtl8FPdAD3N+Gr27gTFdutUPmvFdJMURSDaDNCr0kfGx0fIx9
-# wIosVA5c4NLNxh4ukJ36voZygMFOjI90pxyMLqYCrr7+GIwOem8pQgenJgTNZR5q
-# 23Ipe0x/5Csl5D6fLmMEv7Gp0448TPd2Duqfz+imtStRsYsG/19abXx9Zd0C/U8K
-# 0sv9pwwu0ejJ5JUwpBioMdvdCbS5D41DRgTiRTFJBr5b9wLNgAjfa43Sdv0zgyvW
-# mPhslmJ02QzgnJip7OiEgvFiSAdtuglAhKtBaublFh3KEoGmm0n0kmfRnrcuN2fO
-# U5TGOWwBtCKvZabP84kTvTcFseZBlHDM/HW+7tLnMIIHnjCCBYagAwIBAgITMwAA
+# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAHf+
+# 60si2TAtOng1+H32+tulKwvw3A8iPb5MGdkYvcLx61MZiz4dlTE0b6s15lr5HO72
+# gRwBkkOIaMRbK3Mxq8PoGKHecRYWwhbhoaHiAHif+lE955WsriLUsbuMneQ8tGE0
+# 4dmItRC2asXhXojG1QWO8GeKNpn2gjGxJJA/yIcyM/3amNCscEVYcYNuSbH7I7oh
+# qfdA3diZt197DNK+dCYpuSJOJsmBwnUvRNnsHCawO+b7RdGw858WCfOEtWpl0TJb
+# DDXRt+U54EqqRvdJoI1BPPyeyFpRmGvFVTmo2BiNpoNBCb4/ZISkEXtGiUQLeWWV
+# +4vgA4YK2g1085avH28FlNcBV1MTavQgOTz7nLWQsZMsrOY0WfqRUJzkF10zvGgN
+# ZDhpSgJFdywF5GGxyWTuRVc/7MkY85fCNQlufPYq32IX/wHoUM7huUa4auiAynJe
+# S7AILZnhdx/IyM8OGplgA8YZNQg0y0Vtq7lG0YbUM5YT150JqG248wOAHJ8+LG+H
+# LeyfvNQeAgL9iw5MzFW4xCL9uBqZ6aj9U0pmuxlpLSfOY7EqmD2oN5+Pl8n2Agdd
+# ynYXQ4dxXB7cqcRdrySrMwN+tGX/DAqs1IWfenuDRvjgB3U40OZa3rUwtC8Xngsb
+# raLp9+FMJ6gVP1n2ltSjaDGXJMWDsGbR+A6WdF8YMIIHnjCCBYagAwIBAgITMwAA
 # AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
 # MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
 # ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
@@ -257,26 +283,26 @@ function GetScriptIntegrity()
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
 # nTiOL60cPqfny+Fq8UiuZzGCGpQwghqQAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMgITMwACFjXU2yUrJAjqGQAAAAIWNTAN
+# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADDLSb5661oDUaJAAAAAMMtDAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCD8UxAqAIIZLxS2J7C0X3PNoh/W
-# eZ8r2uPvDutI5KFmQTANBgkqhkiG9w0BAQEFAASCAYAqP37cMDTkTX/UPMJbUmqZ
-# ZEoLlsjFQb7t6hm5IqFG0OzWj97tx+zzYnJNqoSct2L7mLVzGKvXbC9WXMxYdMcS
-# OtYv5dzjpfC14ci38x/fxls2nkK4Xpqg7f/Tq44zVXV1Ygi9jqSdu/NBVCDMLVYq
-# rcQXBnvteZPNsxh3KnjJ206cvULb4FZfe0iNkRgZwwvMKLL/ZZ37ZEVgtjc3wXEr
-# tcSuCcfNFdCcOUnO23Jy4GTHLXuS3n4d9dZJFQjE4OthtJ52IEJiV5awSrNrpZB7
-# jK6T6b/EENldLcec5lTKb7LAMngo34D7jFcaJTng77qDIu8G8YfigMxrN3IDxfpv
-# YylilIuU9wBmbB1m3SumKh/icQ18Upylq2Y03/U22DJj9Q3EK+/MweV7tbXTxrHr
-# 1xgUJrwZ/i1u9bA4fA2znf6aAlmZdEHk5yYBSj+AAg3BNnwX+kG23fVdZw3KK+P8
-# Hl8HddMhSRzIKHyO6sO9CuB4hW/mvze7eMW97Pk/5PqhghgUMIIYEAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCrCy9cOkWDm6IfdQrw/fjzaFo4
+# hVM4of1MArSNr5wkgjANBgkqhkiG9w0BAQEFAASCAYCTel1BDagKC27RIW5TECc5
+# kRy4BUdxOf9yzeN/RJ3DXF15SlB+HjqY27+9sra/oYIBrwZOv25WZ5ldj72xXtns
+# QDCX97S6K0kP/0wdObSP5dyk7zrYQO2orB/YB6C2PIUDx7uZ7ZAE4Adx5zZsHHID
+# wAg0ALOi1rcTO3Ts5mj7DruSJLZwc7xwid1FIw5O7PCldUysmK76YiAybodNkumn
+# TlKjYe7JmNq9lEtUfebDJVBjoryqsLBrATH3UE66K7xbp2XDB4sLUCqIyofmsjyd
+# 7sBwoILILSSY/3YqSmq3rPlGPqVGG6Jt3u2uT4ng718QHzR8mzbtJKqhc+bew0PB
+# tovBTtaozKHmTYmgxFnxxH8Krg9cK5y1zwmexWK0rixfZZH0/npgN0EJ9/ts2ljW
+# u4ko5/HvQfVcGbgEtKCxDnxWzCc3HfW5BCer1ZtZQSXPuNJdEbJj5SDhxHgOqWYQ
+# Wjf6BYW5WpC+KRlDd7xr2xdedsRNjD1WDB9zwkkm6Q6hghgUMIIYEAYKKwYBBAGC
 # NwMDATGCGAAwghf8BgkqhkiG9w0BBwKgghftMIIX6QIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgSx2pbmH82pPc8mC3nSrm5ckCDECDW7O3sHezQgMd
-# KFkCBmfDX7soHxgTMjAyNTAzMTYxODI4MzIuNjU2WjAEgAIB9KCB4aSB3jCB2zEL
+# MTANBglghkgBZQMEAgEFAAQgwU3CxzOdNxd1ZWv/0FY6uppgyzFqfDixYe9KV2am
+# hc8CBmfcmdMhYhgTMjAyNTAzMjIwMjA0MTEuNTcyWjAEgAIB9KCB4aSB3jCB2zEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
-# RVNOOjc4MDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJT
+# RVNOOjdEMDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJT
 # QSBUaW1lIFN0YW1waW5nIEF1dGhvcml0eaCCDyEwggeCMIIFaqADAgECAhMzAAAA
 # BeXPD/9mLsmHAAAAAAAFMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4w
 # HAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29m
@@ -318,27 +344,27 @@ function GetScriptIntegrity()
 # +mTm8LWVydt4ytxYP/bqjN49D9NZ81coE6aQWm88TwIf4R4YZbOpMKN0CyejaPNN
 # 41LGXHeCUMYmBx3PkP8ADHD1J2Cr/6tjuOOCztfp+o9Nc+ZoIAkpUcA/X2gSMkgH
 # APUvIdtoSAHEUKiBhI6JQivRepyvWcl+JYbYbBh7pmgAXVswggeXMIIFf6ADAgEC
-# AhMzAAAATBtLnGPC5NN6AAAAAABMMA0GCSqGSIb3DQEBDAUAMGExCzAJBgNVBAYT
+# AhMzAAAAS6GxreFZ/Oc0AAAAAABLMA0GCSqGSIb3DQEBDAUAMGExCzAJBgNVBAYT
 # AlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1p
 # Y3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMB4XDTI0MTEy
-# NjE4NDg1OVoXDTI1MTExOTE4NDg1OVowgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
+# NjE4NDg1N1oXDTI1MTExOTE4NDg1N1owgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
 # EwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3Nv
 # ZnQgQ29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJh
-# dGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjo3ODAwLTA1RTAtRDk0NzE1
+# dGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjo3RDAwLTA1RTAtRDk0NzE1
 # MDMGA1UEAxMsTWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRo
-# b3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDcde8XEX4HjETY
-# u6YHtWiP7+6Vf2abeUo/si4NcaeiKrRMTF8F7mpCoPJyo/h5VHbhyKDZazOm1cLu
-# zKeVEMzDN4vuf3fZb5hSlpVlCXBSJ3YBLwLnRJtWNk+XkUMcAc96RdalToVYWltO
-# IwbCCkjE42fnCafwjZajw1UGaxl4tRQNHwVk5gwC2wlVVSJREJqCSsB9TXXHIKxP
-# HnnFJqJ/LI1goJ+Ve0Bar4PiKiMfnvnZ8LR3ktW24X6FDQJRKLjnJQ0JVebQEvI+
-# q8Y/frheUldXeLVD4SfQNl1fLKN58o+NJsWI0ET6C8wYZc+eu+EqrzubIPXB7mKI
-# 9cbtmGHvztslz1K/NmRvGGQkeKEKdOWfpfRuYxmhmeVmR1QMLe5pBccJiXw7PUIW
-# +3MB0pM5SBF5FH6INtT1gf5vHwBA9vbeiiggbijJMuK0qu63sIbbE/YN4iYrCURv
-# jZampsTtxmlEtN921N0qXNtNgU0vavdc/vJl/rDef6fMeQuJAinIHxcJzPDTsOXZ
-# legwcCr/J52eij6T9szMlPSCQVAt5u/agNcJ212t6qdwZ4hYYF4LkCmXQgDPZpR1
-# lGDCaojAB6zy/H7nME+nnTvTgTMtR4d4lHVBQxpJDnvYNvGPurrnP7FZT3ue8Yzf
-# FEiE5chmJia8THexs46F8tCr8T5UxQIDAQABo4IByzCCAccwHQYDVR0OBBYEFGrq
-# I3Sxu357rKTylpgwcVAF1Nw/MB8GA1UdIwQYMBaAFGtpKDo1L0hjQM972K9J6T7Z
+# b3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCdnYqzfzSDLZ8t
+# /IcnBhZ/VS77fz7MIUKa1I9mDjnJRNPdVWovmgU5UbARCbLCIIzZj8J0/YDeyJBD
+# YFTySXAgaHlDw06rUBcryq2eaxoWfShTHSdlOnyzhDUw8GXGYJT1x/q+nGm6k1or
+# uwW2wrYNR86/Q5sr1XYCJlM8yteWaJFvZJGE6vCOPQxni/lEN2qoTrq2ejmpVVMP
+# ngkX9IMCyrlxav40gC15WTU7dZ3o19bQs7u+drzbzON0MtKsqa1vDFsHuqvH2q1S
+# 21zETmed/llmTK5QaRLLhk5WCd9w1n/Do5gHarg6Jv861uSCqAdMdNnI34fnTsIR
+# naEtCGWGu7W1Zd7blHSligBaGALIC61vJzWj1Mb8JxhhmhfPX20d6nB1Jpmm4qIP
+# /FW02uCxJSq9Fe8ziedvlg4m1aCqjWX0Q566/i7VieVsOA3rx1xRXeIbADmsxnw3
+# 6YlZohsqREsZUMjQZ4e6cCfKAlaO02ca7GizIRn7mNvzHNYc47gQCFEC+YgX2SLv
+# w4b6R5Taq43XJ0hfhDwPSPiT60dySjLUIcmDcs2vI878t3WxEl2an9HJCaYPKvV/
+# UZ1Ay9HjkSJc3ZqIXvgGlh1VI7kCpPTBayY7RC0IzJl5a7+DM7FcBhei9h1eJ8Ad
+# ZszVcUGk+LkF+uqU3GAnjYadJC/x2QIDAQABo4IByzCCAccwHQYDVR0OBBYEFCCZ
+# GsUvRVF/zToRWkE3JYWmuHQmMB8GA1UdIwQYMBaAFGtpKDo1L0hjQM972K9J6T7Z
 # PdshMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9w
 # a2lvcHMvY3JsL01pY3Jvc29mdCUyMFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGlu
 # ZyUyMENBJTIwMjAyMC5jcmwweQYIKwYBBQUHAQEEbTBrMGkGCCsGAQUFBzAChl1o
@@ -347,55 +373,55 @@ function GetScriptIntegrity()
 # VR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAOBgNVHQ8BAf8EBAMC
 # B4AwZgYDVR0gBF8wXTBRBgwrBgEEAYI3TIN9AQEwQTA/BggrBgEFBQcCARYzaHR0
 # cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRt
-# MAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEAAFYcd7rrNVHRZWofhE4ft9YN
-# ZPVEzaQ90iE/5kCDoQlCKTE7jFYnFcfxETrL4ed8JSj0JxCZSJQVUwEp6haUSPki
-# Sg4mf7rq+m3qbCjHB8Dj82rsFSxAs8NqI/08Dq1Ci/rxVhryPOSZmtXRgNeJzxwD
-# qSch50pNBGQMU8APLSnwpqzhwRN76MK5PXYCVqm/u/v579+fFJh0bIsw49/wTcTC
-# Xh3s0C9y0iAmSvsJKnTfEvtfe+eS9qw2wyf2LdJ5n8klFJ6OtDg8YB9n+E+0vX1E
-# JIDPxN2yX7+2sJiABcUSc55jIHxPTArDdzR0YUwQIjZO0j9hIjyMbRYjgjJ4UK9Z
-# LrvN2nUyc0upLqKKvhAqKP1jX0FL5M0wuneZ9/SGy2ZFn/Bg8ISBOp34ri+412tO
-# lzqR9ZU+CU9Xn1MqcWXvvDhTqjexxKZMVRMqGjRECQWSA62WdCGYjEOWnH5lQJqL
-# YRhYpeAwvjszdEAjSFtFXFLGTRw4bSKoad5TjUEvsKFO8DVPCjrbMEzGdku4znme
-# FddbqXR41HlunpyOLuSoC1II/Bh+aX0nU19JU79T10OFRKZDFKUI3LWB9jTdT+3E
-# OJr/pQ5T0fFeei0A7UdmTgXbmP4IaCbTc41NG7KMmsmV6Xyank4qB5aSL30uegrr
-# vnHPjQBLLYjerGCNtQMxggdGMIIHQgIBATB4MGExCzAJBgNVBAYTAlVTMR4wHAYD
+# MAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEAMb3YbNgyOUIdvrmh8yK25QWz
+# U4kVUvlJmCygDGdnUKokh4ZAMzZu+c7cTlw+hcCH8vbx7zMRbKbLzp1XOXP+/Bvn
+# UKynTgEGBkXPEbKwEezCtNwGZm7fAHHh7fAC8GN0R4dEneZBuyvUwjv/RMa3bRCN
+# 0IuMTsIpjzwOVivH6lDU8o6dxkE6w+1EhKgImb3iCnGXS1gnotzJ6oa0x3lYMuir
+# YOpLFlc54xJR1RncJBKqVqC+2vu31GRaVmBiwVU/bFuYN0o6LVnAPTcu1fMDcn6t
+# s5EbW5chgEMFIoUM3tSDMNXoMIQkMQvN3beZpjnLDb4V8OANLd5oXz+bd+p5zW21
+# v6odGTBUX/qhjSxBhTbwTPqlV1/Dx95x/6/52PrETq6bQb6t6TAFq4fpXTmRo8uB
+# Vj1pkGVljJPDxvi6DyaBZECqlHQws8wM4qDWTk9hTIZrKlK/mvD6J3hR782HLG6W
+# JiEuuVSxv+8zsI86ibPK6ywwjlBloH6/+YEtQtS4gIx4D/1xnP7qVfK7FcPtRO4A
+# HEw2g+Nm37R+6B+RDime4WvUvxR8FweNjEry0QGtQVvZcEIflDXryIp2UdQIIgW+
+# zmUO2b05TulkFPIsiVsgcAYPZjeBuyJkdlhZpYdP0JpYPQiUZTY3hjkum3n/7FnE
+# aVhOV+ZdS+0XXVa3A7kxggdGMIIHQgIBATB4MGExCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
-# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAATBtLnGPC5NN6AAAA
-# AABMMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
-# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTAzMTYxODI4
-# MzJaMC8GCSqGSIb3DQEJBDEiBCBSMTQS1Uqi2wJxrSJ9DKi2anqQ53SBXrOb6tKt
-# 8HFDiDCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEIN46bOoVmqp2Rt/G6TI8
-# VIZkg7qJ8OddiPDqk6jY+midMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
+# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAA
+# AABLMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
+# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTAzMjIwMjA0
+# MTFaMC8GCSqGSIb3DQEJBDEiBCBJn8WPoiOQvd7wkb5ns9E2MhoTDeUSYqwjyClV
+# n15jHjCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
+# CKowMSTh9DWm0OSNAeUABkSnMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
-# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAATBtLnGPC5NN6AAAAAABM
+# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAAAABL
 # MIIDYQYLKoZIhvcNAQkQAhIxggNQMIIDTKGCA0gwggNEMIICLAIBATCCAQmhgeGk
 # gd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQH
 # EwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJTAjBgNV
 # BAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlvbnMxJzAlBgNVBAsTHm5TaGll
-# bGQgVFNTIEVTTjo3ODAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1
+# bGQgVFNTIEVTTjo3RDAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1
 # YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3JpdHmiIwoBATAHBgUrDgMCGgMV
-# AJueWs/5vWNYP+JGxmOfpj88ZvzBoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
+# APV6ws6b5FNHUOmEILADVgzql5kzoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBCwUAAgUA
-# 64D7xjAiGA8yMDI1MDMxNjA3MjcwMloYDzIwMjUwMzE3MDcyNzAyWjB3MD0GCisG
-# AQQBhFkKBAExLzAtMAoCBQDrgPvGAgEAMAoCAQACAg9EAgH/MAcCAQACAg7LMAoC
-# BQDrgk1GAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
-# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAHBZJcq/iRObpX39
-# wGAoesGz1KP0BbR5bFY8LWiUpmEmBEbwXU/gwqMOsAyB9HltPKFKPdsr7hKxFVyJ
-# CsfdoZHqvkwzYRUV8Xio5bgY4ECRmhJBCcbZ5Zb3PwGRtky1rQj0B8pJeMTHGHvD
-# uOJElo5I+HH//lKC0Z3M8DIQZrMFNHnKTyLP0IfyI+4gs4l1mF9k/uPCPla7ULeg
-# 0Dbi0G0Ci6jfrAQsaW652YyjilsPf0Jq0fQKgxf59vFcNRnZQzc+YJAKovH6cvJK
-# cEr+d66trHPugdrw2UZD301PGrpK+24qcHwnkjpxkDCfUQ7tvkdu0ftXbaZQnzWW
-# 5jMg+5YwDQYJKoZIhvcNAQEBBQAEggIAQQSdLP5VhhcI18HnI4zYqHDghZmUcSgi
-# /FHCbgPs6in95dOgKWwTL66Tuj1T8gmIURgETJUuruSOPGlU6XWuuiOEXa6yzdO4
-# Qz26pbGkkb0YFDUQG3kM6tOH6KW+0JGkDfMV+1CHNvDu4YpiKrUJLPvbZWVMarr7
-# wNOy5M5Va7FMBJPDTAEVQJYk4CDHLDYqiAZfT6u4l13wReAJfUOSpcH9Z2qQZxYa
-# nhFSXz3l+U1phWtaD27MHyB7ZEIKMeUhTIvII/sRBbUUXK5nNooK7/8mM9B0XTjd
-# CgFnW6noVgv9wwD2FuJsMTMdnmon/uImt+RCsBp4CmSKEKJuYSpBhQT+SQHVitLD
-# NSCBf3fDuIdGE0NV7Fu5j+pZYU7KfmddO3LOjnY10Ml1lPMyMjsfofga6tKFjhtA
-# iOlECD5EU4byZMwNgiH2cIDYhzsZB4NUh5UujAcwe4ogojzceZy/fJQ0mIjxtqB/
-# SFVv82vMS+h8SRM/lWpz95k9Z5cnupWClnLrSX5RUe+M0KRN9mbg9NuuJvvzB/Ti
-# ZcGF6j+0d35t7Uoa/1/H+lN1u1FqU7zeS2bSOgreRdX6WsNF5hkT4p35Ko9rOaae
-# +8K88jTiCfIuvTHSf1ujjW8mwo/v2xfKlcYyEOx2iauRLZeA936OnrZY/0Bb6Van
-# qvFR+EQ/M/Y=
+# 64hp0jAiGA8yMDI1MDMyMTIyNDIyNloYDzIwMjUwMzIyMjI0MjI2WjB3MD0GCisG
+# AQQBhFkKBAExLzAtMAoCBQDriGnSAgEAMAoCAQACAh6/AgH/MAcCAQACAhNSMAoC
+# BQDribtSAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
+# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAFwWAg7M9qBlluEz
+# mX94nNhqQrdM67vC7TdFgBL/OFsfwa/rB3P3tUj/CbDWxApQs4vKpLcKvUN1Rved
+# lUtLwYcYz+PYVGfbMn3RZ0yZmSWtZVUlfF8Y5/lzOIA8pKAWeyJptf7TcjeJO0Bm
+# SWGWMpGovbWSwYvpWj28qVuDH6gg7P1udZgP25eGXx+7RRHi94/7891CXzzDKbuG
+# MVRg5XopBRO3lXESKAvPeCWQUgijOtZw/dH5GvEWvFDtf17HOehfHdI/6EvGHrGZ
+# kAjbzmCk3kmeyih5kbbZadJP1BIP1iUO0tJBDGIsHhAj8qO+bs0MskQUvAM+2Ipz
+# e0IFjfowDQYJKoZIhvcNAQEBBQAEggIAS+cFWEtSPK4arnJCksyO1xAwVCfCQNtZ
+# HrcpHpmqVTrYOlO4WyZNNrv3jL+umPvganmybXmEW7LckMJS6OFTgeLpk1Po4j4g
+# vGAWejhc8Hl32EOVZSAaMpMv2xAFKBvMjdZo5tTus5mw6xJ8v5zeo0VGf+wRtU33
+# /whszEDiCNpRhrMEwhW7YBe8juaZh7E2WaVz/MdXIJRGt2skbYYfUuQkcoSFhLPt
+# 3o1SW2La/i2Rc23Gemt4JjEQP6Wk9iCEGAqz3XLqcJYvWd6jeZL1FSsUatjOVwZB
+# 1mKLSlT+K4G1ghU04LHBCS5La49iE751O4M275W4I7QxEFsOzRm8QOLzIFJr9Yto
+# 3K4ok1a81yZTSalmPHaW84dFKN2RxUkfayfoFwJqwoTOYb82bIAxGSYja5Q4/f7T
+# f5Gy5aMIviecb4QoSApm0PErQoQD1g3Oo8O7la699EDuCeNTDigmscAVoixHL7JW
+# aClNr+Swo5WG3140HuqDV6cewY0OfesQqL7p0g5HgStrGugEmAtDC5sJmdwTRftK
+# wT4ERy1PHs5FsUGzS/9mAoj0hqqYDsHVLpjdO1BExftuRZznNpI27SXMDAcbrEMN
+# mo6im1teSvRyI5mI78U7DtqdX4i3q4mMNywgoesPVfBIbR4ndSQEOywn+lP6OTub
+# 6yTCm49lpys=
 # SIG # End signature block

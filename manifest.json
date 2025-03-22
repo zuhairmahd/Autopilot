@@ -1,4 +1,78 @@
 {
+  "Cmds": [
+    {
+      "name": "check",
+      "version": {
+        "Major": 3,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "06EC5EF6B4683A429AF45FD581EAD9AEA06BEE398B8ABD08ECBD25315BABAB72"
+    },
+    {
+      "name": "forceupdate",
+      "version": {
+        "Major": 3,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "34F1479525F60E0448A49ADA033D8D9CC71575AA43DE6C8D6F6B477F23D57E36"
+    },
+    {
+      "name": "GetHash",
+      "version": {
+        "Major": 3,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "702D4B406C930A8B47873EFC8C3BD7EA7698EB1A206C03C4D53ECDB2758437B1"
+    },
+    {
+      "name": "redeploy",
+      "version": {
+        "Major": 3,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "8FC46221EBC83CEA860890BEB0093D680E76AE94DED0D6575349E499440E3F87"
+    },
+    {
+      "name": "register",
+      "version": {
+        "Major": 3,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "F9E0F8501DEBFB4CA24C10BC3B4A0ED47490064A62DB76A46089527BCD20FC93"
+    },
+    {
+      "name": "update",
+      "version": {
+        "Major": 3,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
+    }
+  ],
   "Functions": [
     {
       "name": "CheckForScriptUpdates",
@@ -253,85 +327,11 @@
       "hash": "8F60CD5AB90B744E263756BABFE02134D95703D958B55769118D1200C455EB74"
     }
   ],
-  "Cmds": [
-    {
-      "name": "check",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "06EC5EF6B4683A429AF45FD581EAD9AEA06BEE398B8ABD08ECBD25315BABAB72"
-    },
-    {
-      "name": "forceupdate",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "34F1479525F60E0448A49ADA033D8D9CC71575AA43DE6C8D6F6B477F23D57E36"
-    },
-    {
-      "name": "GetHash",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "702D4B406C930A8B47873EFC8C3BD7EA7698EB1A206C03C4D53ECDB2758437B1"
-    },
-    {
-      "name": "redeploy",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "8FC46221EBC83CEA860890BEB0093D680E76AE94DED0D6575349E499440E3F87"
-    },
-    {
-      "name": "register",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "F9E0F8501DEBFB4CA24C10BC3B4A0ED47490064A62DB76A46089527BCD20FC93"
-    },
-    {
-      "name": "update",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
-    }
-  ],
   "Scripts": [
     {
       "name": "Register-Device",
       "version": {
-        "Major": 2,
+        "Major": 3,
         "Minor": 2,
         "Build": 0,
         "Revision": -1,
