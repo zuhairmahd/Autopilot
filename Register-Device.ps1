@@ -224,12 +224,7 @@ if (-not($NoUpdateCheck))
 {
     Write-Host 'Checking for script updates.'
     $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteVersionURL -LocalManifestContent $localManifest
-    $scriptsToUpdate = $remoteManifest | Where-Object { $_.method -eq 'update' }
-    Write-Host "The number of scripts to update is $($scriptsToUpdate.count)"
-    exit 0
-    if ($scriptsToUpdate.count -gt 0)
-    {
-        Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow
+    Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow
         $response = Read-Host
         while ($response -notin 'Y', 'N')
         {

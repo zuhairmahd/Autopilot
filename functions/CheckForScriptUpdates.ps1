@@ -22,12 +22,22 @@ function CheckForScriptUpdates()
         {
             $localItem = $LocalManifestContent.$($type.Name) | Where-Object { $_.name -eq $remoteItem.name }
             Write-Verbose "Comparing the remote item $($remoteItem.name) withthe the local item $($localItem.name)"
+            Write-Verbose "Remote item version: $($remoteItem.version.major).$($remoteItem.version.minor).$($remoteItem.version.build)"
+            Write-Verbose "Local item version: $($localItem.version.major).$($localItem.version.minor).$($localItem.version.build)"
+            #Get the local version in a system.version object
+            $localVersion = [System.Version]::new($localItem.version.major, $localItem.version.minor, $localItem.version.build)
+            $remoteVersion = [System.Version]::new($remoteItem.version.major, $remoteItem.version.minor, $remoteItem.version.build)
+            if ($null -eq $localVersion)
+            {
+                Write-Verbose "Local version not found. Setting to 0.0.0"
+                $localVersion = $remoteVersion
+            }
             if ($null -eq $localItem)
             {
                 Write-Verbose "Script $($remoteItem.name) not found in local manifest. Adding to updated manifest."
-                updatedManifestContent.$($type.Name) += [ordered]@ { Name = $remoteItem.name; Version = $remoteItem.version; hash = $remoteItem.hash; method = 'add' }
+                $updatedManifestContent.$($type.Name) += [ordered]@{ Name = $remoteItem.name; Version = $remoteItem.version; hash = $remoteItem.hash; method = 'add' }
             }
-            elseif ($localItem.name.version -lt $remoteItem.name.version)
+            elseif ($localVersion -lt $remoteVersion )
             {
                 Write-Verbose "Updating script $($remoteItem.name) from version $($localItem.version.major).$($localItem.version.minor).$($localItem.version.build) to version $($remoteItem.version.major).$($remoteItem.version.minor).$($remoteItem.version.build)"
                 $updatedManifestContent.$($type.Name) += [ordered]@{ Name = $remoteItem.name; Version = $remoteItem.version; hash = $remoteItem.hash; method = 'update' }
@@ -35,20 +45,22 @@ function CheckForScriptUpdates()
             else
             {
                 Write-Verbose "script $($remoteItem.name) with version $($localItem.version.major).$($localItem.version.minor).$($localItem.version.build) is up to date."
-                $updatedManifestContent.$($type.Name) += [ordered]@{ Name = $remoteItem.name; Version = $remoteItem.version; hash = $remoteItem.hash; method = 'none' }
+                # $updatedManifestContent.$($type.Name) += [ordered]@{ Name = $remoteItem.name; Version = $remoteItem.version; hash = $remoteItem.hash; method = 'none' }
             }
         }
     }
-    Write-Verbose "Returning updated manifest content."
-    return $updatedManifestContent | ConvertTo-Json -Depth 10
+    Write-Host "Returning updated manifest content with $($updatedManifestContent.functions.count) functions, $($updatedManifestContent.scripts.count) scripts, and $($updatedManifestContent.cmds.count) cmds."
+    Write-Host "Updated manifest content: $($updatedManifestContent | ConvertTo-Json -Depth 10)"
+    # return $updatedManifestContent | ConvertTo-Json -Depth 10
+    return $updatedManifestContent
 }
 
 
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBbfNhSD9FariFg
-# cmRwiG/eGuPvhLMxTot1VSDaEQfGu6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBDo72rpFx+W+x7
+# uQ3RJ1Np/7hxF02FFBOgK+QZoa/4OqCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -237,24 +249,24 @@ function CheckForScriptUpdates()
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADDLSb5661oDUaJAAAAAMMtDAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCBYgTrhVBn+i1uTdY7szQ/27RNb
-# IHOKCvbs7lPC2tqWVzANBgkqhkiG9w0BAQEFAASCAYCupl0S2OWYcby9kcBO8/RY
-# wp+F+EEWP/jof4mgEPO8P10HNDXQeOl+bps+8vmTeHiH9GYKwJsYuUdQ/GuOU0wF
-# N0/e7HDOClXiF7C3C4piyMNF3Jq1dStDkWNAeTtFwlCkJmH9hf3GtaEBS0o9e4zS
-# H9B9/exoL4CqoMNHMNVDCNE/nCvpe9kJkf6r2PONYxuNrPkTBb/StQofA+7N9zvK
-# HwCJKRSQ3s9ZwvL7zHrj+nsxL3YVkJ1AosmD0EgoFhWzfft1CpmPBLdc0Pz3vYKb
-# LUkCIyCBzRy1r1ahQjtH8mvujlFljCSa2BI24azL+pIaKsDVlzSuCsyDQxgqKwcH
-# mPYXLDSZ8xlpSDYYesAVvMTZAXOiBFWxNDAA9bqeU9ND9CAbIevSyDP6goFPmT9H
-# NmNI+iGem2z9qy0dSuBhf3FY7ax7aHcdF6dGnx7mg3GMzyNjAGvbUUaz5Jz7mFDA
-# c431/Zu15n8uxClGUKaoaA2kLqwQGrh2cceU+CWJBGyhghSgMIIUnAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDkMptTQ75IyQcsCzV11sLkJiLS
+# 1444/dPRcmheUC3UJTANBgkqhkiG9w0BAQEFAASCAYBNtOv2xM4kE8wzHlB+52/8
+# vwOA0RXMkj6yu3MZnlxmGsTeXtHaORxzgTtviUojo99sJP7q1IgGF84bDUJ13Dmi
+# GMVKPS30/dP94aiCQEqtM6ZlPpYivA3QXqyhuAhehA9l3k0McGBtCrvNA4KBlFM/
+# eQWG9LE1aqEOjpxnLgmuziDeDocC0r2yJRxrHU8B7ZX16Q6v3N+kYRox5gQ+RVXY
+# 6wiqmYTibPZ4pL+jpHDPrrYcLP72padIJSHKfAMIYfx/UatVolw6Av9eVutupq1v
+# PBDYhXQMZVm+RQ7V4XYv7ZsrzrzsrVIcFj1Xwp4JL3DkWhvPhfoVsfNK6Z5Mt2Y3
+# W9sDtEPFrMd2h3yyoDf1B9bN70BCVRNCNdDTWVFSIcpBs2f9cXgIMMDORptwxVz4
+# FCOChKfEZmd4BTLMVwaawTfrAcwY44OCUqGYgdaCghK8/4Z74T9Pq8d4Ifcto6ng
+# t0ViTqZsF8iRdQAC8CG2GWkC2QcLxlgEDWGReyggSIuhghSgMIIUnAYKKwYBBAGC
 # NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQg2h+f1Ew4iQuGu7/4arNwJ8nCUd8rd4pdPH/gphRl
-# Be8CBmfTCJ9zixgTMjAyNTAzMjIwMjQ1MDUuMDI0WjAEgAIB9KCB4KSB3TCB2jEL
+# MTANBglghkgBZQMEAgEFAAQgmIg2YIJAG5BHf3mJHr9gUrSMZEBYrtO4oef4LXbw
+# vaoCBmfdnxSxmRgTMjAyNTAzMjIwMzQ3NDAuNTAyWjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
-# U046QkI3My05NkZELTc3RUYxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
+# U046RTQ2Mi05NkYwLTQ0MkUxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
 # IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
 # 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
@@ -296,27 +308,27 @@ function CheckForScriptUpdates()
 # ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
 # UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
 # 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
-# EzMAAABF33vn5wwJFp4AAAAAAEUwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
+# EzMAAABK/bhVx2KqyYkAAAAAAEowDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
 # VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
 # cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
-# MTg0ODQ3WhcNMjUxMTE5MTg0ODQ3WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
+# MTg0ODU1WhcNMjUxMTE5MTg0ODU1WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
 # Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
 # dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
-# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046QkI3My05NkZELTc3RUYxNTAz
+# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046RTQ2Mi05NkYwLTQ0MkUxNTAz
 # BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
-# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwI7T9DdCYDUnYfj4
-# va+Mk9tdPmx23cLwlHHIA8ZEIuTEgrFV8F5gIAHDzvgdrLpaAfNYt5y+Vtpx5RHb
-# FVJnRgnwWE3FrDKGO1r+kFXcXRCxzajb7rv7n+pBSwhwwKmQeiTA8UZNujosLQ1W
-# 0ojOEL7xMc4l5mzLugA6CL618wL7gaZWwaOGq6RROC7Yv1r18+y1O2mSoEMzM3lV
-# r3PvIj3UTmtbovReZOc7NlPuGPTAwjXtqpS16GU7Df4CrBvC9a5n9M15oqCtWjZE
-# ZlsgfMzA28KvSKqqS/UyRBUwbLEC0kP6d/rOzyy0uxCgP259ntzUF6c+N7XmC5X0
-# 4PFo7OSnKcsJ004j9W4gki6MtRHBlPW1hB3EUlPzMfx7vPVk+/0erh3DKe5UUiZ5
-# 4aC6hclk3qc74OoRcXkRiqheE7fDLMmkGzGziMfii8o1K0fcDUhL1Etff2GL6G0N
-# 3qs/2stJrtm4oyoURJawlTN5yJ85zzcF1XSaM7P595jhFz8gB4QBTvs67wQa5nrM
-# JRHNWTlvqYbImoYYX7yhzmAULFO3essnrvIriGpi1pv4NvoPSsvgoQ70DjVUrDbi
-# f8gwOlIefpcunbGYzCKNZC3rOexU6JGeU0NlZLA9UPaF3pxenjEFqsZWVr3JKf6/
-# sbstAIFsyM2ZOMivlI8pfaWS4W8CAwEAAaOCAcswggHHMB0GA1UdDgQWBBQl0Nvq
-# 9SXQRMmn8B3Grz2HYyuV8jAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
+# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA6DkQYZ6zYlw1AbxF
+# kFNwc0V0BaXCCo1/+d01YKizalK9bX8fGrIUSVf75pYJOrhYmofIMh7wBv8j+kIp
+# lOKYixrtVq+aQwAezI0wBFdFFeOyNCIynTQwz343z5IWVZ0/7cOXT1IDk9fIsI51
+# kZKHa4SPf9rFmH9XtH1/P1ExueAGskBF/AvI1Ol2Vv2W9EDke8csxcPgXTkDNG9I
+# 5ljEjM9pZUzf9kgw8Po8CVpD1/OFb468jcaWpsi/ydqboa3KJnPoyUlnq+cmgp6f
+# kpqYmPM3EhAr1aAqbMnkiUrD4Q15DTv0XoZOi1zjXRhF5xxXKLr1m5k5xZlHp7mn
+# PimiG67T7/e5DuFFt7XbAsOCW8N1Zq5jdNeLrMLtBvkRyKlkTSsp6nJQXR4Rf2e8
+# 7TrveQiJjLsW+ZQ46KXdcDI1WoaxI0JzypicOQBbcU98823p/TArYdVpIYuYlXq0
+# 923cf9+im62BVFG9eXhm+601RsXdWlH7QUMZzbD233aAP8LiB0pDrkK/ybUpYs6D
+# okAJ9r0am4NFXu7LC+DfIFveRIZOCBaHGt4SJ3G2VgkFIoALFcThj+ro7oX+BT3s
+# r0L57Lzi/QmU2UkTCwV1qKM6+aqbzhV4BxsxRjfQdetqzFvxI4IHf0IBuPoYYMiJ
+# 4AXTa2moymfuejK2NZgL75mWwisCAwEAAaOCAcswggHHMB0GA1UdDgQWBBQXdNaJ
+# ti4We46ErU/TNnIOeWGVejAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
 # ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
 # b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
 # MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
@@ -325,36 +337,36 @@ function CheckForScriptUpdates()
 # EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
 # MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
-# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBAGy9tedaeCT4seFHGLKgQteRiPy0
-# twNtoLqOU80gWazoi0L5DHQGhXiVDMVJb9zu1IU3J5unNxwad9hA6/4jeu/kHgZF
-# z3EEszczT480nzwx69zWtVPuCH//b7h1qNZ0p7YKpamUDu1ZjBWuSmgPhK/GgVLX
-# LO1TQ6ntrjbz8bMJf35HsUFWvCRrbPpX4hhNepUbL0jU3l1YECHoleDhtrnqV5v+
-# rz/lXQxhGyVSjPh+NTg80Xwk8Of/7saYnvMdW28xoelULIYnFqTxPn+1vKJX1Qnl
-# HzBBUtWKVDPU/fMERcU2UF052chin0TCQayP8cABd1jYYILQMatiYJzSLAAdNiPM
-# x/clpoD0w13egpMD9B3bx0qyruz2MQK31KR4ZwoKGLfCwuuayzB2aEDcp3Q+SVGg
-# ngYn8SaTjneUZLohh/Wk9A4LOkZhDBYjFQ1BotbTc9KYUV05JXNaheMSwRiFQuCe
-# ZnTtqwhN+UpTO+lZGzBjxPYTXObQYrY6vsB4jzmgzV2+UkE6J2nczJP6LdijGr2P
-# KPpQ3bVG8dpqnOaY8ahKtQouoTfJPHG25BrrX2whPch8xZBYSWn0NYj/yZKje/cr
-# qJYvUoEALhomQbuBU5+Fv4U/R8xzMUGJgoeHIh8n9OoNN2JEtMOeypI6oTrGVRtK
-# YtHyZmb4a5gUM8TXMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
+# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBADApzTDXWbyj/r85v6Az19sJPtwK
+# dE5ukA0FrPxJffIDQ0WJLW1G7zXIXIJY3S5dCHbvXr5bDrmL67MlnU0M0RIapm5x
+# pS8ejuWdRplHqkRiwhB5hm+7nEdxm+YdKCcoIPxbGqI1t8E0S0Zt7uw1/9LzRUar
+# duTHQ0PKyZQnuYkHLGx83/+RR40w1gemiIFtC/UfvNY9URHCfB6bWp90qi3TjWLM
+# O03FwcpuvZ15RubMVH/eH3WavJjLB4rDWd7NzeSAkiTqCEUAFNqrGFbnjOviBMUb
+# KkAa/mFj9m1Dk6Zx4SbXtT5wCodX3k30m0cSB2nClULbR4YyWO5/MoSlTwnMPvFX
+# MOWUkzd/SARbw7XVF6WLtgZHVBKAyZ4MFKwrKCP8hXdozdkeOX3Ru12+wewRk8An
+# o/f9zrm4G/B/wO6u7smB3eR8OerqioPt73ufFMWsSCwXhSGz8xpjq6DKiG39sDRP
+# F2CHnsBIJmv7dPMgYCKxskb7GiIkHbqa79vIAqQs9nY4s7XhR8NKRAKVIYj9/8Xk
+# eY5S1G0YQhCwQlRUtvHZMY0pYmOXBfWpjQG+ZaIwfd07tB0hprJBh5zJLIussfsI
+# P3tGr4o64tqRa8+OItP3mLWCdslKcBY5HIzHC2b0NnasAY1bqzfTfotsflhrV+pX
+# SyN3As36dKMTqpGGMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
 # ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEXfe+fnDAkWngAAAAAA
-# RTANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCCeq1lvScnaO2oGIQFsg4J4/n2PiewFY3LDJz7JFU5Z
-# wTCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
-# iM9F0uvKQRUOfiHf0m5xMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
+# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEr9uFXHYqrJiQAAAAAA
+# SjANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
+# MC8GCSqGSIb3DQEJBDEiBCAuBS71fKCXRvzCpcAvMJ6TcNtWCsPuJbJBz7xRlcCw
+# aDCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIGZ7KbWlzY0AQkdLdW/gAxiy
+# l7PEf9Wpsv+xde8uw+EKMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
-# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARd975+cMCRaeAAAAAABFMCIE
-# IPl8ySvrSTIfmUDjgzovkdGZX/S4pKbSXCK35Tm81ZcKMA0GCSqGSIb3DQEBCwUA
-# BIICAAe02wQTtCigLxX64X4uZLuliSYlQG8kpZcXHK/Q8zJPdtJYmP4cMLDXFsf4
-# Tphss1P4LF/r3gnaeNNM3O9IHTqLcQ4NEBipQ0woJ7FN6tFnk5pV6p6v+c4qj2HG
-# 7UxBJZQXZIh+QbBRIYDUCpbrCGtL3KcHLx0+lUHBu6y1hk4ontw46AnN+8jGqoIX
-# s4n+EqRgu4enCKKKtTeIicuo25QkodHKEGXQ2wlZR5VtHLD5kDZ9B3YmFGjmOz2R
-# Jn/O/fuCoTiDsRWnMc4hY16Rxc2tM2qeGYVibix0rjQM33QApzy5qs4re0ri8Q8U
-# DFrVSG8k4L51GodFFWBymwoS6Wb8Fe7+Hg/P/D36GRO3ssuu0u9cd5QyhTDaDqq5
-# sWSLe80Mq2Z12YxE0L/1F6R6ZtLVwrKChVeHgTV331eq+A/xTUEKTP4UyomaZbmx
-# iQmDvNhBphVKQyOW6TwGKxjp0wXTWhzKGYWUVF0tbTlxJlll9lx7Ls+psBSBSth7
-# 93DlLflNnYKr2qZeRfk7piOH4dVGjjq1ZcUa6t2Nnrh2y6Rc80+GWRO4TJW9RWvo
-# ySa4UHfYzzpPoVBv24cOga6Gr7eD0H6DPTHz++MKe2Z7REy24i8389Sm5dmoTz04
-# 1QzoImj/dfDU9iWK+wTK3UqBz+aCaLHJQzcRDJcwrCs100LH
+# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASv24VcdiqsmJAAAAAABKMCIE
+# IA5OXdWa2jrxjgDX5jJZMsCRkbZKXb8O2lmxdrYqXo/yMA0GCSqGSIb3DQEBCwUA
+# BIICAAJ7/ndD/DKm2xsYB/+86Nl8esERc89aRZCMTCIK4rNa9DYxjCU2St9dPDrQ
+# r0N7aiE/Ndtr9TeFjeTGPEdoFZ2OW24XzLZDQOwETm8biIykidlbumj+C1h8hz+9
+# 94q2JoJPeFB5K1Tr8utLE/0VK7hadZ37/teBfaE2b+y5O+raam/TTxDnB3ml8Urt
+# t/7og1HJGeX5jEErtvxZ6aWMuNEVZ+NFXvV1aHDzEKvpfm2a7zWt44DGKzmMHo4w
+# tE4iAVEOR3qxRQ4WsKjqWH57bZ79djP8ilgtoPc4yvtIk1fFXQUaa0hPAQoUZazg
+# 2p23EX3PiXGzUvfoQZ6ETIZaxAWRIJkUdklR3YgcanebVX0YvoOp/rVa8ZF0pXmn
+# qRoX7GnQoxSxIFmyNTDLps8c3PsSWgwGogK+q9GanH8xiQak8ckVcRbINUyDRxqU
+# Isb7ng9cd9/QGVTzAaJZJKDWdk/yS446xUQeD1tYYQZPiuMl+RGoRXomQBHR5/t2
+# 7b8wCUehQim4z8/TuK9N7RetUzz1Q/ZhohBnEPvQdIhk9E0+9bWu8ibOBjGq8Qdg
+# TCTHfFs6GpByagSyq8wK+11FqWWqxA86WRr9rPd8+GF3vNaTsbR3ng5N4I8DOG8X
+# qR1PsdRj9dtziXvcpudr+Nir5F5VRu81y2nHcxnllO3m88Bl
 # SIG # End signature block
