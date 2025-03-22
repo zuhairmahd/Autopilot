@@ -35,7 +35,7 @@
 param(
     [string]$SourceFolder = $PSScriptRoot,
     [string]$ReleaseFolder = "$($pwd)\Release",
-    [string]$ManifestFile = "$psScriptRoot\manifest.json",
+    [string]$ManifestFile = "$releaseFolder\manifest.json",
     [switch]$Sign,
     [switch]$Copy,
     [switch]$Manifest,
@@ -177,18 +177,21 @@ function CopyFiles()
         [string]$DestinationFolder = "$sourceFolder\Release",
         [Parameter(Mandatory = $false)]
         [string]$FunctionsFolder = "$sourceFolder\functions",
+        [Parameter(Mandatory = $false)]
+        [string]$PowerShellFolder = "$sourceFolder\pwsh",
         [Parameter(Mandatory = $true)]
-        [string]$manifestFile = "$DestinationFolder\manifest.json"
+        [string]$manifestFile = "$SourceFolder\manifest.json"
     )
     Write-Verbose 'Received the following parameters:'
     Write-Verbose "SourceFolder: $SourceFolder"
     Write-Verbose "DestinationFolder: $DestinationFolder"
     Write-Verbose "FunctionsFolder: $FunctionsFolder"
+    Write-Verbose "PowerShellFolder: $PowerShellFolder"
     Write-Verbose "Manifest: $manifestFile"
     $success = $false
     $destinationFunctionsFolder = "$DestinationFolder\functions"
     # Check if any of the required paths do not exist, set $success to false and return $success.
-    if (-not (Test-Path -Path $DestinationFolder) -or -not (Test-Path -Path $manifestFile) -or -not (Test-Path -Path $FunctionsFolder))
+    if (-not (Test-Path -Path $DestinationFolder) -or -not (Test-Path -Path $manifestFile) -or -not (Test-Path -Path $FunctionsFolder) -or -not (Test-Path -Path $PowerShellFolder))
     {
         Write-Host "Cannot find one or more required paths: DestinationFolder ($DestinationFolder), ManifestFile ($manifest), or FunctionsFolder ($FunctionsFolder)."
         return $success
@@ -263,6 +266,16 @@ function CopyFiles()
                 Write-Host 'Unknown category'
             }
         }
+    }
+    # Copy the PowerShell folder to the destination folder.
+    Write-Host "Copying $PowerShellFolder to $DestinationFolder"
+    Copy-Item -Path $PowerShellFolder -Destination $DestinationFolder -Recurse -Force
+    #check to make sure it copied.
+    if (-not (Test-Path -Path "$DestinationFolder\pwsh"))
+    {
+        Write-Error "Failed to copy $PowerShellFolder to $DestinationFolder"
+        $success = $false
+        return $success
     }
     $success = $true
     return $success
@@ -425,16 +438,20 @@ if (-not $Overwrite)
         Write-Host "Files in the folder will be overwritten."
         do
         {
-            $response = Read-Host "Proceed? (Y/N):"
+            $response = Read-Host "Proceed? (Y/N)"
         } 
         until ($response -eq 'Y' -or $response -eq 'N')
         if ($response -eq 'Y')
         {
             Write-Host "Cleaning folder $releaseFolder..."
-            Remove-Item -Path $releaseFolder\*.ps1 -Force
-            Remove-Item -Path $releaseFolder\*.cmd -Force
-            Remove-Item -Path $releaseFolder\functions\*.ps1 -Force
-            Write-Verbose "Creating $releaseFolder\functions"
+            Remove-Item -Path $releaseFolder\*.ps1 -Force | Out-Null
+            Write-Verbose "Removing scripts in  $releaseFolder"
+            Remove-Item -Path $releaseFolder\*.cmd -Force | Out-Null
+            Write-Verbose "Removing commands in  $releaseFolder"
+            Remove-Item -Path $releaseFolder\functions\*.ps1 -Force | Out-Null
+            Write-Verbose "Removing functions in  $releaseFolder\functions"
+            Remove-Item -Path $releaseFolder\Pwsh -Recurse  -Force | Out-Null
+            Write-Verbose "Removing PowerShell folder in  $releaseFolder\Pwsh"
         }    
         else 
         {
@@ -533,8 +550,8 @@ catch
 # SIG # Begin signature block
 # MII95AYJKoZIhvcNAQcCoII91TCCPdECAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDd5STYYjCB/g4B
-# oqyH4PuPDTU+VnIU0AwXJ4JPedKJx6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCC+go8GXQHZ3rh9
+# qazS1j11AfeQoKRkzeDLp9ulpIGP36CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -723,20 +740,20 @@ catch
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADDLSb5661oDUaJAAAAAMMtDAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCAdbK2wyO4P2kUIv7vXLYLl02jt
-# GeGqqw1TvuVcz6mrVjANBgkqhkiG9w0BAQEFAASCAYALANVT5WlKX74MyH37xyE9
-# G/xqEVOkO36CMWDM7xq0QLsvfI4KkZ5rLnZt6+nFAE0cya6H8uxlB2NQZGYiqrsF
-# ZjrLPmm3HnS0u/PfVmtXdOiOB13m4EqvzZjGFZQMpVqdN9rY/y2Rt/ZmhdHFef8m
-# uMnd1VgHDd/OQMihw54PyBLVZwjPX3KiWquU7xqGUdNUhC2fx/TT3rxfovQdKYjN
-# b6UxdYG45iQFf860yhe6F4qBOIY9z4CRKpMGoKng/9W8HBEfXXRwvnGku6fg87cW
-# 4ExAPE+x0Y/6sfGUu0qR7SqrceWDobfoeBsx0BX6vb41BqY6auT0FFlk54I0eFLj
-# VYYD3GbyT1xvViAO/qzKTPIVZZT5vfQVJmG+6fOQ2zwh7BpUPaUZQL/L3MpCo4hs
-# Px0QTnRMV7gLH89GaQX7/BhWG0r3RBp886TGP3lz1nW5C0NQxtam8nf0EP/yFDmj
-# tZH3qxJjyaBNex80DZAdTJLN10XCsqo/XRlUHWi3qo6hghgUMIIYEAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDxHY5zUFlQ5E1NY5Lewu9FZtj7
+# rxxV2FVXavx8dvB0uDANBgkqhkiG9w0BAQEFAASCAYCDbCBtzq6Tc2OJj2guztRN
+# DwznvrNrT6+ZDygY57x5OgeU8Ofwgri2uwkWR12gBDVYPA0oIqdRaYE9Z46l9tue
+# R4XopAUsKtgEaaTqU1OHPY3W3ZK56uEaZfiNXHTSSOPtdctMaGeROr0ksxOmbo/H
+# /9rfi0xJfm99Cy0JKh50SzBhDMawytBw1Ldrp2u5GcGE+J7yLQbyHM8IElEWWiNJ
+# lW2WWP7MyleqfblG41FFcn3a/JzJRCyvPDOOD+Pt6S37HE5g3i4rx8K41E8U5r1H
+# eop+N0TxO/pA9XjEp980iYyFw9m+nkC7utxllY7wpbjj6DMVMK4obFndfK01LO3l
+# q8Sx97Jd1Q4KbSBBwu1hGyMNfjWDDP8HEXhEt2MZW7vl/tQbOAJ5beZLp9vpO2+V
+# +cD9hsih60hzL3JOaDoH0LZ91sNCibJLyIfXajnK9O3Pt6qhTZKP1n9HC693lYEn
+# sskwWKfsMwt0DzwZcH6v6hIvWhNR2ks4m8tyGYc/KXOhghgUMIIYEAYKKwYBBAGC
 # NwMDATGCGAAwghf8BgkqhkiG9w0BBwKgghftMIIX6QIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQguWtQTRempqVd9oX/l5ZuCIv/halvU7eCT8cH0Aa4
-# V2cCBmfcmdBkIxgTMjAyNTAzMjExMjUyNTkuMjQ4WjAEgAIB9KCB4aSB3jCB2zEL
+# MTANBglghkgBZQMEAgEFAAQgKP/1XG/kxJcIC3TGkMmLHrSbIa8r70BnHABr/+XN
+# MRgCBmfcmdLFHxgTMjAyNTAzMjEyMzE3MzMuMzQ0WjAEgAIB9KCB4aSB3jCB2zEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
@@ -826,9 +843,9 @@ catch
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAA
 # AABLMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
-# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTAzMjExMjUy
-# NTlaMC8GCSqGSIb3DQEJBDEiBCBdTTaMgnXbXXmVAAk3+HwF+HhakXYjmZJMkrtK
-# nf8S/TCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
+# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTAzMjEyMzE3
+# MzNaMC8GCSqGSIb3DQEJBDEiBCD/SQaXeKsN7ZWZlBDaz+rk2A9IXhYDUK1tuPDL
+# hZk7UzCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
 # CKowMSTh9DWm0OSNAeUABkSnMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
 # aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAAAABL
@@ -841,25 +858,25 @@ catch
 # APV6ws6b5FNHUOmEILADVgzql5kzoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBCwUAAgUA
-# 64fBEjAiGA8yMDI1MDMyMTEwNDIyNloYDzIwMjUwMzIyMTA0MjI2WjB3MD0GCisG
-# AQQBhFkKBAExLzAtMAoCBQDrh8ESAgEAMAoCAQACAhO4AgH/MAcCAQACAhNpMAoC
-# BQDriRKSAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
-# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAMhC1tFap5lak8wp
-# po6svH69KPn/SBKr+RjL0YUb652OK4ybwBvsOP5GsJ/2y/fBrtKv+/r9kZ49eO1I
-# zmqQPt3D3GDDMUjSFke6BE03jZkl+a0JfNscl+SR48BCqrT71DdHJjiQcAAWLkN1
-# pkyHkL4/2hCyEY4dGoMzb+WITZNej6yJL6Ry3gx3GAzbC7m8MuRI8W5Vn9bD8GlE
-# EQPjmDzZbiUatz3oevC1JDZeMTv3G3+wausUMPxu58yjrsRXz3+rpWCEdby4R8Tw
-# V9NUucVcW957frxN4jJ8dL5BBBp88Eh5+XZ+XA2PjMOFsL8c6bpCzwsTsnUI+eu/
-# cGIjDNUwDQYJKoZIhvcNAQEBBQAEggIALULUmxVCimziHWfdcsbY0u9JQg/QA6sF
-# 0Z1CjXrjXFMq2H7otxLilB+KFTUfcSpanozPKJBimfRcRB6/a9ZlZuKAKvgfzG9B
-# 6UB7+FvAy7XVyd+OmtMNjsUR+ADhVSdph4byIfIOx/BbEQbO0WZOmgz9yescBH/e
-# pM236wewM+ZbQQyR2mxgUOAk/NZc9NdrZuU/wg05puvnj3Lu4kJHw9DsuYyin5sl
-# Lk2SasWz/0fC3cSvrutWmSYdGtnDz2isv6Q8olmkOyaBh78XZ0TzH0WulRJ8d5IS
-# dKD0t3vMDbgrRbmLKx8ejJTkJHfeKFTeYN26kW61OUDcj+tztKc9ZLnDaE8xLY2i
-# RIHjbZWZW02KhyF5fSZvcbjSUas6eYS8sW6FAKe2oc0dHSXcsrWW/pJctGu0ecln
-# qSwgNAgdpSRPnEQhY2d1Rje9xvfVYi7jV7w3LruoGkSwIsTlNwbvoMi6UOoyMx0Y
-# ubNXZDYNJPqXDsNdbWBn/lEECcD5trA4JWOPHmV+Z5IuQ4FTvdia5Iebhee31VmZ
-# jupu388Tq6Ooq2sd+FUTP0XNBmPrFfgrmP9H9E22ol6vJ7NPUjPF0yvYa0hoPSJK
-# qavZC6FONJQs+j0xhLuzvRK1SWrYoPfO/BmPaBx+MkTBA1KvlwGjCYPTVxOzKw/h
-# yK/sO8m72e8=
+# 64hp0jAiGA8yMDI1MDMyMTIyNDIyNloYDzIwMjUwMzIyMjI0MjI2WjB3MD0GCisG
+# AQQBhFkKBAExLzAtMAoCBQDriGnSAgEAMAoCAQACAh6/AgH/MAcCAQACAhNSMAoC
+# BQDribtSAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
+# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAFwWAg7M9qBlluEz
+# mX94nNhqQrdM67vC7TdFgBL/OFsfwa/rB3P3tUj/CbDWxApQs4vKpLcKvUN1Rved
+# lUtLwYcYz+PYVGfbMn3RZ0yZmSWtZVUlfF8Y5/lzOIA8pKAWeyJptf7TcjeJO0Bm
+# SWGWMpGovbWSwYvpWj28qVuDH6gg7P1udZgP25eGXx+7RRHi94/7891CXzzDKbuG
+# MVRg5XopBRO3lXESKAvPeCWQUgijOtZw/dH5GvEWvFDtf17HOehfHdI/6EvGHrGZ
+# kAjbzmCk3kmeyih5kbbZadJP1BIP1iUO0tJBDGIsHhAj8qO+bs0MskQUvAM+2Ipz
+# e0IFjfowDQYJKoZIhvcNAQEBBQAEggIAeCeqbMlDp48J5PcHd7KWMNfrAfcbHTP5
+# GA8MdvKM2XA9wPK0UTLSdZBXjJpEWw6w6JNozo++Q0RsfV2Qsl7HxptUBpFMturJ
+# n2EuPb15T0i7VCxafxBkHktx6pTb+VBy1dI8pRR3l7Y+EW7FK58tTePBDR007IQE
+# bSiEIJtNbQY2Vj3l0ZfvsMq9gurya1OaQBop1a+MTgbzhvLCfPnXjmqBBjn5bCBO
+# qIpfBOcbt7Ab024s9NhMbfFmdUbjg5ALYmsf0FZilOKtt/sDawhrp7UWyuYeSqao
+# ke8N9r7MRvu4MyUvb/ptWyoeZ/+trYkmdTariKMXyQ21S12LyZ4X1F1AEOWoAVL1
+# jHoF+Oj/weHAn2t42uvQACfBdZT/Yb6j7SjhfMTf/k6F3t/q9m8dAhLJH8k2Jwhk
+# C+EaAvQKkY0RCGPOmiwSeAd8nBQpDleLL8jVYf+5qokhQ19OlQ9LhoV8NSRH4yGQ
+# jMP3S+wzl21S/GI4h3UBkB+q7Q6FbnpF4PDZFPWPbsQ6DBzOBLYzobp5ygIjVyYn
+# 4sLcMBA9VUTGoma0NZf8fqq0uPf5BlR+9CdVG399MAoISmZ5FWRxfU07Byn5UzK4
+# kbtrbDRjzJ6Mg+ZmdGYXMcoWRRk3ecHxAJJXMo3xBtfIvH1Tl7KFCFVP/XjVzKLq
+# fgpR7/MMNOM=
 # SIG # End signature block
