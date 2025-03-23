@@ -11,9 +11,11 @@ function DownloadScriptUpdates()
         [string]$ScriptRoot
     )
 
-    $manifest = $scriptsToUpdate | ConvertFrom-Json
+    $manifest = $scriptsToUpdate 
+    $success = $false
     Write-Verbose "Received ScriptRoot: $ScriptRoot"
-    Write-Verbose "Received $($manifest.functions.count) functions, $($manifest.scripts.count) scripts, and $($manifest.cmds.count) cmds from the remote manifest."    
+    Write-Verbose "Received $($manifest.functions.count) functions, $($manifest.scripts.count) scripts, and $($manifest.cmds.count) cmds from the remote manifest." 
+    exit 0
     foreach ($type in $manifest.PSObject.Properties)
     {
         Write-Host "Processing $($type.Value.count) $($type.Name)"
@@ -73,6 +75,7 @@ function DownloadScriptUpdates()
             }
         }
     }
+    return $success
 }
 
 
