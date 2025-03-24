@@ -14,8 +14,8 @@ function DownloadScriptUpdates()
     $categories = @('functions', 'scripts', 'cmds')
     $statusCodes = @()
     $tempFolder = "$ScriptRoot\temp"
-    $localManifest = "$ScriptRoot\manifest.json"
-    $remoteManifest = "$ScriptRoot\remoteManifest.json"
+    $localManifest = "manifest.json"
+    $remoteManifest = "remoteManifest.json"
     Write-Verbose "Received ScriptRoot: $ScriptRoot"
     Write-Verbose "Received ScriptURI: $scriptURI"
     Write-Debug "Received ScriptsToUpdate: $($scriptsToUpdate | ConvertTo-Json -Depth 5)"
@@ -47,7 +47,6 @@ function DownloadScriptUpdates()
                 {
                     $extension = 'ps1'
                     $fullFunctionName = "$($item.Name).$extension"
-                    $localPath = Join-Path -Path $ScriptRoot -ChildPath "functions\$fullFunctionName"
                     $tempFilePath = Join-Path -Path $tempFolder -ChildPath "functions\$fullFunctionName"
                     Write-Host "Downloading function $($fullFunctionName):"
                     Write-Verbose "Remote URL: $($scriptURI)/functions/$fullFunctionName"
@@ -55,7 +54,7 @@ function DownloadScriptUpdates()
                     $response = Invoke-WebRequest -Uri "$scriptURI/functions/$fullFunctionName" -OutFile $tempFilePath -UseBasicParsing -Method Get -PassThru
                     if ($response.StatusCode -eq 200)
                     {
-                        Write-Host "Successfully downloaded $fullFunctionName to $localPath" -ForegroundColor Green
+                        Write-Host "Successfully downloaded $fullFunctionName to $tempFilePath" -ForegroundColor Green
                         Write-Verbose "The status code is $($response.StatusCode)"
                     }
                     else
@@ -67,7 +66,6 @@ function DownloadScriptUpdates()
                 {
                     $extension = 'ps1'
                     $fullScriptName = "$($item.Name).$extension"
-                    $localPath = Join-Path -Path $ScriptRoot -ChildPath $fullScriptName
                     $tempFilePath = Join-Path -Path $tempFolder -ChildPath $fullScriptName
                     Write-Host "Downloading script $($fullScriptName):"
                     Write-Verbose "Remote URL: $($scriptURI)/$fullScriptName"
@@ -75,7 +73,7 @@ function DownloadScriptUpdates()
                     $response = Invoke-WebRequest -Uri "$scriptURI/$fullScriptName" -OutFile $tempFilePath -UseBasicParsing -Method Get -PassThru
                     if ($response.StatusCode -eq 200)
                     {
-                        Write-Host "Successfully downloaded $fullScriptName to $localPath" -ForegroundColor Green
+                        Write-Host "Successfully downloaded $fullScriptName to $tempFilePath" -ForegroundColor Green
                         Write-Verbose "The status code is $($response.StatusCode)"
                     }
                     else
@@ -87,15 +85,14 @@ function DownloadScriptUpdates()
                 {
                     $extension = 'cmd'
                     $fullCmdName = "$($item.Name).$extension"
-                    $localPath = Join-Path -Path $ScriptRoot -ChildPath $fullCmdName
                     $tempFilePath = Join-Path -Path $tempFolder -ChildPath $fullCmdName
-                    Write-Host "Downloading cmd $($fullCmdName):"
+                    Write-Host "Downloading file $($fullCmdName):"
                     Write-Verbose "Remote URL: $($scriptURI)/$fullcmdName"
                     Write-Verbose "File path: $tempFilePath"
                     $response = Invoke-WebRequest -Uri "$scriptURI/$fullCmdName" -OutFile $tempFilePath -UseBasicParsing -Method Get -PassThru
                     if ($response.StatusCode -eq 200)
                     {
-                        Write-Host "Successfully downloaded $fullCmdName to $localPath" -ForegroundColor Green
+                        Write-Host "Successfully downloaded $fullCmdName to $tempFilePath" -ForegroundColor Green
                         Write-Verbose "The status code is $($response.StatusCode)"
                     }
                     else
@@ -110,9 +107,10 @@ function DownloadScriptUpdates()
         }
     }
     # Check if all files were downloaded successfully.
+    Write-Host "Verifying downloaded files."
     foreach ($statusCode in $statusCodes)
     {
-        Write-Verbose "Checking file ($statusCode.filename) with status code: $($statusCode.statuscode)"
+        Write-Verbose "Verifying file ($statusCode.filename) with status code: $($statusCode.statuscode)"
         if ($statusCode.statuscode -ne 200)
         {
             $success = $false
@@ -120,18 +118,28 @@ function DownloadScriptUpdates()
         }
         else 
         {
-            Write-Host "Successfully downloaded file $($statusCode.filename)." -ForegroundColor Green
+            Write-Verbose "Successfully downloaded file $($statusCode.filename)." -ForegroundColor Green
         }
     }
     if ($success -eq $true)
     {
-        Write-Host "All files downloaded successfully. Moving files to the script root." -ForegroundColor Green
-        Get-ChildItem -Path $tempFolder -Recurse | Move-Item -Destination $ScriptRoot -Force
-        Write-Verbose "Cleaning up temp folder."
-        Remove-Item -Path $tempFolder -Recurse -Force
-        Write-Verbose "Updating local manifest."
+        Write-Host "All files downloaded successfully." -ForegroundColor Green
+        Write-Host "Updating the local manifest."
         remove-item "$ScriptRoot\$localManifest" -Force
         rename-item "$ScriptRoot\$remoteManifest" -NewName "$localManifest"
+        Write-Verbose "Creating temporary manifest file."
+        $scriptsToUpdate | ConvertTo-Json | Set-Content "$tempFolder\$localManifest"
+        Write-Host "Copying files..."
+        if (CopyFiles -SourceFolder $tempFolder -DestinationFolder $ScriptRoot -manifestFile $tempFolder\$localManifest)
+        {
+            Write-Host "Files copied successfully."
+            Write-Verbose "Cleaning up temp folder."
+            Remove-Item -Path $tempFolder -Recurse -Force
+        }
+        else
+        {
+            Write-Host "Failed to copy files." -ForegroundColor Red
+        }
     }
     else
     {
@@ -141,10 +149,10 @@ function DownloadScriptUpdates()
 }
 
 # SIG # Begin signature block
-# MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
+# MII94AYJKoZIhvcNAQcCoII90TCCPc0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCCKzv3tMy1EaA3J
-# Oa7le4CKrES0loSpNAmtkRWfYtPeoqCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCD+5dBqgVHJJSJS
+# jH3Ed0lgYEZhDyeyzQOxWxRMjbupPKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -329,29 +337,29 @@ function DownloadScriptUpdates()
 # zt6J0GwzvU8g0rYGgTZR8zDEIJfeZxwWDHpSxB5FJ1VVU1LIAtB7o9PXbjXzGifa
 # IMYTzU4YKt4vMNwwBmetQDHhdAtTPplOXrnI9SI6HeTtjDD3iUN/7ygbahmYOHk7
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
-# nTiOL60cPqfny+Fq8UiuZzGCFyAwghccAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
+# nTiOL60cPqfny+Fq8UiuZzGCGpAwghqMAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMQITMwACLjx0xzKgoQoUeAAAAAIuPDAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCC/m62lBkCXTRzayIUQjfCB8V0N
-# fIS/MOWqjwng5MFGBDANBgkqhkiG9w0BAQEFAASCAYCMDrdWGPUYFWNE2ZHzieJq
-# 9zd9Xj50xAMekKGVYHW9pCKI2ROEGi+HHiv7kXScI1xMUJamWHf6mQlFv9bfFtfb
-# 93lcxGqBr4vo1puWiCHeiT+sdkQM+noUpckJ/hjPDV2i9U9/CmV4QHgYn4NvMryK
-# ZRtt4mmPytmvTeKhqxBrXr8pslQu7GxgXkb3bcvHuxP3K3k7lZZilh5tlkrFNAin
-# ZMhZcJAFbPwVC/7aOf69agwFr1OmA0FHMWTWwVNV5X09BQUqacKRCTqceboHVyra
-# Amjed02CwsYSWOX0Czaa7G0pKW+g6lTbEGhTsNcqchqNIU1Z7VHDg3GEhLkNSFMJ
-# RUq41lppJg2FoS/bLTETCd+AGJQbqyMYhw9lkY+9w+Nqy5rtm9dJeEbIyiglXRGA
-# okIPzcb1CIntsto1w8FSWaoic+Q3ZYtlnGshuAI1GMsh+QIAjz6iLzPyQG1D2snL
-# eNkZYacx8zFl/KVWBYRULTa19N37chyuiqC3KEBIiauhghSgMIIUnAYKKwYBBAGC
-# NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCtCvxdu0SqsoIlusBINkA7FfaZ
+# T8MwFEpj+YnC/WaV1jANBgkqhkiG9w0BAQEFAASCAYAQjGgg66CJ+eIDh79qNLBn
+# e+b8EdZE1PdoIHFZXfodEfSSq0erdpLqmV8ZGsSmOOWCrWL6Lncmqpd/baXjC6uq
+# rbKsH8ONAgE/RM6kE9tv0v11I2eKoJRg9lQiZs9Bzuez6btyIcY7dLiMUpyYRT+V
+# Wq1/onxzLLkptSuLhchBrdEA/iL5hgq8zcbEnQWRLTbwBjb+/CrfEZ0fv3Sfdkc5
+# n3h98XTE/vMvYlTIW6a8v1niy04jFIBTczVBoyZqGlVbmRMvviICp8sxVt8+K9I5
+# GZJyVFZGgpWnz4ruxiWHRJ1CC3TrNbuCRICTRCUzc5Evt0TX2Mb4AB5AxEhOh5CT
+# f3xNFiXN0AkSEAoD5E6uSDPOwD+VKqJOKL8m96AqQBAe3up/bUd2lSLa891J9jOO
+# R1VoW0mXuRP4D3oMx3Cr7DGcPGEC66YctHglxCsRZ6SrDTuizBWReWggZ+BEd2By
+# MBprJGxLtrAsiLP5WMwRu+Ar90QgACwCVWswCL3tfMmhghgQMIIYDAYKKwYBBAGC
+# NwMDATGCF/wwghf4BgkqhkiG9w0BBwKgghfpMIIX5QIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQghnZJoAZKqpmCRYZgLWdZWiC83ZoyikhDeSrauIEb
-# 4AsCBmfTCKbFhBgTMjAyNTAzMjQwMzM5NTIuMzMxWjAEgAIB9KCB4KSB3TCB2jEL
-# MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
-# bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
-# cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
-# U046QkI3My05NkZELTc3RUYxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
-# IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
+# MTANBglghkgBZQMEAgEFAAQghHYXC6MDsWjxFe5gO7n1HWNqEJ3OvUaaukSdo5uk
+# fcECBmfdoLiwjRgSMjAyNTAzMjQwNDI3NTMuMjlaMASAAgH0oIHhpIHeMIHbMQsw
+# CQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9u
+# ZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSUwIwYDVQQLExxNaWNy
+# b3NvZnQgQW1lcmljYSBPcGVyYXRpb25zMScwJQYDVQQLEx5uU2hpZWxkIFRTUyBF
+# U046NzgwMC0wNUUwLUQ5NDcxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
+# IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPITCCB4IwggVqoAMCAQICEzMAAAAF
 # 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
 # IElkZW50aXR5IFZlcmlmaWNhdGlvbiBSb290IENlcnRpZmljYXRlIEF1dGhvcml0
@@ -391,66 +399,85 @@ function DownloadScriptUpdates()
 # fsNGif1OXHJ2IWG+7zyjTDfkmQ1snFOTgyEX8qBpefQbF0fx6URrYiarjmBprwP6
 # ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
 # UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
-# 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
-# EzMAAABF33vn5wwJFp4AAAAAAEUwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
+# 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5cwggV/oAMCAQIC
+# EzMAAABMG0ucY8Lk03oAAAAAAEwwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
 # VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
 # cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
-# MTg0ODQ3WhcNMjUxMTE5MTg0ODQ3WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
+# MTg0ODU5WhcNMjUxMTE5MTg0ODU5WjCB2zELMAkGA1UEBhMCVVMxEzARBgNVBAgT
 # Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
 # dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
-# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046QkI3My05NkZELTc3RUYxNTAz
-# BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
-# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwI7T9DdCYDUnYfj4
-# va+Mk9tdPmx23cLwlHHIA8ZEIuTEgrFV8F5gIAHDzvgdrLpaAfNYt5y+Vtpx5RHb
-# FVJnRgnwWE3FrDKGO1r+kFXcXRCxzajb7rv7n+pBSwhwwKmQeiTA8UZNujosLQ1W
-# 0ojOEL7xMc4l5mzLugA6CL618wL7gaZWwaOGq6RROC7Yv1r18+y1O2mSoEMzM3lV
-# r3PvIj3UTmtbovReZOc7NlPuGPTAwjXtqpS16GU7Df4CrBvC9a5n9M15oqCtWjZE
-# ZlsgfMzA28KvSKqqS/UyRBUwbLEC0kP6d/rOzyy0uxCgP259ntzUF6c+N7XmC5X0
-# 4PFo7OSnKcsJ004j9W4gki6MtRHBlPW1hB3EUlPzMfx7vPVk+/0erh3DKe5UUiZ5
-# 4aC6hclk3qc74OoRcXkRiqheE7fDLMmkGzGziMfii8o1K0fcDUhL1Etff2GL6G0N
-# 3qs/2stJrtm4oyoURJawlTN5yJ85zzcF1XSaM7P595jhFz8gB4QBTvs67wQa5nrM
-# JRHNWTlvqYbImoYYX7yhzmAULFO3essnrvIriGpi1pv4NvoPSsvgoQ70DjVUrDbi
-# f8gwOlIefpcunbGYzCKNZC3rOexU6JGeU0NlZLA9UPaF3pxenjEFqsZWVr3JKf6/
-# sbstAIFsyM2ZOMivlI8pfaWS4W8CAwEAAaOCAcswggHHMB0GA1UdDgQWBBQl0Nvq
-# 9SXQRMmn8B3Grz2HYyuV8jAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
-# ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
-# b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
-# MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
-# cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0cy9NaWNyb3NvZnQlMjBQ
-# dWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmclMjBDQSUyMDIwMjAuY3J0MAwGA1Ud
-# EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
-# MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
-# Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
-# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBAGy9tedaeCT4seFHGLKgQteRiPy0
-# twNtoLqOU80gWazoi0L5DHQGhXiVDMVJb9zu1IU3J5unNxwad9hA6/4jeu/kHgZF
-# z3EEszczT480nzwx69zWtVPuCH//b7h1qNZ0p7YKpamUDu1ZjBWuSmgPhK/GgVLX
-# LO1TQ6ntrjbz8bMJf35HsUFWvCRrbPpX4hhNepUbL0jU3l1YECHoleDhtrnqV5v+
-# rz/lXQxhGyVSjPh+NTg80Xwk8Of/7saYnvMdW28xoelULIYnFqTxPn+1vKJX1Qnl
-# HzBBUtWKVDPU/fMERcU2UF052chin0TCQayP8cABd1jYYILQMatiYJzSLAAdNiPM
-# x/clpoD0w13egpMD9B3bx0qyruz2MQK31KR4ZwoKGLfCwuuayzB2aEDcp3Q+SVGg
-# ngYn8SaTjneUZLohh/Wk9A4LOkZhDBYjFQ1BotbTc9KYUV05JXNaheMSwRiFQuCe
-# ZnTtqwhN+UpTO+lZGzBjxPYTXObQYrY6vsB4jzmgzV2+UkE6J2nczJP6LdijGr2P
-# KPpQ3bVG8dpqnOaY8ahKtQouoTfJPHG25BrrX2whPch8xZBYSWn0NYj/yZKje/cr
-# qJYvUoEALhomQbuBU5+Fv4U/R8xzMUGJgoeHIh8n9OoNN2JEtMOeypI6oTrGVRtK
-# YtHyZmb4a5gUM8TXMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
-# ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEXfe+fnDAkWngAAAAAA
-# RTANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCBG/YWQ1kxv4N61LaPYRpuJ58H6xOoxRmUXYFk//9b0
-# rDCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
-# iM9F0uvKQRUOfiHf0m5xMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
-# aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
-# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARd975+cMCRaeAAAAAABFMCIE
-# IB+DJMPumpzXE3yjQTgtfjXms1Ux/PpE+VXEqa/E4hM5MA0GCSqGSIb3DQEBCwUA
-# BIICABIHQDnE9ApeX0AgTfD6eX3HPLKGKTks34OcrvcnpT94pj20GJdozF3jUs+v
-# vdaV9ahf2CnjSZ8039hAkLpxDfAOrSHIZg50LwkUMtsi4/7pQ+eZm1YOwPjOI9Ju
-# UmTGM3rQR1UqKwrTFf+X8/wPcqqBDcjROtIEGLJPjvx5cgSG2S5sHbLMZuqNsQ0j
-# FlAH6kuNQYoclE1meqCMzwnOwG5tSOpmzYJWFts0CfWWlqJPWwmHSN3utNpo0nVO
-# tx558stnCy7mLrujPgkmV/Zx1M2xx0qulE7zcWU7pVgBQU7fpnE3UqP64v+VWj45
-# j1nRFnurBBBWir+Rt/PPZ9KtFK1oZCQAZh9qu1EFBb08pLHMZlOrgDg4qLgQw9yv
-# dHi7pG4mAHkcwwDUTHwPZcXDgR4c0bs2ZjEqLSQfWrekBt24rEqVkozpjYKnWrTw
-# EvEJiFylbTtwt6mU3VdPq1/lhWImsMjMrE9ufc/SysJRPMVI93uEbwMUYrc0ZA+h
-# B4agfasJ7N4NcIwpnDOClNRq1JpNGUqs9y8t1HiLfFc27k+xkmYajV59LCx7cKjX
-# aaE3DtwSLeqH7yAMLCIpEG1GDGpiezbTYcpjMfYKB5EdQb9O0lf+uXnGtesG9Q0G
-# ip2fyMgquAEUdRiVJM8M/6lPgYtkNH9OvwRQT1xa18480QNa
+# aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1MgRVNOOjc4MDAtMDVFMC1EOTQ3MTUw
+# MwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJTQSBUaW1lIFN0YW1waW5nIEF1dGhv
+# cml0eTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBANx17xcRfgeMRNi7
+# pge1aI/v7pV/Zpt5Sj+yLg1xp6IqtExMXwXuakKg8nKj+HlUduHIoNlrM6bVwu7M
+# p5UQzMM3i+5/d9lvmFKWlWUJcFIndgEvAudEm1Y2T5eRQxwBz3pF1qVOhVhaW04j
+# BsIKSMTjZ+cJp/CNlqPDVQZrGXi1FA0fBWTmDALbCVVVIlEQmoJKwH1NdccgrE8e
+# ecUmon8sjWCgn5V7QFqvg+IqIx+e+dnwtHeS1bbhfoUNAlEouOclDQlV5tAS8j6r
+# xj9+uF5SV1d4tUPhJ9A2XV8so3nyj40mxYjQRPoLzBhlz5674SqvO5sg9cHuYoj1
+# xu2YYe/O2yXPUr82ZG8YZCR4oQp05Z+l9G5jGaGZ5WZHVAwt7mkFxwmJfDs9Qhb7
+# cwHSkzlIEXkUfog21PWB/m8fAED29t6KKCBuKMky4rSq7rewhtsT9g3iJisJRG+N
+# lqamxO3GaUS033bU3Spc202BTS9q91z+8mX+sN5/p8x5C4kCKcgfFwnM8NOw5dmV
+# 6DBwKv8nnZ6KPpP2zMyU9IJBUC3m79qA1wnbXa3qp3BniFhgXguQKZdCAM9mlHWU
+# YMJqiMAHrPL8fucwT6edO9OBMy1Hh3iUdUFDGkkOe9g28Y+6uuc/sVlPe57xjN8U
+# SITlyGYmJrxMd7GzjoXy0KvxPlTFAgMBAAGjggHLMIIBxzAdBgNVHQ4EFgQUauoj
+# dLG7fnuspPKWmDBxUAXU3D8wHwYDVR0jBBgwFoAUa2koOjUvSGNAz3vYr0npPtk9
+# 2yEwbAYDVR0fBGUwYzBhoF+gXYZbaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3Br
+# aW9wcy9jcmwvTWljcm9zb2Z0JTIwUHVibGljJTIwUlNBJTIwVGltZXN0YW1waW5n
+# JTIwQ0ElMjAyMDIwLmNybDB5BggrBgEFBQcBAQRtMGswaQYIKwYBBQUHMAKGXWh0
+# dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMvTWljcm9zb2Z0JTIw
+# UHVibGljJTIwUlNBJTIwVGltZXN0YW1waW5nJTIwQ0ElMjAyMDIwLmNydDAMBgNV
+# HRMBAf8EAjAAMBYGA1UdJQEB/wQMMAoGCCsGAQUFBwMIMA4GA1UdDwEB/wQEAwIH
+# gDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNodHRw
+# Oi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5odG0w
+# CAYGZ4EMAQQCMA0GCSqGSIb3DQEBDAUAA4ICAQAAVhx3uus1UdFlah+ETh+31g1k
+# 9UTNpD3SIT/mQIOhCUIpMTuMVicVx/EROsvh53wlKPQnEJlIlBVTASnqFpRI+SJK
+# DiZ/uur6bepsKMcHwOPzauwVLECzw2oj/TwOrUKL+vFWGvI85Jma1dGA14nPHAOp
+# JyHnSk0EZAxTwA8tKfCmrOHBE3vowrk9dgJWqb+7+/nv358UmHRsizDj3/BNxMJe
+# HezQL3LSICZK+wkqdN8S+19755L2rDbDJ/Yt0nmfySUUno60ODxgH2f4T7S9fUQk
+# gM/E3bJfv7awmIAFxRJznmMgfE9MCsN3NHRhTBAiNk7SP2EiPIxtFiOCMnhQr1ku
+# u83adTJzS6kuooq+ECoo/WNfQUvkzTC6d5n39IbLZkWf8GDwhIE6nfiuL7jXa06X
+# OpH1lT4JT1efUypxZe+8OFOqN7HEpkxVEyoaNEQJBZIDrZZ0IZiMQ5acfmVAmoth
+# GFil4DC+OzN0QCNIW0VcUsZNHDhtIqhp3lONQS+woU7wNU8KOtswTMZ2S7jOeZ4V
+# 11updHjUeW6enI4u5KgLUgj8GH5pfSdTX0lTv1PXQ4VEpkMUpQjctYH2NN1P7cQ4
+# mv+lDlPR8V56LQDtR2ZOBduY/ghoJtNzjU0bsoyayZXpfJqeTioHlpIvfS56Cuu+
+# cc+NAEstiN6sYI21AzGCB0Mwggc/AgEBMHgwYTELMAkGA1UEBhMCVVMxHjAcBgNV
+# BAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFB1
+# YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjACEzMAAABMG0ucY8Lk03oAAAAA
+# AEwwDQYJYIZIAWUDBAIBBQCgggScMBEGCyqGSIb3DQEJEAIPMQIFADAaBgkqhkiG
+# 9w0BCQMxDQYLKoZIhvcNAQkQAQQwHAYJKoZIhvcNAQkFMQ8XDTI1MDMyNDA0Mjc1
+# M1owLwYJKoZIhvcNAQkEMSIEIGlVb+RWOSkrzk0BZaoTuM+Vmma8SWVYRvxLV0d7
+# p0XiMIG5BgsqhkiG9w0BCRACLzGBqTCBpjCBozCBoAQg3jps6hWaqnZG38bpMjxU
+# hmSDuonw512I8OqTqNj6aJ0wfDBlpGMwYTELMAkGA1UEBhMCVVMxHjAcBgNVBAoT
+# FU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFB1Ymxp
+# YyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjACEzMAAABMG0ucY8Lk03oAAAAAAEww
+# ggNeBgsqhkiG9w0BCRACEjGCA00wggNJoYIDRTCCA0EwggIpAgEBMIIBCaGB4aSB
+# 3jCB2zELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcT
+# B1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UE
+# CxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVs
+# ZCBUU1MgRVNOOjc4MDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVi
+# bGljIFJTQSBUaW1lIFN0YW1waW5nIEF1dGhvcml0eaIjCgEBMAcGBSsOAwIaAxUA
+# m55az/m9Y1g/4kbGY5+mPzxm/MGgZzBlpGMwYTELMAkGA1UEBhMCVVMxHjAcBgNV
+# BAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFB1
+# YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwDQYJKoZIhvcNAQELBQACBQDr
+# isI2MCIYDzIwMjUwMzIzMTcyNDA2WhgPMjAyNTAzMjQxNzI0MDZaMHQwOgYKKwYB
+# BAGEWQoEATEsMCowCgIFAOuKwjYCAQAwBwIBAAICK7QwBwIBAAICE3QwCgIFAOuM
+# E7YCAQAwNgYKKwYBBAGEWQoEAjEoMCYwDAYKKwYBBAGEWQoDAqAKMAgCAQACAweh
+# IKEKMAgCAQACAwGGoDANBgkqhkiG9w0BAQsFAAOCAQEAOeHHH18dvtEgVWgWYWub
+# 1AtSKG+yD+lOOKaitNAaDSLqlzMKsHUvC0133rSgMJkq5/Ig/YQHqRN+SxzdXvh2
+# y8O12zwEyOLWOXpW88moCunG9QQYDg36EvtOcSemWp7T/2/FLvU3YLR4UGBkqTVr
+# oNGC1U1b9UlyCERWMu4GvZK4jgpHAlpxuIi6v4uyrZcmtaSewp/IBkTMMFrGAmdh
+# gDJnnCBlrENE7pxezNT29yz8mX4MHB0ML+der2/nnBlCHmHlFVR6mBoeb94203iI
+# /fi87pg8+c/FeNRBhMwF3MokOb7eEG4bVxq623Azwt9MYquusZmPjAs86lxTupZl
+# TTANBgkqhkiG9w0BAQEFAASCAgBpDGJ6X7rKlRwTkQpteVYFaDNl833LqXXyHWLu
+# 5QeaFVh+N0Xi7ZwGqTG0/GkwxKx4THA1JtExjTIV+NvJ9W34dfRT2VLfgau5E8DG
+# 22VmGrjhzpDHDgTr6kus/c7xrgRFsTv2eQTp9eq84AjvquLhbK3HlXJ2mi0+31np
+# 7j0CXRIcN/M4Le2B7fgxuPV6cbZ16sRsTagDJHXfgaTTebuTAzsGyeX91Edab7V2
+# /ZLMjtFxh1bO7QNIBOLs1a0VYosrwP6/T1pkLosnTbSEIpK0Eanh4QnwCYex4NDH
+# d63MrtagysOYKkd+nV2MqEcUUKnC+lhwnxgFCCBChIyjlUez+Cdd19+Qk1nrv3cI
+# 5O6kPeDShddrIBpozI2v+Dh/Pa5iUfIyr2I2CMgePLKR6+JZasajRNKtsMvaoh44
+# sjo5ODl7xz+tRBW3oEWZzv2hnk5DAQVsnAwgfVF/zX75xeyNj5Pf4uoCJnx3h1ZZ
+# CeggXs8xe+QT9Wo7WBZR/aVuiphQdCHMxxoSERKotVTva00Y9VoF8JCBxdHpyIEo
+# uN1OM9kHnnwZIyVVogyrPoHeGBZbouHiW2+N7WmvNxmbRbIFjpOmdrqBYEVYmKac
+# 3DREqVKHHr4HxsB8snh/TwDU0MXLhrhdTNbUGrQOe1sIAme3oKmBNPdDkbgSvh0n
+# B6b7yA==
 # SIG # End signature block
