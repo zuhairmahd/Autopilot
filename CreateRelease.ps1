@@ -336,7 +336,7 @@ function CopyFiles()
     Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts and $($manifest.cmds.Count) command files from $($manifestFile)."
     foreach ($category in $manifest.PSObject.Properties)
     {
-        Write-Host "Processing $($category.Value.Count) $($category.Name)s"
+        Write-Host "Copying $($category.Value.Count) $($category.Name)s"
         switch ($category.Name) 
         {
             functions
@@ -678,25 +678,21 @@ if (($Manifest) -or ($FullRelease))
                 Write-Error $_.Exception.Message
                 exit 1
             }
-            else 
-            {
-                Write-Host 'The manifest will not be copied to the root folder.'
-            }
         }
         else 
         {
-            Write-Host 'Skipping manifest copy process.'
+            Write-Host 'The manifest will not be copied to the root folder.'
         }
     }
-    else
+    else 
     {
-        Write-Host 'Failed to create manifest.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
+        Write-Host 'Skipping manifest copy process.'
     }
 }
-else 
+else
 {
-    Write-Host 'Skipping manifest creation.'
+    Write-Host 'Failed to create manifest.'
+    Write-Host 'Run the script with the -verbose switch for more information.'
 }
 
 if (($Copy) -or ($FullRelease))
