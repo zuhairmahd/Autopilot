@@ -224,15 +224,23 @@ if (-not($NoUpdateCheck))
 {
     Write-Host 'Checking for script updates.'
     $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteVersionURL -LocalManifestContent $localManifest
-    if ($remoteManifest.functions.count -gt 0 -or $remoteManifest.scripts.count -gt 0 -or $remoteManifest.cmds.count -gt 0)
+    $scriptsToUpdate = $remoteManifest | Where-Object { $_.method -eq 'update' }
+    Write-Host "The number of scripts to update is $($scriptsToUpdate.count)"
+    exit 0
+    if ($scriptsToUpdate.count -gt 0)
     {
-        Write-Host "Returned $($remoteManifest.functions.count) functions, $($remoteManifest.scripts.count) scripts, and $($remoteManifest.cmds.count) cmds."
         Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow
         $response = Read-Host
+        while ($response -notin 'Y', 'N')
+        {
+            Write-Host 'Please enter Y or N.' -ForegroundColor Yellow
+            [console]::beep(500, 300)
+            $response = Read-Host
+        }
         if ($response -eq 'Y')
         {
             Write-Host 'Downloading the latest version of the script.'
-            if (DownloadScriptUpdates -scriptsToUpdate $remoteManifest -scriptURI $updateURL -ScriptRoot $PSScriptRoot -verbose)
+            if (GetScriptUpdates -scriptsToUpdate $scriptsToUpdate -scriptURI $updateURL -ScriptRoot $PSScriptRoot -scriptVersionURL $remoteVersionURL -scriptHashURL $scriptHashURL)
             {
                 Write-Host 'All scripts have been updated.' -ForegroundColor Green
             }
@@ -243,23 +251,18 @@ if (-not($NoUpdateCheck))
         }
         else
         {
-            Write-Host 'Failed to update scripts.' -ForegroundColor Red
+            Write-Host 'Skipping script update.'
         }
     }
     else
     {
         Write-Host 'All scripts are up to date.' -ForegroundColor Green
     }
-}
-else
-{
-    Write-Host 'Skipping script update check.'
-}
-
-if ($UpdateOnly)
-{
-    Write-Host 'Update check complete.'
-    exit 0
+    if ($UpdateOnly)
+    {
+        Write-Host 'Update check complete.'
+        exit 0
+    }
 }
 else
 {
@@ -269,7 +272,7 @@ else
 if (-not($NoAdminCheck))
 {
     Write-Host 'Checking whether the script has sufficient permissions to run.'
-    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
         Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
         exit 1
