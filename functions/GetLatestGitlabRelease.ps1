@@ -7,7 +7,7 @@ function GetLatestGitlabRelease()
     $gitlabURL = 'https://git.gao.gov'
     $gitlabAPIEndpoint = "$gitlabURL/api/v4"
     $gitlabAPIProjectEndpoint = "$gitlabAPIEndpoint/projects/$ProjectID"
-    $gitlabAPILatestReleaseEndpoint = "$gitlabAPIProjectEndpoint/releases/latest"
+    $gitlabAPILatestReleaseEndpoint = "$gitlabAPIProjectEndpoint/releases/permalink/latest"
     $returnValue = $null
     Write-Verbose "GitLab URL: $gitlabURL"
     Write-Verbose "GitLab API Endpoint: $gitlabAPIEndpoint"
@@ -15,6 +15,7 @@ function GetLatestGitlabRelease()
     Write-Verbose "GitLab API Latest Release Endpoint: $gitlabAPILatestReleaseEndpoint"
     Write-Verbose "Project ID: $ProjectID"
     Write-Verbose 'Attempting to retrieve the latest release from GitLab...'
+    Write-Verbose "getting latest release from $gitlabAPILatestReleaseEndpoint"
     $response = Invoke-RestMethod -Uri $gitlabAPILatestReleaseEndpoint -Method Get -ErrorAction SilentlyContinue
     if ($response)
     {

@@ -95,9 +95,11 @@ param (
     [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
     [Parameter(Mandatory = $False)] [switch]$Redeploy,
     [Parameter(Mandatory = $False)] [string]$SerialNumber = '',
-    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
-    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')]
-    [Parameter(Mandatory = $False, ParameterSetName = 'github')][ValidateSet('auto', 'main')][string]$Release = 'main'
+    [Parameter(ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
+    [Parameter(ParameterSetName = 'UpdateOnlySet')]
+    [Parameter(Mandatory = $False, ParameterSetName = 'github')]
+    [Parameter(Mandatory = $False, ParameterSetName = 'gitlab')]
+    [ValidateSet('auto', 'main')][string]$Release = 'auto'
 )
 
 #import functions.
@@ -133,7 +135,7 @@ if ($repo -eq 'github')
         else
         {
             Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
-            Write-Host "Defaulting to main branch."
+            Write-Host 'Defaulting to main branch.'
             $latestRelease = 'main'
         }
     }
@@ -144,10 +146,11 @@ if ($repo -eq 'github')
 }
 elseif ($repo -eq 'gitlab')
 {
-    # $baseSourceURL = 'https://git.gao.gov'
-    # $baseRepoURL = 'https://git.gao.gov'
-    # $repoPath = 'mahmoudz'
-    # $repoName = 'autopilot-deployment'
+    $baseSourceURL = 'https://git.gao.gov'
+    $repoPath = 'mahmoudz'
+    $repoName = 'autopilot-deployment'
+    $repoId = '1031'
+    $latestRelease = GetLatestGitlabRelease -RepositoryId $repoId
 }
 else
 {
