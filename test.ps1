@@ -34,16 +34,32 @@ Write-Verbose "Latest Release: $latestRelease"
 Write-Verbose "Repo Source Code URL: $repoSourceCodeURL"
 Write-Verbose "Remote Manifest Path: $remoteManifestPath"
 
-# $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest
-# DownloadScriptUpdates -ScriptsToUpdate $remoteManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot -verbose
-$baseSourceURL = 'https://git.gao.gov'
-$repoPath = 'mahmoudz'
-$repoName = 'autopilot-deployment'
-$projectId = '1031'
-$latestRelease = GetLatestGitlabRelease -ProjectID $projectId -verbose
-# $global:r = GetLatestGitlabRelease -ProjectID '1031'
-$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
+#Read all config*.json files in the config folder.
+$configFiles = Get-ChildItem -Path "$pwd\.secrets" -Filter 'config*.json' -ErrorAction SilentlyContinue
+foreach ($file in $configFiles)
+{
+    Write-Host "Checking if the data in $($file.Name) is encrypted"
+    $data = Get-Content -Path $file.FullName | ConvertFrom-Json
+    if (isEncrypted -Data $data)
+    {
+        Write-Host "The data is encrypted"
+    }
+    else
+    {
+        Write-Host "The data is not encrypted"
+    }
+}
 
-Write-Host "Update URL: $updateURL"
-Write-Host "Remote version: $remoteVersionURL"
+# # $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest
+# # DownloadScriptUpdates -ScriptsToUpdate $remoteManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot -verbose
+# $baseSourceURL = 'https://git.gao.gov'
+# $repoPath = 'mahmoudz'
+# $repoName = 'autopilot-deployment'
+# $projectId = '1031'
+# $latestRelease = GetLatestGitlabRelease -ProjectID $projectId -verbose
+# # $global:r = GetLatestGitlabRelease -ProjectID '1031'
+# $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
+# $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
+
+# Write-Host "Update URL: $updateURL"
+# Write-Host "Remote version: $remoteVersionURL"

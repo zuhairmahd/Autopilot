@@ -35,7 +35,7 @@
 param(
     [string]$SourceFolder = $PSScriptRoot,
     [string]$ReleaseFolder = "$($pwd)\Release",
-    [string]$ManifestFile = "$releaseFolder\manifest.json",
+    [string]$ManifestFile = "$ReleaseFolder\manifest.json",
     [switch]$Sign,
     [switch]$Copy,
     [switch]$Manifest,
@@ -43,6 +43,8 @@ param(
     [switch]$FullRelease,
     [switch]$Secrets
 )
+
+
 
 $foldersToSign = @(
     $PSScriptRoot,
@@ -63,6 +65,57 @@ Write-Verbose "Secrets: $Secrets"
 if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease -or $Secrets))
 {
     throw 'At least one of the following switches must be provided: -Copy, -Sign, -Manifest, -Secrets or -FullRelease.'
+}
+
+function isEncrypted
+<#
+.SYNOPSIS
+    A function to check if the passed JSON data is encrypted.
+.DESCRIPTION
+    This function will check if the passed JSON data is encrypted.  The function will iterate through the properties of the data and check if the value is a base 64 string. If the value is a base 64 string, the function will return true.
+.EXAMPLE
+    isEncrypted -data $data
+    This will check if the data is encrypted.
+#>
+{
+    [CmdletBinding()]
+    param (
+        [psObject]$data
+    )
+    $isEncrypted = $false
+    $encryptedCount = 0
+    $unencryptedCount = 0
+    Write-Verbose 'Checking if the data is encrypted.'
+    foreach ($prop in $data.PSObject.Properties)
+    {
+        Write-Verbose "Checking if the value of $($prop.Name) $($prop.Value) is encrypted."
+        if ($(try
+                {
+                    $null = [Convert]::FromBase64String($prop.Value); $true 
+                }
+                catch
+                {
+                    $false 
+                }))
+        {
+            Write-Verbose "The value $($prop.Value) is encrypted."
+            $encryptedCount++
+        }
+        else
+        {
+            Write-Verbose "The value $($prop.Value) is not encrypted."
+            $unencryptedCount++
+        }
+    }
+    Write-Verbose "The number of encrypted values is $encryptedCount"
+    Write-Verbose "The number of unencrypted values is $unencryptedCount"
+    #If the number of encrypted values is greater than the number of unencrypted values, the data is encrypted.
+    if ($encryptedCount -gt $unencryptedCount)
+    {
+        $isEncrypted = $true
+    }
+    Write-Verbose "The data is encrypted: $isEncrypted"
+    return $isEncrypted
 }
 
 function CopySecrets()
@@ -89,20 +142,29 @@ function CopySecrets()
     else
     {
         Write-Host "Found $($secrets.Count) secret files."
-        Write-Host 'Please choose the secret you would like to copy to the release folder:'
-        for ($i = 1; $i -lt $secrets.Count; $i++)
+        Write-Host 'Please choose the secret you would like to copy to the release folder.'
+        for ($i = 0; $i -lt $secrets.Count; $i++)
         {
-            $domain = (Get-Content -Path $secrets[$i - 1].FullName | ConvertFrom-Json).domain
+            $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
+            $domain = $data.domain
+            $encrypted = (isEncrypted -data $data)
+            if ($encrypted)
+            {
+                $encryption = 'Encrypted'
+            }
+            else
+            {
+                $encryption = 'Unencrypted'
+            }
             if (-not $domain)
             {
                 $domain = 'Unknown'
             }
-            Write-Host "$i. $domain"
+            Write-Host "$i. $domain ($encryption)"
         }
-        $index = Read-Host 'Enter the number of the secret you would like to copy.'
-        $secret = $secrets[$index - 1]
-        #make sure only a valid number in the correct range is chosen.
-        while ($index -lt 1 -or $index -ge $secrets.Count)
+        $index = Read-Host 'Enter the number of the secret you would like to copy. (99 to quit)'
+        $secret = $secrets[$index]
+        while (($index -lt 0 -or $index -ge $secrets.Count) -and $index -ne 99)
         {
             Write-Host 'Invalid choice.'
             #beep
@@ -112,7 +174,7 @@ function CopySecrets()
         }
         if (-not $secret)
         {
-            Write-Host 'No secrets selected.'
+            Write-Verbose 'No secrets selected.'
             return $false
         }
     }
@@ -595,18 +657,35 @@ if (($Manifest) -or ($FullRelease))
     if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
     {
         Write-Host 'Manifest created successfully.'
-        $manifestFile = (Split-Path -Path $manifestFile -Leaf).json
-        Write-Host "Copying manifest $manifestFile.json from $releaseFolder to $PSScriptRoot"
-        try
+        $manifestFileName = (Split-Path -Path $manifestFile -Leaf).json
+        $response = Read-Host "Would you like to copy the manifest from the release folder to the root folder at $($PSScriptRoot)? (Y/N)"
+        while ($response -notin 'Y', 'N')
         {
-            Copy-Item -Path "$ReleaseFolder\$manifestFile" -Destination $PSScriptRoot -Force 
-            Write-Host 'Manifest copied successfully.'
+            $response = Read-Host "Invalid input. Please enter Y or N: "
+            [console]::beep(500, 300)
         }
-        catch
+        if ($response -eq 'Y')
         {
-            Write-Error "Failed to copy manifest to $PSScriptRoot"
-            Write-Error $_.Exception.Message
-            exit 1
+            Write-Host "Copying manifest $manifestFileName.json from $releaseFolder to $PSScriptRoot"
+            try
+            {
+                Copy-Item -Path "$ReleaseFolder\$manifestFileName" -Destination $PSScriptRoot -Force 
+                Write-Host 'Manifest copied successfully.'
+            }
+            catch
+            {
+                Write-Error "Failed to copy manifest to $PSScriptRoot"
+                Write-Error $_.Exception.Message
+                exit 1
+            }
+            else 
+            {
+                Write-Host 'The manifest will not be copied to the root folder.'
+            }
+        }
+        else 
+        {
+            Write-Host 'Skipping manifest copy process.'
         }
     }
     else
@@ -622,7 +701,7 @@ else
 
 if (($Copy) -or ($FullRelease))
 {
-    Write-Host "Copying files from $SourceFolder to $ReleaseFolder"
+    Write-Host "Copying files from $SourceFolder to $ReleaseFolder using $ManifestFile"
     if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -Manifest $ManifestFile)
     {
         Write-Host 'Files copied successfully.'
@@ -647,7 +726,7 @@ if (($Secrets) -or ($FullRelease))
     }
     else
     {
-        Write-Host 'Failed to copy secrets.'
+        Write-Host 'No secrets files copied.'
         Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
