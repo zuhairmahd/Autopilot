@@ -459,20 +459,23 @@ if (-not $Overwrite)
             exit 0  
         }
     }
-}
-else 
-{
-    if (Test-Path -Path $ReleaseFolder)
+    else
     {
-        Write-Host "Destination folder $releaseFolder already exists."
-        Write-Host "Removing $ReleaseFolder..."
-        Remove-Item -Path $ReleaseFolder -Recurse -Force
+        Write-Host "Creating folder $ReleaseFolder"
+        New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
+        Write-Verbose "Creating functions folder"
+        New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
     }
-    Write-Host "Creating $ReleaseFolder"
+}
+else
+{
+    Write-Host "Overwriting $ReleaseFolder"
+    Remove-Item -Path $ReleaseFolder -Recurse -Force | Out-Null
     New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
-    Write-Host "Creating $releaseFolder\functions"
+    Write-Verbose "Creating functions folder"
     New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
 }
+
 
 if (($sign) -or ($FullRelease))
 {
