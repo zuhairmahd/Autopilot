@@ -34,8 +34,8 @@ Write-Verbose "Latest Release: $latestRelease"
 Write-Verbose "Repo Source Code URL: $repoSourceCodeURL"
 Write-Verbose "Remote Manifest Path: $remoteManifestPath"
 
-$remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest
-$global:r = $remoteManifest
-Write-Host "Returned $($remoteManifest.functions.count) functions, $($remoteManifest.scripts.count) scripts, and $($remoteManifest.cmds.count) cmds."
+# $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest
+# DownloadScriptUpdates -ScriptsToUpdate $remoteManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot -verbose
 
-DownloadScriptUpdates -ScriptsToUpdate $remoteManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot -verbose
+$global:r = GetLatestGitlabRelease -ProjectID '1031'
+Write-Host $global:r
