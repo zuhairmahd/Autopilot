@@ -74,11 +74,11 @@ function CopySecrets()
         [Parameter(Mandatory = $true)]
         [string]$DestinationFolder
     )
-
+    
     Write-Verbose 'Received the following parameters:'
     Write-Verbose "SourceFolder: $SourceFolder"
     Write-Verbose "DestinationFolder: $DestinationFolder"
-
+    
     Write-Host 'Looking for secrets...'
     $secrets = Get-ChildItem -Path $SourceFolder -Filter config*.json -Recurse
     if ($secrets.Count -eq 0)
@@ -89,7 +89,7 @@ function CopySecrets()
     else
     {
         Write-Host "Found $($secrets.Count) secret files."
-        Write-Host "Please choose the secret you would like to copy to the release folder:"
+        Write-Host 'Please choose the secret you would like to copy to the release folder:'
         for ($i = 1; $i -lt $secrets.Count; $i++)
         {
             $domain = (Get-Content -Path $secrets[$i - 1].FullName | ConvertFrom-Json).domain
@@ -508,10 +508,10 @@ if (-not $Overwrite)
     if (Test-Path -Path $ReleaseFolder)
     {
         Write-Host "Destination folder $releaseFolder already exists."
-        Write-Host "What would you like to do?"
+        Write-Host 'What would you like to do?'
         do
         {
-            $response = Read-Host "Choose O to overwrite, C to continue or E to exit (O/C/E)"
+            $response = Read-Host 'Choose O to overwrite, C to continue or E to exit (O/C/E)'
         } 
         until ($response -in 'O', 'C', 'E')
         switch ($response)
@@ -522,14 +522,14 @@ if (-not $Overwrite)
                 Remove-Item -Path $ReleaseFolder -Recurse -Force | Out-Null
                 Write-Host "Creating folder $ReleaseFolder"
                 New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
-                Write-Verbose "Creating functions folder"
+                Write-Verbose 'Creating functions folder'
                 New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
-                Write-Host "Creating secrets folder."
+                Write-Host 'Creating secrets folder.'
                 New-Item -Path "$ReleaseFolder\.secrets" -ItemType Directory -Force | Out-Null
             }
             C
             {
-                Write-Host "Continuing with the existing folder."
+                Write-Host 'Continuing with the existing folder.'
                 #Check to make sure all subfolders exist.
                 if (-not (Test-Path -Path "$ReleaseFolder\functions"))
                 {
@@ -544,7 +544,7 @@ if (-not $Overwrite)
             }
             E
             {
-                Write-Host "Exiting..."
+                Write-Host 'Exiting...'
                 exit 0
             }
         }
@@ -553,9 +553,9 @@ if (-not $Overwrite)
     {
         Write-Host "Creating folder $ReleaseFolder"
         New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
-        Write-Verbose "Creating functions folder"
+        Write-Verbose 'Creating functions folder'
         New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
-        Write-Verbose "Creating secrets folder"
+        Write-Verbose 'Creating secrets folder'
         New-Item -Path "$ReleaseFolder\.secrets" -ItemType Directory -Force | Out-Null
     }
 }
@@ -564,7 +564,7 @@ else
     Write-Host "Overwriting $ReleaseFolder"
     Remove-Item -Path $ReleaseFolder -Recurse -Force | Out-Null
     New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
-    Write-Verbose "Creating functions folder"
+    Write-Verbose 'Creating functions folder'
     New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
 }
 
@@ -600,7 +600,7 @@ if (($Manifest) -or ($FullRelease))
         try
         {
             Copy-Item -Path "$ReleaseFolder\$manifestFile" -Destination $PSScriptRoot -Force 
-            Write-Host "Manifest copied successfully."
+            Write-Host 'Manifest copied successfully.'
         }
         catch
         {
