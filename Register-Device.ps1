@@ -78,10 +78,10 @@ Registers one or more devices into Intune and checks for profiles and module req
   8. Check deployment profile assignment and display status.  
   9. If the device is assigned, prompt for restart. Otherwise, advise the user to check the Intune portal.
 #>
-
 [CmdletBinding(DefaultParameterSetName = 'Default')]
 param (
     [string]$configFile = '.\.secrets\config.json',
+    [string]$Configuration = 'vars.json',
     [Parameter(Mandatory = $False, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True, Position = 0)][alias('DNSHostName', 'ComputerName', 'Computer')] [String[]] $Name = @('localhost'),
     [Parameter(Mandatory = $False)] [String] $GroupTag = 'MSB01',
     [Parameter(Mandatory = $False)] [String] $AssignedUser = '',
@@ -94,13 +94,58 @@ param (
     [Parameter(Mandatory = $False)] [switch]$NoHashVerify,
     [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
     [Parameter(Mandatory = $False)] [switch]$Redeploy,
-    [Parameter(Mandatory = $False)] [string]$SerialNumber = '',
+    [Parameter(Mandatory = $False)] [string]$SerialNumber,
     [Parameter(ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
     [Parameter(ParameterSetName = 'UpdateOnlySet')]
     [Parameter(Mandatory = $False, ParameterSetName = 'github')]
     [Parameter(Mandatory = $False, ParameterSetName = 'gitlab')]
     [ValidateSet('auto', 'main')][string]$Release = 'main'
 )
+
+# Load parameters from the configuration file if it exists
+if (Test-Path -Path $Configuration)
+{
+    Write-Host " Loading configuration values from $Configuration."
+    try
+    {
+        $configData = Get-Content -Path $Configuration -Raw | ConvertFrom-Json
+        Write-Host "Found $($configData.PSObject.Properties.Name.count) configurations."
+        foreach ($key in $configData.PSObject.Properties.Name)
+        {
+            Write-Verbose "Checking if $($key) is in the parameters."
+            if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $configData.$key)
+            {
+                Write-Verbose "Setting $key to $($configData.$key)"
+                Set-Variable -Name $key -Value $configData.$key -Scope Local
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "Failed to load configuration from $configFile. Error: $_"
+    }
+}
+
+#print a verbose log of all received variables
+Write-Verbose "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
+Write-Verbose "The current parameter set is $($PSCmdlet.ParameterSetName)"
+Write-Verbose "Configuration file: $configFile"
+Write-Verbose "Initial values file: $initialValues"
+Write-Verbose "Computer name: $Name"
+Write-Verbose "Group tag: $GroupTag"
+Write-Verbose "Assigned user: $AssignedUser"
+Write-Verbose "Check: $check"
+Write-Verbose "No module check: $NoModuleCheck"
+Write-Verbose "No update check: $NoUpdateCheck"
+Write-Verbose "Update only: $UpdateOnly"
+Write-Verbose "No admin check: $NoAdminCheck"
+Write-Verbose "No signature verify: $NoSignatureVerify"
+Write-Verbose "No hash verify: $NoHashVerify"
+Write-Verbose "Get device hash: $GetDeviceHash"
+Write-Verbose "Redeploy: $Redeploy"
+Write-Verbose "Serial number: $SerialNumber"
+Write-Verbose "Repository: $Repo"
+Write-Verbose "Release: $Release"
 
 #import functions.
 $functionsFolder = "$PWD\functions"
