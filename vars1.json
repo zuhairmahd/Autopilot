@@ -1,0 +1,20 @@
+{
+    "configFile": ".\\.secrets\\config.json",
+    "Name": [
+        "localhost"
+    ],
+    "GroupTag": "MSB01",
+    "AssignedUser": "",
+    "check": false,
+    "NoModuleCheck": false,
+    "NoUpdateCheck": true,
+    "UpdateOnly": false,
+    "NoAdminCheck": true,
+    "NoSignatureVerify": true,
+    "NoHashVerify": true,
+    "GetDeviceHash": false,
+    "Redeploy": false,
+    "SerialNumber": "1234",
+    "Repo": "gitlab",
+    "Release": "auto"
+}

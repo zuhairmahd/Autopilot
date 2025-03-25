@@ -41,10 +41,9 @@ param(
     [switch]$Manifest,
     [switch]$Overwrite,
     [switch]$FullRelease,
-    [switch]$Secrets
+    [switch]$Secrets,
+    [switch]$NoConfig
 )
-
-
 
 $foldersToSign = @(
     $PSScriptRoot,
@@ -61,22 +60,92 @@ Write-Verbose "Copy: $Copy"
 Write-Verbose "Overwrite: $Overwrite"
 Write-Verbose "FullRelease: $FullRelease"
 Write-Verbose "Secrets: $Secrets"
+Write-Verbose "NoConfig: $NoConfig"
 
 if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease -or $Secrets))
 {
     throw 'At least one of the following switches must be provided: -Copy, -Sign, -Manifest, -Secrets or -FullRelease.'
 }
 
+function CreateConfiguration()
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$Folder,
+        [string]$ConfigurationFile = "$folder\vars.json"
+    )
+
+    #print verbose log of received parameters
+    Write-Verbose "Folder: $Folder"
+    Write-Verbose "ConfigurationFile: $ConfigurationFile"
+    
+    $valuesToEdit = @(
+        @{name = 'Repo'; value = @('Github', 'Gitlab')}, 
+        @{name = 'Release'; value = @('main', 'auto')}
+    )
+    $success = $false
+
+    # Load parameters from the configuration file if it exists
+    if (Test-Path -Path $ConfigurationFile)
+    {
+        Write-Host " Loading configuration values from $ConfigurationFile."
+        $configData = Get-Content -Path $ConfigurationFile -Raw | ConvertFrom-Json
+        Write-Host "Found $($configData.PSObject.Properties.Name.count) configurations."
+    }
+    else
+    {
+        Write-Host "No configuration file found at $ConfigurationFile."
+    }
+    #itterate over the configuration data and prompt the user to choose a value
+    foreach ($config in $configData.PSObject.Properties)
+    {
+        Write-Verbose "Configuration: $($config.Name) = $($config.Value)"
+        if ($valuesToEdit.name -contains $config.Name)
+        {
+            Write-Host "Choose a value for $($config.Name)"
+            $configValues = $valuesToEdit | Where-Object { $_.name -eq $config.Name } | Select-Object -ExpandProperty value
+            $index = 1
+            $configValues | ForEach-Object {
+                Write-Host "($index): $_"
+                $index++
+            }
+            $selectedValue = Read-Host "Enter the number of the value you want to select"
+            Write-Verbose "Selected value: $selectedValue"
+            while ($selectedValue -lt 1 -or $selectedValue -gt $configValues.Count)
+            {
+                Write-Host "$selectedValue is an invalid selection. Please enter a number between 1 and $($configValues.Count)"
+                [console]::beep(500, 300)
+                $selectedValue = Read-Host "Enter the number of the value you want to select"
+            }
+            $config.Value = $configValues[$selectedValue - 1]
+            Write-Verbose "$($config.name) =  $($config.Value )"
+        }
+    }
+    #Print all the new configuration data but only in verbose mode.
+    Write-Verbose "New configuration data:"
+    $configData.PSObject.Properties | ForEach-Object {
+        Write-Verbose "$($_.Name) = $($_.Value)"
+    }
+    #Save the new configuration data to the configuration file
+    Write-Verbose "Saving configuration to $ConfigurationFile."
+    $configData | ConvertTo-Json | Set-Content -Path $ConfigurationFile
+    Write-Verbose "Configuration saved to $ConfigurationFile."
+    Write-Verbose "Checking if configuration file exists."
+    if (Test-Path -Path $ConfigurationFile)
+    {
+        Write-Verbose "Configuration saved to $ConfigurationFile."
+        $success = $true
+    }
+    else
+    {
+        Write-Verbose "Failed to save configuration to $ConfigurationFile."
+    }
+    return $success
+}
+
 function isEncrypted
-<#
-.SYNOPSIS
-    A function to check if the passed JSON data is encrypted.
-.DESCRIPTION
-    This function will check if the passed JSON data is encrypted.  The function will iterate through the properties of the data and check if the value is a base 64 string. If the value is a base 64 string, the function will return true.
-.EXAMPLE
-    isEncrypted -data $data
-    This will check if the data is encrypted.
-#>
 {
     [CmdletBinding()]
     param (
@@ -333,7 +402,7 @@ function CopyFiles()
     }
     # Get the manifest file and convert it to a hashtable.
     $manifest = Get-Content -Path $manifestFile | ConvertFrom-Json
-    Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts and $($manifest.cmds.Count) command files from $($manifestFile)."
+    Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts, $($manifest.cmds.Count) command files and $($manifest.configurations.Count) configurations from $($manifestFile)."
     foreach ($category in $manifest.PSObject.Properties)
     {
         Write-Host "Copying $($category.Value.Count) $($category.Name)s"
@@ -396,6 +465,24 @@ function CopyFiles()
                 }
                 Write-Host "Copied $($category.Value.Count) command files."
             }
+            configurations
+            {
+                foreach ($configuration in $category.Value)
+                {
+                    Write-Verbose "Copying $($configuration.name) to $DestinationFolder"
+                    try
+                    {
+                        Copy-Item -Path "$SourceFolder\$($configuration.name).json" -Destination $DestinationFolder -Force    
+                    }
+                    catch
+                    {
+                        Write-Error "Failed to copy $($configuration.name) to $DestinationFolder"
+                        Write-Error $_.Exception.Message
+                        $success = $false
+                        return $success
+                    }
+                }
+            }
             Default
             {
                 Write-Host 'Unknown category'
@@ -413,6 +500,66 @@ function CopyFiles()
         return $success
     }
     $success = $true
+    return $success
+}
+
+function CopyManifest()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFolder,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationFolder,
+        [Parameter(Mandatory = $false)]
+        [string]$manifestFile = "$SourceFolder\manifest.json",
+        [bool]$NoPrompt = $false
+    )
+    
+    #write a verbose log of all received parameters
+    Write-Verbose "SourceFolder: $SourceFolder"
+    Write-Verbose "DestinationFolder: $DestinationFolder"
+    Write-Verbose "ManifestFile: $manifestFile"
+    Write-Verbose "NoPrompt: $NoPrompt"
+    $manifestFileName = Split-Path -Path $manifestFile -Leaf
+    Write-Verbose "ManifestFileName: $manifestFileName"
+    $success = $false
+    
+    if (-not $NoPrompt)
+    {
+        $response = Read-Host "Would you like to copy the manifest from the release folder to the root folder at $($PSScriptRoot)? (Y/N)"
+        while ($response -notin 'Y', 'N')
+        {
+            $response = Read-Host "Invalid input. Please enter Y or N: "
+            [console]::beep(500, 300)
+        }
+    }
+    if ($response -eq 'Y' -or $NoPrompt)
+    {
+        Write-Host "Copying the $manifestFileName from $SourceFolder to $DestinationFolder"
+        try
+        {
+            Copy-Item -Path "$sourceFolder\$manifestFileName" -Destination "$destinationFolder\$manifestFileName" -Force 
+            Write-Verbose 'Manifest copied successfully.'
+        }
+        catch
+        {
+            Write-Error "Failed to copy manifest to $PSScriptRoot"
+            Write-Error $_.Exception.Message
+            $success = $false
+            return $success
+        }
+    }
+    else 
+    {
+        Write-Verbose 'The manifest will not be copied to the root folder.'
+        return $success
+    }
+    #Check if the file was really copied.
+    if (Test-Path -Path "$destinationFolder\$manifestFileName")
+    {
+        $success = $true
+    }
     return $success
 }
 
@@ -440,15 +587,17 @@ function CreateManifest()
     {
         Write-Host "Creating $($ManifestFile)..."
     }
-    $version = @{'Functions' = @(); 'Scripts' = @(); 'Cmds' = @() }
+    $version = @{'Functions' = @(); 'Scripts' = @(); 'Cmds' = @(); 'configurations' = @() }
     $version | ConvertTo-Json | Set-Content -Path $ManifestFile -Force
     $functionFiles = Get-ChildItem -File -Path $functionsFolder -Recurse -Include *.ps1 -Force
     $scriptFiles = Get-ChildItem -Path "$pwd" *.ps1 -Force
     $cmdFiles = Get-ChildItem -File -Path "$pwd" *.cmd -Force
-    $fileTypes = @('functions', 'scripts', 'cmds')
+    $configurationFiles = Get-ChildItem -File -Path "$pwd" vars.json -Force
+    $fileTypes = @('functions', 'scripts', 'cmds', 'configurations' )
     $functions = @()
     $scripts = @()
     $cmds = @()
+    $configurations = @()
     $filesToExclude = GetExclusions
     foreach ($filetype in $fileTypes)
     {
@@ -551,13 +700,33 @@ function CreateManifest()
                 }
                 Write-Host "Processed $($cmds.Count) Cmds."
             }
+            configurations 
+            {
+                foreach ($configuration in $configurationFiles)
+                {
+                    Write-Verbose "Checking if $($configuration.BaseName) is in the exclusion list."
+                    if ($configuration.BaseName -notin $filesToExclude)
+                    {
+                        Write-Verbose "Computing hash for $($cmd.BaseName)"                        
+                        $hash = Get-FileHash -Path $configuration.FullName -Algorithm SHA256
+                        Write-Verbose "The hash for $($configuration.BaseName) is $($hash.Hash)"
+                        Write-Verbose "Adding $($configuration.BaseName) to $manifestFile"
+                        $configurations += [ordered]@{'name' = $configuration.BaseName; 'hash' = $hash.Hash }
+                    }
+                    else
+                    {
+                        Write-Verbose "Skipping $($configuration.BaseName)"
+                    }
+                }
+                Write-Host "Processed $($configurations.Count) configurations."
+            }
             Default
             {
                 Write-Host 'Unknown filetype'
             }
         }        
     }
-    $combined = @{'Functions' = $functions; 'Scripts' = $scripts; 'Cmds' = $cmds }    
+    $combined = @{'Functions' = $functions; 'Scripts' = $scripts; 'Cmds' = $cmds; configurations = $configurations }    
     $combined | ConvertTo-Json -Depth 5 | Set-Content -Path $ManifestFile -Force    
     Write-Host "Successfully updated $($ManifestFile)"
     $success = $true
@@ -630,7 +799,7 @@ else
     New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
 }
 
-if (($sign) -or ($FullRelease))
+if ($sign -or $FullRelease)
 {
     foreach ($folder in $foldersToSign)
     {
@@ -651,51 +820,33 @@ else
     Write-Host 'Skipping signing process.'
 }
 
-if (($Manifest) -or ($FullRelease))
+if ($Manifest -or $FullRelease)
 {
     Write-Host "Creating manifest in $ReleaseFolder"
     if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
     {
         Write-Host 'Manifest created successfully.'
-        $manifestFileName = (Split-Path -Path $manifestFile -Leaf).json
-        $response = Read-Host "Would you like to copy the manifest from the release folder to the root folder at $($PSScriptRoot)? (Y/N)"
-        while ($response -notin 'Y', 'N')
+        if (CopyManifest -SourceFolder $ReleaseFolder -DestinationFolder $PSScriptRoot -ManifestFile $ManifestFile -NoPrompt $Overwrite)
         {
-            $response = Read-Host "Invalid input. Please enter Y or N: "
-            [console]::beep(500, 300)
+            Write-Host 'Manifest copied successfully.'
         }
-        if ($response -eq 'Y')
+        else
         {
-            Write-Host "Copying manifest $manifestFileName.json from $releaseFolder to $PSScriptRoot"
-            try
-            {
-                Copy-Item -Path "$ReleaseFolder\$manifestFileName" -Destination $PSScriptRoot -Force 
-                Write-Host 'Manifest copied successfully.'
-            }
-            catch
-            {
-                Write-Error "Failed to copy manifest to $PSScriptRoot"
-                Write-Error $_.Exception.Message
-                exit 1
-            }
-        }
-        else 
-        {
-            Write-Host 'The manifest will not be copied to the root folder.'
+            Write-Host 'The manifest was not copied.'
         }
     }
-    else 
+    else
     {
-        Write-Host 'Skipping manifest copy process.'
+        Write-Host 'Failed to create manifest.'
+        Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
 else
 {
-    Write-Host 'Failed to create manifest.'
-    Write-Host 'Run the script with the -verbose switch for more information.'
+    Write-Host 'Skipping manifest creation process.'
 }
 
-if (($Copy) -or ($FullRelease))
+if ($Copy -or $FullRelease)
 {
     Write-Host "Copying files from $SourceFolder to $ReleaseFolder using $ManifestFile"
     if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -Manifest $ManifestFile)
@@ -713,7 +864,7 @@ else
     Write-Host 'Skipping copy process.'
 }
 
-if (($Secrets) -or ($FullRelease))
+if ($Secrets -or $FullRelease)
 {
     Write-Host "Copying secrets from $PSScriptRoot to $ReleaseFolder"
     if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
@@ -731,11 +882,29 @@ else
     Write-Host 'Skipping secrets copy process.'
 }
 
+if (-not $NoConfig -or $FullRelease)
+{
+    Write-Host "Creating configuration file in $ReleaseFolder"
+    if (CreateConfiguration -Folder $ReleaseFolder)
+    {
+        Write-Host 'Configuration file created successfully.'
+    }
+    else
+    {
+        Write-Host 'Failed to create configuration file.'
+        Write-Host 'Run the script with the -verbose switch for more information.'
+    }
+}
+else
+{
+    Write-Host 'Skipping configuration file creation process.'
+}
+
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDnQQ62UuUXpmIj
-# yLpzGUbe8sQWpPmdtbXHHhaebYPkT6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBomOR+92M/hzb9
+# zYqS35S1buET1zisS9fczp0ElCmaRqCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -766,100 +935,100 @@ else
 # uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
 # GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
 # ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAMVHlg5
-# gWYqQMnfAAAAAxUeMA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
+# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAIztf3H
+# p+2ytw6TAAAAAjO1MA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBBT0MgQ0EgMDEwHhcNMjUwMzI0MDcwMDM5WhcNMjUwMzI3
-# MDcwMDM5WjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
+# RCBWZXJpZmllZCBDUyBFT0MgQ0EgMDEwHhcNMjUwMzI1MDY1NjExWhcNMjUwMzI4
+# MDY1NjExWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
 # BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
 # Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# nab4bPyKWEQobHp0R47lcM00uZzLPiT90EL5FLbdx72agnLr1enPBr3pqOfD0tdV
-# J1oyQ8ygsdH26+ZA07C8A1Sh/zXCZKvaPl1Tm7myXVZkgd0pZ8XeJQbZY6qb/nKI
-# AUS30GLyGyERuJUoXg9B7AChnDIU4zal/NZKikLTsOoO0D+IIftoHGSzjScISiVG
-# Msu+TWJrATlnxaZQOvPCwUiDpXr+WVm2CkaQNE98YJRRrtiXqKNHucnL7PuoaBkC
-# QPEYCNefo6+U6V42wfcIvVj+obbDl5TJubmNvsKP0hNjGlrcpLvxUOcCw/IkeEU0
-# M/DVzg/UT3H2MM0JshiBpEj03z+rxpmEFCvSv602cGKiOn76IBRsVTOkoifIE1tG
-# fn90KFqqNaRA9yeT7x3mAp1kBRBEnvnMu2mmf6HVb7rFQL3Iyshjle1EjS7XpH2+
-# WHXRwpMV5C4C3PTMLSM3YJW+4uuDtVZpWo/dLA9vil4NMizgX1XHIGJRFukguG2n
+# iSM5tT+Jjd+jvxIrUc0mpDf3zr/MwFft3bbflYjOHrAIJxTjcqrTDp2upH+1Ipyu
+# 4ejcycNDOp+anmUZjefME5bpNUBx9oRmVq0RcrB65IZeqKmi9GNsPO0e4ohRt5Lp
+# 56lRjkFLXRM99oPrg5oZHC1xDRAFfhpkRe+MSCUhlapJbPvp764uNgIckHtnLgVY
+# OCJOmeAWt9wpzlzAuQ7Bwb3U472aENOyuKQSl5GNXZ2KkkhhPmVFOUb/usvrObCF
+# teCDsQ4lZzXhrTGZjy3PJUVZzUmdKHzAeSz5KMIKE+Q6UC8TRspwEd12thfZFkqK
+# Suh38sX0TNZYOyFLIoz/WE7jxiIWrhKSlSzKOcr3vdWtDU1D4PUdE43M+sEl1nuU
+# UQeDzFhAKfiurodcj9bqYtbmGUnUdojPPK0opYIOGPvnh7g15YP+838BJL+8HqW1
+# dNEkREELeOyOEPeq5Eo8EkJF9Tl5pVa/sCiyDl48s1TK3stv5MZaMqxWF4qKZAkr
 # AgMBAAGjggIYMIICFDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDA7BgNV
 # HSUENDAyBgorBgEEAYI3YQEABggrBgEFBQcDAwYaKwYBBAGCN2GBmtGaFtje9WuB
-# vfqFXPmA7xswHQYDVR0OBBYEFJ3lzRLRAIvkV9pg0HjX0jqKd21OMB8GA1UdIwQY
-# MBaAFOiDxDPX3J8MnHaaCqbU34emXljuMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
+# vfqFXPmA7xswHQYDVR0OBBYEFE3JWjohOo26TUlGpdFZFn4ClUblMB8GA1UdIwQY
+# MBaAFHacNnQT0ZB9YV+zAuuA9JlLpT6FMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMElEJTIw
-# VmVyaWZpZWQlMjBDUyUyMEFPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
+# VmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
 # mDCBlTBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
-# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBBT0MlMjBD
+# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBFT0MlMjBD
 # QSUyMDAxLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
 # LmNvbS9vY3NwMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUH
 # AgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0
-# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAA2ESQyXn0crR1au
-# 5n87mZ2nTntlvNlBW9i/CnanNly72jKC/jgNhmZUFRplHqjl4uRsoiJkZrBl6QO/
-# RsYUmNsJBxjEqI4Q8uWeNG7wEYcoFbO+O+jpgkkKUrADYVyhVQbacDCxBunpLW4C
-# K+D+HUlA0/FEuxdgUJMw2aJ1i3paxZATm6Vfa7uEiQzTeAzCxaR/GlO6dI8orZF8
-# nG6cVpYgFKfq9CEKsY7Q8QbfuVUDvPhnf/mBVe4O2sydK2nqxjmgd8GFC0BAQ76N
-# XrUGFQm42n9gCGtc2BDLbGZ1iSH93pfI1MIDsELSHOyKSiiL9x06IzVERs94GQUk
-# vAt2xLULsWDfhz+jw0653j1tH8aTkUXIZziqFsEUwhjwrY2PEiYl7LgBbNV47gxj
-# b3Yhc/zL+PRGt5PDYBaBBHizfKgyjgawaeCGdx3XoAWIzW6zTSfRE55Y7Mgruufd
-# qdQPCG7/Sm7dpONoq/dVtuidbni0U3P8CRZOcBJPEa3YG6OvsSqXYBOSlahH34Mw
-# qqFdFqlwM9X982lXT7i88i+AFdGVHxa/vW3fjP+kd07Wix9plj3XeM1eWhpTfT0i
-# 7X1Yg15re0oDOGsXQddSTfmeFqZk8tQuK8OpUw2aDgYg6RR990HROsNo4G6/XJrY
-# GyMm9AkQuLYpD9IbmPyyQF/e8HcyMIIG5zCCBM+gAwIBAgITMwADFR5YOYFmKkDJ
-# 3wAAAAMVHjANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
+# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAINGxW/npLkbDcHm
+# sJ+PIc+bl83WKMAURUk/AjHx9VGDIL9VjBtVQdhZtb+N4Qlgq1SXxaX18Pt4/XxQ
+# 30NlnBZlL79C6zedA/nihd0rrm4nRVEomdNWufshITLejU3K2i3U/u3Eb4/Ydtbl
+# RVU1IMxlbdnHipB4ey1B20gXWri8n+vNbpppcewlX4K4+557t70d68a5wBuaT0/R
+# xl1XdNWqwM3Bxfmv5fR2PNrzGNEVvDvmF/ug4cLJRZMe9kZnaMqYTkb5x2S3PDkW
+# JcVY7vyrOdSK77hwZlUxhtBMOy43xUwuwm668Ff+idLcCSlx4n6XYklZaJhvqDri
+# RGw6ysCcoihT0udQvupcOVz1ezB5fECWuFTH4eHAUrTJZkdyWrXIqmEiqOJpXB3T
+# BxXFjQHZZb2C8UUHp4cBeBizvE3kZiBw+MOkvAPXQwHWPeEEvCqp+Tg5m5PWdJWV
+# YkNb7Q4SJaJlHZJbXwA47XsHhdKof/E8pL5f07FJUnvkqOp/OP5bl9BzKkARAQUO
+# FRADH32Ea2MXwYfPs+kDrFjYlZzPjvyRDERDnbxT/UasJS2HBr2xjgl2FpUtBPYJ
+# 6KnJ9hd/iQ+gIWngnK2MUsDh7viQdTFMdbjWp9tmDfwqfG9yerRC/wxngavEI1C1
+# NUEWqP4CkdkJR3wWCglQiNRxIUZ8MIIG5zCCBM+gAwIBAgITMwACM7X9x6ftsrcO
+# kwAAAAIztTANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
 # TWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVy
-# aWZpZWQgQ1MgQU9DIENBIDAxMB4XDTI1MDMyNDA3MDAzOVoXDTI1MDMyNzA3MDAz
-# OVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
+# aWZpZWQgQ1MgRU9DIENBIDAxMB4XDTI1MDMyNTA2NTYxMVoXDTI1MDMyODA2NTYx
+# MVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
 # cmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhh
-# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAJ2m+Gz8
-# ilhEKGx6dEeO5XDNNLmcyz4k/dBC+RS23ce9moJy69Xpzwa96ajnw9LXVSdaMkPM
-# oLHR9uvmQNOwvANUof81wmSr2j5dU5u5sl1WZIHdKWfF3iUG2WOqm/5yiAFEt9Bi
-# 8hshEbiVKF4PQewAoZwyFOM2pfzWSopC07DqDtA/iCH7aBxks40nCEolRjLLvk1i
-# awE5Z8WmUDrzwsFIg6V6/llZtgpGkDRPfGCUUa7Yl6ijR7nJy+z7qGgZAkDxGAjX
-# n6OvlOleNsH3CL1Y/qG2w5eUybm5jb7Cj9ITYxpa3KS78VDnAsPyJHhFNDPw1c4P
-# 1E9x9jDNCbIYgaRI9N8/q8aZhBQr0r+tNnBiojp++iAUbFUzpKInyBNbRn5/dCha
-# qjWkQPcnk+8d5gKdZAUQRJ75zLtppn+h1W+6xUC9yMrIY5XtRI0u16R9vlh10cKT
-# FeQuAtz0zC0jN2CVvuLrg7VWaVqP3SwPb4peDTIs4F9VxyBiURbpILhtpwIDAQAB
+# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAIkjObU/
+# iY3fo78SK1HNJqQ3986/zMBX7d2235WIzh6wCCcU43Kq0w6drqR/tSKcruHo3MnD
+# Qzqfmp5lGY3nzBOW6TVAcfaEZlatEXKweuSGXqipovRjbDztHuKIUbeS6eepUY5B
+# S10TPfaD64OaGRwtcQ0QBX4aZEXvjEglIZWqSWz76e+uLjYCHJB7Zy4FWDgiTpng
+# FrfcKc5cwLkOwcG91OO9mhDTsrikEpeRjV2dipJIYT5lRTlG/7rL6zmwhbXgg7EO
+# JWc14a0xmY8tzyVFWc1JnSh8wHks+SjCChPkOlAvE0bKcBHddrYX2RZKikrod/LF
+# 9EzWWDshSyKM/1hO48YiFq4SkpUsyjnK973VrQ1NQ+D1HRONzPrBJdZ7lFEHg8xY
+# QCn4rq6HXI/W6mLW5hlJ1HaIzzytKKWCDhj754e4NeWD/vN/ASS/vB6ltXTRJERB
+# C3jsjhD3quRKPBJCRfU5eaVWv7Aosg5ePLNUyt7Lb+TGWjKsVheKimQJKwIDAQAB
 # o4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDVR0lBDQw
 # MgYKKwYBBAGCN2EBAAYIKwYBBQUHAwMGGisGAQQBgjdhgZrRmhbY3vVrgb36hVz5
-# gO8bMB0GA1UdDgQWBBSd5c0S0QCL5FfaYNB419I6indtTjAfBgNVHSMEGDAWgBTo
-# g8Qz19yfDJx2mgqm1N+Hpl5Y7jBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
+# gO8bMB0GA1UdDgQWBBRNyVo6ITqNuk1JRqXRWRZ+ApVG5TAfBgNVHSMEGDAWgBR2
+# nDZ0E9GQfWFfswLrgPSZS6U+hTBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
 # Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlm
-# aWVkJTIwQ1MlMjBBT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
+# aWVkJTIwQ1MlMjBFT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
 # ZAYIKwYBBQUHMAKGWGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2Vy
-# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwQU9DJTIwQ0ElMjAw
+# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwRU9DJTIwQ0ElMjAw
 # MS5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
 # b2NzcDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNo
 # dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5o
-# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQANhEkMl59HK0dWruZ/O5md
-# p057ZbzZQVvYvwp2pzZcu9oygv44DYZmVBUaZR6o5eLkbKIiZGawZekDv0bGFJjb
-# CQcYxKiOEPLlnjRu8BGHKBWzvjvo6YJJClKwA2FcoVUG2nAwsQbp6S1uAivg/h1J
-# QNPxRLsXYFCTMNmidYt6WsWQE5ulX2u7hIkM03gMwsWkfxpTunSPKK2RfJxunFaW
-# IBSn6vQhCrGO0PEG37lVA7z4Z3/5gVXuDtrMnStp6sY5oHfBhQtAQEO+jV61BhUJ
-# uNp/YAhrXNgQy2xmdYkh/d6XyNTCA7BC0hzsikooi/cdOiM1REbPeBkFJLwLdsS1
-# C7Fg34c/o8NOud49bR/Gk5FFyGc4qhbBFMIY8K2NjxImJey4AWzVeO4MY292IXP8
-# y/j0RreTw2AWgQR4s3yoMo4GsGnghncd16AFiM1us00n0ROeWOzIK7rn3anUDwhu
-# /0pu3aTjaKv3VbbonW54tFNz/AkWTnASTxGt2Bujr7Eql2ATkpWoR9+DMKqhXRap
-# cDPV/fNpV0+4vPIvgBXRlR8Wv71t34z/pHdO1osfaZY913jNXloaU309Iu19WINe
-# a3tKAzhrF0HXUk35nhamZPLULivDqVMNmg4GIOkUffdB0TrDaOBuv1ya2BsjJvQJ
-# ELi2KQ/SG5j8skBf3vB3MjCCB1owggVCoAMCAQICEzMAAAAHN4xbodlbjNQAAAAA
-# AAcwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
+# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQCDRsVv56S5Gw3B5rCfjyHP
+# m5fN1ijAFEVJPwIx8fVRgyC/VYwbVUHYWbW/jeEJYKtUl8Wl9fD7eP18UN9DZZwW
+# ZS+/Qus3nQP54oXdK65uJ0VRKJnTVrn7ISEy3o1Nytot1P7txG+P2HbW5UVVNSDM
+# ZW3Zx4qQeHstQdtIF1q4vJ/rzW6aaXHsJV+CuPuee7e9HevGucAbmk9P0cZdV3TV
+# qsDNwcX5r+X0djza8xjRFbw75hf7oOHCyUWTHvZGZ2jKmE5G+cdktzw5FiXFWO78
+# qznUiu+4cGZVMYbQTDsuN8VMLsJuuvBX/onS3AkpceJ+l2JJWWiYb6g64kRsOsrA
+# nKIoU9LnUL7qXDlc9XsweXxAlrhUx+HhwFK0yWZHclq1yKphIqjiaVwd0wcVxY0B
+# 2WW9gvFFB6eHAXgYs7xN5GYgcPjDpLwD10MB1j3hBLwqqfk4OZuT1nSVlWJDW+0O
+# EiWiZR2SW18AOO17B4XSqH/xPKS+X9OxSVJ75Kjqfzj+W5fQcypAEQEFDhUQAx99
+# hGtjF8GHz7PpA6xY2JWcz478kQxEQ528U/1GrCUthwa9sY4JdhaVLQT2CeipyfYX
+# f4kPoCFp4JytjFLA4e74kHUxTHW41qfbZg38Knxvcnq0Qv8MZ4GrxCNQtTVBFqj+
+# ApHZCUd8FgoJUIjUcSFGfDCCB1owggVCoAMCAQICEzMAAAAGShr6zwVhanQAAAAA
+# AAYwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
 # c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
 # IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTRaFw0yNjA0MTMx
 # NzMxNTRaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
-# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC398ADKAfFuj6PEDTi
-# E0jxvP4Spta9K711GABrCMJlq7VjnghBqXkCuklaLxwiPRYD6anCLHyJNGC6r0kQ
-# tm9MyjZnVToC0TVOfea+rebLBn1J7FV36s85Ov651roZWDAsDzQuFF/zYC+tLDGZ
-# mkIf+VpPTx2fv4a3RxdhU0ok5GbWFKsCOMNCJnUmKr9KqIOgc3o8aZPmFcqzbYTv
-# 0x4VZgHjLRSU2pbRnYs825ryTStsRF2I1L6dM//GwRJlSetubJdloe9zIQpgrzlY
-# HPdKvoS3xWVt2J3+mMGlwcj4fK2hpQAYTqtJaqaHv9oRl4MNSTP24wo4ZqwiBid6
-# dSTkTRvZT/9tCoO/ep2GP1QlhYAM1gL/eLeLFxbVUQtpT7BOpdPEsAV6UKL+VEdK
-# NpaKkN4T9NsFvTNMKIudz2eY6Nk8qW60w2Gj3XDGjiK1wmgiTZs+i3234BX5TA1o
-# NEhtwRpBoHJyX2lxjBaZ/RsnggWf8KZgxUbV6QIHEHLJE2QWQea4xctfo8xdy94T
-# jqMyv2zILczwkdF11HjNWN38XEGdLkc6ujemDpK24Q+yGunsj8qTVxMbzI5aXxqp
-# /o4l4BXIbiXIn1X5nEKViZpTnK+0pgqTUUsGcQF8NbD5QDNBXS9wunoBXHYVzyfS
-# +mjK52vdLBmZyQm7PtH5Lv0HMwIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTog8Qz19yfDJx2mgqm1N+Hpl5Y
-# 7jBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
+# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBFT0MgQ0Eg
+# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDH48g/9CHdxhnAu8XL
+# q64nh9OneWfsaqzuzyVNXJ+A4lY/VoAHCTb+jF1WN9IdSrgxM9eKUvnuqL98ftid
+# 0Qrgqd3e7lx50XCvZodJOnq+X88vV0Av2x+gO82l0bQ39HzgCFg2kFBOGk7j8GrG
+# YKCXeIhF+GHagVU66JOINVa9cGDvptyOcecQS1fO8BbAm7RsFTuhFGpB53hVcm0g
+# JW35mgpRKOpjnBSWEB3AeH7fUGekE8LMW0pWIunrMS1HI7FF6BqAVT7IuBe++Z3T
+# sgM3RLZMti6JmNPD6Rxg62g2AqvuTQLoT1Z/cfiMdq+TYzGoWm2B8vSAv7NtJv5U
+# E0qJVPSarNckgmZaarDQr4Pcwp+YJ6vd7cJus/4XlG0JvRdoTS5Fwk9kmNbByIMH
+# EEhuQ0XgYvXaGXm/J2AUybNBw26h0rJf//eUsnWrbaugdVLVyC2wuCmNZhmUGWEJ
+# Nxcl5nfG5om9dkH2twsJfXk6BcvbW1RTAkIsTbtXkAZnGQ7eLniaBIKzC06ZZTgA
+# p38H97cq1e/pcFREq4C157PUSmCWhpnBB6P2Xl031SHxbX0FmD0iUuX7EdFfi8OI
+# xYBR//sA17gyhL3wXjmvvogYnSELTYQy4xnEASvBmPSWfRovncTOUxrkkKJE5tvR
+# Sgsd8ZJ00mwyDS6PcMBAN1VZMQIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
+# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBR2nDZ0E9GQfWFfswLrgPSZS6U+
+# hTBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
 # aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
 # gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
 # FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
@@ -868,18 +1037,18 @@ else
 # AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
 # b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
 # JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAHf+
-# 60si2TAtOng1+H32+tulKwvw3A8iPb5MGdkYvcLx61MZiz4dlTE0b6s15lr5HO72
-# gRwBkkOIaMRbK3Mxq8PoGKHecRYWwhbhoaHiAHif+lE955WsriLUsbuMneQ8tGE0
-# 4dmItRC2asXhXojG1QWO8GeKNpn2gjGxJJA/yIcyM/3amNCscEVYcYNuSbH7I7oh
-# qfdA3diZt197DNK+dCYpuSJOJsmBwnUvRNnsHCawO+b7RdGw858WCfOEtWpl0TJb
-# DDXRt+U54EqqRvdJoI1BPPyeyFpRmGvFVTmo2BiNpoNBCb4/ZISkEXtGiUQLeWWV
-# +4vgA4YK2g1085avH28FlNcBV1MTavQgOTz7nLWQsZMsrOY0WfqRUJzkF10zvGgN
-# ZDhpSgJFdywF5GGxyWTuRVc/7MkY85fCNQlufPYq32IX/wHoUM7huUa4auiAynJe
-# S7AILZnhdx/IyM8OGplgA8YZNQg0y0Vtq7lG0YbUM5YT150JqG248wOAHJ8+LG+H
-# LeyfvNQeAgL9iw5MzFW4xCL9uBqZ6aj9U0pmuxlpLSfOY7EqmD2oN5+Pl8n2Agdd
-# ynYXQ4dxXB7cqcRdrySrMwN+tGX/DAqs1IWfenuDRvjgB3U40OZa3rUwtC8Xngsb
-# raLp9+FMJ6gVP1n2ltSjaDGXJMWDsGbR+A6WdF8YMIIHnjCCBYagAwIBAgITMwAA
+# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAGov
+# CZ/YsHVCNSBrQbvMWRsZ3w0FAsc/Qo4UFY0kVmJO0p+k7RtnZZ+zq/m+ogqMTfZD
+# ozz0bhmRVy9a4QAD52+MtOFLLz1jT/+b9ZNIrBi2JHUTCfvHWTD8WD3fBCmzYLVZ
+# SP7TT/q42sX53gxUnFXUegEgP73lkhbQqSpmimc4DjDm8/hPlwGmtlACU/+8wbIH
+# Qf36kc2jSNP1DyB8ok3MdL2LUOAGaa58Z1b1MHK6ejwYCLMUyEuUizTxvmWKUiQT
+# nPcUwBQCv5eAgjUU1mdvjc4jpB3bM6KNuNh+6uxdQI0cL5FLAkablQvM/KZiCCcn
+# 6SEk6ruhKWo8aluvvSEYF4/D8nv+aZKqnuFOC3SY+KRLWLhqnzH4/fJ6ZhKGcWuB
+# XXvnZMj4Czr0t+Au2GQhO9/tsUcHy+YiFp1kI5LS9MLHcH785VwQws07ZsnQ72KR
+# zUmpHQW+rHucDAxFKHcVWqiyDMFtadWRAmruhYXAxV8Uhifos9Fky3jy7qIxQIUF
+# I912w8D/qTzmYS/7TxTlYJDvJ2PUpVXZMet7/yYseJ6b3B/8LOiGpGe3EzYT/H40
+# fLpMEydI9BGqGE1+46BQMBYRiaUz9kcZo8hvvE699XItD/uXph+iBPd6m3CngY4Z
+# GMfnP6Ab2SkEjHxCtGXo6KWeXFETGiSYx+UvuXXZMIIHnjCCBYagAwIBAgITMwAA
 # AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
 # MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
 # ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
@@ -922,26 +1091,26 @@ else
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
 # nTiOL60cPqfny+Fq8UiuZzGCFyAwghccAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADFR5YOYFmKkDJ3wAAAAMVHjAN
+# IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMQITMwACM7X9x6ftsrcOkwAAAAIztTAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDkPPzc9b2aTMyLAsdEHCq+NtO6
-# abCD4Cpt5G0smoktzDANBgkqhkiG9w0BAQEFAASCAYCGqAgI2M5hMxp6rUl7RAzY
-# Hid4mdYHCXh/UJy4r85KqGrY4XqP4ERvC2Z3MsUWhJZRqVEL6ZHTkqr0aQCIUCTY
-# wBk8q9m5VPRD5alMNQn+3vc07a2X/PQ5cVBhv2+OcT55dZbInqdcClX2vDo9Qfjr
-# SflEfuhAj0MEkWk+uWH43x7uuxtq5XdplkobX1wWucpY5jpnmf4GfKhNhxl2bwp/
-# pYcI9zZGLSYran5W1/8tDxQ7/a8mdyd+7DjP1ed0Ih2xcFrnOTS2zgaCc8D9zS8V
-# cPWZvLvihLZOC29gbnuDS2iMWigl4jAqx/b2LZcd9T/h7q6wwppzB5UoTddIrhxJ
-# KZV6e1Wxkw0mGCK2N5dBiwgBlsvsrayIeCC2BDgTu6zPbAo8TId63SbxvXx3+HLi
-# HKxP7lAkC7tRSXfUaQTY+37LL6wzF5DBuLdr0MZeTOurx95qCKvCmAk7AWKQKyIf
-# sBF3HIZuTbgbFym7Mq96CD9IU5S1qj0zSUHKQuhFsgWhghSgMIIUnAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCzlrkjjpABPvWLRWP2EgZ+keAU
+# Is6SCQPLQjxKHKlP5DANBgkqhkiG9w0BAQEFAASCAYAKh2xmwPtQqXuMOnpsBA+Y
+# K8ZZyggHVGCc1Wy4jRfP2tl7AAw8hkmwx48YMlpTKfo76zHGww0486MccjiT4URs
+# eAEek3mrKcy3if1gfr1xDrk7fEvNQaFta1fQDZ+bQKnK9FgaUj9/vO57FXZR5C5I
+# /bSbOJnKfQMmNTv/3jJi2X9tyNzeMMesR9B1Y3Wbmdy6ykzhkKPZRBxaBsh7Z6bm
+# QqqTjbrm/HB7kfEKvhPjdTeMKrbFyu4ZKGOVSK1dyxylLYQNA000phMs5SClnPdR
+# lpBwkI1sgCjS50ojLRc29KKzLdoSRxze1wdhgL1tpr9pPmFe/DOVQGrQjjRp6/FE
+# L98bLOAh6u+SkBjevgPH23WVnmXokO6x5gqdiN9f024ebaHr9wh+AzTSK33li16n
+# v/3rPyvwY4Kf/RI3uyHuVcdYn7LSeTVtOrT6wmn5+gsxFVeeF4uRlYPSXH1dHvYy
+# ba17IyBTT9j2gYS7adEoD97bkoLQv60mzo3f2pbGiG6hghSgMIIUnAYKKwYBBAGC
 # NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgxB/wtpHHJFo6eLSUV5m1qfxMahCOXyon1NZ+QgfS
-# aGoCBmfYFHFw1BgTMjAyNTAzMjQyMzAzMjQuNzIyWjAEgAIB9KCB4KSB3TCB2jEL
+# MTANBglghkgBZQMEAgEFAAQgtrPr5830qDkK86FDkwIVRjkI8pHRdHYDXiQQPhwy
+# 30YCBmfdnyaxXBgTMjAyNTAzMjUyMzU2MDAuNDkyWjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
-# U046M0RBNS05NjNCLUUxRjQxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
+# U046RTQ2Mi05NkYwLTQ0MkUxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
 # IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
 # 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
@@ -983,27 +1152,27 @@ else
 # ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
 # UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
 # 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
-# EzMAAABGF+R1esr92uUAAAAAAEYwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
+# EzMAAABK/bhVx2KqyYkAAAAAAEowDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
 # VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
 # cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
-# MTg0ODQ5WhcNMjUxMTE5MTg0ODQ5WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
+# MTg0ODU1WhcNMjUxMTE5MTg0ODU1WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
 # Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
 # dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
-# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046M0RBNS05NjNCLUUxRjQxNTAz
+# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046RTQ2Mi05NkYwLTQ0MkUxNTAz
 # BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
-# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAsJV86I/zDS9QX51f
-# oIOHdH2bptR3VCYnUjU3A86Ryb5iAah+euswWHFdE8je/t6jpyY6aE8eiQTIDWJy
-# +QZk1/R65l9FnTTC3++LuzbQUrgA9rH+p9qlFK8+4vH+69CYmYsSiZ5LwP9WpCx6
-# aUDAwroNaAtAGI3e+d2+b8tb1nax1xPYS+9QWXuQwquf+CwZ8vGjkGZc743sIDjZ
-# ImZvkn3LZCY4fS8XZA5auRLxhOmFNLgt+1xe6pB7yJLA9vl4AT9JRDH5jyaNnyPR
-# cCAPWDF+yiCDRDOTmOp5Lyq8jPbOWyui1eM+PDWKYiNcbx9eWA6bPtfZxwrSjFU2
-# XQeHGIQNHVaie3QLuFXMVMA9QBHDMVmyDkdc+jhZFWPRl+aB/JNe3fbd+T1n59F7
-# sVuEhv64poLRYKRP7IUbMuZzAmx8ngnVtB3taZa2EKk7Ehz9p/5c9gwoCJZ8frrz
-# y1X+fiRv9XdYvy3cGwtlh+lBBCcmSJd2tGMDOK3c6Efj+HTvSP9qFjsVwmKhcrWH
-# QsvZYxC1MG8i4640XXbXkfEE8awn2nSqSnxWOgJPxzWT1B2gD2pN22jiL1e0PGsa
-# Nw1kMtom9811eoTDzbdb/dKb/qvXWkHcFM1K4HG8E4Xa0YVh8JUSFYNrEeuvBz5+
-# P/JfYpBqJKy+oAJlcTbMBGfWsAsCAwEAAaOCAcswggHHMB0GA1UdDgQWBBQRNtDU
-# r3awumenJukTxj/GG6iK8TAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
+# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA6DkQYZ6zYlw1AbxF
+# kFNwc0V0BaXCCo1/+d01YKizalK9bX8fGrIUSVf75pYJOrhYmofIMh7wBv8j+kIp
+# lOKYixrtVq+aQwAezI0wBFdFFeOyNCIynTQwz343z5IWVZ0/7cOXT1IDk9fIsI51
+# kZKHa4SPf9rFmH9XtH1/P1ExueAGskBF/AvI1Ol2Vv2W9EDke8csxcPgXTkDNG9I
+# 5ljEjM9pZUzf9kgw8Po8CVpD1/OFb468jcaWpsi/ydqboa3KJnPoyUlnq+cmgp6f
+# kpqYmPM3EhAr1aAqbMnkiUrD4Q15DTv0XoZOi1zjXRhF5xxXKLr1m5k5xZlHp7mn
+# PimiG67T7/e5DuFFt7XbAsOCW8N1Zq5jdNeLrMLtBvkRyKlkTSsp6nJQXR4Rf2e8
+# 7TrveQiJjLsW+ZQ46KXdcDI1WoaxI0JzypicOQBbcU98823p/TArYdVpIYuYlXq0
+# 923cf9+im62BVFG9eXhm+601RsXdWlH7QUMZzbD233aAP8LiB0pDrkK/ybUpYs6D
+# okAJ9r0am4NFXu7LC+DfIFveRIZOCBaHGt4SJ3G2VgkFIoALFcThj+ro7oX+BT3s
+# r0L57Lzi/QmU2UkTCwV1qKM6+aqbzhV4BxsxRjfQdetqzFvxI4IHf0IBuPoYYMiJ
+# 4AXTa2moymfuejK2NZgL75mWwisCAwEAAaOCAcswggHHMB0GA1UdDgQWBBQXdNaJ
+# ti4We46ErU/TNnIOeWGVejAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
 # ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
 # b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
 # MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
@@ -1012,36 +1181,36 @@ else
 # EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
 # MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
-# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBABSFuS/oBs1+IMh6K0t92Cl7ivYg
-# vdYmU6Zt9MfxHRxulPDQLtqorcsY2VaujA6t9NILKRtJ7cy2KlYY35Lu4jcxO/JO
-# rTYBQq/cLxpCB3ivkNkQDvf7OUfK4TQvpcsDgfuiuWYtJHztGoFV3+zZNjuheg/Q
-# BMzS4oxvnDnuRH9heZeGbFUpCxQiOYxCwvq+CpzWY7p3Pqr40s9g5DbF364xYcpP
-# iu7+1O/iRWfJGefMhbsRF9HMQyqSS8YjYfzgwji9lMWJIcnyNwEdBIX8V/UGR1YM
-# cmcJ2r0d+Rcai0ohk3gCbCu2Dd2yMcrj+ngnJ5F/EzHabvZDw/e7B5zO6aNFEA64
-# 2je3rb4iw8Z2sdp3pnbyVtwXsDixaw9Z0p3e2R3Txjwd6Fkwmivf918EBES4t14/
-# h2XPPUT+dDbe4e/txuqKtpF2DYnSPYlnfoC/pb5EGR/WEyHwQi1o77l71FFFPgLx
-# SNNFLaq73ayHaghWqhPRx0IEn13kOd8S1nTAs7VD/2JzF4icTQZHOlBNqcf6Ovvy
-# 1yQyKcCF0eB0qHS35H7DUJehRaydcbDmBkh73BZB/N/PUZlL6469TQW3XrHOAbuJ
-# KMft3GmzmXNc5vPRvtUUS9rUXhc0jJWEhjt4ip9xhl5kIkZhZQW9wqW1FUM/n4MV
-# TH3i9I+C5ikH09YyMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
+# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBADApzTDXWbyj/r85v6Az19sJPtwK
+# dE5ukA0FrPxJffIDQ0WJLW1G7zXIXIJY3S5dCHbvXr5bDrmL67MlnU0M0RIapm5x
+# pS8ejuWdRplHqkRiwhB5hm+7nEdxm+YdKCcoIPxbGqI1t8E0S0Zt7uw1/9LzRUar
+# duTHQ0PKyZQnuYkHLGx83/+RR40w1gemiIFtC/UfvNY9URHCfB6bWp90qi3TjWLM
+# O03FwcpuvZ15RubMVH/eH3WavJjLB4rDWd7NzeSAkiTqCEUAFNqrGFbnjOviBMUb
+# KkAa/mFj9m1Dk6Zx4SbXtT5wCodX3k30m0cSB2nClULbR4YyWO5/MoSlTwnMPvFX
+# MOWUkzd/SARbw7XVF6WLtgZHVBKAyZ4MFKwrKCP8hXdozdkeOX3Ru12+wewRk8An
+# o/f9zrm4G/B/wO6u7smB3eR8OerqioPt73ufFMWsSCwXhSGz8xpjq6DKiG39sDRP
+# F2CHnsBIJmv7dPMgYCKxskb7GiIkHbqa79vIAqQs9nY4s7XhR8NKRAKVIYj9/8Xk
+# eY5S1G0YQhCwQlRUtvHZMY0pYmOXBfWpjQG+ZaIwfd07tB0hprJBh5zJLIussfsI
+# P3tGr4o64tqRa8+OItP3mLWCdslKcBY5HIzHC2b0NnasAY1bqzfTfotsflhrV+pX
+# SyN3As36dKMTqpGGMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
 # ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEYX5HV6yv3a5QAAAAAA
-# RjANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCCDT3kj9BOOIsvrpnpd9txO8YvhH6j6ObCETwPrvnVe
-# BzCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIBIndkiaVD4+cUJu9zOL6g5l
-# YdUEek4rk1FZC9z/ForOMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
+# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEr9uFXHYqrJiQAAAAAA
+# SjANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
+# MC8GCSqGSIb3DQEJBDEiBCCwVZpLMqUpA6qXlwl8VtFQN8gNu2Kz4MwDGy1IKhQc
+# qzCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIGZ7KbWlzY0AQkdLdW/gAxiy
+# l7PEf9Wpsv+xde8uw+EKMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
-# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARhfkdXrK/drlAAAAAABGMCIE
-# INCGKUhxDcfmYcFUlZQVr7S7oU/Zc70VqIZPgNKr1C18MA0GCSqGSIb3DQEBCwUA
-# BIICAEGLvXRqKzuZ4tyOwZpPXeHVVQ7qmAFV2eboXDYiGl4iwosZLt4FHNB7vgRG
-# P3pNIrVIMEkHQsxXDg/VxsMWfEljvwgwBAenwlY61pl+kSQcgZanCkr+axaI8xWi
-# 0MBX4USmt1qOiwKsjrqOLwToWy/P+X3nB+4GyJMxGZFg/Ma5bieUu5CwtTxL/gza
-# 4lg0MA27Xc7I1V45bLvGEn+G7XlLD+gfPdv4sNjSTMVdQyzAi5u4ZthVb/RX8x9k
-# zfc9STH8hBkDbTLNMPMlioIsbBJ9aj8vqLV6cl0Dnx8KVZBzgZWvHgbgSnxL84An
-# hzIpWx//otbXwsaeauSjPIjej9tk/Rjio221TVUADSUStptbnuXQZQRRF8aK6/bi
-# 07OvgZuyZ746KRGQJOTypGsO1MwinHIwm/VA4nWEwNRtpYI2fJq0FWWyUB5/hHAt
-# sNKCE3aUOfWnaxi6ca3GOBr1ZWJgW0TZBn2xdZ5Y3jfqP3mmuUtgIhl4D9OherIa
-# yIoakkhiuJ/Es/y24h3YMUbUgj6TVD35f6w6+94Zs7RlgRurReNcY8+IUA9PrFe/
-# 0pMYXNOgLR4dy2BMbDXWlN4xG5sy6dgUNy3tMYsRj3czPa6TxipwNTBbVvcFOpH/
-# k2PetoTAwJ/2Y88Nsyk8jgjohBGFWe9I8si5OYyJ5zdpK+K8
+# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASv24VcdiqsmJAAAAAABKMCIE
+# IHXYk57rB7q2Y+7EDRP0629SC2kPOkozPiK7fn9sLMV5MA0GCSqGSIb3DQEBCwUA
+# BIICACr+pI05JR9y1ZUCe86r6cZDSeQryuAlKYe2AJA+K9kfc+wEWhq/mk1dcmAP
+# k1nxOa1LokVJmnKWK5qe/SUtUWmW04vCFxwPFCKUonASAjwr8pHZrXJSN3zl9QEM
+# 1ilr6DGolgFbf9qDUq5RWH6MnxmtaA7XFerFe3+fefjVCUe1RwXvmsvwByCf4kXa
+# QYac+dCBBRSzSk1bGr1M/46K5853WAWVdYQPYzXO/6ixvDCGWlVrYJfQ5egfj3l2
+# CdsMyyvXtyMABjNB08vF9HF1F1VsIVVqlEoY4NDruqmfqC++g8mKp2A+TpS7HNm7
+# wHpGGSo6AaMotdB5loLgcu9OS+rov+X9adEv0wxsHhZr2YXjHAsgL7lG6vFaiERn
+# E0iHCQn62hYEi1QVK+gyXq6w3Rqbi3EYJLMakKaMRt+OR5xsrgAJcyDtb8ItPMna
+# w8R5Y5ai1UnAXJc3jfdHILouHsWh13hfCSmTSrTbVBxJoVrVmFnGjGC2nTJXddRP
+# hI+uFjHm7EeW/Vym4a5P0apB6uaFSKcHwZ6KACc24/s2JIM19NbdMmi028DSV3EN
+# ZNxEjiK+qfwCgTAi0wXBL0Z0g/Z4Q7bOBhSjlPz4g7o3LwKok4nSeWjZktZjQ23n
+# el9ZJFFG4rpEPstm/5OqvDF/8BRwD0KYMzcxN3aAcXISCm9b
 # SIG # End signature block

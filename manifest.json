@@ -10,7 +10,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "B0B0E85F38D7FF74965845BFA882DFDBF7C8C9D3879CB59BA00116868FC92893"
+      "hash": "67A18134BBE8448782E12E115C80441E2937DB4ED89F5999880A0D3B46E14E4C"
     }
   ],
   "Cmds": [
@@ -25,6 +25,18 @@
         "MinorRevision": -1
       },
       "hash": "06EC5EF6B4683A429AF45FD581EAD9AEA06BEE398B8ABD08ECBD25315BABAB72"
+    },
+    {
+      "name": "forceUpdate",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "8258D8FEE48C6BCF7F512C0FF8BDB25E42A7254006D60342B94BF69AAFFA5303"
     },
     {
       "name": "GetHash",
@@ -86,7 +98,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "CC7D4537BFA3AFCB54740D1A5F5CC3BE22D95CED2E10968D9AA5444CA3A0F6B9"
+      "hash": "B5A8DC640483D407A87349BACD9D37D74924B3A5006C36218E2BD051B001B695"
     },
     {
       "name": "ConnectToTenant",
@@ -98,7 +110,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "C75E84D1E9F2CCF010B44619DE4848D65133C22F7F2F8358DE89DA0D2C19A5C2"
+      "hash": "0260E1DB258CCB24BA13F85F9B175CD66D6D6B2CD1EBB5FD4260597AA3B269D0"
     },
     {
       "name": "DownloadScriptUpdates",
@@ -110,7 +122,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "1B7324A1786476727B8A5DEAEAE70CA8D14AE19517AC550406C46DBD2CB45A48"
+      "hash": "51CD5F9CB64F36FC03B8D4B599764C8112BC5CB93666E2DE1A4FAC67C228E179"
     },
     {
       "name": "GetDecryptedObject",
@@ -206,7 +218,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "372997CE3E2817F655A8664E9C5B23399F5EA64CE81A97FEEDFBB352F28E278E"
+      "hash": "79F5B520F6715FD0254C17DDAC350F10FB92CDC7A8F3E17C540DCC896CB236E4"
     },
     {
       "name": "GetRequiredModules",
@@ -257,18 +269,6 @@
       "hash": "EF60279CEF6BDDBB5A6637041A29FAE1BD7492E77B142B1C2C467FCC636D654F"
     },
     {
-      "name": "GetUSBDriveLetter",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "968EC59CABCDBEFF67C7EACE57527BA816CF9561CC7C880B48BBC4DC1BD01292"
-    },
-    {
       "name": "ListAllDevices",
       "version": {
         "Major": 0,
@@ -305,18 +305,6 @@
       "hash": "12FA4D2E7951378849841139441E6BA5AC579C43570167EF8EACD2D08BCE03B5"
     },
     {
-      "name": "TestScriptUpdates",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "5C91BCA92AFC0E58952405B5B20AAC7E123F35755FF5A70AB775C2DFC02D6503"
-    },
-    {
       "name": "VerifyEnrollmentStatus",
       "version": {
         "Major": 0,
@@ -327,6 +315,12 @@
         "MinorRevision": -1
       },
       "hash": "8F60CD5AB90B744E263756BABFE02134D95703D958B55769118D1200C455EB74"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "vars",
+      "hash": "5ED6B9554F3B5DA1AD90395E6A86D7D0E60BB516A0CACE127BB56E886F60782D"
     }
   ]
 }
