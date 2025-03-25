@@ -34,32 +34,17 @@ Write-Verbose "Latest Release: $latestRelease"
 Write-Verbose "Repo Source Code URL: $repoSourceCodeURL"
 Write-Verbose "Remote Manifest Path: $remoteManifestPath"
 
-#Read all config*.json files in the config folder.
-$configFiles = Get-ChildItem -Path "$pwd\.secrets" -Filter 'config*.json' -ErrorAction SilentlyContinue
-foreach ($file in $configFiles)
-{
-    Write-Host "Checking if the data in $($file.Name) is encrypted"
-    $data = Get-Content -Path $file.FullName | ConvertFrom-Json
-    if (isEncrypted -Data $data)
-    {
-        Write-Host "The data is encrypted"
-    }
-    else
-    {
-        Write-Host "The data is not encrypted"
-    }
-}
 
-# # $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest
-# # DownloadScriptUpdates -ScriptsToUpdate $remoteManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot -verbose
-# $baseSourceURL = 'https://git.gao.gov'
-# $repoPath = 'mahmoudz'
-# $repoName = 'autopilot-deployment'
-# $projectId = '1031'
-# $latestRelease = GetLatestGitlabRelease -ProjectID $projectId -verbose
-# # $global:r = GetLatestGitlabRelease -ProjectID '1031'
-# $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-# $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
+$modulesFolder = "$PWD\pwsh\modules"
+$modulesToInstall = @(
+    'Microsoft.Graph.Authentication',
+    'Microsoft.Graph.Groups',
+    'Microsoft.Graph.Identity.DirectoryManagement',
+    'Microsoft.Graph.DeviceManagement',
+    'PackageManagement',
+    'PowerShellGet',
+    'WindowsAutoPilotIntune'
+)
 
-# Write-Host "Update URL: $updateURL"
-# Write-Host "Remote version: $remoteVersionURL"
+
+GetRequiredModules -moduleNames $modulesToInstall -modulesFolder $modulesFolder
