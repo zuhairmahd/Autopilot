@@ -42,7 +42,7 @@ param(
     [switch]$Overwrite,
     [switch]$FullRelease,
     [switch]$Secrets,
-    [switch]$NoConfig
+    [switch]$Config
 )
 
 $foldersToSign = @(
@@ -882,7 +882,7 @@ else
     Write-Host 'Skipping secrets copy process.'
 }
 
-if (-not $NoConfig -or $FullRelease)
+if ($Config -or $FullRelease)
 {
     Write-Host "Creating configuration file in $ReleaseFolder"
     if (CreateConfiguration -Folder $ReleaseFolder)
