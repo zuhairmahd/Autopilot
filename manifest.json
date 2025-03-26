@@ -166,7 +166,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "72F1D956D3C155D81F63FB82F86F37B0BC13FCA7F82EAF1D7ED212D38925A50B"
+      "hash": "0AB834B546D36FC1603568083EAF4CEAEC6D2BD7B4FDC0B9B818A0E1F021EC65"
     },
     {
       "name": "GetScriptUpdates",
@@ -245,6 +245,20 @@
     {
       "name": "vars",
       "hash": "A1C03B2F8CB9906F9FC2A7CDE4D3850D5ABF8013AB6903EA0B601BF66C222C5F"
+    }
+  ],
+  "Scripts": [
+    {
+      "name": "Register-Device",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "B25C21AD94C04D1E75D8DF1F52F3FCB929EC52770C227FFA827EA6ED7FBB785E"
     }
   ],
   "Cmds": [
@@ -331,20 +345,6 @@
         "MinorRevision": -1
       },
       "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
-    }
-  ],
-  "Scripts": [
-    {
-      "name": "Register-Device",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "B25C21AD94C04D1E75D8DF1F52F3FCB929EC52770C227FFA827EA6ED7FBB785E"
     }
   ]
 }
