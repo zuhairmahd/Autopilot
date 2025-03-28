@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param
 (
-    [string]$Folder= "$PWD",
+    [string]$Folder = "$PWD",
     [string]$ConfigurationFile = "$folder\vars.json"
 )
 
@@ -22,5 +22,14 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
+if (connectToTenant -configFile '.\.secrets\config.json')
+{
+    Write-Host 'Connected to tenant' -ForegroundColor Green
+}
+else
+{
+    Write-Host 'Failed to connect to tenant' -ForegroundColor Red
+    exit 1
+}
 
-CreateConfiguration -Folder $Folder -ConfigurationFile $ConfigurationFile
+$global:device = GetDeviceBySerialNumber -SerialNumber '5R3SBZ3'
