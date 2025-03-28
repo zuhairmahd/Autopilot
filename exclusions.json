@@ -1,7 +1,11 @@
 {
     "exclusions": [
         "test",
+        "CopyFiles",
+        "GetUSBDriveLetter",
+        "IsEncrypted",
         "Test1",
+        "TestScriptUpdates",
         "UpdateManifest",
         "CreateRelease",
         "updateRelease"

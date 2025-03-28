@@ -1,9 +1,12 @@
-
-[CmdletBinding(DefaultParameterSetName = 'Default')]
-param ()
+[CmdletBinding()]
+param
+(
+    [string]$Folder = "$PWD",
+    [string]$ConfigurationFile = "$folder\vars.json"
+)
 
 #import functions.
-$functionsFolder = "$pwd\functions"
+$functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "Importing functions from $functionsFolder"
@@ -19,23 +22,14 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
+if (connectToTenant -configFile '.\.secrets\config.json')
+{
+    Write-Host 'Connected to tenant' -ForegroundColor Green
+}
+else
+{
+    Write-Host 'Failed to connect to tenant' -ForegroundColor Red
+    exit 1
+}
 
-
-#define variables.
-$manifest = Get-Content -Path "$pwd\manifest.json" | ConvertFrom-Json 
-$repo = 'zuhairmahd/Autopilot'
-# $latestRelease = GetLatestGithubRelease -Repository $repo -verbose
-$latestRelease = 'main'
-$repoSourceCodeURL = "https://raw.githubusercontent.com/$repo/$latestRelease"
-$remoteManifestPath = "$repoSourceCodeURL/manifest.json"
-#write a verbose log of all the variables.
-Write-Verbose "Manifest: $($manifest)"
-Write-Verbose "Latest Release: $latestRelease"
-Write-Verbose "Repo Source Code URL: $repoSourceCodeURL"
-Write-Verbose "Remote Manifest Path: $remoteManifestPath"
-
-# $updatedManifest = CheckForScriptUpdates -RemoteManifestPath $remoteManifestPath -LocalManifestContent $manifest 
-# $Global:u = $updatedManifest
-# DownloadScriptUpdates -ScriptsToUpdate $updatedManifest -ScriptURI $repoSourceCodeURL -ScriptRoot $PSScriptRoot
-
-$global:i = GetScriptIntegrity -scriptFolders ($PSScriptRoot, $functionsFolder) -rootFolder $PSScriptRoot
+$global:device = GetDeviceBySerialNumber -SerialNumber '5R3SBZ3'
