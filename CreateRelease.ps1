@@ -146,6 +146,8 @@ function CreateQuickConfiguration()
     }
     return $success
 }
+
+
 function CreateFullConfiguration()
 {
     [CmdletBinding()]
@@ -165,15 +167,15 @@ function CreateFullConfiguration()
         @{name = 'Name'; value = 'localhost'; description = "The name of the device to configure."; type = 'string'},
         @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; type = 'string'},
         @{name = 'AssignedUser'; value = ''; description = "the user to assign the autopilot device to."; type = 'string'},
-        @{name = 'check'; value = 'false'; description = "Check the status of the device."; type = 'bool'},
-        @{name = 'NoModuleCheck'; value = 'false'; description = 'skip checking for installed powershell modules.'; type = 'bool'},
-        @{name = 'NoUpdateCheck'; value = 'false'; description = 'skip checking for updates.'; type = 'bool'},
+        @{name = 'check'; value = @('on', 'off'); description = "Check the status of the device."; type = 'array'},
+        @{name = 'NoModuleCheck'; value = @('on', 'off'); description = 'skip checking for installed powershell modules.'; type = 'array'},
+        @{name = 'NoUpdateCheck'; value = @('on', 'off'); description = 'skip checking for updates.'; type = 'array'},
         @{name = 'UpdateOnly'; value = 'false'; description = 'Only check for updates and exit.'; type = 'static'},
-        @{name = 'NoAdminCheck'; value = 'false'; description = 'skip checking for admin rights.'; type = 'bool'},
-        @{name = 'NoSignatureVerify'; value = 'false'; description = 'skip verifying the signature of the script.'; type = 'bool'},
-        @{name = 'NoHashVerify'; value = 'false'; description = 'skip verifying the hash of the script.'; type = 'bool'},
-        @{name = 'GetDeviceHash'; value = 'false'; description = 'Gets the hash of the device and exit.'; type = 'bool'},
-        @{name = 'Redeploy'; value = 'false'; description = 'Check the deployment status of the device.'; type = 'bool'},
+        @{name = @('on', 'off'); value = 'false'; description = 'skip checking for admin rights.'; type = 'array'},
+        @{name = 'NoSignatureVerify'; value = @('on', 'off'); description = 'skip verifying the signature of the script.'; type = 'array'},
+        @{name = 'NoHashVerify'; value = @('on', 'off'); description = 'skip verifying the hash of the script.'; type = 'array'},
+        @{name = 'GetDeviceHash'; value = @('on', 'off'); description = 'Gets the hash of the device and exit.'; type = 'array'},
+        @{name = 'Redeploy'; value = @('on', 'off'); description = 'Check the deployment status of the device.'; type = 'array'},
         @{name = 'SerialNumber'; value = ''; description = 'The serial number of the device to check.'; type = 'string'},
         @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; type = 'array'}, 
         @{name = 'Release'; value = @('main', 'auto'); description = 'The release branch to use.'; type = 'array'}
@@ -210,8 +212,9 @@ function CreateFullConfiguration()
             }
             Write-Verbose "Key name: $($config.Name)"
             Write-Verbose "Key value: $($config.Value)"
-            Write-Verbose "Key type: $($configType)"
-            Write-Verbose "Key description: $($configDescription)"
+            Write-Verbose "Found Key value: $configValue"
+            Write-Verbose "Key description: $configDescription"
+            Write-Verbose "Key type: $configType"
             switch ($configType)
             {
                 'string'
@@ -224,6 +227,7 @@ function CreateFullConfiguration()
                         $value = $config.Value
                     }
                     Write-Host "New value: $value"
+                    Write-Verbose "Changing the value of $($config.Name) from $($config.Value) to $value"
                     $config.Value = $value
                 }
                 'bool'
@@ -260,12 +264,13 @@ function CreateFullConfiguration()
                     $value = $choices | Where-Object { $_.number -eq [int]$value } | Select-Object -ExpandProperty choice
                     }
                     Write-Host "Value: $value"
-                    $config.Value = [bool]$value
+                    Write-Verbose "Changing the value of $($config.Name) from $($config.Value) to $value"
+                    $config.Value = $value
                 }
                 'array'
                 {
                     Write-Host "Please enter a new value for $($config.Name)."
-                    Write-Host "Press enter to keep the current value: $($config.Value)"
+                    Write-Host "Press enter to keep the current value: $config.Value"
                     Write-Host "Description: $($configDescription)"
                     foreach ($item in $configValue)
                     {
@@ -273,6 +278,7 @@ function CreateFullConfiguration()
                         if ($config.Value -contains $item)
                         {
                             $currentlySelected = $configValue.IndexOf($item)+1
+                            Write-Verbose "The currently selected value is $currentlySelected"
                         }
                     }
                     $value = Read-Host -Prompt "Choice: [$currentlySelected])"
@@ -291,6 +297,7 @@ function CreateFullConfiguration()
                         $value = $configValue[$value-1]
                     }
                     Write-Host "Value: $value"
+                    Write-Verbose "Changing the value of $($config.Name) from $($config.Value) to $value"
                     $config.Value = $value
                 }
                 'static'
@@ -1046,6 +1053,7 @@ else
 
 if ($Secrets -or $FullRelease)
 {
+    Write-Verbose 'Checking if the secrets folder exists.'
     #Check if there are any secrets in the destination folder.
     if (Test-Path -Path "$ReleaseFolder\.secrets\config.json")
     {
@@ -1056,16 +1064,39 @@ if ($Secrets -or $FullRelease)
             $response = Read-Host 'Invalid input. Please enter Y or N: '
             [console]::beep(500, 300)
         }
-    }
-    Write-Host "Checking for secrets in $PSScriptRoot."
-    if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
-    {
-        Write-Host 'Secrets copied successfully.'
+        switch ($response)
+        {
+            Y 
+            { 
+                Write-Host 'Overwriting secrets...' 
+                if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
+                {
+                    Write-Host 'Secrets copied successfully.'
+                }
+                else
+                {
+                    Write-Host 'Failed to copy secrets.'
+                    Write-Host 'Run the script with the -verbose switch for more information.'
+                }
+            }
+            N
+            {
+                Write-Host 'No secrets will be copied.'
+            }
+        }
     }
     else
     {
-        Write-Host 'No secrets files copied.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
+        Write-Host 'Secrets do not exist in the destination folder.'
+        if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
+        {
+            Write-Host 'Secrets copied successfully.'
+        }
+        else
+        {
+            Write-Host 'Failed to copy secrets.'
+            Write-Host 'Run the script with the -verbose switch for more information.'
+        }
     }
 }
 else
@@ -1079,7 +1110,7 @@ if ($Config -or $FullRelease)
     Write-Host "(1) Quick Configuration"
     Write-Host "(2) Full Configuration"
     Write-Host "(3) Skip Configuration"
-    $configChoice = Read-Host "Enter your choice (1 or 2)"
+    $configChoice = Read-Host "Enter your choice (1 or 2, 3 to skip)"
     while ($configChoice -notin '1', '2', '3')
     {
         Write-Host "Invalid choice. Please enter 1 or 2, or enter 3 to skip."
@@ -1093,13 +1124,14 @@ if ($Config -or $FullRelease)
             Write-Host 'Creating quick configuration file.' 
             $configSuccess = CreateQuickConfiguration -Folder $ReleaseFolder
         }
-        2 { 
+        2
+        { 
             Write-Host 'Creating full configuration file.' 
             $configSuccess = CreateFullConfiguration -Folder $ReleaseFolder
         }
-        3 { 
-            Write-Host 'Skipping configuration file creation process.' 
-            $configSuccess = $true
+        3
+        { 
+            Write-Host 'Copying default configuration file.' 
         }
     }
     if ($configSuccess -and $configChoice -ne 3)
@@ -1120,8 +1152,8 @@ else
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCASQ+fXxE/hdfes
-# IYPGWmO3Z1Iu6XWfIysovU5PHMJr7aCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCC9J30mSoigzzDO
+# 3QT9kxmEIILKOm9w4D2cjFqI3MavL6CCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -1310,20 +1342,20 @@ else
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADITjMersUT+iH6QAAAAMhODAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDBFRl0VMAYzUSQj1lPelDwNNcT
-# 5iHZzX1Yz5ykLWMv5jANBgkqhkiG9w0BAQEFAASCAYB3czesjjLvpc32f0SNLtx1
-# 0g+xUJIB9P5J1bqg6ItFDhYD00O/MBrqSgBkiSLhhmyDx7ZClr9ChuY6tQytG/He
-# 8qAM36R7PligCqhXuIy3wOphlAIdLi/SGIttHxGBQZFrOiYwTfC84GINF6/TVr2t
-# HgFYWSJUHoNlQctCKMpB0d4Pfv2vRmGcHdzUOjA+kA4kisO+28ZyHz9fnl0zsYgU
-# 8GQBevOE6TtvS+Z9mNoRjZ2GQoho3dbFN9ByNRX0kxsEH8uTtofdotZBczsRSgw1
-# Voxybii80W+O02T6frU+ce1afwLuyHhbfI4vOMzyqslzC7EJbUCuaLCoIGh6s3IW
-# OYQUt+ufXIFw1LNd9s6CZpoCv6Ajyb7y0rIZT8D3N1k3avS/83HgvXykUJHHzGaT
-# Zogn8gZeC0POSmGLij906oXrKISfrpD1I9hELbdMN8bmayyGMPEiH8yRept0Anu/
-# d92NxbOo3+M9RpjkznwjrxdjDArpU62Wh6t4CPpXPc+hghSgMIIUnAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCC9kT0HD8xL6KZ/Lm/9s/KeHosX
+# EjeOI0Qtx9CbmVp04TANBgkqhkiG9w0BAQEFAASCAYBeZ9QgHU/+MSBF9U7S5GtX
+# /jKV7iOocQWLuvuP4CMTT0T6Fg+8BHx00KmGkcjXzBN522sZbzFiK1hTCJueB839
+# zQ8PGY6tOG5tjRB0jviJK3p4RJqtTLt1araHpPVV5pbxtL6m4UC6v218d3yL1kE6
+# +B6ad1egAM0A5MJM8mgOwPLTKJhVL1ztitJc68KCe3Xz93+Tb/qoCYc00dqpviBH
+# R2kiU+1BPb4coh2bSAPduGlycGSLRWXPdrbh/v99RJvO77b5ylZuGhPAmfVUvH9E
+# BhsMYxKzqk0GkR3Fy1QWifd/WgOk2JHC1YQAMBbwru9DDQ7A6pY5TVSC3AbcwvPE
+# +NJC0zmtVMiyxPtL9GDxW/7hdDKYsRjb6pK16ZDo3l6WHmU74BBhSSdtPyV/o+Pd
+# ckNm0RuvuFq9BxUd8OLAn/Yt2NqeqIqqWWFdEdJvMpKDYEpMyeaujBa/ilfBKls6
+# jMkH+Z6rM4V7TkupAJvILU/Cy26fFO/mO627M3o+cNGhghSgMIIUnAYKKwYBBAGC
 # NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgbwhvKTNR/8UjkX6fCre3+BYK1jqVsh+8C9oxk+Tl
-# 3aMCBmfm6cu2lxgTMjAyNTAzMjkwNDI4NDYuMTY1WjAEgAIB9KCB4KSB3TCB2jEL
+# MTANBglghkgBZQMEAgEFAAQgM+hZxBNS+Qc23rbr1W6vbsaMzscoXJBc9sfcLy2N
+# foYCBmfm6cwESxgTMjAyNTAzMjkwNjQyMzIuNTk2WjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
@@ -1413,21 +1445,21 @@ else
 # ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
 # bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEXfe+fnDAkWngAAAAAA
 # RTANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCCJiiQJLzxs1SqbnNx6FmJTdKWkyOdKUyI1nQDN60q7
-# /TCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
+# MC8GCSqGSIb3DQEJBDEiBCDWx7W2lLB6dBNKVZ9jzOXAgzPLUrA1F7rC++Ox3XVa
+# pjCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
 # iM9F0uvKQRUOfiHf0m5xMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
 # UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARd975+cMCRaeAAAAAABFMCIE
-# IM+UD8D4fRfJYUur6RalShjijUhy1twVeDyVCripPL2dMA0GCSqGSIb3DQEBCwUA
-# BIICAFkWb/hY8wVFoo7YOEVgiXdCfSpvSj78LpRINoSEAtB8rbhpRXh+oOlvUjeJ
-# v8ntND/GAHbNfCdHHIPzo3H4fjARuERtfnYd8Uo7S1tCmVe9BB9X18stIf2AnFn1
-# JwCI1B9GskfrrsWx9fNymoNLzbxuMiZInSKtyewGqB+8+YXYko+L5XMaefqk3Bul
-# wf4y1hyTCzaD0B439Afj6aVT9NAAlpOQ5+KbLJQJ7AEcwsAn5gSz5dqa3t/Ip9lc
-# /A8XrYgakIHeK2Tkjzr2OQ7nHpcucqqzpfpXVs8eIsmQnoe75LcSr2VJE7gNBTFs
-# VgV2/2H/CXpTZOU1i52+1BMNRdelBCdBKwp3WVl0II2z3Bbggoud62q3LvkUxWkh
-# JyzqQnfhXRz/9OaBFgU7HSgctOWDzuNjMu89ayyCFqeY2c6stKrIP9UT6qO7eX2X
-# mh66YJsp8QmQQ40qKd05KdGPmt4kd2zA2SlMNyWHdVRq3Ob2wKuDMivllyl9HVs8
-# r5MQAjRx0+9xrleN+iKrNU8zIJamti5WP0tOTj/tsNETHXnD60Wly41tteCupZnz
-# zj3kra0a2rJLqIvsvRa1RkFh5mL1+x4cN4IdqWXhtvoxPjgOfxIX16leaNmziO2v
-# TbVwZ1mLUCniOwbFWfpGlmSITawhjAPV/ZEl6PnDop2ZSRbY
+# IPaNt61OuvSKSj2DDryxIzTL0HWnwF/r98RiB2fQmxxIMA0GCSqGSIb3DQEBCwUA
+# BIICAGIUql3w1mpskl1kZ1EFwQ4n9KOUxyd5VVl+lmGnN2SkryWTcKxbNWe0aGCw
+# +uVAtMTQD3IHGqmN4gX/BFPIqyh8uLvHsyXOn9ZXpSxt7d+YZ00ElgIB3enpGogJ
+# cFMAB63TSFqZxjyTHLjT/n9wAwhFsKHO0YrQ9w39wm+j8a5snELOiRg241nAuNy5
+# I7edR+fFoL9xLT0F11SbxJ3LAUXYv9j/3q5VZoE8TwPBUWgC9EdcK5yqa2uz054O
+# J9LO2+bcrCJmBXJiTfcXGqhwCN8jQVPMFDrez6xbSm2cJWmXBbQkFmAKGlg/F2Fc
+# 2K3Ae11e3mw9T0Pk7UykyZd6hwuQcqg0JgNX/QJ354eT94Nmko9Bdv4UD+S59g0O
+# NXdDS76T0nYWUSD+lrtnRiQHcIifLBQJrnItP1WUdQjJ9jwZ4Dk6gK3aLFbed2vb
+# 5HtxA+OynC5VC76Q9XYYu4SfGYG4WbvlfityLUJH2n5zwJKMMzkPNBoCi8YAB/u7
+# HGNCxgWYCh1TYlL6l4hQUv93A6zxlpjwT6CoIBfYHXJL5NRQD/0uk9wHyr9UZEm8
+# PLtihK7T8uE7KIHaukNkU/Z/A5YgC8dR+IgnaX02VmuKIgUH/Zc1VTb/rhyAe38U
+# F2EJqGES1VJXWSWgYXzPR+d1kgh6lr7r+GXZILC/kcPaZBgk
 # SIG # End signature block
