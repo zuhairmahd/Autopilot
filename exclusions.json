@@ -8,6 +8,10 @@
         "TestScriptUpdates",
         "UpdateManifest",
         "CreateRelease",
+        "GetUSBDriveLetter",
+        "GetDevicesByType",
+        "GetDevices",
+        "ListAllDevices",
         "updateRelease"
     ]
 }

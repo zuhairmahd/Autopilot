@@ -1,4 +1,4 @@
-<#PSScriptInfo
+<#region PSScriptInfo
 .VERSION 1.0.0
 .GUID d973dfdd-190f-48ca-97de-a99d8e9cbd37
 .AUTHOR Zuhair Mahmoud
@@ -29,7 +29,7 @@
     Creates a release package by signing the scripts in the specified folders, copying the files from the source folder to the release folder, and creating a manifest file.
     .NOTES
 #>
-
+#endregion PSScriptInfo
 
 [CmdletBinding()]
 param(
@@ -50,6 +50,7 @@ $foldersToSign = @(
     "$PSScriptRoot\functions"
 )
 
+#region Variables
 Write-Verbose 'Received the following parameters:'
 Write-Verbose "SourceFolder: $SourceFolder"
 Write-Verbose "ReleaseFolder: $ReleaseFolder"
@@ -60,14 +61,15 @@ Write-Verbose "Copy: $Copy"
 Write-Verbose "Overwrite: $Overwrite"
 Write-Verbose "FullRelease: $FullRelease"
 Write-Verbose "Secrets: $Secrets"
-Write-Verbose "NoConfig: $NoConfig"
+Write-Verbose "Config: $Config"
+#endregion Variables
 
 if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease -or $Secrets))
 {
     throw 'At least one of the following switches must be provided: -Copy, -Sign, -Manifest, -Secrets or -FullRelease.'
 }
 
-function CreateConfiguration()
+function CreateQuickConfiguration()
 {
     [CmdletBinding()]
     param
@@ -144,6 +146,184 @@ function CreateConfiguration()
     }
     return $success
 }
+function CreateFullConfiguration()
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$Folder,
+        [string]$ConfigurationFile = "$folder\vars.json"
+    )
+    #print verbose log of received parameters
+    Write-Verbose "Folder: $Folder"
+    Write-Verbose "ConfigurationFile: $ConfigurationFile"
+    
+    $valuesToEdit = @(
+        @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; type = 'string'},
+        @{name = 'configuration'; value = "vars.json"; description = "The path to the configuration file."; type = 'string'},
+        @{name = 'Name'; value = 'localhost'; description = "The name of the device to configure."; type = 'string'},
+        @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; type = 'string'},
+        @{name = 'AssignedUser'; value = ''; description = "the user to assign the autopilot device to."; type = 'string'},
+        @{name = 'check'; value = 'false'; description = "Check the status of the device."; type = 'bool'},
+        @{name = 'NoModuleCheck'; value = 'false'; description = 'skip checking for installed powershell modules.'; type = 'bool'},
+        @{name = 'NoUpdateCheck'; value = 'false'; description = 'skip checking for updates.'; type = 'bool'},
+        @{name = 'UpdateOnly'; value = 'false'; description = 'Only check for updates and exit.'; type = 'static'},
+        @{name = 'NoAdminCheck'; value = 'false'; description = 'skip checking for admin rights.'; type = 'bool'},
+        @{name = 'NoSignatureVerify'; value = 'false'; description = 'skip verifying the signature of the script.'; type = 'bool'},
+        @{name = 'NoHashVerify'; value = 'false'; description = 'skip verifying the hash of the script.'; type = 'bool'},
+        @{name = 'GetDeviceHash'; value = 'false'; description = 'Gets the hash of the device and exit.'; type = 'bool'},
+        @{name = 'Redeploy'; value = 'false'; description = 'Check the deployment status of the device.'; type = 'bool'},
+        @{name = 'SerialNumber'; value = ''; description = 'The serial number of the device to check.'; type = 'string'},
+        @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; type = 'array'}, 
+        @{name = 'Release'; value = @('main', 'auto'); description = 'The release branch to use.'; type = 'array'}
+    )
+    $success = $false
+    
+    # Load parameters from the configuration file if it exists
+    if (Test-Path -Path $ConfigurationFile)
+    {
+        Write-Host " Loading configuration values from $ConfigurationFile."
+        $configData = Get-Content -Path $ConfigurationFile -Raw | ConvertFrom-Json
+        Write-Host "Found $($configData.PSObject.Properties.Name.count) configurations."
+    }
+    else
+    {
+        Write-Host "No configuration file found at $ConfigurationFile."
+        Write-Host "Creating new configuration file."
+    }
+    
+    #itterate over the configuration data and prompt the user to choose a value
+    foreach ($config in $configData.PSObject.Properties)
+    {
+        Write-Verbose "Configuration: $($config.Name) = $($config.Value)"
+        if ($valuesToEdit.name -contains $config.Name)
+        {
+            $configType = ($valuesToEdit | Where-Object { $_.name -eq $config.Name }).type
+            $configDescription = ($valuesToEdit | Where-Object { $_.name -eq $config.Name }).description
+            $configValue = ($valuesToEdit | Where-Object { $_.name -eq $config.Name }).value
+            if ($configValue -eq '')
+            {
+                Write-Verbose "Config value is empty."
+                Write-Verbose "Setting config value to 'none'."
+                $configValue = 'none'
+            }
+            Write-Verbose "Key name: $($config.Name)"
+            Write-Verbose "Key value: $($config.Value)"
+            Write-Verbose "Key type: $($configType)"
+            Write-Verbose "Key description: $($configDescription)"
+            switch ($configType)
+            {
+                'string'
+                {
+                    Write-Host "Please enter a new value for $($config.Name)."
+                    Write-Host "Description: $($configDescription)"
+                    $value = Read-Host -Prompt "Press enter to keep the current value: ($configValue)"
+                    if ($value -eq '' -or $null -eq $value)
+                    {
+                        $value = $config.Value
+                    }
+                    Write-Host "New value: $value"
+                    $config.Value = $value
+                }
+                'bool'
+                {
+                    Write-Host "Please enter a new value for $($config.Name)."
+                    Write-Host "Press enter to keep the current value: $($config.Value)"
+                    Write-Host "Description: $($configDescription)"
+                    $choices = @(
+                        @{number = 1; choice ='true' },
+                        @{number = 2; choice = 'false' }
+                    )
+                    ForEach ($choice in $choices) 
+                    { 
+                        Write-Host "[$($choice.number)] $($choice.choice)"
+                        if ($choice.choice -eq $config.Value)
+                        {
+                            Write-Verbose "There is a match"
+                            $currentlySelected = $choice.number
+                        }
+                    }                        
+                    $value =  Read-Host -Prompt "Choice: [$currentlySelected])"
+                    while ($value -ne '1' -and $value -ne '2' -and $value -ne '')
+                    {
+                        Write-Host "Invalid choice."
+                        [console]::beep(500,300)
+                        $value = Read-Host -Prompt "Choice: [$currentlySelected])"
+                    }
+                    if ($value -eq '')
+                    {
+                        $value = $config.Value
+                    }
+                    else 
+                    {
+                    $value = $choices | Where-Object { $_.number -eq [int]$value } | Select-Object -ExpandProperty choice
+                    }
+                    Write-Host "Value: $value"
+                    $config.Value = [bool]$value
+                }
+                'array'
+                {
+                    Write-Host "Please enter a new value for $($config.Name)."
+                    Write-Host "Press enter to keep the current value: $($config.Value)"
+                    Write-Host "Description: $($configDescription)"
+                    foreach ($item in $configValue)
+                    {
+                        Write-Host "[$($configValue.IndexOf($item)+1)] $item"
+                        if ($config.Value -contains $item)
+                        {
+                            $currentlySelected = $configValue.IndexOf($item)+1
+                        }
+                    }
+                    $value = Read-Host -Prompt "Choice: [$currentlySelected])"
+                    while ($value -lt 1 -or $value -gt $configValue.Count -and $value -ne '')
+                    {
+                        Write-Host "Invalid choice."
+                        [console]::beep(500,300)
+                        $value = Read-Host -Prompt "Choice: [$currentlySelected])"
+                    }
+                    if ($value -eq '')
+                    {
+                        $value = $config.Value
+                    }
+                    else
+                    {
+                        $value = $configValue[$value-1]
+                    }
+                    Write-Host "Value: $value"
+                    $config.Value = $value
+                }
+                'static'
+                {
+                    Write-Verbose "This is a static value and cannot be changed."
+                    Write-Host "Value: $($config.Value)"
+                }
+            }
+        }
+    } # Closing brace for foreach loop
+    #Print all the new configuration data but only in verbose mode.
+    Write-Verbose "New configuration data:"
+    $configData.PSObject.Properties | ForEach-Object {
+        Write-Verbose "$($_.Name) = $($_.Value)"
+    }
+    #Save the new configuration data to the configuration file
+    Write-Verbose "Saving configuration to $ConfigurationFile."
+    $configData | ConvertTo-Json | Set-Content -Path $ConfigurationFile
+    Write-Verbose "Configuration saved to $ConfigurationFile."
+    Write-Verbose "Checking if configuration file exists."
+    if (Test-Path -Path $ConfigurationFile)
+    {
+        Write-Verbose "Configuration saved to $ConfigurationFile."
+        $success = $true
+    }
+    else
+    {
+        Write-Verbose "Failed to save configuration to $ConfigurationFile."
+    }
+    return $success
+}
+
+
 
 function isEncrypted
 {
@@ -866,7 +1046,18 @@ else
 
 if ($Secrets -or $FullRelease)
 {
-    Write-Host "Copying secrets from $PSScriptRoot to $ReleaseFolder"
+    #Check if there are any secrets in the destination folder.
+    if (Test-Path -Path "$ReleaseFolder\.secrets\config.json")
+    {
+        Write-Host 'Secrets already exist in the destination folder.'
+        $response = Read-Host 'Would you like to overwrite them? (Y/N)'
+        while ($response -notin 'Y', 'N')
+        {
+            $response = Read-Host 'Invalid input. Please enter Y or N: '
+            [console]::beep(500, 300)
+        }
+    }
+    Write-Host "Checking for secrets in $PSScriptRoot."
     if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
     {
         Write-Host 'Secrets copied successfully.'
@@ -884,14 +1075,40 @@ else
 
 if ($Config -or $FullRelease)
 {
-    Write-Host "Creating configuration file in $ReleaseFolder"
-    if (CreateConfiguration -Folder $ReleaseFolder)
+    Write-Host "Choose the type of configuration you want to create:"
+    Write-Host "(1) Quick Configuration"
+    Write-Host "(2) Full Configuration"
+    Write-Host "(3) Skip Configuration"
+    $configChoice = Read-Host "Enter your choice (1 or 2)"
+    while ($configChoice -notin '1', '2', '3')
+    {
+        Write-Host "Invalid choice. Please enter 1 or 2, or enter 3 to skip."
+        [console]::beep(500, 300)
+        $configChoice = Read-Host "Enter your choice (1 or 2)"
+    }
+    switch ($configChoice)
+    {
+        1 
+        { 
+            Write-Host 'Creating quick configuration file.' 
+            $configSuccess = CreateQuickConfiguration -Folder $ReleaseFolder
+        }
+        2 { 
+            Write-Host 'Creating full configuration file.' 
+            $configSuccess = CreateFullConfiguration -Folder $ReleaseFolder
+        }
+        3 { 
+            Write-Host 'Skipping configuration file creation process.' 
+            $configSuccess = $true
+        }
+    }
+    if ($configSuccess -and $configChoice -ne 3)
     {
         Write-Host 'Configuration file created successfully.'
     }
     else
     {
-        Write-Host 'Failed to create configuration file.'
+        Write-Host 'Configuration file was not created.'
         Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
@@ -903,8 +1120,8 @@ else
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBomOR+92M/hzb9
-# zYqS35S1buET1zisS9fczp0ElCmaRqCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCASQ+fXxE/hdfes
+# IYPGWmO3Z1Iu6XWfIysovU5PHMJr7aCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -935,100 +1152,100 @@ else
 # uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
 # GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
 # ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAIztf3H
-# p+2ytw6TAAAAAjO1MA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
+# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAMhOMx6
+# uxRP6IfpAAAAAyE4MA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBFT0MgQ0EgMDEwHhcNMjUwMzI1MDY1NjExWhcNMjUwMzI4
-# MDY1NjExWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
+# RCBWZXJpZmllZCBDUyBBT0MgQ0EgMDEwHhcNMjUwMzI4MDYzOTQ1WhcNMjUwMzMx
+# MDYzOTQ1WjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
 # BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
 # Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# iSM5tT+Jjd+jvxIrUc0mpDf3zr/MwFft3bbflYjOHrAIJxTjcqrTDp2upH+1Ipyu
-# 4ejcycNDOp+anmUZjefME5bpNUBx9oRmVq0RcrB65IZeqKmi9GNsPO0e4ohRt5Lp
-# 56lRjkFLXRM99oPrg5oZHC1xDRAFfhpkRe+MSCUhlapJbPvp764uNgIckHtnLgVY
-# OCJOmeAWt9wpzlzAuQ7Bwb3U472aENOyuKQSl5GNXZ2KkkhhPmVFOUb/usvrObCF
-# teCDsQ4lZzXhrTGZjy3PJUVZzUmdKHzAeSz5KMIKE+Q6UC8TRspwEd12thfZFkqK
-# Suh38sX0TNZYOyFLIoz/WE7jxiIWrhKSlSzKOcr3vdWtDU1D4PUdE43M+sEl1nuU
-# UQeDzFhAKfiurodcj9bqYtbmGUnUdojPPK0opYIOGPvnh7g15YP+838BJL+8HqW1
-# dNEkREELeOyOEPeq5Eo8EkJF9Tl5pVa/sCiyDl48s1TK3stv5MZaMqxWF4qKZAkr
+# telPbF1c/Z3bR7ZgxLv8x9ceHiNgsLA3waTMd4FPGy4wEqw5MVvpNw9qvRQ3/MkS
+# L+Arzdw02sf3V9LP1wVx1rKJjm+4sTvbtuRXHbAkyakzJxJdZnLYwSHCnchSncVa
+# 3noIsPw5a4y8w5Go9uxbKdk4moxRpaJbk7rqQOIOicbsMzOPc4+nG1GGuKjYM3hM
+# SLa/V4ZSOPejqo2dd93AND5IKf+Hl8dsI2ZqF9aPcg0YVbRuZ7XepMa+bg9Zq8m7
+# 8nrAi2f4JrKcIH5lIkHJITse3C+94FW7IfmhtQ3cIlLo4tP4JFMFKZ4E5qELER+v
+# OSBgJ6qfPNh+ayfySnnd9YyJ/VUHYo9YXZd9aV3pCgk4jA0ujXEc6lLYQBZqSBmk
+# JuWVAi/wSMJqVKQvVBte1EcsBMw2WwLZnYqpYHI1AbmK3Cdw5hnaXSKj92YaMqbq
+# WyDQIASq+PLVRwXD1B+5pipCaFTHnFVVCducRcOtm2/j9kdf8WBxjvqLj7o0fwt7
 # AgMBAAGjggIYMIICFDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDA7BgNV
 # HSUENDAyBgorBgEEAYI3YQEABggrBgEFBQcDAwYaKwYBBAGCN2GBmtGaFtje9WuB
-# vfqFXPmA7xswHQYDVR0OBBYEFE3JWjohOo26TUlGpdFZFn4ClUblMB8GA1UdIwQY
-# MBaAFHacNnQT0ZB9YV+zAuuA9JlLpT6FMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
+# vfqFXPmA7xswHQYDVR0OBBYEFFd37/NEhYZBwUr4r/cZmn/HvuAXMB8GA1UdIwQY
+# MBaAFOiDxDPX3J8MnHaaCqbU34emXljuMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMElEJTIw
-# VmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
+# VmVyaWZpZWQlMjBDUyUyMEFPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
 # mDCBlTBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
-# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBFT0MlMjBD
+# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBBT0MlMjBD
 # QSUyMDAxLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
 # LmNvbS9vY3NwMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUH
 # AgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0
-# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAINGxW/npLkbDcHm
-# sJ+PIc+bl83WKMAURUk/AjHx9VGDIL9VjBtVQdhZtb+N4Qlgq1SXxaX18Pt4/XxQ
-# 30NlnBZlL79C6zedA/nihd0rrm4nRVEomdNWufshITLejU3K2i3U/u3Eb4/Ydtbl
-# RVU1IMxlbdnHipB4ey1B20gXWri8n+vNbpppcewlX4K4+557t70d68a5wBuaT0/R
-# xl1XdNWqwM3Bxfmv5fR2PNrzGNEVvDvmF/ug4cLJRZMe9kZnaMqYTkb5x2S3PDkW
-# JcVY7vyrOdSK77hwZlUxhtBMOy43xUwuwm668Ff+idLcCSlx4n6XYklZaJhvqDri
-# RGw6ysCcoihT0udQvupcOVz1ezB5fECWuFTH4eHAUrTJZkdyWrXIqmEiqOJpXB3T
-# BxXFjQHZZb2C8UUHp4cBeBizvE3kZiBw+MOkvAPXQwHWPeEEvCqp+Tg5m5PWdJWV
-# YkNb7Q4SJaJlHZJbXwA47XsHhdKof/E8pL5f07FJUnvkqOp/OP5bl9BzKkARAQUO
-# FRADH32Ea2MXwYfPs+kDrFjYlZzPjvyRDERDnbxT/UasJS2HBr2xjgl2FpUtBPYJ
-# 6KnJ9hd/iQ+gIWngnK2MUsDh7viQdTFMdbjWp9tmDfwqfG9yerRC/wxngavEI1C1
-# NUEWqP4CkdkJR3wWCglQiNRxIUZ8MIIG5zCCBM+gAwIBAgITMwACM7X9x6ftsrcO
-# kwAAAAIztTANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
+# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAEjYPwuT4vxwHeed
+# sFcCRD/ye2CS3S+syW8peFce5U1G2m5v01zNe7z3N7lo4Py7gD/w5GcoVlwSWqJa
+# 9MGRBZubsXAcBL8qHVaEnW7Qe5kderc3D48Ou12lVVaF8CRcfkzoa7/aPygzWJmE
+# vagdawsPhp5ulxA8d0DiPOfI1nJbehw3fp8T4GCq2GRcV1aAqmcqHuv3HowjGnmk
+# 1fMpj0ux+tLAP6GhFzuuFqTcO0vjHEND6aV4uEyp1Fauash/JpkiMn9uM/h5+KWv
+# Ajz7892J2H6tsceD5mH1xYJ88dKTlfPiw2hTB6yoPUtbs1no1hhN1cMiu9depjCb
+# fcxrOnIuq57pPKsBIfjwgTFKVE8IRZunzK5r6WOeO86N9z006R1mQyWpRhB1MDYl
+# YqpJ9Xt3DRDCFZQoGZCw0Hb2zwHweCDIf2yYI0/mKyppWmuTGIqMYc4SgBglzR3V
+# OI5dplZohdWKpauOaYAlznfyE4jaCY09SyFiK8EM4y9NxRb05iNUc8d+c8C+jscL
+# lHBIv4NiHEkBXxP/mNmBV64+UCxqTwvgprlINXBa+97TauOW/a7QFeBH7MZP4O0Z
+# t2Fy/YGu3AlUS8dJCSovoqRtxU0+Bmqe0Ch+UbG/QzVo4UjDkjMAhv9Qub9rIXuA
+# /H/F2rg9LNGORgKLzsWCypwQilh9MIIG5zCCBM+gAwIBAgITMwADITjMersUT+iH
+# 6QAAAAMhODANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
 # TWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVy
-# aWZpZWQgQ1MgRU9DIENBIDAxMB4XDTI1MDMyNTA2NTYxMVoXDTI1MDMyODA2NTYx
-# MVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
+# aWZpZWQgQ1MgQU9DIENBIDAxMB4XDTI1MDMyODA2Mzk0NVoXDTI1MDMzMTA2Mzk0
+# NVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
 # cmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhh
-# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAIkjObU/
-# iY3fo78SK1HNJqQ3986/zMBX7d2235WIzh6wCCcU43Kq0w6drqR/tSKcruHo3MnD
-# Qzqfmp5lGY3nzBOW6TVAcfaEZlatEXKweuSGXqipovRjbDztHuKIUbeS6eepUY5B
-# S10TPfaD64OaGRwtcQ0QBX4aZEXvjEglIZWqSWz76e+uLjYCHJB7Zy4FWDgiTpng
-# FrfcKc5cwLkOwcG91OO9mhDTsrikEpeRjV2dipJIYT5lRTlG/7rL6zmwhbXgg7EO
-# JWc14a0xmY8tzyVFWc1JnSh8wHks+SjCChPkOlAvE0bKcBHddrYX2RZKikrod/LF
-# 9EzWWDshSyKM/1hO48YiFq4SkpUsyjnK973VrQ1NQ+D1HRONzPrBJdZ7lFEHg8xY
-# QCn4rq6HXI/W6mLW5hlJ1HaIzzytKKWCDhj754e4NeWD/vN/ASS/vB6ltXTRJERB
-# C3jsjhD3quRKPBJCRfU5eaVWv7Aosg5ePLNUyt7Lb+TGWjKsVheKimQJKwIDAQAB
+# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBALXpT2xd
+# XP2d20e2YMS7/MfXHh4jYLCwN8GkzHeBTxsuMBKsOTFb6TcPar0UN/zJEi/gK83c
+# NNrH91fSz9cFcdayiY5vuLE727bkVx2wJMmpMycSXWZy2MEhwp3IUp3FWt56CLD8
+# OWuMvMORqPbsWynZOJqMUaWiW5O66kDiDonG7DMzj3OPpxtRhrio2DN4TEi2v1eG
+# Ujj3o6qNnXfdwDQ+SCn/h5fHbCNmahfWj3INGFW0bme13qTGvm4PWavJu/J6wItn
+# +CaynCB+ZSJBySE7HtwvveBVuyH5obUN3CJS6OLT+CRTBSmeBOahCxEfrzkgYCeq
+# nzzYfmsn8kp53fWMif1VB2KPWF2XfWld6QoJOIwNLo1xHOpS2EAWakgZpCbllQIv
+# 8EjCalSkL1QbXtRHLATMNlsC2Z2KqWByNQG5itwncOYZ2l0io/dmGjKm6lsg0CAE
+# qvjy1UcFw9QfuaYqQmhUx5xVVQnbnEXDrZtv4/ZHX/FgcY76i4+6NH8LewIDAQAB
 # o4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDVR0lBDQw
 # MgYKKwYBBAGCN2EBAAYIKwYBBQUHAwMGGisGAQQBgjdhgZrRmhbY3vVrgb36hVz5
-# gO8bMB0GA1UdDgQWBBRNyVo6ITqNuk1JRqXRWRZ+ApVG5TAfBgNVHSMEGDAWgBR2
-# nDZ0E9GQfWFfswLrgPSZS6U+hTBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
+# gO8bMB0GA1UdDgQWBBRXd+/zRIWGQcFK+K/3GZp/x77gFzAfBgNVHSMEGDAWgBTo
+# g8Qz19yfDJx2mgqm1N+Hpl5Y7jBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
 # Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlm
-# aWVkJTIwQ1MlMjBFT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
+# aWVkJTIwQ1MlMjBBT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
 # ZAYIKwYBBQUHMAKGWGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2Vy
-# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwRU9DJTIwQ0ElMjAw
+# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwQU9DJTIwQ0ElMjAw
 # MS5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
 # b2NzcDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNo
 # dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5o
-# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQCDRsVv56S5Gw3B5rCfjyHP
-# m5fN1ijAFEVJPwIx8fVRgyC/VYwbVUHYWbW/jeEJYKtUl8Wl9fD7eP18UN9DZZwW
-# ZS+/Qus3nQP54oXdK65uJ0VRKJnTVrn7ISEy3o1Nytot1P7txG+P2HbW5UVVNSDM
-# ZW3Zx4qQeHstQdtIF1q4vJ/rzW6aaXHsJV+CuPuee7e9HevGucAbmk9P0cZdV3TV
-# qsDNwcX5r+X0djza8xjRFbw75hf7oOHCyUWTHvZGZ2jKmE5G+cdktzw5FiXFWO78
-# qznUiu+4cGZVMYbQTDsuN8VMLsJuuvBX/onS3AkpceJ+l2JJWWiYb6g64kRsOsrA
-# nKIoU9LnUL7qXDlc9XsweXxAlrhUx+HhwFK0yWZHclq1yKphIqjiaVwd0wcVxY0B
-# 2WW9gvFFB6eHAXgYs7xN5GYgcPjDpLwD10MB1j3hBLwqqfk4OZuT1nSVlWJDW+0O
-# EiWiZR2SW18AOO17B4XSqH/xPKS+X9OxSVJ75Kjqfzj+W5fQcypAEQEFDhUQAx99
-# hGtjF8GHz7PpA6xY2JWcz478kQxEQ528U/1GrCUthwa9sY4JdhaVLQT2CeipyfYX
-# f4kPoCFp4JytjFLA4e74kHUxTHW41qfbZg38Knxvcnq0Qv8MZ4GrxCNQtTVBFqj+
-# ApHZCUd8FgoJUIjUcSFGfDCCB1owggVCoAMCAQICEzMAAAAGShr6zwVhanQAAAAA
-# AAYwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
+# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQBI2D8Lk+L8cB3nnbBXAkQ/
+# 8ntgkt0vrMlvKXhXHuVNRtpub9NczXu89ze5aOD8u4A/8ORnKFZcElqiWvTBkQWb
+# m7FwHAS/Kh1WhJ1u0HuZHXq3Nw+PDrtdpVVWhfAkXH5M6Gu/2j8oM1iZhL2oHWsL
+# D4aebpcQPHdA4jznyNZyW3ocN36fE+BgqthkXFdWgKpnKh7r9x6MIxp5pNXzKY9L
+# sfrSwD+hoRc7rhak3DtL4xxDQ+mleLhMqdRWrmrIfyaZIjJ/bjP4efilrwI8+/Pd
+# idh+rbHHg+Zh9cWCfPHSk5Xz4sNoUwesqD1LW7NZ6NYYTdXDIrvXXqYwm33Mazpy
+# Lque6TyrASH48IExSlRPCEWbp8yua+ljnjvOjfc9NOkdZkMlqUYQdTA2JWKqSfV7
+# dw0QwhWUKBmQsNB29s8B8HggyH9smCNP5isqaVprkxiKjGHOEoAYJc0d1TiOXaZW
+# aIXViqWrjmmAJc538hOI2gmNPUshYivBDOMvTcUW9OYjVHPHfnPAvo7HC5RwSL+D
+# YhxJAV8T/5jZgVeuPlAsak8L4Ka5SDVwWvve02rjlv2u0BXgR+zGT+DtGbdhcv2B
+# rtwJVEvHSQkqL6KkbcVNPgZqntAoflGxv0M1aOFIw5IzAIb/ULm/ayF7gPx/xdq4
+# PSzRjkYCi87FgsqcEIpYfTCCB1owggVCoAMCAQICEzMAAAAHN4xbodlbjNQAAAAA
+# AAcwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
 # c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
 # IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTRaFw0yNjA0MTMx
 # NzMxNTRaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBFT0MgQ0Eg
-# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDH48g/9CHdxhnAu8XL
-# q64nh9OneWfsaqzuzyVNXJ+A4lY/VoAHCTb+jF1WN9IdSrgxM9eKUvnuqL98ftid
-# 0Qrgqd3e7lx50XCvZodJOnq+X88vV0Av2x+gO82l0bQ39HzgCFg2kFBOGk7j8GrG
-# YKCXeIhF+GHagVU66JOINVa9cGDvptyOcecQS1fO8BbAm7RsFTuhFGpB53hVcm0g
-# JW35mgpRKOpjnBSWEB3AeH7fUGekE8LMW0pWIunrMS1HI7FF6BqAVT7IuBe++Z3T
-# sgM3RLZMti6JmNPD6Rxg62g2AqvuTQLoT1Z/cfiMdq+TYzGoWm2B8vSAv7NtJv5U
-# E0qJVPSarNckgmZaarDQr4Pcwp+YJ6vd7cJus/4XlG0JvRdoTS5Fwk9kmNbByIMH
-# EEhuQ0XgYvXaGXm/J2AUybNBw26h0rJf//eUsnWrbaugdVLVyC2wuCmNZhmUGWEJ
-# Nxcl5nfG5om9dkH2twsJfXk6BcvbW1RTAkIsTbtXkAZnGQ7eLniaBIKzC06ZZTgA
-# p38H97cq1e/pcFREq4C157PUSmCWhpnBB6P2Xl031SHxbX0FmD0iUuX7EdFfi8OI
-# xYBR//sA17gyhL3wXjmvvogYnSELTYQy4xnEASvBmPSWfRovncTOUxrkkKJE5tvR
-# Sgsd8ZJ00mwyDS6PcMBAN1VZMQIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBR2nDZ0E9GQfWFfswLrgPSZS6U+
-# hTBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
+# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
+# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC398ADKAfFuj6PEDTi
+# E0jxvP4Spta9K711GABrCMJlq7VjnghBqXkCuklaLxwiPRYD6anCLHyJNGC6r0kQ
+# tm9MyjZnVToC0TVOfea+rebLBn1J7FV36s85Ov651roZWDAsDzQuFF/zYC+tLDGZ
+# mkIf+VpPTx2fv4a3RxdhU0ok5GbWFKsCOMNCJnUmKr9KqIOgc3o8aZPmFcqzbYTv
+# 0x4VZgHjLRSU2pbRnYs825ryTStsRF2I1L6dM//GwRJlSetubJdloe9zIQpgrzlY
+# HPdKvoS3xWVt2J3+mMGlwcj4fK2hpQAYTqtJaqaHv9oRl4MNSTP24wo4ZqwiBid6
+# dSTkTRvZT/9tCoO/ep2GP1QlhYAM1gL/eLeLFxbVUQtpT7BOpdPEsAV6UKL+VEdK
+# NpaKkN4T9NsFvTNMKIudz2eY6Nk8qW60w2Gj3XDGjiK1wmgiTZs+i3234BX5TA1o
+# NEhtwRpBoHJyX2lxjBaZ/RsnggWf8KZgxUbV6QIHEHLJE2QWQea4xctfo8xdy94T
+# jqMyv2zILczwkdF11HjNWN38XEGdLkc6ujemDpK24Q+yGunsj8qTVxMbzI5aXxqp
+# /o4l4BXIbiXIn1X5nEKViZpTnK+0pgqTUUsGcQF8NbD5QDNBXS9wunoBXHYVzyfS
+# +mjK52vdLBmZyQm7PtH5Lv0HMwIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
+# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTog8Qz19yfDJx2mgqm1N+Hpl5Y
+# 7jBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
 # aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
 # gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
 # FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
@@ -1037,18 +1254,18 @@ else
 # AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
 # b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
 # JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAGov
-# CZ/YsHVCNSBrQbvMWRsZ3w0FAsc/Qo4UFY0kVmJO0p+k7RtnZZ+zq/m+ogqMTfZD
-# ozz0bhmRVy9a4QAD52+MtOFLLz1jT/+b9ZNIrBi2JHUTCfvHWTD8WD3fBCmzYLVZ
-# SP7TT/q42sX53gxUnFXUegEgP73lkhbQqSpmimc4DjDm8/hPlwGmtlACU/+8wbIH
-# Qf36kc2jSNP1DyB8ok3MdL2LUOAGaa58Z1b1MHK6ejwYCLMUyEuUizTxvmWKUiQT
-# nPcUwBQCv5eAgjUU1mdvjc4jpB3bM6KNuNh+6uxdQI0cL5FLAkablQvM/KZiCCcn
-# 6SEk6ruhKWo8aluvvSEYF4/D8nv+aZKqnuFOC3SY+KRLWLhqnzH4/fJ6ZhKGcWuB
-# XXvnZMj4Czr0t+Au2GQhO9/tsUcHy+YiFp1kI5LS9MLHcH785VwQws07ZsnQ72KR
-# zUmpHQW+rHucDAxFKHcVWqiyDMFtadWRAmruhYXAxV8Uhifos9Fky3jy7qIxQIUF
-# I912w8D/qTzmYS/7TxTlYJDvJ2PUpVXZMet7/yYseJ6b3B/8LOiGpGe3EzYT/H40
-# fLpMEydI9BGqGE1+46BQMBYRiaUz9kcZo8hvvE699XItD/uXph+iBPd6m3CngY4Z
-# GMfnP6Ab2SkEjHxCtGXo6KWeXFETGiSYx+UvuXXZMIIHnjCCBYagAwIBAgITMwAA
+# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAHf+
+# 60si2TAtOng1+H32+tulKwvw3A8iPb5MGdkYvcLx61MZiz4dlTE0b6s15lr5HO72
+# gRwBkkOIaMRbK3Mxq8PoGKHecRYWwhbhoaHiAHif+lE955WsriLUsbuMneQ8tGE0
+# 4dmItRC2asXhXojG1QWO8GeKNpn2gjGxJJA/yIcyM/3amNCscEVYcYNuSbH7I7oh
+# qfdA3diZt197DNK+dCYpuSJOJsmBwnUvRNnsHCawO+b7RdGw858WCfOEtWpl0TJb
+# DDXRt+U54EqqRvdJoI1BPPyeyFpRmGvFVTmo2BiNpoNBCb4/ZISkEXtGiUQLeWWV
+# +4vgA4YK2g1085avH28FlNcBV1MTavQgOTz7nLWQsZMsrOY0WfqRUJzkF10zvGgN
+# ZDhpSgJFdywF5GGxyWTuRVc/7MkY85fCNQlufPYq32IX/wHoUM7huUa4auiAynJe
+# S7AILZnhdx/IyM8OGplgA8YZNQg0y0Vtq7lG0YbUM5YT150JqG248wOAHJ8+LG+H
+# LeyfvNQeAgL9iw5MzFW4xCL9uBqZ6aj9U0pmuxlpLSfOY7EqmD2oN5+Pl8n2Agdd
+# ynYXQ4dxXB7cqcRdrySrMwN+tGX/DAqs1IWfenuDRvjgB3U40OZa3rUwtC8Xngsb
+# raLp9+FMJ6gVP1n2ltSjaDGXJMWDsGbR+A6WdF8YMIIHnjCCBYagAwIBAgITMwAA
 # AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
 # MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
 # ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
@@ -1091,26 +1308,26 @@ else
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
 # nTiOL60cPqfny+Fq8UiuZzGCFyAwghccAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMQITMwACM7X9x6ftsrcOkwAAAAIztTAN
+# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADITjMersUT+iH6QAAAAMhODAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCzlrkjjpABPvWLRWP2EgZ+keAU
-# Is6SCQPLQjxKHKlP5DANBgkqhkiG9w0BAQEFAASCAYAKh2xmwPtQqXuMOnpsBA+Y
-# K8ZZyggHVGCc1Wy4jRfP2tl7AAw8hkmwx48YMlpTKfo76zHGww0486MccjiT4URs
-# eAEek3mrKcy3if1gfr1xDrk7fEvNQaFta1fQDZ+bQKnK9FgaUj9/vO57FXZR5C5I
-# /bSbOJnKfQMmNTv/3jJi2X9tyNzeMMesR9B1Y3Wbmdy6ykzhkKPZRBxaBsh7Z6bm
-# QqqTjbrm/HB7kfEKvhPjdTeMKrbFyu4ZKGOVSK1dyxylLYQNA000phMs5SClnPdR
-# lpBwkI1sgCjS50ojLRc29KKzLdoSRxze1wdhgL1tpr9pPmFe/DOVQGrQjjRp6/FE
-# L98bLOAh6u+SkBjevgPH23WVnmXokO6x5gqdiN9f024ebaHr9wh+AzTSK33li16n
-# v/3rPyvwY4Kf/RI3uyHuVcdYn7LSeTVtOrT6wmn5+gsxFVeeF4uRlYPSXH1dHvYy
-# ba17IyBTT9j2gYS7adEoD97bkoLQv60mzo3f2pbGiG6hghSgMIIUnAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDBFRl0VMAYzUSQj1lPelDwNNcT
+# 5iHZzX1Yz5ykLWMv5jANBgkqhkiG9w0BAQEFAASCAYB3czesjjLvpc32f0SNLtx1
+# 0g+xUJIB9P5J1bqg6ItFDhYD00O/MBrqSgBkiSLhhmyDx7ZClr9ChuY6tQytG/He
+# 8qAM36R7PligCqhXuIy3wOphlAIdLi/SGIttHxGBQZFrOiYwTfC84GINF6/TVr2t
+# HgFYWSJUHoNlQctCKMpB0d4Pfv2vRmGcHdzUOjA+kA4kisO+28ZyHz9fnl0zsYgU
+# 8GQBevOE6TtvS+Z9mNoRjZ2GQoho3dbFN9ByNRX0kxsEH8uTtofdotZBczsRSgw1
+# Voxybii80W+O02T6frU+ce1afwLuyHhbfI4vOMzyqslzC7EJbUCuaLCoIGh6s3IW
+# OYQUt+ufXIFw1LNd9s6CZpoCv6Ajyb7y0rIZT8D3N1k3avS/83HgvXykUJHHzGaT
+# Zogn8gZeC0POSmGLij906oXrKISfrpD1I9hELbdMN8bmayyGMPEiH8yRept0Anu/
+# d92NxbOo3+M9RpjkznwjrxdjDArpU62Wh6t4CPpXPc+hghSgMIIUnAYKKwYBBAGC
 # NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgtrPr5830qDkK86FDkwIVRjkI8pHRdHYDXiQQPhwy
-# 30YCBmfdnyaxXBgTMjAyNTAzMjUyMzU2MDAuNDkyWjAEgAIB9KCB4KSB3TCB2jEL
+# MTANBglghkgBZQMEAgEFAAQgbwhvKTNR/8UjkX6fCre3+BYK1jqVsh+8C9oxk+Tl
+# 3aMCBmfm6cu2lxgTMjAyNTAzMjkwNDI4NDYuMTY1WjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
-# U046RTQ2Mi05NkYwLTQ0MkUxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
+# U046QkI3My05NkZELTc3RUYxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
 # IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
 # 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
@@ -1152,27 +1369,27 @@ else
 # ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
 # UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
 # 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
-# EzMAAABK/bhVx2KqyYkAAAAAAEowDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
+# EzMAAABF33vn5wwJFp4AAAAAAEUwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
 # VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
 # cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
-# MTg0ODU1WhcNMjUxMTE5MTg0ODU1WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
+# MTg0ODQ3WhcNMjUxMTE5MTg0ODQ3WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
 # Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
 # dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
-# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046RTQ2Mi05NkYwLTQ0MkUxNTAz
+# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046QkI3My05NkZELTc3RUYxNTAz
 # BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
-# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA6DkQYZ6zYlw1AbxF
-# kFNwc0V0BaXCCo1/+d01YKizalK9bX8fGrIUSVf75pYJOrhYmofIMh7wBv8j+kIp
-# lOKYixrtVq+aQwAezI0wBFdFFeOyNCIynTQwz343z5IWVZ0/7cOXT1IDk9fIsI51
-# kZKHa4SPf9rFmH9XtH1/P1ExueAGskBF/AvI1Ol2Vv2W9EDke8csxcPgXTkDNG9I
-# 5ljEjM9pZUzf9kgw8Po8CVpD1/OFb468jcaWpsi/ydqboa3KJnPoyUlnq+cmgp6f
-# kpqYmPM3EhAr1aAqbMnkiUrD4Q15DTv0XoZOi1zjXRhF5xxXKLr1m5k5xZlHp7mn
-# PimiG67T7/e5DuFFt7XbAsOCW8N1Zq5jdNeLrMLtBvkRyKlkTSsp6nJQXR4Rf2e8
-# 7TrveQiJjLsW+ZQ46KXdcDI1WoaxI0JzypicOQBbcU98823p/TArYdVpIYuYlXq0
-# 923cf9+im62BVFG9eXhm+601RsXdWlH7QUMZzbD233aAP8LiB0pDrkK/ybUpYs6D
-# okAJ9r0am4NFXu7LC+DfIFveRIZOCBaHGt4SJ3G2VgkFIoALFcThj+ro7oX+BT3s
-# r0L57Lzi/QmU2UkTCwV1qKM6+aqbzhV4BxsxRjfQdetqzFvxI4IHf0IBuPoYYMiJ
-# 4AXTa2moymfuejK2NZgL75mWwisCAwEAAaOCAcswggHHMB0GA1UdDgQWBBQXdNaJ
-# ti4We46ErU/TNnIOeWGVejAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
+# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwI7T9DdCYDUnYfj4
+# va+Mk9tdPmx23cLwlHHIA8ZEIuTEgrFV8F5gIAHDzvgdrLpaAfNYt5y+Vtpx5RHb
+# FVJnRgnwWE3FrDKGO1r+kFXcXRCxzajb7rv7n+pBSwhwwKmQeiTA8UZNujosLQ1W
+# 0ojOEL7xMc4l5mzLugA6CL618wL7gaZWwaOGq6RROC7Yv1r18+y1O2mSoEMzM3lV
+# r3PvIj3UTmtbovReZOc7NlPuGPTAwjXtqpS16GU7Df4CrBvC9a5n9M15oqCtWjZE
+# ZlsgfMzA28KvSKqqS/UyRBUwbLEC0kP6d/rOzyy0uxCgP259ntzUF6c+N7XmC5X0
+# 4PFo7OSnKcsJ004j9W4gki6MtRHBlPW1hB3EUlPzMfx7vPVk+/0erh3DKe5UUiZ5
+# 4aC6hclk3qc74OoRcXkRiqheE7fDLMmkGzGziMfii8o1K0fcDUhL1Etff2GL6G0N
+# 3qs/2stJrtm4oyoURJawlTN5yJ85zzcF1XSaM7P595jhFz8gB4QBTvs67wQa5nrM
+# JRHNWTlvqYbImoYYX7yhzmAULFO3essnrvIriGpi1pv4NvoPSsvgoQ70DjVUrDbi
+# f8gwOlIefpcunbGYzCKNZC3rOexU6JGeU0NlZLA9UPaF3pxenjEFqsZWVr3JKf6/
+# sbstAIFsyM2ZOMivlI8pfaWS4W8CAwEAAaOCAcswggHHMB0GA1UdDgQWBBQl0Nvq
+# 9SXQRMmn8B3Grz2HYyuV8jAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
 # ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
 # b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
 # MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
@@ -1181,36 +1398,36 @@ else
 # EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
 # MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
-# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBADApzTDXWbyj/r85v6Az19sJPtwK
-# dE5ukA0FrPxJffIDQ0WJLW1G7zXIXIJY3S5dCHbvXr5bDrmL67MlnU0M0RIapm5x
-# pS8ejuWdRplHqkRiwhB5hm+7nEdxm+YdKCcoIPxbGqI1t8E0S0Zt7uw1/9LzRUar
-# duTHQ0PKyZQnuYkHLGx83/+RR40w1gemiIFtC/UfvNY9URHCfB6bWp90qi3TjWLM
-# O03FwcpuvZ15RubMVH/eH3WavJjLB4rDWd7NzeSAkiTqCEUAFNqrGFbnjOviBMUb
-# KkAa/mFj9m1Dk6Zx4SbXtT5wCodX3k30m0cSB2nClULbR4YyWO5/MoSlTwnMPvFX
-# MOWUkzd/SARbw7XVF6WLtgZHVBKAyZ4MFKwrKCP8hXdozdkeOX3Ru12+wewRk8An
-# o/f9zrm4G/B/wO6u7smB3eR8OerqioPt73ufFMWsSCwXhSGz8xpjq6DKiG39sDRP
-# F2CHnsBIJmv7dPMgYCKxskb7GiIkHbqa79vIAqQs9nY4s7XhR8NKRAKVIYj9/8Xk
-# eY5S1G0YQhCwQlRUtvHZMY0pYmOXBfWpjQG+ZaIwfd07tB0hprJBh5zJLIussfsI
-# P3tGr4o64tqRa8+OItP3mLWCdslKcBY5HIzHC2b0NnasAY1bqzfTfotsflhrV+pX
-# SyN3As36dKMTqpGGMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
+# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBAGy9tedaeCT4seFHGLKgQteRiPy0
+# twNtoLqOU80gWazoi0L5DHQGhXiVDMVJb9zu1IU3J5unNxwad9hA6/4jeu/kHgZF
+# z3EEszczT480nzwx69zWtVPuCH//b7h1qNZ0p7YKpamUDu1ZjBWuSmgPhK/GgVLX
+# LO1TQ6ntrjbz8bMJf35HsUFWvCRrbPpX4hhNepUbL0jU3l1YECHoleDhtrnqV5v+
+# rz/lXQxhGyVSjPh+NTg80Xwk8Of/7saYnvMdW28xoelULIYnFqTxPn+1vKJX1Qnl
+# HzBBUtWKVDPU/fMERcU2UF052chin0TCQayP8cABd1jYYILQMatiYJzSLAAdNiPM
+# x/clpoD0w13egpMD9B3bx0qyruz2MQK31KR4ZwoKGLfCwuuayzB2aEDcp3Q+SVGg
+# ngYn8SaTjneUZLohh/Wk9A4LOkZhDBYjFQ1BotbTc9KYUV05JXNaheMSwRiFQuCe
+# ZnTtqwhN+UpTO+lZGzBjxPYTXObQYrY6vsB4jzmgzV2+UkE6J2nczJP6LdijGr2P
+# KPpQ3bVG8dpqnOaY8ahKtQouoTfJPHG25BrrX2whPch8xZBYSWn0NYj/yZKje/cr
+# qJYvUoEALhomQbuBU5+Fv4U/R8xzMUGJgoeHIh8n9OoNN2JEtMOeypI6oTrGVRtK
+# YtHyZmb4a5gUM8TXMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
 # ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEr9uFXHYqrJiQAAAAAA
-# SjANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCCwVZpLMqUpA6qXlwl8VtFQN8gNu2Kz4MwDGy1IKhQc
-# qzCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIGZ7KbWlzY0AQkdLdW/gAxiy
-# l7PEf9Wpsv+xde8uw+EKMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
+# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEXfe+fnDAkWngAAAAAA
+# RTANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
+# MC8GCSqGSIb3DQEJBDEiBCCJiiQJLzxs1SqbnNx6FmJTdKWkyOdKUyI1nQDN60q7
+# /TCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
+# iM9F0uvKQRUOfiHf0m5xMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
-# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASv24VcdiqsmJAAAAAABKMCIE
-# IHXYk57rB7q2Y+7EDRP0629SC2kPOkozPiK7fn9sLMV5MA0GCSqGSIb3DQEBCwUA
-# BIICACr+pI05JR9y1ZUCe86r6cZDSeQryuAlKYe2AJA+K9kfc+wEWhq/mk1dcmAP
-# k1nxOa1LokVJmnKWK5qe/SUtUWmW04vCFxwPFCKUonASAjwr8pHZrXJSN3zl9QEM
-# 1ilr6DGolgFbf9qDUq5RWH6MnxmtaA7XFerFe3+fefjVCUe1RwXvmsvwByCf4kXa
-# QYac+dCBBRSzSk1bGr1M/46K5853WAWVdYQPYzXO/6ixvDCGWlVrYJfQ5egfj3l2
-# CdsMyyvXtyMABjNB08vF9HF1F1VsIVVqlEoY4NDruqmfqC++g8mKp2A+TpS7HNm7
-# wHpGGSo6AaMotdB5loLgcu9OS+rov+X9adEv0wxsHhZr2YXjHAsgL7lG6vFaiERn
-# E0iHCQn62hYEi1QVK+gyXq6w3Rqbi3EYJLMakKaMRt+OR5xsrgAJcyDtb8ItPMna
-# w8R5Y5ai1UnAXJc3jfdHILouHsWh13hfCSmTSrTbVBxJoVrVmFnGjGC2nTJXddRP
-# hI+uFjHm7EeW/Vym4a5P0apB6uaFSKcHwZ6KACc24/s2JIM19NbdMmi028DSV3EN
-# ZNxEjiK+qfwCgTAi0wXBL0Z0g/Z4Q7bOBhSjlPz4g7o3LwKok4nSeWjZktZjQ23n
-# el9ZJFFG4rpEPstm/5OqvDF/8BRwD0KYMzcxN3aAcXISCm9b
+# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARd975+cMCRaeAAAAAABFMCIE
+# IM+UD8D4fRfJYUur6RalShjijUhy1twVeDyVCripPL2dMA0GCSqGSIb3DQEBCwUA
+# BIICAFkWb/hY8wVFoo7YOEVgiXdCfSpvSj78LpRINoSEAtB8rbhpRXh+oOlvUjeJ
+# v8ntND/GAHbNfCdHHIPzo3H4fjARuERtfnYd8Uo7S1tCmVe9BB9X18stIf2AnFn1
+# JwCI1B9GskfrrsWx9fNymoNLzbxuMiZInSKtyewGqB+8+YXYko+L5XMaefqk3Bul
+# wf4y1hyTCzaD0B439Afj6aVT9NAAlpOQ5+KbLJQJ7AEcwsAn5gSz5dqa3t/Ip9lc
+# /A8XrYgakIHeK2Tkjzr2OQ7nHpcucqqzpfpXVs8eIsmQnoe75LcSr2VJE7gNBTFs
+# VgV2/2H/CXpTZOU1i52+1BMNRdelBCdBKwp3WVl0II2z3Bbggoud62q3LvkUxWkh
+# JyzqQnfhXRz/9OaBFgU7HSgctOWDzuNjMu89ayyCFqeY2c6stKrIP9UT6qO7eX2X
+# mh66YJsp8QmQQ40qKd05KdGPmt4kd2zA2SlMNyWHdVRq3Ob2wKuDMivllyl9HVs8
+# r5MQAjRx0+9xrleN+iKrNU8zIJamti5WP0tOTj/tsNETHXnD60Wly41tteCupZnz
+# zj3kra0a2rJLqIvsvRa1RkFh5mL1+x4cN4IdqWXhtvoxPjgOfxIX16leaNmziO2v
+# TbVwZ1mLUCniOwbFWfpGlmSITawhjAPV/ZEl6PnDop2ZSRbY
 # SIG # End signature block
