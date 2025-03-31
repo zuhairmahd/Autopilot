@@ -330,8 +330,6 @@ function CreateFullConfiguration()
     return $success
 }
 
-
-
 function isEncrypted
 {
     [CmdletBinding()]
@@ -799,7 +797,7 @@ function CreateManifest()
                     if ($function.BaseName -notin $filesToExclude) 
                     {
                         Write-Verbose "Getting the version number for $($function.BaseName)"
-                        $versionString = Select-String -Path $function.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw
+                        $versionString = Select-String -Path $function.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
                         if ($versionString)
                         {
                             $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
@@ -831,7 +829,7 @@ function CreateManifest()
                     if ($script.BaseName -notin $filesToExclude)
                     {
                         Write-Verbose "Getting the version number for $($script.BaseName)"
-                        $versionString = Select-String -Path $script.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw
+                        $versionString = Select-String -Path $script.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
                         if ($versionString)
                         {
                             $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
@@ -863,7 +861,7 @@ function CreateManifest()
                     if ($cmd.BaseName -notin $filesToExclude)
                     {
                         Write-Verbose "Getting the version number for $($cmd.BaseName)"
-                        $versionString = Select-String -Path $cmd.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)' -Raw
+                        $versionString = Select-String -Path $cmd.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
                         if ($versionString)
                         {
                             $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
