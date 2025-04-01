@@ -4,33 +4,44 @@ function CreateFullConfiguration()
     param
     (
         [Parameter(Mandatory = $true)]
-        [string]$Folder,
-        [string]$ConfigurationFile = "$folder\vars.json"
+        [string]$DestinationFolder,
+        [string]$ConfigurationFile = "$DestinationFolder\vars.json",
+        [Parameter(Mandatory = $true)]
+        [string]$RootFolder,
+        [string]$InitFile = "$RootFolder\init.json",
+        [ValidateSet('Dev', 'Release')]
+        [string]$ConfigurationType = 'Release'
     )
-    #print verbose log of received parameters
+
+    #region Variables and logs
     Write-Verbose "Folder: $Folder"
     Write-Verbose "ConfigurationFile: $ConfigurationFile"
-    
-    $valuesToEdit = @(
-        @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; type = 'string'},
-        @{name = 'configuration'; value = "vars.json"; description = "The path to the configuration file."; type = 'string'},
-        @{name = 'Name'; value = 'localhost'; description = "The name of the device to configure."; type = 'string'},
-        @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; type = 'string'},
-        @{name = 'AssignedUser'; value = ''; description = "the user to assign the autopilot device to."; type = 'string'},
-        @{name = 'check'; value = @('true','false'); description = "Check the status of the device."; type = 'array'},
-        @{name = 'NoModuleCheck'; value = @('true','false'); description = 'skip checking for installed powershell modules.'; type = 'array'},
-        @{name = 'NoUpdateCheck'; value = @('true','false'); description = 'skip checking for updates.'; type = 'array'},
-        @{name = 'UpdateOnly'; value = @('true','false'); description = 'Only check for updates and exit.'; type = 'static'},
-        @{name = @('true','false'); value = 'false'; description = 'skip checking for admin rights.'; type = 'array'},
-        @{name = 'NoSignatureVerify'; value = @('true','false'); description = 'skip verifying the signature of the script.'; type = 'array'},
-        @{name = 'NoHashVerify'; value = @('true','false'); description = 'skip verifying the hash of the script.'; type = 'array'},
-        @{name = 'GetDeviceHash'; value = @('true','false'); description = 'Gets the hash of the device and exit.'; type = 'array'},
-        @{name = 'Redeploy'; value = @('true','false'); description = 'Check the deployment status of the device.'; type = 'array'},
-        @{name = 'SerialNumber'; value = ''; description = 'The serial number of the device to check.'; type = 'string'},
-        @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; type = 'array'}, 
-        @{name = 'Release'; value = @('main', 'auto'); description = 'The release branch to use.'; type = 'array'}
-    )
+    Write-Verbose "RootFolder: $RootFolder"
+    Write-Verbose "InitFile: $InitFile"
+    Write-Verbose "ConfigurationType: $ConfigurationType"
+    # $valuesToEdit = @(
+    #     @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; type = 'string'},
+    #     @{name = 'configuration'; value = "vars.json"; description = "The path to the configuration file."; type = 'string'},
+    #     @{name = 'Name'; value = 'localhost'; description = "The name of the device to configure."; type = 'string'},
+    #     @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; type = 'string'},
+    #     @{name = 'AssignedUser'; value = ''; description = "the user to assign the autopilot device to."; type = 'string'},
+    #     @{name = 'check'; value = @('true','false'); description = "Check the status of the device."; type = 'array'},
+    #     @{name = 'NoModuleCheck'; value = @('true','false'); description = 'skip checking for installed powershell modules.'; type = 'array'},
+    #     @{name = 'NoUpdateCheck'; value = @('true','false'); description = 'skip checking for updates.'; type = 'array'},
+    #     @{name = 'UpdateOnly'; value = @('true','false'); description = 'Only check for updates and exit.'; type = 'static'},
+    #     @{name = @('true','false'); value = 'false'; description = 'skip checking for admin rights.'; type = 'array'},
+    #     @{name = 'NoSignatureVerify'; value = @('true','false'); description = 'skip verifying the signature of the script.'; type = 'array'},
+    #     @{name = 'NoHashVerify'; value = @('true','false'); description = 'skip verifying the hash of the script.'; type = 'array'},
+    #     @{name = 'GetDeviceHash'; value = @('true','false'); description = 'Gets the hash of the device and exit.'; type = 'array'},
+    #     @{name = 'Redeploy'; value = @('true','false'); description = 'Check the deployment status of the device.'; type = 'array'},
+    #     @{name = 'SerialNumber'; value = ''; description = 'The serial number of the device to check.'; type = 'string'},
+    #     @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; type = 'array'}, 
+    #     @{name = 'Release'; value = @('main', 'auto'); description = 'The release branch to use.'; type = 'array'}
+    # )
+    $valuesToEdit = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
     $success = $false
+    $configData = @()
+    #endregion
     
     # Load parameters from the configuration file if it exists
     if (Test-Path -Path $ConfigurationFile)
@@ -42,7 +53,31 @@ function CreateFullConfiguration()
     else
     {
         Write-Host "No configuration file found at $ConfigurationFile."
-        Write-Host "Creating new configuration file."
+        Write-Host "Creating new $ConfigurationType configuration file."
+        foreach ($config in $valuesToEdit.PSObject.Properties)
+        {
+            if ($ConfigurationType -eq 'Release')            
+            {
+                Write-Verbose "Creating release configuration: $($config.Name) = $($config.relValue)"
+                $config.name += $config.relValue
+            }   
+            elseif ($ConfigurationType -eq 'Dev')
+            {
+                Write-Verbose "Creating dev configuration: $($config.Name) = $($config.devValue)"
+                $config.name += $config.devValue
+            }
+            else
+            {
+                Write-Host "Invalid configuration type. Please use 'Release' or 'Dev'."
+                return $success
+            }
+        }
+        Write-Host "Processed $($configData.PSObject.Properties.Name.count) configurations."
+        Write-Host "Writing configuration file to $ConfigurationFile."
+        $configData | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigurationFile -Force
+        Write-Host "Configuration file written to $ConfigurationFile."
+        $success = $true
+        return $success
     }
     
     #itterate over the configuration data and prompt the user to choose a value
@@ -82,40 +117,40 @@ function CreateFullConfiguration()
                 }
                 # 'bool'
                 # {
-                    # Write-Host "Please enter a new value for $($config.Name)."
-                    # Write-Host "Press enter to keep the current value: $($config.Value)"
-                    # Write-Host "Description: $($configDescription)"
-                    # $choices = @(
-                        # @{number = 1; choice ='true' },
-                        # @{number = 2; choice = 'false' }
-                    # )
-                    # ForEach ($choice in $choices) 
-                    # { 
-                        # Write-Host "[$($choice.number)] $($choice.choice)"
-                        # if ($choice.choice -eq $config.Value)
-                        # {
-                            # Write-Verbose "There is a match"
-                            # $currentlySelected = $choice.number
-                        # }
-                    # }                        
-                    # $value =  Read-Host -Prompt "Choice: [$currentlySelected])"
-                    # while ($value -ne '1' -and $value -ne '2' -and $value -ne '')
-                    # {
-                        # Write-Host "Invalid choice."
-                        # [console]::beep(500,300)
-                        # $value = Read-Host -Prompt "Choice: [$currentlySelected])"
-                    # }
-                    # if ($value -eq '')
-                    # {
-                        # $value = [bool]$config.Value
-                    # }
-                    # else 
-                    # {
-                    # $value = $choices | Where-Object { $_.number -eq [int]$value } | Select-Object -ExpandProperty choice
-                    # }
-                    # Write-Host "Value: $value"
-                    # Write-Verbose "Changing the value of $($config.Name) from $($config.Value) to $value"
-                    # $config.Value = [bool]$value
+                # Write-Host "Please enter a new value for $($config.Name)."
+                # Write-Host "Press enter to keep the current value: $($config.Value)"
+                # Write-Host "Description: $($configDescription)"
+                # $choices = @(
+                # @{number = 1; choice ='true' },
+                # @{number = 2; choice = 'false' }
+                # )
+                # ForEach ($choice in $choices) 
+                # { 
+                # Write-Host "[$($choice.number)] $($choice.choice)"
+                # if ($choice.choice -eq $config.Value)
+                # {
+                # Write-Verbose "There is a match"
+                # $currentlySelected = $choice.number
+                # }
+                # }                        
+                # $value =  Read-Host -Prompt "Choice: [$currentlySelected])"
+                # while ($value -ne '1' -and $value -ne '2' -and $value -ne '')
+                # {
+                # Write-Host "Invalid choice."
+                # [console]::beep(500,300)
+                # $value = Read-Host -Prompt "Choice: [$currentlySelected])"
+                # }
+                # if ($value -eq '')
+                # {
+                # $value = [bool]$config.Value
+                # }
+                # else 
+                # {
+                # $value = $choices | Where-Object { $_.number -eq [int]$value } | Select-Object -ExpandProperty choice
+                # }
+                # Write-Host "Value: $value"
+                # Write-Verbose "Changing the value of $($config.Name) from $($config.Value) to $value"
+                # $config.Value = [bool]$value
                 # }
                 'array'
                 {
@@ -127,7 +162,7 @@ function CreateFullConfiguration()
                         Write-Host "[$($configValue.IndexOf($item)+1)] $item"
                         if ($config.Value -contains $item)
                         {
-                            $currentlySelected = $configValue.IndexOf($item)+1
+                            $currentlySelected = $configValue.IndexOf($item) + 1
                             Write-Verbose "The currently selected value is $currentlySelected"
                         }
                     }
@@ -135,7 +170,7 @@ function CreateFullConfiguration()
                     while ($value -lt 1 -or $value -gt $configValue.Count -and $value -ne '')
                     {
                         Write-Host "Invalid choice."
-                        [console]::beep(500,300)
+                        [console]::beep(500, 300)
                         $value = Read-Host -Prompt "Choice: [$currentlySelected])"
                     }
                     if ($value -eq '')
@@ -144,7 +179,7 @@ function CreateFullConfiguration()
                     }
                     else
                     {
-                        $value = $configValue[$value-1]
+                        $value = $configValue[$value - 1]
                     }
                     Write-Host "Value: $value"
                     Write-Verbose "Changing the value of $($config.Name) from $($config.Value) to $value"
@@ -165,7 +200,7 @@ function CreateFullConfiguration()
     }
     #Save the new configuration data to the configuration file
     Write-Verbose "Saving configuration to $ConfigurationFile."
-    $configData | ConvertTo-Json | Set-Content -Path $ConfigurationFile
+    $configData | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigurationFile -Force
     Write-Verbose "Configuration saved to $ConfigurationFile."
     Write-Verbose "Checking if configuration file exists."
     if (Test-Path -Path $ConfigurationFile)
