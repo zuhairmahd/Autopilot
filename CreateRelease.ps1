@@ -75,7 +75,7 @@ $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter 'Create*Configuration.ps1' -ErrorAction Stop
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*Configuration.ps1' -ErrorAction Stop
     Write-Host "Importing $($functions.Count) functions."
     foreach ($function in $functions)
     {
