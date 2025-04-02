@@ -2,6 +2,7 @@
     "exclusions": [
         "test",
         "CopyFiles",
+        "manifest",
         "GetUSBDriveLetter",
         "IsEncrypted",
         "Test1",

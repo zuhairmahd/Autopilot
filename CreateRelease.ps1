@@ -458,7 +458,7 @@ function CopyManifest()
         [string]$DestinationFolder,
         [Parameter(Mandatory = $false)]
         [string]$manifestFile = "$SourceFolder\manifest.json",
-        [bool]$NoPrompt = $false
+        [switch]$NoPrompt
     )
     
     #write a verbose log of all received parameters
@@ -537,7 +537,7 @@ function CreateManifest()
     $functionFiles = Get-ChildItem -File -Path $functionsFolder -Recurse -Include *.ps1 -Force
     $scriptFiles = Get-ChildItem -Path "$pwd" *.ps1 -Force
     $cmdFiles = Get-ChildItem -File -Path "$pwd" *.cmd -Force
-    $configurationFiles = Get-ChildItem -File -Path "$pwd" -Include *.json -Force
+    $configurationFiles = Get-ChildItem -File -Path $pwd -Filter '*.json' -Force
     $fileTypes = @('functions', 'scripts', 'cmds', 'configurations' )
     $functions = @()
     $scripts = @()
@@ -889,7 +889,7 @@ if ($Config -or $FullRelease)
     Write-Host "(2) Create Dev Configuration"
     Write-Host "(0) Skip Configuration"
     $configChoice = Read-Host "Enter your choice (1, 2, or 0 to skip)"
-    while ($configChoice -notin ('0','1','2'))
+    while ($configChoice -notin ('0', '1', '2'))
     {
         Write-Host "Invalid choice. Please enter 1, 2 or 3, or enter 0 to skip."
         [console]::beep(500, 300)
