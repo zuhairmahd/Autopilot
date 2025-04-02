@@ -50,7 +50,7 @@ $foldersToSign = @(
     "$PSScriptRoot\functions"
 )
 
-#region Variables
+#region Variable logs
 Write-Verbose 'Received the following parameters:'
 Write-Verbose "SourceFolder: $SourceFolder"
 Write-Verbose "ReleaseFolder: $ReleaseFolder"
@@ -64,13 +64,12 @@ Write-Verbose "Secrets: $Secrets"
 Write-Verbose "Config: $Config"
 #endregion Variables
 
-if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease -or $Secrets))
+if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease -or $Secrets -or $Config))
 {
     throw 'At least one of the following switches must be provided: -Copy, -Sign, -Manifest, -Secrets or -FullRelease.'
 }
 
-
-#import functions.
+#region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
@@ -88,7 +87,7 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
-
+#endregion import functions.
 
 function isEncrypted
 {
@@ -865,13 +864,13 @@ else
 if ($Config -or $FullRelease)
 {
     Write-Host "Choose the type of configuration you want to create:"
-    Write-Host "(1) Quick Configuration"
-    Write-Host "(2) Full Configuration"
-    Write-Host "(3) Skip Configuration"
-    $configChoice = Read-Host "Enter your choice (1 or 2, 3 to skip)"
-    while ($configChoice -notin '1', '2', '3')
+    Write-Host "(1) Create Release Configuration"
+    Write-Host "(2) Create Dev Configuration"
+    Write-Host "(0) Skip Configuration"
+    $configChoice = Read-Host "Enter your choice (1, 2, or 0 to skip)"
+    while ($configChoice -notin ('0','1','2'))
     {
-        Write-Host "Invalid choice. Please enter 1 or 2, or enter 3 to skip."
+        Write-Host "Invalid choice. Please enter 1, 2 or 3, or enter 0 to skip."
         [console]::beep(500, 300)
         $configChoice = Read-Host "Enter your choice (1 or 2)"
     }
@@ -879,22 +878,27 @@ if ($Config -or $FullRelease)
     {
         1 
         { 
-            Write-Host 'Creating quick configuration file.' 
-            $configSuccess = CreateQuickConfiguration -Folder $ReleaseFolder
+            Write-Host 'Creating Release configuration file.' 
+            $configSuccess = CreateConfiguration -RootFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -ConfigurationType 'Release'
         }
-        2
+        2 
         { 
-            Write-Host 'Creating full configuration file.' 
-            $configSuccess = CreateFullConfiguration -Folder $ReleaseFolder
+            Write-Host 'Creating Development configuration file.' 
+            $configSuccess = CreateConfiguration -RootFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -ConfigurationType 'Dev'
         }
-        3
+        0
         { 
-            Write-Host 'Copying default configuration file.' 
+            Write-Host 'Skipping configuration file creation process.' 
+            $configSuccess = $true
         }
     }
-    if ($configSuccess -and $configChoice -ne 3)
+    if ($configSuccess -and $configChoice -ne 0)
     {
         Write-Host 'Configuration file created successfully.'
+    }
+    elseif ($configChoice -eq 0)
+    {
+        Write-Host 'Skipping configuration file creation process.'
     }
     else
     {

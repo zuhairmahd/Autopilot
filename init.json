@@ -1,0 +1,169 @@
+[
+  {
+    "devdefault": ".\\\\.secrets\\\\config.json",
+    "value": ".\\\\.secrets\\\\config.json",
+    "name": "configFile",
+    "description": "The path to the authentication configuration file.",
+    "reldefault": ".\\\\.secrets\\\\config.json",
+    "type": "string"
+  },
+  {
+    "devdefault": "vars.json",
+    "value": "vars.json",
+    "name": "configuration",
+    "description": "The path to the configuration file.",
+    "reldefault": "vars.json",
+    "type": "string"
+  },
+  {
+    "devdefault": "localhost",
+    "value": "localhost",
+    "name": "Name",
+    "description": "The name of the device to configure.",
+    "reldefault": "localhost",
+    "type": "string"
+  },
+  {
+    "devdefault": "MSB01",
+    "value": "MSB01",
+    "name": "GroupTag",
+    "description": "The Autopilot group tag.",
+    "reldefault": "MSB01",
+    "type": "string"
+  },
+  {
+    "devdefault": "",
+    "value": "",
+    "name": "AssignedUser",
+    "description": "the user to assign the autopilot device to.",
+    "reldefault": "",
+    "type": "string"
+  },
+  {
+    "devdefault": "false",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "check",
+    "description": "Check the status of the device.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "false",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "NoModuleCheck",
+    "description": "skip checking for installed powershell modules.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "false",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "NoUpdateCheck",
+    "description": "skip checking for updates.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "name": "UpdateOnly",
+    "type": "static",
+    "value": [
+      "true",
+      "false"
+    ],
+    "description": "Only check for updates and exit."
+  },
+  {
+    "devdefault": "false",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "NoAdminCheck",
+    "description": "skip checking for admin rights.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "true",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "NoSignatureVerify",
+    "description": "skip verifying the signature of the script.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "true",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "NoHashVerify",
+    "description": "skip verifying the hash of the script.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "false",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "GetDeviceHash",
+    "description": "Gets the hash of the device and exit.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "false",
+    "value": [
+      "true",
+      "false"
+    ],
+    "name": "Redeploy",
+    "description": "Check the deployment status of the device.",
+    "reldefault": "false",
+    "type": "array"
+  },
+  {
+    "devdefault": "",
+    "value": "",
+    "name": "SerialNumber",
+    "description": "The serial number of the device to check.",
+    "reldefault": "",
+    "type": "static"
+  },
+  {
+    "devdefault": "Github",
+    "value": [
+      "Github",
+      "Gitlab"
+    ],
+    "name": "Repo",
+    "description": "The repository provider to use.",
+    "reldefault": "Gitlab",
+    "type": "array"
+  },
+  {
+    "devdefault": "main",
+    "value": [
+      "main",
+      "auto"
+    ],
+    "name": "Release",
+    "description": "The release branch to use.",
+    "reldefault": "main",
+    "type": "array"
+  }
+]
