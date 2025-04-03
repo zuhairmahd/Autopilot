@@ -791,7 +791,7 @@ if ($Manifest -or $FullRelease)
     if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
     {
         Write-Host 'Manifest created successfully.'
-        if (CopyManifest -SourceFolder $ReleaseFolder -DestinationFolder $PSScriptRoot -ManifestFile $ManifestFile -NoPrompt $Overwrite)
+        if (CopyManifest -SourceFolder $ReleaseFolder -DestinationFolder $PSScriptRoot -ManifestFile $ManifestFile -NoPrompt)
         {
             Write-Host 'Manifest copied successfully.'
         }
