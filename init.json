@@ -16,14 +16,6 @@
     "type": "string"
   },
   {
-    "name": "Name",
-    "value": "localhost",
-    "description": "The name of the device to configure.",
-    "devdefault": "localhost",
-    "reldefault": "localhost",
-    "type": "string"
-  },
-  {
     "name": "GroupTag",
     "value": "MSB01",
     "description": "The Autopilot group tag.",
@@ -115,25 +107,6 @@
     "devdefault": "false",
     "reldefault": "false",
     "type": "array"
-  },
-  {
-    "name": "Redeploy",
-    "value": [
-      "true",
-      "false"
-    ],
-    "description": "Check the deployment status of the device.",
-    "devdefault": "false",
-    "reldefault": "false",
-    "type": "array"
-  },
-  {
-    "name": "SerialNumber",
-    "value": "",
-    "description": "The serial number of the device to check.",
-    "devdefault": "",
-    "reldefault": "",
-    "type": "static"
   },
   {
     "name": "Repo",
