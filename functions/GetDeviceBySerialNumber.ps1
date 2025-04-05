@@ -6,6 +6,7 @@ function GetDeviceBySerialNumber () {
         $serialNumber
     )
     Write-Verbose "Searching for device with serial number $serialNumber"
+    $managedDevice = Get-MgBetaDeviceManagementManagedDevice -Filter "contains(serialNumber,'$serialNumber')" -All
     $uri = "https://graph.microsoft.com/beta/deviceManagement/managedDevices"
     $devices = Invoke-MgGraphRequest -Uri $uri -Method Get -OutputType PSObject
     $devices = $devices.value

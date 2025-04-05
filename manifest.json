@@ -1,18 +1,4 @@
 {
-  "Scripts": [
-    {
-      "name": "Register-Device",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "16C9E7F059B24E45D0A2AAD3D23E844BA15DF0F091A9EEF1A5B4F06A4655BF17"
-    }
-  ],
   "Cmds": [
     {
       "name": "check",
@@ -99,6 +85,34 @@
       "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
     }
   ],
+  "Scripts": [
+    {
+      "name": "Register-Device",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "846BE9E23491D05708E2204593C9EE42A1D198DC0D06658A801C86670313FFC3"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "exclusions",
+      "hash": "A642D2CEF33FDF3EA0D386F8CB550017FBD6DE0258754EA51D3A8B69B47EA01C"
+    },
+    {
+      "name": "init",
+      "hash": "D7B04D5DB1CA663B6E9926B2050AAB159C56857A8A8106ECBFEA03297AFB6E33"
+    },
+    {
+      "name": "remoteManifest",
+      "hash": "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
+    }
+  ],
   "Functions": [
     {
       "name": "CheckForScriptUpdates",
@@ -134,7 +148,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "16A8D35775D634B967F1F4C5D94C4FD16CE3D4068E2C215C3F5F89BBCD95B09D"
+      "hash": "383AB16767DE61824E2A4013D0B831DD511F6E4D4344A87523318BEA2998753F"
     },
     {
       "name": "CreateFullConfiguration",
@@ -146,7 +160,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "7B0A08E36E377B2E223FFD76EFD0F4DAFA47678644DB5DA3E15598374C739A45"
+      "hash": "0226DC277019FB525FE1B22A8AED31860B125FFC3AD603A4FC68706F1C643E2C"
     },
     {
       "name": "DownloadScriptUpdates",
@@ -209,6 +223,18 @@
       "hash": "49EC721360879073F619C98E045CE70B9D649EF8AB602CADC1A62D23124FFECE"
     },
     {
+      "name": "GetExclusions",
+      "version": {
+        "Major": 0,
+        "Minor": 0,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "BF1E2E8E9DD299187D1695FEB16D8633E3C9F175CEB3F93101CD2440A9565E26"
+    },
+    {
       "name": "GetLatestGithubrRelease",
       "version": {
         "Major": 0,
@@ -254,7 +280,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "0AB834B546D36FC1603568083EAF4CEAEC6D2BD7B4FDC0B9B818A0E1F021EC65"
+      "hash": "29B44E838515C0D41E2C0C60A0B586A8FC81DE7414BE60DA83BE1A1F83E23C18"
     },
     {
       "name": "GetScriptUpdates",
@@ -278,7 +304,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "EF60279CEF6BDDBB5A6637041A29FAE1BD7492E77B142B1C2C467FCC636D654F"
+      "hash": "841E8F76E081E30BC53BC4BFAD63E96E01C1E15138EAE9CDC4FAB539FD5ABF2C"
     },
     {
       "name": "InitializeConfiguration",
@@ -290,7 +316,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "90805D98EF242FD8A8749D359E71EF3796C29798523EB18248E43166184B62E3"
+      "hash": "872273F47200107D4CA444C8C44DDBC698A8EDD14556C3D0459A71DDEE7C957A"
     },
     {
       "name": "RestartDevice",
@@ -327,20 +353,6 @@
         "MinorRevision": -1
       },
       "hash": "8F60CD5AB90B744E263756BABFE02134D95703D958B55769118D1200C455EB74"
-    }
-  ],
-  "configurations": [
-    {
-      "name": "exclusions",
-      "hash": "A642D2CEF33FDF3EA0D386F8CB550017FBD6DE0258754EA51D3A8B69B47EA01C"
-    },
-    {
-      "name": "init",
-      "hash": "72703922D52E836C21D9D57F5C12AC7E248681B274946895224BE0E1C8EDC587"
-    },
-    {
-      "name": "remoteManifest",
-      "hash": "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
     }
   ]
 }

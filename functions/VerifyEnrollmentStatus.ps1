@@ -21,26 +21,29 @@ function VerifyEnrollmentStatus
         $serialNumber = $serialNumber -replace " ", ""
         Write-Verbose "New Device Serial Number: $serialNumber"
     }
-    $device = GetDeviceBySerialNumber -serialNumber $serialNumber
-Write-Verbose "Device serial number: $($device.serialNumber)"
+    $device = Get-MgBetaDeviceManagementManagedDevice -Filter "contains(serialNumber,'$serialNumber')" -All
+    # $device = GetDeviceBySerialNumber -serialNumber $serialNumber
+    Write-Verbose "Device serial number: $($device.serialNumber)"
     if ($device)
     {
         $deviceId = $device.id
+        Write-Verbose "Device ID: $deviceId"
+        $serialNumber = $device.serialNumber
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $users = $device.usersLoggedOn
         if ($users.count -eq 1)
         {
             Write-Verbose "Device has $($users.count) users logged on"
-            $userName = (Get-MgUser -UserId $users.userId).UserPrincipalName
-            Write-Host "User: $username"
-            if ($username -like "*@*")
+            $userName = Get-MgUser -UserId $users.userId
+            Write-Verbose "User: $($username.UserPrincipalName)"
+            if ($username.UserPrincipalName -like "*@*")
             {
-                Write-Host "User is an Azure AD user"
+                Write-Verbose "User is an Azure AD user"
                 $enrolled = $true
             }
             else
             {
-                Write-Host "User is not an Azure AD user"
+                Write-Verbose "User is not an Azure AD user"
                 $userName = 'unknown'
             }
         }
@@ -54,10 +57,12 @@ Write-Verbose "Device serial number: $($device.serialNumber)"
     $deviceState = @{
         imported = $imported
         enrolled = $enrolled
-        userName = $userName
-        id = $deviceId
+        userName = $userName.UserPrincipalName
+        UserDisplayName = $userName.DisplayName
+        id       = $deviceId
+        serial   = $serialNumber
     }
-    Write-Verbose "Returning $deviceState)"
+    Write-Verbose "Device State: $($deviceState | ConvertTo-Json)"
     return $deviceState
 }
 

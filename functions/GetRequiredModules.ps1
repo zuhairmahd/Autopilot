@@ -13,6 +13,39 @@ function GetRequiredModules()
     $installed = $false
     $installedModulesCount = 0
     $checkedModulesCount = 0
+    $importedModuleCount = 0
+
+    # #let us see if the modules are already imported
+    # $importedModules = Get-Module -ListAvailable | Select-Object -ExpandProperty Name
+    # Write-Verbose "Found $($importedModules.Count) imported modules."
+    # foreach ($module in $moduleNames)
+    # {
+    #     Write-Verbose "Checking for $module"
+    #     if ($importedModules -contains $module)
+    #     {
+    #         Write-Verbose "$module is already imported."
+    #         $importedModuleCount++
+    #         #remove it from the list of modules to import
+    #         Write-Verbose "Removing $module from the list of modules to import."
+    #         $moduleNames = $moduleNames | Where-Object { $_ -ne $module }
+    #     }
+    #     else
+    #     {
+    #         Write-Verbose "$module is not imported."
+    #     }
+    # }
+    # #if nothing is left in module, we can declare success.
+    # if ($moduleNames.Count -eq 0)
+    # {
+    #     Write-Host 'All modules are already imported.'
+    #     $returnValue.Add('ImportedModuleCount', $importedModuleCount)
+    #     $returnValue.Add('InstalledModulesCount', $installedModulesCount)
+    #     $returnValue.Add('PreviouslyInstalledModulesCount', $checkedModulesCount)
+    #     $returnValue.Add('Imported', $imported)
+    #     $returnValue.Add('Installed', $installed)
+    #     return $returnValue
+    # }
+    
     if (-not($NoImport))
     {
         Write-Verbose "NoImport switch is $NoImport"
@@ -21,7 +54,7 @@ function GetRequiredModules()
         foreach ($module in $moduleNames)
         {
             Write-Verbose "Importing $module"
-            Import-Module -Name "$ModulesFolder\$module" -ErrorAction Stop
+            Import-Module -Name "$ModulesFolder\$module" -Force -ErrorAction Stop
             $importedModuleCount++
         }
         Write-Host "$importedModuleCount module(s) imported."
