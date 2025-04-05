@@ -59,7 +59,12 @@ function ConnectToTenant()
         Write-Host 'Please provide a valid config file.'
         exit 1
     }
-    if ($clientSecret)
+    if ([Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.Scopes)
+    {
+        Write-Host "Successfully connected to $domain using existing session."
+        $success = $true
+    }
+    if ($clientSecret -and -not $success)
     {
         Write-Verbose 'Connecting to Microsoft Graph using client secret authentication with the following details:'
         Write-Verbose "Client ID: $clientID"
@@ -70,7 +75,7 @@ function ConnectToTenant()
         Write-Host "Successfully connected to $domain using a client secret"
         $success = $true
     }
-    else
+    elseif ($thumbprint -and -not $success)
     {
         Write-Verbose 'Connecting to Microsoft Graph using certificate authentication with the following details:'
         Write-Verbose "Client ID: $clientID"

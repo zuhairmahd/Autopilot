@@ -85,7 +85,6 @@ Registers one or more devices into Intune and checks for profiles and module req
 param (
     [string]$configFile = '.\.secrets\config.json',
     [string]$Configuration = 'vars.json',
-    [Parameter(Mandatory = $False, ValueFromPipeline = $True, ValueFromPipelineByPropertyName = $True, Position = 0)][alias('DNSHostName', 'ComputerName', 'Computer')] [String[]] $Name = @('localhost'),
     [Parameter(Mandatory = $False)] [String] $GroupTag = 'MSB01',
     [Parameter(Mandatory = $False)] [String] $AssignedUser = '',
     [Parameter(Mandatory = $False)] [switch]$check,
@@ -94,9 +93,7 @@ param (
     [Parameter(Mandatory = $False)] [switch]$NoSignatureVerify,
     [Parameter(Mandatory = $False)] [switch]$NoHashVerify,
     [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
-    [Parameter(Mandatory = $False)] [switch]$Redeploy,
     [Parameter(Mandatory = $False)] [switch]$Reconfigure,
-    [Parameter(Mandatory = $False)] [string]$SerialNumber,
     [Parameter(Mandatory = $False, ParameterSetName = 'NoUpdateCheckSet')] [switch]$NoUpdateCheck,
     [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')] [switch]$UpdateOnly,
     [Parameter(ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
@@ -144,30 +141,6 @@ else
 }
 #endregion Load parameters from the configuration file if it exists
 
-#region logging
-#print a verbose log of all received variables
-Write-Verbose "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
-Write-Verbose "The current parameter set is $($PSCmdlet.ParameterSetName)"
-Write-Verbose "Configuration file: $configFile"
-Write-Verbose "Initial values file: $initialValues"
-Write-Verbose "Computer name: $Name"
-Write-Verbose "Group tag: $GroupTag"
-Write-Verbose "Assigned user: $AssignedUser"
-Write-Verbose "Check: $check"
-Write-Verbose "No module check: $NoModuleCheck"
-Write-Verbose "No update check: $NoUpdateCheck"
-Write-Verbose "Update only: $UpdateOnly"
-Write-Verbose "No admin check: $NoAdminCheck"
-Write-Verbose "No signature verify: $NoSignatureVerify"
-Write-Verbose "No hash verify: $NoHashVerify"
-Write-Verbose "Get device hash: $GetDeviceHash"
-Write-Verbose "Redeploy: $Redeploy"
-Write-Verbose "Reconfigure: $Reconfigure"
-Write-Verbose "Serial number: $SerialNumber"
-Write-Verbose "Repository: $Repo"
-Write-Verbose "Release: $Release"
-#endregion logging
-
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -187,21 +160,7 @@ else
 }
 #endregion import functions.
 
-if ($Reconfigure)
-{
-    Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -DestinationFolder $PSScriptRoot -RootFolder $PSScriptRoot)
-    {
-        Write-Host 'The script has been reconfigured.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
-        exit 1
-    }
-    exit 0
-}   
-
+#region Define static and dynamic variables
 if ($repo -eq 'github')
 {
     $baseSourceURL = 'https://raw.githubusercontent.com'
@@ -240,8 +199,13 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.'
     $latestRelease = 'main'
 }
-
-#region Define variables.
+$accessToken = GetGraphAccessToken -configFile $configFile
+if ($null -eq $accessToken)
+{
+    Write-Host 'Failed to retrieve access token.' -ForegroundColor Red
+    Write-Host 'Functions that require direct access to the API will not work.' -ForegroundColor Red
+}
+$Name = @('localhost'),
 $maxWaitTime = 30
 $timeInSeconds = 60
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
@@ -261,9 +225,48 @@ $modulesToInstall = @(
     # 'PowerShellGet',
     'WindowsAutoPilotIntune'
 )
-#endregion Define variables.
+#endregion Define static and dynamic variables
+
+#region logging
+#print a verbose log of all received variables
+Write-Verbose "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
+Write-Verbose "The current parameter set is $($PSCmdlet.ParameterSetName)"
+Write-Verbose "Configuration file: $configFile"
+Write-Verbose "Initial values file: $initialValues"
+Write-Verbose "Computer name: $Name"
+Write-Verbose "Group tag: $GroupTag"
+Write-Verbose "Assigned user: $AssignedUser"
+Write-Verbose "Check: $check"
+Write-Verbose "No module check: $NoModuleCheck"
+Write-Verbose "No update check: $NoUpdateCheck"
+Write-Verbose "Update only: $UpdateOnly"
+Write-Verbose "No admin check: $NoAdminCheck"
+Write-Verbose "No signature verify: $NoSignatureVerify"
+Write-Verbose "No hash verify: $NoHashVerify"
+Write-Verbose "Get device hash: $GetDeviceHash"
+Write-Verbose "Redeploy: $Redeploy"
+Write-Verbose "Reconfigure: $Reconfigure"
+Write-Verbose "Serial number: $SerialNumber"
+Write-Verbose "Repository: $Repo"
+Write-Verbose "Release: $Release"
+#endregion logging
 
 #region Perform checks
+if ($Reconfigure)
+{
+    Write-Host 'Reconfiguring the script...'
+    if (CreateFullConfiguration -DestinationFolder $PSScriptRoot -RootFolder $PSScriptRoot)
+    {
+        Write-Host 'The script has been reconfigured.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
+        exit 1
+    }
+    exit 0
+}   
+
 if (-not($NoSignatureVerify))
 {
     Write-Host 'Verifying code signature.'
@@ -391,28 +394,22 @@ else
 }
 #endregion Perform checks
 
-if (($Redeploy) -and ($SerialNumber -ne ''))
-{
-    Write-Host "Checking redeployment status for device with serial number $serialNumber"
-    $serial = $SerialNumber
-}
-else
-{
-    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    $serial = $deviceObject.serialNumber
-    Write-Verbose "The serial number is $serial"
-    $hash = $deviceObject.hardwareHash
-    Write-Verbose "The hardware hash is $hash"
-    $make = $deviceObject.manufacturer
-    Write-Verbose "The manufacturer is $make"
-    $model = $deviceObject.model
-    Write-Verbose "The model is $model"
-    $parentDir = (Get-Item -Path $PWD).Parent.FullName
-    Write-Verbose "The parent directory is $parentDir"
-    $outputFile = "$parentDir\device_$serial.csv"
-    Write-Verbose "The output file is $outputFile"
-    Write-Host "Processing device with serial number $serial, manufacturer $make, and model $model."
-}
+#region Gather device information.
+$deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+$serial = $deviceObject.serialNumber
+Write-Verbose "The serial number is $serial"
+$hash = $deviceObject.hardwareHash
+Write-Verbose "The hardware hash is $hash"
+$make = $deviceObject.manufacturer
+Write-Verbose "The manufacturer is $make"
+$model = $deviceObject.model
+Write-Verbose "The model is $model"
+$parentDir = (Get-Item -Path $PWD).Parent.FullName
+Write-Verbose "The parent directory is $parentDir"
+$outputFile = "$parentDir\device_$serial.csv"
+Write-Verbose "The output file is $outputFile"
+Write-Host "Processing device with serial number $serial, manufacturer $make, and model $model."
+#endregion Gather device information.
 
 if ($GetDeviceHash)
 {
@@ -420,16 +417,16 @@ if ($GetDeviceHash)
     exit 0
 }
 
+#region Connect to Microsoft Graph
 if (connectToTenant($configFile))
 {
-    Write-Host 'Successfully connected to Microsoft Graph.' -ForegroundColor Green
+    Write-Verbose 'Successfully connected to Microsoft Graph.' 
 }
 else
 {
     Write-Host 'Failed to connect to Microsoft Graph.' -ForegroundColor Red
     exit 1
 }
-
 $scopes = Get-MgContext | Select-Object -ExpandProperty Scopes | Sort-Object
 if ($scopes)
 {
@@ -440,92 +437,9 @@ else
 {
     Get-MgContext | Format-List
 }
+#endregion Connect to Microsoft Graph
 
-if ($Redeploy)
-{
-    $check = $true
-    if ($SerialNumber -eq '')
-    {
-        Write-Host "Checking redeployment status for this device, serial number $serial."
-    }
-    else
-    {
-        Write-Host "Checking redeployment status for device with serial number $Serial."
-        $reminderMessage = 'Remember to reboot the device after the script completes.'
-    }
-    $enrollmentState = VerifyEnrollmentStatus -serialNumber $Serial
-    #print the enrollment state.
-    Write-Verbose "The enrollment state is: $($enrollmentState | Out-String)"
-    if (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $false))
-    {
-        Write-Host "The device with serial number $SerialNumber is not imported or enrolled." -ForegroundColor Yellow
-        Write-Host 'Continue to import the device.' -ForegroundColor Yellow
-    }
-    elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $false))
-    {
-        Write-Host 'The device is imported in Intune but is not enrolled.' -ForegroundColor Yellow
-        Write-Host 'Continue to check assignment.' -ForegroundColor Yellow
-    }
-    elseif (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $true) -and ($enrollmentState.userName -ne 'unknown'))
-    {
-        Write-Host "This device is enrolled and is being used by $($enrollmentState.userName) ($($enrollmentState.UserDisplayName))" -ForegroundColor Green
-    }
-    elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $true))
-    {
-        Write-Host 'The device is enrolled and is registered to a user.'
-        if ($enrollmentState.userName -ne 'unknown')
-        {
-            Write-Host "The registered user is $($enrollmentState.username)"
-            Write-Host 'You must wipe the device to get it ready for another user'
-            Write-Host 'Wiping a device is a distructive command.  Make sure you are wiping the correct device.'
-            Write-Host "Device id: $($enrollmentState.id)"
-            Write-Host "Device serial number: $SerialNumber"
-            Write-Host "Registered user: $($enrollmentState.username) `r`n"
-            Write-Host 'Would you still like to send a wipe command to the device? (Y/N)'
-            $response = Read-Host
-            while ($response -notin 'Y', 'N')
-            {
-                Write-Host 'Please enter Y or N.' -ForegroundColor Yellow
-                [console]::beep(500, 300)
-                $response = Read-Host
-            }
-            if ($response -eq 'Y')
-            {
-                $response = SendDeviceCommand -ManagedDeviceId $enrollmentState.id
-                if ($response -eq $true)
-                {
-                    Write-Host "The wipe command has been sent to the device with serial number $SerialNumber."
-                    Write-Host 'Please manually sync the device or give the device enough time to sync and reset.'
-                    Write-Host 'The device will be ready for another user after the wipe is complete.'
-                    Write-Host 'Please contact an Intune admin if you have any problems.'
-                }
-                else
-                {
-                    Write-Host "The wipe command failed to send to the device with serial number $SerialNumber."
-                    Write-Host 'Please contact an Intune admin.'
-                }
-                exit 0
-            }
-            else
-            {
-                Write-Host 'Aborting script.'
-                exit 0
-            }
-        }
-        else
-        {
-            Write-Host 'The user is not registered.'
-        }
-    }
-    else
-    {
-        Write-Host 'Unknown error.' -ForegroundColor Red
-        Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-        exit 1
-    }
-}
-
-#Let us check if the device has already been imported.
+#region check if the device has already been imported.
 $assignment = Get-AutopilotDevice -serial $serial
 if ($assignment)
 {
@@ -553,9 +467,10 @@ if ($assignment)
         exit 1
     }
 }
+#endregion check if the device has already been imported.
 
+#region Add the device to Intune.
 $importStart = Get-Date
-# Add the device to Intune.
 if (-not($check))
 {
     $imported = Add-AutopilotImportedDevice -serialNumber $serial -hardwareIdentifier $hash -groupTag $GroupTag -assignedUser $AssignedUser
@@ -624,8 +539,9 @@ if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
         }
         elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
         {
+            $assignedProfileName = GetAutopilotProfileAssignment -serialNumber $serial
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
-            Write-Host 'The device is successfully assigned to a deployment profile.' -ForegroundColor Green
+            Write-Host "The device is successfully assigned to the deployment profile." -ForegroundColor Green
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
             Write-Host "Elapsed time to complete: $importSeconds seconds"
