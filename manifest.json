@@ -1,7 +1,7 @@
 {
-  "Scripts": [
+  "Functions": [
     {
-      "name": "Redeploy-Device",
+      "name": "CheckDeviceAssignment",
       "version": {
         "Major": 0,
         "Minor": 0,
@@ -10,122 +10,8 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "5ECA6E6441532D0311052981ED8E73C3712411DAD4726F73F9B6137529B9937C"
+      "hash": "46E4E98B3B5F7E709B0B914554BEFBE0A5E4DAB5AA1F723074158C016C0F8149"
     },
-    {
-      "name": "Register-Device",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "9C246A71A807896A8FD8181D2E3372984632980B41D2EA5814D472BB0BBD3588"
-    }
-  ],
-  "configurations": [
-    {
-      "name": "exclusions",
-      "hash": "A642D2CEF33FDF3EA0D386F8CB550017FBD6DE0258754EA51D3A8B69B47EA01C"
-    },
-    {
-      "name": "init",
-      "hash": "C87098B717039C3B421ABBB5D822A793405C49CBF8640A5E90875E39456DBA82"
-    },
-    {
-      "name": "remoteManifest",
-      "hash": "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
-    }
-  ],
-  "Cmds": [
-    {
-      "name": "check",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "06EC5EF6B4683A429AF45FD581EAD9AEA06BEE398B8ABD08ECBD25315BABAB72"
-    },
-    {
-      "name": "forceUpdate",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "8258D8FEE48C6BCF7F512C0FF8BDB25E42A7254006D60342B94BF69AAFFA5303"
-    },
-    {
-      "name": "GetHash",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "702D4B406C930A8B47873EFC8C3BD7EA7698EB1A206C03C4D53ECDB2758437B1"
-    },
-    {
-      "name": "reconfigure",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "4119C23110CF4915F833E70DBDE7BB5AFA913A598CB6B865E13D8A5AA874ADA7"
-    },
-    {
-      "name": "redeploy",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "EE4685B9B7882299A606DE0A5D7B5B5E3FB9A6C418B959352D7E2DDC80DBA2AB"
-    },
-    {
-      "name": "register",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "F9E0F8501DEBFB4CA24C10BC3B4A0ED47490064A62DB76A46089527BCD20FC93"
-    },
-    {
-      "name": "update",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
-    }
-  ],
-  "Functions": [
     {
       "name": "CheckForScriptUpdates",
       "version": {
@@ -148,7 +34,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "5C5FD66A0372549E7164A7BF41EFD45AB50A0EFE5FA0A6E272E50D946FF38E6D"
+      "hash": "2505CE22FDF333D69921824750FFC53003EAC0A2A924307EF7DF7CD0C4012FE9"
     },
     {
       "name": "CreateConfiguration",
@@ -376,7 +262,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "F9E1AC30D16F22C5FCFE1A472CA7B140CE768251A21645CAE93B6755A0EC8258"
+      "hash": "1F301E2DA0F6E88D04F9177855232983419A65EF0348E35AC158FF2475ADFE4F"
     },
     {
       "name": "SendDeviceCommand",
@@ -401,6 +287,132 @@
         "MinorRevision": -1
       },
       "hash": "25E6D49A13A1A3A19AF19241D02A0257DBA83F636AD4CB7B996CE3CECBBF44F7"
+    }
+  ],
+  "Cmds": [
+    {
+      "name": "check",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "06EC5EF6B4683A429AF45FD581EAD9AEA06BEE398B8ABD08ECBD25315BABAB72"
+    },
+    {
+      "name": "forceUpdate",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "8258D8FEE48C6BCF7F512C0FF8BDB25E42A7254006D60342B94BF69AAFFA5303"
+    },
+    {
+      "name": "GetHash",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "702D4B406C930A8B47873EFC8C3BD7EA7698EB1A206C03C4D53ECDB2758437B1"
+    },
+    {
+      "name": "reconfigure",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "4119C23110CF4915F833E70DBDE7BB5AFA913A598CB6B865E13D8A5AA874ADA7"
+    },
+    {
+      "name": "redeploy",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "264D74A2772B24F02E85567246B596F67948A31EB292BCEA3D3E2C93FF32C786"
+    },
+    {
+      "name": "register",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "F9E0F8501DEBFB4CA24C10BC3B4A0ED47490064A62DB76A46089527BCD20FC93"
+    },
+    {
+      "name": "update",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "exclusions",
+      "hash": "A642D2CEF33FDF3EA0D386F8CB550017FBD6DE0258754EA51D3A8B69B47EA01C"
+    },
+    {
+      "name": "init",
+      "hash": "C87098B717039C3B421ABBB5D822A793405C49CBF8640A5E90875E39456DBA82"
+    },
+    {
+      "name": "remoteManifest",
+      "hash": "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
+    }
+  ],
+  "Scripts": [
+    {
+      "name": "Redeploy-Device",
+      "version": {
+        "Major": 0,
+        "Minor": 0,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "34B5A9D44E52556A82E7145671E8759134DE960831B81F78795869755C84970D"
+    },
+    {
+      "name": "Register-Device",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "2A5E8436403EFB2588E9288EB86DA4BC66E00A92D9136D9A1E3AEF588D5A7953"
     }
   ]
 }
