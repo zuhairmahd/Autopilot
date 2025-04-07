@@ -1,9 +1,16 @@
 [CmdletBinding()]
 param
 (
+    [Parameter(Mandatory = $true)]
+    [string]$userName
 )
+
+
+$groupsToInclude = @('IOS-COMPANY-PORTAL')
+$groupsToExclude = @('User elevation management')
 $configFile = "$pwd\.secrets\config.json"
-$serialNumber = 'VMware-564d734181a15091-8cab81424cc39146'
+# $serialNumber = 'VMware-564d734181a15091-8cab81424cc39146'
+
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -33,6 +40,8 @@ else
     exit 1
 }
 
-$accessToken = GetGraphAccessToken -configFile $configFile
-$global:device1 = GetDeviceBySerial -serialNumber $serialNumber  -Access_Token $accessToken
-$global:device2 = GetDeviceBySerialNumber -serialNumber $serialNumber
+
+# $accessToken = GetGraphAccessToken -configFile $configFile
+# $global:device1 = GetDeviceBySerial -serialNumber $serialNumber  -Access_Token $accessToken
+# $global:device2 = GetDeviceBySerialNumber -serialNumber $serialNumber
+VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude -verbose

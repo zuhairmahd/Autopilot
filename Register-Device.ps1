@@ -249,6 +249,7 @@ Write-Verbose "Reconfigure: $Reconfigure"
 Write-Verbose "Serial number: $SerialNumber"
 Write-Verbose "Repository: $Repo"
 Write-Verbose "Release: $Release"
+Write-Verbose "Domain: $domain"
 #endregion logging
 
 #region Perform checks

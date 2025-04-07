@@ -1,0 +1,13 @@
+{
+  "groupsToInclude": [
+    "iOS-userDriven",
+    "MAC-CP-user",
+    "autoPilot-device-preparation-user",
+    "IOS-USER-DRIVEN"
+  ],
+  "groupsToExclude": [
+    "Remote access (rdp) enabled",
+    "Mark 8 Project Team",
+    "Local admins"
+  ]
+}
