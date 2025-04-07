@@ -10,7 +10,8 @@ function GetGraphAccessToken()
         [Parameter(Mandatory = $false, ParameterSetName = 'Manual')]
         [string]$clientSecret,
         [Parameter(Mandatory = $true, ParameterSetName = 'File')]
-        [string]$configFile
+        [string]$configFile,
+        [switch]$SecureString
     )
 
     #region write a verbose log of the received parameters
@@ -44,6 +45,12 @@ function GetGraphAccessToken()
         }   
         $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -ContentType 'application/x-www-form-urlencoded' -Body $body
         $accessToken = $tokenResponse.access_token
+    }
+
+    if ($SecureString)
+    {
+        Write-Verbose "Converting access token to secure string"
+        $accessToken = ConvertTo-SecureString -String $accessToken -AsPlainText -Force 
     }
     return $accessToken
 }

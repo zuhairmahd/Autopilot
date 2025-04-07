@@ -1,13 +1,11 @@
 [CmdletBinding()]
 param
 (
-    [Parameter(Mandatory = $true)]
-    [string]$userName
 )
 
-
-$groupsToInclude = @('IOS-COMPANY-PORTAL')
-$groupsToExclude = @('User elevation management')
+$importedAutopilotDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/importedWindowsAutopilotDeviceIdentities"
+$deviceManagementUri = "https://graph.microsoft.com/beta/deviceManagement/managedDevices"
+$autoPilotDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities"
 $configFile = "$pwd\.secrets\config.json"
 # $serialNumber = 'VMware-564d734181a15091-8cab81424cc39146'
 
@@ -30,18 +28,19 @@ else
 }
 #endregion
 
-if (connectToTenant -configFile '.\.secrets\config.json')
-{
-    Write-Verbose 'Connected to tenant'
-}
-else
-{
-    Write-Host 'Failed to connect to tenant' -ForegroundColor Red
-    exit 1
-}
+# if (connectToTenant -configFile '.\.secrets\config.json')
+# {
+#     Write-Verbose 'Connected to tenant'
+# }
+# else
+# {
+#     Write-Host 'Failed to connect to tenant' -ForegroundColor Red
+#     exit 1
+# }
 
 
-# $accessToken = GetGraphAccessToken -configFile $configFile
-# $global:device1 = GetDeviceBySerial -serialNumber $serialNumber  -Access_Token $accessToken
-# $global:device2 = GetDeviceBySerialNumber -serialNumber $serialNumber
-VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude -verbose
+$accessToken = GetGraphAccessToken -configFile $configFile
+
+$global:devices = CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri
+$global:imported = CallGraphAPI -AccessToken $accessToken -Uri $importedAutopilotDeviceURI -Method GET
+$global:autopilot = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI -Method GET
