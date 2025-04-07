@@ -26,14 +26,14 @@ else
 #endregion import functions.
 
 #region Define variables
-$init = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
+$init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json
 $groupsToInclude = $init.groupsToInclude
 $groupsToExclude = $init.groupsToExclude
-$domain = Get-Content -Path $configFile -Raw | ConvertFrom-Json | Select-Object -ExpandProperty domain
+$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 #endregion Define variables
 
 #region Get user input.
-Write-Host "What would you like to do?"
+Write-Host 'What would you like to do?'
 $choices = @('Verify a device', 'Verify a user', 'Exit')
 foreach ($i in 0..($choices.Count - 1))
 {
@@ -50,8 +50,8 @@ switch ($choice)
 {
     1
     {
-        Write-Host "Please enter the serial number of the device you want to verify."
-        Write-Host "The serial number is typically a combination of letters and numbers and is no more than 10 digits long."
+        Write-Host 'Please enter the serial number of the device you want to verify.'
+        Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
         $SerialNumber = Read-Host 'Please enter the serial number of the device'
         Write-Verbose "Got serial number: $SerialNumber"
         $SerialNumber = $SerialNumber.Trim()
@@ -60,19 +60,19 @@ switch ($choice)
     }
     2
     {
-        Write-Host "Please enter the user name (email address) of the user you want to verify."
-        Write-Host "You can type the full email address or just the user name."
+        Write-Host 'Please enter the user name (email address) of the user you want to verify.'
+        Write-Host 'You can type the full email address or just the user name.'
         Write-Host "If you type just the user name, it will be converted to userName@$domain."
-        Write-Host "The user name is not case sensitive."
+        Write-Host 'The user name is not case sensitive.'
         $userName = Read-Host 'Please enter the user name (email address)'
         Write-Verbose "Got user name: $userName"
         $userName = $userName.Trim()
         Write-Verbose "Trimmed user name: $userName"
         #Check if the username is missing the domain suffix. If so, add it such that it becomes $userName@$domain
-        Write-Verbose "Checking if the user name is missing the domain suffix."
+        Write-Verbose 'Checking if the user name is missing the domain suffix.'
         if ($userName -notmatch "@$domain$")
         {
-            Write-Verbose "The user name is missing the domain suffix. Adding it now."
+            Write-Verbose 'The user name is missing the domain suffix. Adding it now.'
             $userName = "$userName@$domain"
         }
         Write-Verbose "The user name is now: $userName"
@@ -193,11 +193,11 @@ if ($whatToDo -eq 'device')
 elseif ($whatToDo -eq 'user')
 {
     Write-Host "Checking group membership for user $userName."
-    $groups = VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
+    $groups = VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude -verbose
     if ($groups -eq $true)
     {
         Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
-        Write-Host "You may proceed with enrollment."
+        Write-Host 'You may proceed with enrollment.'
     }
     else
     {

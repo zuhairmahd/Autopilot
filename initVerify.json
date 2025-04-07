@@ -1,13 +1,9 @@
 {
   "groupsToInclude": [
-    "iOS-userDriven",
-    "MAC-CP-user",
-    "autoPilot-device-preparation-user",
-    "IOS-USER-DRIVEN"
+    "sg_Office_365_License_G5_wth_windows_pilot",
+    "sg_passwrd_hash_stage",
+    "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
+    "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
   ],
-  "groupsToExclude": [
-    "Remote access (rdp) enabled",
-    "Mark 8 Project Team",
-    "Local admins"
-  ]
+  "groupsToExclude": []
 }
