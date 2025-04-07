@@ -25,31 +25,46 @@ Checks if a device is enrolled in Intune and imported into Autopilot.
 #>
 #endregion help
 
-function VerifyEnrollmentStatus
+function VerifyEnrollmentStatus()
 {
     [CmdletBinding()]
     param (
-        [string]$serialNumber
+        [string]$serialNumber,
+        [string]$accessToken
     )
+
+    #region Define variables
     Write-Verbose "Serial Number: $serialNumber"
+    if ($accessToken)
+    {
+        Write-Verbose 'Received Access Token'
+    }
     $imported = $false
     $enrolled = $false
     $deviceState = @{}
-    $autopilotDevice = Get-AutopilotDevice -serial $serialNumber
+    $loggedOnUsers = @()
+    $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
+    $deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
+    $userUri = 'https://graph.microsoft.com/beta/users'
+    #endregion
+
+    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI
+    Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
+    $autopilotDevice = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
     Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($autopilotDevice)
     {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
         $imported = $true
     }
-    if ($serialNumber -like "vmware*")
+    if ($serialNumber -like 'vmware*')
     {
-        Write-Verbose "Device Serial Number begins with vmware. Removing spaces from the serial number."
-        $serialNumber = $serialNumber -replace " ", ""
+        Write-Verbose 'Device Serial Number begins with vmware. Removing spaces from the serial number.'
+        $serialNumber = $serialNumber -replace ' ', ''
         Write-Verbose "New Device Serial Number: $serialNumber"
     }
-    $device = Get-MgBetaDeviceManagementManagedDevice -Filter "contains(serialNumber,'$serialNumber')" -All
-    # $device = GetDeviceBySerialNumber -serialNumber $serialNumber
+    
+    $device = (CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri -Filter "contains(serialNumber,'$serialNumber')").value
     Write-Verbose "Device serial number: $($device.serialNumber)"
     if ($device)
     {
@@ -58,34 +73,54 @@ function VerifyEnrollmentStatus
         $serialNumber = $device.serialNumber
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $users = $device.usersLoggedOn
-        if ($users.count -eq 1)
+        Write-Verbose "Number of users logged on: $($users.count)"
+        Write-Verbose "Users logged on: $($users | ConvertTo-Json)"
+        if ($users.count -gt 0)
         {
-            Write-Verbose "Device has $($users.count) users logged on"
-            $userName = Get-MgUser -UserId $users.userId
-            Write-Verbose "User: $($username.UserPrincipalName)"
-            if ($username.UserPrincipalName -like "*@*")
+            for ($i = 0; $i -lt $users.count; $i++)
             {
-                Write-Verbose "User is an Azure AD user"
-                $enrolled = $true
-            }
-            else
-            {
-                Write-Verbose "User is not an Azure AD user"
-                $userName = 'unknown'
-            }
+                Write-Verbose "Retrieving the user object for user with id $($users[$i].userId)"
+                $user = CallGraphAPI -AccessToken $accessToken -Uri "$userUri/$($users[$i].userId)"
+                if ($user.userPrincipalName -like '*@*' -or $user.userName -like '*@*')
+                {
+                    Write-Verbose 'User is an Azure AD user'
+                    Write-Verbose "User Display Name: $($user.displayName)"
+                    Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
+                    $loggedOnUsers += @{
+                        userId            = $users[$i].userId
+                        userPrincipalName = $user.userPrincipalName
+                        displayName       = $user.displayName
+                        lastLogOnDateTime = $users[$i].lastLogonDateTime
+                    }
+                    Write-Verbose "LoggedOn Users: $($loggedOnUsers |ConvertTo-Json)"
+                    $enrolled = $true
+                }
+                else
+                {
+                    Write-Verbose 'User is not an Azure AD user'
+                    $loggedOnUsers += @{
+                        userId            = $users[$i].userId
+                        displayName       = $user.displayName
+                        lastLogOnDateTime = $users[$i].lastLogonDateTime
+                    }
+                }
+            }                
+        }
+        else
+        {
+            Write-Verbose 'Device has no users logged on'
         }
     }
     else 
     {
-        Write-Verbose "Device not found in Intune"
-        $userName = $null
+        Write-Verbose 'Device not found in Intune'
+        $users = $null
         $deviceId = $null
     }
     $deviceState = @{
         imported = $imported
         enrolled = $enrolled
-        userName = $userName.UserPrincipalName
-        UserDisplayName = $userName.DisplayName
+        users    = $loggedOnUsers
         id       = $deviceId
         serial   = $serialNumber
     }

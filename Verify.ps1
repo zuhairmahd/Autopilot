@@ -32,6 +32,7 @@ $groupsToExclude = $init.groupsToExclude
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 #endregion Define variables
 
+
 #region Get user input.
 Write-Host 'What would you like to do?'
 $choices = @('Verify a device', 'Verify a user', 'Exit')
@@ -109,7 +110,7 @@ switch ($choice)
 
 if ($whatToDo -eq 'device')
 {
-    Write-Host "Checking redeployment status for device with serial number $SerialNumber."
+    Write-Host "Checking deployment status for device with serial number $SerialNumber."
     $enrollmentState = VerifyEnrollmentStatus -serialNumber $Serial
     Write-Verbose "The enrollment state is: $($enrollmentState | Out-String)"
     if (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $false))
@@ -193,7 +194,7 @@ if ($whatToDo -eq 'device')
 elseif ($whatToDo -eq 'user')
 {
     Write-Host "Checking group membership for user $userName."
-    $groups = VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude -verbose
+    $groups = VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
     if ($groups -eq $true)
     {
         Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
