@@ -50,6 +50,14 @@ function CallGraphAPI()
     try
     {
         $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -StatusCodeVariable 'statusCode'
+        $response | ForEach-Object {
+            if ($_.'@odata.nextLink')
+            {
+                $nextLink = $_.'@odata.nextLink'
+                $nextGroups = CallGraphAPI -accessToken $accessToken -Uri $nextLink -Method GET
+                $response.value += $nextGroups.value
+            }
+        }
         Write-Verbose "The status code is $statusCode"
         Write-Verbose 'The call was successful.'
         Write-Verbose "Number of objects: $($response.Count) objects."

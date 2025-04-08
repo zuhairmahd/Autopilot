@@ -67,11 +67,20 @@ function VerifyGroupMembership()
     Write-Verbose "The Azure Directory id for $userName ($($user.DisplayName)) is $($user.ID)."
     Write-Verbose "Checking whether the user $userName is a member of the required groups."
     Write-Verbose "Getting group membership for user $userName ($($user.displayName)) with id $userID"
-    $groupUri = "https://graph.microsoft.com/beta/users/$($userName)/memberOf/microsoft.graph.group?`$top=500"
+    $groupUri = "https://graph.microsoft.com/beta/users/$($userName)/memberOf/microsoft.graph.group"
     try
     {
         $response = Invoke-RestMethod -Uri $groupUri -Authentication Bearer -Token (ConvertTo-SecureString -String $accessToken -AsPlainText -Force) -Method Get -StatusCodeVariable 'GroupStatusCode'
+        $response | ForEach-Object {
+            if ($_.'@odata.nextLink')
+            {
+                $nextLink = $_.'@odata.nextLink'
+                $nextGroups = CallGraphAPI -accessToken $accessToken -Uri $nextLink -Method GET
+                $response.value += $nextGroups.value
+            }
+        }
         $groups = $response.value | Select-Object -ExpandProperty displayName
+        Write-Host "The user $username is a member of $($groups.Count) groups."
         Write-Verbose "The status code is $GroupStatusCode"
     }
     catch
