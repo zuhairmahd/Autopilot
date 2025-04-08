@@ -30,6 +30,7 @@ $init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-
 $groupsToInclude = $init.groupsToInclude
 $groupsToExclude = $init.groupsToExclude
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+$accessToken = GetGraphAccessToken -configFile $configFile
 #endregion Define variables
 
 
@@ -111,7 +112,7 @@ switch ($choice)
 if ($whatToDo -eq 'device')
 {
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
-    $enrollmentState = VerifyEnrollmentStatus -serialNumber $Serial
+    $global:enrollmentState = VerifyEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
     Write-Verbose "The enrollment state is: $($enrollmentState | Out-String)"
     if (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $false))
     {
@@ -121,33 +122,22 @@ if ($whatToDo -eq 'device')
     elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $false))
     {
         Write-Host 'The device is imported in Intune but is not enrolled.' -ForegroundColor Yellow
-        Write-Host 'Checking deployment profile assignment.' -ForegroundColor Yellow
-        $assignmentProfile = GetAutopilotProfileAssignment -serialNumber $SerialNumber
-        if ($assignmentProfile)
-        {
-            Write-Host "The device is assigned to the $assignmentProfile deployment profile." -ForegroundColor Yellow
         }
-        else
-        {
-            Write-Host 'The device is not assigned to any deployment profile.' -ForegroundColor Yellow
-            Write-Host 'Please contact an Intune administrator.' -ForegroundColor Yellow
-        }
-    }
     elseif (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $true) -and ($enrollmentState.userName -ne 'unknown'))
     {
-        Write-Host "This device is enrolled and is being used by $($enrollmentState.userName) ($($enrollmentState.UserDisplayName))" -ForegroundColor Green
+        Write-Host "This device is enrolled and is being used by $($enrollmentState.usersLoggedOn[0].userPrincipalName) ($($enrollmentState.DisplayName))" -ForegroundColor Green
     }
     elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $true))
     {
         Write-Host 'The device is enrolled and is registered to a user.'
-        if ($enrollmentState.userName -ne 'unknown')
+        if ($enrollmentState.usersLoggedOn.userPrincipalName -ne 'unknown')
         {
-            Write-Host "The registered user is $($enrollmentState.username)"
+            Write-Host "The registered user is $($enrollmentState.usersLoggedOn[0].userPrincipalName) ($($enrollmentState.usersLoggedOn[0].DisplayName))" -ForegroundColor Green
             Write-Host 'You must wipe the device to get it ready for another user'
             Write-Host 'Wiping a device is a distructive command.  Make sure you are wiping the correct device.'
-            Write-Host "Device id: $($enrollmentState.id)"
+            Write-Host "Device id: $($enrollmentState.deviceId)"
             Write-Host "Device serial number: $SerialNumber"
-            Write-Host "Registered user: $($enrollmentState.username) `r`n"
+            Write-Host "Registered user: $($enrollmentState.usersLoggedOn[0].userPrincipalName) `r`n"
             Write-Host 'Would you still like to send a wipe command to the device? (Y/N)'
             $response = Read-Host
             while ($response -notin 'Y', 'N')

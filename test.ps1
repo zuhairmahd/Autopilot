@@ -30,18 +30,8 @@ $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windows
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
 
-$global:mygroups = CallGraphAPI -accessToken $accessToken -Uri 'https://graph.microsoft.com/beta/users/mahmoudz@gao.gov/memberOf/microsoft.graph.group' -Method GET
-$global:mygroups | ForEach-Object {
-    if ($_.'@odata.nextLink')
-    {
-        $global:nextLink = $_.'@odata.nextLink'
-        $nextGroups = CallGraphAPI -accessToken $accessToken -Uri $nextLink -Method GET
-        $global:mygroups.value += $nextGroups.value
-    }
-}
-
 # $global:enrollmentState = VerifyEnrollmentStatus -serialNumber $serialNumber -accessToken $accessToken
 # Write-Host "Enrollment State: $($global:enrollmentState |ConvertTo-Json)" -ForegroundColor Green
-# $global:devices = CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri
-# $global:imported = CallGraphAPI -AccessToken $accessToken -Uri $importedAutopilotDeviceURI -Method GET
-# $global:autopilot = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI -Method GET
+$global:devices = CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri
+$global:imported = CallGraphAPI -AccessToken $accessToken -Uri $importedAutopilotDeviceURI -Method GET
+$global:autopilot = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI -Method GET
