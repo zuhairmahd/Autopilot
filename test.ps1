@@ -24,18 +24,24 @@ else
 }
 #endregion
 
+#region variables
 $importedAutopilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/importedWindowsAutopilotDeviceIdentities'
+$deviceUri = "https://graph.microsoft.com/beta/devices"
 $deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
 $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
+#endregion variables
 
 # $global:enrollmentState = VerifyEnrollmentStatus -serialNumber $serialNumber -accessToken $accessToken
 # Write-Host "Enrollment State: $($global:enrollmentState |ConvertTo-Json)" -ForegroundColor Green
-$global:devices = CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri -Filter "startswith(OperatingSystem,'Windows')" -Method GET
+$global:devices = CallGraphAPI -AccessToken $accessToken -Uri $deviceUri -Filter "startswith(operatingSystem,'Windows')" -Method GET
+$global:managedDevices = CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri -Filter "startswith(OperatingSystem,'Windows')" -Method GET
 $global:imported = CallGraphAPI -AccessToken $accessToken -Uri $importedAutopilotDeviceURI -Method GET
 $global:autopilot = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI -Method GET
-$global:matchingDevices = @()
+
+exit 0
+#region properties search
 foreach ($global:autopilotDevice in $global:autopilot.value)
 {
     Write-Host "Checking autopilot device with serial number: $($global:autopilotDevice.serialNumber) and deviceId: $($global:autopilotDevice.id)" -ForegroundColor Green
@@ -126,3 +132,4 @@ foreach ($global:autopilotDevice in $global:autopilot.value)
         }
     }
 }
+#endregion
