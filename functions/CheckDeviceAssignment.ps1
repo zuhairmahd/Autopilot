@@ -23,20 +23,31 @@ function CheckDeviceAssignment()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$serial
+        [string]$serial,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken
     )
     Write-Verbose "Received parameters: serial=$serial."
+    if ($AccessToken)
+    {
+        Write-Verbose "Access token provided."
+    }
     $success = $false
+    $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
     Write-Host "Checking whether the device with serial number $serial is already in Intune."
-    $assignment = Get-AutopilotDevice -serial $serial
+    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI
+    Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
+    $assignment = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
     if ($assignment)
     {
-        Write-Host 'The device is already in Intune.' -ForegroundColor Yellow
+        Write-Host 'The device is registered in Intune.' -ForegroundColor Yellow
         Write-Host 'Checking profile assignment'
         if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
         {
-            $assignedProfileName = GetAutopilotProfileAssignment -serialNumber $serial
-            Write-Host "The device is assigned to the $assignedProfileName deployment profile and ready for enrollment." -ForegroundColor Green
+            $expandedDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotRawDevice.id)?`$expand=deploymentProfile"
+            $autopilotDevice = CallGraphAPI -AccessToken $accessToken -Uri $expandedDeviceURI
+            Write-Host "The device was assigned to the $($autopilotDevice.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)." -ForegroundColor Green
+            Write-Host 'The device is ready for enrollment.' -ForegroundColor Green
             $success = $true
         }
         else

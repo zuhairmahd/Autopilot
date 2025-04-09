@@ -69,7 +69,7 @@ function VerifyEnrollmentStatus()
     $autopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI
     Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
     $autopilotRawDevice = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+    Write-Verbose "Autopilot Device serial number: $($autopilotRawDevice.serialNumber)"
     if ($autopilotRawDevice)
     {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"

@@ -439,8 +439,8 @@ else
 }
 #endregion Connect to Microsoft Graph
 
-
-$deviceAssignment = CheckDeviceAssignment -serial $serial
+#region Check if the device is already in Intune
+$deviceAssignment = CheckDeviceAssignment -serial $serial -AccessToken $accessToken
 if ($check -AND $deviceAssignment)
 {
     Write-Host 'The device is already in Intune.' -ForegroundColor Green
@@ -461,6 +461,7 @@ else
     GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
+#endregion Check if the device is already in Intune
 
 #region Add the device to Intune.
 $importStart = Get-Date
