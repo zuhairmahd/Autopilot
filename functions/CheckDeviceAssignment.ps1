@@ -18,45 +18,86 @@ Author: Zuhair Mahmoud
 GUID: 3f2504e0-4f89-11d3-9a0c-0305e82c3301
 Date: April 5, 2025
 #>
-function CheckDeviceAssignment() 
-{
+function CheckDeviceAssignment() {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$serial,
+        [string]$serialNumber,
         [Parameter(Mandatory = $true)]
-        [string]$AccessToken
+        [string]$AccessToken,
+        [Parameter(Mandatory = $false, ParameterSetName = 'WaitForAssignment')]
+        [switch]$WaitForAssignment,
+        [Parameter(Mandatory = $false, ParameterSetName = 'WaitForAssignment')]
+        [int]$waitTimeInSeconds = 60,
+        [Parameter(Mandatory = $false, ParameterSetName = 'WaitForAssignment')]
+        [int]$maxWaitTime = 30
     )
-    Write-Verbose "Received parameters: serial=$serial."
-    if ($AccessToken)
-    {
+
+    Write-Verbose "Received parameters: serialNumber=$serialNumber."
+    if ($AccessToken) {
         Write-Verbose "Access token provided."
     }
-    $success = $false
+    if ($WaitForAssignment) {
+        Write-Verbose "WaitForAssignment switch: $WaitForAssignment."
+        Write-Verbose "Wait time in seconds: $waitTimeInSeconds."
+        Write-Verbose "Max wait time: $maxWaitTime."
+    }
     $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
-    Write-Host "Checking whether the device with serial number $serial is already in Intune."
+    Write-Verbose "Calling Graph API at $autoPilotDeviceURI."
+    Write-Host "Checking whether the device with serial number $serialNumber is already in Intune."
     $autopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI
+    Write-Verbose "Graph response: $($autopilotDevices)."
+    if ($null -eq $autopilotDevices -and $autopilotDevices -notin 200..204) {
+        Write-Host 'No devices found in Intune.' -ForegroundColor Red
+        return $null
+    }
     Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
     $assignment = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    if ($assignment)
-    {
+    if ($assignment) {
         Write-Host 'The device is registered in Intune.' -ForegroundColor Yellow
         Write-Host 'Checking profile assignment'
-        if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
-        {
-            $expandedDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotRawDevice.id)?`$expand=deploymentProfile"
+        $expandedDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)?`$expand=deploymentProfile"
+        Write-Verbose "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
+        if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState') {
             $autopilotDevice = CallGraphAPI -AccessToken $accessToken -Uri $expandedDeviceURI
-            Write-Host "The device was assigned to the $($autopilotDevice.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)." -ForegroundColor Green
-            Write-Host 'The device is ready for enrollment.' -ForegroundColor Green
-            $success = $true
+            Write-Verbose "Graph response: $($autopilotDevice)."
+            Write-Verbose "Device details: $($autopilotDevice | ConvertTo-Json -Depth 10)"
+            Write-Verbose "The device was assigned to the $($autopilotDevice.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
+            Write-Verbose 'The device is ready for enrollment.'
+            return $autopilotDevice
         }
-        else
-        {
+        elsif ($wwait) {
+            Write-Host "Waiting for up to $maxWaitTime minutes for the device to be assigned to a deployment profile."
+            $index = 0
+            while ($assignment.deploymentProfileAssignmentStatus -ne 'assignedUnkownSyncState' -and $index -lt $maxWaitTime) {
+                Write-Host "Waiting for $waitTimeInSeconds  seconds before checking again..." -ForegroundColor Yellow
+                Start-Sleep -Seconds $waitTimeInSeconds
+                $index++
+                Write-Host "Checking again... ($index/$maxWaitTime)"
+                $autopilotDevice = CallGraphAPI -AccessToken $accessToken -Uri $expandedDeviceURI
+                Write-Verbose "Graph response: $($autopilotDevices)."
+            }
+            if (($assignment.deploymentProfileAssignmentStatus -ne 'assignedUnkownSyncState' -or -not ($assignment.deploymentProfileAssignedDateTime)) -and $index -gt $maxWaitTime) {
+                Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
+                Write-Host 'Please check the Intune portal or contact an Intune administrator.'
+            }
+            elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState') {
+                Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
+                Write-Host "The device is successfully assigned to the $($autopilotDevice.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)." -ForegroundColor Green
+            }
+        }
+        else {
             Write-Host 'The device is imported but not assigned to a deployment profile.' -ForegroundColor Yellow
             Write-Host 'Please check the Intune portal or contact an Intune administrator.'
+            return $null
         }
+        return $autopilotDevice
     }
-    return $success
+    else {
+        Write-Host 'The device is not found in Intune.' -ForegroundColor Red
+        Write-Host 'Please check the Intune portal or contact an Intune administrator.'
+        return $null
+    }
 }
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor

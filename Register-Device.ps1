@@ -104,104 +104,86 @@ param (
 )
 
 #region Load parameters from the configuration file if it exists
-if (Test-Path -Path $Configuration)
-{
+if (Test-Path -Path $Configuration) {
     Write-Host " Loading configuration values from $Configuration."
     $configData = Get-Content -Path $Configuration -Raw | ConvertFrom-Json
     Write-Host "Found $($configData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $configData.PSObject.Properties.Name)
-    {
+    foreach ($key in $configData.PSObject.Properties.Name) {
         Write-Verbose "Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $configData.$key)
-        {
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $configData.$key) {
             Write-Verbose "Read parameter $key from the configuration file as $($configData.$key)"
             Write-Verbose "Setting $key to $($configData.$key)"
-            if ($configData.$key -in ('true', 'false'))
-            {
+            if ($configData.$key -in ('true', 'false')) {
                 Write-Verbose "Converting $key to boolean."
                 $keyBooleanValue = [bool]::Parse($configData.$key)
                 Write-Verbose "Setting the value of $key to the boolean value ($keybooleanValue)."
                 Set-Variable -Name $key -Value $keyBooleanValue
             }
-            else
-            {
+            else {
                 Write-Verbose "Setting the value of $key to the string value ($($configData.$key))."
                 Set-Variable -Name $key -Value $configData.$key
             }
         }
-        else
-        {
+        else {
             Write-Verbose "Read parameter $key from the commandline as $($PSBoundParameters[$key])"
         }
     }
 }
-else
-{
+else {
     Write-Host "Configuration file $Configuration not found. Using default values."
 }
 #endregion Load parameters from the configuration file if it exists
 
 #region import functions.
 $functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder)
-{
+if (Test-Path $functionsFolder) {
     Write-Verbose "Importing functions from $functionsFolder"
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-    foreach ($function in $functions)
-    {
+    foreach ($function in $functions) {
         Write-Verbose "Importing function $function"
         . $function.FullName
     }
 }
-else
-{
+else {
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
 #endregion import functions.
 
 #region Define static and dynamic variables
-if ($repo -eq 'github')
-{
+if ($repo -eq 'github') {
     $baseSourceURL = 'https://raw.githubusercontent.com'
     $repoPath = 'zuhairmahd'
     $repoName = 'autopilot'
-    if ($release -eq 'auto')
-    {
+    if ($release -eq 'auto') {
         $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
-        if ($latestRelease)
-        {
+        if ($latestRelease) {
             Write-Host "The latest release is $latestRelease"
         }
-        else
-        {
+        else {
             Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
             Write-Host 'Defaulting to main branch.'
             $latestRelease = 'main'
         }
     }
-    else
-    {
+    else {
         $latestRelease = $Release
     }
 }
-elseif ($repo -eq 'gitlab')
-{
+elseif ($repo -eq 'gitlab') {
     $baseSourceURL = 'https://git.gao.gov'
     $repoPath = 'mahmoudz'
     $repoName = 'autopilot-deployment'
     $repoId = '1031'
     $latestRelease = GetLatestGitlabRelease -RepositoryId $repoId
 }
-else
-{
+else {
     Write-Host 'Invalid repository specified.'
     Write-Host 'Defaulting to the main branch from GitHub.'
     $latestRelease = 'main'
 }
 $accessToken = GetGraphAccessToken -configFile $configFile
-if ($null -eq $accessToken)
-{
+if ($null -eq $accessToken) {
     Write-Host 'Failed to retrieve access token.' -ForegroundColor Red
     Write-Host 'Functions that require direct access to the API will not work.' -ForegroundColor Red
 }
@@ -253,30 +235,24 @@ Write-Verbose "Domain: $domain"
 #endregion logging
 
 #region Perform checks
-if ($Reconfigure)
-{
+if ($Reconfigure) {
     Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -DestinationFolder $PSScriptRoot -RootFolder $PSScriptRoot)
-    {
+    if (CreateFullConfiguration -DestinationFolder $PSScriptRoot -RootFolder $PSScriptRoot) {
         Write-Host 'The script has been reconfigured.' -ForegroundColor Green
     }
-    else
-    {
+    else {
         Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
         exit 1
     }
     exit 0
 }   
 
-if (-not($NoSignatureVerify))
-{
+if (-not($NoSignatureVerify)) {
     Write-Host 'Verifying code signature.'
     $codeAuthenticity = GetSignatureStatus -scriptFolders @("$PSScriptRoot", "$functionsFolder") -exclusions $exclusions
-    if ($codeAuthenticity.count -gt 0)
-    {
+    if ($codeAuthenticity.count -gt 0) {
         Write-Host "$($codeAuthenticity.count) scripts failed the signature check." -ForegroundColor Red
-        foreach ($Script in $codeAuthenticity.keys)
-        {
+        foreach ($Script in $codeAuthenticity.keys) {
             Write-Host "The script $script is $($codeAuthenticity[$script].status)."
             Write-Verbose "The reason is $($codeAuthenticity[$script].reason)."
         }
@@ -284,121 +260,98 @@ if (-not($NoSignatureVerify))
         Write-Host 'Exiting script.' -ForegroundColor Red
         exit 1
     }
-    else
-    {
+    else {
         Write-Host 'All scripts are signed.' -ForegroundColor Green
     }
 }
-else
-{
+else {
     Write-Host 'Skipping signature verification check.'
 }
 
-if (-not($NoHashVerify))
-{
+if (-not($NoHashVerify)) {
     Write-Host 'Verifying file integrity.'
     $fileIntegrity = GetScriptIntegrity -scriptFolders @("$PSScriptRoot", "$functionsFolder") -RootFolder $PSScriptRoot -exclusions $exclusions
     Write-Verbose "The file integrity check returned $($fileIntegrity.count) scripts."
-    if (-not $fileIntegrity)
-    {
+    if (-not $fileIntegrity) {
         Write-Host 'You may not run this script because the integrity check failed.' -ForegroundColor Red
         Write-Host 'Exiting script.' -ForegroundColor Red
         exit 1
     }
-    else
-    {
+    else {
         Write-Host 'All scripts passed integrity verification.' -ForegroundColor Green
     }
 }
-else
-{
+else {
     Write-Host 'Skipping integrity verification check.'
 }
 
-if (-not($NoUpdateCheck))
-{
+if (-not($NoUpdateCheck)) {
     Write-Host 'Checking for script updates.'
     $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteVersionURL -LocalManifestContent $localManifest
-    if ($remoteManifest.functions.count -gt 0 -or $remoteManifest.scripts.count -gt 0 -or $remoteManifest.cmds.count -gt 0)
-    {
+    if ($remoteManifest.functions.count -gt 0 -or $remoteManifest.scripts.count -gt 0 -or $remoteManifest.cmds.count -gt 0) {
         Write-Host "$($remoteManifest.functions.count) functions, $($remoteManifest.scripts.count) scripts, and $($remoteManifest.cmds.count) cmds have an update available."
         Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow
         $response = Read-Host
-        if ($response -eq 'Y')
-        {
+        if ($response -eq 'Y') {
             Write-Host 'Downloading the latest version of the script.'
-            if (DownloadScriptUpdates -scriptsToUpdate $remoteManifest -scriptURI $updateURL -ScriptRoot $PSScriptRoot)
-            {
+            if (DownloadScriptUpdates -scriptsToUpdate $remoteManifest -scriptURI $updateURL -ScriptRoot $PSScriptRoot) {
                 Write-Host 'All scripts have been updated.' -ForegroundColor Green
             }
-            else
-            {
+            else {
                 Write-Host 'Failed to update scripts.' -ForegroundColor Red
             }
         }
-        else
-        {
+        else {
             Write-Host 'Updates will not be downloaded.' -ForegroundColor Red
         }
     }
-    else
-    {
+    else {
         Write-Host 'All scripts are up to date.' -ForegroundColor Green
     }
 }
-else
-{
+else {
     Write-Host 'Skipping script update check.'
 }
 
-if ($UpdateOnly)
-{
+if ($UpdateOnly) {
     Write-Host 'Update check complete.'
     exit 0
 }
 
-if (-not($NoAdminCheck -or $UpdateOnly -or $Redeploy -or $Reconfigure))
-{
+if (-not($NoAdminCheck -or $UpdateOnly -or $Redeploy -or $Reconfigure)) {
     Write-Host 'Checking whether the script has sufficient permissions to run.'
-    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
         Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
         exit 1
     }
-    else
-    {
+    else {
         Write-Host 'The script has sufficient permissions. Continuing.'
     }
 }
-else
-{
+else {
     Write-Host 'Skipping administrator check.'
 }
 
-if (-not($NoModuleCheck))
-{
+if (-not($NoModuleCheck)) {
     Write-Host 'Checkin for installed modules.'
     $module = GetRequiredModules -moduleNames $modulesToInstall -ModulesFolder $modulesFolder
-    if ($module -eq 0)
-    {
+    if ($module -eq 0) {
         Write-Host 'All required modules are installed.' -ForegroundColor Green
     }
-    else
-    {
+    else {
         Write-Host "$($module.InstalledModulesCount) modules were installed."
         Write-Host "$($module.PreviouslyInstalledModulesCount) modules were already installed."
     }
 }
-else
-{
+else {
     Write-Host 'Skipping module check.'
 }
 #endregion Perform checks
 
 #region Gather device information.
 $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-$serial = $deviceObject.serialNumber
-Write-Verbose "The serial number is $serial"
+$serialNumber = $deviceObject.serialNumber
+Write-Verbose "The serial number is $serialNumber."
 $hash = $deviceObject.hardwareHash
 Write-Verbose "The hardware hash is $hash"
 $make = $deviceObject.manufacturer
@@ -409,74 +362,107 @@ $parentDir = (Get-Item -Path $PWD).Parent.FullName
 Write-Verbose "The parent directory is $parentDir"
 $outputFile = "$parentDir\device_$serial.csv"
 Write-Verbose "The output file is $outputFile"
-Write-Host "Processing device with serial number $serial, manufacturer $make, and model $model."
-if ($GetDeviceHash)
-{
+Write-Host "Processing device with serial number $serialNumber, manufacturer $make, and model $model."
+if ($GetDeviceHash) {
     GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 0
 }
 #endregion Gather device information.
 
 #region Connect to Microsoft Graph
-if (connectToTenant($configFile))
-{
+if (connectToTenant($configFile)) {
     Write-Verbose 'Successfully connected to Microsoft Graph.' 
 }
-else
-{
+else {
     Write-Host 'Failed to connect to Microsoft Graph.' -ForegroundColor Red
     exit 1
 }
 $scopes = Get-MgContext | Select-Object -ExpandProperty Scopes | Sort-Object
-if ($scopes)
-{
+if ($scopes) {
     Write-Verbose "The following $($scopes.Count) scopes are available:"
     $scopes | ForEach-Object { Write-Verbose $_ }
 }
-else
-{
+else {
     Get-MgContext | Format-List
 }
 #endregion Connect to Microsoft Graph
 
 #region Check if the device is already in Intune
-$deviceAssignment = CheckDeviceAssignment -serial $serial -AccessToken $accessToken
-if ($check -AND $deviceAssignment)
-{
-    Write-Host 'The device is already in Intune.' -ForegroundColor Green
-    Write-Host 'Remember to restart the device to begin enrollment' -ForegroundColor Green
-    exit 0
-}
-elseif (-not $check -and $deviceAssignment)
-{
-    if (-not (RestartDevice)) 
-    {
-        exit 0
+$deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+Write-Verbose "The device assignment status is $deviceAssignment."
+if ($deviceAssignment) {
+    switch ($deviceAssignment.deploymentProfileAssignmentStatus) {
+        'assignedInSync' {
+            Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
+            Write-Host "The device is assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName)." -ForegroundColor Green
+            Write-Host "The device profile assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)." -ForegroundColor Green
+            Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
+            switch ($deviceAssignment.enrollmentState) {
+                'notContacted' {
+                    Write-Host 'The device has not contacted the enrollment service.' -ForegroundColor Yellow
+                }
+                'enrolled' {
+                    Write-Host 'The device is enrolled.' -ForegroundColor Green
+                }
+                'enrollmentPending' {
+                    Write-Host 'The device is pending enrollment.' -ForegroundColor Yellow
+                }
+                'enrollmentFailed' {
+                    Write-Host 'The device enrollment failed.' -ForegroundColor Red
+                    Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+                    exit 1
+                }
+            }
+            if (-not (RestartDevice)) {
+                exit 0
+            }
+        }
+        'unassigned' {
+            Write-Host 'The device is not assigned to a deployment profile.' -ForegroundColor Red
+            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+            exit 1
+        }
+        'pending' {
+            Write-Host 'The device is pending assignment to a deployment profile.' -ForegroundColor Yellow
+            Write-Host 'Please check again after a little while.' -ForegroundColor Yellow
+            Write-Host 'If you continue to get this messgage, please check the Intune portal or contact an Intune administrator.' -ForegroundColor Yellow
+            exit 1
+        }
+        'assignedUnkownSyncState' {
+            Write-Host 'The device is assigned to a deployment profile but the the deployment profile could not be dtermined.' -ForegroundColor Yellow
+            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Yellow
+            exit 1
+        }
+        default {
+            Write-Host "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)."
+            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+            exit 1
+        }
     }
 }
-else
-{
+else {
     Write-Host 'The device is not in Intune.'
-    Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-    exit 1
+}
+if ($check) {
+    Write-Host "Exitting script as requested."
+    exit 0
+}
+else {
+    Write-Host 'Continuing to import the device.'
 }
 #endregion Check if the device is already in Intune
 
 #region Add the device to Intune.
 $importStart = Get-Date
-if (-not($check))
-{
+if (-not($check)) {
     $imported = Add-AutopilotImportedDevice -serialNumber $serial -hardwareIdentifier $hash -groupTag $GroupTag -assignedUser $AssignedUser
     #wait for the device to be imported
     Write-Host "Waiting for device with device ID $($imported.id) to be imported."
     $device = Get-AutopilotImportedDevice -id $imported.id
     $index = 0
-    while ($index -lt $maxWaitTime)
-    {
+    while ($index -lt $maxWaitTime) {
         Write-Verbose "The device import status is $($device.state.deviceImportStatus)"
-        if (($device.state.deviceImportStatus -ne 'unknown') -or ($index -gt $maxWaitTime))
-        {
+        if (($device.state.deviceImportStatus -ne 'unknown') -or ($index -gt $maxWaitTime)) {
             break
         }
         Write-Host "The import status is $($device.state.deviceImportStatus)."
@@ -488,78 +474,50 @@ if (-not($check))
     }
     Write-Host "The device import status is $($device.state.deviceImportStatus)"
     Write-Verbose "The index count is $index."
-    if (($device.state.deviceImportStatus -eq 'unknown') -and ($index -gt $maxWaitTime))
-    {
+    if (($device.state.deviceImportStatus -eq 'unknown') -and ($index -gt $maxWaitTime)) {
         Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
         GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
-if (($device.state.deviceImportStatus -eq 'complete') -or ($check))
-{
+if (($device.state.deviceImportStatus -eq 'complete') -or ($check)) {
     Write-Host 'Checking device assignment.'
-    Start-Sleep -Seconds ($timeInSeconds / 12)
-    $assignment = Get-AutopilotDevice -serial $serial
-    if ($assignment)
-    {
+    $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+    if ($assignment) {
         Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
-        $index = 0
-        while ($index -lt $maxWaitTime)
-        {
-            Write-Verbose "The device assignment status is $($assignment.deploymentProfileAssignmentStatus)"
-            Write-Verbose "The device assignment date is $($assignment.deploymentProfileAssignedDateTime)"
-            if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState') -or ($index -gt $maxWaitTime))
-            {
-                break
-            }
-            Write-Host "The device assignment status is $($assignment.deploymentProfileAssignmentStatus)"
-            Write-Host 'Waiting for device to be assigned to a deployment profile.'
-            Write-Host "Will check again in $timeInSeconds seconds"
-            Start-Sleep -Seconds $timeInSeconds
-            $assignment = Get-AutopilotDevice -serial $serial
-            $index++
-            Write-Host "Pass $index of $maxWaitTime"
-            Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
-        }
-        Write-Host "The device assignment status is $($assignment.deploymentProfileAssignmentStatus)"
-        Write-Host "The device assignment date is $($assignment.deploymentProfileAssignedDateTime)"
-        if ((($assignment.deploymentProfileAssignmentStatus -ne 'assignedUnkownSyncState') -or -not($assignment.deploymentProfileAssignedDateTime)) -and ($index -gt $maxWaitTime))
-        {
-            Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
-            Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-            GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-            exit 1
-        }
-        elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState')
-        {
-            $assignedProfileName = GetAutopilotProfileAssignment -serialNumber $serial
+        if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -and $null -ne $assignment.deploymentProfile.displayName ) {
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
             Write-Host "The device is successfully assigned to the deployment profile $assignedProfileName." -ForegroundColor Green
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
             Write-Host "Elapsed time to complete: $importSeconds seconds"
-            RestartDevice
-            exit 0
+            if (-not (RestartDevice)) {
+                exit 0
+            }
+        }
+        else {
+            Write-Host 'The device could not be assigned to a deployment profile.' -ForegroundColor Red
+            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+            Write-Host "The device current assignment status is $($assignment.deploymentProfileAssignmentStatus)."
+            Write-Host "The device assignment profile name is $($assignment.deploymentProfile.displayName)."
+            Write-Host "The device profile assignment date is $($assignment.deploymentProfileAssignmentDateTime)."
         }
     }
-    else
-    {
+    else {
         Write-Host 'The device cannot be found in Intune.'
         Write-Host 'Please check the Intune Portal or contact an Intune administrator.'
         GetDeviceHash -Device $deviceObject -OutputFile $outputFile
         exit 1
     }
 }
-elseif ($device.state.deviceImportStatus -eq 'error')
-{
+elseif ($device.state.deviceImportStatus -eq 'error') {
     Write-Host 'The device import failed with the following error:' -ForegroundColor Red
     Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
     GetDeviceHash -Device $deviceObject -OutputFile $outputFile
     exit 1
 }
-else
-{
+else {
     Write-Host 'The device import failed with the following error:' -ForegroundColor Red
     Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
     GetDeviceHash -Device $deviceObject -OutputFile $outputFile

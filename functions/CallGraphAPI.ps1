@@ -1,5 +1,4 @@
-function CallGraphAPI()
-{
+function CallGraphAPI() {
     [CmdletBinding()]
     param
     (
@@ -14,7 +13,9 @@ function CallGraphAPI()
     )
     
     #region variables and logs
-    Write-Verbose "AccessToken: $accessToken"
+    if ($accessToken) {
+        Write-Verbose "Access token provided."
+    }
     Write-Verbose "Uri: $uri"
     Write-Verbose "Method: $method"
     Write-Verbose "Filter: $filter"
@@ -23,23 +24,20 @@ function CallGraphAPI()
     #endregion
 
     #region Encode filter and add headers
-    if ($Filter)
-    {
+    if ($Filter) {
         Write-Verbose 'Encoding the filter value.'
         $Filter = [System.Web.HttpUtility]::UrlEncode($filter)
         $uri += "?`$filter=$Filter"
         Write-Verbose "Uri: $uri"
     }
-    if ($consistencyLevel) 
-    {
+    if ($consistencyLevel) {
         $headers = @{
             Authorization    = "Bearer $accessToken"
             'Content-Type'   = 'application/json'
             ConsistencyLevel = 'Eventual'
         }
     }
-    else
-    {
+    else {
         $headers = @{
             Authorization  = "Bearer $accessToken"
             'Content-Type' = 'application/json'
@@ -47,12 +45,10 @@ function CallGraphAPI()
     }
     #endregion
     Write-Verbose "Making the following call to the Url: $uri"
-    try
-    {
+    try {
         $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -StatusCodeVariable 'statusCode'
         $response | ForEach-Object {
-            if ($_.'@odata.nextLink')
-            {
+            if ($_.'@odata.nextLink') {
                 $nextLink = $_.'@odata.nextLink'
                 $nextGroups = CallGraphAPI -accessToken $accessToken -Uri $nextLink -Method GET
                 $response.value += $nextGroups.value
@@ -63,31 +59,24 @@ function CallGraphAPI()
         Write-Verbose "Number of objects: $($response.Count) objects."
         Write-Verbose "Number of items in each object: $($response.value.Count)"
     }
-    catch
-    {
+    catch {
         $statusCode = $_.Exception.statuscode.value__
         $statusCodeMessage = $_.Exception.statuscode
         $statusMessage = $_.Exception.Message
-        switch ($statusCode)
-        {
-            400
-            {
+        switch ($statusCode) {
+            400 {
                 Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
             }
-            401
-            {
+            401 {
                 Write-Host 'Unauthorized. Please check your access token.' -ForegroundColor Red 
             }
-            403
-            {
+            403 {
                 Write-Host 'Forbidden. You do not have permission to access this resource.' -ForegroundColor Red 
             }
-            404
-            {
+            404 {
                 Write-Host 'Not found. The resource does not exist.' -ForegroundColor Red 
             }
-            default
-            {
+            default {
                 Write-Host 'An unknown error occurred. Please check the error message below.' -ForegroundColor Red 
             }
         }
@@ -98,6 +87,8 @@ function CallGraphAPI()
         Write-Host 'The full error message follows below:'
         Write-Host '----------------------------------------------------------'
         Write-Host "$_"
+        $response = $statusCode
+        return $response
     }
     Write-Verbose "Response value: $($response.value)"
     return $response
