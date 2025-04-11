@@ -25,8 +25,7 @@ Checks if a device is enrolled in Intune and imported into Autopilot.
 #>
 #endregion help
 
-function VerifyEnrollmentStatus()
-{
+function VerifyEnrollmentStatus() {
     [CmdletBinding()]
     param (
         [string]$serialNumber,
@@ -35,14 +34,18 @@ function VerifyEnrollmentStatus()
 
     #region Define variables
     Write-Verbose "Serial Number: $serialNumber"
-    if ($accessToken)
-    {
+    if ($accessToken) {
         Write-Verbose 'Received Access Token'
     }
     $imported = $false
     $enrolled = $false
     $registered = $false
-    $deviceState = @{}
+    $azureUser = $false
+    $returnedImportedDevice = [ordered] @{}
+    $returnedAutopilotDevice = [ordered] @{}
+    $returnedManagedDevice = [ordered] @{}
+    $loggedOnUsers = [ordered] @{}
+    $deviceState = [ordered] @{}
     $loggedOnUsers = @()
     $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
     $importedAutopilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/importedWindowsAutopilotDeviceIdentities'
@@ -54,35 +57,31 @@ function VerifyEnrollmentStatus()
     $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $importedAutopilotDeviceURI
     Write-Verbose "Found $($importedAutopilotDevices.value.count) Imported Autopilot devices."
     $importedAutopilotDevice = $importedAutopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    Write-Verbose "Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
-    if ($importedAutopilotDevice)
-    {
-        Write-Verbose "Device found in Imported Autopilot with serial number $($autopilotDevice.serialNumber)"
+    Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+    if ($importedAutopilotDevice) {
+        Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
         $imported = $true
+        $returnedImportedDevice = $importedAutopilotDevice
     }
-    else
-    {
+    else {
         Write-Verbose 'Device not found in the list of imported Autopilot devices'
         Write-Verbose "This means the device may have already been registered."
-        $imported = $false
     }
     $autopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI
     Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
     $autopilotRawDevice = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
     Write-Verbose "Autopilot Device serial number: $($autopilotRawDevice.serialNumber)"
-    if ($autopilotRawDevice)
-    {
+    if ($autopilotRawDevice) {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
         $expandedDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotRawDevice.id)?`$expand=deploymentProfile"
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -Uri $expandedDeviceURI
         $registered = $true
+        $returnedAutopilotDevice = $autopilotDevice
     }
-    else
-    {
+    else {
         Write-Verbose 'Device is not an autopilot device.'
     }
-    if ($serialNumber -like 'vmware*')
-    {
+    if ($serialNumber -like 'vmware*') {
         Write-Verbose 'Device Serial Number begins with vmware. Removing spaces from the serial number.'
         $serialNumber = $serialNumber -replace ' ', ''
         Write-Verbose "New Device Serial Number: $serialNumber"
@@ -92,113 +91,67 @@ function VerifyEnrollmentStatus()
     #region Get the managed device info
     $device = (CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri -Filter "contains(serialNumber,'$serialNumber')").value
     Write-Verbose "Device serial number: $($device.serialNumber)"
-    if ($device)
-    {
+    if ($device) {
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $enrolled = $true
+        $returnedManagedDevice = $device
         $users = $device.usersLoggedOn
-        Write-Verbose "Users logged on: $($users | ConvertTo-Json)"
-        if ($users.count -gt 0)
-        {
-            for ($i = 0; $i -lt $users.count; $i++)
-            {
-                Write-Verbose "Retrieving the user object for user with id $($users[$i].userId)"
-                $user = CallGraphAPI -AccessToken $accessToken -Uri "$userUri/$($users[$i].userId)"
-                if ($user.userPrincipalName -like '*@*' -or $user.userName -like '*@*')
-                {
-                    Write-Verbose 'User is an Azure AD user'
-                    Write-Verbose "User Display Name: $($user.displayName)"
-                    Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
-                    $loggedOnUsers += @{
-                        userId            = $users[$i].userId
-                        userPrincipalName = $user.userPrincipalName
-                        displayName       = $user.displayName
-                        lastLogOnDateTime = $users[$i].lastLogonDateTime
-                    }
-                    Write-Verbose "LoggedOn Users: $($loggedOnUsers |ConvertTo-Json)"
-                    $enrolled = $true
-                }
-                else
-                {
-                    Write-Verbose 'User is not an Azure AD user'
-                    $loggedOnUsers += @{
-                        userId            = $users[$i].userId
-                        displayName       = $user.displayName
-                        lastLogOnDateTime = $users[$i].lastLogonDateTime
-                    }
-                }
-            }                
-        }
-        else
-        {
-            Write-Verbose 'Device has no users logged on'
+        Write-Verbose "Users logged on: $($users)"
+        if ($users) {
+            Write-Verbose "Retrieving the user object for user with id $($user.userId)"
+            $user = CallGraphAPI -AccessToken $accessToken -Uri "$userUri/$($users.userId)"
+            if ($user.userPrincipalName -like '*@*' -or $user.userName -like '*@*') {
+                Write-Verbose 'User is an Azure AD user'
+                $azureUser = $true
+            }
+            else {
+                Write-Verbose 'User is not an Azure AD user'
+            }
+            Write-Verbose "User Display Name: $($user.displayName)"
+            Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
+            $loggedOnUsers = @{
+                AzureUser         = $azureUser
+                userId            = $users.userId
+                userPrincipalName = $user.userPrincipalName
+                displayName       = $user.displayName
+                lastLogOnDateTime = $device.usersLoggedOn.lastLogonDateTime
+            }
+            Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json)"
+            $deviceState.Add('loggedOnUsers', $loggedOnUsers)
         }
     }
-    else 
-    {
+    else {
         Write-Verbose 'Device not found in Intune'
     }
     #endregion
     
-    if ($registered)
-    {
+    if ($registered) {
         Write-Verbose "Device registered in Autopilot with serial number $($autopilotDevice.serialNumber)"
-        $deviceState.add('registered', $registered)
-        Write-Verbose "Device registered: $registered"
-        $deviceState.add('autopilotSerialNumber', $autopilotDevice.serialNumber) 
-        Write-Verbose "Device Autopilot Serial Number: $($autopilotDevice.serialNumber)"
-        $deviceState.add('autopilotDeviceId', $autopilotDevice.id)
-        Write-Verbose "Device Autopilot ID: $($autopilotDevice.id)"
-        $deviceState.add('deploymentProfileAssignmentStatus', $autopilotDevice.deploymentProfileAssignmentStatus)
-        Write-Verbose "Device Deployment Profile Assignment Status: $($autopilotDevice.deploymentProfileAssignmentStatus)"
-        $deviceState.add('enrollmentState', $autopilotDevice.enrollmentState)
-        Write-Verbose "Device Enrollment State: $($autopilotDevice.enrollmentState)"
-        $deviceState.add('groupTag', $autopilotDevice.groupTag)
-        Write-Verbose "Device Group Tag: $($autopilotDevice.groupTag)"
-        $deviceState.add('deploymentProfileAssignedDateTime', $autopilotDevice.deploymentProfileAssignedDateTime)
-        Write-Verbose "Device Deployment Profile Assigned Date Time: $($autopilotDevice.deploymentProfileAssignedDateTime)"
-        if ($null -ne $autopilotDevice.deploymentProfile.displayName)
-        {
-            $deviceState.add('deploymentProfileDisplayName', $autopilotDevice.deploymentProfile.displayName)
-            Write-Verbose "Device Deployment Profile Display Name: $($autopilotDevice.deploymentProfile.displayName)"
-        }
+        Write-Verbose "Autopilot Registered: $registered"
     }
-    if ($enrolled)
-    {
-        $deviceState.add('enrolled', $enrolled)
-        Write-Verbose "Enrollment State: $enrolled"
-        $deviceState.add('deviceId', $device.id)
-        Write-Verbose "Device ID: $($device.id)"
-        $deviceState.add('serialNumber', $device.serialNumber)
-        Write-Verbose "Device Serial Number: $($device.serialNumber)"
-        $deviceState.add('usersLoggedOnCount', $($users.count))
-        Write-Verbose "Number of users logged on: $($users.count)"
-        $deviceState.add('usersLoggedOn', $loggedOnUsers)
+    else {
+        Write-Verbose 'Device not registered in Autopilot'
     }
-    if ($imported)
-    {
-        $deviceState.add('imported', $imported)
+    if ($enrolled) {
+        Write-Verbose "Device enrolled in Intune with serial number $($device.serialNumber)"
+        Write-Verbose "Device enrolled: $enrolled"
+    }
+    else {
+        Write-Verbose 'Device not enrolled in Intune'
+    }
+    if ($imported) {
+        Write-Verbose "Device is imported into Autopilot with serial number $($importedAutopilotDevice.serialNumber)"
         Write-Verbose "Device Imported: $imported"
-        $deviceState.add('importedAutopilotSerialNumber', $importedAutopilotDevice.serialNumber) 
-        Write-Verbose "Device Imported Autopilot Serial Number: $($importedAutopilotDevice.serialNumber)"
-        $deviceState.add('importedAutopilotId', $importedAutopilotDevice.id)
-        Write-Verbose "Device Imported Autopilot ID: $($importedAutopilotDevice.id)"
-        $deviceState.Add('groupTag', $importedAutopilotDevice.groupTag)
-        Write-Verbose "Device Imported Group Tag: $($importedAutopilotDevice.groupTag)"
-        $deviceState.Add('importId', $importedAutopilotDevice.importId)
-        Write-Verbose "Device Imported ID: $($importedAutopilotDevice.importId)"
-        $deviceState.Add('ImportState', $importedAutopilotDevice.state.deviceImportStatus)
-        Write-Verbose "Device Import State: $($importedAutopilotDevice.state.deviceImportStatus)"
-        $deviceState.Add('importStateRegistrationId', $importedAutopilotDevice.state.deviceRegistrationId)
-        Write-Verbose "Device Import State Registration ID: $($importedAutopilotDevice.state.deviceRegistrationId)"
-        $deviceState.add('importStateErrorCode', $importedAutopilotDevice.state.deviceErrorCode)
-        Write-Verbose "Device Import State Error Code: $($importedAutopilotDevice.state.deviceErrorCode)"
-        $deviceState.add('importStateErrorName', $importedAutopilotDevice.state.deviceErrorName)
     }
-    else
-    {
+    else {
         Write-Verbose 'Device not imported into Autopilot'
     }
+    $deviceState.Add('registered', $registered)
+    $deviceState.add('autoPilotDevice', $returnedAutopilotDevice)
+    $deviceState.add('enrolled', $enrolled)
+    $deviceState.add('device', $returnedManagedDevice)
+    $deviceState.add('imported', $imported)
+    $deviceState.add('importedAutopilotDevice', $returnedImportedDevice)
     Write-Verbose "Device State: $($deviceState | ConvertTo-Json)"
     return $deviceState
 }

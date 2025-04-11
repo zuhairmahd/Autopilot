@@ -46,7 +46,7 @@ function CallGraphAPI() {
     #endregion
     Write-Verbose "Making the following call to the Url: $uri"
     try {
-        $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -StatusCodeVariable 'statusCode'
+        $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers
         $response | ForEach-Object {
             if ($_.'@odata.nextLink') {
                 $nextLink = $_.'@odata.nextLink'
@@ -54,9 +54,8 @@ function CallGraphAPI() {
                 $response.value += $nextGroups.value
             }
         }
-        Write-Verbose "The status code is $statusCode"
         Write-Verbose 'The call was successful.'
-        Write-Verbose "Number of objects: $($response.Count) objects."
+        Write-Verbose "Number of objects: $($response.Count)"
         Write-Verbose "Number of items in each object: $($response.value.Count)"
     }
     catch {
