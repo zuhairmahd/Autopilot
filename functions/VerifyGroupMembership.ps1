@@ -11,7 +11,6 @@ function VerifyGroupMembership() {
     Write-Verbose "The user name is $userName"
     Write-Verbose "The groups to include are $($groupsToInclude -join ', ')"
     Write-Verbose "The groups to exclude are $($groupsToExclude -join ', ')"
-    $success = $false
     $missingIncludeGroups = @()
     $invalidExcludeGroups = @()
     $groupsToReturn = @{}
@@ -22,14 +21,25 @@ function VerifyGroupMembership() {
     $userUri = "https://graph.microsoft.com/beta/users/$($userName)" 
     $accessToken = GetGraphAccessToken -configFile $configFile
     $user = CallGraphApi -accessToken $accessToken -Uri $userUri 
+    #check if the user is a numberic string.
+    if ($user -is [string] -and $user -match '^\d+$') {
+        Write-Verbose "The user $userName was not found in Azure AD."
+        Write-Host "The user $userName was not found in Azure AD." -ForegroundColor Red
+        Write-Host "Please check the user name and try again." -ForegroundColor Red
+        return $false
+    }
     Write-Verbose "The Azure Directory id for $userName ($($user.DisplayName)) is $($user.ID)."
     Write-Verbose "Checking whether the user $userName is a member of the required groups."
     Write-Host "Getting group membership for user $userName ($($user.displayName)) with id $($user.ID)"
     $groupUri = "https://graph.microsoft.com/beta/users/$($userName)/memberOf/microsoft.graph.group"
     $response = CallGraphAPI -accessToken $accessToken -uri $groupUri 
+    if ($response -is [string] -and $response -match '^\d+$') {
+        Write-Host "The group membership for $userName could not be determined."
+        Write-Host "Please try again or contact an intune administrator." -ForegroundColor Red
+        return $false
+    }
     $groups = $response.value | Select-Object -ExpandProperty displayName
     Write-Host "The user $username is a member of $($groups.Count) groups."
-    Write-Verbose "The user $userName is a member of $($($groups.Count)) groups."
     Write-Verbose "The user $userName is a member of the following groups:`n$($groups -join "`n")"
     #endregion
     
@@ -74,8 +84,7 @@ function VerifyGroupMembership() {
 
     if (($missingIncludeGroups.Count -eq 0) -and ($invalidExcludeGroups.Count -eq 0)) {
         Write-Verbose "The user $userName is a member of all required groups and not a member of any excluded groups."
-        $success = $true
-        return $success
+        return $true
     }
     else {
         if ($missingIncludeGroups.Count -gt 0) {
@@ -88,5 +97,4 @@ function VerifyGroupMembership() {
         }
         return $groupsToReturn
     }
-    return $success
 }

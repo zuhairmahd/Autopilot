@@ -80,30 +80,33 @@ function CallGraphAPI() {
         }
         switch ($statusCode) {
             400 {
+                Write-Verbose "Status code: $statusCode"
                 Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
             }
             401 {
+                Write-Verbose "Status code: $statusCode"
                 Write-Host 'Unauthorized. Please check your access token.' -ForegroundColor Red 
             }
             403 {
+                Write-Verbose "Status code: $statusCode"
                 Write-Host 'Forbidden. You do not have permission to access this resource.' -ForegroundColor Red 
             }
             404 {
+                Write-Verbose "Status code: $statusCode"
                 Write-Host 'Not found. The resource does not exist.' -ForegroundColor Red 
             }
             default {
                 Write-Host 'An unknown error occurred. Please check the error message below.' -ForegroundColor Red 
+                Write-Host "Error: $statusMessage" -ForegroundColor Red
+                Write-Host "The status code is $statusCode"
+                Write-Host "$statusCode indicates $statusCodeMessage"
+                Write-Host "Status message: $statusMessage"
+                Write-Host 'The full error message follows below:'
+                Write-Host '----------------------------------------------------------'
+                Write-Host "$_"
             }
         }
-        Write-Host "Error: $statusMessage" -ForegroundColor Red
-        Write-Host "The status code is $statusCode"
-        Write-Host "$statusCode indicates $statusCodeMessage"
-        Write-Host "Status message: $statusMessage"
-        Write-Host 'The full error message follows below:'
-        Write-Host '----------------------------------------------------------'
-        Write-Host "$_"
-        $response = $statusCode
-        return $response
+        return $statusCode
     }
     Write-Verbose "Response value: $($response.value)"
     return $response
