@@ -30,7 +30,6 @@ $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertF
 $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion Define variables
 
-
 #region Get user input.
 Write-Host 'What would you like to do?'
 $choices = @('Verify this device', 'Verify another device', 'Verify a user', 'Exit')
@@ -95,87 +94,16 @@ switch ($choice) {
 }
 #endregion Get user input.
 
-# #region Connect to Microsoft Graph
-# if (connectToTenant($configFile))
-# {
-#     Write-Verbose 'Successfully connected to Microsoft Graph.' 
-# }
-# else
-# {
-#     Write-Host 'Failed to connect to Microsoft Graph.' -ForegroundColor Red
-#     exit 1
-# }
-# $scopes = Get-MgContext | Select-Object -ExpandProperty Scopes | Sort-Object
-# if ($scopes)
-# {
-#     Write-Verbose "The following $($scopes.Count) scopes are available:"
-#     $scopes | ForEach-Object { Write-Verbose $_ }
-# }
-# else
-# {
-#     Get-MgContext | Format-List
-# }
-# #endregion Connect to Microsoft Graph
-
 Write-Verbose "Action to execute: $whatToDo"
 if ($whatToDo -eq 'device') {
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
     $global:enrollmentState = VerifyEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
-    exit 0
-    Write-Verbose "The enrollment state is: $($enrollmentState | Out-String)"
-    if (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $false)) {
-        Write-Host "The device with serial number $SerialNumber is not imported or enrolled." -ForegroundColor Yellow
-        Write-Host 'You need to import the device in Intune manually or using the provided script.' -ForegroundColor Yellow
-    }
-    elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $false)) {
-        Write-Host 'The device is imported in Intune but is not enrolled.' -ForegroundColor Yellow
-    }
-    elseif (($enrollmentState.imported -eq $false) -and ($enrollmentState.enrolled -eq $true) -and ($enrollmentState.userName -ne 'unknown')) {
-        Write-Host "This device is enrolled and is being used by $($enrollmentState.usersLoggedOn[0].userPrincipalName) ($($enrollmentState.DisplayName))" -ForegroundColor Green
-    }
-    elseif (($enrollmentState.imported -eq $true) -and ($enrollmentState.enrolled -eq $true)) {
-        Write-Host 'The device is enrolled and is registered to a user.'
-        if ($enrollmentState.usersLoggedOn.userPrincipalName -ne 'unknown') {
-            Write-Host "The registered user is $($enrollmentState.usersLoggedOn[0].userPrincipalName) ($($enrollmentState.usersLoggedOn[0].DisplayName))" -ForegroundColor Green
-            Write-Host 'You must wipe the device to get it ready for another user'
-            Write-Host 'Wiping a device is a distructive command.  Make sure you are wiping the correct device.'
-            Write-Host "Device id: $($enrollmentState.deviceId)"
-            Write-Host "Device serial number: $SerialNumber"
-            Write-Host "Registered user: $($enrollmentState.usersLoggedOn[0].userPrincipalName) `r`n"
-            Write-Host 'Would you still like to send a wipe command to the device? (Y/N)'
-            $response = Read-Host
-            while ($response -notin 'Y', 'N') {
-                Write-Host 'Please enter Y or N.' -ForegroundColor Yellow
-                [console]::beep(500, 300)
-                $response = Read-Host
-            }
-            if ($response -eq 'Y') {
-                $response = SendDeviceCommand -ManagedDeviceId $enrollmentState.id
-                if ($response -eq $true) {
-                    Write-Host "The wipe command has been sent to the device with serial number $SerialNumber."
-                    Write-Host 'Please manually sync the device or give the device enough time to sync and reset.'
-                    Write-Host 'The device will be ready for another user after the wipe is complete.'
-                    Write-Host 'Please contact an Intune admin if you have any problems.'
-                }
-                else {
-                    Write-Host "The wipe command failed to send to the device with serial number $SerialNumber."
-                    Write-Host 'Please contact an Intune admin.'
-                }
-                exit 0
-            }
-            else {
-                Write-Host 'Aborting script.'
-                exit 0
-            }
-        }
-        else {
-            Write-Host 'The user is not registered.'
-        }
-    }
-    else {
-        Write-Host 'Unknown error.' -ForegroundColor Red
-        Write-Host 'Please check the Intune portal or contact an Intune administrator.'
-        exit 1
+    Write-Host "The enrollment state is: $($enrollmentState.enrolled)"
+    Write-Host "The registration state is: $($enrollmentState.registered)"
+    Write-Host "The imported state is: $($enrollmentState.imported)"
+    if ($enrollmentState.enrolled -eq $true) {
+        Write-Host 'The device is enrolled.' -ForegroundColor Green
+        Write-Host 'You may proceed with enrollment.'
     }
 }
 elseif ($whatToDo -eq 'user') {

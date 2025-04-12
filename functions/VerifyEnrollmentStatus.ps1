@@ -47,7 +47,7 @@ function VerifyEnrollmentStatus() {
     $loggedOnUsers = [ordered] @{}
     $deviceState = [ordered] @{}
     $loggedOnUsers = @()
-    $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
+    $autoPilotDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities`?$filter=serialNumber eq '$serialNumber'"
     $importedAutopilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/importedWindowsAutopilotDeviceIdentities'
     $deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
     $userUri = 'https://graph.microsoft.com/beta/users'
@@ -72,7 +72,7 @@ function VerifyEnrollmentStatus() {
     $autopilotRawDevice = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
     Write-Verbose "Autopilot Device serial number: $($autopilotRawDevice.serialNumber)"
     if ($autopilotRawDevice) {
-        Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "Device found in Autopilot with serial number $($autopilotRawDevice.serialNumber)"
         $expandedDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotRawDevice.id)?`$expand=deploymentProfile"
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -Uri $expandedDeviceURI
         $registered = $true

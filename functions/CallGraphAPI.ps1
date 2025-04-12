@@ -19,18 +19,24 @@ function CallGraphAPI() {
     Write-Verbose "Uri: $uri"
     Write-Verbose "Method: $method"
     Write-Verbose "Filter: $filter"
-    Write-Verbose "Consistency Level: $cl"
+    Write-Verbose "Consistency Level: $consistencyLevel"
     Write-Verbose "SecureString: $secureString"
     #endregion
 
     #region Encode filter and add headers
     if ($Filter) {
         Write-Verbose 'Encoding the filter value.'
-        $Filter = [System.Web.HttpUtility]::UrlEncode($filter)
-        $uri += "?`$filter=$Filter"
+        $encodedFilter = [uri]::EscapeDataString($filter)
+        if ($uri -notmatch '\?') {
+            $uri += "?`$filter=$encodedFilter"
+        }
+        else {
+            $uri += "&`$filter=$encodedFilter"
+        }
         Write-Verbose "Uri: $uri"
     }
     if ($consistencyLevel) {
+        Write-Verbose 'Adding consistency level to the headers.'
         $headers = @{
             Authorization    = "Bearer $accessToken"
             'Content-Type'   = 'application/json'
@@ -38,15 +44,16 @@ function CallGraphAPI() {
         }
     }
     else {
+        Write-Verbose 'No consistency level provided.'
         $headers = @{
             Authorization  = "Bearer $accessToken"
             'Content-Type' = 'application/json'
         }
     }
     #endregion
-    Write-Verbose "Making the following call to the Url: $uri"
+    Write-Verbose "Making the following call to the Url: $uri with the method: $method."
     try {
-        $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers
+        $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -UseBasicParsing 
         $response | ForEach-Object {
             if ($_.'@odata.nextLink') {
                 $nextLink = $_.'@odata.nextLink'
@@ -59,9 +66,18 @@ function CallGraphAPI() {
         Write-Verbose "Number of items in each object: $($response.value.Count)"
     }
     catch {
-        $statusCode = $_.Exception.statuscode.value__
-        $statusCodeMessage = $_.Exception.statuscode
-        $statusMessage = $_.Exception.Message
+        if ($null -eq $_.Exception.statusCode) {
+            $statusCode = [regex]::Match($_.Exception.Message, '\d+').Value
+            Write-Verbose "Status code: $statusCode"
+            $statusCodeMessage = $_.Exception | Out-String
+            Write-Verbose "Status code message: $statusCodeMessage"
+            $statusMessage = $statusCodeMessage
+        }
+        else {
+            $statusCode = $_.Exception.statuscode.value__
+            $statusCodeMessage = $_.Exception.statuscode
+            $statusMessage = $_.Exception.Message
+        }
         switch ($statusCode) {
             400 {
                 Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
@@ -82,7 +98,7 @@ function CallGraphAPI() {
         Write-Host "Error: $statusMessage" -ForegroundColor Red
         Write-Host "The status code is $statusCode"
         Write-Host "$statusCode indicates $statusCodeMessage"
-        Write-Host "The status message is $statusMessage"
+        Write-Host "Status message: $statusMessage"
         Write-Host 'The full error message follows below:'
         Write-Host '----------------------------------------------------------'
         Write-Host "$_"

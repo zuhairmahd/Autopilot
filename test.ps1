@@ -7,18 +7,15 @@ param
 
 #region import functions.
 $functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder)
-{
+if (Test-Path $functionsFolder) {
     Write-Verbose "Importing functions from $functionsFolder"
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-    foreach ($function in $functions)
-    {
+    foreach ($function in $functions) {
         Write-Verbose "Importing function $function"
         . $function.FullName
     }
 }
-else
-{
+else {
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
@@ -29,6 +26,7 @@ $importedAutopilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement
 $deviceUri = "https://graph.microsoft.com/beta/devices"
 $deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
 $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
+$filter = "serialNumber eq '$serialNumber'"
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
@@ -42,24 +40,19 @@ $global:autopilot = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDevice
 
 exit 0
 #region properties search
-foreach ($global:autopilotDevice in $global:autopilot.value)
-{
+foreach ($global:autopilotDevice in $global:autopilot.value) {
     Write-Host "Checking autopilot device with serial number: $($global:autopilotDevice.serialNumber) and deviceId: $($global:autopilotDevice.id)" -ForegroundColor Green
     $id = $global:autopilotDevice.id
     $productKey = $global:autopilotDevice.productKey
     $azureActiveDirectoryDeviceId = $global:autopilotDevice.azureActiveDirectoryDeviceId
     $azureAdDeviceId = $global:autopilotDevice.azureAdDeviceId
     $managedDeviceId = $global:autopilotDevice.managedDeviceId
-    for ($i = 0; $i -lt $global:devices.value.Count; $i++)
-    {
+    for ($i = 0; $i -lt $global:devices.value.Count; $i++) {
         $device = $global:devices.value[$i]
         Write-Host "Checking device with serial number: $($device.serialNumber)"
-        foreach ($property in $device.PSObject.Properties)
-        {
-            if (($property.Name -like '*Id') -and ($null -ne $property.value) -and ($property.value -contains $azureAdDeviceId -or $property.value -contains $azureActiveDirectoryDeviceId -or $property.value -contains $managedDeviceId -or $property.value -contains $productKey -or $property.value -contains $id))
-            {
-                if ($property.value -contains $azureAdDeviceId)
-                {
+        foreach ($property in $device.PSObject.Properties) {
+            if (($property.Name -like '*Id') -and ($null -ne $property.value) -and ($property.value -contains $azureAdDeviceId -or $property.value -contains $azureActiveDirectoryDeviceId -or $property.value -contains $managedDeviceId -or $property.value -contains $productKey -or $property.value -contains $id)) {
+                if ($property.value -contains $azureAdDeviceId) {
                     Write-Host "The property with name $($property.Name) contains the AzureAdDeviceId: $azureAdDeviceId" -ForegroundColor Yellow
                     Write-Host "The Property tested: AzureAdDeviceId"
                     Write-Host "The Property tested value: $azureAdDeviceId"
@@ -72,8 +65,7 @@ foreach ($global:autopilotDevice in $global:autopilot.value)
                         'MatchingPropertyValue' = $property.value
                     }
                 }
-                if ($property.value -contains $azureActiveDirectoryDeviceId)
-                {
+                if ($property.value -contains $azureActiveDirectoryDeviceId) {
                     Write-Host "The property with name $($property.Name) contains the AzureActiveDirectoryDeviceId: $azureActiveDirectoryDeviceId" -ForegroundColor Yellow
                     Write-Host "The Property tested: AzureActiveDirectoryDeviceId"
                     Write-Host "The Property tested value: $azureActiveDirectoryDeviceId"
@@ -86,8 +78,7 @@ foreach ($global:autopilotDevice in $global:autopilot.value)
                         'MatchingPropertyValue' = $property.value
                     }
                 }
-                if ($property.value -contains $managedDeviceId)
-                {
+                if ($property.value -contains $managedDeviceId) {
                     Write-Host "The property with name $($property.Name) contains the ManagedDeviceId: $managedDeviceId" -ForegroundColor Yellow
                     Write-Host "The Property tested: ManagedDeviceId"
                     Write-Host "The Property tested value: $managedDeviceId"
@@ -100,8 +91,7 @@ foreach ($global:autopilotDevice in $global:autopilot.value)
                         'MatchingPropertyValue' = $property.value
                     }
                 } 
-                if ($property.value -contains $productKey)
-                {
+                if ($property.value -contains $productKey) {
                     Write-Host "The property with name $($property.Name) contains the ProductKey: $productKey" -ForegroundColor Yellow
                     Write-Host "The Property tested: ProductKey"
                     Write-Host "The Property tested value: $productKey"
@@ -114,8 +104,7 @@ foreach ($global:autopilotDevice in $global:autopilot.value)
                         'MatchingPropertyValue' = $property.value
                     }
                 }
-                if ($property.value -contains $id)
-                {
+                if ($property.value -contains $id) {
                     Write-Host "The property with name $($property.Name) contains the Id: $id" -ForegroundColor Yellow
                     Write-Host "The Property tested: Id"
                     Write-Host "The Property tested value: $id"
