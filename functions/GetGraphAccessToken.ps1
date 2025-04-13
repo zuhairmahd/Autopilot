@@ -1,5 +1,4 @@
-function GetGraphAccessToken()
-{
+function GetGraphAccessToken() {
     [CmdletBinding()]
     param
     (
@@ -15,13 +14,39 @@ function GetGraphAccessToken()
     )
 
     #region write a verbose log of the received parameters
-    Write-Verbose "TenantId: $tenantId"
-    Write-Verbose "ClientId: $clientId"
-    Write-Verbose "ClientSecret: $clientSecret"
-    Write-Verbose "ConfigFile: $configFile"
+    if ($PSCmdlet.ParameterSetName -eq 'Manual') {
+        Write-Verbose "Using parameters from the command line"
+        Write-Verbose "TenantId: $tenantId"
+        Write-Verbose "ClientId: $clientId"
+        Write-Verbose "ClientSecret: secret Provided"
+    }
+    elseif ($PSCmdlet.ParameterSetName -eq 'File') {
+        Write-Verbose "Using parameters from the config file $($configFile)"
+    }
+    else {
+        Write-Error "Invalid parameter set. Use -configFile or -tenantId, -clientId, and -clientSecret."
+        return $null
+    }
     #endregion
-    if ($configFile)
-    {
+    
+    $tokenExpiryBufferMinutes = 5 # Request new token 5 minutes before actual expiry
+    Write-Verbose "Token expiry buffer: $tokenExpiryBufferMinutes minutes"
+    # Check if a valid token exists in the cache
+    Write-Verbose "Checking for cached token"
+    $bufferTime = (Get-Date).AddMinutes($tokenExpiryBufferMinutes)
+    Write-Verbose "Buffer time for token expiry: $bufferTime"
+    if ($null -ne $global:accessToken -and $global:tokenExpiryTime -gt $bufferTime) {
+        $remainingMinutes = [math]::Floor(($global:tokenExpiryTime - (Get-Date)).TotalMinutes)
+        $remainingSeconds = [math]::Floor(($global:tokenExpiryTime - (Get-Date)).TotalSeconds) % 60
+        Write-Verbose "Using cached Access Token. The token expires on $($global:tokenExpiryTime.ToString('MM-dd-yyyy HH:mm:ss')) and is valid for another $remainingMinutes minutes and $remainingSeconds seconds."
+        Write-Host "Using cached Access Token."
+        return $accessToken
+    }
+    else {
+        Write-Verbose "No valid cached token found. Requesting a new token."
+        Write-Host "Requesting a new token."
+    }
+    if ($configFile) {
         Write-Verbose "Reading config file $configFile"
         $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
         Write-Verbose "Decrypting values from $configFile"
@@ -30,29 +55,46 @@ function GetGraphAccessToken()
         $clientId = $config.appId
         $clientSecret = $config.appSecret
     }
-    else 
-    {
+    else {
         Write-Verbose "Using parameters from the command line"
     }
 
-    if ($tenantId -and $clientId -and $clientSecret)
-    {
+    if ($tenantId -and $clientId -and $clientSecret) {
+        Write-Verbose "Requesting new access token"
         $body = @{
             client_id     = $clientId
             scope         = 'https://graph.microsoft.com/.default'
             client_secret = $clientSecret
             grant_type    = 'client_credentials'
         }   
-        $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -ContentType 'application/x-www-form-urlencoded' -Body $body
-        $accessToken = $tokenResponse.access_token
+        try {
+            $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -ContentType 'application/x-www-form-urlencoded' -Body $body
+            Write-Verbose "Access token received"
+            if ($SecureString) {
+                Write-Verbose "Converting access token to secure string"
+                $accessToken = ConvertTo-SecureString -String $accessToken -AsPlainText -Force 
+            }
+            # Calculate the absolute expiry time
+            $global:tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+            Write-Verbose "Access token will expire at $($global:tokenExpiryTime)"
+            $global:accessToken = $tokenResponse.access_token
+            return $global:accessToken
+        }
+        catch {
+            Write-Error "Failed to get access token: $_"
+            if ($_.Exception.Response) {
+                $errorResponse = $_.Exception.Response.GetResponseStream()
+                $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                $errorMessage = $streamReader.ReadToEnd()
+                $streamReader.Close()
+                Write-Error "Server Response: $errorMessage"
+            }
+            # Reset cache on failure
+            $global:accessToken = $null
+            $global:tokenExpiryTime = $null
+            return $null # Indicate failure
+        }
     }
-
-    if ($SecureString)
-    {
-        Write-Verbose "Converting access token to secure string"
-        $accessToken = ConvertTo-SecureString -String $accessToken -AsPlainText -Force 
-    }
-    return $accessToken
 }
 
 

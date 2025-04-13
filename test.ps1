@@ -31,6 +31,8 @@ $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
 
+
+
 # $global:enrollmentState = VerifyEnrollmentStatus -serialNumber $serialNumber -accessToken $accessToken
 # Write-Host "Enrollment State: $($global:enrollmentState |ConvertTo-Json)" -ForegroundColor Green
 $global:devices = CallGraphAPI -AccessToken $accessToken -Uri $deviceUri -Filter "startswith(operatingSystem,'Windows')" -Method GET
