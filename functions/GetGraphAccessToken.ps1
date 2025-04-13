@@ -1,58 +1,50 @@
 function GetGraphAccessToken()
 {
-    [CmdletBinding(DefaultParameterSetName = 'Manual')]
+    [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')]
-        [string]$tenantId,
-        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')]
-        [string]$clientId,
-        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')]
-        [string]$clientSecret,
-        [Parameter(Mandatory = $true, ParameterSetName = 'File')]
+        [Parameter(Mandatory = $true)]
         [string]$configFile,
-        [Parameter(ParameterSetName = 'Manual')]
-        [Parameter(ParameterSetName = 'File')]
         [int]$renewalLeadTime = 5,
-        [Parameter(ParameterSetName = 'Manual')]
-        [Parameter(ParameterSetName = 'File')]
         [switch]$SecureString,
-        [Parameter(ParameterSetName = 'Manual')]
-        [Parameter(ParameterSetName = 'File')]
         [switch]$ForceNewToken,
-        [Parameter(ParameterSetName = 'Manual')]
-        [Parameter(ParameterSetName = 'File')]
-        [Parameter(ParameterSetName = 'Cache')]
         [ValidateSet('file', 'memory')]
-        [string]$CacheType = 'File'
+        [string]$CacheType = 'Memory'
     )
-    #region write a verbose log of the received parameters
-    if ($PSCmdlet.ParameterSetName -eq 'Manual')
+    #region Read config file
+    if ($configFile)
     {
-        Write-Verbose "Using parameters from the command line"
-        foreach ($param in $PSBoundParameters.Keys)
+        Write-Verbose "Reading config file $configFile"
+        $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
+        Write-Verbose "Decrypting values from $configFile"
+        if (isEncrypted -data $config)
         {
-            Write-Verbose "$($param): $($PSBoundParameters[$param])"
+            Write-Verbose "Config file is encrypted. Decrypting."
+            $config = DecryptObject -encryptedObject $config -excludeFields 'domain'
         }
-        $cacheFolder = $pwd
-        Write-Verbose "Cache folder: $cacheFolder"
-    }
-    elseif ($PSCmdlet.ParameterSetName -eq 'File')
-    {
-        Write-Verbose "Using parameters from the config file $($configFile)"
-        $cacheFolder = Split-Path -Path $configFile
-        Write-Verbose "Cache folder: $cacheFolder"
+        else
+        {
+            Write-Verbose "Config file is not encrypted. Using as is."
+        }
+        $tenantId = $config.tenantId
+        $clientId = $config.appId
+        $clientSecret = $config.appSecret
+        $domain = $config.domain
     }
     else
     {
-        Write-Error "Invalid parameter set. Use -configFile or -tenantId, -clientId, and -clientSecret."
+        Write-Error "Config file not found. Please provide a valid config file."
         return $null
     }
-    #Check if any other commandlines were past in the default set and add them to the verbose log.
-    Write-Verbose "Checking any other commandlines passed in the default set."
-    foreach ($param in $PSBoundParameters.Keys)
-    {
-        Write-Verbose "$($param): $($PSBoundParameters[$param])"
-    }
+    #endregion
+
+    #region write a verbose log of the received parameters
+    Write-Verbose "Received parameters:"
+    Write-Verbose "Configuration File: $configFile"
+    Write-Verbose "Renewal Lead Time: $renewalLeadTime"
+    Write-Verbose "Secure String: $SecureString"
+    Write-Verbose "Force New Token: $ForceNewToken"
+    Write-Verbose "Cache Type: $CacheType"
+    Write-Verbose "Domain: $domain"
     #endregion
 
     $cacheTokenFile = $cacheFolder + "\accessToken.json"
@@ -74,17 +66,28 @@ function GetGraphAccessToken()
                 if ($Global:MemoryCache.ContainsKey('accessToken'))
                 {
                     $accessTokenObject = $Global:MemoryCache['accessToken']
-                    Write-Verbose "Token found in memory cache."
-                    $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-                    if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
+                    if ($accessTokenObject.domain -eq $domain)
                     {
-                        Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
-                        Write-Host "Using cached access token from memory."
-                        return $accessTokenObject.access_token
+                        Write-Verbose "Domain matches. Using cached token."
+                        Write-Verbose "Domain: $($accessTokenObject.domain)"
+                        Write-Verbose "Matching domain: $domain"
+                        Write-Verbose "Token for $domain found in memory cache."
+                        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
+                        if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
+                        {
+                            Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
+                            Write-Host "Using cached access token for $($accessTokenObject.domain) from memory."
+                            return $accessTokenObject.access_token
+                        }
+                        else
+                        {
+                            Write-Host "Access token in memory is expired or invalid. Requesting a new one."
+                        }
                     }
                     else
                     {
-                        Write-Host "Access token in memory is expired or invalid. Requesting a new one."
+                        Write-Host "Domain does not match. Requesting a new token from $domain."
+                        $accessTokenObject = $null
                     }
                 }
                 else
@@ -101,29 +104,28 @@ function GetGraphAccessToken()
                 try
                 {
                     $accessTokenObject = Get-Content -Path $cacheTokenFile -Raw -Force | ConvertFrom-Json
-                    Write-Verbose "Cache file read successfully"
-                    if (isEncrypted -data $accessTokenObject)
+                    if ($accessTokenObject.domain -eq $domain)
                     {
-                        Write-Verbose "Access token is encrypted. Converting to plain text."
-                        $accessToken = DecryptObject -encryptedObject $accessTokenObject -excludeFields 'AbsoluteExpiryTime'
-                        Write-Verbose "Decrypted access token."
-                    }
-                    else
-                    {
-                        Write-Verbose "Access token is not a secure string. Using as is."
+                        Write-Verbose "Domain matches. Using cached token."
+                        Write-Verbose "Cache file read successfully"
                         $accessToken = $accessTokenObject.access_token
-                    }
-                    $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-                    Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires, which will be on $($timeBuffer)"
-                    if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
-                    {
-                        Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
-                        Write-Host "Using cached access token from disk."
-                        return $accessToken
+                        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
+                        Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires, which will be on $($timeBuffer)"
+                        if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
+                        {
+                            Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
+                            Write-Host "Using cached access token from disk."
+                            return $accessToken
+                        }
+                        else
+                        {
+                            Write-Host "Access token is expired or invalid. Requesting a new one."
+                        }
                     }
                     else
                     {
-                        Write-Host "Access token is expired or invalid. Requesting a new one."
+                        Write-Verbose "Domain does not match. Requesting a new token."
+                        $accessTokenObject = $null
                     }
                 }
                 catch
@@ -153,31 +155,7 @@ function GetGraphAccessToken()
     }
     #endregion
 
-    #region Check for config file
-    if ($configFile)
-    {
-        Write-Verbose "Reading config file $configFile"
-        $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
-        Write-Verbose "Decrypting values from $configFile"
-        if (isEncrypted -data $config)
-        {
-            Write-Verbose "Config file is encrypted. Decrypting."
-            $config = DecryptObject -encryptedObject $config -excludeFields 'domain'
-        }
-        else
-        {
-            Write-Verbose "Config file is not encrypted. Using as is."
-        }
-        $tenantId = $config.tenantId
-        $clientId = $config.appId
-        $clientSecret = $config.appSecret
-    }
-    else
-    {
-        Write-Verbose "Using parameters from the command line"
-    }
-    #endregion
-
+    
     if ($tenantId -and $clientId -and $clientSecret)
     {
         Write-Verbose "Requesting new access token"
@@ -193,11 +171,12 @@ function GetGraphAccessToken()
             Write-Verbose "Access token received"
             Write-Verbose "Calculating absolute expiry time"
             Write-Verbose "Converting from $($tokenResponse.expires_in)"
-            $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+            $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in).ToLocalTime()
             Write-Verbose "Converted to $($tokenExpiryTime)"
             Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
             Write-Verbose "Creating hashtable for cached token"
             $cachedToken = [psCustomObject] @{
+                'domain'           = $domain
                 access_token       = $tokenResponse.access_token
                 AbsoluteExpiryTime = $tokenExpiryTime
                 'expires_in'       = $tokenResponse.expires_in
@@ -211,7 +190,7 @@ function GetGraphAccessToken()
             else
             {
                 Write-Verbose "Encrypting access token"
-                $encryptedCashedToken = EncryptObject -plainObject $cachedToken -excludeFields 'AbsoluteExpiryTime'
+                $encryptedCashedToken = EncryptObject -plainObject $cachedToken -excludeFields @('AbsoluteExpiryTime', 'expires_in')
                 Write-Verbose "Saving access token to cache file: $cacheTokenFile"
                 Write-Verbose "Creating cache folder if it does not exist"
                 if (-not (Test-Path -Path $cacheFolder))

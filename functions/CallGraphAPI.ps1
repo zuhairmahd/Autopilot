@@ -1,4 +1,5 @@
-function CallGraphAPI() {
+function CallGraphAPI()
+{
     [CmdletBinding()]
     param
     (
@@ -13,7 +14,8 @@ function CallGraphAPI() {
     )
     
     #region variables and logs
-    if ($accessToken) {
+    if ($accessToken)
+    {
         Write-Verbose "Access token provided."
     }
     Write-Verbose "Uri: $uri"
@@ -24,18 +26,16 @@ function CallGraphAPI() {
     #endregion
 
     #region Encode filter and add headers
-    if ($Filter) {
+    if ($Filter)
+    {
         Write-Verbose 'Encoding the filter value.'
         $encodedFilter = [uri]::EscapeDataString($filter)
-        if ($uri -notmatch '\?') {
-            $uri += "?`$filter=$encodedFilter"
-        }
-        else {
-            $uri += "&`$filter=$encodedFilter"
-        }
-        Write-Verbose "Uri: $uri"
+        Write-Host "Encoded filter: $encodedFilter"
+        $uri = "$uri`?`$filter=$encodedFilter"
+        Write-Host "Uri: $uri"
     }
-    if ($consistencyLevel) {
+    if ($consistencyLevel)
+    {
         Write-Verbose 'Adding consistency level to the headers.'
         $headers = @{
             Authorization    = "Bearer $accessToken"
@@ -43,7 +43,8 @@ function CallGraphAPI() {
             ConsistencyLevel = 'Eventual'
         }
     }
-    else {
+    else
+    {
         Write-Verbose 'No consistency level provided.'
         $headers = @{
             Authorization  = "Bearer $accessToken"
@@ -52,10 +53,12 @@ function CallGraphAPI() {
     }
     #endregion
     Write-Verbose "Making the following call to the Url: $uri with the method: $method."
-    try {
+    try
+    {
         $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -UseBasicParsing 
         $response | ForEach-Object {
-            if ($_.'@odata.nextLink') {
+            if ($_.'@odata.nextLink')
+            {
                 $nextLink = $_.'@odata.nextLink'
                 $nextGroups = CallGraphAPI -accessToken $accessToken -Uri $nextLink -Method GET
                 $response.value += $nextGroups.value
@@ -65,37 +68,46 @@ function CallGraphAPI() {
         Write-Verbose "Number of objects: $($response.Count)"
         Write-Verbose "Number of items in each object: $($response.value.Count)"
     }
-    catch {
-        if ($null -eq $_.Exception.statusCode) {
+    catch
+    {
+        if ($null -eq $_.Exception.statusCode)
+        {
             $statusCode = [regex]::Match($_.Exception.Message, '\d+').Value
             Write-Verbose "Status code: $statusCode"
             $statusCodeMessage = $_.Exception | Out-String
             Write-Verbose "Status code message: $statusCodeMessage"
             $statusMessage = $statusCodeMessage
         }
-        else {
+        else
+        {
             $statusCode = $_.Exception.statuscode.value__
             $statusCodeMessage = $_.Exception.statuscode
             $statusMessage = $_.Exception.Message
         }
-        switch ($statusCode) {
-            400 {
+        switch ($statusCode)
+        {
+            400
+            {
                 Write-Verbose "Status code: $statusCode"
                 Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
             }
-            401 {
+            401
+            {
                 Write-Verbose "Status code: $statusCode"
                 Write-Host 'Unauthorized. Please check your access token.' -ForegroundColor Red 
             }
-            403 {
+            403
+            {
                 Write-Verbose "Status code: $statusCode"
                 Write-Host 'Forbidden. You do not have permission to access this resource.' -ForegroundColor Red 
             }
-            404 {
+            404
+            {
                 Write-Verbose "Status code: $statusCode"
                 Write-Host 'Not found. The resource does not exist.' -ForegroundColor Red 
             }
-            default {
+            default
+            {
                 Write-Host 'An unknown error occurred. Please check the error message below.' -ForegroundColor Red 
                 Write-Host "Error: $statusMessage" -ForegroundColor Red
                 Write-Host "The status code is $statusCode"
@@ -106,6 +118,15 @@ function CallGraphAPI() {
                 Write-Host "$_"
             }
         }
+        Write-Error "Failed to call the Graph API: $_"
+        if ($_.Exception.Response)
+        {
+            $errorResponse = $_.Exception.Response.GetResponseStream()
+            $streamReader = New-Object System.IO.StreamReader($errorResponse)
+            $errorMessage = $streamReader.ReadToEnd()
+            $streamReader.Close()
+            Write-Error "Server Response: $errorMessage"
+        }   
         return $statusCode
     }
     Write-Verbose "Response value: $($response.value)"
