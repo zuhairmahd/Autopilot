@@ -1,5 +1,6 @@
-function GetDecryptedObject ()
-<#
+function DecryptObject ()
+{
+    <#
 .SYNOPSIS
     A function to decrypt the values in a hash table.
 .DESCRIPTION
@@ -9,9 +10,8 @@ function GetDecryptedObject ()
     This will decrypt the values in the data hash table and exclude the password field.
 .NOTES
 Version: 3.0.0
-Author: [Your Name]
+Author: Zuhair Mahmoud
 #>
-{
     [CmdletBinding()]
     param (
         [psObject]$encryptedObject,
@@ -29,17 +29,26 @@ Author: [Your Name]
             $decryptedObject.Add($prop.Name, $prop.Value)
             continue
         }
-        Write-Verbose "Decrypting $($prop.Name) with value $($prop.Value)"
+        Write-Verbose "Decrypting $($prop.Name)."
         $propValue = $prop.Value.ToString()
         #convert the value from base 64 to a regular string.
         $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($propValue))
-        Write-Verbose "The unencrypted value for $($prop.Name) is $decodedValue"
-        #add the decoded dictionary to the hash table.
-        $decryptedObject.Add($prop.Name, $decodedValue)
+        #check if the decoding was successful.
+        if ($null -ne $decodedValue)
+        {
+            Write-Verbose "Successfully decrypted $($prop.Name)."
+            #add the decoded dictionary to the hash table.
+            $decryptedObject.Add($prop.Name, $decodedValue)
+        }
+        else
+        {
+            Write-Verbose "Failed to decrypt $($prop.Name)."
+            #add the raw entry to the hash table.
+            $decryptedObject.Add($prop.Name, $propValue)
+        }
     }
     if ($decryptedObject)
     {
-        Write-Verbose "The decoded data is: $($decodedData | ConvertTo-Json)"
         return $decryptedObject
     }
     else

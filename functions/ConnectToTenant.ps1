@@ -18,8 +18,7 @@ Author: Zuhair Mahmoud
 GUID: 7c9e6679-7425-40de-944b-e07fc1f90ae7
 Date: April 5, 2025
 #>
-function ConnectToTenant()
-{
+function ConnectToTenant() {
     [CmdletBinding()]
     param
     (
@@ -28,59 +27,47 @@ function ConnectToTenant()
     )
     $success = $false
     Write-Verbose "Reading app registration details from $configFile."
-    if ($configFile)
-    {
+    if ($configFile) {
         $Config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
-        $config = GetDecryptedObject -encryptedObject $Config -excludeFields 'domain'
-        if ($Config.appId)
-        {
+        $config = DecryptObject -encryptedObject $Config -excludeFields 'domain'
+        if ($Config.appId) {
             $clientID = $Config.AppId
         }
-        else 
-        {
+        else {
             Write-Error 'A client id must be provided in the config file.'
             exit 1
         }
-        if ($config.domain)
-        {
+        if ($config.domain) {
             $domain = $config.domain
         }
-        else 
-        {
+        else {
             Write-Host 'No domain was provided.  Defaulting  to Your Company'
             $domain = 'Your Company'
         }
-        if ($Config.tenantId)
-        {
+        if ($Config.tenantId) {
             $tenantID = $Config.tenantId
         }
-        else 
-        {
+        else {
             Write-Error 'A tenant id must be provided in the config file.'
             exit 1
         }
-        if ($Config.AppSecret)
-        {
+        if ($Config.AppSecret) {
             $clientSecret = $Config.AppSecret
         }
-        elseif ($Config.thumbprint)
-        {
+        elseif ($Config.thumbprint) {
             $thumbprint = $Config.thumbprint
         }
-        else 
-        {
+        else {
             Write-Host 'Either a client secret or a certificate thumbprint must be provided in the config file.'
             exit 1
         }
     }
-    else
-    {
+    else {
         Write-Host "The file $configFile does not exist."
         Write-Host 'Please provide a valid config file.'
         exit 1
     }
-    if ($clientSecret -and -not $success)
-    {
+    if ($clientSecret -and -not $success) {
         Write-Verbose 'Connecting to Microsoft Graph using client secret authentication with the following details:'
         Write-Verbose "Client ID: $clientID"
         Write-Verbose "Tenant ID: $tenantID"
@@ -90,8 +77,7 @@ function ConnectToTenant()
         Write-Host "Successfully connected to $domain using a client secret"
         $success = $true
     }
-    elseif ($thumbprint -and -not $success)
-    {
+    elseif ($thumbprint -and -not $success) {
         Write-Verbose 'Connecting to Microsoft Graph using certificate authentication with the following details:'
         Write-Verbose "Client ID: $clientID"
         Write-Verbose "Tenant ID: $tenantID"
