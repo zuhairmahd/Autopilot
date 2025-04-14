@@ -110,10 +110,11 @@ function GetGraphAccessToken()
                         Write-Verbose "Domain matches. Using cached token."
                         Write-Verbose "Cache file read successfully"
                         $accessToken = $accessTokenObject.access_token
-                        #convert to local time
+                        Write-Verbose "Access Token Expirey Time in UTC: $($accessTokenObject.AbsoluteExpiryTime)"
                         $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
+                        Write-Verbose "Absolute Expiry Time: $absoluteExpiryTime"
                         $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-                        Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires, which will be on $($timeBuffer)"
+                        Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires."
                         if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $absoluteExpiryTime -gt $timeBuffer)
                         {
                             Write-Host "Access token for $($accessTokenObject.domain) is valid until $absoluteExpiryTime."
@@ -174,7 +175,7 @@ function GetGraphAccessToken()
             Write-Verbose "Access token received"
             Write-Verbose "Calculating absolute expiry time"
             Write-Verbose "Converting from $($tokenResponse.expires_in)"
-            $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in).ToLocalTime()
+            $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
             Write-Verbose "Converted to $($tokenExpiryTime)"
             Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
             Write-Verbose "Creating hashtable for cached token"
