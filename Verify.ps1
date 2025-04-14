@@ -112,14 +112,10 @@ if ($whatToDo -eq 'device')
 {
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
     $global:enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
-    Write-Host "The enrollment state is: $($enrollmentState.enrolled)"
-    Write-Host "The registration state is: $($enrollmentState.registered)"
+    Write-Host "The management state is: $($enrollmentState.managed)"
+    Write-Host "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
     Write-Host "The imported state is: $($enrollmentState.imported)"
-    if ($enrollmentState.enrolled -eq $true)
-    {
-        Write-Host 'The device is enrolled.' -ForegroundColor Green
-        Write-Host 'You may proceed with enrollment.'
-    }
+    Write-Host "Has device object: $(enrollmentState.hasDeviceObject"
 }
 elseif ($whatToDo -eq 'user')
 {
@@ -134,26 +130,26 @@ elseif ($whatToDo -eq 'user')
     {
         Write-Verbose "The function returned $($groups.missingIncludeGroups.Count) missing groups and $($groups.invalidExcludeGroups.Count) invalid groups."
         Write-Verbose "Missing include groups: $($groups.missingIncludeGroups) | Out-String)"
-        Write-Verbose "The function returned $($groups.invalidExcludeGroups.Count) invalid exclude groups."
-        Write-Verbose "Invalid exclude groups: $($groups.invalidExcludeGroups) | Out-String)"
-        if ($groups.missingIncludeGroups.Count -gt 0)
+    Write-Verbose "The function returned $($groups.invalidExcludeGroups.Count) invalid exclude groups."
+    Write-Verbose "Invalid exclude groups: $($groups.invalidExcludeGroups) | Out-String)"
+    if ($groups.missingIncludeGroups.Count -gt 0)
+    {
+        Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
+        foreach ($group in $groups.missingIncludeGroups)
         {
-            Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
-            foreach ($group in $groups.missingIncludeGroups)
-            {
-                Write-Host $group -ForegroundColor Red
-            }
+            Write-Host $group -ForegroundColor Red
         }
-        if ($groups.invalidExcludeGroups.Count -gt 0)
-        {
-            Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
-            foreach ($group in $groups.invalidExcludeGroups)
-            {
-                Write-Host $group -ForegroundColor Red
-            }
-        }
-        Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
     }
+    if ($groups.invalidExcludeGroups.Count -gt 0)
+    {
+        Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
+        foreach ($group in $groups.invalidExcludeGroups)
+        {
+            Write-Host $group -ForegroundColor Red
+        }
+    }
+    Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
+}
 }
 else
 {

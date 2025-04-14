@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param
 (
-    [parameter(helpMessage = 'Please enter the serial number of the device you want to verify.', Position = 0)]$serialNumber = '5R3SBZ3'
+    [parameter(mandatory, helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$ObjectId
 )
 
 
@@ -29,17 +29,12 @@ $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceId
 $deviceUri = "devices"
 $deviceManagementUri = "deviceManagement/managedDevices"
 $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-$configFile = "$pwd\.secrets\config.json"
-$accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'File'
-#endregion variables
-
-
 $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 $importedDeviceFilter = "serialNumber eq '$serialNumber'"
-Write-Verbose "Getting autopilot devices"
-$global:autopilotDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter
-Write-Host "Getting managed devices"
-$global:managedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $deviceManagementUri -filter $managedDeviceFilter
-Write-Host "Getting imported devices"
-$global:importedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter
+$configFile = "$pwd\.secrets\config.json"
+$accessToken = GetGraphAccessToken -configFile $configFile
+#endregion variables
+
+$uri = "$deviceUri/$($ObjectId)"
+$global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -method GET

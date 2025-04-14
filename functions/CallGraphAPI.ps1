@@ -7,7 +7,7 @@ function CallGraphAPI()
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         [string]$ResourcePath,
-        [string]$APIVersion = 'v1.0',
+        [string]$APIVersion = 'beta',
         [string]$method = 'get',
         [string]$Filter,
         [switch]$consistencyLevel,
@@ -95,7 +95,7 @@ function CallGraphAPI()
         }
     }
     #endregion
-    Write-Verbose "Making the following call to the Url: $encodedUri with the method: $method."
+    Write-Verbose "Making the following call to Microsoft Graph at $encodedUri with the method: $method."
     try
     {
         $response = Invoke-RestMethod -Method $method -Uri $encodedUri -Headers $headers -UseBasicParsing 
@@ -108,7 +108,15 @@ function CallGraphAPI()
             }
         }
         Write-Verbose 'The call was successful.'
-        Write-Verbose "Number of items returned: $($response.value.Count)"
+        if ($response.count)
+        {
+            Write-Verbose "Number of objects returned: $($response.count)."
+        }
+        if ($response.value.Count)
+        {
+            Write-Verbose "Number of items returned: $($response.value.Count)."
+        }
+            
     }
     catch
     {
@@ -171,7 +179,14 @@ function CallGraphAPI()
         }   
         return $statusCode
     }
-    Write-Verbose "Response value: $($response.value)"
+    if ($response.value.Count -eq 0 -and $null -eq $response.count)
+    {
+        Write-Verbose "Response value: $($response |Out-String)"
+    }
+    else
+    {
+        Write-Verbose "Response value: $($response.value)"
+    }
     return $response
 }
 
