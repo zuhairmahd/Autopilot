@@ -111,7 +111,7 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 if ($whatToDo -eq 'device')
 {
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
-    $global:enrollmentState = VerifyEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
+    $global:enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
     Write-Host "The enrollment state is: $($enrollmentState.enrolled)"
     Write-Host "The registration state is: $($enrollmentState.registered)"
     Write-Host "The imported state is: $($enrollmentState.imported)"

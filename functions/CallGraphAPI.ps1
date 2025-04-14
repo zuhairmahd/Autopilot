@@ -108,8 +108,7 @@ function CallGraphAPI()
             }
         }
         Write-Verbose 'The call was successful.'
-        Write-Verbose "Number of objects: $($response.Count)"
-        Write-Verbose "Number of items in each object: $($response.value.Count)"
+        Write-Verbose "Number of items returned: $($response.value.Count)"
     }
     catch
     {

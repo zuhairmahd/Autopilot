@@ -34,7 +34,12 @@ $accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'File'
 #endregion variables
 
 
-$filter = "serialNumber eq '$serialNumber'"
-$autopilotFilter = "contains(serialNumber,'$serialNumber')"
-$global:autopilotDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotFilter
-$global:managedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $deviceManagementUri -filter $filter
+$managedDeviceFilter = "serialNumber eq '$serialNumber'"
+$autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
+$importedDeviceFilter = "serialNumber eq '$serialNumber'"
+Write-Verbose "Getting autopilot devices"
+$global:autopilotDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter
+Write-Host "Getting managed devices"
+$global:managedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $deviceManagementUri -filter $managedDeviceFilter
+Write-Host "Getting imported devices"
+$global:importedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter

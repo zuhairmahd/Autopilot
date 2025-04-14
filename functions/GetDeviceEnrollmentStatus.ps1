@@ -25,7 +25,8 @@ Checks if a device is enrolled in Intune and imported into Autopilot.
 #>
 #endregion help
 
-function VerifyEnrollmentStatus() {
+function GetDeviceEnrollmentStatus()
+{
     [CmdletBinding()]
     param (
         [string]$serialNumber,
@@ -34,7 +35,8 @@ function VerifyEnrollmentStatus() {
 
     #region Define variables
     Write-Verbose "Serial Number: $serialNumber"
-    if ($accessToken) {
+    if ($accessToken)
+    {
         Write-Verbose 'Received Access Token'
     }
     $imported = $false
@@ -47,41 +49,51 @@ function VerifyEnrollmentStatus() {
     $loggedOnUsers = [ordered] @{}
     $deviceState = [ordered] @{}
     $loggedOnUsers = @()
-    $autoPilotDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities`?$filter=serialNumber eq '$serialNumber'"
-    $importedAutopilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/importedWindowsAutopilotDeviceIdentities'
-    $deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
-    $userUri = 'https://graph.microsoft.com/beta/users'
+    $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+    $deviceUri = "devices"
+    $deviceManagementUri = "deviceManagement/managedDevices"
+    $userUri = "users"
+    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+    $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+    $managedDeviceFilter = "serialNumber eq '$serialNumber'"
+    $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
+    $importedDeviceFilter = "serialNumber eq '$serialNumber'"
+    $deviceFilter = "contains(deviceName,'$serialNumber')"
     #endregion
 
     #region Get the autopilot device info
-    $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $importedAutopilotDeviceURI
+    $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter
     Write-Verbose "Found $($importedAutopilotDevices.value.count) Imported Autopilot devices."
     $importedAutopilotDevice = $importedAutopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
     Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
-    if ($importedAutopilotDevice) {
+    if ($importedAutopilotDevice)
+    {
         Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
         $imported = $true
         $returnedImportedDevice = $importedAutopilotDevice
     }
-    else {
+    else
+    {
         Write-Verbose 'Device not found in the list of imported Autopilot devices'
         Write-Verbose "This means the device may have already been registered."
     }
-    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -Uri $autoPilotDeviceURI
-    Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
-    $autopilotRawDevice = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    Write-Verbose "Autopilot Device serial number: $($autopilotRawDevice.serialNumber)"
-    if ($autopilotRawDevice) {
-        Write-Verbose "Device found in Autopilot with serial number $($autopilotRawDevice.serialNumber)"
-        $expandedDeviceURI = "https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotRawDevice.id)?`$expand=deploymentProfile"
-        $autopilotDevice = CallGraphAPI -AccessToken $accessToken -Uri $expandedDeviceURI
+    $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
+    Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
+    Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+    if ($autopilotDevice)
+    {
+        Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
+        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
+        $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta'
         $registered = $true
         $returnedAutopilotDevice = $autopilotDevice
     }
-    else {
+    else
+    {
         Write-Verbose 'Device is not an autopilot device.'
     }
-    if ($serialNumber -like 'vmware*') {
+    if ($serialNumber -like 'vmware*')
+    {
         Write-Verbose 'Device Serial Number begins with vmware. Removing spaces from the serial number.'
         $serialNumber = $serialNumber -replace ' ', ''
         Write-Verbose "New Device Serial Number: $serialNumber"
@@ -89,22 +101,26 @@ function VerifyEnrollmentStatus() {
     #endregion
 
     #region Get the managed device info
-    $device = (CallGraphAPI -AccessToken $accessToken -Uri $deviceManagementUri -Filter "contains(serialNumber,'$serialNumber')").value
+    $device = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -Filter $managedDeviceFilter).value
     Write-Verbose "Device serial number: $($device.serialNumber)"
-    if ($device) {
+    if ($device)
+    {
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $enrolled = $true
         $returnedManagedDevice = $device
         $users = $device.usersLoggedOn
         Write-Verbose "Users logged on: $($users)"
-        if ($users) {
+        if ($users)
+        {
             Write-Verbose "Retrieving the user object for user with id $($user.userId)"
-            $user = CallGraphAPI -AccessToken $accessToken -Uri "$userUri/$($users.userId)"
-            if ($user.userPrincipalName -like '*@*' -or $user.userName -like '*@*') {
+            $user = CallGraphAPI -AccessToken $accessToken -Uri "$ManagedDeviceUri/$($users.userId)/$userUri"
+            if ($user.userPrincipalName -like '*@*' -or $user.userName -like '*@*')
+            {
                 Write-Verbose 'User is an Azure AD user'
                 $azureUser = $true
             }
-            else {
+            else
+            {
                 Write-Verbose 'User is not an Azure AD user'
             }
             Write-Verbose "User Display Name: $($user.displayName)"
@@ -120,30 +136,37 @@ function VerifyEnrollmentStatus() {
             $deviceState.Add('loggedOnUsers', $loggedOnUsers)
         }
     }
-    else {
+    else
+    {
         Write-Verbose 'Device not found in Intune'
     }
     #endregion
     
-    if ($registered) {
+    if ($registered)
+    {
         Write-Verbose "Device registered in Autopilot with serial number $($autopilotDevice.serialNumber)"
         Write-Verbose "Autopilot Registered: $registered"
     }
-    else {
+    else
+    {
         Write-Verbose 'Device not registered in Autopilot'
     }
-    if ($enrolled) {
+    if ($enrolled)
+    {
         Write-Verbose "Device enrolled in Intune with serial number $($device.serialNumber)"
         Write-Verbose "Device enrolled: $enrolled"
     }
-    else {
+    else
+    {
         Write-Verbose 'Device not enrolled in Intune'
     }
-    if ($imported) {
+    if ($imported)
+    {
         Write-Verbose "Device is imported into Autopilot with serial number $($importedAutopilotDevice.serialNumber)"
         Write-Verbose "Device Imported: $imported"
     }
-    else {
+    else
+    {
         Write-Verbose 'Device not imported into Autopilot'
     }
     $deviceState.Add('registered', $registered)
