@@ -30,11 +30,13 @@ $deviceUri = "https://graph.microsoft.com/beta/devices"
 $deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
 $autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
 $configFile = "$pwd\.secrets\config.json"
-$accessToken = GetGraphAccessToken -configFile $configFile
+$accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'File'
 $global:ac = $accessToken
 #endregion variables
 
 
-$Uri = "https://graph.microsoft.com/v1.0/deviceManagement/managedDevices"
+$Uri = "deviceManagement/managedDevices"
 
-$global:myDevice = CallGraphAPI -accessToken $accessToken -uri $Uri -filter "serialNumber eq $serialNumber" -verbose 
+$global:myDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $Uri -filter "serialNumber eq '$serialNumber'"
+$Uri = "deviceManagement/managedDevices/$($myDevice.value.id)/users"
+$global:myDeviceUser = CallGraphAPI -accessToken $accessToken -APIVersion Beta -ResourcePath $Uri

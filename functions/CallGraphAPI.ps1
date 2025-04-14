@@ -6,9 +6,10 @@ function CallGraphAPI()
         [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
-        [string]$uri,
+        [string]$ResourcePath,
+        [string]$APIVersion = 'v1.0',
         [string]$method = 'get',
-        [string]$filter = $null,
+        [string]$Filter,
         [switch]$consistencyLevel,
         [switch]$secureString
     )
@@ -18,21 +19,63 @@ function CallGraphAPI()
     {
         Write-Verbose "Access token provided."
     }
-    Write-Verbose "Uri: $uri"
+    else
+    {
+        Write-Host 'Access token not provided. Please provide a valid access token.' -ForegroundColor Red
+        return
+    }
+    Write-Verbose "Resource Path: $ResourcePath"
     Write-Verbose "Method: $method"
     Write-Verbose "Filter: $filter"
+    Write-Verbose "Version: $APIVersion"
     Write-Verbose "Consistency Level: $consistencyLevel"
     Write-Verbose "SecureString: $secureString"
+    $uri = "https://graph.microsoft.com/$APIVersion/$ResourcePath"
+    Write-Verbose "Uri: $uri"
     #endregion
 
     #region Encode filter and add headers
     if ($Filter)
     {
-        Write-Verbose 'Encoding the filter value.'
-        $encodedFilter = [uri]::EscapeDataString($filter)
-        Write-Host "Encoded filter: $encodedFilter"
-        $uri = "$uri`?`$filter=$encodedFilter"
-        Write-Host "Uri: $uri"
+        Write-Verbose "Seperating the filter into key, operator and value."
+        #if the filter contains operators such as eq, ne, gt, lt, ge, le, etc. then split the filter into key, operator and value.
+        if ($Filter -match 'startswith\(|contains\(|endswith\(')
+        {
+            Write-Verbose "Processing function-based filter (e.g., startswith, contains, endswith)."
+            #get the values between parenthesis and split them into key and value.
+            $filterParts = $Filter -replace '.*\((.*)\)', '$1' -split ','
+            $FilterKey = $filterParts[0].Trim()
+            $FilterValue = $filterParts[1].Trim()
+            #the filter operater is what is before the first parenthesis.
+            $FilterOperator = $Filter -replace '\s*\(.*', ''
+            Write-Verbose "Filter Key: $FilterKey"
+            Write-Verbose "Filter Value: $FilterValue"
+            Write-Verbose "Filter Operator: $FilterOperator"
+            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
+            Write-Verbose "Encoded Filter Value: $encodedFilterValue"
+            #build the uri.
+            $encodedUri = "$uri`?`$filter=$FilterOperator($FilterKey,$encodedFilterValue)"
+        }
+        else
+        {
+            Write-Verbose "Processing standard filter with operators (e.g., eq, ne, gt, lt)."
+            $filterParts = $Filter -split '\s+(eq|ne|gt|lt|ge|le)\s+'
+            $FilterKey = $filterParts[0].Trim()
+            $FilterOperator = $filterParts[1].Trim()
+            $FilterValue = $filterParts[2].Trim()
+            Write-Verbose "Filter Key: $FilterKey"
+            Write-Verbose "Filter Operator: $FilterOperator"
+            Write-Verbose "Filter Value: $FilterValue"
+            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
+            Write-Verbose "Encoded Filter Value: $encodedFilterValue"
+            $encodedUri = "$uri`?`$filter=$FilterKey $FilterOperator $encodedFilterValue"
+        }
+        Write-Verbose "Uri: $encodedUri"
+    }
+    else
+    {
+        Write-Verbose 'No filter provided.'
+        $encodedUri = $uri
     }
     if ($consistencyLevel)
     {
@@ -52,10 +95,10 @@ function CallGraphAPI()
         }
     }
     #endregion
-    Write-Verbose "Making the following call to the Url: $uri with the method: $method."
+    Write-Verbose "Making the following call to the Url: $encodedUri with the method: $method."
     try
     {
-        $response = Invoke-RestMethod -Method $method -Uri $uri -Headers $headers -UseBasicParsing 
+        $response = Invoke-RestMethod -Method $method -Uri $encodedUri -Headers $headers -UseBasicParsing 
         $response | ForEach-Object {
             if ($_.'@odata.nextLink')
             {

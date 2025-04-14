@@ -46,7 +46,8 @@ function GetGraphAccessToken()
     Write-Verbose "Cache Type: $CacheType"
     Write-Verbose "Domain: $domain"
     #endregion
-
+    
+    $cacheFolder = Split-Path $configFile
     $cacheTokenFile = $cacheFolder + "\accessToken.json"
     #region Check for existing token
     if (-not $ForceNewToken)
@@ -109,22 +110,24 @@ function GetGraphAccessToken()
                         Write-Verbose "Domain matches. Using cached token."
                         Write-Verbose "Cache file read successfully"
                         $accessToken = $accessTokenObject.access_token
-                        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
+                        #convert to local time
+                        $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
+                        $timeBuffer = $absoluteExpiryTime.AddMinutes(-$renewalLeadTime)
                         Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires, which will be on $($timeBuffer)"
-                        if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
+                        if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $absoluteExpiryTime -gt $timeBuffer)
                         {
-                            Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
+                            Write-Host "Access token for $($accessTokenObject.domain) is valid until $absoluteExpiryTime."
                             Write-Host "Using cached access token from disk."
                             return $accessToken
                         }
                         else
                         {
-                            Write-Host "Access token is expired or invalid. Requesting a new one."
+                            Write-Host "Access token is expired or invalid. Requesting a new one for $domain."
                         }
                     }
                     else
                     {
-                        Write-Verbose "Domain does not match. Requesting a new token."
+                        Write-Verbose "Domain $domain does not match cached token domain $($accessTokenObject.domain)."
                         $accessTokenObject = $null
                     }
                 }
@@ -189,8 +192,6 @@ function GetGraphAccessToken()
             }
             else
             {
-                Write-Verbose "Encrypting access token"
-                $encryptedCashedToken = EncryptObject -plainObject $cachedToken -excludeFields @('AbsoluteExpiryTime', 'expires_in')
                 Write-Verbose "Saving access token to cache file: $cacheTokenFile"
                 Write-Verbose "Creating cache folder if it does not exist"
                 if (-not (Test-Path -Path $cacheFolder))
@@ -198,12 +199,12 @@ function GetGraphAccessToken()
                     Write-Verbose "Creating cache folder: $cacheFolder"
                     New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
                 }
+                else 
+                {
+                    Write-Verbose "Cache folder already exists: $cacheFolder"
+                }
                 Write-Verbose "Saving access token to disk cache."
-                $encryptedCashedToken | ConvertTo-Json | Set-Content -Path $cacheTokenFile -Force
-                #make the file hidden.
-                Write-Verbose "Making cache file hidden"
-                $hiddenFile = Get-Item -Path $cacheTokenFile -Force
-                $hiddenFile.Attributes = 'Hidden'
+                $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
                 Write-Verbose "Access token saved to $cacheTokenFile"
             }
             if ($SecureString)
