@@ -112,7 +112,7 @@ function GetGraphAccessToken()
                         $accessToken = $accessTokenObject.access_token
                         #convert to local time
                         $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
-                        $timeBuffer = $absoluteExpiryTime.AddMinutes(-$renewalLeadTime)
+                        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
                         Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires, which will be on $($timeBuffer)"
                         if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $absoluteExpiryTime -gt $timeBuffer)
                         {

@@ -33,8 +33,8 @@ $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 $configFile = "$pwd\.secrets\config.json"
-$accessToken = GetGraphAccessToken -configFile $configFile
+$accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'file'
 #endregion variables
 
-$uri = "$deviceUri/$($ObjectId)"
-$global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -method GET
+# $uri = "$deviceUri/$($ObjectId)"
+# $global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -method GET
