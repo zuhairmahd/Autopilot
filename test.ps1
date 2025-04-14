@@ -25,18 +25,16 @@ else
 #endregion
 
 #region variables
-$importedAutopilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/importedWindowsAutopilotDeviceIdentities'
-$deviceUri = "https://graph.microsoft.com/beta/devices"
-$deviceManagementUri = 'https://graph.microsoft.com/beta/deviceManagement/managedDevices'
-$autoPilotDeviceURI = 'https://graph.microsoft.com/beta/deviceManagement/windowsAutopilotDeviceIdentities'
+$importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+$deviceUri = "devices"
+$deviceManagementUri = "deviceManagement/managedDevices"
+$autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'File'
-$global:ac = $accessToken
 #endregion variables
 
 
-$Uri = "deviceManagement/managedDevices"
-
-$global:myDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $Uri -filter "serialNumber eq '$serialNumber'"
-$Uri = "deviceManagement/managedDevices/$($myDevice.value.id)/users"
-$global:myDeviceUser = CallGraphAPI -accessToken $accessToken -APIVersion Beta -ResourcePath $Uri
+$filter = "serialNumber eq '$serialNumber'"
+$autopilotFilter = "contains(serialNumber,'$serialNumber')"
+$global:autopilotDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotFilter -verbose
+$global:managedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $deviceManagementUri -filter $filter -verbose 
