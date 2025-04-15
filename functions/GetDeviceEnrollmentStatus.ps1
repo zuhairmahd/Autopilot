@@ -48,6 +48,7 @@ function GetDeviceEnrollmentStatus()
     $returnedAutopilotDevice = [ordered] @{}
     $returnedManagedDevice = [ordered] @{}
     $returnedDevice = [ordered] @{}
+    $returnedAutopilotEvents = [ordered] @{}
     $loggedOnUsers = [ordered] @{}
     $deviceState = [ordered] @{}
     $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -56,9 +57,11 @@ function GetDeviceEnrollmentStatus()
     $userUri = "users"
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
     $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+    $autopilotEventsURI = "deviceManagement/autopilotEvents"
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
     $importedDeviceFilter = "serialNumber eq '$serialNumber'"
+    $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$serialNumber'"
     $deviceFilter = "endswith(displayName,'$serialNumber')"
     #endregion
 
@@ -88,6 +91,19 @@ function GetDeviceEnrollmentStatus()
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta'
         $inAutopilot = $true
         $returnedAutopilotDevice = $autopilotDevice
+        Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
+        $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter -APIVersion 'beta'
+        Write-Verbose "Found $($autopilotEvents.value.count) Autopilot events."
+        if ($autopilotEvents)
+        {
+            Write-Verbose "Events found for device with serial number $($autopilotEvents.serialNumber)"
+            $returnedAutopilotEvents = $autopilotEvents | Sort-Object createdDateTime -Descending
+            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json)"
+        }
+        else
+        {
+            Write-Verbose 'No events found for device in Autopilot'
+        }
     }
     else
     {
@@ -158,6 +174,14 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
         Write-Verbose "Autopilot Registered: $inAutopilot"
+        if ($returnedAutopilotEvents)
+        {
+            Write-Verbose "The device has had $($returnedAutopilotEvents.count) events."
+        }
+        else
+        {
+            Write-Verbose 'No Autopilot events found'
+        }
     }
     else
     {
@@ -193,7 +217,11 @@ function GetDeviceEnrollmentStatus()
     #endregion
 
     $deviceState.Add('InAutopilot', $inAutopilot)
-    $deviceState.add('autoPilotDevice', $returnedAutopilotDevice)
+    $autopilotData = [ordered] @{
+        Device = $returnedAutopilotDevice
+        Events = $returnedAutopilotEvents
+    }
+    $deviceState.add('autopilot', $autopilotData)
     $deviceState.add('Managed', $inManagedDevices)
     $deviceState.add('managedDevice', $returnedManagedDevice)
     $deviceState.add('imported', $imported)

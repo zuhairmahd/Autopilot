@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param
 (
-    # [parameter(mandatory, helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$ObjectId
+    [parameter(helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$ObjectId = 'C4N8054'
 )
 
 
@@ -33,12 +33,30 @@ $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 $configFile = "$pwd\.secrets\config.json"
-$accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'file'
+$accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
 
 
-$uri = "deviceManagement/autopilotEvents"
-$filter = "deviceId eq '$($EnrollmentState.autopilotDevice.id)'"
+
+# $filter = "deviceSerialNumber eq 'C4N8054'"
+# $extraParameters = "orderby=createdDateTime"
+# $serialNumber = [uri]::EscapeDataString('C4N8054')
+# $filter = "deviceSerialNumber eq '$serialNumber'"
+$serialNumber = 'C4N8054' # Define the serial number
+#encode the serialnumber
+$serialNumber = [uri]::EscapeDataString($serialNumber)
+$uri = "https://graph.microsoft.com/beta/deviceManagement/autopilotEvents?`$filter=deviceSerialNumber eq '$serialNumber'&`$orderby=createdDateTime desc&`$top=5"
+
+$headers = @{
+    Authorization    = "Bearer $accessToken"
+    'Content-Type'   = 'application/json'
+    ConsistencyLevel = 'Eventual'
+}
+
+Write-Host "Calling Graph API with the following parameters:" -ForegroundColor Green
+Write-Host "URI: $uri" -ForegroundColor Green
+Invoke-RestMethod -Uri $uri -Headers $headers -UseBasicParsing -Debug
+# $extraParameters = "top=5"
+# $global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -APIVersion 'beta' -filter $filter -extraparameters $extraParameters -verbose
 
 
-$global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -filter $filter -consistencyLevel -APIVersion 'beta' -verbose
