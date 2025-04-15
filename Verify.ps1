@@ -120,7 +120,7 @@ if ($whatToDo -eq 'device')
 elseif ($whatToDo -eq 'user')
 {
     Write-Host "Checking group membership for user $userName."
-    $groups = VerifyGroupMembership -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
+    $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
     if ($groups -eq $true)
     {
         Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
@@ -150,9 +150,9 @@ elseif ($whatToDo -eq 'user')
         }
         Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
     }
-    else
-    {
-        Write-Host 'Unknown error.' -ForegroundColor Red
-        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-    }
+}
+else
+{
+    Write-Host 'Unknown error.' -ForegroundColor Red
+    Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
 }

@@ -137,7 +137,8 @@ function CallGraphAPI()
             if ($_.'@odata.nextLink')
             {
                 $nextLink = $_.'@odata.nextLink'
-                $nextGroups = CallGraphAPI -accessToken $accessToken -Uri $nextLink -Method GET
+                # $nextGroups = CallGraphAPI -accessToken $accessToken -ResourcePath $nextLink -Method GET
+                $nextGroups = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing 
                 $response.value += $nextGroups.value
             }
         }
@@ -150,7 +151,6 @@ function CallGraphAPI()
         {
             Write-Verbose "Number of items returned: $($response.value.Count)."
         }
-            
     }
     catch
     {
