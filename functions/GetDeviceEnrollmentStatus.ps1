@@ -157,7 +157,7 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose 'Device not found in Intune'
     }
     $device = CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceUri -filter $deviceFilter -consistencyLevel
-    if ($device)
+    if ($device -and $device.value.count -gt 0)
     {
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $hasDeviceObject = $true
