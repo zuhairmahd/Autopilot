@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param
 (
-    [parameter(mandatory, helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$ObjectId
+    # [parameter(mandatory, helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$ObjectId
 )
 
 
@@ -36,5 +36,9 @@ $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile -cacheType 'file'
 #endregion variables
 
-# $uri = "$deviceUri/$($ObjectId)"
-# $global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -method GET
+
+$uri = "deviceManagement/autopilotEvents"
+$filter = "deviceId eq '$($EnrollmentState.autopilotDevice.id)'"
+
+
+$global:result = callGraphApi -ResourcePath $uri -accessToken $accessToken -filter $filter -consistencyLevel -APIVersion 'beta' -verbose

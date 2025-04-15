@@ -9,7 +9,8 @@ function CallGraphAPI()
         [string]$ResourcePath,
         [string]$APIVersion = 'beta',
         [string]$method = 'get',
-        [string]$Filter,
+        [string]$Filter = $null,
+        [string]$ExtraParameters = $null,
         [switch]$consistencyLevel,
         [switch]$secureString
     )
@@ -27,6 +28,7 @@ function CallGraphAPI()
     Write-Verbose "Resource Path: $ResourcePath"
     Write-Verbose "Method: $method"
     Write-Verbose "Filter: $filter"
+    Write-Verbose "Extra Parameters: $ExtraParameters"
     Write-Verbose "Version: $APIVersion"
     Write-Verbose "Consistency Level: $consistencyLevel"
     Write-Verbose "SecureString: $secureString"
@@ -70,12 +72,40 @@ function CallGraphAPI()
             Write-Verbose "Encoded Filter Value: $encodedFilterValue"
             $encodedUri = "$uri`?`$filter=$FilterKey $FilterOperator $encodedFilterValue"
         }
-        Write-Verbose "Uri: $encodedUri"
+        Write-Verbose "Uri after applying filters: $encodedUri"
     }
     else
     {
         Write-Verbose 'No filter provided.'
         $encodedUri = $uri
+    }
+    if ($ExtraParameters)
+    {
+        Write-Verbose "Extra parameters: $ExtraParameters"
+        Write-Verbose "Splitting extra parameters and Adding to the uri."
+        $extraParams = $ExtraParameters -split '='
+        $extraKey = $extraParams[0].Trim()
+        $extraValue = $extraParams[1].Trim()
+        Write-Verbose "Extra Key: $extraKey"
+        Write-Verbose "Extra Value: $extraValue"
+        Write-Verbose "Adding the '$' to the extra key."
+        $extraKey = "`$$extraKey"
+        Write-Verbose "Encoded Extra Key: $extraKey"
+        if ($filter) 
+        {
+            Write-Verbose "Adding extra parameters to the uri along with the filter."
+            $encodedUri = "$encodedUri`&$extraKey=$extraValue"
+        }
+        else
+        {
+            Write-Verbose "No filter provided. Adding extra parameters to the uri."
+            $encodedUri = "$encodedUri`?$extraKey=$extraValue"
+        }
+        Write-Verbose "Encoded Uri after applying extra parameters: $encodedUri"
+    }
+    else
+    {
+        Write-Verbose 'No extra parameters provided.'
     }
     if ($consistencyLevel)
     {
@@ -95,7 +125,9 @@ function CallGraphAPI()
         }
     }
     #endregion
-    Write-Verbose "Making the following call to Microsoft Graph at $encodedUri with the method: $method."
+    Write-Verbose "Making the following call to Microsoft Graph:" 
+    Write-Verbose "URI: $encodedUri." 
+    Write-Verbose "Method: $method."
     try
     {
         $response = Invoke-RestMethod -Method $method -Uri $encodedUri -Headers $headers -UseBasicParsing 
