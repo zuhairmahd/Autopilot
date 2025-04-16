@@ -30,25 +30,13 @@ $init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-
 $groupsToInclude = $init.groupsToInclude
 $groupsToExclude = $init.groupsToExclude
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+$choices = @('Verify this device', 'Verify another device', 'Verify a user')
 #endregion Define variables
 
-#region Get user input.
-Write-Host 'What would you like to do?'
-$choices = @('Verify this device', 'Verify another device', 'Verify a user', 'Exit')
-foreach ($i in 0..($choices.Count - 1))
-{
-    Write-Host "$($i + 1). $($choices[$i])"
-}
-$choice = Read-Host 'Please enter the number of your choice'
-while ($choice -notin 1..$choices.Count)
-{
-    Write-Host 'Please enter a valid number.' -ForegroundColor Yellow
-    [console]::beep(500, 300)
-    $choice = Read-Host 'Please enter the number of your choice'
-}
+$choice = displayNumericMenu -choices $choices -Prompt 'Type your selection and press Enter' -Banner 'What would you like to do?'
 switch ($choice)
 {
-    1
+    'Verify this device'
     {
         $deviceObject = GetDeviceInfo -NoHash
         if ($deviceObject)
@@ -69,7 +57,7 @@ switch ($choice)
         }
         $whatToDo = 'Device'
     }
-    2
+    'Verify another device'
     {
         Write-Host 'Please enter the serial number of the device you want to verify.'
         Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
@@ -79,7 +67,7 @@ switch ($choice)
         Write-Verbose "Trimmed serial number: $SerialNumber"
         $whatToDo = 'Device'
     }
-    3
+    'Verify a user'
     {
         Write-Host 'Please enter the user name (email address) of the user you want to verify.'
         Write-Host 'You can type the full email address or just the user name.'
@@ -98,7 +86,7 @@ switch ($choice)
         Write-Verbose "The user name is now: $userName"
         $whatToDo = 'User'
     }
-    4
+    0
     {
         Write-Host 'Exiting script.'
         exit 0 

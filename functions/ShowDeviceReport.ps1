@@ -1,4 +1,4 @@
-function GetDeviceReport()
+function ShowDeviceReport()
 {
     [CmdletBinding()]
     param (
@@ -86,7 +86,26 @@ function GetDeviceReport()
         # Print each property and value
         Write-Host "$readableKey`: $($output[$key])"
     }
-    
+    if (-not $Export)    
+    {
+        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
+        if ($choice -eq 'Export to HTML')
+        {
+            $Export = $true
+            $ExportFormat = "HTML"
+        }
+        elseif ($choice -eq 'Export to CSV')
+        {
+            $Export = $true
+            $ExportFormat = "CSV"
+        }
+        else
+        {
+            Write-Host "No export selected."
+            return $null
+        }
+    }
+
     # Export the report if requested
     if ($Export)
     {
@@ -97,7 +116,6 @@ function GetDeviceReport()
         }
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $fileName = "$deviceName`_Report_$timestamp"
-        
         if ($ExportFormat -eq "HTML")
         {
             $htmlPath = "$pwd\$fileName.html"
