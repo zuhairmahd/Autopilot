@@ -66,6 +66,7 @@ function GetDeviceEnrollmentStatus()
     #endregion
 
     #region Get the autopilot device info
+    Write-Verbose "Getting imported Autopilot device info for serial number $serialNumber"
     $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter
     Write-Verbose "Found $($importedAutopilotDevices.value.count) Imported Autopilot devices."
     $importedAutopilotDevice = $importedAutopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
@@ -81,12 +82,14 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose 'Device not found in the list of imported Autopilot devices'
         Write-Verbose "This means the device may have already been registered."
     }
+    Write-Verbose "Getting Autopilot device info for serial number $serialNumber"
     $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
     Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
     Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($autopilotDevice)
     {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
         $inAutopilot = $true
@@ -97,7 +100,7 @@ function GetDeviceEnrollmentStatus()
         if ($autopilotEvents)
         {
             Write-Verbose "Events found for device with serial number $($autopilotEvents.serialNumber)"
-            $returnedAutopilotEvents = $autopilotEvents | Sort-Object createdDateTime -Descending
+            $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
             Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json)"
         }
         else
@@ -118,6 +121,7 @@ function GetDeviceEnrollmentStatus()
     #endregion
 
     #region Get the rest of the device info
+    Write-Verbose "Getting device info for serial number $serialNumber"
     $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -APIVersion 'beta' -Filter $managedDeviceFilter).value
     Write-Verbose "Device serial number: $($managedDevice.serialNumber)"
     if ($managedDevice)
@@ -125,7 +129,8 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Device found in Intune with serial number $($managedDevice.serialNumber)"
         $inManagedDevices = $true
         $returnedManagedDevice = $managedDevice
-        $users = $device.usersLoggedOn
+        Write-Verbose "Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
+        $users = $managedDevice.usersLoggedOn
         Write-Verbose "Users logged on: $($users)"
         if ($users)
         {
@@ -145,11 +150,14 @@ function GetDeviceEnrollmentStatus()
             Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
             $loggedOnUsers = @{
                 AzureUser         = $azureUser
-                user              = $user
+                user              = $user.value
                 lastLogOnDateTime = $device.usersLoggedOn.lastLogonDateTime
             }
             Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json)"
-            $deviceState.Add('loggedOnUsers', $loggedOnUsers)
+        }
+        else
+        {
+            Write-Verbose 'No logged on users found for device in Intune'
         }
     }
     else
@@ -161,7 +169,7 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $hasDeviceObject = $true
-        $returnedDevice = $device
+        $returnedDevice = $device.value
     }
     else
     {
@@ -216,6 +224,7 @@ function GetDeviceEnrollmentStatus()
     }
     #endregion
 
+    #region return values
     $deviceState.Add('InAutopilot', $inAutopilot)
     $autopilotData = [ordered] @{
         Device = $returnedAutopilotDevice
@@ -223,11 +232,16 @@ function GetDeviceEnrollmentStatus()
     }
     $deviceState.add('autopilot', $autopilotData)
     $deviceState.add('Managed', $inManagedDevices)
-    $deviceState.add('managedDevice', $returnedManagedDevice)
+    $managedDeviceData = [ordered] @{
+        Device = $returnedManagedDevice
+        Users  = $loggedOnUsers
+    }
+    $deviceState.add('managedDevice', $managedDeviceData)
     $deviceState.add('imported', $imported)
     $deviceState.add('importedAutopilotDevice', $returnedImportedDevice)
     $deviceState.add('hasDeviceObject', $hasDeviceObject)
     $deviceState.add('device', $returnedDevice)
     Write-Verbose "Device State: $($deviceState | ConvertTo-Json)"
+    #endregion
     return $deviceState
 }

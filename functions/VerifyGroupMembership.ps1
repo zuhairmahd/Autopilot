@@ -44,14 +44,14 @@ function VerifyGroupMembership()
     Write-Verbose "Checking whether the user $userName is a member of the required groups."
     Write-Host "Getting group membership for user $userName ($($user.displayName))."
     $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
-    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters "select=displayName"
+    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters "select=displayName&top=999&orderby=displayName"
     if ($response -is [string] -and $response -match '^\d+$')
     {
         Write-Host "The group membership for $userName could not be determined."
         Write-Host "Please try again or contact an intune administrator." -ForegroundColor Red
         return $false
     }
-    $groups = $response.value | Select-Object -ExpandProperty displayName
+    $groups = $response.value | Select-Object -ExpandProperty displayName | Sort-Object
     Write-Host "The user $username is a member of $($groups.Count) groups."
     Write-Verbose "The user $userName is a member of the following groups:`n$($groups -join "`n")"
     #endregion
