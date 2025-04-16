@@ -92,7 +92,7 @@ function CallGraphAPI()
         $extraKey = "`$$extraKey"
         Write-Verbose "Encoded Extra Key: $extraKey"
         Write-Verbose "URL encoding the extravalue field"
-        $ExtraValue = [uri]::EscapeDataString($extraValue)
+        # $ExtraValue = [uri]::EscapeDataString($extraValue)
         if ($filter) 
         {
             Write-Verbose "Adding extra parameters to the uri along with the filter."

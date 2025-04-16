@@ -88,7 +88,7 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
-        $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta'
+        $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
         $inAutopilot = $true
         $returnedAutopilotDevice = $autopilotDevice
         Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"

@@ -31,7 +31,7 @@ function VerifyGroupMembership()
     #region get the user id and group membership
     Write-Verbose "Getting the user id for $userName"
     $userUri = "users/$($userName)" 
-    $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri 
+    $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri -extraparameters "select=displayName,mail,userPrincipalName"
     #check if the user is a numeric string.
     if ($user -is [string] -and $user -match '^\d+$')
     {
@@ -42,9 +42,9 @@ function VerifyGroupMembership()
     }
     Write-Verbose "The Azure Directory id for $userName ($($user.DisplayName)) is $($user.ID)."
     Write-Verbose "Checking whether the user $userName is a member of the required groups."
-    Write-Host "Getting group membership for user $userName ($($user.displayName)) with id $($user.ID)"
+    Write-Host "Getting group membership for user $userName ($($user.displayName))."
     $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
-    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri
+    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters "select=displayName"
     if ($response -is [string] -and $response -match '^\d+$')
     {
         Write-Host "The group membership for $userName could not be determined."
