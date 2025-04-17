@@ -122,8 +122,8 @@ function GetDeviceEnrollmentStatus()
     #region Get the autopilot device info
     if ($managedDevice -and $serialNumber -match 'vmware')
     {
-        Write-Verbose "Getting Autopilot device info for managed device with ID $($managedDevice.id)"
-        $autopilotDeviceFilter = "AzureActiveDirectoryDeviceId eq '$AzureActiveDirectoryDeviceId'"
+        Write-Verbose "Getting Autopilot device info for managed device with ID $($managedDevice.AzureAdDeviceId)"
+        $autopilotDeviceFilter = "AzureActiveDirectoryDeviceId eq '$($managedDevice.AzureAdDeviceId)'"
         # Alternative approach if the above doesn't work
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)'"
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)' or AzureActiveDirectoryDeviceId eq '$AzureActiveDirectoryDeviceId'"

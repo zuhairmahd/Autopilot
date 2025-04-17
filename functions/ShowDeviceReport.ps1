@@ -33,8 +33,22 @@ function ShowDeviceReport()
         FoundDeviceName          = $enrollmentState.managedDevice.device.deviceName
         FoundSerialNumber        = $enrollmentState.managedDevice.device.serialNumber
         IntuneManagedDeviceId    = $enrollmentState.managedDevice.device.Id
-        IntuneEnrollmentDate     = $enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-        IntuneLastSync           = $enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+        IntuneEnrollmentDate     = if ($enrollmentState.managedDevice.device.enrolledDateTime)
+        {
+            $enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
+        }
+        else
+        {
+            $null 
+        }
+        IntuneLastSync           = if ($enrollmentState.managedDevice.device.lastSyncDateTime)
+        {
+            $enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
+        }
+        else
+        {
+            $null 
+        }
         IntuneEnrollmentProfile  = $enrollmentState.managedDevice.device.enrollmentProfileName
         IntunePrimaryUserId      = $enrollmentState.managedDevice.device.userId # Note: Potential inconsistency
         IntunePrimaryUPN         = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
@@ -53,8 +67,22 @@ function ShowDeviceReport()
         AutopilotDeviceId        = $enrollmentState.autopilot.device.id
         AutopilotState           = $enrollmentState.autopilot.device.enrollmentState
         AutopilotAssignedUser    = $enrollmentState.autopilot.device.userPrincipalName
-        AutopilotLastContacted   = $enrollmentState.autopilot.device.lastContactedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-        LatestAutopilotEventTime = $latestAutopilotEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+        AutopilotLastContacted   = if ($enrollmentState.autopilot.device.lastContactedDateTime)
+        {
+            $enrollmentState.autopilot.device.lastContactedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
+        }
+        else
+        {
+            $null 
+        }
+        LatestAutopilotEventTime = if ($latestAutopilotEvent.eventDateTime)
+        {
+            $latestAutopilotEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
+        }
+        else
+        {
+            $null 
+        }
         LatestAutopilotProfile   = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
         LatestAutopilotStatus    = $latestAutopilotEvent.deploymentState
         LatestAutopilotError     = $latestAutopilotEvent.enrollmentFailureDetails
@@ -67,13 +95,11 @@ function ShowDeviceReport()
     {
         # Format the property name to be more readable
         $readableKey = $key
-        
         # Handle common prefixes separately
         if ($key -match '^(Intune|Autopilot)(.+)$')
         {
             $prefix = $matches[1]
             $remainder = $matches[2]
-            
             # Insert spaces before capital letters in the remainder
             $formattedRemainder = [regex]::Replace($remainder, '(?<=[a-z])(?=[A-Z])', ' ')
             $readableKey = "$prefix $formattedRemainder"
@@ -83,9 +109,7 @@ function ShowDeviceReport()
             # Insert spaces before capital letters
             $readableKey = [regex]::Replace($key, '(?<=[a-z])(?=[A-Z])', ' ')
         }
-        
         $formattedOutput[$readableKey] = $output[$key]
-        
         # Print each property and value
         Write-Host "$readableKey`: $($output[$key])"
     }
