@@ -13,11 +13,13 @@ function ShowDeviceReport()
         [ValidateSet("HTML", "CSV")]
         [string]$ExportFormat = "HTML"
     )
-    #write verbose log of received parameters
+    #region write verbose log of received parameters
     Write-Verbose "Received parameters: $($enrollmentState | Out-String)"
     Write-Verbose "Export: $Export"
     Write-Verbose "ExportFormat: $ExportFormat"
-
+    #endregion write verbose log of received parameters
+    
+    #region report content
     if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
     {
         $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
@@ -36,14 +38,6 @@ function ShowDeviceReport()
         IntuneEnrollmentProfile  = $enrollmentState.managedDevice.device.enrollmentProfileName
         IntunePrimaryUserId      = $enrollmentState.managedDevice.device.userId # Note: Potential inconsistency
         IntunePrimaryUPN         = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
-        AutopilotDeviceId        = $enrollmentState.autopilot.device.id
-        AutopilotState           = $enrollmentState.autopilot.device.enrollmentState
-        AutopilotAssignedUser    = $enrollmentState.autopilot.device.userPrincipalName
-        AutopilotLastContacted   = $enrollmentState.autopilot.device.lastContactedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-        LatestAutopilotEventTime = $latestAutopilotEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-        LatestAutopilotProfile   = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
-        LatestAutopilotStatus    = $latestAutopilotEvent.deploymentState
-        LatestAutopilotError     = $latestAutopilotEvent.enrollmentFailureDetails
         IntuneActionResults      = $enrollmentState.managedDevice.device.deviceActionResults
         IntuneCertExpiration     = $enrollmentState.managedDevice.device.managementCertificateExpirationDate
         IntuneAutopilotEnrolled  = $enrollmentState.managedDevice.device.autopilotEnrolled
@@ -56,9 +50,18 @@ function ShowDeviceReport()
         IntuneComplianceState    = $enrollmentState.managedDevice.device.complianceState
         IntuneManagementState    = $enrollmentState.managedDevice.device.managementState
         IntuneOwnerType          = $enrollmentState.managedDevice.device.managedDeviceOwnerType
+        AutopilotDeviceId        = $enrollmentState.autopilot.device.id
+        AutopilotState           = $enrollmentState.autopilot.device.enrollmentState
+        AutopilotAssignedUser    = $enrollmentState.autopilot.device.userPrincipalName
+        AutopilotLastContacted   = $enrollmentState.autopilot.device.lastContactedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+        LatestAutopilotEventTime = $latestAutopilotEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+        LatestAutopilotProfile   = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
+        LatestAutopilotStatus    = $latestAutopilotEvent.deploymentState
+        LatestAutopilotError     = $latestAutopilotEvent.enrollmentFailureDetails
     }
+    #endregion report content
     
-    # Format property names and display report
+    #region Format property names and display report
     $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
     foreach ($key in $output.Keys)
     {
@@ -86,6 +89,9 @@ function ShowDeviceReport()
         # Print each property and value
         Write-Host "$readableKey`: $($output[$key])"
     }
+    #endregion Format property names and display report
+
+    #region export
     if (-not $Export)    
     {
         $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
@@ -105,7 +111,6 @@ function ShowDeviceReport()
             return $null
         }
     }
-
     # Export the report if requested
     if ($Export)
     {
@@ -175,7 +180,5 @@ function ShowDeviceReport()
             Write-Host "CSV report exported to: $csvPath"
         }
     }
-    
-    # Return the output object
-    return $output
+    #endregion export
 }

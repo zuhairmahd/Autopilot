@@ -104,33 +104,7 @@ if ($whatToDo -eq 'device')
     # Write-Host "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
     # Write-Host "The imported state is: $($enrollmentState.imported)"
     # Write-Host "Has device object: $($enrollmentState.hasDeviceObject)"
-    if ($enrollmentState.autopilot.events.value -and $enrollmentState.autopilot.events.value.Count -gt 0)
-    {
-        $latestAutopilotEvent = $enrollmentState.autopilot.events.value | Select-Object -First 1
-    }
-    $output = [ordered] @{
-        InputIdentifier          = $serialNumber
-        FoundDeviceName          = $enrollmentState.managedDevice.device.deviceName
-        FoundSerialNumber        = $enrollmentState.managedDevice.device.serialNumber
-        IntuneManagedDeviceId    = $enrollmentState.managedDevice.device.Id
-        IntuneEnrollmentDate     = $enrollmentState.managedDevice.device.enrolledDateTime
-        IntuneLastSync           = $enrollmentState.managedDevice.device.lastSyncDateTime
-        IntuneEnrollmentProfile  = $enrollmentState.managedDevice.device.enrollmentProfileName
-        IntunePrimaryUserId      = $enrollmentState.managedDevice.device.userId # Note: Potential inconsistency
-        IntunePrimaryUPN         = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
-        AutopilotDeviceId        = $enrollmentState.autopilot.device.id
-        AutopilotState           = $enrollmentState.autopilot.device.enrollmentState
-        AutopilotAssignedUser    = $enrollmentState.autopilot.device.userPrincipalName
-        AutopilotLastContacted   = $enrollmentState.autopilot.device.lastContactedDateTime
-        LatestAutopilotEventTime = $latestAutopilotEvent.eventDateTime
-        LatestAutopilotProfile   = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
-        LatestAutopilotStatus    = $latestAutopilotEvent.deploymentState
-        LatestAutopilotError     = $latestAutopilotEvent.enrollmentFailureDetails
-    }
-    foreach ($property in $output.Keys)
-    {
-        Write-Host "$property : $($output[$property])"
-    }
+    ShowDeviceReport -EnrollmentState $enrollmentState
 }
 elseif ($whatToDo -eq 'user')
 {

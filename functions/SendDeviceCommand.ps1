@@ -17,7 +17,7 @@ function SendDeviceCommand ()
         $body = @{
             'keepUserData' = $false
         }
-        $response = Invoke-RestMethod -Authentication Bearer -Token $accessToken -Uri $cleanURI -Method POST -Body $body 
+        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body
         Write-Verbose "Response: $response"
     }
     elsif ($command -eq 'wipe')
@@ -28,7 +28,7 @@ function SendDeviceCommand ()
             'keepUserData'         = $false
             'obliterationBehavior' = "doNotObliterate"
         }
-        $response = Invoke-RestMethod -Authentication Bearer -Token $accessToken -Uri $wipeURI -Method POST -Body $body 
+        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body
         Write-Verbose "Response: $response"
     }
     else
@@ -40,7 +40,7 @@ function SendDeviceCommand ()
     {
         Write-Host "The command was sent to the device with ID $ManagedDeviceId."
         Write-Host "Attempting a sync..."
-        $syncResponse = Invoke-RestMethod -Authentication Bearer -Token $accessToken -Uri $syncUri -Method POST
+        $syncResponse = callGraphApi -AccessToken $accessToken -Uri $syncUri -Method POST
         Write-Verbose "Sync Response: $syncResponse"
         #Check if the sync was successful.
         if ($syncResponse -in @(200, 201, 202, 204))
