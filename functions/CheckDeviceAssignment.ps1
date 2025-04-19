@@ -69,21 +69,22 @@ function CheckDeviceAssignment()
         Write-Verbose 'The device is registered in Intune.'
         Write-Verbose 'Checking profile assignment'
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)?`$expand=deploymentProfile"
-        Write-Verbose "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
-        if ($WaitForAssignment)
+        $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
+        Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
+        if ($WaitForAssignment -and ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync')))
         {
             Write-Host "Waiting for up to $maxWaitTime minutes for the device to be assigned to a deployment profile."
             $index = 0
-            while (($assignment.deploymentProfileAssignmentStatus -ne 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -ne 'assignedInSync') -and $index -lt $maxWaitTime)
+            while ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -lt $maxWaitTime)
             {
                 Write-Host "Waiting for $waitTimeInSeconds  seconds before checking again..." -ForegroundColor Yellow
                 Start-Sleep -Seconds $waitTimeInSeconds
                 $index++
                 Write-Host "Checking again... ($index/$maxWaitTime)"
                 $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
-                Write-Verbose "Graph response: $($autopilotDevices)."
+                Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
             }
-            if ((($assignment.deploymentProfileAssignmentStatus -ne 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -ne 'assignedInSync') -or -not ($assignment.deploymentProfileAssignedDateTime)) -and $index -gt $maxWaitTime)
+            if ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -gt $maxWaitTime)
             {
                 Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
                 Write-Host 'Please check the Intune portal or contact an Intune administrator.'

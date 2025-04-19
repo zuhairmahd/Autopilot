@@ -487,16 +487,21 @@ $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $access
 if ($device.state.deviceImportStatus -eq 'complete')
 {
     $serialNumber = $device.SerialNumber
-    Write-Host "The device with serial number $serialNumber was successfully imported into Intune." -ForegroundColor Green
+    Write-Host "The import of device with serial number $serialNumber was started." -ForegroundColor Green
     Write-Host 'Checking device assignment.'
-    $global:assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -verbose
-    if ($global:assignment)
+    $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+    if ($assignment)
     {
-        Write-Verbose "The assignment details are: $($global:assignment | ConvertTo-Json)"
-        if (($global:assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $global:assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $global:assignment.deploymentProfile.displayName )
+        Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
+        if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
         {
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
-            Write-Host "The device is successfully assigned to the deployment profile $assignedProfileName." -ForegroundColor Green
+            Write-Host "The device is successfully assigned to the deployment profile $($assignment.deploymentProfile.displayName) on $($assignment.deploymentProfileAssignedDateTime)." -ForegroundColor Green
+            Write-Host "The device enrollment state is $($assignment.enrollmentState)." -ForegroundColor Green
+            if ($assignment.enrollmentState -eq 'notContacted')
+            {
+                Write-Host 'This is normal for a recently imported device..' -ForegroundColor Green
+            }
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
             Write-Host "Elapsed time to complete: $importSeconds seconds"
