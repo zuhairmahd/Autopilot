@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)]
+    [string]$SerialNumber = '',
+    [string]$userName = '',
     [string]$configFile = "$PSScriptRoot\.secrets\config.json",
-    [Parameter(Mandatory = $false)]
     [string]$InitFile = "$PSScriptRoot\initVerify.json"
 )
 
@@ -33,63 +33,68 @@ $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertF
 $choices = @('Verify this device', 'Verify another device', 'Verify a user')
 #endregion Define variables
 
-$choice = displayNumericMenu -choices $choices -Prompt 'Type your selection and press Enter' -Banner 'What would you like to do?'
-switch ($choice)
+#region get user input
+if ($serialNumber -ne '')
 {
-    'Verify this device'
+    Write-Verbose "Serial number passed as parameter: $SerialNumber"
+    $whatToDo = 'device'
+    Write-Verbose "What to do: $whatToDo"
+}
+elseif ($userName -ne '')
+{
+    Write-Verbose "User name passed as parameter: $userName"
+    $whatToDo = 'user'
+    Write-Verbose "What to do: $whatToDo"
+}
+else
+{
+    $choice = displayNumericMenu -choices $choices -Prompt 'Type your selection and press Enter' -Banner 'What would you like to do?'
+    switch ($choice)
     {
-        $deviceObject = GetDeviceInfo -NoHash
-        if ($deviceObject)
+        'Verify this device'
         {
-            $serialNumber = $deviceObject.serialNumber
-            Write-Verbose "The serial number is $serialNumber."
-            $make = $deviceObject.manufacturer
-            Write-Verbose "The manufacturer is $make"
-            $model = $deviceObject.model
-            Write-Verbose "The model is $model"
-            Write-Host "Checking device with serial number $($serialNumber): $make $model "
+            $deviceObject = GetDeviceInfo -NoHash
+            if ($deviceObject)
+            {
+                $serialNumber = $deviceObject.serialNumber
+                Write-Verbose "The serial number is $serialNumber."
+                $make = $deviceObject.manufacturer
+                Write-Verbose "The manufacturer is $make"
+                $model = $deviceObject.model
+                Write-Verbose "The model is $model"
+                Write-Host "Checking device with serial number $($serialNumber): $make $model "
+            }
+            else
+            {
+                Write-Host "Could not obtain the device's serial number." -ForegroundColor Red
+                Write-Host "You may need to run this script as an administrator." -ForegroundColor Red
+                exit 1
+            }
+            $whatToDo = 'device'
         }
-        else
+        'Verify another device'
         {
-            Write-Host "Could not obtain the device's serial number." -ForegroundColor Red
-            Write-Host "You may need to run this script as an administrator." -ForegroundColor Red
-            exit 1
+            Write-Host 'Please enter the serial number of the device you want to verify.'
+            Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
+            $SerialNumber = Read-Host 'Please enter the serial number of the device'
+            Write-Verbose "Got serial number: $SerialNumber"
+            $whatToDo = 'device'
         }
-        $whatToDo = 'Device'
-    }
-    'Verify another device'
-    {
-        Write-Host 'Please enter the serial number of the device you want to verify.'
-        Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
-        $SerialNumber = Read-Host 'Please enter the serial number of the device'
-        Write-Verbose "Got serial number: $SerialNumber"
-        $SerialNumber = $SerialNumber.Trim()
-        Write-Verbose "Trimmed serial number: $SerialNumber"
-        $whatToDo = 'Device'
-    }
-    'Verify a user'
-    {
-        Write-Host 'Please enter the user name (email address) of the user you want to verify.'
-        Write-Host 'You can type the full email address or just the user name.'
-        Write-Host "If you type just the user name, it will be converted to userName@$domain."
-        Write-Host 'The user name is not case sensitive.'
-        $userName = Read-Host 'Please enter the user name (email address)'
-        Write-Verbose "Got user name: $userName"
-        $userName = $userName.Trim()
-        Write-Verbose "Trimmed user name: $userName"
-        Write-Verbose 'Checking if the user name is missing the domain suffix.'
-        if ($userName -notmatch "@$domain$")
+        'Verify a user'
         {
-            Write-Verbose 'The user name is missing the domain suffix. Adding it now.'
-            $userName = "$userName@$domain"
+            Write-Host 'Please enter the user name (email address) of the user you want to verify.'
+            Write-Host 'You can type the full email address or just the user name.'
+            Write-Host "If you type just the user name, it will be converted to userName@$domain."
+            Write-Host 'The user name is not case sensitive.'
+            $userName = Read-Host 'Please enter the user name (email address)'
+            Write-Verbose "Got user name: $userName"
+            $whatToDo = 'user'
         }
-        Write-Verbose "The user name is now: $userName"
-        $whatToDo = 'User'
-    }
-    0
-    {
-        Write-Host 'Exiting script.'
-        exit 0 
+        0
+        {
+            Write-Host 'Exiting script.'
+            exit 0 
+        }
     }
 }
 #endregion Get user input.
@@ -98,16 +103,29 @@ Write-Verbose "Action to execute: $whatToDo"
 $accessToken = GetGraphAccessToken -configFile $configFile
 if ($whatToDo -eq 'device')
 {
+    Write-Verbose "Trimming serial number: $SerialNumber"
+    $SerialNumber = $SerialNumber.Trim()
+    Write-Verbose "Trimmed serial number: $SerialNumber"
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
     $global:enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
-    # Write-Host "The management state is: $($enrollmentState.managed)"
-    # Write-Host "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
-    # Write-Host "The imported state is: $($enrollmentState.imported)"
-    # Write-Host "Has device object: $($enrollmentState.hasDeviceObject)"
-    ShowDeviceReport -EnrollmentState $enrollmentState
+    Write-Host "The management state is: $($enrollmentState.managed)"
+    Write-Host "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
+    Write-Host "The imported state is: $($enrollmentState.imported)"
+    Write-Host "Has device object: $($enrollmentState.hasDeviceObject)"
+    # ShowDeviceReport -EnrollmentState $enrollmentState
 }
 elseif ($whatToDo -eq 'user')
 {
+    Write-Verbose "Trimming user name: $userName"        
+    $userName = $userName.Trim()
+    Write-Verbose "Trimmed user name: $userName"
+    Write-Verbose 'Checking if the user name is missing the domain suffix.'
+    if ($userName -notmatch "@$domain$")
+    {
+        Write-Verbose 'The user name is missing the domain suffix. Adding it now.'
+        $userName = "$userName@$domain"
+        Write-Verbose "The user name is now: $userName"
+    }
     Write-Host "Checking group membership for user $userName."
     $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
     if ($groups -eq $true)

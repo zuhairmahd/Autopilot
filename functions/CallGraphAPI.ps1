@@ -111,7 +111,7 @@ function CallGraphAPI()
             }
         }
         Write-Verbose "Final parameter list:"
-        $paramsList | ForEach-Object { Write-Host $_ }
+        $paramsList | ForEach-Object { Write-Verbose $_ }
         # Join the parameters with & to create a complete query string
         $queryString = $paramsList -join '&'
         Write-Verbose "Final query string: $queryString"
@@ -228,7 +228,7 @@ function CallGraphAPI()
             }
         }
         Write-Verbose "Failed to call the Graph API: $_"
-        Write-Verbose "Error: $statusMessage" -ForegroundColor Red
+        Write-Verbose "Error: $statusMessage"
         Write-Verbose "The status code is $statusCode"
         Write-Verbose "$statusCode indicates $statusCodeMessage"
         Write-Verbose "Status message: $statusMessage"
@@ -241,7 +241,7 @@ function CallGraphAPI()
             $streamReader = New-Object System.IO.StreamReader($errorResponse)
             $errorMessage = $streamReader.ReadToEnd()
             $streamReader.Close()
-            Write-Error "Server Response: $errorMessage"
+            Write-Verbose "Server Response: $errorMessage"
         }   
         return $statusCode
     }

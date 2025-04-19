@@ -25,6 +25,41 @@ Checks if a device is enrolled in Intune and imported into Autopilot.
 #>
 #endregion help
 
+
+function GetAutoPilotDeviceSerialNumber() 
+{
+    [CmdletBinding()]
+    param (
+        [string]$serialNumber,
+        [string]$accessToken
+    )
+
+    #write a verbose log  of receved parameters
+    Write-Verbose "Received serial number: $serialNumber"
+    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -APIVersion 'v1.0'
+    Write-Verbose "Received $($autopilotDevices.value.Count) devices from Autopilot."
+    $serialNumbers = $autopilotDevices.value | Select-Object -ExpandProperty serialNumber
+    Write-Verbose "Received $($serialNumbers.Count) serial numbers from Autopilot."
+    Write-Verbose "Serial numbers received from Autopilot: $($serialNumbers -join ', ')"
+    foreach ($device in $serialNumbers)
+    {
+        Write-Verbose "Processing device with serial number $device"
+        $filteredDevice = $device -replace '\s', ''
+        Write-Verbose "Filtered device serial number: $filteredDevice"
+        if ($filteredDevice -eq $serialNumber)
+        {
+            Write-Verbose "Device with serial number $serialNumber found in Autopilot."
+            return $device
+        }
+        else
+        {
+            Write-Verbose "Device with serial number $serialNumber not found in Autopilot."
+        }
+    }
+    return $valueToReturn
+}
+
 function GetDeviceEnrollmentStatus()
 {
     [CmdletBinding()]
@@ -59,7 +94,81 @@ function GetDeviceEnrollmentStatus()
     $userUri = "users"
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
-    $deviceFilter = "endswith(displayName,'$serialNumber')"
+    #endregion
+
+    #region Get the autopilot device info
+    if ($serialNumber -match 'vmware')
+    {
+        Write-Verbose "VMware device detected."
+        # $autopilotDeviceFilter = "AzureActiveDirectoryDeviceId eq '$($managedDevice.AzureAdDeviceId)'"
+        # Alternative approach if the above doesn't work
+        # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)'"
+        # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)' or AzureActiveDirectoryDeviceId eq '$AzureActiveDirectoryDeviceId'"
+        $autoPilotDeviceSerialNumber = GetAutopilotDeviceSerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
+        Write-Verbose "Autopilot device serial number: $autoPilotDeviceSerialNumber"
+        if ($autoPilotDeviceSerialNumber)
+        {
+            Write-Verbose "Device with serial number $autoPilotDeviceSerialNumber found in Autopilot."
+            $autopilotDeviceFilter = "contains(serialNumber,'$autoPilotDeviceSerialNumber')"
+        }
+        else
+        {
+            Write-Verbose "No match for device with serial number $serialNumber found in Autopilot."
+        }
+    }
+    else
+    {
+        Write-Verbose "Not a VMWare device. Continuing"
+    }
+    $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
+    Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
+    Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+    if ($autopilotDevice)
+    {
+        Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
+        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
+        $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
+        $inAutopilot = $true
+        $returnedAutopilotDevice = $autopilotDevice
+        Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
+        $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$($autopilotDevice.serialNumber)'"
+        $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter -APIVersion 'beta'
+        Write-Verbose "Found $($autopilotEvents.value.count) Autopilot events."
+        if ($autopilotEvents)
+        {
+            Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilotEvents.serialNumber)"
+            $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
+            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json)"
+        }
+        else
+        {
+            Write-Verbose 'No events found for device in Autopilot'
+        }
+    }
+    else
+    {
+        Write-Verbose 'Device is not an autopilot device.'
+    }
+    
+    Write-Verbose "Getting imported Autopilot device info for serial number $($autopilotDevice.serialNumber)"
+    $importedDeviceFilter = "serialNumber eq '$($autopilotDevice.serialNumber)'"
+    $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter
+    Write-Verbose "Found $($importedAutopilotDevices.value.count) Imported Autopilot devices."
+    $importedAutopilotDevice = $importedAutopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
+    Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+    if ($importedAutopilotDevice)
+    {
+        Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
+        $imported = $true
+        $returnedImportedDevice = $importedAutopilotDevice
+    }
+    else
+    {
+        Write-Verbose 'Device not found in the list of imported Autopilot devices'
+        Write-Verbose "This means the device may have already been registered."
+    }
+    
     #endregion
 
     #region Get device info
@@ -106,6 +215,8 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose 'Device not found in Intune'
     }
+    $deviceId = $autopilotDevice.azureActiveDirectoryDeviceId
+    $deviceFilter = "deviceId eq '$deviceId'"
     $device = CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceUri -filter $deviceFilter -consistencyLevel
     if ($device -and $device.value.count -gt 0)
     {
@@ -119,70 +230,6 @@ function GetDeviceEnrollmentStatus()
     }
     #endregion
 
-    #region Get the autopilot device info
-    if ($managedDevice -and $serialNumber -match 'vmware')
-    {
-        Write-Verbose "Getting Autopilot device info for managed device with ID $($managedDevice.AzureAdDeviceId)"
-        $autopilotDeviceFilter = "AzureActiveDirectoryDeviceId eq '$($managedDevice.AzureAdDeviceId)'"
-        # Alternative approach if the above doesn't work
-        # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)'"
-        # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)' or AzureActiveDirectoryDeviceId eq '$AzureActiveDirectoryDeviceId'"
-    }
-    else
-    {
-        Write-Verbose "Getting Autopilot device info for serial number $serialNumber"
-        $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
-    }
-    $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
-    Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
-    Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
-    if ($autopilotDevice)
-    {
-        Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
-        Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
-        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
-        $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
-        $inAutopilot = $true
-        $returnedAutopilotDevice = $autopilotDevice
-        Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
-        $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$($autopilotDevice.serialNumber)'"
-        $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter -APIVersion 'beta'
-        Write-Verbose "Found $($autopilotEvents.value.count) Autopilot events."
-        if ($autopilotEvents)
-        {
-            Write-Verbose "Events found for device with serial number $($autopilotEvents.serialNumber)"
-            $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
-            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json)"
-        }
-        else
-        {
-            Write-Verbose 'No events found for device in Autopilot'
-        }
-    }
-    else
-    {
-        Write-Verbose 'Device is not an autopilot device.'
-    }
-    
-    Write-Verbose "Getting imported Autopilot device info for serial number $($autopilotDevice.serialNumber)"
-    $importedDeviceFilter = "serialNumber eq '$($autopilotDevice.serialNumber)'"
-    $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter
-    Write-Verbose "Found $($importedAutopilotDevices.value.count) Imported Autopilot devices."
-    $importedAutopilotDevice = $importedAutopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
-    if ($importedAutopilotDevice)
-    {
-        Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
-        $imported = $true
-        $returnedImportedDevice = $importedAutopilotDevice
-    }
-    else
-    {
-        Write-Verbose 'Device not found in the list of imported Autopilot devices'
-        Write-Verbose "This means the device may have already been registered."
-    }
-    
-    #endregion
     
     #region Verbose logging
     if ($inAutopilot)
