@@ -1,14 +1,14 @@
 {
     "NoAdminCheck":  "false",
+    "NoIntuneCheck":  "false",
     "Repo":  "Github",
-    "NoModuleCheck":  "true",
-    "check":  "false",
+    "timeInSeconds":  "60",
     "NoSignatureVerify":  "true",
     "NoUpdateCheck":  "true",
+    "maxWaitTime":  "30",
     "GetDeviceHash":  "false",
-    "AssignedUser":  "",
     "NoHashVerify":  "true",
-    "GroupTag":  "ENTRA",
+    "GroupTag":  "entra",
     "Release":  "main",
     "configFile":  ".\\\\.secrets\\\\config.json",
     "configuration":  "vars.json"

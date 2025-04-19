@@ -50,7 +50,7 @@ function CreateFullConfiguration()
     {
         Write-Host "No init file found at $InitFile."
         Write-Host "Creating init file at $InitFile."
-        if (InitializeConfiguration -RootFolder $RootFolder -ConfigurationFile $InitFile)
+        if (InitializeConfiguration -RootFolder $RootFolder -InitFile $InitFile)
         {
             Write-Host "Init file created successfully."
         }
@@ -100,9 +100,9 @@ function CreateFullConfiguration()
                 Write-Verbose "Setting config value to 'none'."
                 $configValue = 'none'
             }
-            Write-Verbose "Key name: $($config.Name)"
-            Write-Verbose "Key value: $($config.Value)"
-            Write-Verbose "Found Key value: $configValue"
+            Write-Verbose "Stored Key name: $($config.Name)"
+            Write-Verbose "Stored Key value: $($config.Value)"
+            Write-Verbose "Possible Key values: $configValue"
             Write-Verbose "Key description: $configDescription"
             Write-Verbose "Key type: $configType"
             switch ($configType)
@@ -111,7 +111,7 @@ function CreateFullConfiguration()
                 {
                     Write-Host "Please enter a new value for $($config.Name)."
                     Write-Host "Description: $($configDescription)"
-                    $value = Read-Host -Prompt "Press enter to keep the current value: ($configValue)"
+                    $value = Read-Host -Prompt "Press enter to keep the current value: ($($config.Value))"
                     if ($value -eq '' -or $null -eq $value)
                     {
                         $value = $config.Value

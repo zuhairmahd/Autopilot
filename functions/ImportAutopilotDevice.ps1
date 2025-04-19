@@ -66,10 +66,10 @@ function ImportAutopilotDevice()
     Write-Host "Please check the Intune portal or contact an Intune administrator."
     return $null
   }
-  Write-Host "The device import was successful."
+  Write-Host "The device import was successfully started."
   Write-Host "The imported device ID is $($imported.id)."
   #wait for the device to be imported
-  Write-Host "Waiting for device with device ID $($imported.id) to be imported."
+  Write-Host "Waiting for the import for device with device ID $($imported.id) to be completed."
   $device = callGraphApi -AccessToken $AccessToken -ResourcePath "$uri/$($imported.id)" -Method GET
   $index = 0
   while ($index -lt $maxWaitTime)
