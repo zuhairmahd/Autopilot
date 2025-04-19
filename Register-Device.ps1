@@ -497,10 +497,10 @@ if ($device.state.deviceImportStatus -eq 'complete')
         {
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
             Write-Host "The device is successfully assigned to the deployment profile $($assignment.deploymentProfile.displayName) on $($assignment.deploymentProfileAssignedDateTime)." -ForegroundColor Green
-            Write-Host "The device enrollment state is $($assignment.enrollmentState)." -ForegroundColor Green
+            Write-Host "The device enrollment state is $($assignment.enrollmentState). " -ForegroundColor Green -NoNewline
             if ($assignment.enrollmentState -eq 'notContacted')
             {
-                Write-Host 'This is normal for a recently imported device..' -ForegroundColor Green
+                Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
             }
             $importDuration = (Get-Date) - $importStart
             $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
