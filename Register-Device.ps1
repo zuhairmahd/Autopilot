@@ -94,6 +94,7 @@ param (
     [Parameter(Mandatory = $False)] [switch]$NoHashVerify,
     [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
     [Parameter(Mandatory = $False)] [switch]$Reconfigure,
+    [Parameter(Mandatory = $False)] [switch]$ReInitialize,
     [Parameter(Mandatory = $False, ParameterSetName = 'NoUpdateCheckSet')] [switch]$NoUpdateCheck,
     [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')] [switch]$UpdateOnly,
     [Parameter(ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
@@ -254,6 +255,21 @@ if ($Reconfigure)
     }
     exit 0
 }   
+
+if ($ReInitialize)
+{
+    Write-Host 'Reinitializing the script...'
+    if (InitializeConfiguration -RootFolder $PSScriptRoot -overWrite)
+    {
+        Write-Host 'The script has been reinitialized.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'Failed to reinitialize the script.' -ForegroundColor Red
+        exit 1
+    }
+    exit 0
+}
 
 if (-not($NoSignatureVerify))
 {
