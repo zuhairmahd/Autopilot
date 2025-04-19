@@ -473,11 +473,11 @@ if ($device.state.deviceImportStatus -eq 'complete')
     $serialNumber = $device.SerialNumber
     Write-Host "The device with serial number $serialNumber was successfully imported into Intune." -ForegroundColor Green
     Write-Host 'Checking device assignment.'
-    $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-    if ($assignment)
+    $global:assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -verbose
+    if ($global:assignment)
     {
-        Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
-        if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
+        Write-Verbose "The assignment details are: $($global:assignment | ConvertTo-Json)"
+        if (($global:assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $global:assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $global:assignment.deploymentProfile.displayName )
         {
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
             Write-Host "The device is successfully assigned to the deployment profile $assignedProfileName." -ForegroundColor Green

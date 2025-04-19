@@ -47,7 +47,7 @@ function CheckDeviceAssignment()
         Write-Verbose "Max wait time: $maxWaitTime."
     }
     $autoPilotDeviceURI = 'deviceManagement/windowsAutopilotDeviceIdentities'
-    $returnValue = $null
+    $assignment = $null
     #endregion
     
     Write-Verbose "Calling Graph API at $autoPilotDeviceURI."
@@ -57,11 +57,12 @@ function CheckDeviceAssignment()
     if ($null -eq $autopilotDevices -and $autopilotDevices -notin 200..204)
     {
         Write-Verbose 'No devices found in Intune.'
-        return $returnValue
+        return $null
     }
     Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
+    Write-Verbose "Looking for the device with serial number $serialNumber."
     $assignment = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    Write-Verbose "Found $($assignment.count) devices matching the serial number $serialNumber."
+    Write-Verbose "Found the device matching serial number $serialNumber."
     Write-Verbose "Device assignment: $($assignment | ConvertTo-Json -Depth 10)"
     if ($assignment)
     {
@@ -69,7 +70,7 @@ function CheckDeviceAssignment()
         Write-Verbose 'Checking profile assignment'
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)?`$expand=deploymentProfile"
         Write-Verbose "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
-        if ($wwait)
+        if ($WaitForAssignment)
         {
             Write-Host "Waiting for up to $maxWaitTime minutes for the device to be assigned to a deployment profile."
             $index = 0
@@ -91,7 +92,6 @@ function CheckDeviceAssignment()
             {
                 Write-Verbose 'Congratulations!!! ' 
                 Write-Verbose "The device is successfully assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime)."
-                $returnValue = $assignment
             }
         }
         else
@@ -103,13 +103,11 @@ function CheckDeviceAssignment()
                 Write-Verbose "Device details: $($assignment | ConvertTo-Json -Depth 10)"
                 Write-Verbose "The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
                 Write-Verbose 'The device is ready for enrollment.'
-                $returnValue = $assignment
             }
             else
             {
                 Write-Host "The device is not assigned to a deployment profile."
                 Write-Host "Please check the Intune portal or contact an Intune administrator."
-                Write-Host "The device is not ready for enrollment."
                 Write-Verbose 'The device is not ready for enrollment.'
             }
         }
@@ -118,6 +116,6 @@ function CheckDeviceAssignment()
     {
         Write-Verbose 'The device is not found in Intune.'
     }
-    Write-Verbose "Returning $returnValue."
-    return $returnValue
+    Write-Verbose "Returning $assignment."
+    return $assignment
 }
