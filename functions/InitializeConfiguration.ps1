@@ -19,8 +19,6 @@ function InitializeConfiguration()
         @{name = 'configuration'; value = "vars.json"; description = "The path to the configuration file."; devdefault = 'vars.json'; reldefault = 'vars.json'; type = 'string'},
         @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; devdefault = "MSB01"; reldefault = "MSB01"; type = 'string'},
         @{name = 'AssignedUser'; value = ''; description = "the user to assign the autopilot device to."; devdefault = ''; reldefault = ''; type = 'string'},
-        @{name = 'check'; value = @('true', 'false'); description = "Check the status of the device."; devdefault = 'false'; reldefault = 'false'; type = 'array'},
-        @{name = 'NoModuleCheck'; value = @('true', 'false'); description = 'skip checking for installed powershell modules.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
         @{name = 'NoUpdateCheck'; value = @('true', 'false'); description = 'skip checking for updates.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
         @{name = 'NoAdminCheck'; value = ('true', 'false'); description = 'skip checking for admin rights.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
         @{name = 'NoSignatureVerify'; value = @('true', 'false'); description = 'skip verifying the signature of the script.'; devdefault = 'true'; reldefault = 'false'; type = 'array'},
@@ -37,12 +35,12 @@ function InitializeConfiguration()
         foreach ($var in $initVars)
         {
             $vars += [ordered] @{
-                name = $var.name
-                value = $var.value
+                name        = $var.name
+                value       = $var.value
                 description = $var.description
-                devdefault = $var.devdefault
-                reldefault = $var.reldefault
-                type = $var.type
+                devdefault  = $var.devdefault
+                reldefault  = $var.reldefault
+                type        = $var.type
             }
         }
         $Vars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
@@ -59,7 +57,7 @@ function InitializeConfiguration()
             Write-Host "Initialization file already exists at $InitFile."
             Write-Host "Would you like to overwrite the file?"
             $choice = Read-Host "Overwrite? (y/n)"
-            while ($choice -notin ('y','n'))
+            while ($choice -notin ('y', 'n'))
             {
                 Write-Host "Invalid input. Please enter 'y' or 'n'."
                 [console]::beep(1000, 500)

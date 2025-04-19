@@ -168,7 +168,6 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose 'Device not found in the list of imported Autopilot devices'
         Write-Verbose "This means the device may have already been registered."
     }
-    
     #endregion
 
     #region Get device info

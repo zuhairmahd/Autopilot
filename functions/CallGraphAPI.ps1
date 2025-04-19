@@ -11,6 +11,7 @@ function CallGraphAPI()
         [string]$method = 'get',
         [string]$Filter = $null,
         [string]$ExtraParameters = $null,
+        [string]$body = $null,
         [switch]$consistencyLevel,
         [switch]$secureString
     )
@@ -31,6 +32,7 @@ function CallGraphAPI()
     Write-Verbose "Extra Parameters: $ExtraParameters"
     Write-Verbose "Version: $APIVersion"
     Write-Verbose "Consistency Level: $consistencyLevel"
+    Write-Verbose "Body: $body"
     Write-Verbose "SecureString: $secureString"
     $uri = "https://graph.microsoft.com/$APIVersion/$ResourcePath"
     Write-Verbose "Uri: $uri"
@@ -126,6 +128,10 @@ function CallGraphAPI()
             $encodedUri = "$encodedUri`?$queryString"
         }
     }
+    else
+    {
+        Write-Verbose 'No extra parameters provided.'
+    }
     if ($consistencyLevel)
     {
         Write-Verbose 'Adding consistency level to the headers.'
@@ -143,13 +149,25 @@ function CallGraphAPI()
             'Content-Type' = 'application/json'
         }
     }
+    # Create parameter hashtable for splatting
+    $restParams = @{
+        Method          = $method
+        Uri             = $encodedUri
+        Headers         = $headers
+        UseBasicParsing = $true
+    }
+    # Only add Body parameter if it exists
+    if ($body)
+    {
+        $restParams['Body'] = $body
+    }
     #endregion
     Write-Verbose "Making the following call to Microsoft Graph:" 
     Write-Verbose "URI: $encodedUri." 
     Write-Verbose "Method: $method."
     try
     {
-        $response = Invoke-RestMethod -Method $method -Uri $encodedUri -Headers $headers -UseBasicParsing 
+        $response = Invoke-RestMethod @restParams
         $response | ForEach-Object {
             if ($_.'@odata.nextLink')
             {

@@ -1,0 +1,15 @@
+{
+    "NoAdminCheck":  "false",
+    "Repo":  "Github",
+    "NoModuleCheck":  "true",
+    "check":  "false",
+    "NoSignatureVerify":  "true",
+    "NoUpdateCheck":  "true",
+    "GetDeviceHash":  "false",
+    "AssignedUser":  "",
+    "NoHashVerify":  "true",
+    "GroupTag":  "ENTRA",
+    "Release":  "main",
+    "configFile":  ".\\\\.secrets\\\\config.json",
+    "configuration":  "vars.json"
+}

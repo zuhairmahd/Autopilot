@@ -1,5 +1,6 @@
 [CmdletBinding()]
 param(
+    [switch]$currentDevice,
     [string]$SerialNumber = '',
     [string]$userName = '',
     [string]$configFile = "$PSScriptRoot\.secrets\config.json",

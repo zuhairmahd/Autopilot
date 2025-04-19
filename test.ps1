@@ -35,6 +35,12 @@ else
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
+$serialNumber = 'BTSB25000BCR'
+
+$assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -verbose 
+Write-Host "The assignment status is $($assignment.deploymentProfileAssignmentStatus)"
+
+exit 0 
 $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $deviceManagementUri = "deviceManagement/managedDevices"
 $autopilotDevices = (CallGraphAPI -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -apiVersion 'v1.0').value
