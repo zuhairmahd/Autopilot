@@ -69,16 +69,7 @@ function CheckDeviceAssignment()
         Write-Verbose 'Checking profile assignment'
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)?`$expand=deploymentProfile"
         Write-Verbose "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
-        if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
-        {
-            $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
-            Write-Verbose "Graph response: $($assignment)."
-            Write-Verbose "Device details: $($assignment | ConvertTo-Json -Depth 10)"
-            Write-Verbose "The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
-            Write-Verbose 'The device is ready for enrollment.'
-            $returnValue = $assignment
-        }
-        elseif ($wwait)
+        if ($wwait)
         {
             Write-Host "Waiting for up to $maxWaitTime minutes for the device to be assigned to a deployment profile."
             $index = 0
@@ -105,9 +96,22 @@ function CheckDeviceAssignment()
         }
         else
         {
-            Write-Verbose 'The device is imported but not assigned to a deployment profile.'
-            $returnValue = $assignment
-            Write-Verbose "Returning $returnValue."
+            if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
+            {
+                $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
+                Write-Verbose "Graph response: $($assignment)."
+                Write-Verbose "Device details: $($assignment | ConvertTo-Json -Depth 10)"
+                Write-Verbose "The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
+                Write-Verbose 'The device is ready for enrollment.'
+                $returnValue = $assignment
+            }
+            else
+            {
+                Write-Host "The device is not assigned to a deployment profile."
+                Write-Host "Please check the Intune portal or contact an Intune administrator."
+                Write-Host "The device is not ready for enrollment."
+                Write-Verbose 'The device is not ready for enrollment.'
+            }
         }
     }
     else

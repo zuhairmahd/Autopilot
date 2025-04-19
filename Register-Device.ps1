@@ -477,7 +477,7 @@ if ($device.state.deviceImportStatus -eq 'complete')
     if ($assignment)
     {
         Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
-        if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -and $null -ne $assignment.deploymentProfile.displayName )
+        if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
         {
             Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
             Write-Host "The device is successfully assigned to the deployment profile $assignedProfileName." -ForegroundColor Green
