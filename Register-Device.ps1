@@ -406,7 +406,6 @@ if ($null -eq $accessToken)
 if (-not $NoIntuneCheck)
 {
     $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-    $global:a = $deviceAssignment
     Write-Verbose "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
     if ($deviceAssignment)
     {
