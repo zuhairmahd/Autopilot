@@ -1,5 +1,5 @@
-function isEncrypted
-<#
+function isEncrypted() { 
+    <#
 .SYNOPSIS
     A function to check if the passed JSON data is encrypted.
 .DESCRIPTION
@@ -8,7 +8,6 @@ function isEncrypted
     isEncrypted -data $data
     This will check if the data is encrypted.
 #>
-{
     [CmdletBinding()]
     param (
         [psObject]$data
@@ -17,32 +16,26 @@ function isEncrypted
     $encryptedCount = 0
     $unencryptedCount = 0
     Write-Verbose 'Checking if the data is encrypted.'
-    foreach ($prop in $data.PSObject.Properties)
-    {
-        Write-Verbose "Checking if the value of $($prop.Name) $($prop.Value) is encrypted."
-        if ($(try
-                {
+    foreach ($prop in $data.PSObject.Properties) {
+        Write-Verbose "Checking if the value of $($prop.Name) is encrypted."
+        if ($(try {
                     $null = [Convert]::FromBase64String($prop.Value); $true 
                 }
-                catch
-                {
+                catch {
                     $false 
-                }))
-        {
-            Write-Verbose "The value $($prop.Value) is encrypted."
+                })) {
+            Write-Verbose "The value for $($prop.Name) is encrypted."
             $encryptedCount++
         }
-        else
-        {
-            Write-Verbose "The value $($prop.Value) is not encrypted."
+        else {
+            Write-Verbose "The value for $($prop.Name) is not encrypted."
             $unencryptedCount++
         }
     }
     Write-Verbose "The number of encrypted values is $encryptedCount"
     Write-Verbose "The number of unencrypted values is $unencryptedCount"
     #If the number of encrypted values is greater than the number of unencrypted values, the data is encrypted.
-    if ($encryptedCount -gt $unencryptedCount)
-    {
+    if ($encryptedCount -gt $unencryptedCount) {
         $isEncrypted = $true
     }
     Write-Verbose "The data is encrypted: $isEncrypted"

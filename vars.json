@@ -1,20 +1,15 @@
 {
-  "configFile": ".\\.secrets\\config.json",
-  "Name": [
-    "localhost"
-  ],
-  "GroupTag": "MSB01",
-  "AssignedUser": "",
-  "check": false,
-  "NoModuleCheck": false,
-  "NoUpdateCheck": false,
-  "UpdateOnly": false,
-  "NoAdminCheck": false,
-  "NoSignatureVerify": false,
-  "NoHashVerify": false,
-  "GetDeviceHash": false,
-  "Redeploy": false,
-  "SerialNumber": "",
-  "Repo": "Github",
-  "Release": "main"
+    "NoAdminCheck":  "false",
+    "NoIntuneCheck":  "false",
+    "Repo":  "Github",
+    "timeInSeconds":  "60",
+    "NoSignatureVerify":  "true",
+    "NoUpdateCheck":  "true",
+    "maxWaitTime":  "30",
+    "GetDeviceHash":  "false",
+    "NoHashVerify":  "true",
+    "GroupTag":  "entra",
+    "Release":  "main",
+    "configFile":  ".\\\\.secrets\\\\config.json",
+    "configuration":  "vars.json"
 }

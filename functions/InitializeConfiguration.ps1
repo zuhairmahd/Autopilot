@@ -1,111 +1,99 @@
-function GetScriptIntegrity()
+function InitializeConfiguration()
 {
     [CmdletBinding()]
-    param (
+    param
+    (
         [Parameter(Mandatory = $true)]
-        [string[]]$scriptFolders,
-        [Parameter(Mandatory = $true)]
-        $rootFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$hashFilePath = "$rootFolder\manifest.json",
-        [Parameter(Mandatory = $false)]
-        $exclusions
+        [string]$RootFolder,
+        [string]$InitFile = "$RootFolder\init.json",
+        [switch]$overwrite
     )
-
-    $unVerifiedScripts = @{}
-    Write-Verbose "Received $scriptFolders to check"
-    Write-Verbose "Received $hashFilePath to check"
-    Write-Verbose "The root folder is $rootFolder"
-    Write-Verbose "Received $($exclusions.count) exclusions"
-    Write-Verbose "Checking $($scriptFolders.Count) folders for scripts."
-    $hashes = @()
-    $jsonContent = Get-Content -Path $hashFilePath | ConvertFrom-Json
-    $success  = $false
     
-    foreach ($category in $jsonContent.PSObject.Properties)
+    #print verbose log of received parameters
+    Write-Verbose "Root folder: $RootFolder"
+    Write-Verbose "InitFile: $InitFile"
+    Write-Verbose "Overwrite: $overwrite"
+    
+    $initVars = @(
+        [ordered] @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; devdefault = ".\\.secrets\\config.json"; reldefault = ".\\.secrets\\config.json"; type = 'string'},
+        [ordered] @{name = 'configuration'; value = "vars.json"; description = "The path to the configuration file."; devdefault = 'vars.json'; reldefault = 'vars.json'; type = 'string'},
+        [ordered] @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; devdefault = "MSB01"; reldefault = "MSB01"; type = 'string'},
+        [ordered] @{name = 'maxWaitTime'; value = '60'; description = 'How long to wait before giving up on importing a device.'; devdefault = '60'; reldefault = '60'; type = 'string'},
+        [ordered] @{name = 'timeInSeconds'; value = '60'; description = 'How long to wait before initiating another check.'; devdefault = '60'; reldefault = '60'; type = 'string'},
+        [ordered] @{name = 'NoUpdateCheck'; value = @('true', 'false'); description = 'skip checking for updates.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
+        [ordered] @{name = 'NoAdminCheck'; value = ('true', 'false'); description = 'skip checking for admin rights.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
+        [ordered] @{name = 'NoSignatureVerify'; value = @('true', 'false'); description = 'skip verifying the signature of the script.'; devdefault = 'true'; reldefault = 'false'; type = 'array'},
+        [ordered] @{name = 'NoHashVerify'; value = @('true', 'false'); description = 'skip verifying the hash of the script.'; devdefault = 'true'; reldefault = 'false'; type = 'array'},
+        [ordered] @{name = 'NoIntuneCheck'; value = @('true', 'false'); description = 'skip checking whether the device is present in Intune.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
+        [ordered] @{name = 'GetDeviceHash'; value = @('true', 'false'); description = 'Gets the hash of the device and exit.'; devdefault = 'false'; reldefault = 'false'; type = 'array'},
+        [ordered] @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; devdefault = 'Github'; reldefault = 'Gitlab'; type = 'array'}, 
+        [ordered] @{name = 'Release'; value = @('main', 'auto'); description = 'The release branch to use.'; devdefault = 'main'; reldefault = 'main'; type = 'array'}
+    )
+    $vars = @()
+    $success = $false
+    if (-not(Test-Path $InitFile))
     {
-        Write-Verbose "Processing $($category.Value.count) $($category.Name)"
-        switch ($category.Name)
+        Write-Verbose "Creating configuration file at $InitFile."
+        foreach ($var in $initVars)
         {
-            'Scripts' { $scriptFolder = $rootFolder }
-            'cmds' { $scriptFolder = $rootFolder }
-            'Functions' { $scriptFolder = "$rootFolder\functions" }
-        }
-        foreach ($script in $category.Value)
-        {
-            Write-Verbose "Reading script $($script.Name) with hash $($script.Hash) from manifest."
-            $hashes += @{
-                Name = $script.Name
-                Path = $scriptFolder
-                Hash = $script.Hash
+            $vars += [ordered] @{
+                name        = $var.name
+                value       = $var.value
+                description = $var.description
+                devdefault  = $var.devdefault
+                reldefault  = $var.reldefault
+                type        = $var.type
             }
         }
+        $Vars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
     }
-
-    foreach ($folder in $scriptFolders)
+    else
     {
-        Write-Verbose "Checking integrity for files in $($folder)."
-        $files = Get-ChildItem -Path "$folder\*.ps1", "$folder\*.cmd" -File -Force
-        Write-Verbose "Found $($files.count) files in $($folder)."
-        #subtract the exclusions count from the scripts count.
-        if ($exclusions.Count -gt 0)
+        if ($overwrite)
         {
-            Write-Verbose "Excluding $($exclusions.count) files from the check."
-            $files = $files | Where-Object { $_.BaseName -notin $exclusions }
+            Write-Verbose "Overwriting configuration file at $InitFile."
+            $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
         }
-        Write-Verbose "Found $($files.count) files after exclusions."
-        foreach ($file in $files)
+        else
         {
-            Write-Verbose "Processing file $($file.Name)"
-            $script = $hashes | Where-Object { $_.Name -eq $file.BaseName }
-            if ($script)
+            Write-Host "Initialization file already exists at $InitFile."
+            Write-Host "Would you like to overwrite the file?"
+            $choice = Read-Host "Overwrite? (y/n)"
+            while ($choice -notin ('y', 'n'))
             {
-                Write-Verbose "Found script $($script.Name) with hash $($script.Hash)"
-                $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
-                if ($hash.Hash -ne $script.Hash)
-                {
-                    Write-Verbose "Hash mismatch for script $($file.Name). Expected: $($script.Hash), Found: $($hash.Hash)"
-                    $unVerifiedScripts[$file.Name] = [ordered] @{
-                        Path = $file.FullName
-                        Hash = $hash.Hash
-                        reason = 'hash mismatch'
-                    }
-                }
-                else
-                {
-                    Write-Verbose "Hash match for script $($file.Name)."
-                }
+                Write-Host "Invalid input. Please enter 'y' or 'n'."
+                [console]::beep(1000, 500)
+                $choice = Read-Host "Overwrite? (y/n)"
+            }
+            if ($choice -eq 'y')
+            {
+                Write-Verbose "Overwriting initialization file at $InitFile."
+                $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
             }
             else
             {
-                Write-Verbose "Script $($file.Name) not found in manifest."
-                $unVerifiedScripts[$file.Name] = [ordered] @{
-                    Path = $file.FullName
-                    Hash = 'Not Found in Manifest'
-                    reason = 'not found in manifest'
-                }
+                Write-Host "Initialization file not overwritten."
+                return $success
             }
         }
-    }    
-    Write-Verbose "Found $($unVerifiedScripts.count) unverified scripts."
-    if ($unVerifiedScripts.Count -eq 0)
+    }
+    if (Test-Path $InitFile)
     {
-        Write-Host "All scripts successfully passed the integrity check." -ForegroundColor Green
+        Write-Host "Initialization file created successfully at $InitFile."
         $success = $true
     }
     else
     {
-        Write-Host "The following scripts failed the integrity check:" -ForegroundColor Red
-        $unVerifiedScripts.GetEnumerator() | ForEach-Object { Write-Host "$($_.Key): $($_.Value.Path) - Hash: $($_.Value.reason)" }
+        Write-Host "Failed to create initialization file at $InitFile."
     }
-    Write-Verbose "Returning $($unVerifiedScripts.Count) unverified scripts."
     return $success
 }
+
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCCd3jZA8Wi06N2r
-# 8kD7khDvUIyLt1OYJAXOcsstoWNMVaCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCByCyd6wy6Nn99r
+# 8Q4qexH5mqpKxwpbbvYMX7ZZ0vludKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -136,100 +124,100 @@ function GetScriptIntegrity()
 # uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
 # GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
 # ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAM1skIm
-# 5t4Y5itQAAAAAzWyMA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
+# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAJTLw6Q
+# AbyxO+trAAAAAlMvMA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBBT0MgQ0EgMDEwHhcNMjUwNDA0MDYwODQxWhcNMjUwNDA3
-# MDYwODQxWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
+# RCBWZXJpZmllZCBDUyBFT0MgQ0EgMDEwHhcNMjUwNDA1MDYwNDE3WhcNMjUwNDA4
+# MDYwNDE3WjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
 # BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
 # Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# uqspbx8MXZXVSoBUd6U6NGyAHNHAI/F4Sy22FhwfsozNvfuPhJOVLU7czPUJGd2G
-# YkqkZrQU3kD8uXv2PpPm6YbU+FVQc8++4ZfjmwHFOpbybWTrn0WzDALvVdpXlLgr
-# U3WJvkSPuc8MfFNeR/Z1TlKZyGs8H311PC6vRaRnMQZudluEfTR8LTeaNzxrQG0B
-# EV5AXhA9fXxdINVTt2BU4kkMcDD8WmC0Jir5UWdxMjDgrnwV0BE6HJG5SI7JDQ/9
-# uxJlypyN/GfqGRHE8TWFP0I8/wm9x64xADf6wYihmZSmkhzaV27YTWheiqUprzBK
-# vTeY/JxOBJ3/gkTysTsGka6wClOOFL3xwVy8We4hXAZZcp2gPUwz3ltRjE/k3HJr
-# oXubmX35eO9hJyjBc9mziuXrPIE7Yp7wBo6JWfUk3ZxN/MvZahxL3Hagf9fGli7/
-# wU/gMCrr+rXEGXhak1gUjMOCFB+4+CA+BjZ0KOQO36iLsqykXEZLAHGFzCrraeQr
+# pDL9ztepCuGvrQ+Az3uc39Dg/xRxogU5K4uFHTyEsHpkYagTj3v9DMlra4cxPS5N
+# tifxD9lU64xOdcm3cDYyXsQVF7Upj3HoIcQk7vCms3wrTFuoa3RA+HyD9OfQduaE
+# kAJ6YsqDGbg2ugwy2mcNjDFYUeAXyuwUp7RtE6ebwrF0CCLuB2GUUVCbuxXJ+NI4
+# D+nWKImxvmQ9ox+gEn8tzFuTLjKFqohO6qz/ZGsHbv4yG02uNzwkS3Ed1p5JpiKk
+# g8B+qxZ5VKsiyN/6YRGRqLk9q+OYxaz+vR7B+6IAw+GVNMtGJ4j1hC0xJ9ZSUM2w
+# bBjha7rgsjqG3iMZkLLRxeaqZMDAhBLwXXn6Xao4wJ0yA1W9F3O2FLXfjEOyaW6j
+# YkzRctspNO1Lhwg6vyXlRpVByHQcpIkeIpi6MPzJ1PKrBFPn0L+qu1xog3KIbTQ5
+# 47kJmxrfLTG5huoFSCTERBY1V9Cd7mUq8rHiweLuuqEjorbGTsnyNq2ITaLezrT5
 # AgMBAAGjggIYMIICFDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDA7BgNV
 # HSUENDAyBgorBgEEAYI3YQEABggrBgEFBQcDAwYaKwYBBAGCN2GBmtGaFtje9WuB
-# vfqFXPmA7xswHQYDVR0OBBYEFG9nQS7mKgt2/VkQeyOkS8mNurH+MB8GA1UdIwQY
-# MBaAFOiDxDPX3J8MnHaaCqbU34emXljuMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
+# vfqFXPmA7xswHQYDVR0OBBYEFAJlnZta3B1lqFS+1XvKFjbfJEbAMB8GA1UdIwQY
+# MBaAFHacNnQT0ZB9YV+zAuuA9JlLpT6FMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
 # Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMElEJTIw
-# VmVyaWZpZWQlMjBDUyUyMEFPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
+# VmVyaWZpZWQlMjBDUyUyMEVPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
 # mDCBlTBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
-# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBBT0MlMjBD
+# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBFT0MlMjBD
 # QSUyMDAxLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
 # LmNvbS9vY3NwMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUH
 # AgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0
-# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAHoRqOnawpplL/d1
-# g5h8IxTkYtqBPi7+94PNDg4B40rt6lt855KabIa4sWbwvig7NtUG4ROOlGRWP6Os
-# ZDfaHQXsAbEC9siBWGCsoyGJ85V2gLPMm8UZwLgrrrxAkZFfZd4kmn7EJDfcE3sB
-# Kiae0XIRhUh/x/pwvpq0tPeMEl4MUcIJIZyq1FjYf04b1fQOWGwagL7H51CnDRiP
-# vWiOz1tVwoyOHyiryX1nGcIx74gczDttdcgRtaOlocYIk5CRwmBID47DjD9U96im
-# oE15ayYjRxlY4eok5/CSq4gl0yDR1Dv5tukzlahbjJI9MhufA/Yz5rO7cSKzzh+f
-# tIbdB9s/waX7D03YnxXX2yodNQYGie3mmDFbv3fTk1Qcp02jP+oUrnO7wtpJxhRX
-# 5BA9if5s2gaO7b9gEjvDNPbOtTpo8rGG6FoYRJN/YKVr5tL35RQCaPw7uDtDI/02
-# cpgPfT91E4YLXBS0ralIZojLo6NCciQ5abQ6xKYcuuEIif0W40fBKi/BFSolDF7B
-# MYmL9OgOT67no4LxYYEGn3JlqOIWyecD7rhYO/tQMSgufhuPXubzp1ToLn7cAw9C
-# /oBuD8v1aqtx8bBM36CANIfRzC4KQ657ahAYL67oZvA8an3BS4ng0CcEQR0TDFti
-# QS0sAlDvMlpHwwmIXtYg2P5y0wC8MIIG5zCCBM+gAwIBAgITMwADNbJCJubeGOYr
-# UAAAAAM1sjANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
+# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAABThEUkCudwAUfJ
+# vSWcK6gVjV4rszARFHl+2xl4e0QOwAVgm8rKZ2uP6ulsDQ3/XA1k/9vV980zluoz
+# 2RoVD1e0q8nYZvUCUFVyZyKESPGKqoY5fiBmJ4FpVNUj1+8Na1SLLuNPe3/Ir6yY
+# XtuRnIO27kRmOTolF/kMoWZshyQJ/ybUH+gbFgTtcmsKL5TN4teEAKQkSaG+oUzh
+# RsPKf3cqwE4R5wzD5Ws7D5CJZW0Bzju7pcdm1yLin68Mj1TgDoGE+WUAdAolJxUl
+# e8MvhvqbzL0Rln3TBMvVV1yYet/b+mMvmx5vRX/ncfgOI+wxUD5z+S8hx2p+HlYs
+# yqNO99t4w3qKSVta7MJi9Ybcg4+Z4X9WrN1Gh5xPeuiz3leZixi1R3zNjEaR9Rie
+# V/oRgPFfbqQ6rrkLD39Me/bW+n7hT4ap8Rmko6wVDyhbX2WTGjY4Un1Sf8fuDkCF
+# nizuavx+8qP8mhqw6WLHdgV1XF5AoKXkX6j63KiWXirsBbMaxxl61FujW24+AkCt
+# eWnxjCFdF8ZxC4OjLXvIvdaCIGK4VzD6bEPP2yzyAqWbPbTC1y6sJTPAx/MZysI6
+# qivU7kvdsiQsju69gTNdohYdEx3N2wwt6SDsQvh8+1yp1NuaDGnPhkRSFDRy4642
+# MDc3EsT9r8vkn6YS5hapslnEVmZJMIIG5zCCBM+gAwIBAgITMwACUy8OkAG8sTvr
+# awAAAAJTLzANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
 # TWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVy
-# aWZpZWQgQ1MgQU9DIENBIDAxMB4XDTI1MDQwNDA2MDg0MVoXDTI1MDQwNzA2MDg0
-# MVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
+# aWZpZWQgQ1MgRU9DIENBIDAxMB4XDTI1MDQwNTA2MDQxN1oXDTI1MDQwODA2MDQx
+# N1owZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
 # cmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhh
-# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBALqrKW8f
-# DF2V1UqAVHelOjRsgBzRwCPxeEstthYcH7KMzb37j4STlS1O3Mz1CRndhmJKpGa0
-# FN5A/Ll79j6T5umG1PhVUHPPvuGX45sBxTqW8m1k659FswwC71XaV5S4K1N1ib5E
-# j7nPDHxTXkf2dU5SmchrPB99dTwur0WkZzEGbnZbhH00fC03mjc8a0BtARFeQF4Q
-# PX18XSDVU7dgVOJJDHAw/FpgtCYq+VFncTIw4K58FdAROhyRuUiOyQ0P/bsSZcqc
-# jfxn6hkRxPE1hT9CPP8JvceuMQA3+sGIoZmUppIc2ldu2E1oXoqlKa8wSr03mPyc
-# TgSd/4JE8rE7BpGusApTjhS98cFcvFnuIVwGWXKdoD1MM95bUYxP5Nxya6F7m5l9
-# +XjvYScowXPZs4rl6zyBO2Ke8AaOiVn1JN2cTfzL2WocS9x2oH/XxpYu/8FP4DAq
-# 6/q1xBl4WpNYFIzDghQfuPggPgY2dCjkDt+oi7KspFxGSwBxhcwq62nkKwIDAQAB
+# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAKQy/c7X
+# qQrhr60PgM97nN/Q4P8UcaIFOSuLhR08hLB6ZGGoE497/QzJa2uHMT0uTbYn8Q/Z
+# VOuMTnXJt3A2Ml7EFRe1KY9x6CHEJO7wprN8K0xbqGt0QPh8g/Tn0HbmhJACemLK
+# gxm4NroMMtpnDYwxWFHgF8rsFKe0bROnm8KxdAgi7gdhlFFQm7sVyfjSOA/p1iiJ
+# sb5kPaMfoBJ/Lcxbky4yhaqITuqs/2RrB27+MhtNrjc8JEtxHdaeSaYipIPAfqsW
+# eVSrIsjf+mERkai5PavjmMWs/r0ewfuiAMPhlTTLRieI9YQtMSfWUlDNsGwY4Wu6
+# 4LI6ht4jGZCy0cXmqmTAwIQS8F15+l2qOMCdMgNVvRdzthS134xDsmluo2JM0XLb
+# KTTtS4cIOr8l5UaVQch0HKSJHiKYujD8ydTyqwRT59C/qrtcaINyiG00OeO5CZsa
+# 3y0xuYbqBUgkxEQWNVfQne5lKvKx4sHi7rqhI6K2xk7J8jatiE2i3s60+QIDAQAB
 # o4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDVR0lBDQw
 # MgYKKwYBBAGCN2EBAAYIKwYBBQUHAwMGGisGAQQBgjdhgZrRmhbY3vVrgb36hVz5
-# gO8bMB0GA1UdDgQWBBRvZ0Eu5ioLdv1ZEHsjpEvJjbqx/jAfBgNVHSMEGDAWgBTo
-# g8Qz19yfDJx2mgqm1N+Hpl5Y7jBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
+# gO8bMB0GA1UdDgQWBBQCZZ2bWtwdZahUvtV7yhY23yRGwDAfBgNVHSMEGDAWgBR2
+# nDZ0E9GQfWFfswLrgPSZS6U+hTBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
 # Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlm
-# aWVkJTIwQ1MlMjBBT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
+# aWVkJTIwQ1MlMjBFT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
 # ZAYIKwYBBQUHMAKGWGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2Vy
-# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwQU9DJTIwQ0ElMjAw
+# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwRU9DJTIwQ0ElMjAw
 # MS5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
 # b2NzcDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNo
 # dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5o
-# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQB6Eajp2sKaZS/3dYOYfCMU
-# 5GLagT4u/veDzQ4OAeNK7epbfOeSmmyGuLFm8L4oOzbVBuETjpRkVj+jrGQ32h0F
-# 7AGxAvbIgVhgrKMhifOVdoCzzJvFGcC4K668QJGRX2XeJJp+xCQ33BN7ASomntFy
-# EYVIf8f6cL6atLT3jBJeDFHCCSGcqtRY2H9OG9X0DlhsGoC+x+dQpw0Yj71ojs9b
-# VcKMjh8oq8l9ZxnCMe+IHMw7bXXIEbWjpaHGCJOQkcJgSA+Ow4w/VPeopqBNeWsm
-# I0cZWOHqJOfwkquIJdMg0dQ7+bbpM5WoW4ySPTIbnwP2M+azu3Eis84fn7SG3Qfb
-# P8Gl+w9N2J8V19sqHTUGBont5pgxW79305NUHKdNoz/qFK5zu8LaScYUV+QQPYn+
-# bNoGju2/YBI7wzT2zrU6aPKxhuhaGESTf2Cla+bS9+UUAmj8O7g7QyP9NnKYD30/
-# dROGC1wUtK2pSGaIy6OjQnIkOWm0OsSmHLrhCIn9FuNHwSovwRUqJQxewTGJi/To
-# Dk+u56OC8WGBBp9yZajiFsnnA+64WDv7UDEoLn4bj17m86dU6C5+3AMPQv6Abg/L
-# 9WqrcfGwTN+ggDSH0cwuCkOue2oQGC+u6GbwPGp9wUuJ4NAnBEEdEwxbYkEtLAJQ
-# 7zJaR8MJiF7WINj+ctMAvDCCB1owggVCoAMCAQICEzMAAAAHN4xbodlbjNQAAAAA
-# AAcwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
+# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQAAU4RFJArncAFHyb0lnCuo
+# FY1eK7MwERR5ftsZeHtEDsAFYJvKymdrj+rpbA0N/1wNZP/b1ffNM5bqM9kaFQ9X
+# tKvJ2Gb1AlBVcmcihEjxiqqGOX4gZieBaVTVI9fvDWtUiy7jT3t/yK+smF7bkZyD
+# tu5EZjk6JRf5DKFmbIckCf8m1B/oGxYE7XJrCi+UzeLXhACkJEmhvqFM4UbDyn93
+# KsBOEecMw+VrOw+QiWVtAc47u6XHZtci4p+vDI9U4A6BhPllAHQKJScVJXvDL4b6
+# m8y9EZZ90wTL1VdcmHrf2/pjL5seb0V/53H4DiPsMVA+c/kvIcdqfh5WLMqjTvfb
+# eMN6iklbWuzCYvWG3IOPmeF/VqzdRoecT3ros95XmYsYtUd8zYxGkfUYnlf6EYDx
+# X26kOq65Cw9/THv21vp+4U+GqfEZpKOsFQ8oW19lkxo2OFJ9Un/H7g5AhZ4s7mr8
+# fvKj/JoasOlix3YFdVxeQKCl5F+o+tyoll4q7AWzGscZetRbo1tuPgJArXlp8Ywh
+# XRfGcQuDoy17yL3WgiBiuFcw+mxDz9ss8gKlmz20wtcurCUzwMfzGcrCOqor1O5L
+# 3bIkLI7uvYEzXaIWHRMdzdsMLekg7EL4fPtcqdTbmgxpz4ZEUhQ0cuOuNjA3NxLE
+# /a/L5J+mEuYWqbJZxFZmSTCCB1owggVCoAMCAQICEzMAAAAGShr6zwVhanQAAAAA
+# AAYwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
 # c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
 # IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTRaFw0yNjA0MTMx
 # NzMxNTRaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
-# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC398ADKAfFuj6PEDTi
-# E0jxvP4Spta9K711GABrCMJlq7VjnghBqXkCuklaLxwiPRYD6anCLHyJNGC6r0kQ
-# tm9MyjZnVToC0TVOfea+rebLBn1J7FV36s85Ov651roZWDAsDzQuFF/zYC+tLDGZ
-# mkIf+VpPTx2fv4a3RxdhU0ok5GbWFKsCOMNCJnUmKr9KqIOgc3o8aZPmFcqzbYTv
-# 0x4VZgHjLRSU2pbRnYs825ryTStsRF2I1L6dM//GwRJlSetubJdloe9zIQpgrzlY
-# HPdKvoS3xWVt2J3+mMGlwcj4fK2hpQAYTqtJaqaHv9oRl4MNSTP24wo4ZqwiBid6
-# dSTkTRvZT/9tCoO/ep2GP1QlhYAM1gL/eLeLFxbVUQtpT7BOpdPEsAV6UKL+VEdK
-# NpaKkN4T9NsFvTNMKIudz2eY6Nk8qW60w2Gj3XDGjiK1wmgiTZs+i3234BX5TA1o
-# NEhtwRpBoHJyX2lxjBaZ/RsnggWf8KZgxUbV6QIHEHLJE2QWQea4xctfo8xdy94T
-# jqMyv2zILczwkdF11HjNWN38XEGdLkc6ujemDpK24Q+yGunsj8qTVxMbzI5aXxqp
-# /o4l4BXIbiXIn1X5nEKViZpTnK+0pgqTUUsGcQF8NbD5QDNBXS9wunoBXHYVzyfS
-# +mjK52vdLBmZyQm7PtH5Lv0HMwIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTog8Qz19yfDJx2mgqm1N+Hpl5Y
-# 7jBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
+# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBFT0MgQ0Eg
+# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDH48g/9CHdxhnAu8XL
+# q64nh9OneWfsaqzuzyVNXJ+A4lY/VoAHCTb+jF1WN9IdSrgxM9eKUvnuqL98ftid
+# 0Qrgqd3e7lx50XCvZodJOnq+X88vV0Av2x+gO82l0bQ39HzgCFg2kFBOGk7j8GrG
+# YKCXeIhF+GHagVU66JOINVa9cGDvptyOcecQS1fO8BbAm7RsFTuhFGpB53hVcm0g
+# JW35mgpRKOpjnBSWEB3AeH7fUGekE8LMW0pWIunrMS1HI7FF6BqAVT7IuBe++Z3T
+# sgM3RLZMti6JmNPD6Rxg62g2AqvuTQLoT1Z/cfiMdq+TYzGoWm2B8vSAv7NtJv5U
+# E0qJVPSarNckgmZaarDQr4Pcwp+YJ6vd7cJus/4XlG0JvRdoTS5Fwk9kmNbByIMH
+# EEhuQ0XgYvXaGXm/J2AUybNBw26h0rJf//eUsnWrbaugdVLVyC2wuCmNZhmUGWEJ
+# Nxcl5nfG5om9dkH2twsJfXk6BcvbW1RTAkIsTbtXkAZnGQ7eLniaBIKzC06ZZTgA
+# p38H97cq1e/pcFREq4C157PUSmCWhpnBB6P2Xl031SHxbX0FmD0iUuX7EdFfi8OI
+# xYBR//sA17gyhL3wXjmvvogYnSELTYQy4xnEASvBmPSWfRovncTOUxrkkKJE5tvR
+# Sgsd8ZJ00mwyDS6PcMBAN1VZMQIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
+# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBR2nDZ0E9GQfWFfswLrgPSZS6U+
+# hTBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
 # aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
 # gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
 # FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
@@ -238,18 +226,18 @@ function GetScriptIntegrity()
 # AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
 # b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
 # JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAHf+
-# 60si2TAtOng1+H32+tulKwvw3A8iPb5MGdkYvcLx61MZiz4dlTE0b6s15lr5HO72
-# gRwBkkOIaMRbK3Mxq8PoGKHecRYWwhbhoaHiAHif+lE955WsriLUsbuMneQ8tGE0
-# 4dmItRC2asXhXojG1QWO8GeKNpn2gjGxJJA/yIcyM/3amNCscEVYcYNuSbH7I7oh
-# qfdA3diZt197DNK+dCYpuSJOJsmBwnUvRNnsHCawO+b7RdGw858WCfOEtWpl0TJb
-# DDXRt+U54EqqRvdJoI1BPPyeyFpRmGvFVTmo2BiNpoNBCb4/ZISkEXtGiUQLeWWV
-# +4vgA4YK2g1085avH28FlNcBV1MTavQgOTz7nLWQsZMsrOY0WfqRUJzkF10zvGgN
-# ZDhpSgJFdywF5GGxyWTuRVc/7MkY85fCNQlufPYq32IX/wHoUM7huUa4auiAynJe
-# S7AILZnhdx/IyM8OGplgA8YZNQg0y0Vtq7lG0YbUM5YT150JqG248wOAHJ8+LG+H
-# LeyfvNQeAgL9iw5MzFW4xCL9uBqZ6aj9U0pmuxlpLSfOY7EqmD2oN5+Pl8n2Agdd
-# ynYXQ4dxXB7cqcRdrySrMwN+tGX/DAqs1IWfenuDRvjgB3U40OZa3rUwtC8Xngsb
-# raLp9+FMJ6gVP1n2ltSjaDGXJMWDsGbR+A6WdF8YMIIHnjCCBYagAwIBAgITMwAA
+# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAGov
+# CZ/YsHVCNSBrQbvMWRsZ3w0FAsc/Qo4UFY0kVmJO0p+k7RtnZZ+zq/m+ogqMTfZD
+# ozz0bhmRVy9a4QAD52+MtOFLLz1jT/+b9ZNIrBi2JHUTCfvHWTD8WD3fBCmzYLVZ
+# SP7TT/q42sX53gxUnFXUegEgP73lkhbQqSpmimc4DjDm8/hPlwGmtlACU/+8wbIH
+# Qf36kc2jSNP1DyB8ok3MdL2LUOAGaa58Z1b1MHK6ejwYCLMUyEuUizTxvmWKUiQT
+# nPcUwBQCv5eAgjUU1mdvjc4jpB3bM6KNuNh+6uxdQI0cL5FLAkablQvM/KZiCCcn
+# 6SEk6ruhKWo8aluvvSEYF4/D8nv+aZKqnuFOC3SY+KRLWLhqnzH4/fJ6ZhKGcWuB
+# XXvnZMj4Czr0t+Au2GQhO9/tsUcHy+YiFp1kI5LS9MLHcH785VwQws07ZsnQ72KR
+# zUmpHQW+rHucDAxFKHcVWqiyDMFtadWRAmruhYXAxV8Uhifos9Fky3jy7qIxQIUF
+# I912w8D/qTzmYS/7TxTlYJDvJ2PUpVXZMet7/yYseJ6b3B/8LOiGpGe3EzYT/H40
+# fLpMEydI9BGqGE1+46BQMBYRiaUz9kcZo8hvvE699XItD/uXph+iBPd6m3CngY4Z
+# GMfnP6Ab2SkEjHxCtGXo6KWeXFETGiSYx+UvuXXZMIIHnjCCBYagAwIBAgITMwAA
 # AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
 # MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
 # ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
@@ -292,22 +280,22 @@ function GetScriptIntegrity()
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
 # nTiOL60cPqfny+Fq8UiuZzGCFyAwghccAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADNbJCJubeGOYrUAAAAAM1sjAN
+# IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMQITMwACUy8OkAG8sTvrawAAAAJTLzAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCDm6VibMCvqQ71sW8Dnra8VtlJ
-# xqDCyaIWnrkEB9hrxTANBgkqhkiG9w0BAQEFAASCAYBgxA4a3vMvx3GLCuEyYvKI
-# CR5kdTaqcdIZL51eoY0RIBi2kkRi8YXP9iBnlSwgc76jujkvg4DVBINoyNKeDK7T
-# K87GRmN2N5Tpt065sxolHK7VQkFY33iOEkNlIZrxZexYw2Tr/F51b+ZBis5flID5
-# ISJ87rttngVF3HSZsGXNrSTuKJXot340sSfTcuCFgHKFXsYlRAxLBymzsV2cUyMT
-# ZzdH9L4BUJ+XjiusJQhgQxUjRmRnKamWKRxfX1iiVtRZA6Uyz8Wk7abxd2XaEHCy
-# jfGAmqc72h0nFT/DvYMWDFbHaidXO/WaKnxqx1YxOWlM2H8zZd27kE646zaH2toO
-# ufV+lLUnyWJ+dlhNkhUIpKcPcPvWFqpjvhEkeDk8KFAHxPO7S9umeZBkJvRs44sx
-# 4SnDwzdOv9B6iqxNg+Dxga+Ntq/GDkVTjLXcgHyap+eccrfHXHSSwcdTASdc1RqU
-# 8FMq7ux636RdbQXb6MMbRomAvPelj6krXpLPvx389HihghSgMIIUnAYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCAY3+4tfMkSLzbAEQQ69qIxiSFJ
+# 3QYmFWRLOPKif4TfDjANBgkqhkiG9w0BAQEFAASCAYBlNkIMGgO2Z4e2RrWX/LpW
+# itAQEcoea9dlC94bJX+8gVl1hOpk2aUup+Q6vrOf93rMr6eezYyPJph3mD/o6JNV
+# 4EZY0ARPDb2TiaBSLoKOvdjunQ+eNYfBtNA0bx1dlViva2Ft+0tatU1Qu9dgqAwk
+# ZtbQWSIN6lz81zoof4Ndiu95MbtKYUjZ7c1DZvOKNIPFlVP6cnadiV604ilzSPGe
+# G6TIVOngq4GX4/LiVV/essRQPlLayBwXcNFKm+yYju1WkfDOMt2lPQzis2jrZogR
+# 72ho3dKGQYUMMPpVslpzRG5AHNanCtWf+4pruT0POztXU24XymwArpsNVgcXGkWU
+# wCQNgQBYDf3uWeUu62BWSRY7yNOx6Csibu3HAmno63mt5mFFiRvXjS2vIYaHj5jm
+# BhzPqF8Bpi/6A1PnP0pqbqU1oh1M7ulf2bW+LfITIuEND4e/cv7sLVbC+fQ8B6j0
+# zepVLPn1PQle6kZtqmAN0SLPL5cHHclzdKcGV/fH/q6hghSgMIIUnAYKKwYBBAGC
 # NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgBlaOozFENRsaIgZLsYY1nv8ArejUTF7hM0ekGK+5
-# +/UCBmfdn12FOBgTMjAyNTA0MDUwMDU3NTEuNjc1WjAEgAIB9KCB4KSB3TCB2jEL
+# MTANBglghkgBZQMEAgEFAAQgG78tUkmCRKvldjHCDQj20fpaHxD6lehLBb6dZQMz
+# tx0CBmfdn2CzYhgTMjAyNTA0MDUyMjI3MTQuMzY0WjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
@@ -397,21 +385,21 @@ function GetScriptIntegrity()
 # ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
 # bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEr9uFXHYqrJiQAAAAAA
 # SjANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
-# MC8GCSqGSIb3DQEJBDEiBCBy6cTkXyUM0AWJ8pmDpJz+CwvvMz+YbRtDq83Q4tWd
-# ojCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIGZ7KbWlzY0AQkdLdW/gAxiy
+# MC8GCSqGSIb3DQEJBDEiBCBJoC4lRm5Toov9xB8axNeHXncWpy9VwleDm13ya+20
+# VDCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEIGZ7KbWlzY0AQkdLdW/gAxiy
 # l7PEf9Wpsv+xde8uw+EKMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
 # aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
 # UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASv24VcdiqsmJAAAAAABKMCIE
-# IBzQVGklSR2vybyvIN4m6pY0gLgbWNmHlQAK4fygFewIMA0GCSqGSIb3DQEBCwUA
-# BIICAIfEqstgZEzRuK3/rR7khHx7R9mH53EZ6GCsYxcq30pQr5gGbf1d0THJwfLN
-# gjmIrs8duUeddtB1VVlE/0FCGOSyJZwIrrOLvdmBVj1FKrh7hG9bnvZM3qdCCAJ5
-# mLCUfrssmp31b3UF0IAPv2NM/FyfMrLlNYWLQ4CO/qOzRCP6G27jQFXMk3azdsFB
-# caUGXdzmW9l40XtxOnA008nMu7u6QoPr4k1mLEc0HepRVmvg3AQcR64sIfxb2le/
-# P2n+CTz25Bx0CIxrpQA7oaFYhWicuiXhkRuj+Hi3xfvwTaCZWr+ytKvNKn6tCI/k
-# JhOYB4PeMC6hiS4uGiBKovgg+3UlsFftt85BoM6AaoWNJSfXuvLRD+N669mJc+Uz
-# dd3z/ncmEtufJaRBXPtnX2CUp0S/qJ+sIsJRiMA8JYZPhsE1W3/Km0U3M6O8bIKD
-# nCNxlSY5s8nsQa8FsssSZc0Fc1Kgf6YInf3StpZ7HyL1oR6Hluzho14KXmaYExuX
-# tXSYpaBMiQ7m/aHDFknT9AhuxOkCfkyKh2elW09CxAqSpl2Lz6fNw8sjtOM1Xlum
-# LcrpY2sTUHyPndpaWy6H/kXEh5zDR7Jg4Uw3lT8xDvhEv19lF5QcIPRSUqX2q01j
-# cmKKz6Gu+0hIP36u38uSYC/qgDkcrJ8+NhYhKn1TaIyvMKpc
+# IN/SRtJBAN4cJnlBaIdz81wfjRThoFhZ7JGRfFean0jtMA0GCSqGSIb3DQEBCwUA
+# BIICAIYCDQwtSLZKWoEsPtD+MjRF7JLrCsdh+uPKE4qpSxLB4aKjT0jk4zjy9ZXx
+# dBD/u/22CplF1mRV9CAGqX9NkQhGM8azb6XDcY2DB5nPtXfsaaqB58UzcgWeAWwQ
+# biKoX+xM4U3A5J1Ptw7McwLqf54hodbuVkUsDewt8z2dO/lZixnkaU0UBQycI17w
+# 1rNKDFeGpktC52cb54nlvE+4bpJyncG2CI+Zf7Q6JYPEVWd3YtcbrOSESPiREsLc
+# OKkOK4slROfM/nmW9Ffl4bG54uGZDkd7VXHNtD9sR8FDbjY5lcSDHGqZPh8VdG4q
+# 1JPs/P+DMlDBWDmxYDeWgmuI3ljPnAwYNt4W05C4WvgVanZInLeUFUfWHFp33f0a
+# O8lr13YGZesosZCWKEXlste6Gf1sGW18U9GZvFLTYQgoahHUVYqlgSqbDDfUmDfj
+# NJaEt8v38b7oWEmWKiKSCSHpPJiOr5jb+ycbfTGa5XUfZ4MKQzYhiRkC7IuIeSVY
+# 8/KZtLCm0zvE4wAYy6bO+vRoihRWktMiteSzWFbMiNBnnAPLwfOjgEXaCV0chKIF
+# mDuBUuPhgO4U9y6e7KA5EMCXxNk9DfygtmEVMTpA9yaRgX3Cc9urCve+6WiEzkQk
+# DvYA2jPkYdmiUU0y/Y5w5dRRhkzk0ydJL8oLXhryD/EAX2YW
 # SIG # End signature block

@@ -1,13 +1,25 @@
 {
-    "exclusions": [
-        "test",
-        "CopyFiles",
-        "GetUSBDriveLetter",
-        "IsEncrypted",
-        "Test1",
-        "TestScriptUpdates",
-        "UpdateManifest",
-        "CreateRelease",
-        "updateRelease"
-    ]
+  "exclusions": [
+    "callGraph",
+    "CleanExclusions",
+    "ConnectMe",
+    "CopyFiles",
+    "CreateRelease",
+    "GetDevices",
+    "GetDevicesByType",
+    "GetUSBDriveLetter",
+    "graph",
+    "graph1",
+    "graphtest",
+    "GroupMembers",
+    "groups",
+    "IsEncrypted",
+    "ListAllDevices",
+    "manifest",
+    "test",
+    "Test1",
+    "TestScriptUpdates",
+    "UpdateManifest",
+    "updateRelease"
+  ]
 }

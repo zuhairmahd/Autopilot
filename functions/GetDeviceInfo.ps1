@@ -1,36 +1,36 @@
-function GetDeviceInfo()
-{
+function GetDeviceInfo() {
     [CmdletBinding()]
     param
     (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string]$name,
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $false)]
         [string]$GroupTag,
         [Parameter(Mandatory = $false)]
-        [string]$AssignedUser = ''
+        [string]$AssignedUser = '',
+        [switch]$NoHash
     )
     $device = @{}
     $session = New-CimSession
-    Write-Verbose "Checking $name for hardware hash."
+    if (-not $NoHash) {
+        Write-Verbose "Checking $name for hardware hash."
+        $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
+        Write-Verbose "The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
+        if ($devDetail) {
+            $hash = $devDetail.DeviceHardwareData
+            $device.Add('HardwareHash', $hash)
+            Write-Verbose "The hardware hash is $hash."
+        }
+        else {
+            Write-Error 'No hardware hash was found.'
+            exit 1
+        }
+    }
+    #Get other -NoTypeInformation
     $serial = (Get-CimInstance -CimSession $session -Class Win32_BIOS).SerialNumber
     #Add the serial number to the hash table.
     $device.Add('SerialNumber', $serial)
     Write-Verbose "The serial number is $serial."
-    $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
-    Write-Verbose "The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
-    if ($devDetail)
-    {
-        $hash = $devDetail.DeviceHardwareData
-        $device.Add('HardwareHash', $hash)
-        Write-Verbose "The hardware hash is $hash."
-    }
-    else
-    {
-        Write-Error 'No hardware hash was found.'
-        exit 1
-    }
-    #Get other -NoTypeInformation
     $cs = Get-CimInstance -CimSession $session -Class Win32_ComputerSystem
     $make = $cs.Manufacturer.Trim()
     $device.Add('Manufacturer', $make)

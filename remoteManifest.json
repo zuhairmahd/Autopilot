@@ -1,18 +1,6 @@
 {
   "Functions": [
     {
-      "name": "CheckDeviceAssignment",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "46E4E98B3B5F7E709B0B914554BEFBE0A5E4DAB5AA1F723074158C016C0F8149"
-    },
-    {
       "name": "CheckForScriptUpdates",
       "version": {
         "Major": 0,
@@ -34,7 +22,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "2505CE22FDF333D69921824750FFC53003EAC0A2A924307EF7DF7CD0C4012FE9"
+      "hash": "0260E1DB258CCB24BA13F85F9B175CD66D6D6B2CD1EBB5FD4260597AA3B269D0"
     },
     {
       "name": "CreateConfiguration",
@@ -46,19 +34,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "383AB16767DE61824E2A4013D0B831DD511F6E4D4344A87523318BEA2998753F"
-    },
-    {
-      "name": "CreateFullConfiguration",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "0226DC277019FB525FE1B22A8AED31860B125FFC3AD603A4FC68706F1C643E2C"
+      "hash": "9D8BFCAB5020998AECC92FB8C7B56AD999FEDC4B00EDB00B46834B7480853CE3"
     },
     {
       "name": "DownloadScriptUpdates",
@@ -73,18 +49,6 @@
       "hash": "51CD5F9CB64F36FC03B8D4B599764C8112BC5CB93666E2DE1A4FAC67C228E179"
     },
     {
-      "name": "GetAutopilotProfileAssignment",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "FD74322CEC327B308CBC4AE570C2C05B7616A90C592C794768814CA9D7DEBE6C"
-    },
-    {
       "name": "GetDecryptedObject",
       "version": {
         "Major": 0,
@@ -97,18 +61,6 @@
       "hash": "3BB81DA2F23053F3C49B712612AF31E650D084C455CF3F516FC18912C26D87AA"
     },
     {
-      "name": "GetDeviceBySerial",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "2075C827AE6EA0E91CBB5D5957FFA08F2B74D433F3A25AE50C1D06118944FBF6"
-    },
-    {
       "name": "GetDeviceBySerialNumber",
       "version": {
         "Major": 0,
@@ -118,7 +70,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "1FE091B743160C6FC48153EA5E93F5CB55D6E40DCF559EC33C13FC7A1EC95BDC"
+      "hash": "062239817EDA31CDB0E6A0E9C13A3F81D3D5CB2AA63DEB771F3CD5848E813C17"
     },
     {
       "name": "GetDeviceHash",
@@ -145,7 +97,7 @@
       "hash": "49EC721360879073F619C98E045CE70B9D649EF8AB602CADC1A62D23124FFECE"
     },
     {
-      "name": "GetExclusions",
+      "name": "GetDevices",
       "version": {
         "Major": 0,
         "Minor": 0,
@@ -154,10 +106,10 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "87F313D598386E9449C39F341349F011F63BB1A605936DDE638B1B4EED879C37"
+      "hash": "8CA71E49A8468575AFF4B9CB3575DFAB67F8E7F041D26DBB557142FCB50555D3"
     },
     {
-      "name": "GetGraphAccessToken",
+      "name": "GetDevicesByType",
       "version": {
         "Major": 0,
         "Minor": 0,
@@ -166,7 +118,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "BE9FD8983F300470ED6691A5528ED0E02E7BB3984E53E3877BB4ADDAFA39F31A"
+      "hash": "EAAB43DEEB07A37F2F3B43931844CEE43C3D9C2F40C752DDFF2F177E0D8F9EC4"
     },
     {
       "name": "GetLatestGithubrRelease",
@@ -202,7 +154,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "6DC62751B38F0422369E2ACBFABBCED6DCD2A2E5C36F59EAC823834F135CE119"
+      "hash": "528087D799B6E59C3EDEF1D652569E3B17808AFB18711117CF6F548AF523CD98"
     },
     {
       "name": "GetScriptIntegrity",
@@ -214,7 +166,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "29B44E838515C0D41E2C0C60A0B586A8FC81DE7414BE60DA83BE1A1F83E23C18"
+      "hash": "0AB834B546D36FC1603568083EAF4CEAEC6D2BD7B4FDC0B9B818A0E1F021EC65"
     },
     {
       "name": "GetScriptUpdates",
@@ -238,10 +190,10 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "841E8F76E081E30BC53BC4BFAD63E96E01C1E15138EAE9CDC4FAB539FD5ABF2C"
+      "hash": "EF60279CEF6BDDBB5A6637041A29FAE1BD7492E77B142B1C2C467FCC636D654F"
     },
     {
-      "name": "InitializeConfiguration",
+      "name": "ListAllDevices",
       "version": {
         "Major": 0,
         "Minor": 0,
@@ -250,7 +202,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "9CEE639DA9D6A92A5A778ADD472A64F67A80DFE7355638F4E628018B99A65C1E"
+      "hash": "800186BE935572C47418FE822DC503EFD46443EEEC4733DDA289B58053A9CCB8"
     },
     {
       "name": "RestartDevice",
@@ -262,7 +214,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "1F301E2DA0F6E88D04F9177855232983419A65EF0348E35AC158FF2475ADFE4F"
+      "hash": "F9E1AC30D16F22C5FCFE1A472CA7B140CE768251A21645CAE93B6755A0EC8258"
     },
     {
       "name": "SendDeviceCommand",
@@ -286,7 +238,27 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "25E6D49A13A1A3A19AF19241D02A0257DBA83F636AD4CB7B996CE3CECBBF44F7"
+      "hash": "8F60CD5AB90B744E263756BABFE02134D95703D958B55769118D1200C455EB74"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "vars",
+      "hash": "A1C03B2F8CB9906F9FC2A7CDE4D3850D5ABF8013AB6903EA0B601BF66C222C5F"
+    }
+  ],
+  "Scripts": [
+    {
+      "name": "Register-Device",
+      "version": {
+        "Major": 2,
+        "Minor": 2,
+        "Build": 0,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "hash": "B25C21AD94C04D1E75D8DF1F52F3FCB929EC52770C227FFA827EA6ED7FBB785E"
     }
   ],
   "Cmds": [
@@ -348,7 +320,7 @@
         "MajorRevision": -1,
         "MinorRevision": -1
       },
-      "hash": "264D74A2772B24F02E85567246B596F67948A31EB292BCEA3D3E2C93FF32C786"
+      "hash": "8FC46221EBC83CEA860890BEB0093D680E76AE94DED0D6575349E499440E3F87"
     },
     {
       "name": "register",
@@ -373,46 +345,6 @@
         "MinorRevision": -1
       },
       "hash": "4CE4B796668FB88DC18BDFF551B2188EB4424D60633B1CAC39C105BF7F45A483"
-    }
-  ],
-  "configurations": [
-    {
-      "name": "exclusions",
-      "hash": "A642D2CEF33FDF3EA0D386F8CB550017FBD6DE0258754EA51D3A8B69B47EA01C"
-    },
-    {
-      "name": "init",
-      "hash": "C87098B717039C3B421ABBB5D822A793405C49CBF8640A5E90875E39456DBA82"
-    },
-    {
-      "name": "remoteManifest",
-      "hash": "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
-    }
-  ],
-  "Scripts": [
-    {
-      "name": "Redeploy-Device",
-      "version": {
-        "Major": 0,
-        "Minor": 0,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "34B5A9D44E52556A82E7145671E8759134DE960831B81F78795869755C84970D"
-    },
-    {
-      "name": "Register-Device",
-      "version": {
-        "Major": 2,
-        "Minor": 2,
-        "Build": 0,
-        "Revision": -1,
-        "MajorRevision": -1,
-        "MinorRevision": -1
-      },
-      "hash": "2A5E8436403EFB2588E9288EB86DA4BC66E00A92D9136D9A1E3AEF588D5A7953"
     }
   ]
 }
