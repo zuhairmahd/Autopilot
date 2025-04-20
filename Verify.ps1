@@ -110,11 +110,20 @@ if ($whatToDo -eq 'device')
     Write-Verbose "Trimmed serial number: $SerialNumber"
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
     $global:enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
-    Write-Host "The management state is: $($enrollmentState.managed)"
-    Write-Host "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
-    Write-Host "The imported state is: $($enrollmentState.imported)"
-    Write-Host "Has device object: $($enrollmentState.hasDeviceObject)"
-    AssessDeviceState -enrollmentState $enrollmentState -Settings $settings
+    Write-Verbose "The management state is: $($enrollmentState.managed)"
+    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
+    Write-Verbose "The imported state is: $($enrollmentState.imported)"
+    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
+    if (AssessDeviceState -enrollmentState $enrollmentState -Settings $settings)
+    {
+        Write-Host 'The device is in the correct state.' -ForegroundColor Green
+        Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'The device is not in the correct state.' -ForegroundColor Red
+        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+    }
     # ShowDeviceReport -EnrollmentState $enrollmentState
 }
 elseif ($whatToDo -eq 'user')

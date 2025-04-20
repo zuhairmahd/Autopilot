@@ -35,9 +35,41 @@ function AssessDeviceState()
                 {
                     'enrolled'
                     {
-                        Write-Host 'The device appears to have been enrolled.' -ForegroundColor Red
-                        Write-Host "This may cause issues when the user loggs on for the first timme." -ForegroundColor Red
-                        Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
+                        Write-Host 'The device appears to have been enrolled.'
+                        Write-Host "Checking associated managed device..."
+                        if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
+                        #we can also potentially match on
+                        #($enrollmentState.autopilot.device.azureAdDeviceId -eq $enrollmentState.managedDevice.device.azureADDeviceId)
+                        #or
+                        #($enrollmentState.autopilot.device.azureActiveDirectoryDeviceId -eq $enrollmentState.managedDevice.device.azureActiveDirectoryDeviceId
+                        {
+                            Write-Host "The device is associated with the following managed device:"
+                            Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
+                            Write-Host "Serial number: $($enrollmentState.managedDevice.device.serialNumber)"
+                            Write-Host "Registration State: $($enrollmentState.managedDevice.device.deviceRegistrationState)"
+                            Write-Host "Enrollment type: $($enrollmentState.managedDevice.device.deviceEnrollmentType)"
+                            Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            Write-Host "The device is associated with the user $($enrollmentState.managedDevice.device.userPrincipalName) ($($enrollmentState.managedDevice.device.userDisplayName))."
+                            Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
+                            if ($null -ne $enrollmentState.managedDevice.device.deviceActionResults)
+                            {
+                                Write-Host "The device has the following actions pending:"
+                                foreach ($action in $enrollmentState.managedDevice.device.deviceActionResults)
+                                {
+                                    Write-Host "Action: $($action.action)"
+                                    Write-Host "Action state: $($action.actionState)"
+                                    Write-Host "Action result: $($action.actionResult)"
+                                    Write-Host "Action initiated by: $($action.initiatedBy)"
+                                    Write-Host "Action initiated on: $($action.initiatedDateTime)"
+                                }
+                            }
+                            else
+                            {
+                                Write-Host "The device has no actions pending."
+                            }
+                        }
                     }
                     'notContacted'
                     { 
