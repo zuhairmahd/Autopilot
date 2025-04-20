@@ -228,7 +228,6 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose 'Device not found in Intune'
     }
     #endregion
-
     
     #region Verbose logging
     if ($inAutopilot)

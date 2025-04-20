@@ -5,5 +5,8 @@
     "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
     "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
   ],
-  "groupsToExclude": []
+  "groupsToExclude": [],
+  "settings": {
+    "DesiredAutopilotProfile": "windowsCloudConfig Autopilot profile"
+  }
 }

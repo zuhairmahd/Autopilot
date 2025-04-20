@@ -431,10 +431,10 @@ if (-not $NoIntuneCheck)
                     Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
                     exit 1
                 }
-                'enrollmentPending'
+                'pendingReset'
                 {
-                    Write-Host 'The device is pending enrollment.' -ForegroundColor Yellow
-                    Write-Host "This means someone has already started the enrollment process." -ForegroundColor Yellow
+                    Write-Host 'The device is pending a reset.' -ForegroundColor Yellow
+                    Write-Host "The device needs to be allowed to finish the reset." -ForegroundColor Yellow
                     Write-Host "It is likely the next user may experience issues when logging on for the first time." -ForegroundColor Yellow
                     Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Yellow
                     exit 1
@@ -520,7 +520,6 @@ if ($device.state.deviceImportStatus -eq 'complete')
         if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
         {
             $assignment.deploymentProfileAssignedDateTime
-
             $profileAssignmentDate = if ($enrollmentState.managedDevice.device.enrolledDateTime)
             {
                 $assignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 

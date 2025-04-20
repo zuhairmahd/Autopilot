@@ -30,6 +30,7 @@ else
 $init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json
 $groupsToInclude = $init.groupsToInclude
 $groupsToExclude = $init.groupsToExclude
+$settings = $init.settings
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $choices = @('Verify this device', 'Verify another device', 'Verify a user')
 #endregion Define variables
@@ -113,6 +114,7 @@ if ($whatToDo -eq 'device')
     Write-Host "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
     Write-Host "The imported state is: $($enrollmentState.imported)"
     Write-Host "Has device object: $($enrollmentState.hasDeviceObject)"
+    AssessDeviceState -enrollmentState $enrollmentState -Settings $settings
     # ShowDeviceReport -EnrollmentState $enrollmentState
 }
 elseif ($whatToDo -eq 'user')
