@@ -4,7 +4,11 @@ param(
     [string]$SerialNumber = '',
     [string]$userName = '',
     [string]$configFile = "$PSScriptRoot\.secrets\config.json",
-    [string]$InitFile = "$PSScriptRoot\initVerify.json"
+    [string]$InitFile = "$PSScriptRoot\initVerify.json",
+    [Parameter(Mandatory = $false, ParameterSetName = 'Batch')]
+    [switch]$batchProcessingMode,
+    [Parameter(Mandatory = $false, ParameterSetName = 'Batch')]
+    [string]$FileName = "$PSScriptRoot\sn.txt"
 )
 
 #region import functions.
@@ -26,6 +30,35 @@ else
 }
 #endregion import functions.
 
+function ProcessSerialNumber
+{
+    param (
+        [string]$SerialNumber,
+        $AccessToken,
+        $Settings
+    )
+    Write-Verbose "Trimming serial number: $SerialNumber"
+    $SerialNumber = $SerialNumber.Trim()
+    Write-Verbose "Trimmed serial number: $SerialNumber"
+    Write-Host "Checking deployment status for device with serial number $SerialNumber."
+    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
+    Write-Verbose "The management state is: $($enrollmentState.managed)"
+    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
+    Write-Verbose "The imported state is: $($enrollmentState.imported)"
+    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
+    if (AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings)
+    {
+        Write-Host 'The device is in the correct state.' -ForegroundColor Green
+        Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'The device is not in the correct state.' -ForegroundColor Red
+        Write-Host "The function returned a value of false." -ForegroundColor Red
+        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+    }
+}
+
 #region Define variables
 $init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json
 $groupsToInclude = $init.groupsToInclude
@@ -33,10 +66,21 @@ $groupsToExclude = $init.groupsToExclude
 $settings = $init.settings
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $choices = @('Verify this device', 'Verify another device', 'Verify a user')
+if ($batchProcessingMode)
+{
+    Write-Verbose "Batch processing mode enabled."
+    if (Test-Path $BatchProcessFileName)
+    {
+        Write-Verbose "Batch process file found: $BatchProcessFileName"
+        $batchProcess = (Get-Content -Path $BatchProcessFileName -Raw -Force) -split '\r?\n' | Where-Object { $_ -ne '' } | ForEach-Object { $_.Trim() }
+        Write-Host "Found $($batchProcess.Count) serial numbers in $BatchProcessFileName."
+        Write-Verbose "Batch process file contents: $($batchProcess)"
+    }
+}
 #endregion Define variables
 
 #region get user input
-if ($serialNumber -ne '')
+if ($serialNumber -ne '' -or $batchProcessingMode)
 {
     Write-Verbose "Serial number passed as parameter: $SerialNumber"
     $whatToDo = 'device'
@@ -105,26 +149,22 @@ Write-Verbose "Action to execute: $whatToDo"
 $accessToken = GetGraphAccessToken -configFile $configFile
 if ($whatToDo -eq 'device')
 {
-    Write-Verbose "Trimming serial number: $SerialNumber"
-    $SerialNumber = $SerialNumber.Trim()
-    Write-Verbose "Trimmed serial number: $SerialNumber"
-    Write-Host "Checking deployment status for device with serial number $SerialNumber."
-    $global:enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
-    Write-Verbose "The management state is: $($enrollmentState.managed)"
-    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
-    Write-Verbose "The imported state is: $($enrollmentState.imported)"
-    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
-    if (AssessDeviceState -enrollmentState $enrollmentState -Settings $settings)
+    if ($batchProcessingMode)
     {
-        Write-Host 'The device is in the correct state.' -ForegroundColor Green
-        Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
+        Write-Host "Batch processing mode enabled. Processing $($batchProcess.Count) serial numbers."
+        foreach ($serial in $batchProcess)
+        {
+            Write-Verbose "Processing serial number: $serial"
+            ProcessSerialNumber -SerialNumber $serial -AccessToken $accessToken -Settings $settings
+        }
+        exit 0
     }
     else
     {
-        Write-Host 'The device is not in the correct state.' -ForegroundColor Red
-        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+        $global:enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber.Trim() -AccessToken $accessToken
+        ProcessSerialNumber -SerialNumber $SerialNumber -AccessToken $accessToken -Settings $settings
+        # ShowDeviceReport -EnrollmentState $enrollmentState
     }
-    # ShowDeviceReport -EnrollmentState $enrollmentState
 }
 elseif ($whatToDo -eq 'user')
 {

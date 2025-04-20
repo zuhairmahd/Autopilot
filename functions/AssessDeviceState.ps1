@@ -23,7 +23,7 @@ function AssessDeviceState()
         if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedUnkownSyncState', 'assignedInSync') )
         {
             Write-Verbose "The device is assigned to a deployment profile."
-            if ($enrollmentState.autopilot.device.deploymentProfile.displayName -eq $settings.DesiredAutopilotProfile)
+            if ($enrollmentState.autopilot.device.deploymentProfile.displayName -in $settings.DesiredAutopilotProfiles)
             {
                 Write-Host "The device is assigned to the correct deployment profile."
                 Write-Host "Deployment profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
@@ -31,6 +31,7 @@ function AssessDeviceState()
                 Write-Host "---------------------------------"
                 Write-Host "Checking enrollment state..."
                 Write-Host "---------------------------------"
+                Write-Verbose "Enrollment State: $($enrollmentState.autopilot.device.enrollmentState)"
                 switch ($enrollmentState.autopilot.device.enrollmentState)
                 {
                     'enrolled'
@@ -51,8 +52,17 @@ function AssessDeviceState()
                             Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
                             Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
                             Write-Host "The device is associated with the user $($enrollmentState.managedDevice.device.userPrincipalName) ($($enrollmentState.managedDevice.device.userDisplayName))."
-                            Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            #if we can get the last logged on date and time from the managed device, we can display it here
+                            if ($null -ne $enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime)
+                            {
+                                Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            }
+                            else
+                            {
+                                Write-Host "The last logon date and time is unavailable."
+                            }
                             Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
+                            Write-Host "Last action results: $($enrollmentState.managedDevice.device.deviceActionResults)."
                             if ($null -ne $enrollmentState.managedDevice.device.deviceActionResults)
                             {
                                 Write-Host "The device has the following actions pending:"
@@ -69,6 +79,44 @@ function AssessDeviceState()
                             {
                                 Write-Host "The device has no actions pending."
                             }
+                            Write-Host "If you would like to make this device available to another user, you will need to initiate a wipe or a clean action."
+                            $choice = DisplayNumericMenu -choices @('Wipe', 'Clean') -Banner "What would you like to do?"
+                            switch ($choice)
+                            {
+                                'wipe'
+                                {
+                                    Write-Host "Initiating a wipe action on the device..."
+                                    $confirmation = DisplayNumericMenu -choices @('Wipe') -Banner "Are you sure?  This cannot be undone!"
+                                    if ($confirmation -eq 'Wipe')
+                                    {
+                                        Write-Host "Wipe action confirmed."
+                                        $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Wipe' -Verbose
+                                    }
+                                    else
+                                    {
+                                        Write-Host "Wipe action canceled."
+                                    }
+                                }
+                                'clean'
+                                {
+                                    Write-Host "Initiating a clean action on the device..."
+                                    $confirmation = DisplayNumericMenu -choices @('Clean') -Banner "Are you sure?  This cannot be undone!"
+                                    if ($confirmation -eq 'Clean')
+                                    {
+                                        Write-Host "Clean action confirmed."
+                                        $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Clean' -verbose 
+                                    }
+                                    else
+                                    {
+                                        Write-Host "Clean action canceled."
+                                    }
+                                }
+                                'default'
+                                {
+                                    Write-Host "No action taken."
+                                }
+                            }
+                            Write-Host "Action result: $actionResult"
                         }
                     }
                     'notContacted'
@@ -76,6 +124,35 @@ function AssessDeviceState()
                         Write-Host "Device enrollment state: $($enrollmentState.autopilot.device.enrollmentState)."
                         Write-Host "This is normal for a newly imported device."
                         Write-Host "You may proceed with enrollment."
+                        if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
+                        {
+                            Write-Host "The device is associated with the following managed device:"
+                            Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
+                            Write-Host "Serial number: $($enrollmentState.managedDevice.device.serialNumber)"
+                            Write-Host "Registration State: $($enrollmentState.managedDevice.device.deviceRegistrationState)"
+                            Write-Host "Enrollment type: $($enrollmentState.managedDevice.device.deviceEnrollmentType)"
+                            Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            Write-Host "The device is associated with the user $($enrollmentState.managedDevice.device.userPrincipalName) ($($enrollmentState.managedDevice.device.userDisplayName))."
+                            #if we can get the last logged on date and time from the managed device, we can display it here
+                            if ($null -ne $enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime)
+                            {
+                                Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                            }
+                            else
+                            {
+                                Write-Host "The last logon date and time is unavailable."
+                            }
+                            Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
+                            $success = $true
+                        }
+                        else
+                        {
+                            Write-Host "The device is not associated with a managed device."
+                            Write-Host "This is normal for a newly imported device."
+                            Write-Host "You may proceed with enrollment."
+                            $success = $true
+                        }
                     }
                     'pendingReset'
                     {
@@ -93,11 +170,11 @@ function AssessDeviceState()
                     }
                     'unknown'
                     {
-                        Write-Host "The enrollment state is unknown." -ForegroundColor Yellow; $success = $false 
+                        Write-Host "The enrollment state is unknown." -ForegroundColor Yellow 
                     }
-                    default
+                    'default'
                     {
-                        Write-Host "The enrollment state is: $($enrollmentState.autopilot.device.enrollmentState)" -ForegroundColor Yellow; $success = $false 
+                        Write-Host "The enrollment state is: $($enrollmentState.autopilot.device.enrollmentState)" -ForegroundColor Yellow 
                     }
                 }
             }
@@ -105,7 +182,7 @@ function AssessDeviceState()
             {
                 Write-Host "The device is assigned to the wrong deployment profile."
                 Write-Host "The device is assigned to: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
-                Write-Host "The desired deployment profile is: $($settings.desiredDeploymentProfileName)"
+                Write-Host "The desired deployment profile is: $($settings.DesiredAutopilotProfile)"
             }
         }
         else

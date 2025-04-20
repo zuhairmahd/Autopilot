@@ -4,31 +4,31 @@ function SendDeviceCommand ()
     param (
         [string]$ManagedDeviceId,
         [string]$accessToken,
-        [string]$command = "clean"
+        [string]$Command = "clean"
     )
     Write-Verbose "Device ID: $ManagedDeviceId"
     Write-Host "Sending $command command to device with ID $ManagedDeviceId"
-    $cleanURI = "https://graph.microsoft.com/beta/deviceManagement/managedDevices/$($ManagedDeviceId)/cleanWindowsDevice"
-    $wipeURI = "https://graph.microsoft.com/beta/deviceManagement/managedDevices/$($ManagedDeviceId)/wipe"
-    $syncUri = "https://graph.microsoft.com/beta/deviceManagement/managedDevices/$($ManagedDeviceId)/syncDevice"
+    $cleanURI = "deviceManagement/managedDevices/$($ManagedDeviceId)/cleanWindowsDevice"
+    $wipeURI = "deviceManagement/managedDevices/$($ManagedDeviceId)/wipe"
+    $syncUri = "deviceManagement/managedDevices/$($ManagedDeviceId)/syncDevice"
     if ($command -eq "clean")
     {
         Write-Host 'Cleaning the device...'
         $body = @{
             'keepUserData' = $false
-        }
-        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body
+        } | ConvertTo-Json
+        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0'
         Write-Verbose "Response: $response"
     }
-    elsif ($command -eq 'wipe')
+    elseif ($command -eq 'wipe')
     {
         Write-Host 'Wiping the device...'
         $body = @{
             'keepEnrollmentData'   = $false
             'keepUserData'         = $false
             'obliterationBehavior' = "doNotObliterate"
-        }
-        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body
+        } | ConvertTo-Json
+        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0'
         Write-Verbose "Response: $response"
     }
     else
