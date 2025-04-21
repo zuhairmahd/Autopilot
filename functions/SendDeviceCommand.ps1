@@ -46,7 +46,7 @@ function SendDeviceCommand ()
         $action = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
         Write-Host "Action: $action"
         Write-Host "Attempting to perform a device sync."
-        $syncResponse = callGraphApi -AccessToken $accessToken -Uri $syncUri -Method POST
+        $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST
         Write-Verbose "Sync Response: $syncResponse"
     }
     return $success
