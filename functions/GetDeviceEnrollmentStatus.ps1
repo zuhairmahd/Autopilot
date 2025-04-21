@@ -37,7 +37,7 @@ function GetAutoPilotDeviceSerialNumber()
     #write a verbose log  of receved parameters
     Write-Verbose "Received serial number: $serialNumber"
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -APIVersion 'v1.0'
+    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI
     Write-Verbose "Received $($autopilotDevices.value.Count) devices from Autopilot."
     $serialNumbers = $autopilotDevices.value | Select-Object -ExpandProperty serialNumber
     Write-Verbose "Received $($serialNumbers.Count) serial numbers from Autopilot."
@@ -133,7 +133,7 @@ function GetDeviceEnrollmentStatus()
         $returnedAutopilotDevice = $autopilotDevice
         Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
         $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$($autopilotDevice.serialNumber)'"
-        $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter -APIVersion 'beta'
+        $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter
         Write-Verbose "Found $($autopilotEvents.value.count) Autopilot events."
         if ($autopilotEvents)
         {

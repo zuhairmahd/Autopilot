@@ -1,3 +1,33 @@
+function ConvertDisplayName()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$DisplayName
+    )
+    # Convert "Lastname, Firstname, initial (nickname)" to "Firstname Lastname (nickname)" if nickname exists,
+    # otherwise to "Firstname Lastname"
+    if ($displayName -match '^(.*), (.*?)(?: \((.*?)\))?$')
+    {
+        $lastName = $matches[1].Trim()
+        $firstName = $matches[2].Trim()
+        $nickname = $matches[3]
+        if ($nickname)
+        {
+            $currentUser = "$firstName $lastName ($nickname)"
+        }
+        else
+        {
+            $currentUser = "$firstName $lastName"
+        }
+    }
+    else
+    {
+        $currentUser = $displayName
+    }
+    return $currentUser
+}
+
 function AssessDeviceState() 
 {
     [CmdletBinding()]
@@ -36,7 +66,7 @@ function AssessDeviceState()
                 {
                     'enrolled'
                     {
-                        Write-Host 'The device appears to have been enrolled.'
+                        Write-Host 'The device is enrolled.'
                         Write-Host "Checking associated managed device..."
                         if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
                         #we can also potentially match on
@@ -51,7 +81,8 @@ function AssessDeviceState()
                             Write-Host "Enrollment type: $($enrollmentState.managedDevice.device.deviceEnrollmentType)"
                             Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
                             Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            Write-Host "The device is associated with the user $($enrollmentState.managedDevice.device.userPrincipalName) ($($enrollmentState.managedDevice.device.userDisplayName))."
+                            $currentUser = ConvertDisplayName -DisplayName $enrollmentState.managedDevice.device.userDisplayName
+                            Write-Host "The device is associated with the user $currentUser ($($enrollmentState.managedDevice.device.userDisplayName), $($enrollmentState.managedDevice.device.userPrincipalName)) ."
                             #if we can get the last logged on date and time from the managed device, we can display it here
                             if ($null -ne $enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime)
                             {
@@ -65,7 +96,8 @@ function AssessDeviceState()
                             Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
                             Write-Host "Checking the latest Autopilot event state..."
                             Write-Host "---------------------------------"
-                            if ($enrollmentState.autopilot.events[0] -ne '') 
+                            Write-Host "The device has $($enrollmentState.autopilot.events.count) autopilot events."
+                            if ($enrollmentState.autopilot.events.count -gt 0 -and $enrollmentState.autopilot.events[0] -ne '') 
                             {
                                 $latestEvent = $enrollmentState.autopilot.events[0]
                                 if ($latestEvent.deploymentState -eq 'failure' -or $latestEvent.deviceSetupStatus -eq 'failure' -or $latestEvent.accountSetupStatus -eq 'failure') 

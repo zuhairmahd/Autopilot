@@ -1,15 +1,30 @@
 {
-  "groupsToInclude": [
-    "sg_Office_365_License_G5_wth_windows_pilot",
-    "sg_passwrd_hash_stage",
-    "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
-    "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
-  ],
-  "groupsToExclude": [],
-  "settings": {
-    "DesiredAutopilotProfiles": [
-      "windowsCloudConfig Autopilot profile",
-      "Hybrid join profile"
-    ]
+  "description": "This is the configuration file for the initVerify script. It contains the settings for the script to run correctly.",
+  "version": "1.0",
+  "domains": {
+    "gao.gov": {
+      "groupsToInclude": [
+        "sg_Office_365_License_G5_wth_windows_pilot",
+        "sg_passwrd_hash_stage",
+        "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
+        "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
+      ],
+      "groupsToExclude": [],
+      "settings": {
+        "DesiredAutopilotProfiles": [
+          "msb"
+        ]
+      }
+    },
+    "arabictutor.com": {
+      "groupsToInclude": [],
+      "groupsToExclude": [],
+      "settings": {
+        "DesiredAutopilotProfiles": [
+          "windowsCloudConfig Autopilot profile",
+          "Hybrid join profile"
+        ]
+      }
+    }
   }
 }

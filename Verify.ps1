@@ -56,14 +56,85 @@ function ProcessSerialNumber
         Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
     }
 }
+function validateInput()
+{
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $true)]
+        [string]$UserInput,
+        [parameter(Mandatory = $true)]
+        [string]$type
+    )
+    
+    Write-Verbose "Validating input of type '$type': '$UserInput'"
+    
+    # Trim input to remove any leading or trailing spaces
+    $UserInput = $UserInput.Trim()
+    Write-Verbose "Trimmed input: '$UserInput'"
+    
+    switch ($type)
+    {
+        'serialNumber'
+        {
+            # Check if input exceeds maximum length
+            if ($UserInput.Length -gt 30)
+            {
+                Write-Verbose "Serial number exceeds maximum length of 30 characters"
+                Write-Host "Serial number cannot exceed 30 characters." -ForegroundColor Red
+                return $false
+            }
+            
+            if ($UserInput -match '^[a-zA-Z0-9]{7,}$')
+            {
+                Write-Verbose "Serial number validation passed"
+                return $true
+            }
+            else
+            {
+                Write-Verbose "Serial number validation failed - must be alphanumeric and at least 10 characters"
+                Write-Host 'Invalid serial number format.' -ForegroundColor Red
+                return $false
+            }
+        }
+        'userName'
+        {
+            # Check if input exceeds maximum length
+            if ($UserInput.Length -gt 50)
+            {
+                Write-Verbose "Username exceeds maximum length of 50 characters"
+                Write-Host "Username cannot exceed 50 characters." -ForegroundColor Red
+                return $false
+            }
+            
+            if ($UserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+            {
+                Write-Verbose "Username validation passed"
+                return $true
+            }
+            else
+            {
+                Write-Verbose "Username validation failed - must be a valid email format"
+                Write-Host 'Invalid user name format.' -ForegroundColor Red
+                return $false
+            }
+        }
+        default 
+        {
+            Write-Verbose "Unknown validation type: '$type'"
+            Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
+            return $false
+        }
+    }
+}
 #endregion import functions.
 
 #region Define variables
-$init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json
+$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+# $init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json
+$init = (Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domains).$domain
 $groupsToInclude = $init.groupsToInclude
 $groupsToExclude = $init.groupsToExclude
 $settings = $init.settings
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $choices = @('Verify this device', 'Verify another device', 'Verify a user')
 if ($batchProcessingMode)
 {
@@ -122,6 +193,14 @@ else
             Write-Host 'Please enter the serial number of the device you want to verify.'
             Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
             $SerialNumber = Read-Host 'Please enter the serial number of the device'
+            #validate serial number
+            while (-not (validateInput -UserInput $SerialNumber -type 'serialNumber'))
+            {
+                #beep
+                [console]::beep(1000, 500)
+                Write-Host 'Invalid serial number. Enter a valid serial number.' -ForegroundColor Red
+                $SerialNumber = Read-Host 'Please enter the serial number of the device'
+            }
             Write-Verbose "Got serial number: $SerialNumber"
             $whatToDo = 'device'
         }
