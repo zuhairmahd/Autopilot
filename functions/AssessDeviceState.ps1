@@ -60,8 +60,40 @@ function AssessDeviceState()
                             else
                             {
                                 Write-Host "The last logon date and time is unavailable."
+                                Write-Host "This could be because the user was unable to complete the enrollment."
                             }
                             Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
+                            Write-Host "Checking the latest Autopilot event state..."
+                            Write-Host "---------------------------------"
+                            if ($enrollmentState.autopilot.events[0] -ne '') 
+                            {
+                                $latestEvent = $enrollmentState.autopilot.events[0]
+                                if ($latestEvent.deploymentState -eq 'failure' -or $latestEvent.deviceSetupStatus -eq 'failure' -or $latestEvent.accountSetupStatus -eq 'failure') 
+                                {
+                                    Write-Host "The last Autopilot enrollment resulted in a failure."
+                                    Write-Host "Here are the details:"
+                                    Write-Host ("Event date: {0}" -f ($($latestEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")))
+                                    Write-Host ("Enrollment start date: {0}" -f ($latestEvent.enrollmentStartDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                                    Write-Host "Enrollment type: $($latestEvent.enrollmentType)."
+                                    Write-Host "Device name: $($latestEvent.managedDeviceName)."
+                                    Write-Host "User name: $($latestEvent.userPrincipalName)."
+                                    Write-Host "Autopilot profile display name: $($latestEvent.windowsAutopilotDeploymentProfileDisplayName)."
+                                    Write-Host "Enrollment Status Page (ESP) name: $($latestEvent.windows10EnrollmentCompletionPageConfigurationDisplayName)."
+                                    Write-Host "Deployment state: $($latestEvent.deploymentState)."
+                                    Write-Host "Device setup status: $($latestEvent.deviceSetupStatus)."
+                                    Write-Host "Account setup status: $($latestEvent.accountSetupStatus)."
+                                    Write-Host ("Deployment started on {0} and ended on {1}, lasting {2}" -f ($latestEvent.deploymentStartDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"), ($latestEvent.deploymentEndDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"), $latestEvent.deploymentDuration)
+                                    Write-Host "Deployment total duration: $($latestEvent.deploymentTotalDuration)."
+                                    Write-Host "Device setup duration: $($latestEvent.deviceSetupDuration)."
+                                    Write-Host "Account setup duration: $($latestEvent.accountSetupDuration)."
+                                    Write-Host "Enrollment failure details: $($latestEvent.enrollmentFailureDetails)."
+                                    Write-Host "--------------------------------"
+                                }
+                                else
+                                {
+                                    Write-Host "The last autopilot enrollment was successful."
+                                }
+                            }
                             Write-Host "Last action results: $($enrollmentState.managedDevice.device.deviceActionResults)."
                             if ($null -ne $enrollmentState.managedDevice.device.deviceActionResults)
                             {
@@ -79,7 +111,7 @@ function AssessDeviceState()
                             {
                                 Write-Host "The device has no actions pending."
                             }
-                            Write-Host "If you would like to make this device available to another user, you will need to initiate a wipe or a clean action."
+                            Write-Host "You will need to initiate a wipe or a clean action."
                             $choice = DisplayNumericMenu -choices @('Wipe', 'Clean') -Banner "What would you like to do?"
                             switch ($choice)
                             {
