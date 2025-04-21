@@ -35,8 +35,8 @@ else
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
-$serialNumber = 'BTSB25000BCR'
-$ManagedDeviceId = "bb2c0930-36e1-4515-80af-df4266d3cdb5"
-$deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
-$global:action = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
-Write-Host "Action: $global:action"
+$username = 'mahmoudz@gao.gov'
+$extraparameters = "select=Id,deviceName,serialNumber"
+$filter = "userPrincipalName eq '$username' and startswith(deviceName,'w11-')"
+$managedDeviceUri = "deviceManagement/managedDevices"
+$global:response = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
