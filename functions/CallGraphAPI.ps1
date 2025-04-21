@@ -170,8 +170,6 @@ function CallGraphAPI()
     {
         $response = Invoke-RestMethod @restParams
         Write-Verbose "Session content: $requestSession"
-        $global:r = $response
-        $global:s = $requestSession
         $response | ForEach-Object {
             if ($_.'@odata.nextLink')
             {

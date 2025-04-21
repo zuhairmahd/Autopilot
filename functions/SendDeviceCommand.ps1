@@ -8,9 +8,11 @@ function SendDeviceCommand ()
     )
     Write-Verbose "Device ID: $ManagedDeviceId"
     Write-Host "Sending $command command to device with ID $ManagedDeviceId"
-    $cleanURI = "deviceManagement/managedDevices/$($ManagedDeviceId)/cleanWindowsDevice"
-    $wipeURI = "deviceManagement/managedDevices/$($ManagedDeviceId)/wipe"
-    $syncUri = "deviceManagement/managedDevices/$($ManagedDeviceId)/syncDevice"
+    $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
+    $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
+    $wipeURI = "$deviceManagementUri/wipe"
+    $syncUri = "$deviceManagementUri/syncDevice"
+    $success = $false
     if ($command -eq "clean")
     {
         Write-Host 'Cleaning the device...'
@@ -34,36 +36,18 @@ function SendDeviceCommand ()
     else
     {
         Write-Host "Invalid command.  Please use 'clean' or 'wipe'."
-        return $null
+        return $success
     }
-    if ($response -in @(200, 201, 202, 204))
+    if ($response -eq '')
     {
-        Write-Host "The command was sent to the device with ID $ManagedDeviceId."
-        Write-Host "Attempting a sync..."
+        Write-Host "Success."
+        $success = $true
+        Write-Verbose "Attempting to get the latest device action results."
+        $action = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
+        Write-Host "Action: $action"
+        Write-Host "Attempting to perform a device sync."
         $syncResponse = callGraphApi -AccessToken $accessToken -Uri $syncUri -Method POST
         Write-Verbose "Sync Response: $syncResponse"
-        #Check if the sync was successful.
-        if ($syncResponse -in @(200, 201, 202, 204))
-        {
-            Write-Host "The sync command was sent to the device with ID $ManagedDeviceId."
-        }
-        else
-        {
-            Write-Host "The sync command failed to send to the device with ID $ManagedDeviceId."
-            Write-Host 'Please manually sync the device or give the device enough time to sync and reset.'
-            Write-Host "Error: $($syncResponse | Out-String)"
-            Write-Host "Status code: $($syncResponse.StatusCode)"
-        }
-        Write-Host 'The device will be ready for another user after the wipe is complete.'
-        Write-Host 'Please contact an Intune admin if you have any problems.'
-        return $true
     }
-    else
-    {
-        Write-Host "The command failed to send to the device with ID $ManagedDeviceId."
-        Write-Host 'Please contact an Intune admin.'
-        Write-Host "Error: $($response | Out-String)"
-        Write-Host "Status code: $($response.StatusCode)"
-        return $false
-    }
+    return $success
 }

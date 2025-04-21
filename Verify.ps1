@@ -28,8 +28,6 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
-#endregion import functions.
-
 function ProcessSerialNumber
 {
     param (
@@ -58,6 +56,7 @@ function ProcessSerialNumber
         Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
     }
 }
+#endregion import functions.
 
 #region Define variables
 $init = Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json
@@ -94,7 +93,7 @@ elseif ($userName -ne '')
 }
 else
 {
-    $choice = displayNumericMenu -choices $choices -Prompt 'Type your selection and press Enter' -Banner 'What would you like to do?'
+    $choice = displayNumericMenu -choices $choices -Prompt 'Type your selection and press Enter' -Banner 'What would you like to do today?'
     switch ($choice)
     {
         'Verify this device'

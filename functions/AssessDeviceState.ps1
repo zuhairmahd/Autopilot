@@ -91,6 +91,7 @@ function AssessDeviceState()
                                     {
                                         Write-Host "Wipe action confirmed."
                                         $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Wipe' -Verbose
+                                        Write-Host "Wipe action result: $action"
                                     }
                                     else
                                     {
@@ -105,6 +106,7 @@ function AssessDeviceState()
                                     {
                                         Write-Host "Clean action confirmed."
                                         $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Clean' -verbose 
+                                        Write-Host "Clean action result: $action"
                                     }
                                     else
                                     {
