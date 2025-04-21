@@ -155,6 +155,7 @@ function CallGraphAPI()
         Uri             = $encodedUri
         Headers         = $headers
         UseBasicParsing = $true
+        SessionVariable = 'requestSession'
     }
     # Only add Body parameter if it exists
     if ($body)
@@ -168,6 +169,7 @@ function CallGraphAPI()
     try
     {
         $response = Invoke-RestMethod @restParams
+        Write-Verbose "Session content: $requestSession"
         $response | ForEach-Object {
             if ($_.'@odata.nextLink')
             {
@@ -263,14 +265,8 @@ function CallGraphAPI()
         }   
         return $statusCode
     }
-    if ($response.value.Count -eq 0 -and $null -eq $response.count)
-    {
-        Write-Verbose "Response value: $($response |Out-String)"
-    }
-    else
-    {
-        Write-Verbose "Response value: $($response.value)"
-    }
+    Write-Verbose "Response: $($response)"
+    Write-Verbose "Response value: $($response.value)"
     return $response
 }
 
