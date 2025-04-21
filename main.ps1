@@ -106,10 +106,8 @@ function Show-Menu
         [hashtable]$Menu,
         [Parameter(Mandatory = $false)]
         [int]$Depth = 0,
-        
         [Parameter(Mandatory = $false)]
         [System.Collections.ArrayList]$History = $null,
-        
         [Parameter(Mandatory = $false)]
         [System.Collections.ArrayList]$MenuHistory = $null
     )
@@ -243,15 +241,28 @@ function Show-Menu
     }
 }
 
+$mainMenu = New-Menu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
+$receiveMenu = New-Menu -Title "Receive Device" -Description "Select a user option"
+$giveMenu = New-Menu -Title "Give Device" -Description "Select a device option"
+
+$mainMenu = Add-MenuItem -Menu $mainMenu -Name "Give a device to a user" -Submenu $giveMenu
+$mainMenu = Add-menuItem -Menu $mainMenu -Name "Receive a device from a user" -Submenu $receiveMenu
+
+Show-Menu -Menu $mainMenu
+
+
+<#
 # Example usage:
 # Create the main menu
 $mainMenu = New-Menu -Title "Main Menu" -Description "Please select an option"
+
 
 # Add items to the main menu
 $mainMenu = Add-MenuItem -Menu $mainMenu -Name "System Information" -Action { 
     "System Information:`n-----------------`n"
     Get-ComputerInfo | Select-Object WindowsProductName, OsVersion, OsArchitecture | Format-List | Out-String
 }
+
 
 # Create a submenu
 $networkMenu = New-Menu -Title "Network Options" -Description "Select a network option"
@@ -281,3 +292,4 @@ $networkMenu = Add-MenuItem -Menu $networkMenu -Name "Diagnostic Tools" -Submenu
 
 # Start the menu system
 Show-Menu -Menu $mainMenu
+#>
