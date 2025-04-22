@@ -1,5 +1,5 @@
 {
-  "description": "This is the configuration file for the initVerify script. It contains the settings for the script to run correctly.",
+  "description": "This is the configuration file for the Intune helpdesk script. It contains the settings for the script to run correctly.",
   "version": "1.0",
   "domains": {
     "gao.gov": {
