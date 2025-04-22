@@ -30,6 +30,97 @@ function GetDevicesAndUsers() {
     return $outputArray
 }
 
+function GetDevices()
+{
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $false)]
+        [string]$deviceNamePrefix = "",
+        [parameter(Mandatory = $true)]
+        [string]$AccessToken
+    )
+    
+    Write-Verbose "DeviceNamePrefix: $deviceNamePrefix"
+    if ($null -ne $AccessToken)
+    {
+        Write-Verbose "AccessToken provided."
+    }
+    else
+    {
+        Write-Verbose "AccessToken not provided."
+        return $null
+    }
+    
+    $extraparameters = "select=Id,deviceName,serialNumber,userPrincipalName"
+    $filter = ""
+    if (-not [string]::IsNullOrEmpty($deviceNamePrefix))
+    {
+        $filter = "startswith(deviceName,'$deviceNamePrefix')"
+    }
+    
+    $managedDeviceUri = "deviceManagement/managedDevices"
+    $deviceInfo = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
+    
+    Write-Verbose "Device value count: $($deviceInfo.value.Count)"
+    Write-Verbose "Device Info: $($deviceInfo | Out-String)"
+    
+    if ($deviceInfo -notin 400, 401, 403, 404)
+    {
+        if ($deviceInfo.value.Count -eq 0) 
+        {
+            Write-Host "No devices found" -ForegroundColor Yellow
+            if (-not [string]::IsNullOrEmpty($deviceNamePrefix))
+            {
+                Write-Host "Try without device name prefix filter" -ForegroundColor Yellow
+            }
+            return $null
+        }
+        elseif ($deviceInfo.value.Count -eq 1) 
+        {
+            # If only one device found, return it directly
+            Write-Host "Found one device" -ForegroundColor Green
+            Write-Host "Device Name: $($deviceInfo.value[0].deviceName)" -ForegroundColor Cyan
+            Write-Host "Serial Number: $($deviceInfo.value[0].serialNumber)" -ForegroundColor Cyan
+            Write-Host "User: $($deviceInfo.value[0].userPrincipalName)" -ForegroundColor Cyan
+            return $deviceInfo.value[0]
+        }
+        else 
+        {
+            # Create device selection menu
+            $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device"
+            
+            # Store devices in an array to reference later
+            $devices = $deviceInfo.value
+            
+            # Add each device as a menu item
+            foreach ($device in $devices)
+            {
+                # Create a display name for the menu
+                $userName = if ([string]::IsNullOrEmpty($device.userPrincipalName)) { "No user" } else { $device.userPrincipalName }
+                $menuItemName = "Device: $($device.deviceName) - SN: $($device.serialNumber) - User: $userName"
+                
+                # Create a scriptblock action that returns this specific device when selected
+                $currentDevice = $device
+                $action = {
+                    $currentDevice
+                }.GetNewClosure()
+                
+                # Add the menu item with the action
+                $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action
+            }
+            
+            # Show the menu and return the selected device
+            $selectedDevice = ShowMenu -Menu $deviceMenu
+            return $selectedDevice
+        }
+    }
+    else
+    {
+        Write-Host "Failed to retrieve devices" -ForegroundColor Red
+        return $null
+    }
+}
+
 # SIG # Begin signature block
 # MII9YAYJKoZIhvcNAQcCoII9UTCCPU0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
@@ -322,41 +413,4 @@ function GetDevicesAndUsers() {
 # H0REYeBmTVIVUh68i6yVmPFYsJazv8WXVDLbmSDuCrQ8kbv4MHdoYJy7dF/qmURf
 # 9xkBuajORGaT+uRmDRLboMZHLIufi/pglNDt0Bb16+HvkJ654b+sTZ45SWNLmUb9
 # QXKSt5iMMdCfzsM8LDsovzgeRG+Oal7YeLSi6GSOGxPLlcSvtXN2csLGzRPVNMJt
-# FeaToNBfSPI9KyaIMYIGxDCCBsACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
-# ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAElwvYaqFnhMMQAAAAAA
-# STANBglghkgBZQMEAgEFAKCCBB0wEQYLKoZIhvcNAQkQAg8xAgUAMBoGCSqGSIb3
-# DQEJAzENBgsqhkiG9w0BCRABBDAcBgkqhkiG9w0BCQUxDxcNMjUwMzExMDUxMDU1
-# WjAvBgkqhkiG9w0BCQQxIgQgBjvW3kIwLPY0r53e/1469CjNAsSTpSqCZPcd0opj
-# 6uEwgbkGCyqGSIb3DQEJEAIvMYGpMIGmMIGjMIGgBCBZKDgGu8T+xwIzm2AmYzwg
-# NDM/08rlNoMjGGIJ5AbVIjB8MGWkYzBhMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
-# TWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVibGlj
-# IFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAElwvYaqFnhMMQAAAAAASTCC
-# At8GCyqGSIb3DQEJEAISMYICzjCCAsqhggLGMIICwjCCAisCAQEwggEIoYHgpIHd
-# MIHaMQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMH
-# UmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSUwIwYDVQQL
-# ExxNaWNyb3NvZnQgQW1lcmljYSBPcGVyYXRpb25zMSYwJAYDVQQLEx1UaGFsZXMg
-# VFNTIEVTTjo0NUQ2LTk2QzUtNUU2MzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1Ymxp
-# YyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3JpdHmiIwoBATAHBgUrDgMCGgMVACAL
-# jk8yViMVfCNap6QGEogntH7UoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
-# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
-# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBBQUAAgUA63ok
-# gDAiGA8yMDI1MDMxMTAyNTQ1NloYDzIwMjUwMzEyMDI1NDU2WjB3MD0GCisGAQQB
-# hFkKBAExLzAtMAoCBQDreiSAAgEAMAoCAQACAg3/AgH/MAcCAQACAhE4MAoCBQDr
-# e3YAAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEAAgMH
-# oSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQEFBQADgYEAJDn1d3B7ztvAuKx0JIp/
-# vEQ4dglwqtSWEWpbdeRJBxUUZQSmJFaHobQh0yFpS53HJbarET/5QMMazgR65nwO
-# cjcoOTIMNc9m+Z/8hLZIWq/BAlXdkycrRLI7L9S6j+6b7PfjzNH5UcYgDMvnDzYh
-# vSUhcGwMkm0VdsIMr/pTMgYwDQYJKoZIhvcNAQEBBQAEggIAsBrlhoWH3l5CADul
-# aHFHa0DyOapHYhAl+NrcK8S2LOHXBahb1R+B4OAcrLwuLaFwIj69WYLTlZwkvHfN
-# cMnGqwhKHTvpDO9mf219XHNC1lU5oiiGjcpw8cj6YcR1XI2usETDq2vOmFEaq+5l
-# KCWzub8fS65Kuq6O6lQwMmn/wGFkpLoIor9a4FUOw5cbEYCV29PLGU3BjUZ0iwHa
-# /vGJLY0zoztDh6l78yZD9Js5rt8BUxTcyTCW9ZFA0JtEBeYbqvIPY+YqDfiousRE
-# E4f5QJbRGAXGj4IoLrL2Is4MrFoTbgDbAGG5Mkbdg/eIrOpeN2IfeL55JzQpXPRP
-# +MNLDiW3vYpAtz6DtDRFiGDR/Gwi2+DgsNfQM5SLYuRN091tvGPUadA64qPTxDns
-# 0OajN/KVo8w1R0Ht3tt/Evb+hLdXCGGPyLCtkzyMrGV2BowA3WTIg+wicUZgWuIi
-# 0J4+C1dNNrTKr34k8oo3Zn9h+jQilmRuO7SnofCNnN29U3+aoQ8COb/kjXTvKRX7
-# z+Kt7FWzQS67Qm1A3WPxuiWhz5A4bILY9MBn1n283PCXFrEpfRwTYlDOGBdf2xAm
-# O7d39HMhaJ2EKTBPX69agkdZTfm2Hdopl8NpfeNpxLdgtZsJcpMPQg3qBV8x+p3Z
-# uCy6ZRlc2hVidYe7kFhTRwTHSj0=
-# SIG # End signature block
+# FeaToNBfSPI9KyaI

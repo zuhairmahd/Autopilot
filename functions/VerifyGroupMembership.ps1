@@ -44,7 +44,8 @@ function VerifyGroupMembership()
     Write-Verbose "Checking whether the user $userName is a member of the required groups."
     Write-Host "Getting group membership for user $userName ($($user.displayName))."
     $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
-    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters "select=displayName&top=999&orderby=displayName"
+    $groupSelection = "select=displayName&top=999&orderby=displayName"
+    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters $groupSelection
     if ($response -is [string] -and $response -match '^\d+$')
     {
         Write-Host "The group membership for $userName could not be determined."

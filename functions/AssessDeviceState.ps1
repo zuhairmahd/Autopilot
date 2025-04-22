@@ -1,3 +1,163 @@
+#region Helper functions
+function TakeAction()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        $enrollmentState
+    )
+    
+    Write-Host "You will need to initiate a wipe or a clean action."
+    $choice = DisplayNumericMenu -choices @('Wipe', 'Clean') -Banner "What would you like to do?"
+    switch ($choice)
+    {
+        'wipe'
+        {
+            Write-Host "Initiating a wipe action on the device..."
+            $confirmation = DisplayNumericMenu -choices @('Wipe') -Banner "Are you sure?  This cannot be undone!"
+            if ($confirmation -eq 'Wipe')
+            {
+                Write-Host "Wipe action confirmed."
+                $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Wipe' -Verbose
+                Write-Host "Wipe action result: $action"
+            }
+            else
+            {
+                Write-Host "Wipe action canceled."
+            }
+        }
+        'clean'
+        {
+            Write-Host "Initiating a clean action on the device..."
+            $confirmation = DisplayNumericMenu -choices @('Clean') -Banner "Are you sure?  This cannot be undone!"
+            if ($confirmation -eq 'Clean')
+            {
+                Write-Host "Clean action confirmed."
+                $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Clean' -verbose 
+                Write-Host "Clean action result: $action"
+            }
+            else
+            {
+                Write-Host "Clean action canceled."
+            }
+        }
+        'default'
+        {
+            Write-Host "No action taken."
+        }
+    }
+    Write-Host "Action result: $actionResult"
+}
+
+function CheckAutopilotState()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        $enrollmentState
+    )
+
+    # Check if the device is enrolled in Autopilot and display the enrollment state
+    if ($enrollmentState.inAutopilot)
+    {
+        Write-Host "The device is enrolled in Autopilot."
+        # Display the enrollment state details
+        Write-Host "Checking the latest Autopilot event state..."
+        Write-Host "---------------------------------"
+        Write-Host "The device has $($enrollmentState.autopilot.events.count) autopilot events."
+        if ($enrollmentState.autopilot.events.count -gt 0 -and $enrollmentState.autopilot.events[0] -ne '') 
+        {
+            $latestEvent = $enrollmentState.autopilot.events[0]
+            if ($latestEvent.deploymentState -eq 'failure' -or $latestEvent.deviceSetupStatus -eq 'failure' -or $latestEvent.accountSetupStatus -eq 'failure') 
+            {
+                Write-Host "The last Autopilot enrollment resulted in a failure."
+                Write-Host "Here are the details:"
+                Write-Host ("Event date: {0}" -f ($($latestEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")))
+                Write-Host ("Enrollment start date: {0}" -f ($latestEvent.enrollmentStartDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+                Write-Host "Enrollment type: $($latestEvent.enrollmentType)."
+                Write-Host "Device name: $($latestEvent.managedDeviceName)."
+                Write-Host "User name: $($latestEvent.userPrincipalName)."
+                Write-Host "Autopilot profile display name: $($latestEvent.windowsAutopilotDeploymentProfileDisplayName)."
+                Write-Host "Enrollment Status Page (ESP) name: $($latestEvent.windows10EnrollmentCompletionPageConfigurationDisplayName)."
+                Write-Host "Deployment state: $($latestEvent.deploymentState)."
+                Write-Host "Device setup status: $($latestEvent.deviceSetupStatus)."
+                Write-Host "Account setup status: $($latestEvent.accountSetupStatus)."
+                Write-Host ("Deployment started on {0} and ended on {1}, lasting {2}" -f ($latestEvent.deploymentStartDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"), ($latestEvent.deploymentEndDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"), $latestEvent.deploymentDuration)
+                Write-Host "Deployment total duration: $($latestEvent.deploymentTotalDuration)."
+                Write-Host "Device setup duration: $($latestEvent.deviceSetupDuration)."
+                Write-Host "Account setup duration: $($latestEvent.accountSetupDuration)."
+                Write-Host "Enrollment failure details: $($latestEvent.enrollmentFailureDetails)."
+                Write-Host "--------------------------------"
+            }
+            else
+            {
+                Write-Host "The last autopilot enrollment was successful."
+            }
+        }
+    }
+    else
+    {
+        Write-Host "The device is not enrolled in Autopilot."
+        return
+    }
+}
+
+function FindAssociatedManagedDevice()
+{                        
+    [CmdletBinding()]
+    param(
+        $enrollmentState
+    )
+
+    Write-Host "Checking associated managed device..."
+    if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
+    #we can also potentially match on
+    #($enrollmentState.autopilot.device.azureAdDeviceId -eq $enrollmentState.managedDevice.device.azureADDeviceId)
+    #or
+    #($enrollmentState.autopilot.device.azureActiveDirectoryDeviceId -eq $enrollmentState.managedDevice.device.azureActiveDirectoryDeviceId
+    {
+        Write-Host "The device is associated with the following managed device:"
+        Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
+        Write-Host "Serial number: $($enrollmentState.managedDevice.device.serialNumber)"
+        Write-Host "Registration State: $($enrollmentState.managedDevice.device.deviceRegistrationState)"
+        Write-Host "Enrollment type: $($enrollmentState.managedDevice.device.deviceEnrollmentType)"
+        Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+        Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+        $currentUser = ConvertDisplayName -DisplayName $enrollmentState.managedDevice.device.userDisplayName
+        Write-Host "The device is associated with the user $currentUser ($($enrollmentState.managedDevice.device.userDisplayName), $($enrollmentState.managedDevice.device.userPrincipalName)) ."
+        #if we can get the last logged on date and time from the managed device, we can display it here
+        if ($null -ne $enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime)
+        {
+            Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
+        }
+        else
+        {
+            Write-Host "The last logon date and time is unavailable."
+            Write-Host "This could be because the user was unable to complete the enrollment."
+        }
+        Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
+        Write-Host "Last action results: $($enrollmentState.managedDevice.device.deviceActionResults)."
+        if ($null -ne $enrollmentState.managedDevice.device.deviceActionResults)
+        {
+            Write-Host "The device has the following actions pending:"
+            foreach ($action in $enrollmentState.managedDevice.device.deviceActionResults)
+            {
+                Write-Host "Action: $($action.action)"
+                Write-Host "Action state: $($action.actionState)"
+                Write-Host "Action result: $($action.actionResult)"
+                Write-Host "Action initiated by: $($action.initiatedBy)"
+                Write-Host "Action initiated on: $($action.initiatedDateTime)"
+            }
+        }
+        else
+        {
+            Write-Host "The device has no actions pending."
+        }
+    }
+}
+
 function ConvertDisplayName()
 {
     [CmdletBinding()]
@@ -27,6 +187,7 @@ function ConvertDisplayName()
     }
     return $currentUser
 }
+#endregion
 
 function AssessDeviceState() 
 {

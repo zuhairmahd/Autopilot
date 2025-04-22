@@ -1,0 +1,43 @@
+
+<#
+# Example usage:
+# Create the main menu
+$mainMenu = New-Menu -Title "Main Menu" -Description "Please select an option"
+
+
+# Add items to the main menu
+$mainMenu = Add-MenuItem -Menu $mainMenu -Name "System Information" -Action { 
+    "System Information:`n-----------------`n"
+    Get-ComputerInfo | Select-Object WindowsProductName, OsVersion, OsArchitecture | Format-List | Out-String
+}
+
+
+# Create a submenu
+$networkMenu = New-Menu -Title "Network Options" -Description "Select a network option"
+$networkMenu = Add-MenuItem -Menu $networkMenu -Name "View IP Configuration" -Action {
+    "IP Configuration:`n-----------------`n"
+    Get-NetIPConfiguration | Format-Table | Out-String
+}
+$networkMenu = Add-MenuItem -Menu $networkMenu -Name "Test Internet Connection" -Action {
+    "Testing Internet Connection:`n-----------------`n"
+    Test-NetConnection -CommonTCPPort HTTP -InformationLevel Detailed
+}
+
+# Add the submenu to the main menu
+$mainMenu = Add-MenuItem -Menu $mainMenu -Name "Network Options" -Submenu $networkMenu
+
+# Create another submenu for a deeper hierarchy
+$diagMenu = New-Menu -Title "Diagnostic Tools" -Description "Select a diagnostic tool"
+$diagMenu = Add-MenuItem -Menu $diagMenu -Name "Check Disk" -Action {
+    "This would run Check Disk if implemented"
+}
+$diagMenu = Add-MenuItem -Menu $diagMenu -Name "Memory Diagnostics" -Action {
+    "This would run Memory Diagnostics if implemented"
+}
+
+# Add the diagnostic submenu to the network menu to create a deeper hierarchy
+$networkMenu = Add-MenuItem -Menu $networkMenu -Name "Diagnostic Tools" -Submenu $diagMenu
+
+# Start the menu system
+Show-Menu -Menu $mainMenu
+#>

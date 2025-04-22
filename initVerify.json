@@ -11,6 +11,7 @@
       ],
       "groupsToExclude": [],
       "settings": {
+        "deviceNamePrefix": "w11-",
         "DesiredAutopilotProfiles": [
           "msb"
         ]
@@ -20,6 +21,7 @@
       "groupsToInclude": [],
       "groupsToExclude": [],
       "settings": {
+        "deviceNamePrefix": "vmware",
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",
           "Hybrid join profile"
