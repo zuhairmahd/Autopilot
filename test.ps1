@@ -27,7 +27,7 @@ else
 #region variables
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $deviceUri = "devices"
-# $deviceManagementUri = "deviceManagement/managedDevices"
+$managedDeviceUri = "deviceManagement/managedDevices"
 # $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
@@ -35,8 +35,29 @@ else
 $configFile = "$pwd\.secrets\config.json"
 $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
-$username = 'mahmoudz@gao.gov'
-$extraparameters = "select=Id,deviceName,serialNumber"
-$filter = "userPrincipalName eq '$username' and startswith(deviceName,'w11-')"
-$managedDeviceUri = "deviceManagement/managedDevices"
-$global:response = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
+
+
+$extraparameters = "select=deviceName,manufacturer,model,serialNumber,userPrincipalName,userDisplayName&orderby=userDisplayName"
+$filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, 'mahmoudz@gao.gov') and startswith(deviceName,'w11-')"
+$global:response = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters -consistencyLevel
+
+# Process and display the sorted results
+# if ($global:response -and $global:response.value)
+# {
+# Write-Host "Processing response data..." -ForegroundColor Green
+    
+# Sort the response data by userDisplayName (in case API sorting didn't work properly)
+# $sortedDevices = $global:response.value | Sort-Object -Property userDisplayName
+
+# Display the sorted results
+# Write-Host "`nDevices sorted by userDisplayName:" -ForegroundColor Cyan
+# $sortedDevices | Format-Table -Property deviceName, userDisplayName, model, serialNumber -AutoSize
+    
+# Export to CSV if needed
+# $sortedDevices | ConvertTo-Csv -NoTypeInformation -Delimiter ',' | Out-File -FilePath "$pwd\devices.csv" -Encoding UTF8 -Force
+# Write-Host "Exported sorted results to $pwd\devices.csv" -ForegroundColor Green
+# }
+# else
+# {
+# Write-Host "No response data was received or the response did not contain any values." -ForegroundColor Red
+# }

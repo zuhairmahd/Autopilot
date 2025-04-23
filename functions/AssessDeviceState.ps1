@@ -56,7 +56,8 @@ function CheckAutopilotState()
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
-        $enrollmentState
+        $enrollmentState,
+        $settings = $settings
     )
 
     # Check if the device is enrolled in Autopilot and display the enrollment state
@@ -108,9 +109,10 @@ function FindAssociatedManagedDevice()
 {                        
     [CmdletBinding()]
     param(
-        $enrollmentState
+        [Parameter(Mandatory = $true)]
+        $enrollmentState,
+        $settings = $settings
     )
-
     Write-Host "Checking associated managed device..."
     if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
     #we can also potentially match on
@@ -158,32 +160,64 @@ function FindAssociatedManagedDevice()
     }
 }
 
-function ConvertDisplayName()
+function ConvertUserDisplayName()
 {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
-        [string]$DisplayName
+        [string]$UserDisplayName
     )
-    # Convert "Lastname, Firstname, initial (nickname)" to "Firstname Lastname (nickname)" if nickname exists,
-    # otherwise to "Firstname Lastname"
-    if ($displayName -match '^(.*), (.*?)(?: \((.*?)\))?$')
+    # Convert "Lastname, Firstname Middle (nickname)" to "Firstname Middle Lastname (nickname)" if nickname exists,
+    # otherwise to "Firstname Middle Lastname"
+    # Also handles "Lastname, Firstname M." format where M. is a middle initial
+    Write-Verbose "Converting user display name: $UserDisplayName"
+    if ($UserDisplayName -match '^(.*), (.*?)(?:\s([A-Z]\.?))?(?: \((.*?)\))?$')
     {
+        Write-Verbose "Extracting first name, last name, middle initial and nickname."
         $lastName = $matches[1].Trim()
+        Write-Verbose "Last name: $lastName"
         $firstName = $matches[2].Trim()
-        $nickname = $matches[3]
-        if ($nickname)
+        Write-Verbose "First name: $firstName"
+        $middleInitial = if ($matches[3])
         {
-            $currentUser = "$firstName $lastName ($nickname)"
+            $matches[3].Trim() 
+            Write-Verbose "Middle initial: $middleInitial"
         }
         else
         {
-            $currentUser = "$firstName $lastName"
+            $null 
+            Write-Verbose "No middle initial found."
+        }
+        $nickname = $matches[4]
+        Write-Verbose "Nickname: $nickname"
+        $fullName = if ($middleInitial)
+        {
+            "$firstName $middleInitial $lastName"
+            Write-Verbose "Full name with middle initial: $fullName"
+        }
+        else
+        {
+            "$firstName $lastName"
+            Write-Verbose "Full name without middle initial: $fullName"
+        }
+        if ($nickname)
+        {
+            Write-Verbose "Nickname found: $nickname"
+            $currentUser = "$fullName ($nickname)"
+            Write-Verbose "Current user with nickname: $currentUser"
+        }
+        else
+        {
+            Write-Verbose "No nickname found."
+            $currentUser = $fullName
+            Write-Verbose "Current user without nickname: $currentUser"
         }
     }
     else
     {
-        $currentUser = $displayName
+        Write-Verbose "No match found for user display name format."
+        Write-Verbose "Returning original display name."
+        $currentUser = $UserDisplayName
     }
     return $currentUser
 }
@@ -195,233 +229,29 @@ function AssessDeviceState()
     param(
         [Parameter(Mandatory = $true)]
         [PSCustomObject]$enrollmentState,
+        $settings = $settings,
         [Parameter(Mandatory = $true)]
-        [PSCustomObject]$Settings
+        [ValidateSet('PropperEnrollmentVerification', 'NextUserReadiness', 'TroubleShooting')]
+        [string]$AssessmentType
     )
-    $success = $false
-    Write-Host "Checking if the device is in Autopilot..."
-    if ($enrollmentState.InAutopilot)
+    
+    Write-Verbose "Type of assessment: $AssessmentType"
+    switch ($AssessmentType)
     {
-        Write-Host "Device is in Autopilot."
-        Write-Host "--------------------------------"
-        Write-Host "Serial Number: $($enrollmentState.autopilot.device.serialNumber)"
-        Write-Host "Manufacturer: $($enrollmentState.autopilot.device.manufacturer)"
-        Write-Host "Model: $($enrollmentState.autopilot.device.model)"
-        Write-Host "--------------------------------"
-        Write-Host "Checking Autopilot registration information..."
-        Write-Host "--------------------------------"
-        Write-Verbose "Deployment Profile Assignment Status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
-        if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedUnkownSyncState', 'assignedInSync') )
+        'PropperEnrollmentVerification'
         {
-            Write-Verbose "The device is assigned to a deployment profile."
-            if ($enrollmentState.autopilot.device.deploymentProfile.displayName -in $settings.DesiredAutopilotProfiles)
-            {
-                Write-Host "The device is assigned to the correct deployment profile."
-                Write-Host "Deployment profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
-                Write-Host ("Deployment Profile Assigned Date And Time: {0}" -f ($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                Write-Host "---------------------------------"
-                Write-Host "Checking enrollment state..."
-                Write-Host "---------------------------------"
-                Write-Verbose "Enrollment State: $($enrollmentState.autopilot.device.enrollmentState)"
-                switch ($enrollmentState.autopilot.device.enrollmentState)
-                {
-                    'enrolled'
-                    {
-                        Write-Host 'The device is enrolled.'
-                        Write-Host "Checking associated managed device..."
-                        if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
-                        #we can also potentially match on
-                        #($enrollmentState.autopilot.device.azureAdDeviceId -eq $enrollmentState.managedDevice.device.azureADDeviceId)
-                        #or
-                        #($enrollmentState.autopilot.device.azureActiveDirectoryDeviceId -eq $enrollmentState.managedDevice.device.azureActiveDirectoryDeviceId
-                        {
-                            Write-Host "The device is associated with the following managed device:"
-                            Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
-                            Write-Host "Serial number: $($enrollmentState.managedDevice.device.serialNumber)"
-                            Write-Host "Registration State: $($enrollmentState.managedDevice.device.deviceRegistrationState)"
-                            Write-Host "Enrollment type: $($enrollmentState.managedDevice.device.deviceEnrollmentType)"
-                            Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            $currentUser = ConvertDisplayName -DisplayName $enrollmentState.managedDevice.device.userDisplayName
-                            Write-Host "The device is associated with the user $currentUser ($($enrollmentState.managedDevice.device.userDisplayName), $($enrollmentState.managedDevice.device.userPrincipalName)) ."
-                            #if we can get the last logged on date and time from the managed device, we can display it here
-                            if ($null -ne $enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime)
-                            {
-                                Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            }
-                            else
-                            {
-                                Write-Host "The last logon date and time is unavailable."
-                                Write-Host "This could be because the user was unable to complete the enrollment."
-                            }
-                            Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
-                            Write-Host "Checking the latest Autopilot event state..."
-                            Write-Host "---------------------------------"
-                            Write-Host "The device has $($enrollmentState.autopilot.events.count) autopilot events."
-                            if ($enrollmentState.autopilot.events.count -gt 0 -and $enrollmentState.autopilot.events[0] -ne '') 
-                            {
-                                $latestEvent = $enrollmentState.autopilot.events[0]
-                                if ($latestEvent.deploymentState -eq 'failure' -or $latestEvent.deviceSetupStatus -eq 'failure' -or $latestEvent.accountSetupStatus -eq 'failure') 
-                                {
-                                    Write-Host "The last Autopilot enrollment resulted in a failure."
-                                    Write-Host "Here are the details:"
-                                    Write-Host ("Event date: {0}" -f ($($latestEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")))
-                                    Write-Host ("Enrollment start date: {0}" -f ($latestEvent.enrollmentStartDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                                    Write-Host "Enrollment type: $($latestEvent.enrollmentType)."
-                                    Write-Host "Device name: $($latestEvent.managedDeviceName)."
-                                    Write-Host "User name: $($latestEvent.userPrincipalName)."
-                                    Write-Host "Autopilot profile display name: $($latestEvent.windowsAutopilotDeploymentProfileDisplayName)."
-                                    Write-Host "Enrollment Status Page (ESP) name: $($latestEvent.windows10EnrollmentCompletionPageConfigurationDisplayName)."
-                                    Write-Host "Deployment state: $($latestEvent.deploymentState)."
-                                    Write-Host "Device setup status: $($latestEvent.deviceSetupStatus)."
-                                    Write-Host "Account setup status: $($latestEvent.accountSetupStatus)."
-                                    Write-Host ("Deployment started on {0} and ended on {1}, lasting {2}" -f ($latestEvent.deploymentStartDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"), ($latestEvent.deploymentEndDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"), $latestEvent.deploymentDuration)
-                                    Write-Host "Deployment total duration: $($latestEvent.deploymentTotalDuration)."
-                                    Write-Host "Device setup duration: $($latestEvent.deviceSetupDuration)."
-                                    Write-Host "Account setup duration: $($latestEvent.accountSetupDuration)."
-                                    Write-Host "Enrollment failure details: $($latestEvent.enrollmentFailureDetails)."
-                                    Write-Host "--------------------------------"
-                                }
-                                else
-                                {
-                                    Write-Host "The last autopilot enrollment was successful."
-                                }
-                            }
-                            Write-Host "Last action results: $($enrollmentState.managedDevice.device.deviceActionResults)."
-                            if ($null -ne $enrollmentState.managedDevice.device.deviceActionResults)
-                            {
-                                Write-Host "The device has the following actions pending:"
-                                foreach ($action in $enrollmentState.managedDevice.device.deviceActionResults)
-                                {
-                                    Write-Host "Action: $($action.action)"
-                                    Write-Host "Action state: $($action.actionState)"
-                                    Write-Host "Action result: $($action.actionResult)"
-                                    Write-Host "Action initiated by: $($action.initiatedBy)"
-                                    Write-Host "Action initiated on: $($action.initiatedDateTime)"
-                                }
-                            }
-                            else
-                            {
-                                Write-Host "The device has no actions pending."
-                            }
-                            Write-Host "You will need to initiate a wipe or a clean action."
-                            $choice = DisplayNumericMenu -choices @('Wipe', 'Clean') -Banner "What would you like to do?"
-                            switch ($choice)
-                            {
-                                'wipe'
-                                {
-                                    Write-Host "Initiating a wipe action on the device..."
-                                    $confirmation = DisplayNumericMenu -choices @('Wipe') -Banner "Are you sure?  This cannot be undone!"
-                                    if ($confirmation -eq 'Wipe')
-                                    {
-                                        Write-Host "Wipe action confirmed."
-                                        $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Wipe' -Verbose
-                                        Write-Host "Wipe action result: $action"
-                                    }
-                                    else
-                                    {
-                                        Write-Host "Wipe action canceled."
-                                    }
-                                }
-                                'clean'
-                                {
-                                    Write-Host "Initiating a clean action on the device..."
-                                    $confirmation = DisplayNumericMenu -choices @('Clean') -Banner "Are you sure?  This cannot be undone!"
-                                    if ($confirmation -eq 'Clean')
-                                    {
-                                        Write-Host "Clean action confirmed."
-                                        $action = SendDeviceCommand -ManagedDeviceId $enrollmentState.ManagedDevice.device.id -accessToken $AccessToken -Command 'Clean' -verbose 
-                                        Write-Host "Clean action result: $action"
-                                    }
-                                    else
-                                    {
-                                        Write-Host "Clean action canceled."
-                                    }
-                                }
-                                'default'
-                                {
-                                    Write-Host "No action taken."
-                                }
-                            }
-                            Write-Host "Action result: $actionResult"
-                        }
-                    }
-                    'notContacted'
-                    { 
-                        Write-Host "Device enrollment state: $($enrollmentState.autopilot.device.enrollmentState)."
-                        Write-Host "This is normal for a newly imported device."
-                        Write-Host "You may proceed with enrollment."
-                        if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
-                        {
-                            Write-Host "The device is associated with the following managed device:"
-                            Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
-                            Write-Host "Serial number: $($enrollmentState.managedDevice.device.serialNumber)"
-                            Write-Host "Registration State: $($enrollmentState.managedDevice.device.deviceRegistrationState)"
-                            Write-Host "Enrollment type: $($enrollmentState.managedDevice.device.deviceEnrollmentType)"
-                            Write-Host ("The device was enrolled on {0}" -f ($enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            Write-Host ("It was last synced on {0}" -f ($enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            Write-Host "The device is associated with the user $($enrollmentState.managedDevice.device.userPrincipalName) ($($enrollmentState.managedDevice.device.userDisplayName))."
-                            #if we can get the last logged on date and time from the managed device, we can display it here
-                            if ($null -ne $enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime)
-                            {
-                                Write-Host ("$($enrollmentState.managedDevice.users.user.givenName)'s last logon was on {0}" -f ($enrollmentState.managedDevice.device.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"))
-                            }
-                            else
-                            {
-                                Write-Host "The last logon date and time is unavailable."
-                            }
-                            Write-Host "The device compliance state is  $($enrollmentState.managedDevice.device.complianceState)."
-                            $success = $true
-                        }
-                        else
-                        {
-                            Write-Host "The device is not associated with a managed device."
-                            Write-Host "This is normal for a newly imported device."
-                            Write-Host "You may proceed with enrollment."
-                            $success = $true
-                        }
-                    }
-                    'pendingReset'
-                    {
-                        Write-Host 'The device is pending a reset.' -ForegroundColor Yellow
-                        Write-Host "The device needs to be allowed to finish the reset." -ForegroundColor Yellow
-                        Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Yellow
-                    }
-                    'failed'
-                    {
-                        Write-Host 'The device enrollment failed.' -ForegroundColor Red
-                        Write-Host 'This may cause issues when the user loggs on for the first time.' -ForegroundColor Red
-                        Write-Host "This means someone has already unsuccessfully tried to enroll the device." -ForegroundColor Red
-                        Write-Host "It is likely the next user may experience issues when logging on for the first time." -ForegroundColor Red
-                        Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
-                    }
-                    'unknown'
-                    {
-                        Write-Host "The enrollment state is unknown." -ForegroundColor Yellow 
-                    }
-                    'default'
-                    {
-                        Write-Host "The enrollment state is: $($enrollmentState.autopilot.device.enrollmentState)" -ForegroundColor Yellow 
-                    }
-                }
-            }
-            else
-            {
-                Write-Host "The device is assigned to the wrong deployment profile."
-                Write-Host "The device is assigned to: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
-                Write-Host "The desired deployment profile is: $($settings.DesiredAutopilotProfile)"
-            }
+            Write-Host "Checking if the device is properly enrolled..."
+            return $true
         }
-        else
+        'NextUserReadiness'
         {
-            Write-Host "The device is not assigned to a deployment profile."
-            Write-Host "Deployment Profile Assignment Status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
-            Write-Host "Deployment Profile Assigned Date And Time: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime)"
+            Write-Host "Checking if the device is ready for the next user..."
+            return $true
+        }
+        'TroubleShooting'
+        {
+            Write-Host "Troubleshooting the device..."
+            return $true
         }
     }
-    else
-    {
-        Write-Host "Device is not in Autopilot."
-    }
-    return $success
 }

@@ -5,13 +5,14 @@ function GetDeviceByUser()
         [parameter(Mandatory = $true)]
         [string]$UserName,
         [parameter(Mandatory = $true)]
-        [string]$deviceNamePrefix,
+        [string]$OperatingSystem,
         [parameter(Mandatory = $true)]
         [string]$AccessToken
     )
-    #write verbose log of all parameters
+    
+    #region write verbose log of all parameters
     Write-Verbose "UserName: $UserName"
-    Write-Verbose "DeviceNamePrefix: $deviceNamePrefix"
+    Write-Verbose "Operating system: $OperatingSystem"
     if ($null -ne $AccessToken)
     {
         Write-Verbose "AccessToken provided."
@@ -23,9 +24,11 @@ function GetDeviceByUser()
     }
     $UserName = $UserName.Trim()
     Write-Verbose "Trimmed user name: $UserName"
-    $extraparameters = "select=Id,deviceName,serialNumber"
-    $filter = "userPrincipalName eq '$username' and startswith(deviceName,'$deviceNamePrefix')"
+    $extraparameters = "select=deviceName,serialNumber,userDisplayName"
+    $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
     $managedDeviceUri = "deviceManagement/managedDevices"
+    #endregion
+
     $deviceInfo = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
     Write-Verbose "Device value count: $($deviceInfo.value.Count)"
     Write-Verbose "Device Info: $($deviceInfo | Out-String)"
@@ -33,13 +36,13 @@ function GetDeviceByUser()
     {
         if ($deviceInfo.value.Count -eq 0)
         {
-            Write-Host "No devices found for user: $UserName" -ForegroundColor Yellow
+            Write-Verbose "No devices found for user: $UserName"
             return $null
         }
         elseif ($deviceInfo.value.Count -eq 1)
         {
             # If only one device found, return its serial number directly
-            Write-Host "Found one device for user: $UserName" -ForegroundColor Green
+            Write-Host "Found one device for user: $UserName ($($deviceInfo.value[0].userDisplayName))." -ForegroundColor Green
             Write-Host "Device Name: $($deviceInfo.value[0].deviceName)" -ForegroundColor Cyan
             Write-Host "Serial Number: $($deviceInfo.value[0].serialNumber)" -ForegroundColor Cyan
             return $deviceInfo.value[0].serialNumber
@@ -47,7 +50,7 @@ function GetDeviceByUser()
         else
         {
             # Create device selection menu
-            $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName"
+            $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
             
             # Store devices in an array to reference later
             $devices = $deviceInfo.value
@@ -56,7 +59,7 @@ function GetDeviceByUser()
             foreach ($device in $devices)
             {
                 # Create a display name for the menu
-                $menuItemName = "Device: $($device.deviceName) - SN: $($device.serialNumber)"
+                $menuItemName = "Device: $($device.deviceName)  (Serial number: $($device.serialNumber))"
                 
                 # Create a scriptblock action that returns this specific device's serial number when selected
                 $serialNumber = $device.serialNumber

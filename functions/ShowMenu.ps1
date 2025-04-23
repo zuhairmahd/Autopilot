@@ -125,7 +125,7 @@ function ShowMenu()
     }
     
     # Clear screen for better readability
-    Clear-Host
+    # Clear-Host
     
     # Add navigation options based on depth
     $choices = @()

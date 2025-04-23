@@ -1,3 +1,84 @@
+# Helper function to process a single filter condition
+function ProcessFilterCondition
+{
+    [CmdletBinding()]
+    param(
+        [string]$condition
+    )
+
+    Write-Verbose "Processing filter condition: $condition"
+    # Check if this is a function-based filter (contains, startswith, endswith)
+    Write-Verbose "Checking for function-based filter..."
+    if ($condition -match '(startswith|contains|endswith)\s*\(([^,]+),\s*([^)]+)\)')
+    {
+        Write-Verbose "Found function-based filter: $($Matches[1])"
+        $filterOperator = $Matches[1]
+        Write-Verbose "Filter Operator: $filterOperator"
+        $filterKey = $Matches[2].Trim()
+        Write-Verbose "Filter Key: $filterKey"
+        $filterValue = $Matches[3].Trim()
+        Write-Verbose "Filter Value: $filterValue"
+        # Remove quotes if present in the value
+        Write-Verbose "Removing quotes from filter value..."
+        $filterValue = $filterValue -replace "^'|'$", ""
+        Write-Verbose "Filter Value after removing double quotes: $filterValue"
+        $filterValue = $filterValue -replace '^"|"$', ""
+        Write-Verbose "Filter Value after removing single quotes: $filterValue"
+        Write-Verbose "Filter Key after removing quotes: $FilterKey"
+        Write-Verbose "Filter Value: $FilterValue"
+        Write-Verbose "Filter Operator: $FilterOperator"
+        $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
+        Write-Verbose "Encoded Filter Value: $encodedFilterValue"
+        # Rebuild the function call with encoded value
+        $returnFilter = "$filterOperator($filterKey,'$encodedFilterValue')"
+        Write-Verbose "Returning filter: $returnFilter"
+        return $returnFilter
+    }
+    # Check for standard comparison operators
+    elseif ($condition -match '([^\s]+)\s+(eq|ne|gt|lt|ge|le)\s+(.+)')
+    {
+        Write-Verbose "Not a function based filter. Checking for standard comparison operators..."
+        $filterKey = $Matches[1].Trim()
+        $filterOperator = $Matches[2].Trim()
+        $filterValue = $Matches[3].Trim()
+        Write-Verbose "Filter Key: $FilterKey"
+        Write-Verbose "Filter Operator: $FilterOperator"
+        Write-Verbose "Filter Value: $FilterValue"
+        # Special handling for null and empty string
+        Write-Verbose "Checking for null or empty string..."
+        if ($filterValue -eq "null" -or $filterValue -eq "''" -or $filterValue -eq '""')
+        {
+            Write-Verbose "Filter value is null or empty string."
+            Write-Verbose "Returning filter without encoding: $filterKey $filterOperator $filterValue"
+            # Don't encode null or empty string values
+            return "$filterKey $filterOperator $filterValue"
+        }
+        else
+        {
+            # Remove quotes if present
+            Write-Verbose "Checking for quotes and removing from value if present..."
+            Write-Verbose "Value before processing: $filterValue"
+            $filterValue = $filterValue -replace "^'|'$", ""
+            Write-Verbose "Value after removing double quotes: $filterValue"
+            $filterValue = $filterValue -replace '^"|"$', ""
+            Write-Verbose "Value after removing single quotes: $filterValue"
+            Write-Verbose "Filter Key: $FilterKey"
+            Write-Verbose "Filter Value: $FilterValue"
+            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
+            Write-Verbose "Encoded Filter Value: $encodedFilterValue"
+            # Add quotes back for the encoded value
+            $returnFilter = "$filterKey $filterOperator '$encodedFilterValue'"
+            Write-Verbose "Returning filter: $returnFilter"
+            return $returnFilter
+        }
+    }
+    else
+    {
+        Write-Verbose "Unrecognized filter condition format: $condition"
+        return $condition
+    }
+}
+
 function CallGraphAPI()
 {
     [CmdletBinding()]
@@ -41,39 +122,60 @@ function CallGraphAPI()
     #region Encode filter and add headers
     if ($Filter)
     {
-        Write-Verbose "Seperating the filter into key, operator and value."
-        #if the filter contains operators such as eq, ne, gt, lt, ge, le, etc. then split the filter into key, operator and value.
-        if ($Filter -match 'startswith\(|contains\(|endswith\(')
+        Write-Verbose "Processing filter string: $Filter"
+        Write-Verbose "Splitting filter by logical operators while preserving operators."
+        $filterParts = [System.Collections.ArrayList]::new()
+        $logicalOperators = [System.Collections.ArrayList]::new()
+        # Pattern to match a logical operator with surrounding spaces
+        $pattern = '\s+(and|or)\s+'
+        $lastIndex = 0
+        # Find all logical operators and their positions
+        $logicalOperaterMatches = [regex]::Matches($Filter, $pattern)
+        Write-Verbose "Found $($logicalOperaterMatches.Count) logical operators."
+        # If no logical operators, process as a single condition
+        if ($logicalOperaterMatches.Count -eq 0)
         {
-            Write-Verbose "Processing function-based filter (e.g., startswith, contains, endswith)."
-            #get the values between parenthesis and split them into key and value.
-            $filterParts = $Filter -replace '.*\((.*)\)', '$1' -split ','
-            $FilterKey = $filterParts[0].Trim()
-            $FilterValue = $filterParts[1].Trim()
-            #the filter operater is what is before the first parenthesis.
-            $FilterOperator = $Filter -replace '\s*\(.*', ''
-            Write-Verbose "Filter Key: $FilterKey"
-            Write-Verbose "Filter Value: $FilterValue"
-            Write-Verbose "Filter Operator: $FilterOperator"
-            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
-            Write-Verbose "Encoded Filter Value: $encodedFilterValue"
-            #build the uri.
-            $encodedUri = "$uri`?`$filter=$FilterOperator($FilterKey,$encodedFilterValue)"
+            Write-Verbose "No logical operators found. Processing as a single filter condition."
+            $processedFilter = ProcessFilterCondition -condition $Filter
+            Write-Verbose "Processed single filter condition: $processedFilter"
+            $encodedFilter = $processedFilter
+            Write-Verbose "Encoded filter: $encodedFilter"
         }
         else
         {
-            Write-Verbose "Processing standard filter with operators (e.g., eq, ne, gt, lt)."
-            $filterParts = $Filter -split '\s+(eq|ne|gt|lt|ge|le)\s+'
-            $FilterKey = $filterParts[0].Trim()
-            $FilterOperator = $filterParts[1].Trim()
-            $FilterValue = $filterParts[2].Trim()
-            Write-Verbose "Filter Key: $FilterKey"
-            Write-Verbose "Filter Operator: $FilterOperator"
-            Write-Verbose "Filter Value: $FilterValue"
-            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
-            Write-Verbose "Encoded Filter Value: $encodedFilterValue"
-            $encodedUri = "$uri`?`$filter=$FilterKey $FilterOperator $encodedFilterValue"
+            # Process each part of the filter
+            Write-Verbose "Logical operators found. Processing filter as multiple conditions."
+            foreach ($logicalOperatorMatch in $logicalOperaterMatches)
+            {
+                Write-Verbose "Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))"
+                $condition = $Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex)
+                Write-Verbose "Condition to process: $condition"
+                [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
+                Write-Verbose "Processed filter condition: $($filterParts[$filterParts.Count - 1])"
+                # Store the logical operator (and, or)
+                [void]$logicalOperators.Add($logicalOperatorMatch.Value.Trim())
+                $lastIndex = $logicalOperatorMatch.Index + $logicalOperatorMatch.Length
+                Write-Verbose "Logical operators so far: $($logicalOperators -join ', ')"
+            }
+            # Don't forget the last part after the last logical operator
+            if ($lastIndex -lt $Filter.Length)
+            {
+                Write-Verbose "Processing filter condition after the last logical operator."
+                $condition = $Filter.Substring($lastIndex)
+                [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
+                Write-Verbose "Processed filter condition: $($filterParts[$filterParts.Count - 1])"
+            }
+            # Rebuild the filter string with processed parts and original logical operators
+            Write-Verbose "Rebuilding the filter string with processed parts and logical operators."
+            $encodedFilter = $filterParts[0]
+            for ($i = 0; $i -lt $logicalOperators.Count; $i++)
+            {
+                $encodedFilter += " $($logicalOperators[$i]) $($filterParts[$i+1])"
+                Write-Verbose "Adding logical operator: $($logicalOperators[$i])"
+            }
+            Write-Verbose "Processed complex filter: $encodedFilter"
         }
+        $encodedUri = "$uri`?`$filter=$([uri]::EscapeUriString($encodedFilter))"
         Write-Verbose "Uri after applying filters: $encodedUri"
     }
     else
@@ -81,6 +183,7 @@ function CallGraphAPI()
         Write-Verbose 'No filter provided.'
         $encodedUri = $uri
     }
+    
     if ($extraParameters)
     {
         Write-Verbose "Extra parameters provided."
@@ -155,7 +258,6 @@ function CallGraphAPI()
         Uri             = $encodedUri
         Headers         = $headers
         UseBasicParsing = $true
-        SessionVariable = 'requestSession'
     }
     # Only add Body parameter if it exists
     if ($body)
@@ -169,7 +271,6 @@ function CallGraphAPI()
     try
     {
         $response = Invoke-RestMethod @restParams
-        Write-Verbose "Session content: $requestSession"
         $response | ForEach-Object {
             if ($_.'@odata.nextLink')
             {
