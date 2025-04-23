@@ -35,6 +35,7 @@ $groupsToExclude = $init.groupsToExclude
 Write-Verbose "Groups to exclude: $($groupsToExclude | Out-String)"
 $settings = $init.settings
 Write-Verbose "Settings: $($settings | Out-String)"
+$backoutText = 'Backout'
 #endregion Define variables
 
 #region Helper Functions (Consolidated and Corrected)
@@ -177,7 +178,7 @@ function GetUserInput()
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
-            Write-Verbose "User pressed Enter. Returning null."
+            Write-Verbose "User pressed Enter. Returning $BackoutText."
             return $null # Return null to signal going back
         }
 
@@ -240,7 +241,6 @@ function ProcessSerialNumber
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
 $receiveMenu = NewMenu -Title "Receive Device" -Description "How would you like to lookup the device?"
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
-
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
@@ -248,8 +248,8 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     # Check if user entered 'back'
     if ($null -eq $serialNumber)
     {
-        Write-Verbose "User pressed Enter. Returning null."
-        # Removed explicit 'return' to potentially avoid the "press any key" prompt on abandon
+        Write-Verbose "User pressed Enter. Returning $BackoutText."
+        return $backoutText
     } 
     else # Process only if a serial number was entered
     {
@@ -281,15 +281,14 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         # Removed exit 1 to allow returning to menu
     }
 }
-
 $receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
-
 $receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
     if ($null -eq $userName)
     {
-        # Removed explicit 'return'
+        Write-Verbose "User pressed Enter. Returning $BackoutText."
+        return $backoutText
     } 
     else # Process only if a username was entered
     {
@@ -315,7 +314,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     # Check if user entered 'back'
     if ($null -eq $username)
     {
-        # Removed explicit 'return' to allow natural script block exit
+        Write-Verbose "User pressed Enter. Returning $BackoutText."
+        return $backoutText # Return to the previous menu
     } 
     else # Continue only if a username was entered
     {
@@ -333,7 +333,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             # Check if user entered 'back'
             if ($null -eq $serialNumber)
             {
-                # Removed explicit 'return'
+                Write-Verbose "User pressed Enter. Returning $BackoutText."
+                return $backoutText # Return to the previous menu
             } 
             else # Process only if a serial number was entered
             {

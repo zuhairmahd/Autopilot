@@ -8,10 +8,12 @@ function DisplayNumericMenu()
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again."
     )
-    #Print a verbose message with received    
+    #region Print a verbose message with received    parameters
     Write-Verbose "Received parameters: $($choices | Out-String)"
     Write-Verbose "Prompt: $Prompt"
     Write-Verbose "ErrorMessage: $errorMessage"
+    Write-Verbose "Banner: $banner"
+    #endregion
 
     # Display the menu options
     Write-Host $banner -ForegroundColor Green
@@ -109,7 +111,8 @@ function ShowMenu()
         [Parameter(Mandatory = $false)]
         [System.Collections.ArrayList]$History = $null,
         [Parameter(Mandatory = $false)]
-        [System.Collections.ArrayList]$MenuHistory = $null
+        [System.Collections.ArrayList]$MenuHistory = $null,
+        [string]$BackoutText = $backoutText
     )
     
     # Initialize history if not provided
@@ -125,7 +128,7 @@ function ShowMenu()
     }
     
     # Clear screen for better readability
-    # Clear-Host
+    Clear-Host
     
     # Add navigation options based on depth
     $choices = @()
@@ -184,11 +187,9 @@ function ShowMenu()
         if ($History.Count -gt 0)
         {
             $History.RemoveAt($History.Count - 1)
-            
             # Get previous menu from MenuHistory
             $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
             $MenuHistory.RemoveAt($MenuHistory.Count - 1)
-            
             return ShowMenu -Menu $previousMenu -Depth ($Depth - 1) -History $History -MenuHistory $MenuHistory
         }
     }
@@ -211,13 +212,11 @@ function ShowMenu()
         # Find the selected item
         $selectedIndex = $choices.IndexOf($selectedOption)
         $selectedItem = $menuItems[$selectedIndex]
-        
         # Handle action or submenu
         if ($selectedItem.Action)
         {
             # Execute the action
             $result = & $selectedItem.Action
-            
             # Always display press any key to continue, regardless of whether action returns a value
             Write-Host "`n"
             # If the action returned a value, display it
@@ -225,10 +224,12 @@ function ShowMenu()
             {
                 Write-Host "$result`n" -ForegroundColor Cyan
             }
-            
-            Write-Host "Press any key to continue..." -ForegroundColor Yellow
-            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            
+            if (-not ($result -eq $backoutText)) 
+            {
+                Write-Verbose "Action executed: $($selectedItem.Name)"
+                Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            }
             return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
         }
         elseif ($selectedItem.Submenu)
