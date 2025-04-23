@@ -28,22 +28,18 @@ else
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $deviceUri = "devices"
 $managedDeviceUri = "deviceManagement/managedDevices"
-# $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+$autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
-# $configFile = "$pwd\.secrets\config.json"
-# $accessToken = GetGraphAccessToken -configFile $configFile
+$configFile = "$pwd\.secrets\config.json"
+$accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
 
-$enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimeZone
 
-
-
-exit 0
-$extraparameters = "select=deviceName,manufacturer,model,serialNumber,userPrincipalName,userDisplayName&orderby=userDisplayName"
-$filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, 'mahmoudz@gao.gov') and startswith(deviceName,'w11-')"
-$global:response = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters -consistencyLevel
+# $extraparameters = "select=deviceName,manufacturer,model,serialNumber,userPrincipalName,userDisplayName&orderby=userDisplayName"
+# $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, 'mahmoudz@gao.gov') and startswith(deviceName,'w11-')"
+$global:ap = CallGraphAPI -accessToken $accessToken -ResourcePath $autoPilotDeviceURI
 
 # Process and display the sorted results
 # if ($global:response -and $global:response.value)
