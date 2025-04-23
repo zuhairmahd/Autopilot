@@ -339,7 +339,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             else # Process only if a serial number was entered
             {
                 Write-Host "Checking device with serial number $($serialNumber)..."
-                ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'EnrollmentVerification'
+                ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
             }
         }
         else

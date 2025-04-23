@@ -32,11 +32,15 @@ $managedDeviceUri = "deviceManagement/managedDevices"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
-$configFile = "$pwd\.secrets\config.json"
-$accessToken = GetGraphAccessToken -configFile $configFile
+# $configFile = "$pwd\.secrets\config.json"
+# $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
 
+$enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimeZone
 
+
+
+exit 0
 $extraparameters = "select=deviceName,manufacturer,model,serialNumber,userPrincipalName,userDisplayName&orderby=userDisplayName"
 $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, 'mahmoudz@gao.gov') and startswith(deviceName,'w11-')"
 $global:response = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters -consistencyLevel

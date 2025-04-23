@@ -1,5 +1,5 @@
 # Function to get the three-letter time zone abbreviation
-function GetTimeZoneAbbreviation
+function GetTimeZoneAbbreviation()
 {
     param (
         [Parameter(Mandatory = $true)]
@@ -110,15 +110,24 @@ function GetTimeZoneAbbreviation
 }
 
 # Function to format date with full day/month names and timezone abbreviation
-function FormatDateWithTimeZone
+function FormatDateWithTimeZone()
 {
+    [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
-        [DateTime]$DateTime
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0, ValueFromPipelineByPropertyName = $true)][DateTime]$DateTime
     )
-    
-    $formattedDate = $DateTime.ToString("dddd, MMMM d, yyyy h:mm:ss tt")
-    $timeZoneAbbr = GetTimeZoneAbbreviation -DateTime $DateTime
-    
-    return "$formattedDate $timeZoneAbbr"
+    #Print verbose log of parameters
+    Write-Verbose "Received parameters: $($DateTime | Out-String)"
+    #Verify the passed datetime is a valid date.
+    Write-Verbose "Verifying DateTime: $($DateTime | Out-String)"
+    if ($DateTime -eq $null -or $DateTime -eq [System.DateTime]::MinValue)
+    {
+        Write-Verbose "Invalid DateTime provided."
+        return $null
+    }
+    Write-Verbose "DateTime is valid."
+    Write-Verbose "Formatting DateTime: $($DateTime | Out-String)"
+    $formattedDate = $DateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
+    Write-Verbose "Formatted DateTime: $($formattedDate | Out-String)"
+    return $formattedDate
 }
