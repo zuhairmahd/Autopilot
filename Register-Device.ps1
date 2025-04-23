@@ -427,7 +427,7 @@ if (-not $NoIntuneCheck)
                 'enrolled'
                 {
                     Write-Host 'The device appears to have been enrolled.' -ForegroundColor Red
-                    Write-Host "This may cause issues when the user loggs on for the first timme." -ForegroundColor Red
+                    Write-Host "This may cause issues when the user loggs on for the first time." -ForegroundColor Red
                     Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
                     exit 1
                 }
