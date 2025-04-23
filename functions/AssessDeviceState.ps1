@@ -240,16 +240,19 @@ function AssessDeviceState()
     {
         'PropperEnrollmentVerification'
         {
+            Write-Host "Place holder text..."
             Write-Host "Checking if the device is properly enrolled..."
             return $true
         }
         'NextUserReadiness'
         {
+            Write-Host "Place holder text..."
             Write-Host "Checking if the device is ready for the next user..."
             return $true
         }
         'TroubleShooting'
         {
+            Write-Host "Place holder text..."
             Write-Host "Troubleshooting the device..."
             return $true
         }

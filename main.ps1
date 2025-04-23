@@ -22,104 +22,6 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
-function ProcessSerialNumber
-{
-    param (
-        [string]$SerialNumber,
-        $AccessToken,
-        $Settings
-    )
-    Write-Verbose "Trimming serial number: $SerialNumber"
-    $SerialNumber = $SerialNumber.Trim()
-    Write-Verbose "Trimmed serial number: $SerialNumber"
-    Write-Host "Checking deployment status for device with serial number $SerialNumber."
-    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
-    Write-Verbose "The management state is: $($enrollmentState.managed)"
-    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
-    Write-Verbose "The imported state is: $($enrollmentState.imported)"
-    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
-    if (AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings)
-    {
-        Write-Host 'The device is in the correct state.' -ForegroundColor Green
-        Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'The device is not in the correct state.' -ForegroundColor Red
-        Write-Host "The function returned a value of false." -ForegroundColor Red
-        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-    }
-}
-function validateInput()
-{
-    [CmdletBinding()]
-    param (
-        [parameter(Mandatory = $true)]
-        [string]$UserInput,
-        [parameter(Mandatory = $true)]
-        [string]$type
-    )
-    
-    Write-Verbose "Validating input of type '$type': '$UserInput'"
-    
-    # Trim input to remove any leading or trailing spaces
-    $UserInput = $UserInput.Trim()
-    Write-Verbose "Trimmed input: '$UserInput'"
-    
-    switch ($type)
-    {
-        'serialNumber'
-        {
-            # Check if input exceeds maximum length
-            if ($UserInput.Length -gt 30)
-            {
-                Write-Verbose "Serial number exceeds maximum length of 30 characters"
-                Write-Host "Serial number cannot exceed 30 characters." -ForegroundColor Red
-                return $false
-            }
-            
-            if ($UserInput -match '^[a-zA-Z0-9]{7,}$')
-            {
-                Write-Verbose "Serial number validation passed"
-                return $true
-            }
-            else
-            {
-                Write-Verbose "Serial number validation failed - must be alphanumeric and at least 10 characters"
-                Write-Host 'Invalid serial number format.' -ForegroundColor Red
-                return $false
-            }
-        }
-        'userName'
-        {
-            # Check if input exceeds maximum length
-            if ($UserInput.Length -gt 50)
-            {
-                Write-Verbose "Username exceeds maximum length of 50 characters"
-                Write-Host "Username cannot exceed 50 characters." -ForegroundColor Red
-                return $false
-            }
-            
-            if ($UserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-            {
-                Write-Verbose "Username validation passed"
-                return $true
-            }
-            else
-            {
-                Write-Verbose "Username validation failed - must be a valid email format"
-                Write-Host 'Invalid user name format.' -ForegroundColor Red
-                return $false
-            }
-        }
-        default 
-        {
-            Write-Verbose "Unknown validation type: '$type'"
-            Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
-            return $false
-        }
-    }
-}
 #endregion import functions.
 
 #region Define variables
@@ -135,12 +37,13 @@ $settings = $init.settings
 Write-Verbose "Settings: $($settings | Out-String)"
 #endregion Define variables
 
+#region Helper Functions (Consolidated and Corrected)
 function NormalizeUserName()
 {
     [CmdletBinding()]
     param (
         [string]$UserName,
-        $Settings = $settings
+        $Settings = $settings # Use the script-level $settings by default
     )
     $domain = $settings.domain
     Write-Verbose "Domain: $domain"
@@ -163,35 +66,6 @@ function NormalizeUserName()
     return $UserName
 }
 
-function ProcessSerialNumber
-{
-    param (
-        [string]$SerialNumber,
-        $AccessToken,
-        $Settings
-    )
-    Write-Verbose "Trimming serial number: $SerialNumber"
-    $SerialNumber = $SerialNumber.Trim()
-    Write-Verbose "Trimmed serial number: $SerialNumber"
-    Write-Host "Checking deployment status for device with serial number $SerialNumber."
-    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
-    Write-Verbose "The management state is: $($enrollmentState.managed)"
-    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
-    Write-Verbose "The imported state is: $($enrollmentState.imported)"
-    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
-    if (AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings)
-    {
-        Write-Host 'The device is in the correct state.' -ForegroundColor Green
-        Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'The device is not in the correct state.' -ForegroundColor Red
-        Write-Host "The function returned a value of false." -ForegroundColor Red
-        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-    }
-}
-
 function validateInput()
 {
     [CmdletBinding()]
@@ -200,14 +74,14 @@ function validateInput()
         [string]$UserInput,
         [parameter(Mandatory = $true)]
         [string]$type,
-        $settings = $settings
+        $settings = $settings # Use the script-level $settings by default
     )
-    
+
     $domain = $settings.domain
-    $MaxUserNameLength = $settings.MaxUserNameLength 
+    $MaxUserNameLength = $settings.MaxUserNameLength
     $MaxSerialNumberLength = $settings.MaxSerialNumberLength
-    $MinSerialNumberLength = $settings.MinSerialNumberLength 
-    $returnValue = @{}
+    $MinSerialNumberLength = $settings.MinSerialNumberLength
+    $returnValue = @{ valid = $false; value = $null } # Initialize return hash table
     Write-Verbose "Validating input of type '$type': '$UserInput'"
     Write-Verbose "Domain: $domain"
     Write-Verbose "MaxUserNameLength: $MaxUserNameLength"
@@ -220,61 +94,57 @@ function validateInput()
     {
         'serialNumber'
         {
-            # Check if input exceeds maximum length
             Write-Verbose "Checking serial number length: $($UserInput.Length)"
             if ($UserInput.Length -gt $MaxSerialNumberLength)
             {
                 Write-Verbose "Serial number exceeds maximum length of $MaxSerialNumberLength characters"
                 Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
-                $returnValue.Add('valid', $false)
-                $returnValue.Add('value', $null)
             }
-            if ($UserInput -match '^[a-zA-Z0-9]{$MinSerialNumberLength,}$')
+            elseif ($UserInput.Length -lt $MinSerialNumberLength)
+            {
+                Write-Verbose "Serial number is shorter than minimum length of $MinSerialNumberLength characters"
+                Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
+            }
+            elseif ($UserInput -match '^[a-zA-Z0-9]+$') # Check if alphanumeric
             {
                 Write-Verbose "Serial number validation passed"
-                $returnValue.Add('valid', $true)
-                $returnValue.Add('value', $UserInput)
+                $returnValue.valid = $true
+                $returnValue.value = $UserInput
             }
             else
             {
-                Write-Host 'Invalid serial number format.' -ForegroundColor Red
-                Write-Host "Serial number must be alphanumeric and contain at least $MinSerialNumberLength characters and no more than $MaxSerialNumberLength characters." -ForegroundColor Red
-                $returnValue.Add('valid', $false)
-                $returnValue.Add('value', $null)
+                Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
             }
         }
         'userName'
         {
-            # Check if input exceeds maximum length
             Write-Verbose "Checking user name length: $($UserInput.Length)"
             if ($UserInput.Length -gt $MaxUserNameLength)
             {
                 Write-Verbose "Username exceeds maximum length of $MaxUserNameLength characters"
                 Write-Host "Username cannot exceed $MaxUserNameLength characters." -ForegroundColor Red
-                $returnValue.Add('valid', $false)
-                $returnValue.Add('value', $null)
-            }
-            $userInput = NormalizeUserName -UserName $UserInput -Settings $settings
-            if ($UserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-            {
-                Write-Verbose "Username validation passed"
-                $returnValue.Add('valid', $true)
-                $returnValue.Add('value', $UserInput)
             }
             else
             {
-                Write-Verbose "Username validation failed - must be a valid email format"
-                Write-Host 'Invalid user name format.' -ForegroundColor Red
-                $returnValue.Add('valid', $false)
-                $returnValue.Add('value', $null)
+                $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
+                # Basic email format check
+                if ($normalizedUserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+                {
+                    Write-Verbose "Username validation passed"
+                    $returnValue.valid = $true
+                    $returnValue.value = $normalizedUserInput
+                }
+                else
+                {
+                    Write-Verbose "Username validation failed - must be a valid email format (e.g., user@$domain)"
+                    Write-Host "Invalid user name format. Please enter a valid email address (e.g., user@$domain)." -ForegroundColor Red
+                }
             }
         }
-        default 
+        default
         {
             Write-Verbose "Unknown validation type: '$type'"
             Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
-            $returnValue.Add('valid', $false)
-            $returnValue.Add('value', $null)
         }
     }
     Write-Verbose "Returning validation result: $($returnValue.valid)"
@@ -290,41 +160,69 @@ function GetUserInput()
         [string]$Prompt,
         [validateSet('userName', 'serialNumber')]
         [string]$InputType,
-        $settings = $settings
+        $settings = $settings # Use the script-level $settings by default
     )
     Write-Verbose "Message: $Message"
     Write-Verbose "Prompt: $Prompt"
     Write-Verbose "InputType: $InputType"
     Write-Host $Message
-    $inputItem = Read-Host $Prompt
-    Write-Verbose "Item entered: $inputItem"
-    $inputResultValid = (validateInput -UserInput $inputItem -type $InputType).valid
-    $inputResult = (validateInput -UserInput $inputItem -type $InputType).value
+    # Updated instruction
+    Write-Host "Press Enter without typing anything to return to the previous menu." 
 
-    while (-not ($inputResultValid))
+    while ($true) # Loop indefinitely until valid input or Enter is pressed
     {
-        #beep
-        [console]::beep(1000, 500)
-        Write-Host "Invalid $inputType. Enter a valid $inputType." -ForegroundColor Red
         $inputItem = Read-Host $Prompt
+        Write-Verbose "Item entered: '$inputItem'" # Added quotes for clarity
+
+        # Check if the user just pressed Enter (empty string OR null)
+        if ($null -eq $inputItem -or $inputItem -eq '')
+        {
+            Write-Verbose "User pressed Enter. Returning null."
+            return $null # Return null to signal going back
+        }
+
+        # Validate the input if it's not empty
+        $validationResult = validateInput -UserInput $inputItem -type $InputType -settings $settings
+        $inputResultValid = $validationResult.valid
+        $inputResult = $validationResult.value
+
+        if ($inputResultValid)
+        {
+            Write-Verbose "Valid $inputType entered: $inputResultValid"
+            Write-Verbose "Input result: $inputResult"
+            return $inputResult # Return the validated input
+        }
+        else
+        {
+            # Beep and show error if validation failed
+            [console]::beep(1000, 500)
+            # Updated error message
+            Write-Host "Invalid $inputType. Please try again or press Enter to return." -ForegroundColor Red 
+            # The loop will continue, prompting the user again
+        }
     }
-    Write-Verbose "Valid $inputType entered: $inputResultValid"
-    Write-Verbose "Input result: $inputResult"
-    return $inputResult
 }
 
-$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
-$receiveMenu = NewMenu -Title "Receive Device" -Description "How would you like to lookup the device?"
-$serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
-$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
-    Write-Host 'Please enter the serial number of the device.'
-    Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
-    $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber'
-    Write-Verbose "Got serial number: $SerialNumber"
-    Write-Host "Checking device with serial number $($SerialNumber)..."
-    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $accessToken
-    $deviceState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
-    if ($deviceState -eq $true)
+function ProcessSerialNumber
+{
+    [CmdletBinding()]
+    param (
+        [string]$SerialNumber,
+        $AccessToken,
+        $Settings = $settings, # Use the script-level $settings by default
+        [string]$AssessmentType = 'GeneralCheck' # Default assessment type
+    )
+    Write-Verbose "Trimming serial number: $SerialNumber"
+    $SerialNumber = $SerialNumber.Trim()
+    Write-Verbose "Trimmed serial number: $SerialNumber"
+    Write-Host "Checking deployment status for device with serial number $SerialNumber."
+    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
+    Write-Verbose "The management state is: $($enrollmentState.managed)"
+    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
+    Write-Verbose "The imported state is: $($enrollmentState.imported)"
+    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
+
+    if (AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings -AssessmentType $AssessmentType)
     {
         Write-Host 'The device is in the correct state.' -ForegroundColor Green
         Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
@@ -336,6 +234,32 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
     }
 }
+#endregion Helper Functions
+
+#region Menu Definitions
+$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
+$receiveMenu = NewMenu -Title "Receive Device" -Description "How would you like to lookup the device?"
+$serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
+
+$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
+    Write-Host 'Please enter the serial number of the device.'
+    Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
+    $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+    # Check if user entered 'back'
+    if ($null -eq $serialNumber)
+    {
+        Write-Verbose "User pressed Enter. Returning null."
+        # Removed explicit 'return' to potentially avoid the "press any key" prompt on abandon
+    } 
+    else # Process only if a serial number was entered
+    {
+        Write-Verbose "Got serial number: $SerialNumber"
+        Write-Host "Checking device with serial number $($SerialNumber)..."
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
+    }
+}
+
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
     Write-Verbose "Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
@@ -347,104 +271,108 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $make = $deviceObject.manufacturer
         Write-Verbose "The manufacturer is $make"
         $model = $deviceObject.model
-        Write-Verbose "The model is $model"
         Write-Host "Checking device with serial number $($serialNumber): $make $model "
-        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $serialNumber -AccessToken $accessToken
-        $deviceState = AssessDeviceState -enrollmentState $enrollmentState -Settings $settings -AssessmentType 'NextUserReadiness'
-        if ($deviceState -eq $true)
-        {
-            Write-Host 'The device is in the correct state.' -ForegroundColor Green
-            Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host 'The device is not in the correct state.' -ForegroundColor Red
-            Write-Host "The function returned a value of false." -ForegroundColor Red
-            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-        }
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
     }
     else
     {
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
-        exit 1
+        # Removed exit 1 to allow returning to menu
     }
 }
+
 $receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
+
 $receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by User" -Action {
-    $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName'
-    $username = NormalizeUserName -UserName $userName -Settings $settings
-    Write-Verbose "Got user name: $UserName"
-    Write-Verbose "Getting access token..."
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile
-    $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem
-    Write-Host "Serial number: $($serialNumber)"
-    if ($serialNumber)
+    $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+    # Check if user entered 'back'
+    if ($null -eq $userName)
     {
-        Write-Host "Checking device with serial number $($serialNumber)..."
-    }
-    else
+        # Removed explicit 'return'
+    } 
+    else # Process only if a username was entered
     {
-        Write-Host "No device found for user $userName." -ForegroundColor Red
-    }
-}
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
-    $username = GetUserInput -Message "Enter the username (email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName'
-    Write-Host "Checking group membership for user $userName."
-    Write-Verbose "Getting access token..."
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile
-    $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
-    if ($groups -eq $true)
-    {
-        Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
-        Write-Host "We will now check the device state." -ForegroundColor Green
-        Write-Host "Enter the device's serial number."
-        Write-Host "This would be the device you plan to give to the user."
-        $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber'
-        Write-Host "Checking device with serial number $($serialNumber)..."
-        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $serialNumber -AccessToken $accessToken
-        $deviceState = AssessDeviceState -enrollmentState $enrollmentState -Settings $settings -assessmentType 'EnrollmentVerification'
-        if ($deviceState -eq $true)
+        Write-Verbose "Got user name: $UserName"
+        Write-Verbose "Getting access token..."
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem
+        Write-Verbose "Serial number: $($serialNumber)"
+        if ($serialNumber)
         {
-            Write-Host 'The device is in the correct state.' -ForegroundColor Green
-            Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
+            Write-Host "Checking device with serial number $($serialNumber)..."
+            ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
         }
         else
         {
-            Write-Host 'The device is not in the correct state.' -ForegroundColor Red
-            Write-Host "The function returned a value of false." -ForegroundColor Red
-            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+            Write-Host "No device found for user $userName." -ForegroundColor Red
         }
-    }
-    else
-    {
-        Write-Verbose "The function returned $($groups.missingIncludeGroups.Count) missing groups and $($groups.invalidExcludeGroups.Count) invalid groups."
-        Write-Verbose "Missing include groups: $($groups.missingIncludeGroups) | Out-String)"
-        Write-Verbose "The function returned $($groups.invalidExcludeGroups.Count) invalid exclude groups."
-        Write-Verbose "Invalid exclude groups: $($groups.invalidExcludeGroups) | Out-String)"
-        if ($groups.missingIncludeGroups.Count -gt 0)
-        {
-            Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
-            foreach ($group in $groups.missingIncludeGroups)
-            {
-                Write-Host $group -ForegroundColor Red
-            }
-        }
-        if ($groups.invalidExcludeGroups.Count -gt 0)
-        {
-            Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
-            foreach ($group in $groups.invalidExcludeGroups)
-            {
-                Write-Host $group -ForegroundColor Red
-            }
-        }
-        Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
-        exit 1
     }
 }
 
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
+    $username = GetUserInput -Message "Enter the username (email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+    # Check if user entered 'back'
+    if ($null -eq $username)
+    {
+        # Removed explicit 'return' to allow natural script block exit
+    } 
+    else # Continue only if a username was entered
+    {
+        Write-Host "Checking group membership for user $userName."
+        Write-Verbose "Getting access token..."
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
+        if ($groups)
+        {
+            Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
+            Write-Host "We will now check the device state." -ForegroundColor Green
+            Write-Host "Enter the device's serial number."
+            Write-Host "This would be the device you plan to give to the user."
+            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+            # Check if user entered 'back'
+            if ($null -eq $serialNumber)
+            {
+                # Removed explicit 'return'
+            } 
+            else # Process only if a serial number was entered
+            {
+                Write-Host "Checking device with serial number $($serialNumber)..."
+                ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'EnrollmentVerification'
+            }
+        }
+        else
+        {
+            Write-Verbose "The function returned $($groups.missingIncludeGroups.Count) missing groups and $($groups.invalidExcludeGroups.Count) invalid groups."
+            Write-Verbose "Missing include groups: $($groups.missingIncludeGroups | Out-String)"
+            Write-Verbose "The function returned $($groups.invalidExcludeGroups.Count) invalid exclude groups."
+            Write-Verbose "Invalid exclude groups: $($groups.invalidExcludeGroups | Out-String)"
+            if ($groups.missingIncludeGroups.Count -gt 0)
+            {
+                Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
+                foreach ($group in $groups.missingIncludeGroups)
+                {
+                    Write-Host $group -ForegroundColor Red
+                }
+            }
+            if ($groups.invalidExcludeGroups.Count -gt 0)
+            {
+                Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
+                foreach ($group in $groups.invalidExcludeGroups)
+                {
+                    Write-Host $group -ForegroundColor Red
+                }
+            }
+            Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
+            # Removed exit 1 to allow returning to menu
+        }
+    } # Corrected: Closing brace for the -Action script block was missing
+}
+
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Receive a device from a user" -Submenu $receiveMenu
+#endregion Menu Definitions
 
-
-
+#region Show Menu
 ShowMenu -Menu $mainMenu
+#endregion Show Menu
 
