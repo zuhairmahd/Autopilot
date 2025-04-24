@@ -215,7 +215,6 @@ $exclusions = (Get-Content -Path $ExclusionsFile | ConvertFrom-Json).$Applicatio
 #endregion Define static and dynamic variables
 
 #region logging
-#print a verbose log of all received variables
 Write-Verbose "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
 Write-Verbose "The current parameter set is $($PSCmdlet.ParameterSetName)"
 Write-Verbose "Configuration file: $configFile"
@@ -363,7 +362,7 @@ if ($UpdateOnly)
     exit 0
 }
 
-if (-not($NoAdminCheck -or $UpdateOnly -or $Reconfigure -or ($check -and $serialNumber -ne '')))
+if (-not($NoAdminCheck -or $UpdateOnly -or $Reconfigure -or $check ))
 {
     Write-Host 'Checking whether the script has sufficient permissions to run.'
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -386,7 +385,7 @@ else
 if ($serialNumber -eq '' -and $check)
 {
     Write-Host 'Using the local device serial number.'
-    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
     $serialNumber = $deviceObject.serialNumber
     Write-Verbose "The serial number is $serialNumber."
     $hash = $deviceObject.hardwareHash
