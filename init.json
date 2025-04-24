@@ -113,7 +113,7 @@
                   ],
         "description":  "The repository provider to use.",
         "devdefault":  "Github",
-        "reldefault":  "Gitlab",
+        "reldefault":  "Github",
         "type":  "array"
     },
     {

@@ -25,7 +25,6 @@
             "GroupMembers",
             "groups",
             "initVerify",
-            "IsEncrypted",
             "ListAllDevices",
             "main",
             "manifest",

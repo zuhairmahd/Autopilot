@@ -179,7 +179,7 @@
                                                                   "MajorRevision":  -1,
                                                                   "MinorRevision":  -1
                                                               },
-                                                  "hash":  "29B44E838515C0D41E2C0C60A0B586A8FC81DE7414BE60DA83BE1A1F83E23C18"
+                                                  "hash":  "117AE5221EECF269EE07EC6A1D1966A62A69B3E65728996A8E4D8BC9D311B263"
                                               },
                                               {
                                                   "name":  "GetScriptUpdates",
@@ -227,7 +227,19 @@
                                                                   "MajorRevision":  -1,
                                                                   "MinorRevision":  -1
                                                               },
-                                                  "hash":  "DF2EEC877CA60E8CC39AA478D5B2F7D2FEAE8A69290C2F4C0CFA3934903E9078"
+                                                  "hash":  "CABA67B6AC32B0211ED7AA5C122FE45BAA0C2A1E8292FFC5CD8D869886D12297"
+                                              },
+                                              {
+                                                  "name":  "IsEncrypted",
+                                                  "version":  {
+                                                                  "Major":  0,
+                                                                  "Minor":  0,
+                                                                  "Build":  0,
+                                                                  "Revision":  -1,
+                                                                  "MajorRevision":  -1,
+                                                                  "MinorRevision":  -1
+                                                              },
+                                                  "hash":  "AD1C489712BA095ED15CE9ECE1B2A2425FEBF4539472709361E34BB835EE569B"
                                               },
                                               {
                                                   "name":  "RestartDevice",
@@ -245,19 +257,15 @@
                             "configurations":  [
                                                    {
                                                        "name":  "exclusions",
-                                                       "hash":  "65B00D77B7964B11B43F3E4188C8C17DAA275251CBB7CDD37D2D074AA0CDD16A"
+                                                       "hash":  "3F33A52F68788F23452DF1C097AB545BBC994757174FBFC6D7F7C5CEDC701811"
                                                    },
                                                    {
                                                        "name":  "init",
-                                                       "hash":  "6EE8181DEDB62481D228C06FCB2ABDD126A74D182A2C2A4CB423AC9D5FDAF63B"
+                                                       "hash":  "7081ECDF81AC3F0C5C3C0486D0EBC902E9F51D738DDD68AD19629279FCFB84D8"
                                                    },
                                                    {
                                                        "name":  "remoteManifest",
                                                        "hash":  "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
-                                                   },
-                                                   {
-                                                       "name":  "vars",
-                                                       "hash":  "0B149F45DB65722F789F751583F08077E22F44ACE1A58F157EFE462F33F17D04"
                                                    }
                                                ],
                             "Cmds":  [
@@ -357,7 +365,7 @@
                                                                 "MajorRevision":  -1,
                                                                 "MinorRevision":  -1
                                                             },
-                                                "hash":  "EDC236F81606DAEE89CC11BAA665E1CC909C4AFA4E6D77A4A615F9788FF8A2C7"
+                                                "hash":  "53A4B18B2705F3BF727A3E434E17D4A05DA27D3975A5D73F220789A044F73205"
                                             }
                                         ]
                         }

@@ -28,10 +28,20 @@ function CheckForScriptUpdates
         [Parameter(Mandatory = $True)]
         [string]$RemoteManifestPath,
         [Parameter(Mandatory = $True)]
-        [System.Object[]]$LocalManifestContent
+        [System.Object[]]$LocalManifestContent,
+        [string]$Application = $Application
     )
 
-    $updatedManifestContent = @{'Functions' = @(); 'Scripts' = @(); 'Cmds' = @() }
+    $updatedManifestContent = @{
+        $application = 
+        @{
+            "Functions"      = @()
+            "Scripts"        = @()
+            "Cmds"           = @()
+            "configurations" = @()
+        }
+    }   
+    
     Write-Verbose "Retrieving remote manifest from $RemoteManifestPath"
     $remoteManifestContent = Invoke-RestMethod -Uri $RemoteManifestPath -Method Get
     Write-Verbose "Read $($LocalManifestContent.functions.count) functions, $($LocalManifestContent.scripts.count) scripts, and $($LocalManifestContent.cmds.count) cmds from the local manifest."
