@@ -522,7 +522,7 @@ function CreateManifest()
             "configurations" = @()
         }
     }   
-    $version | ConvertTo-Json -Depth 10 | Set-Content -Path $ManifestFile -Force
+    $version | ConvertTo-Json -Depth 10 | Set-Content -Path $ManifestFile -Encoding UTF8 -Force
     $functionFiles = Get-ChildItem -File -Path $functionsFolder -Recurse -Include *.ps1 -Force
     $scriptFiles = Get-ChildItem -Path "$pwd" *.ps1 -Force
     $cmdFiles = Get-ChildItem -File -Path "$pwd" *.cmd -Force
@@ -660,7 +660,7 @@ function CreateManifest()
         }        
     }
     $combined = @{$application = @{'Functions' = $functions; 'Scripts' = $scripts; 'Cmds' = $cmds; configurations = $configurations }}    
-    $combined | ConvertTo-Json -Depth 5 | Set-Content -Path $ManifestFile -Encoding UTF8 -Force
+    $combined | ConvertTo-Json -Depth 20 | Set-Content -Path $ManifestFile -Encoding UTF8 -Force
     Write-Host "Successfully updated $($ManifestFile)"
     $success = $true
     return $success

@@ -118,13 +118,10 @@
     },
     {
         "name":  "Release",
-        "value":  [
-                      "main",
-                      "auto"
-                  ],
+        "value":  "2.2",
         "description":  "The release branch to use.",
         "devdefault":  "main",
-        "reldefault":  "main",
-        "type":  "array"
+        "reldefault":  "2.2",
+        "type":  "string"
     }
 ]
