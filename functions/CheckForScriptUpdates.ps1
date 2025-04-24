@@ -73,8 +73,8 @@ function CheckForScriptUpdates
     }
     else
     {
-        Write-Verbose "Failed to convert response to JSON.
-        write-verbose " "This will likely result in an error."
+        Write-Verbose "Failed to convert response to JSON."
+        Write-Verbose "This will likely result in an error."
     }
     Write-Verbose "Read $($LocalManifestContent.functions.count) functions, $($LocalManifestContent.scripts.count) scripts, $($LocalManifestContent.cmds.count) cmds and $($LocalManifestContent.configurations.count) configurations from the local manifest."
     Write-Verbose "Read $($remoteManifestContent.functions.count) functions, $($remoteManifestContent.scripts.count) scripts, $($remoteManifestContent.cmds.count) cmds and $($remoteManifestContent.configurations.count) configurations from the remote manifest."
