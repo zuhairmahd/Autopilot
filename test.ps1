@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param
 (
-    [parameter(helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$ObjectId = 'C4N8054'
+    [parameter(helpMessage = 'Please enter the object id of the device you want to find.', Position = 0)]$SerialNumber = 'C4N8054'
 )
 
 
@@ -27,15 +27,31 @@ else
 #region variables
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $deviceUri = "devices"
-$managedDeviceUri = "deviceManagement/managedDevices"
-$autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-# $managedDeviceFilter = "serialNumber eq '$serialNumber'"
+# $managedDeviceUri = "deviceManagement/managedDevices"
+# $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+$managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 $configFile = "$pwd\.secrets\config.json"
-# $accessToken = GetGraphAccessToken -configFile $configFile
+$accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
-#print the script name.
-$global:ScriptName = ($MyInvocation.MyCommand.Name).Substring(0, $ScriptName.Length - 3)
 
-Write-Host "Running script $ScriptName" -ForegroundColor Green
+$managedDeviceUri = "deviceManagement/managedDevices"
+# Write-Host "managed device uri: $managedDeviceUri" -ForegroundColor Green
+# Write-Host "managed device filter: $managedDeviceFilter" -ForegroundColor Green
+# $extraparameters = "select=userPrincipalName,userDisplayName,lastLogOnDateTime&orderby=userDisplayName"
+# Write-Host "extraparameters: $extraparameters" -ForegroundColor Green
+# $global:managedDevice = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -filter $managedDeviceFilter -extraparameters $extraparameters -verbose 
+
+$deviceManagementUri = "deviceManagement/managedDevices"
+$managedDeviceFilter = "serialNumber eq '$serialNumber'"
+$global:ap = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -APIVersion 'beta' -Filter $managedDeviceFilter).value
+# $extraparameters = "select=deviceName,manufacturer,model,serialNumber,userPrincipalName,userDisplayName&orderby=userDisplayName"
+# $filter = "userPrincipalName eq 'mahmoudz@gao.gov'"
+
+
+
+
+
+
+

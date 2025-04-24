@@ -74,6 +74,18 @@
                                                   "hash":  "CEAC61EEC59802ACA3B097645B66CFBC0C3D2A67809911C73D74D6DA68A2E097"
                                               },
                                               {
+                                                  "name":  "DisplayNumericMenu",
+                                                  "version":  {
+                                                                  "Major":  0,
+                                                                  "Minor":  0,
+                                                                  "Build":  0,
+                                                                  "Revision":  -1,
+                                                                  "MajorRevision":  -1,
+                                                                  "MinorRevision":  -1
+                                                              },
+                                                  "hash":  "48F64BFA48B0FAE780F2F6FE14C12BFD6AB0E417A1542CE5CA1E078A1BEDB460"
+                                              },
+                                              {
                                                   "name":  "DownloadScriptUpdates",
                                                   "version":  {
                                                                   "Major":  0,
@@ -252,12 +264,24 @@
                                                                   "MinorRevision":  -1
                                                               },
                                                   "hash":  "1F301E2DA0F6E88D04F9177855232983419A65EF0348E35AC158FF2475ADFE4F"
+                                              },
+                                              {
+                                                  "name":  "SendDeviceCommand",
+                                                  "version":  {
+                                                                  "Major":  0,
+                                                                  "Minor":  0,
+                                                                  "Build":  0,
+                                                                  "Revision":  -1,
+                                                                  "MajorRevision":  -1,
+                                                                  "MinorRevision":  -1
+                                                              },
+                                                  "hash":  "FC4B077F3F8DED9E75AC5ACF0B9E2EBE93D22E9CBC033C55534F74291F3A99EC"
                                               }
                                           ],
                             "configurations":  [
                                                    {
                                                        "name":  "exclusions",
-                                                       "hash":  "3F33A52F68788F23452DF1C097AB545BBC994757174FBFC6D7F7C5CEDC701811"
+                                                       "hash":  "6BBE3507802BC91DFD9946C4270B291EDC60680CD4B53439D712B76390176184"
                                                    },
                                                    {
                                                        "name":  "init",
@@ -365,7 +389,7 @@
                                                                 "MajorRevision":  -1,
                                                                 "MinorRevision":  -1
                                                             },
-                                                "hash":  "476CBED804C0A9950D988CB99B3F8386260D3FEC29D8DD05E167CBD7E4147D60"
+                                                "hash":  "B35EFE67960A5961E584258ADE244525EB547D641A3A2B13F0E4B63B181E49F4"
                                             }
                                         ]
                         }

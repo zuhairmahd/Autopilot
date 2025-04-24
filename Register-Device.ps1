@@ -87,16 +87,17 @@ param (
     [int]$timeInSeconds = 30,
     [string]$configFile = '.\.secrets\config.json',
     [string]$Configuration = 'vars.json',
-    [Parameter(Mandatory = $False)] [String] $GroupTag = 'MSB01',
-    [Parameter(Mandatory = $False)] [String] $AssignedUser = '',
-    [Parameter(Mandatory = $False)] [switch]$NoAdminCheck,
-    [Parameter(Mandatory = $False, ParameterSetName = 'intune')] [switch]$NoIntuneCheck,
-    [Parameter(Mandatory = $False, ParameterSetName = 'intune')] [switch]$check,
-    [Parameter(Mandatory = $False)] [switch]$NoSignatureVerify,
-    [Parameter(Mandatory = $False)] [switch]$NoHashVerify,
-    [Parameter(Mandatory = $False)] [switch]$GetDeviceHash,
-    [Parameter(Mandatory = $False)] [switch]$Reconfigure,
-    [Parameter(Mandatory = $False)] [switch]$ReInitialize,
+    [String] $GroupTag = 'MSB01',
+    [String] $AssignedUser = '',
+    [switch]$NoAdminCheck,
+    [Parameter(ParameterSetName = 'intune')] [switch]$NoIntuneCheck,
+    [Parameter(ParameterSetName = 'intune')] [switch]$check,
+    [Parameter(ParameterSetName = 'intune')] [string]$SerialNumber = '',
+    [switch]$NoSignatureVerify,
+    [switch]$NoHashVerify,
+    [switch]$GetDeviceHash,
+    [switch]$Reconfigure,
+    [switch]$ReInitialize,
     [Parameter(Mandatory = $False, ParameterSetName = 'NoUpdateCheckSet')] [switch]$NoUpdateCheck,
     [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')] [switch]$UpdateOnly,
     [Parameter(ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
@@ -362,7 +363,7 @@ if ($UpdateOnly)
     exit 0
 }
 
-if (-not($NoAdminCheck -or $UpdateOnly -or $Redeploy -or $Reconfigure))
+if (-not($NoAdminCheck -or $UpdateOnly -or $Reconfigure -or ($check -and $serialNumber -ne '')))
 {
     Write-Host 'Checking whether the script has sufficient permissions to run.'
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -382,24 +383,32 @@ else
 #endregion Perform checks
 
 #region Gather device information.
-$deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-$serialNumber = $deviceObject.serialNumber
-Write-Verbose "The serial number is $serialNumber."
-$hash = $deviceObject.hardwareHash
-Write-Verbose "The hardware hash is $hash"
-$make = $deviceObject.manufacturer
-Write-Verbose "The manufacturer is $make"
-$model = $deviceObject.model
-Write-Verbose "The model is $model"
-$parentDir = (Get-Item -Path $PWD).Parent.FullName
-Write-Verbose "The parent directory is $parentDir"
-$outputFile = "$parentDir\device_$serial.csv"
-Write-Verbose "The output file is $outputFile"
-Write-Host "Processing device with serial number $serialNumber, manufacturer $make, and model $model."
-if ($GetDeviceHash)
+if ($serialNumber -eq '' -and $check)
 {
-    GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-    exit 0
+    Write-Host 'Using the local device serial number.'
+    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    $serialNumber = $deviceObject.serialNumber
+    Write-Verbose "The serial number is $serialNumber."
+    $hash = $deviceObject.hardwareHash
+    Write-Verbose "The hardware hash is $hash"
+    $make = $deviceObject.manufacturer
+    Write-Verbose "The manufacturer is $make"
+    $model = $deviceObject.model
+    Write-Verbose "The model is $model"
+    $parentDir = (Get-Item -Path $PWD).Parent.FullName
+    Write-Verbose "The parent directory is $parentDir"
+    $outputFile = "$parentDir\device_$serial.csv"
+    Write-Verbose "The output file is $outputFile"
+    Write-Host "Processing device with serial number $serialNumber, manufacturer $make, and model $model."
+    if ($GetDeviceHash)
+    {
+        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
+        exit 0
+    }
+}
+else
+{
+    Write-Host "Using the provided serial number $serialNumber."
 }
 #endregion Gather device information.
 
@@ -435,9 +444,60 @@ if (-not $NoIntuneCheck)
                 'enrolled'
                 {
                     Write-Host 'The device appears to have been enrolled.' -ForegroundColor Red
-                    Write-Host "This may cause issues when the user loggs on for the first time." -ForegroundColor Red
-                    Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
-                    exit 1
+                    Write-Host "Looking up user information..."
+                    $deviceManagementUri = "deviceManagement/managedDevices"
+                    $managedDeviceFilter = "serialNumber eq '$serialNumber'"
+                    # $extraparameters = "select=userPrincipalName,userDisplayName,lastLogOnDateTime&orderby=userDisplayName"
+                    $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -Filter $managedDeviceFilter).value
+                    Write-Host "The device is registered to the user $($managedDevice.userDisplayName) with the email address $($managedDevice.userPrincipalName)." -ForegroundColor Red
+                    $LastLogonDate = ($managedDevice.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
+                    Write-Host "The last logon date was $LastLogonDate." -ForegroundColor Red
+                    Write-Host "The device needs to be cleaned before giving to another user.." -ForegroundColor Red
+                    $choices = @('Clean the device', 'Wipe the device')
+                    $choice = DisplayNumericMenu -Choices $choices 
+                    switch ($choice)
+                    {
+                        $choices[0]
+                        {
+                            Write-Host "Cleaning the device is a distructive action and cannot be undone" -ForegroundColor Red
+                            Write-Host "Are you sure you want to clean the device?" -ForegroundColor Red
+                            $subchoices = @('Yes', 'No')
+                            $subchoice = DisplayNumericMenu -Choices $subchoices
+                            switch ($subchoice)
+                            {
+                                'yes'
+                                {
+                                    Write-Host "Cleaning device..."
+                                    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
+                                }
+                                'no'
+                                {
+                                    Write-Host "Exitting... Come back when you are sure."
+                                }
+                            }
+                        }
+                        $choices[1]
+                        {
+                            Write-Host "Wiping device..."
+                            Write-Host "This will remove all data from the device." -ForegroundColor Red
+                            Write-Host "Are you sure you want to wipe the device?" -ForegroundColor Red
+                            Write-Host "This is a destructive action and cannot be undone." -ForegroundColor Red
+                            $subchoices = @('Yes', 'No')
+                            $subchoice = DisplayNumericMenu -Choices $subchoices
+                            switch ($subchoice)
+                            {
+                                'yes'
+                                {
+                                    Write-Host "Wiping device..."
+                                    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
+                                }
+                                'no'
+                                {
+                                    Write-Host "Exitting... Come back when you are sure."
+                                }
+                            }
+                        }
+                    }
                 }
                 'pendingReset'
                 {
@@ -463,7 +523,14 @@ if (-not $NoIntuneCheck)
                     exit 1
                 }
             }
-            if (-not (RestartDevice))
+            if ($deviceAssignment.enrollmentState -ne 'enrolled')
+            {
+                if (-not (RestartDevice))
+                {
+                    exit 0
+                }
+            }
+            else
             {
                 exit 0
             }
@@ -592,8 +659,8 @@ else
 # SIG # Begin signature block
 # MII94QYJKoZIhvcNAQcCoII90jCCPc4CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCCPWOaDMhF6CkKJ
-# +5zK+1gFwdWRMFESWkgIXw9hnY1mIaCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAe79o5xcVdAMUt
+# rzLpexVRwGiyLAZQsdSHTOBHGkfAdaCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -782,20 +849,20 @@ else
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMgITMwACmS1y3QvPn1BnGgAAAAKZLTAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCQstThLLWUjLQYkWjhuOGN/rhv
-# FMXQTIo/IHPiVQR5bDANBgkqhkiG9w0BAQEFAASCAYA5x7Hta8jbxL/v42lHE80z
-# w3wWQg/fW2iaesbLXC+vwaK30iQOhYhz3UkkquJx6s65APazhrBKZFSAeTZ2Dvab
-# jqWGhDoJbvyk58qkV3UYCkzSZFcYGY1exQ8v6ABgwCN/XZUdS64gdn/a3aknd63K
-# pdWvcGSD8znFcZNUoI19zbdx32K4XyVsqZ61cgx2+G5Xuzy8gha9vu9h+5m595Zk
-# ocpDFbogdY0B2ZT7dIDDyGE2yv0E7px0glmV8059UThvtn/7y2bfN0XKhXWQG0gN
-# w5JKIFppst75eLfoumZ4SqW5v+/mpjqENe77rtC9zhWMdlpFbAcVrp0r3sjQ/xtU
-# D67QL/D0aJd8tqkvo1SeHQ+/DTxfUOzoS+7gR49e5tZg+KRHwnzw/5oEBYfXIJYZ
-# VPO6tDtSXeEwj2WNhx4EhzuHotnru3hsZWTrxsqVPDlm1EyYIhHvLEibjqpCUoqt
-# KNmw4XHfHmKwo8LGfjdusOrCA6b9fjBqVNIa8BaNyfuhghgRMIIYDQYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCA7ab1ZBliVgtlUPDLZiLLZ3Dny
+# 2/EY5zGi8P84/A9nEjANBgkqhkiG9w0BAQEFAASCAYAt+Xxtw6WkqiK6qI4zIaqU
+# g3xHPK+6lmpMponGhIziMsjdr+UYBHHpujdoq0sa9heR7P9hwS+duTDcXMc6N1pG
+# Hzl77c6JtQ9/Ou8H2TeTxBGY/kNDPnbsx+j56oeMNHEczPppIeuineOYrhn+82kF
+# 4JrFHiAwW+6Hl/UaJomKkH0ItoX4kQqm/lmq4XGCztLCKNwaZqwF3GNDfqgtyV4v
+# q4uBWJZE2Lm2dTYqrnragekd8UtjHuKvgFipJL+kwTxZM/6sHQLF1OWieCSKuPPg
+# scwtkrT4p9rinKsT2n247esnOu60U2/ebq8SVXUwzcDVYfLWEnV0mIw1k5eRVPiR
+# QVX+DoVPYFwC8SgRY8aBw0upG6x6v2hLcoSgRZj0xF0S0dI6GKCu/r02165vFNyZ
+# ufvU4m7Ok/FWrvsXg0k0rl7CxkqjmX26WSa74Ru05nUZn/opVHl3heTCnRj5VrnV
+# NW/S6nqWeK3uF5sA5QBTyVOIkIRf+EVFMSTPDrxD6nahghgRMIIYDQYKKwYBBAGC
 # NwMDATGCF/0wghf5BgkqhkiG9w0BBwKgghfqMIIX5gIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgYnX8OdEBC3IJLnj1HjzvTAaa9ruHQdcVzGiQymXi
-# f54CBmfnx0Jp3xgTMjAyNTA0MjQwODAyNDIuNjYyWjAEgAIB9KCB4aSB3jCB2zEL
+# MTANBglghkgBZQMEAgEFAAQgVDYPfO9PEoLEdsSQ+ZNVt51uIantYNGv9ysdp3dE
+# QD0CBmfnx0LpNhgTMjAyNTA0MjQwOTU1MTAuOTMyWjAEgAIB9KCB4aSB3jCB2zEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
@@ -885,9 +952,9 @@ else
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAA
 # AABLMA0GCWCGSAFlAwQCAQUAoIIEnDARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
-# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTA0MjQwODAy
-# NDJaMC8GCSqGSIb3DQEJBDEiBCAg8TKPK11anPZ2+/2TcuhvAlfg4AiHWft88//E
-# p1ZyqTCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
+# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTA0MjQwOTU1
+# MTBaMC8GCSqGSIb3DQEJBDEiBCAfc+WHxJFRRr95M4/iHrT/um3cXL4e7kYLlfZ0
+# 1GgefTCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
 # CKowMSTh9DWm0OSNAeUABkSnMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
 # aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAAAABL
@@ -909,16 +976,16 @@ else
 # RCRGW85OHUQoBETXwe3oeZ0SYrKZ9Xv0GJnqmrvnSwbSpq/EfpOtCQYzN51Cufm/
 # IESlFoMqK5PO72UPW/k2mehvEsEqLWTorHshqYSTXJ2i+oef2L2YcNfBkFasIYUZ
 # C7VdX2p4Gp2wDG2CcPIlQIsFM2VpiNL1ukZH2a0zB4nm+GsnjW6XZgKkTC1RZGk/
-# xPswDQYJKoZIhvcNAQEBBQAEggIAWZElxbjIua2l1tpqw1QVA9ixGUxZsz31eu+J
-# Aj5XSMNlA+4KVaYzkWKzTGBghKsuIFUH5lPtfAJ+iI2BL1xszwuQNj0z8QEgyuRg
-# 2zkUKfXgzP4m9KpIDQ5zhHId0BJIsjd4d2akAGpWoTk035cTE/Hb69zHJPIIGL+o
-# nm5uakygQl1PbYQdcdZI0tuKH+fFidPsnhidEiYVjUFmo+u52Zq1pBCmxX2iZHSM
-# NMX9OF047GZhGj6YdNpuTlc6w8Tc5JUEWhs9yK+5vmKPd3C8ZNidtwpQoN2wBNEv
-# eVBPbs2z7mrzO0AggR0ElzcY2SBM7xV3ZMiGVO1iVWh+AnSXkrmPPx/RGu3kRqgI
-# okV7kMEvWbbrI3udDkHFlvR8Wm3DJEr07iq5ehJ5YU/0kUBrWqkoxzuYo4AFO1eI
-# pV8tlPUhCLemNy4gbbMkQIFdfc+d8IY8U94lw8+sIcsoW/3OPTZt0YJnN7bTNQTj
-# C7YnZ42y/7d5vuPLnP0okWwz1iYw7IjoLijHy9u2NFt6w1C5EY2GRa7gc1j/fwU1
-# UmCty+82T1Jg67b5IGSjbobbIyXWtbXj8sPUZhD7prIwJeGJJcXKE3cA2GNaoB0a
-# v/hBFuBUi1RIjE6vAaRk+okC64T4TIoHMXTy9kuESXPbsDNnnasY0iLKyMCSBb87
-# Q3IWrpI=
+# xPswDQYJKoZIhvcNAQEBBQAEggIAi6mN/33KGOcBT3e0YHnb/mILluyV0FSXT6E9
+# 0ZGnUQqvqdI1B8tZFawrdvxutdFvJaaKLhucyMdg+IFf/i2PStTiLgeNkmACiAG/
+# GQYDdENG5Tlahk6XYF4RLWJNipCMap8jNHhIf+LuJppWIdSFHw5rLwUmAHNJwIpV
+# cwWdsra/bHbXGBSygW1aihaiAuJqNgO+6UwhzS4C5FU/zdRbKod6idaPi5oRSZj4
+# UfXgDxeo9v2Hs/sksX/pYxK3r4mtEwuulPKgsc3VYw06zlyFyf69OrOQ/PNdCXaR
+# 6NUZkBeR+JdrU1a3eIIZRpjeF3niNWgRZikNtriraGYBkYP2eZ3aKB55rWnTvV/l
+# 2UHtRnI7/sXPFAH8GaTylMwS1kM5eRW7QRvJnbMTayMmGu1Pu5iSuzkjtUOxtKcH
+# SNFLzn9T3OHBURaKmvH7gyOSI0b0rnqUyzOmmrME8BzNAN7MDOHJZs+T5M/nPfpl
+# v6cutCy07ggiUY0FpGE36rtLySq+13WwxgxKvKwg4D8AiC+reYLpf7DBL9vt/YR6
+# Ad/qAt3CIPA4g73t546y3nHQ0WxjWN8+sZ3dUuDuVybrnxWAuWwdv/CrCqJALvGE
+# 4Q1UFlLjElQFeA+ytGX4+xMHH79hvIUqBColbuL7bLPpTmP6eafxIjmy+EjSZham
+# ks/3Slk=
 # SIG # End signature block
