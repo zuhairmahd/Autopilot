@@ -27,6 +27,7 @@
             "ListAllDevices",
             "main",
             "manifest",
+            "ManifestEditor",
             "ShowDeviceReport",
             "ShowMenu",
             "test",
