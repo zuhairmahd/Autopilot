@@ -53,13 +53,29 @@ function CheckForScriptUpdates
     $response = Invoke-RestMethod -Uri $RemoteManifestPath -Method Get -UseBasicParsing
     if ($response.gettype().name -eq 'string') 
     {
+        Write-Verbose "Response is a string. Attempting to parse as JSON."
         $response = $response.Substring(1, $response.Length - 2)
+        Write-Verbose "Removed first and last characters from response..."
         # Unescape any escaped quotes
         $response = $response -replace '\\\"', '"'
+        Write-Verbose "Removed double quotes..."
         # Unescape any escaped newlines
         $response = $response -replace '\\r\\n', "`r`n"
+        Write-Verbose "Removed single quotes..."
     }
+    Write-Verbose "Attempting to convert response to JSON."
     $remoteManifestContent = ($response | ConvertFrom-Json).$Application
+    #Check if the conversion worked.
+    if ($response.gettype().name -ne 'string') 
+    {
+        Write-Verbose "Looks like it may have worked."
+        Write-Verbose "Attempting to continue..."
+    }
+    else
+    {
+        Write-Verbose "Failed to convert response to JSON.
+        write-verbose " "This will likely result in an error."
+    }
     Write-Verbose "Read $($LocalManifestContent.functions.count) functions, $($LocalManifestContent.scripts.count) scripts, $($LocalManifestContent.cmds.count) cmds and $($LocalManifestContent.configurations.count) configurations from the local manifest."
     Write-Verbose "Read $($remoteManifestContent.functions.count) functions, $($remoteManifestContent.scripts.count) scripts, $($remoteManifestContent.cmds.count) cmds and $($remoteManifestContent.configurations.count) configurations from the remote manifest."
 
