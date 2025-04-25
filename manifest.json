@@ -1,19 +1,5 @@
 {
   "register-device": {
-    "configurations": [
-      {
-        "name": "exclusions",
-        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
-      },
-      {
-        "name": "init",
-        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
-      },
-      {
-        "name": "remoteManifest",
-        "hash": "356234CB0760D63F0ABCBA653FAC071B6FF3959AC87614C8B864250D59DBE281"
-      }
-    ],
     "Cmds": [
       {
         "name": "check",
@@ -88,6 +74,20 @@
         "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
       }
     ],
+    "configurations": [
+      {
+        "name": "exclusions",
+        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
+      },
+      {
+        "name": "init",
+        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
+      },
+      {
+        "name": "remoteManifest",
+        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
+      }
+    ],
     "Functions": [
       {
         "name": "CallGraphAPI",
@@ -123,7 +123,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "07D9E2682314AFE76B039CEE0A7097F374D455AC1726D31E4E75A5C5BFF58E0B"
+        "hash": "316D44151F3E75625A5E15FA78C923E27FA32A7FF1092C1671C293895376DFE6"
       },
       {
         "name": "CreateConfiguration",
@@ -377,7 +377,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "6ACE9F5A12A8FAFD0003279B66C66C2E08E003AF046E51980BACB471B70E4B14"
+        "hash": "21DABEF8D8ECA966EA51F69DD483FA47CC641CA9734C5C81B8505C64B81A3B67"
       }
     ]
   }

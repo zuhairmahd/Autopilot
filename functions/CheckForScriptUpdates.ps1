@@ -21,6 +21,8 @@ Author: Zuhair Mahmoud
 GUID: 4b825dc2-8a00-3a93-830e-4b00e8b8d8a1
 Date: April 5, 2025
 #>
+
+
 function CheckForScriptUpdates
 {
     [CmdletBinding()]
@@ -36,7 +38,6 @@ function CheckForScriptUpdates
     Write-Verbose "RemoteManifestPath: $RemoteManifestPath"
     Write-Verbose "LocalManifestContent: $($LocalManifestContent | ConvertTo-Json -Depth 10)"
     Write-Verbose "Local manifest functions: $($LocalManifestContent.functions.count)."
-    # If LocalManifestContent is an object for a single application, ensure we reference its properties directly
     Write-Verbose "Local manifest scripts: $($LocalManifestContent.scripts.Count)"
     Write-Verbose "Local manifest cmds: $($LocalManifestContent.cmds.count)."
     Write-Verbose "Local manifest configurations: $($LocalManifestContent.configurations.count)."
@@ -50,35 +51,43 @@ function CheckForScriptUpdates
     }   
     
     Write-Verbose "Retrieving remote manifest from $RemoteManifestPath"
-    $response = Invoke-RestMethod -Uri $RemoteManifestPath -Method Get -UseBasicParsing
-    if ($response.gettype().name -eq 'string') 
+    if ($psVersionTable.PSVersion.Major -eq 5 -and $psVersionTable.PSVersion.Minor -eq 1)
     {
-        Write-Verbose "Response is a string. Attempting to parse as JSON."
-        $response = $response.Substring(1, $response.Length - 2)
-        Write-Verbose "Removed first and last characters from response..."
-        # Unescape any escaped quotes
-        $response = $response -replace '\\\"', '"'
-        Write-Verbose "Removed double quotes..."
-        # Unescape any escaped newlines
-        $response = $response -replace '\\r\\n', "`r`n"
-        Write-Verbose "Removed single quotes..."
+        Write-Verbose "PS Version is 5.1."
+        $response = Invoke-RestMethod -Uri $RemoteManifestPath -Method Get -UseBasicParsing
+        if ($response.gettype().name -eq 'string') 
+        {
+            Write-Verbose "Response is a string. Attempting to parse as JSON."
+            $response = $response.Substring(1, $response.Length - 2)
+            Write-Verbose "Removed first and last characters from response..."
+            # Unescape any escaped quotes
+            $response = $response -replace '\\\"', '"'
+            Write-Verbose "Removed double quotes..."
+            # Unescape any escaped newlines
+            $response = $response -replace '\\r\\n', "`r`n"
+            Write-Verbose "Removed single quotes..."
+        }
+        Write-Verbose "Attempting to convert response to JSON."
+        $remoteManifestContent = ($response | ConvertFrom-Json).$Application
+        #Check if the conversion worked.
+        if ($response.gettype().name -ne 'string') 
+        {
+            Write-Verbose "Looks like it may have worked."
+            Write-Verbose "Attempting to continue..."
+        }
+        else
+        {
+            Write-Verbose "Failed to convert response to JSON."
+            Write-Verbose "This will likely result in an error."
+        }
     }
-    Write-Verbose "Attempting to convert response to JSON."
-    $remoteManifestContent = ($response | ConvertFrom-Json).$Application
-    #Check if the conversion worked.
-    if ($response.gettype().name -ne 'string') 
+    else 
     {
-        Write-Verbose "Looks like it may have worked."
-        Write-Verbose "Attempting to continue..."
-    }
-    else
-    {
-        Write-Verbose "Failed to convert response to JSON."
-        Write-Verbose "This will likely result in an error."
+        Write-Verbose "The running version of Powershell is $($psVersionTable.PSVersion.Major).$($psVersionTable.PSVersion.Minor)."
+        $response = Invoke-RestMethod -Uri $RemoteManifestPath -Method Get 
     }
     Write-Verbose "Read $($LocalManifestContent.functions.count) functions, $($LocalManifestContent.scripts.count) scripts, $($LocalManifestContent.cmds.count) cmds and $($LocalManifestContent.configurations.count) configurations from the local manifest."
     Write-Verbose "Read $($remoteManifestContent.functions.count) functions, $($remoteManifestContent.scripts.count) scripts, $($remoteManifestContent.cmds.count) cmds and $($remoteManifestContent.configurations.count) configurations from the remote manifest."
-
     foreach ($type in $remoteManifestContent.PSObject.Properties)
     {
         Write-Verbose "Processing $($type.Value.count) $($type.Name)"
@@ -153,8 +162,8 @@ function CheckForScriptUpdates
 # SIG # Begin signature block
 # MII94QYJKoZIhvcNAQcCoII90jCCPc4CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCClH/EwST7oYCAD
-# gvKdmLFAhmzuOu5dqfSagC89lm8cjKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAG+1EUhwwUh+4O
+# 9GfxiwUxWwYIIT/zsdeEbMVYjCgiKKCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -343,20 +352,20 @@ function CheckForScriptUpdates
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMgITMwACmS1y3QvPn1BnGgAAAAKZLTAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCR9fvOfXkC2xZV4rTJxdjLZRQX
-# 5SrVXIpltun+7f9WFjANBgkqhkiG9w0BAQEFAASCAYAGxKgT0X8AXLuhKmnYjPZ/
-# hy0pWQZeeK4iVoRO1YJMB1jaNpvFj7ivQw5odPgAHWQf0xihkr2eJtZC0AunuBTH
-# ViiEGLf6W1XDZzd4wSziZQhHFg8ZnV1QIwXKB5i45a/T5WWhu2CH1ANHYwq5XDxP
-# NMu8kQM9Yo5KnrVxtZ7MvAndWG5CWQZwVpRhJVGWC4GZVMAoyUy9iicxnGc6v+kY
-# OophRrf8J7hqocfOHFaUnOmfYwYGzfaqqpyD4jNkD+4Gf8QKZY5uBfEp0lscxIAE
-# 3mDsU+A15lFtW0luB76YpyI3vyaEBJgfK3ZryJE1yhq5RcldNQfPjjOqEZxqGSNq
-# V1Y2DeI6GSaRDmMMeuJ+KOEBvXj7PE0I4ID1DiuRNpSrswIxr3VYYCsnuaOwttO2
-# llhI9X9jVGM62Oy70Mb6p7jdyaRb3TBtdkdMSHOxb4AC3oAvHkawxGAfln0Mc+5X
-# 4hqKD6bWY47niFtdp0lDnjdgoiIh1YKq09oKRpu2Yl+hghgRMIIYDQYKKwYBBAGC
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCVPmcbLgjaErZlS0ZYHPf4cbKV
+# GYIkONwN6+qzCzd+ZzANBgkqhkiG9w0BAQEFAASCAYC4Mid2C/ejg+JlEmzKqP7q
+# Hx4qHvkTHPnxvxCB/yCxo9Lydgyst+TWzsB0Cl7AuHXy8oX9XX5VFuYe6a0n70Jo
+# /dGVW+kfiaXJncXmsp5QKrq9Lx1sSBP9gjj5XSHMJVmesIuM0NNwphItE6hanpP2
+# ulez3WcJEv1Ub77+ia/fLNdvrMYBenVKrq5DszZqXgSuWcjV/or0gijAYXy4cfH4
+# DS2Z31IN5/K+pgH5onjOs4uxqLom2Y9QGQHyiW5Dpn/NjPgekZPLdtJTXtswB9Pa
+# AdYDDDaUr9LoeHIszRvJ65D3SkUSqpOXWyDcChdlJjuoU9SBeRbyDeO71TdLJHYT
+# FkmvIx8hOohDQTLvN1Nyr6zYjAPxuVMX2JRlopfkBbrTBcrfuWc0rDHBPIYi2AE7
+# YiEZ58k7Lv0ND/jkTkuFYQZOBaF07w+ttJzuAAZXlvHTCq/riQx/NW+ko8bC2Rvc
+# KgeykrhBngn+nadjXYtmM81EuxF3qkrXH4xtXszappahghgRMIIYDQYKKwYBBAGC
 # NwMDATGCF/0wghf5BgkqhkiG9w0BBwKgghfqMIIX5gIBAzEPMA0GCWCGSAFlAwQC
 # AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgxQNhnyxaqRPXxJe9HjugXi42LUBb5mj7lOdSn/Qg
-# gpACBmfnx0JXNBgTMjAyNTA0MjQwNzQ2MjMuMjQzWjAEgAIB9KCB4aSB3jCB2zEL
+# MTANBglghkgBZQMEAgEFAAQgwkobet5UCQX3K+KHPTSBnWmoKhIixGrDOlUaBt+2
+# DWECBmfnx0bUfBgTMjAyNTA0MjUwMjE1NTcuOTc5WjAEgAIB9KCB4aSB3jCB2zEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
 # cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
@@ -446,9 +455,9 @@ function CheckForScriptUpdates
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAA
 # AABLMA0GCWCGSAFlAwQCAQUAoIIEnDARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
-# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTA0MjQwNzQ2
-# MjNaMC8GCSqGSIb3DQEJBDEiBCCL5TLc63COj5O4PfNbRbVc0ns6PervTyeLeiEK
-# dlXd3jCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
+# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTA0MjUwMjE1
+# NTdaMC8GCSqGSIb3DQEJBDEiBCCB1C6kfDu7qSBM2ey5fCgZCl3e4AidHyX4CuoE
+# xwa1hjCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEINuJKJ0rsvRcScm4woZm
 # CKowMSTh9DWm0OSNAeUABkSnMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
 # aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAS6GxreFZ/Oc0AAAAAABL
@@ -461,25 +470,25 @@ function CheckForScriptUpdates
 # APV6ws6b5FNHUOmEILADVgzql5kzoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
 # VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
 # dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBCwUAAgUA
-# 67PjiDAiGA8yMDI1MDQyMzIyMDkxMloYDzIwMjUwNDI0MjIwOTEyWjB0MDoGCisG
-# AQQBhFkKBAExLDAqMAoCBQDrs+OIAgEAMAcCAQACAhMDMAcCAQACAhJHMAoCBQDr
-# tTUIAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEAAgMH
-# oSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAJ0zYp4+0DpREjsN9nLz
-# Mtl8uVlL2lnjpeW/MQiP/+Q/gaFaIpJvEs/HtxXTh6yJBNiya4cKgjjrmkZ/MBVB
-# c8p4NI43Or++E70H83KKqbNrzzdCwKmJeQcTf66irjdE+55H5wtHYVstAw7j/tST
-# RCRGW85OHUQoBETXwe3oeZ0SYrKZ9Xv0GJnqmrvnSwbSpq/EfpOtCQYzN51Cufm/
-# IESlFoMqK5PO72UPW/k2mehvEsEqLWTorHshqYSTXJ2i+oef2L2YcNfBkFasIYUZ
-# C7VdX2p4Gp2wDG2CcPIlQIsFM2VpiNL1ukZH2a0zB4nm+GsnjW6XZgKkTC1RZGk/
-# xPswDQYJKoZIhvcNAQEBBQAEggIAAsoxXdLVJ/U87iOxkcRzAyF1zrGehbN6wM55
-# gCRLQYAlZt1gAYpWISjIN/AtSS8kCLohUlY2bVW7g15dJD/SkfF4yCXfZ4wgMuaK
-# Ah4umTX8lOSscj7zfQN/u4njM51+Hb3TeJcnwaSrJm/i0eILfSLzWLVvehjtUN3T
-# RMlCgJcxCrdHas+Af9QPQLnUPuAwRlgoSUUPRUKBfYuT1as7o7l3UPlvV01370GA
-# 62TkUxEflYpD8hjCpOnFUYrNP8jcvcGEwNPh1Zd7H6ebRr/zxxUw7y2YNhIaEer1
-# f5lcQU0ou2xJrKCoXbN4BYg4L6c8dHSwZ93lrw8car10U3gpCD1Y58Fs7MQrQ5cE
-# 36Qu0pLPow9S7rgu19lWhkNwuMRl0oM6iYuh4DvGysBK9Jue20Egw0HJdzp/8MPG
-# G+LiE98LqQNpj7r9wgC4YKb99hyRpn1Kw9jwhjTt2raI3AVfKhT0ZwAToPzZ8j+1
-# GGHPyvL4miFiw/qwqmkYwEA6QixxMrIvGPNsw9pMyJJDwQK76YnSsK1dnVbzWTnn
-# dAL/CsmrgEZuHujrB+Z5I1DGaLAWeOgRTqFqrXbnJ6aiH/p//mHZiy8WdhLvMRpc
-# 0WY3wvaomvsHZ8XthQvzj+UyAVRMiWJgeMYYdli6pfr2d31EZqghPjmqLintpJxB
-# 4LaCt8E=
+# 67U1CDAiGA8yMDI1MDQyNDIyMDkxMloYDzIwMjUwNDI1MjIwOTEyWjB0MDoGCisG
+# AQQBhFkKBAExLDAqMAoCBQDrtTUIAgEAMAcCAQACAiMJMAcCAQACAhMNMAoCBQDr
+# toaIAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEAAgMH
+# oSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAFwSikYr5AiZKpuCSbDv
+# RpDrWiYyxLGBW1LKPS2RH5X/rIgXMzP5x46SvQvLcfkBI23JlpCPBLbIm0Uc6dm0
+# F7lNdmoH7F4ypOjnOgZ1TRCz7gPcQ6goHWBszmhpsJWnk3IY/mr+rxsMuhSCBtfY
+# t8NfyRMSYxZdOuG6OQjgUZ04m2euF1BodHkE8iW2fm/ebpWitfXCgrr+DQvICYjR
+# LVG6RecYYy5rVgOvCw0jvNTb/xBAt3kXz0uY09wDSK0tdbzuYaOmp/f861qu+WlF
+# qhOz1L77tSttyqqrGJwkE8CKtnar6n8Ab/+1znsyXdz+od7po3lEIjysv8H3kyHb
+# 2xIwDQYJKoZIhvcNAQEBBQAEggIACRJNjUsLuc0EgmKmoDQTq5LLt/+o2WLddhk/
+# 7gieQ6N83lkwowNMa7XgwXykT1uHFmF8VsqQcBoZIjcQWiqPx7Gvh2yD1zb9YqSH
+# v+7HTjpjt/KgUFMVstadCb1c+Eq0VyK6qwopHWullLrDE6XhBvaPTh7Z696u41UG
+# ezJ3bHM/LP87Ri83tkbsOKm4KDt9vYGo97MsM/7PGZE5pUH6FUwW82Ch0XRoWaop
+# CFlt162GUp3O2x8Xxj5eFBDwSZXLtIAW0fFOqZ9VTAc2kbKa0Nms13fcGx0tauab
+# +RPYtmHGy98/+VOsrXILTCqiy60jIwsKNqLZDuPKoSnEP7lxD5FTzp1s25eYvdaC
+# DgQokP8ScSJF2FTPXdbs6zhzvOneWGQrn6KQC4rfv+wyDLqh0pVf/oYTaDN5dzFC
+# qnxUMCCISsQJ0BLuDSuzNUJ3HN/9ReaMqy8hagOg1UA6M0uPZUFFQP41wgVmN2O8
+# eET1fdO09wLog8mLYo2vi6zBRQiozv3oqlurUUqN1k/GkbQYBKGkVrFqwBazb1qy
+# vB0+aOG3WHflMMqhF0Updz5ElKGRylmm2PYSLa9TP/UVmk54Pjyuzpedgshy4S56
+# dSudjQ3FTNK6nFwnRDvxISe1NSbAW7JxugEtTzYM3KO63WKUJgahMuLpaluIGbs4
+# J28rKi0=
 # SIG # End signature block

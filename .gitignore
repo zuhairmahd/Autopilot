@@ -8,12 +8,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-.secrets
-.secrets/*
-.vscode
-.vscode/*
-release
-release/*
+.secrets/
+.vscode/
+release/
 
 # PowerShell-specific files
 
@@ -40,5 +37,4 @@ release/*
 
 # Local PowerShell modules
 Modules/
-pwsh/*
-pwsh
+pwsh/
