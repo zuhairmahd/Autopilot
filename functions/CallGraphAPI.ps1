@@ -264,6 +264,11 @@ function CallGraphAPI()
     {
         $restParams['Body'] = $body
     }
+    #Add statuscodevariable if we are running under powershell  7.0 or higher
+    if ($PSVersionTable.PSVersion.Major -ge 7)
+    {
+        $restParams['StatusCodeVariable'] = 'statusCode'
+    }
     #endregion
     Write-Verbose "Making the following call to Microsoft Graph:" 
     Write-Verbose "URI: $encodedUri." 
@@ -356,14 +361,16 @@ function CallGraphAPI()
         Write-Verbose 'The full error message follows below:'
         Write-Verbose '----------------------------------------------------------'
         Write-Verbose "$_"
-        if ($_.Exception.Response)
+        if ($_.Exception.Response -and $psversionTable.PSVersion.Major -ge 7)
         {
-            $errorResponse = $_.Exception.Response.GetResponseStream()
-            $streamReader = New-Object System.IO.StreamReader($errorResponse)
-            $errorMessage = $streamReader.ReadToEnd()
-            $streamReader.Close()
-            Write-Verbose "Server Response: $errorMessage"
-        }   
+            {
+                $errorResponse = $_.Exception.Response.GetResponseStream()
+                $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                $errorMessage = $streamReader.ReadToEnd()
+                $streamReader.Close()
+                Write-Verbose "Server Response: $errorMessage"
+            }   
+        }
         return $statusCode
     }
     Write-Verbose "Response: $($response)"

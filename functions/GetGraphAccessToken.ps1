@@ -6,6 +6,10 @@ function GetGraphAccessToken()
         [string]$configFile,
         [int]$renewalLeadTime = 5,
         [switch]$SecureString,
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$Deligated,
+        [parameter(parameterSetName = 'Deligated')]
+        [string]$Scopes,
         [switch]$ForceNewToken,
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
@@ -45,6 +49,8 @@ function GetGraphAccessToken()
     Write-Verbose "Force New Token: $ForceNewToken"
     Write-Verbose "Cache Type: $CacheType"
     Write-Verbose "Domain: $domain"
+    Write-Verbose "Deligated: $Deligated"
+    Write-Verbose "Scopes: $Scopes"
     #endregion
     
     $cacheFolder = Split-Path $configFile
@@ -82,7 +88,75 @@ function GetGraphAccessToken()
                         }
                         else
                         {
-                            Write-Host "Access token in memory is expired or invalid. Requesting a new one."
+                            Write-Host "Access token in memory is expired or invalid."
+                            # Check if we have a refresh token to use
+                            if ($accessTokenObject.refresh_token -and $Deligated)
+                            {
+                                Write-Host "Using refresh token to get a new access token..."
+                                try
+                                {
+                                    $refreshTokenRequestBody = @{
+                                        client_id     = $clientId
+                                        client_secret = $clientSecret
+                                        refresh_token = $accessTokenObject.refresh_token
+                                        grant_type    = 'refresh_token'
+                                        scope         = $Scopes
+                                    }
+                                    $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+                                    $tokenResponse = Invoke-RestMethod -Method Post -Uri $refreshTokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $refreshTokenRequestBody
+                                    Write-Host "Successfully refreshed access token."
+                                    $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+                                    Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
+                                    
+                                    $cachedToken = [PSCustomObject] @{
+                                        'domain'           = $domain
+                                        access_token       = $tokenResponse.access_token
+                                        refresh_token      = $tokenResponse.refresh_token
+                                        AbsoluteExpiryTime = $tokenExpiryTime
+                                        'expires_in'       = $tokenResponse.expires_in
+                                        scope              = $tokenResponse.scope
+                                    }
+                                    
+                                    # Cache the token based on user preference
+                                    if ($CacheType -eq 'memory')
+                                    {
+                                        Write-Verbose "Saving refreshed access token to memory cache."
+                                        $Global:MemoryCache['accessToken'] = $cachedToken
+                                    }
+                                    else
+                                    {
+                                        Write-Verbose "Saving refreshed access token to cache file: $cacheTokenFile"
+                                        if (-not (Test-Path -Path $cacheFolder))
+                                        {
+                                            Write-Verbose "Creating cache folder: $cacheFolder"
+                                            New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
+                                        }
+                                        $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+                                        Write-Verbose "Refreshed access token saved to $cacheTokenFile"
+                                    }
+                                    if ($SecureString)
+                                    {
+                                        Write-Verbose "Converting access token to secure string"
+                                        $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
+                                        Write-Verbose "Returning secure token"
+                                        return $secureAccessToken
+                                    }
+                                    else
+                                    {
+                                        Write-Verbose "Returning plain text access token"
+                                        return $tokenResponse.access_token
+                                    }
+                                }
+                                catch
+                                {
+                                    Write-Host "Failed to use refresh token: $_. Will request new authorization."
+                                    Write-Host "Refresh token might be expired or revoked, proceeding with new authorization."
+                                }
+                            }
+                            else
+                            {
+                                Write-Host "Requesting a new token."
+                            }
                         }
                     }
                     else
@@ -112,6 +186,11 @@ function GetGraphAccessToken()
                         $accessToken = $accessTokenObject.access_token
                         Write-Verbose "Access Token Expirey Time in UTC: $($accessTokenObject.AbsoluteExpiryTime)"
                         $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
+                        if ($absoluteExpiryTime -lt $accessTokenObject.AbsoluteExpiryTime)
+                        {
+                            Write-Verbose "Resolving time differences between UTC and local time."
+                            $absoluteExpiryTime = $accessTokenObject.AbsoluteExpiryTime
+                        }
                         Write-Verbose "Absolute Expiry Time: $absoluteExpiryTime"
                         $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
                         Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires."
@@ -123,7 +202,65 @@ function GetGraphAccessToken()
                         }
                         else
                         {
-                            Write-Host "Access token is expired or invalid. Requesting a new one for $domain."
+                            Write-Host "Access token is expired or invalid."
+                            # Check if we have a refresh token to use
+                            if ($accessTokenObject.refresh_token -and $Deligated)
+                            {
+                                Write-Host "Using refresh token to get a new access token..."
+                                try
+                                {
+                                    $refreshTokenRequestBody = @{
+                                        client_id     = $clientId
+                                        client_secret = $clientSecret
+                                        refresh_token = $accessTokenObject.refresh_token
+                                        grant_type    = 'refresh_token'
+                                        scope         = $Scopes
+                                    }
+                                    $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+                                    $tokenResponse = Invoke-RestMethod -Method Post -Uri $refreshTokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $refreshTokenRequestBody
+                                    Write-Host "Successfully refreshed access token."
+                                    $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+                                    Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
+                                    $cachedToken = [PSCustomObject] @{
+                                        'domain'           = $domain
+                                        access_token       = $tokenResponse.access_token
+                                        refresh_token      = $tokenResponse.refresh_token
+                                        AbsoluteExpiryTime = $tokenExpiryTime
+                                        'expires_in'       = $tokenResponse.expires_in
+                                        scope              = $tokenResponse.scope
+                                    }
+                                    # Save refreshed token to file
+                                    Write-Verbose "Saving refreshed access token to cache file: $cacheTokenFile"
+                                    if (-not (Test-Path -Path $cacheFolder))
+                                    {
+                                        Write-Verbose "Creating cache folder: $cacheFolder"
+                                        New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
+                                    }
+                                    $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+                                    Write-Verbose "Refreshed access token saved to $cacheTokenFile"
+                                    if ($SecureString)
+                                    {
+                                        Write-Verbose "Converting access token to secure string"
+                                        $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
+                                        Write-Verbose "Returning secure token"
+                                        return $secureAccessToken
+                                    }
+                                    else
+                                    {
+                                        Write-Verbose "Returning plain text access token"
+                                        return $tokenResponse.access_token
+                                    }
+                                }
+                                catch
+                                {
+                                    Write-Host "Failed to use refresh token: $_. Will request new authorization."
+                                    Write-Host "Refresh token might be expired or revoked, proceeding with new authorization."
+                                }
+                            }
+                            else
+                            {
+                                Write-Host "Requesting a new token for $domain."
+                            }
                         }
                     }
                     else
@@ -134,14 +271,14 @@ function GetGraphAccessToken()
                 }
                 catch
                 {
-                    Write-Error "Failed to read cache file: $_"
-                    Write-Verbose "Cache file may be corrupted or invalid. Requesting a new token."
+                    Write-Host "Failed to read cache file: $_"
+                    Write-Host "Cache file may be corrupted or invalid. Requesting a new token."
                     $cachedToken = $null
                 }
             }
             else
             {
-                Write-Verbose "No cache file found."
+                Write-Host "No cache file found."
             }
         }
         else
@@ -152,7 +289,7 @@ function GetGraphAccessToken()
     }
     else
     {
-        Write-Verbose "Force new token requested. Ignoring cache."
+        Write-Host "Force new token requested. Ignoring cache."
         $accessToken = $null
         $tokenExpiryTime = $null
         $cachedToken = $null
@@ -162,81 +299,193 @@ function GetGraphAccessToken()
     
     if ($tenantId -and $clientId -and $clientSecret)
     {
-        Write-Verbose "Requesting new access token"
-        $body = @{
-            client_id     = $clientId
-            scope         = 'https://graph.microsoft.com/.default'
-            client_secret = $clientSecret
-            grant_type    = 'client_credentials'
-        }   
-        try
+        if ($deligated)
         {
-            $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -ContentType 'application/x-www-form-urlencoded' -Body $body
-            Write-Verbose "Access token received"
-            Write-Verbose "Calculating absolute expiry time"
-            Write-Verbose "Converting from $($tokenResponse.expires_in)"
-            $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
-            Write-Verbose "Converted to $($tokenExpiryTime)"
-            Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
-            Write-Verbose "Creating hashtable for cached token"
-            $cachedToken = [psCustomObject] @{
-                'domain'           = $domain
-                access_token       = $tokenResponse.access_token
-                AbsoluteExpiryTime = $tokenExpiryTime
-                'expires_in'       = $tokenResponse.expires_in
-            }
-            Write-Verbose "Access token hashtable created"
-            if ($CacheType -eq 'memory')
+            #Generate a random state string and assign it to a variable.
+            Write-Verbose "Generating random state string."
+            $state = [System.Guid]::NewGuid().ToString()
+            Write-Verbose "State string: $state"
+            $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+            Write-Verbose "Using deligated access..." 
+            
+            # Ensure scopes include openid and offline_access
+            if (-not $scopes.Contains("openid"))
             {
-                Write-Verbose "Saving access token to memory cache."
-                $Global:MemoryCache['accessToken'] = $cachedToken
+                $scopes = "openid $scopes"
+                Write-Verbose "Added openid to scopes"
             }
-            else
+            
+            Write-Verbose "Requesting the following scopes: $scopes"
+            Write-Verbose "Encoding scopes..."
+            $encodedScopes = [uri]::EscapeDataString($scopes)
+            Write-Verbose "Encoded scopes: $encodedScopes"
+            
+            #also encode the redirectUri using escapestring.
+            Write-Verbose "Encoding redirect URI..."
+            $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
+            Write-Verbose "Encoded redirect URI: $encodedRedirectUri"
+            
+            # Step 1: Open the authorization URL in the user's default browser to prompt for login and consent.
+            $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=openid%20offline_access%20$($encodedScopes)&state=$state"
+            Write-Host "Opening browser for user authentication and consent..."
+            Start-Process $authUrl
+            Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
+            $code = Read-Host "Enter the authorization code"
+            
+            # Step 2: Exchange the authorization code for an access token
+            Write-Verbose "Exchanging authorization code for access token"
+            $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+            $tokenRequestBody = @{
+                client_id     = $clientId
+                client_secret = $clientSecret
+                code          = $code
+                redirect_uri  = $redirectUri
+                grant_type    = "authorization_code"
+                scope         = "openid offline_access $scopes"
+            }
+            try
             {
-                Write-Verbose "Saving access token to cache file: $cacheTokenFile"
-                Write-Verbose "Creating cache folder if it does not exist"
-                if (-not (Test-Path -Path $cacheFolder))
-                {
-                    Write-Verbose "Creating cache folder: $cacheFolder"
-                    New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
+                Write-Verbose "Sending token request to $tokenEndpoint"
+                $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody
+                
+                Write-Verbose "Access token received"
+                Write-Verbose "Calculating absolute expiry time"
+                $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+                Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
+                
+                $cachedToken = [PSCustomObject] @{
+                    'domain'           = $domain
+                    access_token       = $tokenResponse.access_token
+                    refresh_token      = $tokenResponse.refresh_token
+                    AbsoluteExpiryTime = $tokenExpiryTime
+                    'expires_in'       = $tokenResponse.expires_in
+                    scope              = $tokenResponse.scope
                 }
-                else 
+                
+                # Cache the token based on user preference
+                if ($CacheType -eq 'memory')
                 {
-                    Write-Verbose "Cache folder already exists: $cacheFolder"
+                    Write-Verbose "Saving access token to memory cache."
+                    $Global:MemoryCache['accessToken'] = $cachedToken
                 }
-                Write-Verbose "Saving access token to disk cache."
-                $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
-                Write-Verbose "Access token saved to $cacheTokenFile"
+                else
+                {
+                    Write-Verbose "Saving access token to cache file: $cacheTokenFile"
+                    if (-not (Test-Path -Path $cacheFolder))
+                    {
+                        Write-Verbose "Creating cache folder: $cacheFolder"
+                        New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
+                    }
+                    $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+                    Write-Verbose "Access token saved to $cacheTokenFile"
+                }
+                
+                if ($SecureString)
+                {
+                    Write-Verbose "Converting access token to secure string"
+                    $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
+                    Write-Verbose "Returning secure token"
+                    return $secureAccessToken
+                }
+                else
+                {
+                    Write-Verbose "Returning plain text access token"
+                    return $tokenResponse.access_token
+                }
             }
-            if ($SecureString)
+            catch
             {
-                Write-Verbose "Converting access token to secure string"
-                $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
-                Write-Verbose "Returning secure token"
-                return $secureAccessToken
-            }
-            else
-            {
-                Write-Verbose "Returning plain text access token"
-                return $tokenResponse.access_token
+                Write-Error "Failed to get delegated access token: $_"
+                if ($_.Exception.Response)
+                {
+                    $errorResponse = $_.Exception.Response.GetResponseStream()
+                    $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                    $errorMessage = $streamReader.ReadToEnd()
+                    $streamReader.Close()
+                    Write-Error "Server Response: $errorMessage"
+                }
+                return $null
             }
         }
-        catch
+        else 
         {
-            Write-Error "Failed to get access token: $_"
-            if ($_.Exception.Response)
+            Write-Verbose "Using non-deligated access..."            
+            Write-Verbose "Requesting new access token"
+            $body = @{
+                client_id     = $clientId
+                scope         = 'https://graph.microsoft.com/.default'
+                client_secret = $clientSecret
+                grant_type    = 'client_credentials'
+            }   
+            try
             {
-                $errorResponse = $_.Exception.Response.GetResponseStream()
-                $streamReader = New-Object System.IO.StreamReader($errorResponse)
-                $errorMessage = $streamReader.ReadToEnd()
-                $streamReader.Close()
-                Write-Error "Server Response: $errorMessage"
-                # Reset cache on failure
-                $accessToken = $null
-                $tokenExpiryTime = $null
-                $cachedToken = $null
-                return $cachedToken
-            }        
+                $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -ContentType 'application/x-www-form-urlencoded' -Body $body
+                Write-Verbose "Access token received"
+                Write-Verbose "Calculating absolute expiry time"
+                Write-Verbose "Converting from $($tokenResponse.expires_in)"
+                $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+                Write-Verbose "Converted to $($tokenExpiryTime)"
+                Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
+                Write-Verbose "Creating hashtable for cached token"
+                $cachedToken = [psCustomObject] @{
+                    'domain'           = $domain
+                    access_token       = $tokenResponse.access_token
+                    AbsoluteExpiryTime = $tokenExpiryTime
+                    'expires_in'       = $tokenResponse.expires_in
+                }
+                Write-Verbose "Access token hashtable created"
+                if ($CacheType -eq 'memory')
+                {
+                    Write-Verbose "Saving access token to memory cache."
+                    $Global:MemoryCache['accessToken'] = $cachedToken
+                }
+                else
+                {
+                    Write-Verbose "Saving access token to cache file: $cacheTokenFile"
+                    Write-Verbose "Creating cache folder if it does not exist"
+                    if (-not (Test-Path -Path $cacheFolder))
+                    {
+                        Write-Verbose "Creating cache folder: $cacheFolder"
+                        New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
+                    }
+                    else 
+                    {
+                        Write-Verbose "Cache folder already exists: $cacheFolder"
+                    }
+                    Write-Verbose "Saving access token to disk cache."
+                    $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+                    Write-Verbose "Access token saved to $cacheTokenFile"
+                }
+                if ($SecureString)
+                {
+                    Write-Verbose "Converting access token to secure string"
+                    $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
+                    Write-Verbose "Returning secure token"
+                    return $secureAccessToken
+                }
+                else
+                {
+                    Write-Verbose "Returning plain text access token"
+                    return $tokenResponse.access_token
+                }
+            }
+            catch
+            {
+                Write-Error "Failed to get access token: $_"
+                if ($_.Exception.Response)
+                {
+                    $errorResponse = $_.Exception.Response.GetResponseStream()
+                    $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                    $errorMessage = $streamReader.ReadToEnd()
+                    $streamReader.Close()
+                    Write-Error "Server Response: $errorMessage"
+                    # Reset cache on failure
+                    $accessToken = $null
+                    $tokenExpiryTime = $null
+                    $cachedToken = $null
+                    return $cachedToken
+                }        
+            }
         }
     }
 }
@@ -350,225 +599,5 @@ function GetGraphAccessToken()
 # OCZ3zn0wGdJnxLkp7mQOyLwrWi+upT+kNU4pAQCBlGucMJOnC9BhhRnCOKfy6/Z9
 # +B7AriaeELv3eiGhzMANLOGCZ8B/2yXLSiWDuVYVeTBFQ1NkIHlZAJEORhCCjiAQ
 # NUkfnwvO8YPXZmxY5gB6gN8JDYC9Q1Yo7D6TFwckJ5D9yKhRZQ6z/q5Qc1gb+/Ne
-# FcTrM3HIiIGDxiNuGrEgRlxOqEMgCpJk307YYczXYE+ScaTa4AcBRLlJXpp6sZuP
-# 0/RiLm0339+LWicwDTTSVTCCB1owggVCoAMCAQICEzMAAAAEllBL0tvuy4gAAAAA
-# AAQwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
-# c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
-# IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTJaFw0yNjA0MTMx
-# NzMxNTJaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
-# MDIwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDhzqDoM6JjpsA7AI9s
-# GVAXa2OjdyRRm5pvlmisydGnis6bBkOJNsinMWRn+TyTiK8ElXXDn9v+jKQj55cC
-# pprEx3IA7Qyh2cRbsid9D6tOTKQTMfFFsI2DooOxOdhz9h0vsgiImWLyTnW6locs
-# vsJib1g1zRIVi+VoWPY7QeM73L81GZxY2NqZk6VGPFbZxaBSxR1rNIeBEJ6TztXZ
-# sz/Xtv6jxZdRb3UimCBFqyaJnrlYQUdcpvKGbYtuEErplaZCgV4T4ZaspYIYr+r/
-# hGJNow2Edda9a/7/8jnxS07FWLcNorV9DpgvIggYfMPgKa1ysaK/G6mr9yuse6cY
-# 0Hv/9Ca6XZk/0dw6Zj9qm2BSfBP7bSD8DfuIN+65XDrJLYujT+Sn+Nv4ny8TgUyo
-# iLDEYHIvjzY8xUELep381sVBrwyaPp6exT4cSq/1qv4BtwrC6ZtmokkqZCsZpI11
-# Z+TY2h2BxY6aruPKFvHBk6OcuPT9vCexQ1w0B7T2/6qKjPJBB6zwDdRc9xFBvwb5
-# zTJo7YgKJ9ZMrvJK7JQnzyTWa03bYI1+1uOK2IB5p+hn1WaGflF9v5L8rlqtW9Nw
-# u6S3k91MNDGXnnsQgToD7pcUGl2yM7OQvN0SHsQuTw9U8yNB88KAq0nzhzXt93YL
-# 36nEXWURBQVdj9i0Iv42az1xZQIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBQkRZmhd5AqfMPKg7BuZBaEKvgs
-# ZzBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
-# aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
-# gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
-# FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
-# L3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jcmwvTWljcm9zb2Z0JTIwSUQlMjBW
-# ZXJpZmllZCUyMENvZGUlMjBTaWduaW5nJTIwUENBJTIwMjAyMS5jcmwwga4GCCsG
-# AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
-# b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
-# JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAGct
-# OF2Vsw0iiR0q3NJryKj6kQ73kJzdU7Jj+FCwghx0zKTaEk7Mu38zVZd9DISUOT9C
-# 3IvNfrdN05vkn6c7y3SnPPCLtli8yI2oq8BA7nSww4mfdPeEI+mnE02GgYVXHPZT
-# KJDhva86tywsr1M4QVdZtQwk5tH08zTBmwAEiG7iTpVUvEQN7QZJ5Bf9kTs8d9OD
-# jgu5+3ggqpiae/UK6iyneCUVixV6AucxZlRnxS070XxAKICi4liEvk6UKSyANv29
-# 78dCEsWd6V+Dp1C5sgWyoH0iUKidgoln8doxm9i0DvL0Q5ErhzGW9N60JcAdrKJJ
-# cfS54T9P3bBUbRyy/lV1TKPrJWubba+UpgCRcg0q8M4Hz6ziH5OBKGVRrYAK7YVa
-# fsnOVNJumTQgTxES5iaS7IT8FOST3dYMzHs/Auefgn7l+S9uONDTw57B+kyGHxK4
-# 91AqqZnjQjhbZTIkowxNt63XokWKZKoMKGCcIHqXCWl7SB9uj3tTumult8EqnoHa
-# TZ/tj5ONatBg3451w87JAB3EYY8HAlJokbeiF2SULGAAnlqcLF5iXtKNDkS5rpq2
-# Mh5WE3Qp88sU+ljPkJBT4kLYfv3Hh387pg4VH1ph7nj8Ia6nt1FQh8tK/X+PQM9z
-# oSV/djJbGWhaPzJ5jeQetkVoCVEzCEBfI9DesRf3MIIHnjCCBYagAwIBAgITMwAA
-# AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
-# MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
-# ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
-# aXR5IDIwMjAwHhcNMjEwNDAxMjAwNTIwWhcNMzYwNDAxMjAxNTIwWjBjMQswCQYD
-# VQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTQwMgYDVQQD
-# EytNaWNyb3NvZnQgSUQgVmVyaWZpZWQgQ29kZSBTaWduaW5nIFBDQSAyMDIxMIIC
-# IjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAsvDArxmIKOLdVHpMSWxpCFUJ
-# tFL/ekr4weslKPdnF3cpTeuV8veqtmKVgok2rO0D05BpyvUDCg1wdsoEtuxACEGc
-# gHfjPF/nZsOkg7c0mV8hpMT/GvB4uhDvWXMIeQPsDgCzUGzTvoi76YDpxDOxhgf8
-# JuXWJzBDoLrmtThX01CE1TCCvH2sZD/+Hz3RDwl2MsvDSdX5rJDYVuR3bjaj2Qfz
-# ZFmwfccTKqMAHlrz4B7ac8g9zyxlTpkTuJGtFnLBGasoOnn5NyYlf0xF9/bjVRo4
-# Gzg2Yc7KR7yhTVNiuTGH5h4eB9ajm1OCShIyhrKqgOkc4smz6obxO+HxKeJ9bYmP
-# f6KLXVNLz8UaeARo0BatvJ82sLr2gqlFBdj1sYfqOf00Qm/3B4XGFPDK/H04kteZ
-# EZsBRc3VT2d/iVd7OTLpSH9yCORV3oIZQB/Qr4nD4YT/lWkhVtw2v2s0TnRJubL/
-# hFMIQa86rcaGMhNsJrhysLNNMeBhiMezU1s5zpusf54qlYu2v5sZ5zL0KvBDLHtL
-# 8F9gn6jOy3v7Jm0bbBHjrW5yQW7S36ALAt03QDpwW1JG1Hxu/FUXJbBO2AwwVG4F
-# re+ZQ5Od8ouwt59FpBxVOBGfN4vN2m3fZx1gqn52GvaiBz6ozorgIEjn+PhUXILh
-# AV5Q/ZgCJ0u2+ldFGjcCAwEAAaOCAjUwggIxMA4GA1UdDwEB/wQEAwIBhjAQBgkr
-# BgEEAYI3FQEEAwIBADAdBgNVHQ4EFgQU2UEpsA8PY2zvadf1zSmepEhqMOYwVAYD
-# VR0gBE0wSzBJBgRVHSAAMEEwPwYIKwYBBQUHAgEWM2h0dHA6Ly93d3cubWljcm9z
-# b2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAZBgkrBgEEAYI3FAIE
-# DB4KAFMAdQBiAEMAQTAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFMh+0mqF
-# KhvKGZgEByfPUBBPaKiiMIGEBgNVHR8EfTB7MHmgd6B1hnNodHRwOi8vd3d3Lm1p
-# Y3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJZGVudGl0eSUyMFZl
-# cmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0aWZpY2F0ZSUyMEF1dGhvcml0eSUyMDIw
-# MjAuY3JsMIHDBggrBgEFBQcBAQSBtjCBszCBgQYIKwYBBQUHMAKGdWh0dHA6Ly93
-# d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMvTWljcm9zb2Z0JTIwSWRlbnRp
-# dHklMjBWZXJpZmljYXRpb24lMjBSb290JTIwQ2VydGlmaWNhdGUlMjBBdXRob3Jp
-# dHklMjAyMDIwLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9z
-# b2Z0LmNvbS9vY3NwMA0GCSqGSIb3DQEBDAUAA4ICAQB/JSqe/tSr6t1mCttXI0y6
-# XmyQ41uGWzl9xw+WYhvOL47BV09Dgfnm/tU4ieeZ7NAR5bguorTCNr58HOcA1tcs
-# HQqt0wJsdClsu8bpQD9e/al+lUgTUJEV80Xhco7xdgRrehbyhUf4pkeAhBEjABvI
-# UpD2LKPho5Z4DPCT5/0TlK02nlPwUbv9URREhVYCtsDM+31OFU3fDV8BmQXv5hT2
-# RurVsJHZgP4y26dJDVF+3pcbtvh7R6NEDuYHYihfmE2HdQRq5jRvLE1Eb59PYwIS
-# FCX2DaLZ+zpU4bX0I16ntKq4poGOFaaKtjIA1vRElItaOKcwtc04CBrXSfyL2Op6
-# mvNIxTk4OaswIkTXbFL81ZKGD+24uMCwo/pLNhn7VHLfnxlMVzHQVL+bHa9KhTyz
-# wdG/L6uderJQn0cGpLQMStUuNDArxW2wF16QGZ1NtBWgKA8Kqv48M8HfFqNifN6+
-# zt6J0GwzvU8g0rYGgTZR8zDEIJfeZxwWDHpSxB5FJ1VVU1LIAtB7o9PXbjXzGifa
-# IMYTzU4YKt4vMNwwBmetQDHhdAtTPplOXrnI9SI6HeTtjDD3iUN/7ygbahmYOHk7
-# VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
-# nTiOL60cPqfny+Fq8UiuZzGCGhAwghoMAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
-# BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMgITMwADdLsJe77QwkkGogAAAAN0uzAN
-# BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCC9HvdtL6Fwo1unO8gTnyyF3oEW
-# v4NiyWsGFAF6HI3wsjANBgkqhkiG9w0BAQEFAASCAYAXKRrthitCxMKSqqk0Vl0y
-# 87fkoiilUjkIOtPnkZv/PUW6+G4pUrGEs3MVab9p59azO0YeW5o6L+8jVUXkZmGD
-# ZPasO9GVOic/No1HNwVDHdZOMXT2EN5XVSftR0Dn8hVtZkwGARCmkXvjxu204h2X
-# einMVodlKB+vrLoLWvIBbvg7Q3BC/xCUaZYsvQHLWf/GW2rI0UcehNflp7vLhxcZ
-# DOzRdC1u5ccDRKk+yABm8q1FLVb2IWLWkR43ArF7pm3ybqzprHrGfQWj7WfOPpzB
-# iGMsGBExv9rVHsrgv9sUIqhMe7jgIxfHX+xrL1u3YZ6ZBBRVGVT8VRExhq3mGAPy
-# nmWBBFQpSC1ju2LqhXc7XUoSDy90xwWwtZsAFKjAZ01IiJXXM1r6hz7dqwBa7LXo
-# Vrdt5oJn9ov2A2csIkbOY6FN+0tR5lUBSYT1SYCp4A0MZxCl5lGH/fafMLcUDS6n
-# HHxShYJbw1vA0PEDVjVsGtNin6ZdrxsBEL3fyHGdYqahgheQMIIXjAYKKwYBBAGC
-# NwMDATGCF3wwghd4BgkqhkiG9w0BBwKgghdpMIIXZQIBAzEPMA0GCWCGSAFlAwQC
-# AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgdA2Iveg2gWN0jkfGsInogU/45ZQE3rB3obSfvsYE
-# NggCBmf89yEAmRgTMjAyNTA0MjMyMjM4MjIuNjAyWjAEgAIB9KCB4KSB3TCB2jEL
-# MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
-# bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
-# cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
-# U046NDVENi05NkM1LTVFNjMxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
-# IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
-# 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
-# BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
-# IElkZW50aXR5IFZlcmlmaWNhdGlvbiBSb290IENlcnRpZmljYXRlIEF1dGhvcml0
-# eSAyMDIwMB4XDTIwMTExOTIwMzIzMVoXDTM1MTExOTIwNDIzMVowYTELMAkGA1UE
-# BhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMp
-# TWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwggIiMA0G
-# CSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCefOdSY/3gxZ8FfWO1BiKjHB7X55cz
-# 0RMFvWVGR3eRwV1wb3+yq0OXDEqhUhxqoNv6iYWKjkMcLhEFxvJAeNcLAyT+XdM5
-# i2CgGPGcb95WJLiw7HzLiBKrxmDj1EQB/mG5eEiRBEp7dDGzxKCnTYocDOcRr9Kx
-# qHydajmEkzXHOeRGwU+7qt8Md5l4bVZrXAhK+WSk5CihNQsWbzT1nRliVDwunuLk
-# X1hyIWXIArCfrKM3+RHh+Sq5RZ8aYyik2r8HxT+l2hmRllBvE2Wok6IEaAJanHr2
-# 4qoqFM9WLeBUSudz+qL51HwDYyIDPSQ3SeHtKog0ZubDk4hELQSxnfVYXdTGncaB
-# nB60QrEuazvcob9n4yR65pUNBCF5qeA4QwYnilBkfnmeAjRN3LVuLr0g0FXkqfYd
-# Umj1fFFhH8k8YBozrEaXnsSL3kdTD01X+4LfIWOuFzTzuoslBrBILfHNj8RfOxPg
-# juwNvE6YzauXi4orp4Sm6tF245DaFOSYbWFK5ZgG6cUY2/bUq3g3bQAqZt65Kcae
-# wEJ3ZyNEobv35Nf6xN6FrA6jF9447+NHvCjeWLCQZ3M8lgeCcnnhTFtyQX3XgCoc
-# 6IRXvFOcPVrr3D9RPHCMS6Ckg8wggTrtIVnY8yjbvGOUsAdZbeXUIQAWMs0d3cRD
-# v09SvwVRd61evQIDAQABo4ICGzCCAhcwDgYDVR0PAQH/BAQDAgGGMBAGCSsGAQQB
-# gjcVAQQDAgEAMB0GA1UdDgQWBBRraSg6NS9IY0DPe9ivSek+2T3bITBUBgNVHSAE
-# TTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQu
-# Y29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBMGA1UdJQQMMAoGCCsGAQUF
-# BwMIMBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBBMA8GA1UdEwEB/wQFMAMBAf8w
-# HwYDVR0jBBgwFoAUyH7SaoUqG8oZmAQHJ89QEE9oqKIwgYQGA1UdHwR9MHsweaB3
-# oHWGc2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29m
-# dCUyMElkZW50aXR5JTIwVmVyaWZpY2F0aW9uJTIwUm9vdCUyMENlcnRpZmljYXRl
-# JTIwQXV0aG9yaXR5JTIwMjAyMC5jcmwwgZQGCCsGAQUFBwEBBIGHMIGEMIGBBggr
-# BgEFBQcwAoZ1aHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0cy9N
-# aWNyb3NvZnQlMjBJZGVudGl0eSUyMFZlcmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0
-# aWZpY2F0ZSUyMEF1dGhvcml0eSUyMDIwMjAuY3J0MA0GCSqGSIb3DQEBDAUAA4IC
-# AQBfiHbHfm21WhV150x4aPpO4dhEmSUVpbixNDmv6TvuIHv1xIs174bNGO/ilWMm
-# +Jx5boAXrJxagRhHQtiFprSjMktTliL4sKZyt2i+SXncM23gRezzsoOiBhv14YSd
-# 1Klnlkzvgs29XNjT+c8hIfPRe9rvVCMPiH7zPZcw5nNjthDQ+zD563I1nUJ6y59T
-# bXWsuyUsqw7wXZoGzZwijWT5oc6GvD3HDokJY401uhnj3ubBhbkR83RbfMvmzdp3
-# he2bvIUztSOuFzRqrLfEvsPkVHYnvH1wtYyrt5vShiKheGpXa2AWpsod4OJyT4/y
-# 0dggWi8g/tgbhmQlZqDUf3UqUQsZaLdIu/XSjgoZqDjamzCPJtOLi2hBwL+KsCh0
-# Nbwc21f5xvPSwym0Ukr4o5sCcMUcSy6TEP7uMV8RX0eH/4JLEpGyae6Ki8JYg5v4
-# fsNGif1OXHJ2IWG+7zyjTDfkmQ1snFOTgyEX8qBpefQbF0fx6URrYiarjmBprwP6
-# ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
-# UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
-# 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
-# EzMAAABJcL2GqhZ4TDEAAAAAAEkwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
-# VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
-# cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
-# MTg0ODU0WhcNMjUxMTE5MTg0ODU0WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
-# Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
-# dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
-# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046NDVENi05NkM1LTVFNjMxNTAz
-# BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
-# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA+pnMBEJ5wYi/nr7N
-# 9J+y+uRiVD3AMm7/Q/hyzkTwT7NbQgYHobrt4NzYffDmTKX7EhoDOE0ivbiIlvSC
-# p3AggM2AUVGQ3DpZRWYsTQJrPgEIK7JJ0WADhp8HOLAm3RDEfTkTyi2VZg4jJtYS
-# MaQpgGPlp32JoQlHfWnYLNTwHoxhLEhuM2nv8tYkS0G30+SF+0jO4E61Zqr/oSHs
-# xHE008r+dVyI5o6M9dCPczDaqAv/+aDc6QJ50tj/2Ug5uK8w3+otsQEh4R6n8JBD
-# vXigwdJz8jgHdIzS5qTptOEHqzw0WiaSfA0xaF7AyeRYqe3KbD40UokOnXfiMJRb
-# IXNz+wxi1tu1sKJIwPWP7PJFV4xnESb9uXsao5CCkWhCNqOZkbX2VKSkvjLVy3CC
-# hpxTKZHgTsYERHg5goOr5svVmlI+zxZaPf7SzoLhk1eFiE2I8LUQ7hEs8oKfGtFk
-# EwedPAjv7bpS1jKd5b6zjnTPGaNpI50Ulj3m4oqoQ1s0snP/tOOal3mVhsj9YbTK
-# oY142uqgkiZhxrYMgIxkCAowm2OQDAWVhzITxjer/KGHzwnL4VX/1BSfJRs8LnI0
-# GKDFhrMT3N1EufYiHEwvY+cw9wuvZVuSToLZzXDAWhqBbOClXL3e9z3dUlYolWRC
-# LPgGWE9xCf6qrugNB2NZOrADiOMCAwEAAaOCAcswggHHMB0GA1UdDgQWBBRVjnhP
-# XjrArN1QumQu7fwTWwJKCzAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
-# ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
-# b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
-# MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
-# cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0cy9NaWNyb3NvZnQlMjBQ
-# dWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmclMjBDQSUyMDIwMjAuY3J0MAwGA1Ud
-# EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
-# MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
-# Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
-# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBAGF+OSZ1G/RYme6il24h6LDoni1m
-# wawibMfur2XjEPdVwGjz91D3c7wavAVE1rnX1EKWyVJ1+QNCsN2EewZ9h3/Fhl1t
-# YrjBz+6T4jgOzsgFEXiFhmuIieWMY2+eFMFSw4RcNUdP1fOJz1cNNPk12XL2W69y
-# mUXhJLZjD1xVE98Y+Nt2NG0WPzXBHkzQW+rhepIsL1hQmgTWXs1cP/R/K7AT4VB8
-# /D7X+u3U2HILtYJad72zlBYfQQZH5tsPsVjlBtRWYcMeAsdJzSNjsxOyWgyA6jqZ
-# ivOm7wLuv1xS7yiaIfyTotDGNHJ1VGPwITrbTv0PQiirFLumFLIUEywIXqC1sudZ
-# NxXI8z48QmuHH/KMPGkiFyq1E2XUB3PDjgjv5bCHV170f/Lgh+msMFqO/V3YoOfA
-# jsRUdgJX7TlE4Dnp9NhPqLTcH8evZldegxHs6YzEflUovsJpBK6wCBuqt9TAqx1r
-# H0REYeBmTVIVUh68i6yVmPFYsJazv8WXVDLbmSDuCrQ8kbv4MHdoYJy7dF/qmURf
-# 9xkBuajORGaT+uRmDRLboMZHLIufi/pglNDt0Bb16+HvkJ654b+sTZ45SWNLmUb9
-# QXKSt5iMMdCfzsM8LDsovzgeRG+Oal7YeLSi6GSOGxPLlcSvtXN2csLGzRPVNMJt
-# FeaToNBfSPI9KyaIMYIGxDCCBsACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
-# ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
-# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAElwvYaqFnhMMQAAAAAA
-# STANBglghkgBZQMEAgEFAKCCBB0wEQYLKoZIhvcNAQkQAg8xAgUAMBoGCSqGSIb3
-# DQEJAzENBgsqhkiG9w0BCRABBDAcBgkqhkiG9w0BCQUxDxcNMjUwNDIzMjIzODIy
-# WjAvBgkqhkiG9w0BCQQxIgQgH2qvgLAKpQOzoDjl8P208c79/f/ZuRLyaTCuAfK0
-# qIswgbkGCyqGSIb3DQEJEAIvMYGpMIGmMIGjMIGgBCBZKDgGu8T+xwIzm2AmYzwg
-# NDM/08rlNoMjGGIJ5AbVIjB8MGWkYzBhMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
-# TWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVibGlj
-# IFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAElwvYaqFnhMMQAAAAAASTCC
-# At8GCyqGSIb3DQEJEAISMYICzjCCAsqhggLGMIICwjCCAisCAQEwggEIoYHgpIHd
-# MIHaMQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMH
-# UmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSUwIwYDVQQL
-# ExxNaWNyb3NvZnQgQW1lcmljYSBPcGVyYXRpb25zMSYwJAYDVQQLEx1UaGFsZXMg
-# VFNTIEVTTjo0NUQ2LTk2QzUtNUU2MzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1Ymxp
-# YyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3JpdHmiIwoBATAHBgUrDgMCGgMVACAL
-# jk8yViMVfCNap6QGEogntH7UoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
-# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
-# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBBQUAAgUA67NS
-# 8TAiGA8yMDI1MDQyMzExNTIxN1oYDzIwMjUwNDI0MTE1MjE3WjB3MD0GCisGAQQB
-# hFkKBAExLzAtMAoCBQDrs1LxAgEAMAoCAQACAgr9AgH/MAcCAQACAhE6MAoCBQDr
-# tKRxAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEAAgMH
-# oSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQEFBQADgYEAZzR3yInHx3ODpCw0FqEL
-# rfZtjkGmAEak5Wp2ktWW/Jvnd0HFmhOJmOdRMStzEFjsI/uaBCMpFwRn7rqV3rNh
-# D3A4tDczTaZ2cSrlOhcNtwub5B6IP0DZ1I4o8F2af+Vdlcdm9QVLQNqfLMO0NaaR
-# H5noHRZTwGLGRnYKzPM/iK0wDQYJKoZIhvcNAQEBBQAEggIA5SqmosjUZJKqQqNA
-# Q9JRJKmD0OFTEZ76tCQSVn//qPOYLwaWnsfMLVw87O5j9sC6qccu8DDQhu+sjtYf
-# eeH8lB4DFC74S5ODb6tHrAlINpmIshH+ggnMpRAi3Ej5xeXlGLyVy4XvGb0Rzy2q
-# ybW6uBbNyKlu0w/GIBOOL3Xms89U6V6RDfvBt1S5vGKCueAiAOYNipV/dSfBuPav
-# 5AVieDIytPgNr7ODo2XN7d6d4Z2le/0xGz7K8oLQ85s9VB7Bo8DUfY73N++dHui+
-# ri4zRl+z/koLnaWZE56jU3KW8PrZvUy4X4XDu3DkDttLShDVcUHe9G2rXsx4VnzJ
-# YsnYVxh47kZwcwvyM5uoo/b313iD9lcC3A2QZEsxn9W7/a2XghKZRa83RFAWkmuI
-# yFqz70qjQsIzs0Z0QNIrJMcrwyBeGoppiPFEWSOxeWtNpYOEVYnJSkWiVVDF54HB
-# 6cDgupVgR3c2kTwMWGC5gqWPKxcKngCsDAc9HKBhfLnL38H997SQBVjWz4tBTAQR
-# FyRbG5hzbsxF6cIqOn8vEfbgtf54Vs+ZHRCj7sODNbAgRlH+4HNsaeANdQSjd8Pw
-# YrB8dO+vaYUSPyXu/wE9lQw/aYv6H5noX2qLn7uVFtxe7opBw1ZcvqnX8qPmU3fH
-# ZXPc7HDgv/4Tbq7Ekl8MsjmavsQ=
-# SIG # End signature block
+# FcTrM3HIiIGDxiNuGrEgRlxOqEMgCpJk307YYczNdgT5JxpNrgBwFEuUlemnqxm4
+# /T9GIubTff34taJzANNNJVMIIG5zCCBM+gAwIBAgITMwADdLsJe77QwkkGogAAAAN0uzANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVyaWZpZWQgQ1MgQU9DIENBIDAyMB4XDTI1MDQyMzA0NDQ1NVoXDTI1MDQyNjA0NDQ1NVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlBcmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhhaXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBAIf+bQklimzyrfBfd8Ly2ZT+QAH3Rd5rpJvM9JgULcjCxlyvjVpyzvH71dIHuXlIyAPcHDCxHF9k70AluyMr4oUDIB8tS+rs0/cSlJskCPZCRhF6cOuK7SgIA5Sag+hoAFp8oTszXB0X4DdBzU2ovzHs1cnLegBfUsWZ9V4pwjoVGwcdcE2U70nMcExKnuNx1GSFSeNBt9gWJwXjqEl2ADtGSuG/psUra3wfSCPJUN7XU8buduHDPqmiBdt0FJ4QWmrLggYZ3tqxULmkJ2Pvvxr1nPmXZEdXeHqFeM8rfXfps2BzWfSTTiOF1p+/EtqynYLC/cVo9WCgA9ZoVRbrgSjCF5LUmkg14j3YRlkkHGk2G3IcNjiND3m913+dFg/agxgD3GHY7QdL7oJf3ceWCTiwX6oiMV3lYOkxLIEkE0Q0HQWig4x5mv4F0SSLEMOSj5iTB2gGeXRA6Fbl2w3r9u2L7+FVfeYIjt8C1MdojrAtag3pwVohclj3uFqL8g78RQIDAQABo4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDV...
