@@ -40,3 +40,4 @@ release/*
 
 # Local PowerShell modules
 Modules/
+pwsh/
