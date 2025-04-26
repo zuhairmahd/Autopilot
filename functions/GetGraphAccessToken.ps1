@@ -14,52 +14,142 @@ function GetGraphAccessToken()
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
     )
-    #region Read config file
-    if ($configFile)
+    
+    #region Helper functions
+    function Get-TokenFromResponse
     {
-        Write-Verbose "Reading config file $configFile"
-        $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
-        Write-Verbose "Decrypting values from $configFile"
-        if (isEncrypted -data $config)
+        param($tokenResponse, $domain, $refreshToken)
+        
+        $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
+        Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
+        
+        $cachedToken = [PSCustomObject] @{
+            'domain'           = $domain
+            access_token       = $tokenResponse.access_token
+            AbsoluteExpiryTime = $tokenExpiryTime
+            'expires_in'       = $tokenResponse.expires_in
+        }
+        
+        # Add refresh token if available
+        if ($refreshToken -or $tokenResponse.refresh_token)
         {
-            Write-Verbose "Config file is encrypted. Decrypting."
-            $config = DecryptObject -encryptedObject $config -excludeFields 'domain'
+            $cachedToken | Add-Member -MemberType NoteProperty -Name 'refresh_token' -Value ($refreshToken ?? $tokenResponse.refresh_token)
+        }
+        
+        # Add scope if available
+        if ($tokenResponse.scope)
+        {
+            $cachedToken | Add-Member -MemberType NoteProperty -Name 'scope' -Value $tokenResponse.scope
+        }
+        
+        return $cachedToken
+    }
+    
+    function Save-TokenToCache
+    {
+        param($cachedToken, $cacheType, $cacheTokenFile, $cacheFolder)
+        
+        if ($cacheType -eq 'memory')
+        {
+            Write-Verbose "Saving access token to memory cache."
+            $Global:MemoryCache['accessToken'] = $cachedToken
         }
         else
         {
-            Write-Verbose "Config file is not encrypted. Using as is."
+            Write-Verbose "Saving access token to cache file: $cacheTokenFile"
+            if (-not (Test-Path -Path $cacheFolder))
+            {
+                Write-Verbose "Creating cache folder: $cacheFolder"
+                New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
+            }
+            $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+            Write-Verbose "Access token saved to $cacheTokenFile"
         }
-        $tenantId = $config.tenantId
-        $clientId = $config.appId
-        $clientSecret = $config.appSecret
-        $domain = $config.domain
     }
-    else
-    {
-        Write-Error "Config file not found. Please provide a valid config file."
-        return $null
-    }
-    #endregion
-
-    #region write a verbose log of the received parameters
-    Write-Verbose "Received parameters:"
-    Write-Verbose "Configuration File: $configFile"
-    Write-Verbose "Renewal Lead Time: $renewalLeadTime"
-    Write-Verbose "Secure String: $SecureString"
-    Write-Verbose "Force New Token: $ForceNewToken"
-    Write-Verbose "Cache Type: $CacheType"
-    Write-Verbose "Domain: $domain"
-    Write-Verbose "Deligated: $Deligated"
-    Write-Verbose "Scopes: $Scopes"
-    #endregion
     
-    $cacheFolder = Split-Path $configFile
-    $cacheTokenFile = $cacheFolder + "\accessToken.json"
-    #region Check for existing token
-    if (-not $ForceNewToken)
+    function Format-TokenOutput
     {
-        Write-Verbose "Checking for existing token in cache"
-        if ($CacheType -eq 'memory')
+        param($token, $secureString)
+        
+        if ($secureString)
+        {
+            Write-Verbose "Converting access token to secure string"
+            $secureAccessToken = ConvertTo-SecureString -String $token -AsPlainText -Force
+            Write-Verbose "Returning secure token"
+            return $secureAccessToken
+        }
+        else
+        {
+            Write-Verbose "Returning plain text access token"
+            return $token
+        }
+    }
+    
+    function Get-RefreshToken
+    {
+        param(
+            $accessTokenObject,
+            $clientId,
+            $clientSecret,
+            $tenantId,
+            $scopes,
+            $domain,
+            $cacheType,
+            $cacheTokenFile,
+            $cacheFolder
+        )
+        
+        Write-Host "Using refresh token to get a new access token..."
+        try
+        {
+            $refreshTokenRequestBody = @{
+                client_id     = $clientId
+                client_secret = $clientSecret
+                refresh_token = $accessTokenObject.refresh_token
+                grant_type    = 'refresh_token'
+                scope         = $Scopes
+            }
+            
+            $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+            $tokenResponse = Invoke-RestMethod -Method Post -Uri $refreshTokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $refreshTokenRequestBody
+            
+            Write-Host "Successfully refreshed access token."
+            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain -refreshToken $tokenResponse.refresh_token
+            
+            # Cache the token
+            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            
+            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        }
+        catch
+        {
+            Write-Host "Failed to use refresh token: $_. Will request new authorization."
+            Write-Host "Refresh token might be expired or revoked, proceeding with new authorization."
+            return $null
+        }
+    }
+    
+    function Get-TokenFromCache
+    {
+        param(
+            $cacheType,
+            $domain,
+            $renewalLeadTime,
+            $clientId,
+            $clientSecret,
+            $tenantId,
+            $scopes,
+            $deligated,
+            $cacheFolder,
+            $cacheTokenFile,
+            $secureString
+        )
+        
+        $accessTokenObject = $null
+        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
+        
+        # Get token from memory cache
+        if ($cacheType -eq 'memory')
         {
             Write-Verbose "Using memory cache for access token."
             if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
@@ -67,111 +157,50 @@ function GetGraphAccessToken()
                 Write-Verbose "Initializing memory cache."
                 New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
             }
-            Write-Verbose "Checking for existing token in cache"
-            if ($CacheType -eq 'memory')
+            
+            if ($Global:MemoryCache.ContainsKey('accessToken'))
             {
-                if ($Global:MemoryCache.ContainsKey('accessToken'))
+                $accessTokenObject = $Global:MemoryCache['accessToken']
+                
+                if ($accessTokenObject.domain -eq $domain)
                 {
-                    $accessTokenObject = $Global:MemoryCache['accessToken']
-                    if ($accessTokenObject.domain -eq $domain)
+                    Write-Verbose "Domain matches. Using cached token."
+                    Write-Verbose "Token for $domain found in memory cache."
+                    
+                    # Check if token is still valid
+                    if ($accessTokenObject.access_token -and 
+                        $accessTokenObject.AbsoluteExpiryTime -and 
+                        $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
                     {
-                        Write-Verbose "Domain matches. Using cached token."
-                        Write-Verbose "Domain: $($accessTokenObject.domain)"
-                        Write-Verbose "Matching domain: $domain"
-                        Write-Verbose "Token for $domain found in memory cache."
-                        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-                        if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
-                        {
-                            Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
-                            Write-Host "Using cached access token for $($accessTokenObject.domain) from memory."
-                            return $accessTokenObject.access_token
-                        }
-                        else
-                        {
-                            Write-Host "Access token in memory is expired or invalid."
-                            # Check if we have a refresh token to use
-                            if ($accessTokenObject.refresh_token -and $Deligated)
-                            {
-                                Write-Host "Using refresh token to get a new access token..."
-                                try
-                                {
-                                    $refreshTokenRequestBody = @{
-                                        client_id     = $clientId
-                                        client_secret = $clientSecret
-                                        refresh_token = $accessTokenObject.refresh_token
-                                        grant_type    = 'refresh_token'
-                                        scope         = $Scopes
-                                    }
-                                    $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
-                                    $tokenResponse = Invoke-RestMethod -Method Post -Uri $refreshTokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $refreshTokenRequestBody
-                                    Write-Host "Successfully refreshed access token."
-                                    $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
-                                    Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
-                                    
-                                    $cachedToken = [PSCustomObject] @{
-                                        'domain'           = $domain
-                                        access_token       = $tokenResponse.access_token
-                                        refresh_token      = $tokenResponse.refresh_token
-                                        AbsoluteExpiryTime = $tokenExpiryTime
-                                        'expires_in'       = $tokenResponse.expires_in
-                                        scope              = $tokenResponse.scope
-                                    }
-                                    
-                                    # Cache the token based on user preference
-                                    if ($CacheType -eq 'memory')
-                                    {
-                                        Write-Verbose "Saving refreshed access token to memory cache."
-                                        $Global:MemoryCache['accessToken'] = $cachedToken
-                                    }
-                                    else
-                                    {
-                                        Write-Verbose "Saving refreshed access token to cache file: $cacheTokenFile"
-                                        if (-not (Test-Path -Path $cacheFolder))
-                                        {
-                                            Write-Verbose "Creating cache folder: $cacheFolder"
-                                            New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
-                                        }
-                                        $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
-                                        Write-Verbose "Refreshed access token saved to $cacheTokenFile"
-                                    }
-                                    if ($SecureString)
-                                    {
-                                        Write-Verbose "Converting access token to secure string"
-                                        $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
-                                        Write-Verbose "Returning secure token"
-                                        return $secureAccessToken
-                                    }
-                                    else
-                                    {
-                                        Write-Verbose "Returning plain text access token"
-                                        return $tokenResponse.access_token
-                                    }
-                                }
-                                catch
-                                {
-                                    Write-Host "Failed to use refresh token: $_. Will request new authorization."
-                                    Write-Host "Refresh token might be expired or revoked, proceeding with new authorization."
-                                }
-                            }
-                            else
-                            {
-                                Write-Host "Requesting a new token."
-                            }
-                        }
+                        
+                        Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
+                        Write-Host "Using cached access token for $($accessTokenObject.domain) from memory."
+                        return $accessTokenObject.access_token
                     }
                     else
                     {
-                        Write-Host "Domain does not match. Requesting a new token from $domain."
-                        $accessTokenObject = $null
+                        Write-Host "Access token in memory is expired or invalid."
+                        # Try to use refresh token if available
+                        if ($accessTokenObject.refresh_token -and $Deligated)
+                        {
+                            return Get-RefreshToken -accessTokenObject $accessTokenObject -clientId $clientId -clientSecret $clientSecret `
+                                -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
+                                -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+                        }
                     }
                 }
                 else
                 {
-                    Write-Verbose "No token found in memory cache."
+                    Write-Host "Domain does not match. Requesting a new token from $domain."
                 }
             }
+            else
+            {
+                Write-Verbose "No token found in memory cache."
+            }
         }
-        elseif ($CacheType -eq 'file')
+        # Get token from file cache
+        elseif ($cacheType -eq 'file')
         {
             if (Test-Path -Path $cacheTokenFile)
             {
@@ -179,22 +208,32 @@ function GetGraphAccessToken()
                 try
                 {
                     $accessTokenObject = Get-Content -Path $cacheTokenFile -Raw -Force | ConvertFrom-Json
+                    
                     if ($accessTokenObject.domain -eq $domain)
                     {
                         Write-Verbose "Domain matches. Using cached token."
-                        Write-Verbose "Cache file read successfully"
                         $accessToken = $accessTokenObject.access_token
-                        Write-Verbose "Access Token Expirey Time in UTC: $($accessTokenObject.AbsoluteExpiryTime)"
-                        $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
-                        if ($absoluteExpiryTime -lt $accessTokenObject.AbsoluteExpiryTime)
+                        
+                        # Handle time formats
+                        if ($accessTokenObject.AbsoluteExpiryTime -is [string])
                         {
-                            Write-Verbose "Resolving time differences between UTC and local time."
+                            $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
+                            if ($absoluteExpiryTime -lt $accessTokenObject.AbsoluteExpiryTime)
+                            {
+                                Write-Verbose "Resolving time differences between UTC and local time."
+                                $absoluteExpiryTime = $accessTokenObject.AbsoluteExpiryTime
+                            }
+                        }
+                        else
+                        {
                             $absoluteExpiryTime = $accessTokenObject.AbsoluteExpiryTime
                         }
+                        
                         Write-Verbose "Absolute Expiry Time: $absoluteExpiryTime"
-                        $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-                        Write-Verbose "we will renew the token $($renewalLeadTime) minutes before it expires."
-                        if ($accessTokenObject.access_token -and $accessTokenObject.AbsoluteExpiryTime -and $absoluteExpiryTime -gt $timeBuffer)
+                        Write-Verbose "We will renew the token $($renewalLeadTime) minutes before it expires."
+                        
+                        # Check if token is still valid
+                        if ($accessToken -and $absoluteExpiryTime -gt $timeBuffer)
                         {
                             Write-Host "Access token for $($accessTokenObject.domain) is valid until $absoluteExpiryTime."
                             Write-Host "Using cached access token from disk."
@@ -203,59 +242,12 @@ function GetGraphAccessToken()
                         else
                         {
                             Write-Host "Access token is expired or invalid."
-                            # Check if we have a refresh token to use
+                            # Try to use refresh token if available
                             if ($accessTokenObject.refresh_token -and $Deligated)
                             {
-                                Write-Host "Using refresh token to get a new access token..."
-                                try
-                                {
-                                    $refreshTokenRequestBody = @{
-                                        client_id     = $clientId
-                                        client_secret = $clientSecret
-                                        refresh_token = $accessTokenObject.refresh_token
-                                        grant_type    = 'refresh_token'
-                                        scope         = $Scopes
-                                    }
-                                    $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
-                                    $tokenResponse = Invoke-RestMethod -Method Post -Uri $refreshTokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $refreshTokenRequestBody
-                                    Write-Host "Successfully refreshed access token."
-                                    $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
-                                    Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
-                                    $cachedToken = [PSCustomObject] @{
-                                        'domain'           = $domain
-                                        access_token       = $tokenResponse.access_token
-                                        refresh_token      = $tokenResponse.refresh_token
-                                        AbsoluteExpiryTime = $tokenExpiryTime
-                                        'expires_in'       = $tokenResponse.expires_in
-                                        scope              = $tokenResponse.scope
-                                    }
-                                    # Save refreshed token to file
-                                    Write-Verbose "Saving refreshed access token to cache file: $cacheTokenFile"
-                                    if (-not (Test-Path -Path $cacheFolder))
-                                    {
-                                        Write-Verbose "Creating cache folder: $cacheFolder"
-                                        New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
-                                    }
-                                    $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
-                                    Write-Verbose "Refreshed access token saved to $cacheTokenFile"
-                                    if ($SecureString)
-                                    {
-                                        Write-Verbose "Converting access token to secure string"
-                                        $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
-                                        Write-Verbose "Returning secure token"
-                                        return $secureAccessToken
-                                    }
-                                    else
-                                    {
-                                        Write-Verbose "Returning plain text access token"
-                                        return $tokenResponse.access_token
-                                    }
-                                }
-                                catch
-                                {
-                                    Write-Host "Failed to use refresh token: $_. Will request new authorization."
-                                    Write-Host "Refresh token might be expired or revoked, proceeding with new authorization."
-                                }
+                                return Get-RefreshToken -accessTokenObject $accessTokenObject -clientId $clientId -clientSecret $clientSecret `
+                                    -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
+                                    -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
                             }
                             else
                             {
@@ -266,14 +258,12 @@ function GetGraphAccessToken()
                     else
                     {
                         Write-Verbose "Domain $domain does not match cached token domain $($accessTokenObject.domain)."
-                        $accessTokenObject = $null
                     }
                 }
                 catch
                 {
                     Write-Host "Failed to read cache file: $_"
                     Write-Host "Cache file may be corrupted or invalid. Requesting a new token."
-                    $cachedToken = $null
                 }
             }
             else
@@ -286,208 +276,207 @@ function GetGraphAccessToken()
             Write-Error "Invalid cache type. Use 'file' or 'memory'."
             return $null
         }
+        
+        return $null
+    }
+    
+    function Get-DelegatedToken
+    {
+        param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
+        
+        # Generate a random state string
+        Write-Verbose "Generating random state string."
+        $state = [System.Guid]::NewGuid().ToString()
+        $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+        
+        # Ensure scopes include openid and offline_access
+        if (-not $scopes.Contains("openid"))
+        {
+            $scopes = "openid $scopes"
+            Write-Verbose "Added openid to scopes"
+        }
+        
+        # Encode parameters
+        $encodedScopes = [uri]::EscapeDataString($scopes)
+        $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
+        
+        # Step 1: Open the authorization URL
+        $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=openid%20offline_access%20$($encodedScopes)&state=$state"
+        Write-Host "Opening browser for user authentication and consent..."
+        Start-Process $authUrl
+        Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
+        $code = Read-Host "Enter the authorization code"
+        
+        # Step 2: Exchange the code for a token
+        Write-Verbose "Exchanging authorization code for access token"
+        $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+        $tokenRequestBody = @{
+            client_id     = $clientId
+            client_secret = $clientSecret
+            code          = $code
+            redirect_uri  = $redirectUri
+            grant_type    = "authorization_code"
+            scope         = "openid offline_access $scopes"
+        }
+        
+        try
+        {
+            Write-Verbose "Sending token request to $tokenEndpoint"
+            $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody
+            
+            Write-Verbose "Access token received"
+            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+            
+            # Cache the token
+            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            
+            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        }
+        catch
+        {
+            Write-Error "Failed to get delegated access token: $_"
+            if ($_.Exception.Response)
+            {
+                $errorResponse = $_.Exception.Response.GetResponseStream()
+                $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                $errorMessage = $streamReader.ReadToEnd()
+                $streamReader.Close()
+                Write-Error "Server Response: $errorMessage"
+            }
+            return $null
+        }
+    }
+    
+    function Get-ClientCredentialsToken
+    {
+        param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
+        
+        Write-Verbose "Using non-deligated access..."
+        Write-Verbose "Requesting new access token"
+        
+        $body = @{
+            client_id     = $clientId
+            scope         = 'https://graph.microsoft.com/.default'
+            client_secret = $clientSecret
+            grant_type    = 'client_credentials'
+        }
+        
+        try
+        {
+            $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+            $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType 'application/x-www-form-urlencoded' -Body $body
+            
+            Write-Verbose "Access token received"
+            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+            
+            # Cache the token
+            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            
+            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        }
+        catch
+        {
+            Write-Error "Failed to get access token: $_"
+            if ($_.Exception.Response)
+            {
+                $errorResponse = $_.Exception.Response.GetResponseStream()
+                $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                $errorMessage = $streamReader.ReadToEnd()
+                $streamReader.Close()
+                Write-Error "Server Response: $errorMessage"
+            }
+            return $null
+        }
+    }
+    #endregion Helper functions
+    
+    #region Main function logic
+    # Read and process configuration file
+    if (-not $configFile)
+    {
+        Write-Error "Config file not found. Please provide a valid config file."
+        return $null
+    }
+    
+    Write-Verbose "Reading config file $configFile"
+    try
+    {
+        $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
+        Write-Verbose "Decrypting values from $configFile"
+        if (isEncrypted -data $config)
+        {
+            Write-Verbose "Config file is encrypted. Decrypting."
+            $config = DecryptObject -encryptedObject $config -excludeFields 'domain'
+        }
+        else
+        {
+            Write-Verbose "Config file is not encrypted. Using as is."
+        }
+        
+        $tenantId = $config.tenantId
+        $clientId = $config.appId
+        $clientSecret = $config.appSecret
+        $domain = $config.domain
+    }
+    catch
+    {
+        Write-Error "Failed to read or process config file: $_"
+        return $null
+    }
+    
+    # Log parameters
+    Write-Verbose "Received parameters:"
+    Write-Verbose "Configuration File: $configFile"
+    Write-Verbose "Renewal Lead Time: $renewalLeadTime"
+    Write-Verbose "Secure String: $SecureString"
+    Write-Verbose "Force New Token: $ForceNewToken"
+    Write-Verbose "Cache Type: $CacheType"
+    Write-Verbose "Domain: $domain"
+    Write-Verbose "Deligated: $Deligated"
+    Write-Verbose "Scopes: $Scopes"
+    
+    # Set up cache paths
+    $cacheFolder = Split-Path $configFile
+    $cacheTokenFile = Join-Path $cacheFolder "accessToken.json"
+    
+    # Try to get token from cache if not forcing new token
+    $accessToken = $null
+    if (-not $ForceNewToken)
+    {
+        $accessToken = Get-TokenFromCache -cacheType $CacheType -domain $domain -renewalLeadTime $renewalLeadTime `
+            -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scopes `
+            -deligated $Deligated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile -secureString $SecureString
+            
+        if ($accessToken)
+        {
+            return $accessToken
+        }
     }
     else
     {
         Write-Host "Force new token requested. Ignoring cache."
-        $accessToken = $null
-        $tokenExpiryTime = $null
-        $cachedToken = $null
     }
-    #endregion
-
     
+    # Get new token if we don't have a valid cached token
     if ($tenantId -and $clientId -and $clientSecret)
     {
-        if ($deligated)
+        if ($Deligated)
         {
-            #Generate a random state string and assign it to a variable.
-            Write-Verbose "Generating random state string."
-            $state = [System.Guid]::NewGuid().ToString()
-            Write-Verbose "State string: $state"
-            $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
-            Write-Verbose "Using deligated access..." 
-            
-            # Ensure scopes include openid and offline_access
-            if (-not $scopes.Contains("openid"))
-            {
-                $scopes = "openid $scopes"
-                Write-Verbose "Added openid to scopes"
-            }
-            
-            Write-Verbose "Requesting the following scopes: $scopes"
-            Write-Verbose "Encoding scopes..."
-            $encodedScopes = [uri]::EscapeDataString($scopes)
-            Write-Verbose "Encoded scopes: $encodedScopes"
-            
-            #also encode the redirectUri using escapestring.
-            Write-Verbose "Encoding redirect URI..."
-            $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
-            Write-Verbose "Encoded redirect URI: $encodedRedirectUri"
-            
-            # Step 1: Open the authorization URL in the user's default browser to prompt for login and consent.
-            $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=openid%20offline_access%20$($encodedScopes)&state=$state"
-            Write-Host "Opening browser for user authentication and consent..."
-            Start-Process $authUrl
-            Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
-            $code = Read-Host "Enter the authorization code"
-            
-            # Step 2: Exchange the authorization code for an access token
-            Write-Verbose "Exchanging authorization code for access token"
-            $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
-            $tokenRequestBody = @{
-                client_id     = $clientId
-                client_secret = $clientSecret
-                code          = $code
-                redirect_uri  = $redirectUri
-                grant_type    = "authorization_code"
-                scope         = "openid offline_access $scopes"
-            }
-            try
-            {
-                Write-Verbose "Sending token request to $tokenEndpoint"
-                $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody
-                
-                Write-Verbose "Access token received"
-                Write-Verbose "Calculating absolute expiry time"
-                $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
-                Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
-                
-                $cachedToken = [PSCustomObject] @{
-                    'domain'           = $domain
-                    access_token       = $tokenResponse.access_token
-                    refresh_token      = $tokenResponse.refresh_token
-                    AbsoluteExpiryTime = $tokenExpiryTime
-                    'expires_in'       = $tokenResponse.expires_in
-                    scope              = $tokenResponse.scope
-                }
-                
-                # Cache the token based on user preference
-                if ($CacheType -eq 'memory')
-                {
-                    Write-Verbose "Saving access token to memory cache."
-                    $Global:MemoryCache['accessToken'] = $cachedToken
-                }
-                else
-                {
-                    Write-Verbose "Saving access token to cache file: $cacheTokenFile"
-                    if (-not (Test-Path -Path $cacheFolder))
-                    {
-                        Write-Verbose "Creating cache folder: $cacheFolder"
-                        New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
-                    }
-                    $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
-                    Write-Verbose "Access token saved to $cacheTokenFile"
-                }
-                
-                if ($SecureString)
-                {
-                    Write-Verbose "Converting access token to secure string"
-                    $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
-                    Write-Verbose "Returning secure token"
-                    return $secureAccessToken
-                }
-                else
-                {
-                    Write-Verbose "Returning plain text access token"
-                    return $tokenResponse.access_token
-                }
-            }
-            catch
-            {
-                Write-Error "Failed to get delegated access token: $_"
-                if ($_.Exception.Response)
-                {
-                    $errorResponse = $_.Exception.Response.GetResponseStream()
-                    $streamReader = New-Object System.IO.StreamReader($errorResponse)
-                    $errorMessage = $streamReader.ReadToEnd()
-                    $streamReader.Close()
-                    Write-Error "Server Response: $errorMessage"
-                }
-                return $null
-            }
+            return Get-DelegatedToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
+                -scopes $Scopes -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
         }
-        else 
+        else
         {
-            Write-Verbose "Using non-deligated access..."            
-            Write-Verbose "Requesting new access token"
-            $body = @{
-                client_id     = $clientId
-                scope         = 'https://graph.microsoft.com/.default'
-                client_secret = $clientSecret
-                grant_type    = 'client_credentials'
-            }   
-            try
-            {
-                $tokenResponse = Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token" -ContentType 'application/x-www-form-urlencoded' -Body $body
-                Write-Verbose "Access token received"
-                Write-Verbose "Calculating absolute expiry time"
-                Write-Verbose "Converting from $($tokenResponse.expires_in)"
-                $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
-                Write-Verbose "Converted to $($tokenExpiryTime)"
-                Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
-                Write-Verbose "Creating hashtable for cached token"
-                $cachedToken = [psCustomObject] @{
-                    'domain'           = $domain
-                    access_token       = $tokenResponse.access_token
-                    AbsoluteExpiryTime = $tokenExpiryTime
-                    'expires_in'       = $tokenResponse.expires_in
-                }
-                Write-Verbose "Access token hashtable created"
-                if ($CacheType -eq 'memory')
-                {
-                    Write-Verbose "Saving access token to memory cache."
-                    $Global:MemoryCache['accessToken'] = $cachedToken
-                }
-                else
-                {
-                    Write-Verbose "Saving access token to cache file: $cacheTokenFile"
-                    Write-Verbose "Creating cache folder if it does not exist"
-                    if (-not (Test-Path -Path $cacheFolder))
-                    {
-                        Write-Verbose "Creating cache folder: $cacheFolder"
-                        New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
-                    }
-                    else 
-                    {
-                        Write-Verbose "Cache folder already exists: $cacheFolder"
-                    }
-                    Write-Verbose "Saving access token to disk cache."
-                    $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
-                    Write-Verbose "Access token saved to $cacheTokenFile"
-                }
-                if ($SecureString)
-                {
-                    Write-Verbose "Converting access token to secure string"
-                    $secureAccessToken = ConvertTo-SecureString -String $tokenResponse.access_token -AsPlainText -Force
-                    Write-Verbose "Returning secure token"
-                    return $secureAccessToken
-                }
-                else
-                {
-                    Write-Verbose "Returning plain text access token"
-                    return $tokenResponse.access_token
-                }
-            }
-            catch
-            {
-                Write-Error "Failed to get access token: $_"
-                if ($_.Exception.Response)
-                {
-                    $errorResponse = $_.Exception.Response.GetResponseStream()
-                    $streamReader = New-Object System.IO.StreamReader($errorResponse)
-                    $errorMessage = $streamReader.ReadToEnd()
-                    $streamReader.Close()
-                    Write-Error "Server Response: $errorMessage"
-                    # Reset cache on failure
-                    $accessToken = $null
-                    $tokenExpiryTime = $null
-                    $cachedToken = $null
-                    return $cachedToken
-                }        
-            }
+            return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
+                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
         }
     }
+    else
+    {
+        Write-Error "Missing required authentication parameters (tenantId, clientId, or clientSecret)"
+        return $null
+    }
+    #endregion Main function logic
 }
 
 

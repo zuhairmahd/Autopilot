@@ -38,3 +38,4 @@ release/
 # Local PowerShell modules
 Modules/
 pwsh/
+*.bat
