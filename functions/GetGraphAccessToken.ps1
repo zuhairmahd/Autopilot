@@ -92,7 +92,7 @@ function GetGraphAccessToken()
             if ($isEncrypted)
             {
                 Write-Verbose "Config is encrypted, decrypting before updating"
-                $decryptedConfig = DecryptObject -encryptedObject $config -excludeFields 'domain'
+                $decryptedConfig = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name')
                 $decryptedConfig | Add-Member -MemberType NoteProperty -Name 'refresh_token' -Value $refreshToken -Force
                 
                 # Re-encrypt the config
@@ -514,7 +514,7 @@ function GetGraphAccessToken()
         if (isEncrypted -data $config)
         {
             Write-Verbose "Config file is encrypted. Decrypting."
-            $config = DecryptObject -encryptedObject $config -excludeFields 'domain'
+            $config = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name')
             # Extract the refresh token if it exists
             if (Get-Member -InputObject $config -Name 'refresh_token' -MemberType NoteProperty)
             {
