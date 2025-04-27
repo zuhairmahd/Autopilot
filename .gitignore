@@ -12,8 +12,7 @@ Desktop.ini
 .secrets/*
 .vscode
 .vscode/*
-release
-release/*
+release/
 
 # PowerShell-specific files
 
@@ -40,3 +39,5 @@ release/*
 
 # Local PowerShell modules
 Modules/
+pwsh/
+*.bat
