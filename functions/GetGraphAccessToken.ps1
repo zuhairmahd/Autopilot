@@ -406,7 +406,8 @@ function GetGraphAccessToken()
         Start-Process $authUrl
         Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
         $code = Read-Host "Enter the authorization code"
-        
+        #The $code string above contains the intire URL.  Extract the code from the URL.
+        $code = $code -replace '.*code=([^&]+).*', '$1'        
         # Step 2: Exchange the code for a token
         Write-Verbose "Exchanging authorization code for access token"
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"

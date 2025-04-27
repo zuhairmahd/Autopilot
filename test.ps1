@@ -25,6 +25,8 @@ else
 #endregion
 
 #region variables
+# $scopes = "Device.ReadWrite.All,DeviceLocalCredential.Read.All,DeviceManagementApps.Read.All,DeviceManagementApps.ReadWrite.All,DeviceManagementConfiguration.ReadWrite.All,DeviceManagementManagedDevices.PrivilegedOperations.All,DeviceManagementManagedDevices.ReadWrite.All,DeviceManagementServiceConfig.ReadWrite.All,Directory.ReadWrite.All,Domain.ReadWrite.All,Group.Read.All,GroupMember.ReadWrite.All,Organization.ReadWrite.All"
+$scopes = "DeviceManagementApps.Read.All,DeviceManagementApps.ReadWrite.All,DeviceManagementConfiguration.ReadWrite.All,DeviceManagementManagedDevices.ReadWrite.All,DeviceManagementServiceConfig.ReadWrite.All"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -34,7 +36,7 @@ else
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
-$accessToken = GetGraphAccessToken -configFile $configFile
+$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 #endregion variables
 
 

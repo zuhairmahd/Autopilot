@@ -17,7 +17,7 @@ Author: Zuhair Mahmoud
         [psObject]$plainObject,
         [string[]]$excludeFields
     )
-    $encryptedObject = @{}
+    $encryptedObject = [ordered] @{}
     foreach ($prop in $plainObject.PSObject.Properties)
     {
         Write-Verbose "The exclude list is $($excludeFields -join ',')"
