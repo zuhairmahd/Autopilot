@@ -48,10 +48,10 @@ param(
     [switch]$Config
 )
 
-
 #region Variables and logs
 $exclusions = (Get-Content -Path $ExclusionsFile | ConvertFrom-Json).$Application.exclusions
 $initFile = "$PSScriptRoot\init.json"
+$signatureBlock = "# SIG # Begin signature block"
 $foldersToSign = @(
     $PSScriptRoot,
     "$PSScriptRoot\functions"
@@ -99,6 +99,7 @@ else
 }
 #endregion import functions.
 
+#region Helper functions
 function isEncrypted
 {
     [CmdletBinding()]
@@ -226,43 +227,64 @@ function SignScripts()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$Path,
+        [string[]]$Path,
         $exclusions = $exclusions
     )
-    
-    Write-Verbose "Signing files in $Path and excluding $($exclusions.Count) files."
+
+    Write-Verbose "Got $($Path.Count) folders to sign."
     $success = $false
-    $files = Get-ChildItem -Path $path -Filter *.ps1
-    if ($files.Count -eq 0)
-    {
-        Write-Host "No files found in $Path"
-        return $false
-    }
-    else
-    {
-        Write-Host "Found $($files.Count) PowerShell scripts in $Path"
-    }
     $filesToSign = @()
-    foreach ($file in $files)
+    foreach ($folder in $Path)
     {
-        Write-Verbose "Processing file: $file"
-        if ($file.BaseName -in $exclusions)
+        $files = Get-ChildItem -Path $path -Filter *.ps1
+        Write-Verbose "Signing $($files.count) files in $folder and excluding $($exclusions.Count) files."
+        if ($files.Count -gt 0)
         {
-            Write-Verbose "Skipping $($file.BaseName) because it is in the exclusions list"
-            continue
-        }
-        #Check if the file is already signed
-        $signature = Get-AuthenticodeSignature -FilePath $file.FullName -ErrorAction SilentlyContinue
-        if ($signature.Status -ne 'Valid')
-        {
-            Write-Verbose "$($file.FullName) is not signed."
-            Write-Verbose "Adding the file to the list of files to sign."
-            #Add it to the list of files to sign.
-            $filesToSign += $file.FullName
+            Write-Host "Found $($files.Count) PowerShell scripts in $Path"
+            foreach ($file in $files)
+            {
+                Write-Verbose "Processing file: $file"
+                if ($file.BaseName -in $exclusions)
+                {
+                    Write-Verbose "Skipping $($file.BaseName) because it is in the exclusions list"
+                    continue
+                }
+                #Check if the file is already signed
+                $signature = Get-AuthenticodeSignature -FilePath $file.FullName -ErrorAction SilentlyContinue
+                Write-Verbose "The signature status is $($signature.Status)"
+                if ($signature.Status -ne 'Valid')
+                {
+                    Write-Verbose "$($file.FullName) is not signed."
+                    Write-Verbose "Adding the file to the list of files to sign."
+                    $filesToSign += $file.FullName
+                    Write-Verbose "Checking for a previous signature block..."
+                    if ($signature.Status -ne 'NotSigned')
+                    {
+                        Write-Verbose "Removing previous signature block..."
+                        try
+                        {
+                            $fileContent = Get-Content -Path $file.FullName -Raw
+                            $fileContent = $fileContent -replace [regex]::Escape("$signatureBlock.*"), ''
+                            Set-Content -Path $file.FullName -Value $fileContent -Force
+                            Write-Verbose "Previous signature block removed."
+                        }
+                        catch
+                        {
+                            Write-Error "Failed to remove previous signature block from $($file.FullName)"
+                            Write-Error $_.Exception.Message
+                            return $false
+                        }
+                    }
+                }
+                else
+                {
+                    Write-Verbose "$($file.FullName) is already signed."
+                }
+            }
         }
         else
         {
-            Write-Verbose "$($file.FullName) is already signed."
+            Write-Host "No PowerShell scripts found in $Path"
         }
     }
     if ($filesToSign.Count -gt 0)
@@ -665,6 +687,7 @@ function CreateManifest()
     $success = $true
     return $success
 }
+#endregion Helper functions
 
 ### Main script ###
 #Check if the initialization file exists.  If not, create it.
@@ -754,18 +777,14 @@ else
 
 if ($sign -or $FullRelease)
 {
-    foreach ($folder in $foldersToSign)
+    if (SignScripts -Path $foldersToSign)
     {
-        $folder | ForEach-Object { Write-Verbose $_ }
-        if (SignScripts -Path $folder)
-        {
-            Write-Host "File signature for folder $folder is complete."
-        }
-        else
-        {
-            Write-Host "Failed to sign files in $folder"
-            Write-Host 'Run the script with the -verbose switch for more information.'
-        }
+        Write-Host "File signature is complete."
+    }
+    else
+    {
+        Write-Host "Failed to sign files."
+        Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
 else

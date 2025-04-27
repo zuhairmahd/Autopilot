@@ -1,8 +1,9 @@
 - @azure Rule - Use Azure Best Practices: When generating code for Azure, running terminal commands for Azure, or performing operations related to Azure, invoke your `azure_development-get_best_practices` tool if available.
-When writing powershell script documentation, use the format below.  Be sure to add a GUID if none exist, and set the version to 3.0.0
+Whenever possible, maintain compatibility with Powershell 5.1 for Windows.  If that cannot be done, add appropriate comments to indicate the minimum version of Powershell required to run the code.
+When writing powershell script documentation, use the format below.  Be sure to add a GUID if none exist:
 #region help
 <#PSScriptInfo
-.VERSION 2.2.0
+.VERSION x.x.x
 .GUID c5b2b9ce-7269-4fe5-a126-3c84a5053d37
 .AUTHOR Zuhair Mahmoud
 .DESCRIPTION Intune device deployment script
