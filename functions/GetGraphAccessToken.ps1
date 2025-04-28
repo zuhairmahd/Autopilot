@@ -33,7 +33,7 @@ function GetGraphAccessToken()
         # Add refresh token if available
         if ($refreshToken -or $tokenResponse.refresh_token)
         {
-            $cachedToken | Add-Member -MemberType NoteProperty -Name 'refresh_token' -Value ($refreshToken ?? $tokenResponse.refresh_token)
+            $cachedToken.Add('refresh_token', $tokenResponse.refresh_token)
         }
         
         # Add scope if available

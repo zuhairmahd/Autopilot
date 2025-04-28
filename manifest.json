@@ -23,7 +23,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "765614DCE589E40DFFFCC4949AAE97F1E1E001586892B598CB33A19B5216D2E9"
+        "hash": "6592FA016D9F5D5F0169E4E5628FC45AEF0BCF10CB64513BC3E84EAC5B89B39F"
       },
       {
         "name": "CheckForScriptUpdates",
@@ -143,7 +143,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "E3848741AD1DC6A8E1601CE6C83450A9C52CDCC5CBD4AE3EB4E55CA2388943A6"
+        "hash": "430FBCFA036B28F0D7C4C4F203C7D8D81D7A89ABC791F6DE9DD8CC4063C490BE"
       },
       {
         "name": "GetExclusions",
@@ -290,20 +290,6 @@
         "hash": "FC4B077F3F8DED9E75AC5ACF0B9E2EBE93D22E9CBC033C55534F74291F3A99EC"
       }
     ],
-    "configurations": [
-      {
-        "name": "exclusions",
-        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
-      },
-      {
-        "name": "init",
-        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
-      },
-      {
-        "name": "remoteManifest",
-        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
-      }
-    ],
     "Cmds": [
       {
         "name": "check",
@@ -378,6 +364,20 @@
         "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
       }
     ],
+    "configurations": [
+      {
+        "name": "exclusions",
+        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
+      },
+      {
+        "name": "init",
+        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
+      },
+      {
+        "name": "remoteManifest",
+        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
+      }
+    ],
     "Scripts": [
       {
         "name": "Register-Device",
@@ -389,7 +389,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "DA1856D2CAD0F0D68854804BC58DB8681DE21DC9935B043DB364FEE4F190348D"
+        "hash": "37A5B5A7AF6A803C4DA6E48DA09D723A19A62E3B94EDD9F1857D1C3CA9256E86"
       }
     ]
   }

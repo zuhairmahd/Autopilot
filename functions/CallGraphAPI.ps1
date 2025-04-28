@@ -116,6 +116,7 @@ function CallGraphAPI()
     Write-Verbose "Body: $body"
     Write-Verbose "SecureString: $secureString"
     $uri = "https://graph.microsoft.com/$APIVersion/$ResourcePath"
+    $statusCode = $null
     Write-Verbose "Uri: $uri"
     #endregion
 
@@ -252,6 +253,9 @@ function CallGraphAPI()
             'Content-Type' = 'application/json'
         }
     }
+    #endregion
+
+    #region prepare the call
     # Create parameter hashtable for splatting
     $restParams = @{
         Method          = $method
@@ -264,15 +268,15 @@ function CallGraphAPI()
     {
         $restParams['Body'] = $body
     }
-    #Add statuscodevariable if we are running under powershell  7.0 or higher
+    #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
     {
         $restParams['StatusCodeVariable'] = 'statusCode'
     }
-    #endregion
     Write-Verbose "Making the following call to Microsoft Graph:" 
     Write-Verbose "URI: $encodedUri." 
     Write-Verbose "Method: $method."
+    #endregion
     try
     {
         $response = Invoke-RestMethod @restParams
@@ -293,6 +297,11 @@ function CallGraphAPI()
         if ($response.value.Count)
         {
             Write-Verbose "Number of items returned: $($response.value.Count)."
+        }
+        if ($PSVersionTable.PSVersion.Major -ge 7)
+        {
+            Write-Verbose "Status code: $statusCode"
+            Write-Verbose "Status code message: $statusCodeMessage"
         }
     }
     catch

@@ -171,6 +171,7 @@ function CopySecrets()
         {
             $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
             $domain = $data.domain
+            $name = $data.name
             $encrypted = (isEncrypted -data $data)
             if ($encrypted)
             {
@@ -184,7 +185,11 @@ function CopySecrets()
             {
                 $domain = 'Unknown'
             }
-            Write-Host "$i. $domain ($encryption)"
+            if (-not $name)
+            {
+                $name = 'Unknown'
+            }
+            Write-Host "$i. $($name): $domain ($encryption)"
         }
         $index = Read-Host 'Enter the number of the secret you would like to copy. (99 to quit)'
         $secret = $secrets[$index]

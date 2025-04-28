@@ -1,0 +1,15 @@
+{
+    "NoAdminCheck":  "false",
+    "NoIntuneCheck":  "false",
+    "Repo":  "Github",
+    "timeInSeconds":  "60",
+    "NoSignatureVerify":  "true",
+    "NoUpdateCheck":  "false",
+    "maxWaitTime":  "60",
+    "GetDeviceHash":  "false",
+    "NoHashVerify":  "true",
+    "GroupTag":  "ENTRA",
+    "Release":  "2.2",
+    "configFile":  ".\\\\.secrets\\\\config.json",
+    "configuration":  "vars.json"
+}

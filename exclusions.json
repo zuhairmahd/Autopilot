@@ -8,6 +8,7 @@
             "ConnectToTenant",
             "CopyFiles",
             "CreateRelease",
+            "DeleteAutopilotDevice",
             "FormatDateWithTimeZone",
             "GetAutopilotProfileAssignment",
             "GetDeviceBySerial",
