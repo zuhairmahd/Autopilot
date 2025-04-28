@@ -23,7 +23,7 @@ function GetGraphAccessToken()
         $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
         Write-Verbose "Token absolute expiry time: $($tokenExpiryTime)"
         
-        $cachedToken = [PSCustomObject] @{
+        $cachedToken = [ordered] @{
             'domain'           = $domain
             access_token       = $tokenResponse.access_token
             AbsoluteExpiryTime = $tokenExpiryTime
@@ -39,7 +39,7 @@ function GetGraphAccessToken()
         # Add scope if available
         if ($tokenResponse.scope)
         {
-            $cachedToken | Add-Member -MemberType NoteProperty -Name 'scope' -Value $tokenResponse.scope
+            $cachedToken.Add('scope', $tokenResponse.scope)
         }
         
         return $cachedToken

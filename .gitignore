@@ -39,3 +39,4 @@ release/
 Modules/
 pwsh/
 *.bat
+*.csv

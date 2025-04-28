@@ -37,7 +37,7 @@ $serialNumber = 'BTSB25000BCR'
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
-$accessToken = GetGraphAccessToken -configFile $configFile
+$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 #endregion variables
 
-$global:result = DeleteAutopilotDevice -accessToken $accessToken -serialNumber $serialNumber -verbose
+$global:apps = GetAppAssignmentTypes -accessToken $accessToken -Export
