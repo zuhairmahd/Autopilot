@@ -483,7 +483,7 @@ if (-not $NoIntuneCheck)
                                 'yes'
                                 {
                                     Write-Host "Cleaning device..."
-                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
+                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
                                     SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
                                 }
                                 'no'
@@ -505,7 +505,7 @@ if (-not $NoIntuneCheck)
                                 'yes'
                                 {
                                     Write-Host "Wiping device..."
-                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
+                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
                                     SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
                                 }
                                 'no'

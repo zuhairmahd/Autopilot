@@ -44,7 +44,7 @@ function SendDeviceCommand ()
         $success = $true
         Write-Verbose "Attempting to get the latest device action results."
         $action = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
-        Write-Host "Action: $action"
+        Write-Verbose "Action: $action"
         Write-Host "Attempting to perform a device sync."
         $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST
         Write-Verbose "Sync Response: $syncResponse"
