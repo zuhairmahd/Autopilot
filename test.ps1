@@ -40,4 +40,4 @@ $serialNumber = 'BTSB25000BCR'
 $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 #endregion variables
 
-$global:apps = GetAppAssignmentTypes -accessToken $accessToken -Export
+$global:apps = GetAppAssignmentTypes -accessToken $accessToken

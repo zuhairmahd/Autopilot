@@ -212,6 +212,7 @@ $manifest = (Get-Content -Path $ManifestFile | ConvertFrom-Json).$Application
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
 $ExclusionsFile = "$PSScriptRoot\exclusions.json"
 $exclusions = (Get-Content -Path $ExclusionsFile | ConvertFrom-Json).$Application.exclusions
+$scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
 #endregion Define static and dynamic variables
 
 #region logging
@@ -368,7 +369,7 @@ if ($UpdateOnly)
     exit 0
 }
 
-if (-not($NoAdminCheck -or $UpdateOnly -or $Reconfigure -or $check ))
+if (-not($NoAdminCheck -or $UpdateOnly -or $Reconfigure -or $check -or $serialNumber -ne ''))
 {
     Write-Host 'Checking whether the script has sufficient permissions to run.'
     if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -482,6 +483,7 @@ if (-not $NoIntuneCheck)
                                 'yes'
                                 {
                                     Write-Host "Cleaning device..."
+                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
                                     SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
                                 }
                                 'no'
@@ -503,6 +505,7 @@ if (-not $NoIntuneCheck)
                                 'yes'
                                 {
                                     Write-Host "Wiping device..."
+                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
                                     SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
                                 }
                                 'no'
