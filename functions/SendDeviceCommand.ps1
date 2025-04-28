@@ -12,6 +12,7 @@ function SendDeviceCommand ()
     $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
     $wipeURI = "$deviceManagementUri/wipe"
     $syncUri = "$deviceManagementUri/syncDevice"
+    $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
     $success = $false
     if ($command -eq "clean")
     {
@@ -19,7 +20,7 @@ function SendDeviceCommand ()
         $body = @{
             'keepUserData' = $false
         } | ConvertTo-Json
-        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0'
+        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' -deligated -scopes $scopes
         Write-Verbose "Response: $response"
     }
     elseif ($command -eq 'wipe')
@@ -30,7 +31,7 @@ function SendDeviceCommand ()
             'keepUserData'         = $false
             'obliterationBehavior' = "doNotObliterate"
         } | ConvertTo-Json
-        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0'
+        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0' -deligated -scopes $scopes
         Write-Verbose "Response: $response"
     }
     else
