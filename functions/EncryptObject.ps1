@@ -14,37 +14,45 @@ Author: Zuhair Mahmoud
 #>
     [CmdletBinding()]
     param (
-        [psObject]$plainObject,
+        [hashtable]$PlainObject,
         [string[]]$excludeFields
     )
+
     $encryptedObject = [ordered] @{}
-    foreach ($prop in $plainObject.PSObject.Properties)
+    Write-Verbose "The exclude list is $($excludeFields -join ',')"
+    foreach ($key in $plainObject.keys)
     {
-        Write-Verbose "The exclude list is $($excludeFields -join ',')"
-        Write-Verbose "Checking if $($prop.Name) is in the exclude list."
-        if ($excludeFields -contains $prop.Name)
+        Write-Verbose "Checking if $key is in the exclude list."
+        if ($excludeFields -contains $key)
         {
-            Write-Verbose "Skipping $($prop.Name) because it is in the exclude list."
-            Write-Verbose "Adding the raw entry $($prop.Name) with value $($prop.Value) to the encrypted object."
-            $encryptedObject.Add($prop.Name, $prop.Value)
+            Write-Verbose "Skipping $key because it is in the exclude list."
+            Write-Verbose "Adding the raw entry $key with value $($PlainObject[$key]) to the encrypted object."
+            $encryptedObject.Add($key, $PlainObject[$key])
             continue
         }
-        Write-Verbose "Encrypting $($prop.Name)."
-        $propValue = $prop.Value.ToString()
+        Write-Verbose "Encrypting $key."
+        $propValue = if ($null -eq $PlainObject[$key])
+        {
+            ""
+        }
+        else
+        {
+            $PlainObject[$key].ToString()
+        }
         # Convert the value to base64 string.
         $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($propValue))
         # Check if the encoding was successful.
         if ($null -ne $encodedValue)
         {
-            Write-Verbose "Successfully encrypted $($prop.Name)."
+            Write-Verbose "Successfully encrypted $key."
             # Add the encoded dictionary to the hash table.
-            $encryptedObject.Add($prop.Name, $encodedValue)
+            $encryptedObject.Add($key, $encodedValue)
         }
         else
         {
             Write-Verbose "Failed to encrypt $($prop.Name)."
             # Add the raw entry to the hash table.
-            $encryptedObject.Add($prop.Name, $propValue)
+            $encryptedObject.Add($key, $decryptedObject[$key])
         }
     }
     if ($encryptedObject)
