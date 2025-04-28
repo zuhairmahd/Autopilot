@@ -1,4 +1,5 @@
-function GetDeviceInfo() {
+function GetDeviceInfo()
+{
     [CmdletBinding()]
     param
     (
@@ -10,22 +11,14 @@ function GetDeviceInfo() {
         [string]$AssignedUser = '',
         [switch]$NoHash
     )
+    #Print verbose logs of the received parameters.
+    Write-Verbose "Name: $name"
+    Write-Verbose "GroupTag: $GroupTag"
+    Write-Verbose "AssignedUser: $AssignedUser"
+    Write-Verbose "NoHash: $NoHash"
+
     $device = @{}
     $session = New-CimSession
-    if (-not $NoHash) {
-        Write-Verbose "Checking $name for hardware hash."
-        $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
-        Write-Verbose "The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
-        if ($devDetail) {
-            $hash = $devDetail.DeviceHardwareData
-            $device.Add('HardwareHash', $hash)
-            Write-Verbose "The hardware hash is $hash."
-        }
-        else {
-            Write-Error 'No hardware hash was found.'
-            exit 1
-        }
-    }
     #Get other -NoTypeInformation
     $serial = (Get-CimInstance -CimSession $session -Class Win32_BIOS).SerialNumber
     #Add the serial number to the hash table.
@@ -44,6 +37,27 @@ function GetDeviceInfo() {
     $device.add('GroupTag', $GroupTag)
     Write-Verbose "The assigned user is $AssignedUser"
     $device.add('AssignedUser', $AssignedUser)
+    if (-not $NoHash)
+    {
+        Write-Verbose "Checking $name for hardware hash."
+        $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
+        Write-Verbose "The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
+        if ($devDetail)
+        {
+            $hash = $devDetail.DeviceHardwareData
+            $device.Add('HardwareHash', $hash)
+            Write-Verbose "The hardware hash is $hash."
+        }
+        else
+        {
+            Write-Error 'No hardware hash was found.'
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Verbose "No hardware hash was requested."
+    }
     Remove-CimSession $session
     return $device
 }

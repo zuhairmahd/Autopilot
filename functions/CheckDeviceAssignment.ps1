@@ -62,10 +62,11 @@ function CheckDeviceAssignment()
     Write-Verbose "Found $($autopilotDevices.value.count) Autopilot devices."
     Write-Verbose "Looking for the device with serial number $serialNumber."
     $assignment = $autopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
-    Write-Verbose "Found the device matching serial number $serialNumber."
+    Write-Verbose "Assignment result: $($assignment)."
     Write-Verbose "Device assignment: $($assignment | ConvertTo-Json -Depth 10)"
     if ($assignment)
     {
+        Write-Verbose "Found the device matching serial number $serialNumber."
         Write-Verbose 'The device is registered in Intune.'
         Write-Verbose 'Checking profile assignment'
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)?`$expand=deploymentProfile"

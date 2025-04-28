@@ -1,33 +1,5 @@
 {
   "register-device": {
-    "Scripts": [
-      {
-        "name": "Register-Device",
-        "version": {
-          "Major": 2,
-          "Minor": 2,
-          "Build": 2,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "21DABEF8D8ECA966EA51F69DD483FA47CC641CA9734C5C81B8505C64B81A3B67"
-      }
-    ],
-    "configurations": [
-      {
-        "name": "exclusions",
-        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
-      },
-      {
-        "name": "init",
-        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
-      },
-      {
-        "name": "remoteManifest",
-        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
-      }
-    ],
     "Functions": [
       {
         "name": "CallGraphAPI",
@@ -99,7 +71,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "CEAC61EEC59802ACA3B097645B66CFBC0C3D2A67809911C73D74D6DA68A2E097"
+        "hash": "9896AC1108A99E5D2302DC0AD2544D629B3DD94D16E74AB55716ED56C86746FF"
       },
       {
         "name": "DisplayNumericMenu",
@@ -135,7 +107,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "2C660048B3CC86F43B4493A5C86E6C70CEE698911F9ED8F6590B53FA3D9B051A"
+        "hash": "1EA8BD8D0BDA20153E774BF4715A53A5D3DDC6CA51FB950340DD40BCF99AB856"
       },
       {
         "name": "GetAppAssignmentTypes",
@@ -195,7 +167,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "F80C7CB361C861FB64DCFDC048EBF4643E77F10BA54E8BE5DF7880CB97837CF7"
+        "hash": "E3D18F9BEEBBF6843345B791B49056E9A83637A1AB8E6F5B7356A21E074F111F"
       },
       {
         "name": "GetLatestGithubrRelease",
@@ -318,6 +290,20 @@
         "hash": "FC4B077F3F8DED9E75AC5ACF0B9E2EBE93D22E9CBC033C55534F74291F3A99EC"
       }
     ],
+    "configurations": [
+      {
+        "name": "exclusions",
+        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
+      },
+      {
+        "name": "init",
+        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
+      },
+      {
+        "name": "remoteManifest",
+        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
+      }
+    ],
     "Cmds": [
       {
         "name": "check",
@@ -390,6 +376,20 @@
           "MinorRevision": -1
         },
         "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
+      }
+    ],
+    "Scripts": [
+      {
+        "name": "Register-Device",
+        "version": {
+          "Major": 2,
+          "Minor": 2,
+          "Build": 2,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "DA1856D2CAD0F0D68854804BC58DB8681DE21DC9935B043DB364FEE4F190348D"
       }
     ]
   }
