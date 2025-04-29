@@ -65,7 +65,8 @@ function GetDeviceEnrollmentStatus()
     [CmdletBinding()]
     param (
         [string]$serialNumber,
-        [string]$accessToken
+        [string]$accessToken,
+        $settings = $settings
     )
 
     #region Define variables
@@ -139,7 +140,7 @@ function GetDeviceEnrollmentStatus()
         {
             Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilotEvents.serialNumber)"
             $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
-            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json)"
+            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json -Depth 10)"
         }
         else
         {
@@ -191,8 +192,8 @@ function GetDeviceEnrollmentStatus()
         {
             Write-Verbose "Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
             Write-Verbose "Passing $deviceManagementUri/$($managedDevice.Id)/$userUri to graph."
-            $user = CallGraphAPI -AccessToken $accessToken -ResourcePath "$deviceManagementUri/$($managedDevice.Id)/$userUri" -APIVersion 'beta'
-            if ($user.userPrincipalName -like '*@*' -or $user.userName -like '*@*')
+            $user = (CallGraphAPI -AccessToken $accessToken -ResourcePath "$deviceManagementUri/$($managedDevice.Id)/$userUri" -APIVersion 'beta').value
+            if ($user.userPrincipalName -match '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' -and $user.userPrincipalName -match $settings.domain)
             {
                 Write-Verbose 'User is an Azure AD user'
                 $azureUser = $true
@@ -208,7 +209,7 @@ function GetDeviceEnrollmentStatus()
                 user              = $user.value
                 lastLogOnDateTime = $device.usersLoggedOn.lastLogonDateTime
             }
-            Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json)"
+            Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json -Depth 10)"
         }
         else
         {
@@ -307,7 +308,8 @@ function GetDeviceEnrollmentStatus()
     $deviceState.add('importedAutopilotDevice', $returnedImportedDevice)
     $deviceState.add('hasDeviceObject', $hasDeviceObject)
     $deviceState.add('device', $returnedDevice)
-    Write-Verbose "Device State: $($deviceState | ConvertTo-Json)"
+    Write-Verbose "Device State: $($deviceState | ConvertTo-Json -Depth 10)"
     #endregion
+    $global:enrollment = $deviceState
     return $deviceState
 }

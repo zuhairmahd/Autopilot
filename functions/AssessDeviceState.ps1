@@ -359,17 +359,20 @@ function AssessDeviceState()
         'NextUserReadiness'
         {
             Write-Host "Checking if the device is ready for the next user..."
-            if (CheckAutopilotState -enrollmentState $enrollmentState -settings $settings)
+            if ($enrollmentState.inAutopilot)
             {
-                Write-Host "Device passed."
-                Write-Host "The device is ready to assign to the user"
-                return $true
-            }
-            else 
-            {
-                Write-Host "Device failed."
-                Write-Host "The device is not ready to be assigned to the user."
-                return $false
+                switch ($enrollmentState.autopilot.device.enrollmentState) 
+                {
+                    notContacted 
+                    {
+                        if (-not $enrollmentState.managed)
+                        {
+                            Write-Host "The device has not completed the Technition Flow."
+                            Write-Host "You may give the device to a user, but their setup time will be longer than usual."
+                            return $false
+                        }
+                    }
+                }
             }
         }
         'TroubleShooting'
