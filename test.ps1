@@ -26,7 +26,8 @@ else
 
 #region variables
 $scopes = "offline_access Device.ReadWrite.All DeviceLocalCredential.Read.All DeviceManagementApps.Read.All DeviceManagementApps.ReadWrite.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All Directory.ReadWrite.All Domain.ReadWrite.All Group.Read.All GroupMember.ReadWrite.All Organization.ReadWrite.All"
-$serialNumber = 'BTSB25000BCR'
+$serialNumber = '0F3CFP724223KV'
+# $serialNumber = 'BTSB25000BCR'
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -40,4 +41,13 @@ $serialNumber = 'BTSB25000BCR'
 $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -Interactive
 #endregion variables
 
-$global:apps = GetAppAssignmentTypes -accessToken $accessToken
+if (deleteAutopilotDevice -accessToken $accessToken -serialNumber $serialNumber)
+{
+    Write-Host "Device with serial number $serialNumber deleted successfully." -ForegroundColor Green
+}
+else
+{
+    Write-Host "Failed to delete device with serial number $serialNumber." -ForegroundColor Red
+}
+
+# $global:apps = GetAppAssignmentTypes -accessToken $accessToken

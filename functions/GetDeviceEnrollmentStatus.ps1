@@ -150,12 +150,17 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose 'Device is not an autopilot device.'
     }
-    
-    Write-Verbose "Getting imported Autopilot device info for serial number $($autopilotDevice.serialNumber)"
-    $importedDeviceFilter = "serialNumber eq '$($autopilotDevice.serialNumber)'"
-    $importedAutopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter
-    Write-Verbose "Found $($importedAutopilotDevices.value.count) Imported Autopilot devices."
-    $importedAutopilotDevice = $importedAutopilotDevices.value | Where-Object { $_.serialNumber -match $serialNumber }
+    if ($autopilotDevice)
+    {
+        Write-Verbose "Getting imported Autopilot device info for serial number $($autopilotDevice.serialNumber) from autopilot object."
+        $importedDeviceFilter = "serialNumber eq '$($autopilotDevice.serialNumber)'"
+    }
+    else
+    {
+        Write-Verbose "Getting imported Autopilot device info for serial number $serialNumber from serial number."
+        $importedDeviceFilter = "serialNumber eq '$serialNumber'"
+    }
+    $importedAutopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter).value
     Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($importedAutopilotDevice)
     {
@@ -214,10 +219,19 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose 'Device not found in Intune'
     }
-    $deviceId = $autopilotDevice.azureActiveDirectoryDeviceId
-    $deviceFilter = "deviceId eq '$deviceId'"
-    $device = CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceUri -filter $deviceFilter -consistencyLevel
-    if ($device -and $device.value.count -gt 0)
+    if ($managedDevice)
+    {
+        Write-Verbose "Looking up device with Azure Active Directory id $($autopilotDevice.azureActiveDirectoryDeviceId)"
+        $deviceId = $autopilotDevice.azureActiveDirectoryDeviceId
+        $deviceFilter = "deviceId eq '$deviceId'"
+    }
+    else
+    {
+        Write-Verbose "Attempting to find device with serial number."
+        $deviceFilter = "endswith(displayName,'$serialNumber')"
+    }
+    $device = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceUri -filter $deviceFilter -consistencyLevel).value
+    if ($device -and $device.count -gt 0)
     {
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $hasDeviceObject = $true

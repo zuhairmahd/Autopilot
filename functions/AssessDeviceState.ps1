@@ -60,10 +60,17 @@ function CheckAutopilotState()
         $settings = $settings
     )
 
+    $success = $false
+    if (-not ($enrollmentState.InAutopilot -and $enrollmentState.managed))
+    {
+        Write-Host "The device is not registered in Autopilot."
+        Write-Host "The device must be registered before it is assigned to another user."
+        return $success
+    }
     # Check if the device is enrolled in Autopilot and display the enrollment state
     if ($enrollmentState.inAutopilot)
     {
-        Write-Host "The device is enrolled in Autopilot."
+        Write-Host "The device is registered in Autopilot."
         Write-Host "--------------------------------"
         Write-Host "Checking whether the device is assigned to an autopilot profile..."
         if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
@@ -72,12 +79,13 @@ function CheckAutopilotState()
             Write-Host "Autopilot profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
             Write-Host "Autopilot profile display name: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
             Write-Host "Assignment date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | FormatDateWithTimeZone)"
+            $success = $true
         }
         else
         {
             Write-Host "There is an issue with the device's autopilot profile assignment."
             Write-Host "Autopilot profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
-            return $false
+            return $success
         }
         Write-Host "---------------------------------"
         Write-Host "Checking the device enrollment status..."

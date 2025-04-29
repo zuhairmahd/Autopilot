@@ -60,12 +60,12 @@ function DeleteAutopilotDevice()
         Write-Verbose "Delete response: $($deleteResponse | Out-String)"
         if ($null -eq $deleteResponse -or $deleteResponse -eq '')
         {
-            Write-Host "Autopilot device with serial number $($autopilotDevice.serialNumber) deleted successfully."
+            Write-Verbose "Autopilot device with serial number $($autopilotDevice.serialNumber) deleted successfully."
             $success = $true
         }
         else
         {
-            Write-Host "Failed to delete autopilot device with serial number $($autopilotDevice.serialNumber)."
+            Write-Verbose "Failed to delete autopilot device with serial number $($autopilotDevice.serialNumber)."
         }
     }
     else

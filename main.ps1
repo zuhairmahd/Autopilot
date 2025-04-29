@@ -222,7 +222,6 @@ function ProcessSerialNumber
     Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
     Write-Verbose "The imported state is: $($enrollmentState.imported)"
     Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
-
     if (AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings -AssessmentType $AssessmentType)
     {
         Write-Host 'The device is in the correct state.' -ForegroundColor Green
