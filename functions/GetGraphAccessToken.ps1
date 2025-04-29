@@ -10,6 +10,8 @@ function GetGraphAccessToken()
         [switch]$Deligated,
         [parameter(parameterSetName = 'Deligated')]
         [string]$Scopes,
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$Interactive,
         [switch]$ForceNewToken,
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
@@ -149,7 +151,7 @@ function GetGraphAccessToken()
             return $token
         }
     }
-
+    
     function Test-RefreshTokenValidity
     {
         param(
@@ -475,8 +477,16 @@ function GetGraphAccessToken()
         # Generate a random state string
         Write-Verbose "Generating random state string."
         $state = [System.Guid]::NewGuid().ToString()
-        $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
         
+        if ($interactive)
+        {
+            $redirectUri = "http://localhost:8080"
+        }
+        else 
+        {
+            $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+        }
+
         #region Format scopes properly if necessary
         $scopesFormatted = $scopes
         Write-Verbose "Original scopes: $scopes"
@@ -539,135 +549,183 @@ function GetGraphAccessToken()
         $encodedScopes = [uri]::EscapeDataString($scopesFormatted)
         $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
         
-        # Step 1: Open the authorization URL
-        $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
-        Write-Verbose "Authorization URL: $authUrl"
-        Write-Host "Opening browser for user authentication and consent..."
-        Start-Process $authUrl
-        Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
-        $code = Read-Host "Enter the authorization code"
-        Write-Verbose "Received authorization code input from user"
-        
-        #The $code string above contains the intire URL. Extract the code from the URL.
-        if ($code -match '.*code=([^&]+).*')
+        # Attempt to fetch token using HTTP listener first
+        $automaticFlowSuccess = $false
+        $code = $null
+        if (-not $Interactive)        
         {
-            $code = $Matches[1]
-            Write-Verbose "Extracted code from URL: $($code.Substring(0, [Math]::Min(10, $code.Length)))..."
+            Write-Verbose "Using non-interactive mode (manual code input)"
+            $automaticFlowSuccess = $false
         }
         else
         {
-            Write-Warning "Could not extract code parameter from the provided URL"
-            Write-Verbose "Input received: $($code.Substring(0, [Math]::Min(30, $code.Length)))..."
-        }
-        
-        # Step 2: Exchange the code for a token
-        Write-Verbose "Exchanging authorization code for access token"
-        $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
-        $tokenRequestBody = @{
-            client_id     = $clientId
-            client_secret = $clientSecret
-            code          = $code
-            redirect_uri  = $redirectUri
-            grant_type    = "authorization_code"
-            scope         = $scopesFormatted
-        }
-        
-        Write-Verbose "Token request parameters:"
-        Write-Verbose "  Endpoint: $tokenEndpoint"
-        Write-Verbose "  Client ID: $clientId"
-        Write-Verbose "  Redirect URI: $redirectUri"
-        Write-Verbose "  Grant Type: authorization_code"
-        Write-Verbose "  Scopes: $scopesFormatted"
-        
-        try
-        {
-            Write-Verbose "Sending token request to $tokenEndpoint"
-            $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody -ErrorVariable tokenError
-            Write-Verbose "Access token received successfully"
-            
-            # Log the token response properties (without exposing the actual token)
-            Write-Verbose "Token response contains the following properties:"
-            foreach ($prop in $tokenResponse.PSObject.Properties.Name)
+            # Try the automatic HTTP listener flow first
+            try
             {
-                if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
+                Write-Verbose "Attempting automatic HTTP listener flow"
+                $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
+                Write-Verbose "Authorization URL: $authUrl"
+                Write-Host "Opening browser for user authentication and consent..."
+                Start-Process $authUrl
+                $listenerResult = Start-HttpListener -redirectUri $redirectUri
+                if ($listenerResult.Success)
                 {
-                    $tokenLength = $tokenResponse.$prop.Length
-                    Write-Verbose "  $($prop): [Token of length $tokenLength]"
+                    Write-Verbose "HTTP listener successfully captured the authorization code"
+                    $code = $listenerResult.Code
+                    $automaticFlowSuccess = $true
                 }
                 else
                 {
-                    Write-Verbose "  $($prop): $($tokenResponse.$prop)"
+                    Write-Warning "HTTP listener failed to capture the authorization code: $($listenerResult.ErrorMessage)"
+                    Write-Verbose "Will fall back to manual code input"
+                    $automaticFlowSuccess = $false
                 }
             }
-            
-            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            # Cache the access token based on cache type
-            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            
-            # Save the refresh token to config file regardless of cache type
-            if ($tokenResponse.refresh_token)
+            catch
             {
-                Save-RefreshTokenToConfig -refreshToken $tokenResponse.refresh_token -configFilePath $configFilePath
+                Write-Warning "Error in automatic HTTP listener flow: $_"
+                Write-Verbose "Will fall back to manual code input"
+                $automaticFlowSuccess = $false
             }
-            
-            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
         }
-        catch
+        
+        # Fall back to manual code input if automatic flow failed
+        if (-not $automaticFlowSuccess)
         {
-            Write-Error "Failed to get delegated access token: $_"
-            if ($tokenError)
+            # Step 1: Open the authorization URL
+            $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
+            Write-Verbose "Authorization URL: $authUrl"
+            Write-Host "Opening browser for user authentication and consent..."
+            Start-Process $authUrl
+            Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
+            $code = Read-Host "Enter the authorization code"
+            Write-Verbose "Received authorization code input from user"
+            #The $code string above contains the intire URL. Extract the code from the URL.
+            if ($code -match '.*code=([^&]+).*')
             {
-                Write-Verbose "Error details: $($tokenError | Out-String)"
-                if ($_.ErrorDetails.Message)
+                $code = $Matches[1]
+                Write-Verbose "Extracted code from URL: $($code.Substring(0, [Math]::Min(10, $code.Length)))..."
+            }
+            else
+            {
+                Write-Warning "Could not extract code parameter from the provided URL"
+                Write-Verbose "Input received: $($code.Substring(0, [Math]::Min(30, $code.Length)))..."
+            }
+        }           
+        # Regardless of how we got the code, exchange it for a token
+        if ($code)
+        {
+            Write-Verbose "Exchanging authorization code for access token"
+            $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+            $tokenRequestBody = @{
+                client_id     = $clientId
+                client_secret = $clientSecret
+                code          = $code
+                redirect_uri  = $redirectUri
+                grant_type    = "authorization_code"
+                scope         = $scopesFormatted
+            }
+            Write-Verbose "Token request parameters:"
+            Write-Verbose "  Endpoint: $tokenEndpoint"
+            Write-Verbose "  Client ID: $clientId"
+            Write-Verbose "  Redirect URI: $redirectUri"
+            Write-Verbose "  Grant Type: authorization_code"
+            Write-Verbose "  Scopes: $scopesFormatted"
+        
+            try
+            {
+                Write-Verbose "Sending token request to $tokenEndpoint"
+                $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody -ErrorVariable tokenError
+                Write-Verbose "Access token received successfully"
+            
+                # Log the token response properties (without exposing the actual token)
+                Write-Verbose "Token response contains the following properties:"
+                foreach ($prop in $tokenResponse.PSObject.Properties.Name)
                 {
-                    Write-Verbose "Error message details: $($_.ErrorDetails.Message)"
-                    try
+                    if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
                     {
-                        $errorJson = $_.ErrorDetails.Message | ConvertFrom-Json
-                        Write-Verbose "Error JSON: $($errorJson | ConvertTo-Json -Depth 3)"
-                        Write-Verbose "Error code: $($errorJson.error)"
-                        Write-Verbose "Error description: $($errorJson.error_description)"
+                        $tokenLength = $tokenResponse.$prop.Length
+                        Write-Verbose "  $($prop): [Token of length $tokenLength]"
                     }
-                    catch
+                    else
                     {
-                        Write-Verbose "Could not convert error details to JSON: $_"
+                        Write-Verbose "  $($prop): $($tokenResponse.$prop)"
                     }
                 }
-            }
             
-            if ($_.Exception.Response)
+                $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+                # Cache the access token based on cache type
+                Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            
+                # Save the refresh token to config file regardless of cache type
+                if ($tokenResponse.refresh_token)
+                {
+                    Save-RefreshTokenToConfig -refreshToken $tokenResponse.refresh_token -configFilePath $configFilePath
+                }
+            
+                return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+            }
+            catch
             {
-                Write-Verbose "Status code: $($_.Exception.Response.StatusCode)"
+                Write-Error "Failed to get delegated access token: $_"
+                if ($tokenError)
+                {
+                    Write-Verbose "Error details: $($tokenError | Out-String)"
+                    if ($_.ErrorDetails.Message)
+                    {
+                        Write-Verbose "Error message details: $($_.ErrorDetails.Message)"
+                        try
+                        {
+                            $errorJson = $_.ErrorDetails.Message | ConvertFrom-Json
+                            Write-Verbose "Error JSON: $($errorJson | ConvertTo-Json -Depth 3)"
+                            Write-Verbose "Error code: $($errorJson.error)"
+                            Write-Verbose "Error description: $($errorJson.error_description)"
+                        }
+                        catch
+                        {
+                            Write-Verbose "Could not convert error details to JSON: $_"
+                        }
+                    }
+                }
+            
+                if ($_.Exception.Response)
+                {
+                    Write-Verbose "Status code: $($_.Exception.Response.StatusCode)"
                 
-                # Try to get more information from the response
-                try
-                {
-                    $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
-                    $responseBody = $reader.ReadToEnd()
-                    $reader.Close()
-                    Write-Verbose "Response body: $responseBody"
-                    
+                    # Try to get more information from the response
                     try
                     {
-                        $responseJson = $responseBody | ConvertFrom-Json
-                        Write-Verbose "Error code: $($responseJson.error)"
-                        Write-Verbose "Error description: $($responseJson.error_description)"
+                        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                        $responseBody = $reader.ReadToEnd()
+                        $reader.Close()
+                        Write-Verbose "Response body: $responseBody"
+                    
+                        try
+                        {
+                            $responseJson = $responseBody | ConvertFrom-Json
+                            Write-Verbose "Error code: $($responseJson.error)"
+                            Write-Verbose "Error description: $($responseJson.error_description)"
+                        }
+                        catch
+                        {
+                            Write-Verbose "Could not parse response body as JSON"
+                        }
                     }
                     catch
                     {
-                        Write-Verbose "Could not parse response body as JSON"
+                        Write-Verbose "Could not read response stream: $_"
                     }
                 }
-                catch
-                {
-                    Write-Verbose "Could not read response stream: $_"
-                }
+                return $null
             }
-            
+        }
+        else
+        {
+            Write-Error "Failed to obtain authorization code. Cannot proceed with token request."
             return $null
         }
-    }
-    
+    }   
+
     function Get-ClientCredentialsToken
     {
         param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
