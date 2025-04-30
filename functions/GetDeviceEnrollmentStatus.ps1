@@ -25,41 +25,6 @@ Checks if a device is enrolled in Intune and imported into Autopilot.
 #>
 #endregion help
 
-
-function GetAutoPilotDeviceSerialNumber() 
-{
-    [CmdletBinding()]
-    param (
-        [string]$serialNumber,
-        [string]$accessToken
-    )
-
-    #write a verbose log  of receved parameters
-    Write-Verbose "Received serial number: $serialNumber"
-    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI
-    Write-Verbose "Received $($autopilotDevices.value.Count) devices from Autopilot."
-    $serialNumbers = $autopilotDevices.value | Select-Object -ExpandProperty serialNumber
-    Write-Verbose "Received $($serialNumbers.Count) serial numbers from Autopilot."
-    Write-Verbose "Serial numbers received from Autopilot: $($serialNumbers -join ', ')"
-    foreach ($device in $serialNumbers)
-    {
-        Write-Verbose "Processing device with serial number $device"
-        $filteredDevice = $device -replace '\s', ''
-        Write-Verbose "Filtered device serial number: $filteredDevice"
-        if ($filteredDevice -eq $serialNumber)
-        {
-            Write-Verbose "Device with serial number $serialNumber found in Autopilot."
-            return $device
-        }
-        else
-        {
-            Write-Verbose "Device with serial number $serialNumber not found in Autopilot."
-        }
-    }
-    return $valueToReturn
-}
-
 function GetDeviceEnrollmentStatus()
 {
     [CmdletBinding()]
@@ -95,6 +60,10 @@ function GetDeviceEnrollmentStatus()
     $userUri = "users"
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
+    $autopilotDeviceParams = @{
+        AccessToken  = $accessToken 
+        ResourcePath = $autoPilotDeviceURI
+    }
     #endregion
 
     #region Get the autopilot device info
@@ -110,7 +79,11 @@ function GetDeviceEnrollmentStatus()
         if ($autoPilotDeviceSerialNumber)
         {
             Write-Verbose "Device with serial number $autoPilotDeviceSerialNumber found in Autopilot."
-            $autopilotDeviceFilter = "contains(serialNumber,'$autoPilotDeviceSerialNumber')"
+            $autoPilotDeviceSerialNumber = $autoPilotDeviceSerialNumber.Trim()
+            $autopilotDeviceFilter = "serialNumber eq '$autoPilotDeviceSerialNumber'"
+            $autopilotDeviceParams += @{
+                'filter' = $autopilotDeviceFilter
+            }
         }
         else
         {
@@ -120,8 +93,12 @@ function GetDeviceEnrollmentStatus()
     else
     {
         Write-Verbose "Not a VMWare device. Continuing"
+        $autopilotDeviceParams += @{
+            Filter = $autopilotDeviceFilter
+        }
     }
-    $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
+    $autopilotDeviceResult = CallGraphAPI @autopilotDeviceParams
+    $autopilotDevice = $autopilotDeviceResult.value
     Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
     Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($autopilotDevice)
@@ -160,24 +137,24 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "Getting imported Autopilot device info for serial number $serialNumber from serial number."
         $importedDeviceFilter = "serialNumber eq '$serialNumber'"
-    }
-    $importedAutopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -filter $importedDeviceFilter).value
-    Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
-    if ($importedAutopilotDevice)
-    {
-        Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
-        $imported = $true
-        $returnedImportedDevice = $importedAutopilotDevice
-    }
-    else
-    {
-        Write-Verbose 'Device not found in the list of imported Autopilot devices'
-        Write-Verbose "This means the device may have already been registered."
+        $importedAutopilotDeviceResult = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -Filter $importedDeviceFilter
+        $importedAutopilotDevice = $importedAutopilotDeviceResult.value
+        Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+        if ($importedAutopilotDevice)
+        {
+            Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
+            $imported = $true
+            $returnedImportedDevice = $importedAutopilotDevice
+        }
+        else
+        {
+            Write-Verbose 'Device not found in the list of imported Autopilot devices'
+            Write-Verbose "This means the device may have already been registered."
+        }
     }
     #endregion
 
-    #region Get device info
-    Write-Verbose "Getting device info for serial number $serialNumber"
+    #region Get the managed device info
     $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -APIVersion 'beta' -Filter $managedDeviceFilter).value
     Write-Verbose "Device serial number: $($managedDevice.serialNumber)"
     if ($managedDevice)
@@ -188,12 +165,16 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
         $users = $managedDevice.usersLoggedOn
         Write-Verbose "Users logged on: $($users)"
+        Write-Verbose "Last logon: $managedDevice.usersLoggedOn.lastLogonDateTime"
         if ($users)
         {
             Write-Verbose "Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
             Write-Verbose "Passing $deviceManagementUri/$($managedDevice.Id)/$userUri to graph."
             $user = (CallGraphAPI -AccessToken $accessToken -ResourcePath "$deviceManagementUri/$($managedDevice.Id)/$userUri" -APIVersion 'beta').value
-            if ($user.userPrincipalName -match '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$' -and $user.userPrincipalName -match $settings.domain)
+            Write-Verbose "User Display Name: $($user.displayName)"
+            Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
+            Write-Verbose "Checking if the user principal name matches the domain $($settings.domain)"
+            if ($user.userPrincipalName -match $settings.domain)
             {
                 Write-Verbose 'User is an Azure AD user'
                 $azureUser = $true
@@ -202,12 +183,11 @@ function GetDeviceEnrollmentStatus()
             {
                 Write-Verbose 'User is not an Azure AD user'
             }
-            Write-Verbose "User Display Name: $($user.displayName)"
-            Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
+
             $loggedOnUsers = @{
                 AzureUser         = $azureUser
-                user              = $user.value
-                lastLogOnDateTime = $device.usersLoggedOn.lastLogonDateTime
+                user              = $user
+                lastLogOnDateTime = $managedDevice.usersLoggedOn.lastLogonDateTime
             }
             Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json -Depth 10)"
         }
@@ -220,10 +200,10 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose 'Device not found in Intune'
     }
-    if ($managedDevice)
+    if ($managedDevice )
     {
-        Write-Verbose "Looking up device with Azure Active Directory id $($autopilotDevice.azureActiveDirectoryDeviceId)"
-        $deviceId = $autopilotDevice.azureActiveDirectoryDeviceId
+        Write-Verbose "Looking up device with Azure Active Directory id $($managedDevice.azureActiveDirectoryDeviceId)"
+        $deviceId = $managedDevice.azureActiveDirectoryDeviceId
         $deviceFilter = "deviceId eq '$deviceId'"
     }
     else

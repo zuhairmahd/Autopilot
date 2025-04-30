@@ -82,10 +82,12 @@ function validateInput()
     $MaxUserNameLength = $settings.MaxUserNameLength
     $MaxSerialNumberLength = $settings.MaxSerialNumberLength
     $MinSerialNumberLength = $settings.MinSerialNumberLength
+    $minUsernameLength = $settings.MinUsernameLength
     $returnValue = @{ valid = $false; value = $null } # Initialize return hash table
     Write-Verbose "Validating input of type '$type': '$UserInput'"
     Write-Verbose "Domain: $domain"
     Write-Verbose "MaxUserNameLength: $MaxUserNameLength"
+    Write-Verbose "MinUserNameLength: $minUsernameLength"
     Write-Verbose "MaxSerialNumberLength: $MaxSerialNumberLength"
     Write-Verbose "MinSerialNumberLength: $MinSerialNumberLength"
     # Trim input to remove any leading or trailing spaces
@@ -106,7 +108,7 @@ function validateInput()
                 Write-Verbose "Serial number is shorter than minimum length of $MinSerialNumberLength characters"
                 Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
             }
-            elseif ($UserInput -match '^[a-zA-Z0-9]+$') # Check if alphanumeric
+            elseif ($UserInput -match '^[a-zA-Z0-9-]+$') # Check if alphanumeric or dash
             {
                 Write-Verbose "Serial number validation passed"
                 $returnValue.valid = $true
@@ -120,10 +122,11 @@ function validateInput()
         'userName'
         {
             Write-Verbose "Checking user name length: $($UserInput.Length)"
-            if ($UserInput.Length -gt $MaxUserNameLength)
+            if ($UserInput.Length -gt $MaxUserNameLength -or $UserInput.Length -lt $minUsernameLength -or $UserInput -match '^\d' -and $null -ne $UserInput)
             {
                 Write-Verbose "Username exceeds maximum length of $MaxUserNameLength characters"
-                Write-Host "Username cannot exceed $MaxUserNameLength characters." -ForegroundColor Red
+                Write-Host "Username needs to have a minimum of $minUsernameLength characters and cannot exceed $MaxUserNameLength characters." -ForegroundColor Red
+                Write-Host "The username cannot start with a digit." -ForegroundColor Red
             }
             else
             {
@@ -222,6 +225,12 @@ function ProcessSerialNumber
     Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
     Write-Verbose "The imported state is: $($enrollmentState.imported)"
     Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
+    if ($enrollmentState.managed)
+    {
+        Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
+        Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
+        Write-Host "Manufacturer: $($enrollmentState.managedDevice.device.manufacturer)"
+    }
     if (AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings -AssessmentType $AssessmentType)
     {
         Write-Host 'The device is in the correct state.' -ForegroundColor Green
@@ -255,7 +264,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         Write-Verbose "Got serial number: $SerialNumber"
         Write-Host "Checking device with serial number $($SerialNumber)..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
-        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
+        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness' 
     }
 }
 

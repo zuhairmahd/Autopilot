@@ -21,15 +21,15 @@ function GetAutoPilotDeviceSerialNumber()
         Write-Verbose "Filtered device serial number: $filteredDevice"
         if ($filteredDevice -eq $serialNumber)
         {
-            Write-Verbose "Device with serial number $serialNumber found in Autopilot."
+            Write-Verbose "Found a match for serial number $serialNumber in Autopilot."
             return $device
         }
         else
         {
-            Write-Verbose "Device with serial number $serialNumber not found in Autopilot."
+            Write-Verbose "No match for serial number $serialNumber in Autopilot."
         }
     }
-    return $valueToReturn
+    return $null
 }
 
 

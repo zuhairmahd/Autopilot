@@ -17,6 +17,7 @@
         "MaxUserNameLength": 50,
         "MaxSerialNumberLength": 10,
         "MinSerialNumberLength": 7,
+        "MinUsernameLength": 3,
         "DesiredAutopilotProfiles": [
           "msb"
         ]
@@ -30,7 +31,7 @@
         "deviceNamePrefix": "vmware",
         "operatingSystem": "Windows",
         "MaxUserNameLength": 50,
-        "MaxSerialNumberLength": 30,
+        "MaxSerialNumberLength": 50,
         "MinSerialNumberLength": 7,
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",

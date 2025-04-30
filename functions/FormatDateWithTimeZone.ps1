@@ -114,20 +114,42 @@ function FormatDateWithTimeZone()
 {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0, ValueFromPipelineByPropertyName = $true)][DateTime]$DateTime
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
+        $DateTime
     )
     #Print verbose log of parameters
-    Write-Verbose "Received parameters: $($DateTime | Out-String)"
+    Write-Verbose "Received parameters $DateTime"
     #Verify the passed datetime is a valid date.
     Write-Verbose "Verifying DateTime: $($DateTime | Out-String)"
-    if ($DateTime -eq $null -or $DateTime -eq [System.DateTime]::MinValue)
+    #If the datetime is passed as a string, convert it to a datetime object.
+    if ($DateTime -is [string])
+    {
+        Write-Verbose "Converting string to DateTime."
+        $DateTime = [System.DateTime]::Parse($DateTime)
+    }
+    if ($null -eq $DateTime -or $DateTime -eq [System.DateTime]::MinValue)
     {
         Write-Verbose "Invalid DateTime provided."
         return $null
     }
     Write-Verbose "DateTime is valid."
+    
+    # Convert from UTC to local time if the datetime is in UTC
+    if ($DateTime.Kind -eq [System.DateTimeKind]::Utc)
+    {
+        Write-Verbose "Converting UTC DateTime to local time."
+        $DateTime = $DateTime.ToLocalTime()
+    }
+    
     Write-Verbose "Formatting DateTime: $($DateTime | Out-String)"
-    $formattedDate = $DateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
-    Write-Verbose "Formatted DateTime: $($formattedDate | Out-String)"
-    return $formattedDate
+    # Get the timezone abbreviation
+    $tzAbbreviation = GetTimeZoneAbbreviation -DateTime $DateTime
+    Write-Verbose "Time zone abbreviation: $tzAbbreviation"
+    
+    # Format the date without timezone, then append our custom abbreviation
+    $formattedDate = $DateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt"
+    $formattedWithTz = "$formattedDate $tzAbbreviation"
+    
+    Write-Verbose "Formatted DateTime: $formattedWithTz"
+    return $formattedWithTz
 }

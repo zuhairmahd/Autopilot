@@ -28,6 +28,7 @@ else
 # $scopes = "offline_access Device.ReadWrite.All DeviceLocalCredential.Read.All DeviceManagementApps.Read.All DeviceManagementApps.ReadWrite.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All Directory.ReadWrite.All Domain.ReadWrite.All Group.Read.All GroupMember.ReadWrite.All Organization.ReadWrite.All"
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
+# $serialNumber = '5R3SBZ3'
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -35,27 +36,21 @@ else
 # $managedDeviceUri = "deviceManagement/managedDevices"
 # $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
+# $managedDeviceFilter = "startswith(deviceName,'w11-')"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = (CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken).value
-# $managedDevices = (CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken).value
+# $managedDevices = (CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter).value
 # $importedDevices = (CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken).value
 # $unmanagedDevices = (CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken).value
 # $global:enrollments = [ordered] @{
-# "autopilot" = $autopilotDevices
-# "managed"   = $managedDevices
-# "imported"  = $importedDevices
-# "unmanaged" = $unmanagedDevices
+#     "autopilot" = $autopilotDevices
+#     "managed"   = $managedDevices
+#     "imported"  = $importedDevices
+#     "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
 
 
-for ($i = 0; $i -lt $enrollments.autopilot.count - 1; $i++)
-{
-    if ($enrollments.autopilot[$i].enrollmentState -ne 'enrolled' -and $enrollments.autopilot[$i].enrollmentState -ne 'notContacted')
-    {
-        Write-Host "Serial number $($enrollments.autopilot[$i].serialNumber) is $($enrollments.autopilot[$i].enrollmentState)"
-    }
-}
