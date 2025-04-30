@@ -9,9 +9,9 @@ function GetAutoPilotDeviceSerialNumber()
     #write a verbose log  of receved parameters
     Write-Verbose "Received serial number: $serialNumber"
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-    $autopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI
-    Write-Verbose "Received $($autopilotDevices.value.Count) devices from Autopilot."
-    $serialNumbers = $autopilotDevices.value | Select-Object -ExpandProperty serialNumber
+    $autopilotDevices = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI).value
+    Write-Verbose "Received $($autopilotDevices.Count) devices from Autopilot."
+    $serialNumbers = $autopilotDevices | Select-Object -ExpandProperty serialNumber
     Write-Verbose "Received $($serialNumbers.Count) serial numbers from Autopilot."
     Write-Verbose "Serial numbers received from Autopilot: $($serialNumbers -join ', ')"
     foreach ($device in $serialNumbers)

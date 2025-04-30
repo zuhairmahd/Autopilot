@@ -10,6 +10,7 @@
             "CreateRelease",
             "DeleteAutopilotDevice",
             "FormatDateWithTimeZone",
+            "GetAppAssignmentTypes",
             "GetAutopilotProfileAssignment",
             "GetDeviceBySerial",
             "GetDeviceBySerialNumber",
