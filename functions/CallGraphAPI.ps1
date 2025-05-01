@@ -380,7 +380,8 @@ function CallGraphAPI()
                 Write-Verbose "Server Response: $errorMessage"
             }   
         }
-        return $statusCode
+        # return $statusCode
+        return $null
     }
     Write-Verbose "Response: $($response)"
     Write-Verbose "Response value: $($response.value)"

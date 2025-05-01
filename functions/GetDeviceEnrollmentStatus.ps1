@@ -114,7 +114,7 @@ function GetDeviceEnrollmentStatus()
         {
             Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilotEvents.serialNumber)"
             $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
-            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json -Depth 10)"
+            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json -Depth 100)"
         }
         else
         {
@@ -186,7 +186,7 @@ function GetDeviceEnrollmentStatus()
                 user              = $user
                 lastLogOnDateTime = $managedDevice.usersLoggedOn.lastLogonDateTime
             }
-            Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json -Depth 10)"
+            Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json -Depth 100)"
         }
         else
         {
@@ -285,7 +285,7 @@ function GetDeviceEnrollmentStatus()
     $deviceState.add('importedAutopilotDevice', $returnedImportedDevice)
     $deviceState.add('hasDeviceObject', $hasDeviceObject)
     $deviceState.add('device', $returnedDevice)
-    Write-Verbose "Device State: $($deviceState | ConvertTo-Json -Depth 10)"
+    Write-Verbose "Device State: $($deviceState | ConvertTo-Json -Depth 100)"
     #endregion
     $global:enrollment = $deviceState
     return $deviceState
