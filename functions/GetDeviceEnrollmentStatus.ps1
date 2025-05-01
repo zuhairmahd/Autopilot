@@ -60,10 +60,6 @@ function GetDeviceEnrollmentStatus()
     $userUri = "users"
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
-    $autopilotDeviceParams = @{
-        AccessToken  = $accessToken 
-        ResourcePath = $autoPilotDeviceURI
-    }
     #endregion
 
     #region Get the autopilot device info
@@ -74,15 +70,15 @@ function GetDeviceEnrollmentStatus()
         # Alternative approach if the above doesn't work
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)'"
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)' or AzureActiveDirectoryDeviceId eq '$AzureActiveDirectoryDeviceId'"
-        $autoPilotDeviceSerialNumber = GetAutopilotDeviceSerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
-        Write-Verbose "Autopilot device serial number: $autoPilotDeviceSerialNumber"
-        if ($autoPilotDeviceSerialNumber)
+        $autoPilotVMDevice = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
+        Write-Verbose "Received $($autoPilotVMDevice.count) devices from Autopilot."
+        if ($autoPilotVMDevice -and $autoPilotVMDevice.count -gt 0)
         {
-            Write-Verbose "Device with serial number $autoPilotDeviceSerialNumber found in Autopilot."
-            $autoPilotDeviceSerialNumber = $autoPilotDeviceSerialNumber.Trim()
-            $autopilotDeviceFilter = "serialNumber eq '$autoPilotDeviceSerialNumber'"
-            $autopilotDeviceParams += @{
-                'filter' = $autopilotDeviceFilter
+            Write-Verbose "Got an Autopilot Device with device id $($autoPilotVMDevice)"
+            $autopilotDeviceUriWithId = "$autopilotDeviceUri/$autoPilotVMDevice"
+            $params = @{
+                AccessToken  = $accessToken
+                ResourcePath = $autopilotDeviceUriWithId
             }
         }
         else
@@ -93,12 +89,13 @@ function GetDeviceEnrollmentStatus()
     else
     {
         Write-Verbose "Not a VMWare device. Continuing"
-        $autopilotDeviceParams += @{
-            Filter = $autopilotDeviceFilter
+        $params = @{
+            AccessToken  = $accessToken
+            ResourcePath = $autoPilotDeviceURI
+            Filter       = $autopilotDeviceFilter
         }
     }
-    $autopilotDeviceResult = CallGraphAPI @autopilotDeviceParams
-    $autopilotDevice = $autopilotDeviceResult.value
+    $autopilotDevice = CallGraphAPI @params
     Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
     Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($autopilotDevice)

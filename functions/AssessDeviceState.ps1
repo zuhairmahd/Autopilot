@@ -408,7 +408,7 @@ function AssessDeviceState()
                                 {
                                     Write-Verbose "The managed device is not associated with a user."
                                     Write-Host "This is probably ok."
-                                    return = $true
+                                    return $true
                                 }
                             }
                             else
@@ -424,7 +424,7 @@ function AssessDeviceState()
                         {
                             Write-Host "No managed device is associated with this autopilot device."
                             Write-Host "the device is ready for the next user."
-                            return = $true
+                            return $true
                         }
                     }
                     enrolled 

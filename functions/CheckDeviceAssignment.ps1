@@ -51,10 +51,36 @@ function CheckDeviceAssignment()
     $assignment = $null
     #endregion
     
-    Write-Verbose "Calling Graph API at $autoPilotDeviceURI."
     Write-Verbose "Checking whether the device with serial number $serialNumber is already in Intune."
-    # $autopilotDevices = CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI
-    $assignment = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
+    if ($serialNumber -match 'vmware')
+    {
+        Write-Verbose "VMware device detected."
+        $autoPilotVMDevice = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
+        Write-Verbose "Received $($autoPilotVMDevice.count) devices from Autopilot."
+        if ($autoPilotVMDevice -and $autoPilotVMDevice.count -gt 0)
+        {
+            Write-Verbose "Got an Autopilot Device with device id $($autoPilotVMDevice)"
+            $autopilotDeviceUriWithId = "$autopilotDeviceUri/$autoPilotVMDevice"
+            $params = @{
+                AccessToken  = $accessToken
+                ResourcePath = $autopilotDeviceUriWithId
+            }
+        }
+        else
+        {
+            Write-Verbose "No match for device with serial number $serialNumber found in Autopilot."
+        }
+    }
+    else
+    {
+        Write-Verbose "Not a VMWare device. Continuing"
+        $params = @{
+            AccessToken  = $accessToken
+            ResourcePath = $autoPilotDeviceURI
+            Filter       = $autopilotDeviceFilter
+        }
+    }
+    $assignment = CallGraphAPI @params
     Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
     if ($assignment)
     {

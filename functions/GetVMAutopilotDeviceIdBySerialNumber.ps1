@@ -1,4 +1,4 @@
-function GetAutoPilotDeviceSerialNumber() 
+function GetVMAutopilotDeviceIdBySerialNumber() 
 {
     [CmdletBinding()]
     param (
@@ -11,18 +11,15 @@ function GetAutoPilotDeviceSerialNumber()
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
     $autopilotDevices = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI).value
     Write-Verbose "Received $($autopilotDevices.Count) devices from Autopilot."
-    $serialNumbers = $autopilotDevices | Select-Object -ExpandProperty serialNumber
-    Write-Verbose "Received $($serialNumbers.Count) serial numbers from Autopilot."
-    Write-Verbose "Serial numbers received from Autopilot: $($serialNumbers -join ', ')"
-    foreach ($device in $serialNumbers)
+    foreach ($device in $autopilotDevices)
     {
-        Write-Verbose "Processing device with serial number $device"
-        $filteredDevice = $device -replace '\s', ''
-        Write-Verbose "Filtered device serial number: $filteredDevice"
-        if ($filteredDevice -eq $serialNumber)
+        Write-Verbose "Processing device with serial number $device.serialNumber"
+        $filteredDeviceSerialNumber = $device.serialNumber -replace '\s', ''
+        Write-Verbose "Filtered device serial number: $filteredDeviceSerialNumber"
+        if ($filteredDeviceSerialNumber -eq $serialNumber)
         {
             Write-Verbose "Found a match for serial number $serialNumber in Autopilot."
-            return $device
+            return $device.id
         }
         else
         {
