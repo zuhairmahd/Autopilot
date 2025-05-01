@@ -18,20 +18,6 @@
         "hash": "4F2F08DBC74B034B24255604DAF2F60BD0C1B6B6333200828DB4D378C7D829B4"
       }
     ],
-    "Scripts": [
-      {
-        "name": "Register-Device",
-        "version": {
-          "Major": 2,
-          "Minor": 2,
-          "Build": 2,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "9045404027213B4E1187F1BAB1410441EE22DD2CF235C060E7239A72DCA5362B"
-      }
-    ],
     "Functions": [
       {
         "name": "CallGraphAPI",
@@ -55,7 +41,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "1DF0C16D4B5493B4763FB1BF4A4C2321464F242D990449621BF0B6957FA0B7C9"
+        "hash": "9886F424AD66A89F168C00D93EF59873880072899E3D5A07CBE86322AE442772"
       },
       {
         "name": "CheckForScriptUpdates",
@@ -332,6 +318,20 @@
           "MinorRevision": -1
         },
         "hash": "2C0CC4B47D57218C956316AEEF110D558DCCD383720C8D1016116358AB85A467"
+      }
+    ],
+    "Scripts": [
+      {
+        "name": "Register-Device",
+        "version": {
+          "Major": 2,
+          "Minor": 2,
+          "Build": 2,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "4560866D9453F1EC8D3C487A77F208FFE8936FC89FC5360B58568F9DDCD337C3"
       }
     ],
     "Cmds": [
