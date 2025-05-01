@@ -95,7 +95,7 @@ function GetDeviceEnrollmentStatus()
             Filter       = $autopilotDeviceFilter
         }
     }
-    $autopilotDevice = CallGraphAPI @params
+    $autopilotDevice = (CallGraphAPI @params).value
     Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
     Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($autopilotDevice)
@@ -104,6 +104,9 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
+        Write-Verbose "Got $($autopilotDevice.count) devices from Autopilot."
+        Write-Verbose "Enrollment Profile name: $($autopilotDevice.deploymentProfile.displayname)"
+        Write-Verbose "Device is in Autopilot: $inAutopilot to true."
         $inAutopilot = $true
         $returnedAutopilotDevice = $autopilotDevice
         Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
@@ -114,7 +117,7 @@ function GetDeviceEnrollmentStatus()
         {
             Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilotEvents.serialNumber)"
             $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
-            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents | ConvertTo-Json -Depth 100)"
+            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents.count)"
         }
         else
         {
@@ -162,7 +165,7 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
         $users = $managedDevice.usersLoggedOn
         Write-Verbose "Users logged on: $($users)"
-        Write-Verbose "Last logon: $managedDevice.usersLoggedOn.lastLogonDateTime"
+        Write-Verbose "Last logon: $($managedDevice.usersLoggedOn.lastLogonDateTime)"
         if ($users)
         {
             Write-Verbose "Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
@@ -186,7 +189,7 @@ function GetDeviceEnrollmentStatus()
                 user              = $user
                 lastLogOnDateTime = $managedDevice.usersLoggedOn.lastLogonDateTime
             }
-            Write-Verbose "LoggedOn Users: $($loggedOnUsers | ConvertTo-Json -Depth 100)"
+            Write-Verbose "LoggedOn Users: $($loggedOnUsers.Count)"
         }
         else
         {
@@ -285,7 +288,6 @@ function GetDeviceEnrollmentStatus()
     $deviceState.add('importedAutopilotDevice', $returnedImportedDevice)
     $deviceState.add('hasDeviceObject', $hasDeviceObject)
     $deviceState.add('device', $returnedDevice)
-    Write-Verbose "Device State: $($deviceState | ConvertTo-Json -Depth 100)"
     #endregion
     $global:enrollment = $deviceState
     return $deviceState

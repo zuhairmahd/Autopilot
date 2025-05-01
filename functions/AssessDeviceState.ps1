@@ -364,8 +364,12 @@ function AssessDeviceState()
             if ($enrollmentState.inAutopilot)
             {
                 Write-Host "The device is registered in Autopilot."
+                Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+                Write-Host "Assignment date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)"
+                Write-Host "Assigned profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayname)"
                 Write-Host "Checking enrollment state..."
                 Write-Verbose "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
+
                 switch ($enrollmentState.autopilot.device.enrollmentState) 
                 {
                     notContacted 
