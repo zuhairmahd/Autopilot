@@ -32,7 +32,7 @@
         "operatingSystem": "Windows",
         "MaxUserNameLength": 50,
         "MinUsernameLength": 3,
-        "MaxSerialNumberLength": 50,
+        "MaxSerialNumberLength": 100,
         "MinSerialNumberLength": 7,
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",

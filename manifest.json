@@ -11,7 +11,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "C21E2CFFF5E50DCB71E4D8D63574C2E18CB68F97D40BFFE0381FE309733AE320"
+        "hash": "D49A3356D0559380A79EAB926DC38B22DB4F5237AF59C81902D9761810D71501"
       },
       {
         "name": "CheckDeviceAssignment",
@@ -23,7 +23,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "6592FA016D9F5D5F0169E4E5628FC45AEF0BCF10CB64513BC3E84EAC5B89B39F"
+        "hash": "61423F2C650DC318A50C060E8B8F52411A6BF2B55948589AB4B20B1AE8AE8115"
       },
       {
         "name": "CheckForScriptUpdates",
@@ -86,6 +86,18 @@
         "hash": "48F64BFA48B0FAE780F2F6FE14C12BFD6AB0E417A1542CE5CA1E078A1BEDB460"
       },
       {
+        "name": "DisplayReport",
+        "version": {
+          "Major": 0,
+          "Minor": 0,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "99687DB3DBEC8D761FDEF1F66627F51125CC460EF93DA40CF9A83ABA3592005C"
+      },
+      {
         "name": "DownloadScriptUpdates",
         "version": {
           "Major": 0,
@@ -110,7 +122,7 @@
         "hash": "1EA8BD8D0BDA20153E774BF4715A53A5D3DDC6CA51FB950340DD40BCF99AB856"
       },
       {
-        "name": "GetAppAssignmentTypes",
+        "name": "GetAutopilotDeviceSerialNumber",
         "version": {
           "Major": 0,
           "Minor": 0,
@@ -119,7 +131,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "2BE86F826262D8396E8C3063514BBFAC9E5D985806508510C22AF1204DE4A828"
+        "hash": "0713CDC2E643454356710CFA616DCE66C6B2EB14FADB8207DD99BAFB0E156FCD"
       },
       {
         "name": "GetDeviceHash",
@@ -167,7 +179,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "E3D18F9BEEBBF6843345B791B49056E9A83637A1AB8E6F5B7356A21E074F111F"
+        "hash": "0F9AEF039657BF16F5848DEA6A904F91B2CC9BC6DAD3DA30AAD3C156223479DA"
       },
       {
         "name": "GetLatestGithubrRelease",
@@ -287,7 +299,39 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "FC4B077F3F8DED9E75AC5ACF0B9E2EBE93D22E9CBC033C55534F74291F3A99EC"
+        "hash": "2C0CC4B47D57218C956316AEEF110D558DCCD383720C8D1016116358AB85A467"
+      }
+    ],
+    "Scripts": [
+      {
+        "name": "Register-Device",
+        "version": {
+          "Major": 2,
+          "Minor": 2,
+          "Build": 2,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "9045404027213B4E1187F1BAB1410441EE22DD2CF235C060E7239A72DCA5362B"
+      }
+    ],
+    "configurations": [
+      {
+        "name": "exclusions",
+        "hash": "3244E295E8889D81F5D6C5CBE3F50C953DFEB3C0B90258FDC6209B2F6D16C09A"
+      },
+      {
+        "name": "init",
+        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
+      },
+      {
+        "name": "remoteManifest",
+        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
+      },
+      {
+        "name": "vars",
+        "hash": "4F2F08DBC74B034B24255604DAF2F60BD0C1B6B6333200828DB4D378C7D829B4"
       }
     ],
     "Cmds": [
@@ -362,34 +406,6 @@
           "MinorRevision": -1
         },
         "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
-      }
-    ],
-    "configurations": [
-      {
-        "name": "exclusions",
-        "hash": "0CBB7DC6F48337522CDAB54F0F4F6218968ED89EE1B722B552D8163C757EB1B9"
-      },
-      {
-        "name": "init",
-        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
-      },
-      {
-        "name": "remoteManifest",
-        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
-      }
-    ],
-    "Scripts": [
-      {
-        "name": "Register-Device",
-        "version": {
-          "Major": 2,
-          "Minor": 2,
-          "Build": 2,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "37A5B5A7AF6A803C4DA6E48DA09D723A19A62E3B94EDD9F1857D1C3CA9256E86"
       }
     ]
   }

@@ -108,7 +108,7 @@ function validateInput()
                 Write-Verbose "Serial number is shorter than minimum length of $MinSerialNumberLength characters"
                 Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
             }
-            elseif ($UserInput -match '^[a-zA-Z0-9-]+$') # Check if alphanumeric or dash
+            elseif ($UserInput -match '^[a-zA-Z0-9-\s]+$') 
             {
                 Write-Verbose "Serial number validation passed"
                 $returnValue.valid = $true
