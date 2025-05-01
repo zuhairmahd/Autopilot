@@ -76,7 +76,9 @@ function AddMenuItem()
         [Parameter(Mandatory = $false)]
         [scriptblock]$Action,
         [Parameter(Mandatory = $false)]
-        [hashtable]$Submenu
+        [hashtable]$Submenu,
+        [Parameter(Mandatory = $false)]
+        [switch]$ReturnsValue
     )
     
     if ($Action -and $Submenu)
@@ -90,13 +92,12 @@ function AddMenuItem()
     }
     
     $item = @{
-        Name    = $Name
-        Action  = $Action
-        Submenu = $Submenu
+        Name         = $Name
+        Action       = $Action
+        Submenu      = $Submenu
+        ReturnsValue = $ReturnsValue
     }
-    
     $Menu.Items += $item
-    
     return $Menu
 }
 
@@ -219,6 +220,11 @@ function ShowMenu()
             $result = & $selectedItem.Action
             # Always display press any key to continue, regardless of whether action returns a value
             Write-Host "`n"
+            #If you get the special return boolean, return the value directly.
+            if ($selectedItem.ReturnsValue)
+            {
+                return $result
+            }
             # If the action returned a value, display it
             if ($null -ne $result)
             {

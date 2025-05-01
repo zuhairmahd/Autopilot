@@ -303,9 +303,9 @@ $receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by User" -Act
         Write-Verbose "Got user name: $UserName"
         Write-Verbose "Getting access token..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem
-        Write-Verbose "Serial number: $($serialNumber)"
-        if ($serialNumber)
+        $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem -verbose 
+        Write-Host "Serial number: $($serialNumber)"
+        if ($serialNumber -ne '' -and $null -ne $serialNumber)
         {
             Write-Host "Checking device with serial number $($serialNumber)..."
             ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'

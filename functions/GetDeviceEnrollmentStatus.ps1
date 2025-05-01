@@ -108,14 +108,14 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Enrollment Profile name: $($autopilotDevice.deploymentProfile.displayname)"
         Write-Verbose "Device is in Autopilot: $inAutopilot to true."
         $inAutopilot = $true
-        $returnedAutopilotDevice = $autopilotDevice
+        $returnedAutopilotDevice = $autopilotDevice 
         Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
         $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$($autopilotDevice.serialNumber)'"
         $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter
         Write-Verbose "Found $($autopilotEvents.value.count) Autopilot events."
         if ($autopilotEvents)
         {
-            Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilotEvents.serialNumber)"
+            Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilot.serialNumber)"
             $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
             Write-Verbose "Autopilot Events: $($returnedAutopilotEvents.count)"
         }

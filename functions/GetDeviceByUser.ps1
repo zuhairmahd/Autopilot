@@ -24,7 +24,7 @@ function GetDeviceByUser()
     }
     $UserName = $UserName.Trim()
     Write-Verbose "Trimmed user name: $UserName"
-    $extraparameters = "select=deviceName,serialNumber,userDisplayName"
+    $extraparameters = "select=deviceName,serialNumber,userDisplayName,model,manufacturer,complianceState"
     $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
     $managedDeviceUri = "deviceManagement/managedDevices"
     #endregion
@@ -44,35 +44,35 @@ function GetDeviceByUser()
             # If only one device found, return its serial number directly
             Write-Host "Found one device for user: $UserName ($($deviceInfo.value[0].userDisplayName))." -ForegroundColor Green
             Write-Host "Device Name: $($deviceInfo.value[0].deviceName)" -ForegroundColor Cyan
-            Write-Host "Serial Number: $($deviceInfo.value[0].serialNumber)" -ForegroundColor Cyan
+            Write-Host "Serial Number: $($deviceInfo.value[0].serialNumber)."
+            Write-Host "Device make and model: $($deviceInfo.value[0].manufacturer) $($deviceInfo.value[0].model)."
+            Write-Host "Compliance state: $($deviceInfo.value[0].complianceState)."
             return $deviceInfo.value[0].serialNumber
         }
         else
         {
             # Create device selection menu
             $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
-            
             # Store devices in an array to reference later
             $devices = $deviceInfo.value
-            
             # Add each device as a menu item
             foreach ($device in $devices)
             {
                 # Create a display name for the menu
-                $menuItemName = "Device: $($device.deviceName)  (Serial number: $($device.serialNumber))"
-                
+                # $menuItemName = "Device: $($device.deviceName)  (Serial number: $($device.serialNumber))"
+                $menuItemName = "Device: $($device.deviceName) ($($device.manufacturer) $($device.model) SN: $($device.serialNumber)) ($($device.complianceState))"
                 # Create a scriptblock action that returns this specific device's serial number when selected
                 $serialNumber = $device.serialNumber
                 $action = {
-                    $serialNumber
+                    Write-Verbose "Returning Serial Number: $serialNumber"
+                    return $serialNumber
                 }.GetNewClosure()
-                
                 # Add the menu item with the action
-                $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action
+                $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action -ReturnsValue
             }
-            
             # Show the menu and return the selected device's serial number
             $selectedSerialNumber = ShowMenu -Menu $deviceMenu
+            Write-Verbose "Returning selected serial number: $selectedSerialNumber"
             return $selectedSerialNumber
         }
     }
