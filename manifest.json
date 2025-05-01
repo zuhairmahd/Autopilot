@@ -1,21 +1,91 @@
 {
   "register-device": {
-    "configurations": [
+    "Cmds": [
       {
-        "name": "exclusions",
-        "hash": "3244E295E8889D81F5D6C5CBE3F50C953DFEB3C0B90258FDC6209B2F6D16C09A"
+        "name": "check",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "E1A7E57888A24BF8789C7AA8705FA41D02BEE5044E8DE2A04F1E70C4D872875B"
       },
       {
-        "name": "init",
-        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
+        "name": "forceUpdate",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "673DD161EAAD0A1DEF4548CA1AAE518BB4A76D90F7EBDC936FAB066041FE2364"
       },
       {
-        "name": "remoteManifest",
-        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
+        "name": "GetHash",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "B90911CCB9A2AC3B3E236145D0A16754ED3B4B499AFB6B6F8CFCC1B923C1FD5E"
       },
       {
-        "name": "vars",
-        "hash": "4F2F08DBC74B034B24255604DAF2F60BD0C1B6B6333200828DB4D378C7D829B4"
+        "name": "reconfigure",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "B1231C7346924AFBAA4C38EDF3605B2FBF4FF9D1547094FCA641C8BB4A38B315"
+      },
+      {
+        "name": "register",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "1C9CF8F480C9D7FBD065953E80113D973006DBC678FB2DC5EBE665118D2BAC73"
+      },
+      {
+        "name": "update",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
+      }
+    ],
+    "Scripts": [
+      {
+        "name": "Register-Device",
+        "version": {
+          "Major": 2,
+          "Minor": 2,
+          "Build": 2,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "9045404027213B4E1187F1BAB1410441EE22DD2CF235C060E7239A72DCA5362B"
       }
     ],
     "Functions": [
@@ -29,7 +99,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "D49A3356D0559380A79EAB926DC38B22DB4F5237AF59C81902D9761810D71501"
+        "hash": "40CB97991E968A4BF7F1ADE50ACAAC1DADE9021AE1D8C4FBFAE1AC60C7DC4D51"
       },
       {
         "name": "CheckDeviceAssignment",
@@ -41,7 +111,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "EB9FAA2C8C343FFC15834A9F7DDCCA85530F33526FD4CE8164BD7C7B3AB95EF8"
+        "hash": "1DF0C16D4B5493B4763FB1BF4A4C2321464F242D990449621BF0B6957FA0B7C9"
       },
       {
         "name": "CheckForScriptUpdates",
@@ -320,92 +390,22 @@
         "hash": "2C0CC4B47D57218C956316AEEF110D558DCCD383720C8D1016116358AB85A467"
       }
     ],
-    "Scripts": [
+    "configurations": [
       {
-        "name": "Register-Device",
-        "version": {
-          "Major": 2,
-          "Minor": 2,
-          "Build": 2,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "9045404027213B4E1187F1BAB1410441EE22DD2CF235C060E7239A72DCA5362B"
-      }
-    ],
-    "Cmds": [
-      {
-        "name": "check",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "E1A7E57888A24BF8789C7AA8705FA41D02BEE5044E8DE2A04F1E70C4D872875B"
+        "name": "exclusions",
+        "hash": "3244E295E8889D81F5D6C5CBE3F50C953DFEB3C0B90258FDC6209B2F6D16C09A"
       },
       {
-        "name": "forceUpdate",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "673DD161EAAD0A1DEF4548CA1AAE518BB4A76D90F7EBDC936FAB066041FE2364"
+        "name": "init",
+        "hash": "F721256DF1C3E4FEFD7705F6D38428238B2881B6ED4DD4513B951635EEC9CCD2"
       },
       {
-        "name": "GetHash",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "B90911CCB9A2AC3B3E236145D0A16754ED3B4B499AFB6B6F8CFCC1B923C1FD5E"
+        "name": "remoteManifest",
+        "hash": "04E9385A26D0AACE481A0AC8B7FE46E63B363643AEC880733893A19DB76095E2"
       },
       {
-        "name": "reconfigure",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "B1231C7346924AFBAA4C38EDF3605B2FBF4FF9D1547094FCA641C8BB4A38B315"
-      },
-      {
-        "name": "register",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "1C9CF8F480C9D7FBD065953E80113D973006DBC678FB2DC5EBE665118D2BAC73"
-      },
-      {
-        "name": "update",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
+        "name": "vars",
+        "hash": "4F2F08DBC74B034B24255604DAF2F60BD0C1B6B6333200828DB4D378C7D829B4"
       }
     ]
   }
