@@ -129,7 +129,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "61423F2C650DC318A50C060E8B8F52411A6BF2B55948589AB4B20B1AE8AE8115"
+        "hash": "78999399F6E52F692AFB1896A6B6B18102D29BDC2991AFB98104022D51E0E4BC"
       },
       {
         "name": "CheckForScriptUpdates",
@@ -226,18 +226,6 @@
           "MinorRevision": -1
         },
         "hash": "1EA8BD8D0BDA20153E774BF4715A53A5D3DDC6CA51FB950340DD40BCF99AB856"
-      },
-      {
-        "name": "GetAutopilotDeviceSerialNumber",
-        "version": {
-          "Major": 0,
-          "Minor": 0,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "0713CDC2E643454356710CFA616DCE66C6B2EB14FADB8207DD99BAFB0E156FCD"
       },
       {
         "name": "GetDeviceHash",
@@ -346,6 +334,18 @@
           "MinorRevision": -1
         },
         "hash": "841E8F76E081E30BC53BC4BFAD63E96E01C1E15138EAE9CDC4FAB539FD5ABF2C"
+      },
+      {
+        "name": "GetVMAutopilotDeviceIdBySerialNumber",
+        "version": {
+          "Major": 0,
+          "Minor": 0,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "00F74D631976D9F8C38F43201202FF063DB361D085D1F61555BBFC8D4C2516A5"
       },
       {
         "name": "ImportAutopilotDevice",
