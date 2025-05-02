@@ -96,6 +96,11 @@ function GetDeviceEnrollmentStatus()
         }
     }
     $autopilotDevice = (CallGraphAPI @params).value
+    if ($autopilotDevice.count -eq 0)
+    {
+        Write-Verbose "Calling Microsoft Graph a different way..."
+        $autopilotDevice = CallGraphAPI @params
+    }
     Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
     Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
     if ($autopilotDevice)

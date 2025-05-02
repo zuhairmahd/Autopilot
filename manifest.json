@@ -3,7 +3,7 @@
     "configurations": [
       {
         "name": "exclusions",
-        "hash": "3244E295E8889D81F5D6C5CBE3F50C953DFEB3C0B90258FDC6209B2F6D16C09A"
+        "hash": "D4133C558307B09621DCCDAFD6672CEAF1DEBD94CFEED0F4FD7627BBB9BE3760"
       },
       {
         "name": "init",
@@ -16,6 +16,94 @@
       {
         "name": "vars",
         "hash": "4F2F08DBC74B034B24255604DAF2F60BD0C1B6B6333200828DB4D378C7D829B4"
+      }
+    ],
+    "Scripts": [
+      {
+        "name": "Register-Device",
+        "version": {
+          "Major": 2,
+          "Minor": 2,
+          "Build": 2,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "657A2E4B2CEEC7684BE9022990A61F7A8AE1212543C34515561654760C90DDFE"
+      }
+    ],
+    "Cmds": [
+      {
+        "name": "check",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "E1A7E57888A24BF8789C7AA8705FA41D02BEE5044E8DE2A04F1E70C4D872875B"
+      },
+      {
+        "name": "forceUpdate",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "673DD161EAAD0A1DEF4548CA1AAE518BB4A76D90F7EBDC936FAB066041FE2364"
+      },
+      {
+        "name": "GetHash",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "B90911CCB9A2AC3B3E236145D0A16754ED3B4B499AFB6B6F8CFCC1B923C1FD5E"
+      },
+      {
+        "name": "reconfigure",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "B1231C7346924AFBAA4C38EDF3605B2FBF4FF9D1547094FCA641C8BB4A38B315"
+      },
+      {
+        "name": "register",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "1C9CF8F480C9D7FBD065953E80113D973006DBC678FB2DC5EBE665118D2BAC73"
+      },
+      {
+        "name": "update",
+        "version": {
+          "Major": 2,
+          "Minor": 3,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
       }
     ],
     "Functions": [
@@ -41,7 +129,7 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "9886F424AD66A89F168C00D93EF59873880072899E3D5A07CBE86322AE442772"
+        "hash": "76E842A394DFD226610BDA6D35D8B88E2F39AA9FE52FD3F94E67DC8A4849D644"
       },
       {
         "name": "CheckForScriptUpdates",
@@ -90,6 +178,18 @@
           "MinorRevision": -1
         },
         "hash": "9896AC1108A99E5D2302DC0AD2544D629B3DD94D16E74AB55716ED56C86746FF"
+      },
+      {
+        "name": "DeleteAutoPilotDevice",
+        "version": {
+          "Major": 0,
+          "Minor": 0,
+          "Build": 0,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "5AB12962732288E7FD854E44EF23C40E29A7DE3DE6489D540A686B18F2116F77"
       },
       {
         "name": "DisplayNumericMenu",
@@ -318,94 +418,6 @@
           "MinorRevision": -1
         },
         "hash": "2C0CC4B47D57218C956316AEEF110D558DCCD383720C8D1016116358AB85A467"
-      }
-    ],
-    "Scripts": [
-      {
-        "name": "Register-Device",
-        "version": {
-          "Major": 2,
-          "Minor": 2,
-          "Build": 2,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "4560866D9453F1EC8D3C487A77F208FFE8936FC89FC5360B58568F9DDCD337C3"
-      }
-    ],
-    "Cmds": [
-      {
-        "name": "check",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "E1A7E57888A24BF8789C7AA8705FA41D02BEE5044E8DE2A04F1E70C4D872875B"
-      },
-      {
-        "name": "forceUpdate",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "673DD161EAAD0A1DEF4548CA1AAE518BB4A76D90F7EBDC936FAB066041FE2364"
-      },
-      {
-        "name": "GetHash",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "B90911CCB9A2AC3B3E236145D0A16754ED3B4B499AFB6B6F8CFCC1B923C1FD5E"
-      },
-      {
-        "name": "reconfigure",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "B1231C7346924AFBAA4C38EDF3605B2FBF4FF9D1547094FCA641C8BB4A38B315"
-      },
-      {
-        "name": "register",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "1C9CF8F480C9D7FBD065953E80113D973006DBC678FB2DC5EBE665118D2BAC73"
-      },
-      {
-        "name": "update",
-        "version": {
-          "Major": 2,
-          "Minor": 3,
-          "Build": 0,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "E86E377DC5B944921E6711262A0BF654EA16244900C3128C74E06066C03FE54D"
       }
     ]
   }

@@ -220,7 +220,7 @@ function ProcessSerialNumber
     $SerialNumber = $SerialNumber.Trim()
     Write-Verbose "Trimmed serial number: $SerialNumber"
     Write-Host "Checking deployment status for device with serial number $SerialNumber."
-    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
+    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken -verbose 
     Write-Verbose "The management state is: $($enrollmentState.managed)"
     Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
     Write-Verbose "The imported state is: $($enrollmentState.imported)"
@@ -303,7 +303,7 @@ $receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by User" -Act
         Write-Verbose "Got user name: $UserName"
         Write-Verbose "Getting access token..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem -verbose 
+        $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem
         Write-Host "Serial number: $($serialNumber)"
         if ($serialNumber -ne '' -and $null -ne $serialNumber)
         {

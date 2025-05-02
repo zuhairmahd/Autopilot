@@ -454,6 +454,30 @@ if (-not $NoIntuneCheck)
                 {
                     Write-Host 'The device has not contacted the enrollment service.' -ForegroundColor Green
                     Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
+                    $choices = @('Restart the device', 'Delete from Autopilot')
+                    switch ($choice)
+                    {
+                        'Restart the device'
+                        {
+                            Write-Host 'Restarting the device...'
+                            RestartDevice
+                        }
+                        'Delete from Autopilot'
+                        {
+                            Write-Host 'Deleting the device from Autopilot...'
+                            if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+                            {
+                                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                            }
+                            else
+                            {
+                                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                                exit 1
+                            }
+                        }
+                    }
+                    Write-Verbose "Exitting script as requested."
+                    exit 0
                 }
                 'enrolled'
                 {
@@ -539,7 +563,7 @@ if (-not $NoIntuneCheck)
                     exit 1
                 }
             }
-            if ($deviceAssignment.enrollmentState -ne 'enrolled')
+            if ($deviceAssignment.enrollmentState -ne 'enrolled' -and $deviceAssignment.deploymentProfileAssignmentStatus -notin @('assignedInSync', 'assignedUnkownSyncState'))
             {
                 switch ($deviceAssignment.deploymentProfileAssignmentStatus)
                 {
@@ -547,32 +571,64 @@ if (-not $NoIntuneCheck)
                     {
                         Write-Host 'The device is not assigned to a deployment profile.' -ForegroundColor Red
                         Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-                        exit 1
+                        Write-Host "You can also choose to start a check every minute for the next $maxWaitTime minutes." -ForegroundColor Red
                     }
                     'pending'
                     {
                         Write-Host 'The device is pending assignment to a deployment profile.' -ForegroundColor Yellow
                         Write-Host 'Please check again after a little while.' -ForegroundColor Yellow
-                        Write-Host 'If you continue to get this messgage, please check the Intune portal or contact an Intune administrator.' -ForegroundColor Yellow
-                        exit 1
+                        Write-Host "You can also choose to start a check every minute for the next $maxWaitTime minutes." -ForegroundColor Red
                     }
                     default
                     {
                         Write-Host "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)."
+                        Write-Host "You can also choose to start a check every minute for the next $maxWaitTime minutes." -ForegroundColor Red
                     }
                 }
+                Write-Host "What would you like to do?"
+                $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
+                $choice = DisplayNumericMenu -Choices $choices 
+                switch ($choice)
+                {
+                    'Restart the device'
+                    {
+                        Write-Host 'Restarting the device...'
+                        RestartDevice
+                    }
+                    'Continue to wait for profile assignment'
+                    {
+                        Write-Host 'Continuing to wait for profile assignment...'
+                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+                    }
+                    'Delete from Autopilot'
+                    {
+                        Write-Host 'Deleting the device from Autopilot...'
+                        if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+                        {
+                            Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                            exit 1
+                        }
+                    }
+                }
+                exit 0
             }
         }
     }
     else
     {
         Write-Host 'The device is not in Intune.'
+        Write-Verbose "Checking if the user wants to enroll the device."
         if (-not $check)
         {
-            Write-Host "Would yu like to continue to import the device to Intune?" -ForegroundColor Yellow
+            Write-Host "Would you like to continue to import the device to Intune?" -ForegroundColor Yellow
             $choices = @('Import the device')
             $choice = DisplayNumericMenu -Choices $choices
-            if ($choice[0])
+            Write-Verbose "Got choice $choice"
+            if ($choice -eq $choices[0])
             {
                 Write-Host 'Continuing to import the device.'
             }
@@ -588,42 +644,48 @@ else
 {
     Write-Host 'Skipping Intune check.'
 }
-if (-not $check)
+
+if ($check)
 {
-    $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
-    $choice = DisplayNumericMenu -Choices $choices 
-    switch ($choice)
+    if ($deviceAssignment)
     {
-        $choices[0]
+        if ($deviceAssignment.deploymentProfileAssignmentStatus -notin @('assignedInSync', 'assignedUnkownSyncState'))
         {
-            Write-Host 'Restarting the device...'
-            RestartDevice
+            $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
         }
-        $choices[1]
+        else
         {
-            Write-Host 'Continuing to wait for profile assignment...'
-            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+            $choices = @('Restart the device', 'Delete from Autopilot')
         }
-        $choices[2]
+        $choice = DisplayNumericMenu -Choices $choices 
+        switch ($choice)
         {
-            Write-Host 'Deleting the device from Autopilot...'
-            if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+            'Restart the device'
             {
-                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                Write-Host 'Restarting the device...'
+                RestartDevice
             }
-            else
+            'Continue to wait for profile assignment'
             {
-                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                exit 1
+                Write-Host 'Continuing to wait for profile assignment...'
+                $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+            }
+            'Delete from Autopilot'
+            {
+                Write-Host 'Deleting the device from Autopilot...'
+                if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+                {
+                    Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                    exit 1
+                }
             }
         }
     }
-    Write-Verbose "Exitting script as requested."
     exit 0
-}
-else
-{
-    Write-Host 'Continuing to import the device.'
 }
 #endregion Check if the device is already in Intune
 
@@ -707,10 +769,10 @@ else
 #endregion Add the device to Intune.
 
 # SIG # Begin signature block
-# MII95AYJKoZIhvcNAQcCoII91TCCPdECAQExDzANBglghkgBZQMEAgEFADB5Bgor
+# MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCC7BlfBASo/GlY6
-# rfszP/rgBh30clL0uNM0wh9CzKaw9KCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDv1M0e/rCEMOm9
+# VJbBjwi1E4413EcpLypB+Pzn6qHvXaCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
 # lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
 # ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
 # dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
@@ -895,147 +957,128 @@ else
 # zt6J0GwzvU8g0rYGgTZR8zDEIJfeZxwWDHpSxB5FJ1VVU1LIAtB7o9PXbjXzGifa
 # IMYTzU4YKt4vMNwwBmetQDHhdAtTPplOXrnI9SI6HeTtjDD3iUN/7ygbahmYOHk7
 # VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
-# nTiOL60cPqfny+Fq8UiuZzGCGpQwghqQAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
+# nTiOL60cPqfny+Fq8UiuZzGCFyAwghccAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
 # BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
 # IElEIFZlcmlmaWVkIENTIEVPQyBDQSAwMgITMwACrotgFKzNFagWfwAAAAKuizAN
 # BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDANsy0j7hvjRhCbGTCJB7lccjt
-# 56ALbUxY2yRTX9lqADANBgkqhkiG9w0BAQEFAASCAYBOXS2LERVaUJWVdRTs1cpv
-# bptyz+sd/26ozZxlkLK4avXZnTp1zeULBYLIO8SqrfGROTOAJCm5HFfkC4qFUssn
-# QziNu6tFKhHStneEcFIMJqgQybIq7kBbbU3H3qLvEoPrLaMKJjeVmD87qvx0Ku1u
-# uweuStQcakcId4T50AvV/U2xT6APxEUIKBelxcrQo2xLyh+Cx4KHAsyyFth7v9D2
-# /0Q/Pk+7SvnSbelmuEU1XBpGTUKtVCQHN1YDz57t5m7mtpP+cMfJCHAomRUa76va
-# TwFOoId20R+FBC+tKInj+e59zvr6QO75bWCfqvA15SEJbO/F+eBdpE8uhkH0GYUA
-# wqfPBBozYYts9+uuW3a0i2zRLQp7zaYNu6OdMnZXsXqRc/NhaOo8e0N9Ruuibr7H
-# AJH0vG9yJESyscfbjHa23A+44UqJKuBK8Kk31Z0L4QRf67tvfu+dxu2zKPGws5Yw
-# STJ0vFSai0jCtGIrphHlkSLzk/pYUgFFLLxEugHNLc6hghgUMIIYEAYKKwYBBAGC
-# NwMDATGCGAAwghf8BgkqhkiG9w0BBwKgghftMIIX6QIBAzEPMA0GCWCGSAFlAwQC
-# AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQg5gjBcywDCSshxAcibhR34jTeoALgf3Y9xllnvN03
-# a74CBmgSusgRchgTMjAyNTA1MDExNzU0MzIuMjY0WjAEgAIB9KCB4aSB3jCB2zEL
+# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCDlRArYFChYoucwh/1LkniJs7Jy
+# VRDG7NdDtyw8HG1DYjANBgkqhkiG9w0BAQEFAASCAYAo4SiL7uZ5OEtbnLWRmM5P
+# 0dshHTD1lgHze3ipPFzR3Vos7WgfUiROyDRqVDToCtfZVfPMAAyYnuODCS31pXXM
+# +wFPdXRBsPVrvfSrLtNLGu9eKDgPqqHwfgi/OdyRKZXsIH05zLG2OqB35y4C4nAL
+# c3rR2oQygfqkxFQQO8LqcVo5rR/ue7uZ6dRFtgcojYtwlEW0lnKLO+B8AOLGsoa2
+# KqCLED/YOfPCatrfgOcVmUoVNbsSg9CAZPtYITlKP/tabyzPqgLH/pFkgjpS9uUn
+# y9MpL1T17I3JTgSYHekh4L6JJ35msQx/Af89j0nNBgF7UDwKfTGiKDDvWuTIMQIG
+# HOUa+aUtLPBgj9HT2iuKBBi60mVDPXXbmdXwPBPU+P3k4IeCRDcmHm57A1+zmP2x
+# B3V9k64JbIkkMpcdRK43j3XDtLi0UWaAMlhEfkOrm9DOLv7bjKu4S0yVpAGHqNTF
+# o1FHJfqzWxCYGuxry4+9DlJZMLrl9NB9yTpAB3NOM1qhghSgMIIUnAYKKwYBBAGC
+# NwMDATGCFIwwghSIBgkqhkiG9w0BBwKgghR5MIIUdQIBAzEPMA0GCWCGSAFlAwQC
+# AQUAMIIBYQYLKoZIhvcNAQkQAQSgggFQBIIBTDCCAUgCAQEGCisGAQQBhFkKAwEw
+# MTANBglghkgBZQMEAgEFAAQgE1YhOed9De/QHSAXV+CjLnZkDlbX3vue8OtJiMdg
+# d3kCBmgSuqnc+xgTMjAyNTA1MDIwMDE5MjMuMzczWjAEgAIB9KCB4KSB3TCB2jEL
 # MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
 # bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
-# cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
-# RVNOOkE1MDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJT
-# QSBUaW1lIFN0YW1waW5nIEF1dGhvcml0eaCCDyEwggeCMIIFaqADAgECAhMzAAAA
-# BeXPD/9mLsmHAAAAAAAFMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4w
-# HAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29m
-# dCBJZGVudGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3Jp
-# dHkgMjAyMDAeFw0yMDExMTkyMDMyMzFaFw0zNTExMTkyMDQyMzFaMGExCzAJBgNV
-# BAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMT
-# KU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMIICIjAN
-# BgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAnnznUmP94MWfBX1jtQYioxwe1+eX
-# M9ETBb1lRkd3kcFdcG9/sqtDlwxKoVIcaqDb+omFio5DHC4RBcbyQHjXCwMk/l3T
-# OYtgoBjxnG/eViS4sOx8y4gSq8Zg49REAf5huXhIkQRKe3Qxs8Sgp02KHAznEa/S
-# sah8nWo5hJM1xznkRsFPu6rfDHeZeG1Wa1wISvlkpOQooTULFm809Z0ZYlQ8Lp7i
-# 5F9YciFlyAKwn6yjN/kR4fkquUWfGmMopNq/B8U/pdoZkZZQbxNlqJOiBGgCWpx6
-# 9uKqKhTPVi3gVErnc/qi+dR8A2MiAz0kN0nh7SqINGbmw5OIRC0EsZ31WF3Uxp3G
-# gZwetEKxLms73KG/Z+MkeuaVDQQheangOEMGJ4pQZH55ngI0Tdy1bi69INBV5Kn2
-# HVJo9XxRYR/JPGAaM6xGl57Ei95HUw9NV/uC3yFjrhc087qLJQawSC3xzY/EXzsT
-# 4I7sDbxOmM2rl4uKK6eEpurRduOQ2hTkmG1hSuWYBunFGNv21Kt4N20AKmbeuSnG
-# nsBCd2cjRKG79+TX+sTehawOoxfeOO/jR7wo3liwkGdzPJYHgnJ54UxbckF914Aq
-# HOiEV7xTnD1a69w/UTxwjEugpIPMIIE67SFZ2PMo27xjlLAHWW3l1CEAFjLNHd3E
-# Q79PUr8FUXetXr0CAwEAAaOCAhswggIXMA4GA1UdDwEB/wQEAwIBhjAQBgkrBgEE
-# AYI3FQEEAwIBADAdBgNVHQ4EFgQUa2koOjUvSGNAz3vYr0npPtk92yEwVAYDVR0g
-# BE0wSzBJBgRVHSAAMEEwPwYIKwYBBQUHAgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0
-# LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTATBgNVHSUEDDAKBggrBgEF
-# BQcDCDAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTAPBgNVHRMBAf8EBTADAQH/
-# MB8GA1UdIwQYMBaAFMh+0mqFKhvKGZgEByfPUBBPaKiiMIGEBgNVHR8EfTB7MHmg
-# d6B1hnNodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3Nv
-# ZnQlMjBJZGVudGl0eSUyMFZlcmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0aWZpY2F0
-# ZSUyMEF1dGhvcml0eSUyMDIwMjAuY3JsMIGUBggrBgEFBQcBAQSBhzCBhDCBgQYI
-# KwYBBQUHMAKGdWh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMv
-# TWljcm9zb2Z0JTIwSWRlbnRpdHklMjBWZXJpZmljYXRpb24lMjBSb290JTIwQ2Vy
-# dGlmaWNhdGUlMjBBdXRob3JpdHklMjAyMDIwLmNydDANBgkqhkiG9w0BAQwFAAOC
-# AgEAX4h2x35ttVoVdedMeGj6TuHYRJklFaW4sTQ5r+k77iB79cSLNe+GzRjv4pVj
-# JviceW6AF6ycWoEYR0LYhaa0ozJLU5Yi+LCmcrdovkl53DNt4EXs87KDogYb9eGE
-# ndSpZ5ZM74LNvVzY0/nPISHz0Xva71QjD4h+8z2XMOZzY7YQ0Psw+etyNZ1Cesuf
-# U211rLslLKsO8F2aBs2cIo1k+aHOhrw9xw6JCWONNboZ497mwYW5EfN0W3zL5s3a
-# d4Xtm7yFM7Ujrhc0aqy3xL7D5FR2J7x9cLWMq7eb0oYioXhqV2tgFqbKHeDick+P
-# 8tHYIFovIP7YG4ZkJWag1H91KlELGWi3SLv10o4KGag42pswjybTi4toQcC/irAo
-# dDW8HNtX+cbz0sMptFJK+KObAnDFHEsukxD+7jFfEV9Hh/+CSxKRsmnuiovCWIOb
-# +H7DRon9TlxydiFhvu88o0w35JkNbJxTk4MhF/KgaXn0GxdH8elEa2Imq45gaa8D
-# +mTm8LWVydt4ytxYP/bqjN49D9NZ81coE6aQWm88TwIf4R4YZbOpMKN0CyejaPNN
-# 41LGXHeCUMYmBx3PkP8ADHD1J2Cr/6tjuOOCztfp+o9Nc+ZoIAkpUcA/X2gSMkgH
-# APUvIdtoSAHEUKiBhI6JQivRepyvWcl+JYbYbBh7pmgAXVswggeXMIIFf6ADAgEC
-# AhMzAAAASFV3ch50krf3AAAAAABIMA0GCSqGSIb3DQEBDAUAMGExCzAJBgNVBAYT
-# AlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1p
-# Y3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMB4XDTI0MTEy
-# NjE4NDg1MloXDTI1MTExOTE4NDg1MlowgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
-# EwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3Nv
-# ZnQgQ29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJh
-# dGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjpBNTAwLTA1RTAtRDk0NzE1
-# MDMGA1UEAxMsTWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRo
-# b3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDLfoD3Z++SVTIY
-# JFnFnPrVlMvaJYlPTronDHe0VuiHANnCKTIq8qJk4weZ+cf1+vIJ7cdl+/gw3AaR
-# gAQT/iDU6vLN6QfFg1YAO6cR7voo2y4QDJPguGjKpGtONxGj9fOavAkDTH4gaTJn
-# uK9mhvIzUqI7TEDV7JoK6Sy0kYsVcWbp2mF4RJ4FliqEm70YNSwLjnKn5qYIZJoQ
-# YKg9ZWYzYabgr9clHsjlZtFepsTYn2hrim8vaeO9dymfk7pmXrQX2O85UQl8k6AK
-# 2B8KKQVuNNnBa37EAWfxxqlO97WOvkzboNZYWHWFOlS3aklvSa+742PSVIyEgraC
-# gkqIMZkVuzF+5QnuyVekXaZ/hz+3ujmyrxsnXUXbXYmQi6enT7comWGpTfRo2WZt
-# +tEzvhl46YmQ9IGREfn+ZRBWr8CHA+x2q1uqg9GTfNUvkQ4HxLSeu4eqDFKj9ViI
-# hQu+Yn/IGitWjufmfBKp2nigC4FFabRe4vShrA7xJtrbOFmJ3jAIRtvu2dufiI7V
-# uGQCPN2bXRjiafbBXevEuhA3998ECz4uwnGfSFF1u+LS7yDZLb8NzxXnuiN4bP/X
-# w3AjKBCGr/lnmSJiCwoMERhXCyLb8KUhAOzXF06EZN0xnwud2A94OTQ7o66oXbii
-# 21Z6KxjnSGV1XizJNCa+P1yFEBqVKQIDAQABo4IByzCCAccwHQYDVR0OBBYEFKa9
-# d/S6631KGfe8umYaOzc8HPdHMB8GA1UdIwQYMBaAFGtpKDo1L0hjQM972K9J6T7Z
-# PdshMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9w
-# a2lvcHMvY3JsL01pY3Jvc29mdCUyMFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGlu
-# ZyUyMENBJTIwMjAyMC5jcmwweQYIKwYBBQUHAQEEbTBrMGkGCCsGAQUFBzAChl1o
-# dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUy
-# MFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGluZyUyMENBJTIwMjAyMC5jcnQwDAYD
-# VR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAOBgNVHQ8BAf8EBAMC
-# B4AwZgYDVR0gBF8wXTBRBgwrBgEEAYI3TIN9AQEwQTA/BggrBgEFBQcCARYzaHR0
-# cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRt
-# MAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEATa2L4B40TANMMYgCNXTy+cuK
-# TjDzNZ3dAJ+S4PbAKf78FBwQ79hYihqZ/qIg6GWt/jQ5GAsBSpBYKNZOMtUMArNQ
-# fIlZ42y2tylAP/xBGQ6wwmu0uBmXzg6W3TomTZ56bh90li7ZO4BbiiCg2CAkpvtT
-# vrgYu7FbvvTqTIv/LvXQaCJx+sxvJPsbIAyWUSfIYTdAWlVo63sJ8AkH5pzpifvk
-# LyXmLxq2jTywaeD/pKazEJwXAby8+u04oCGVCZDbD+sDOJ753hbl6XyWOXmCpXVv
-# j2wPoXJdI+T6DPtc9GWtMxSDUKZtVJV2UVgACazx8gODidj6h3aGwOr8Ut/FsO/X
-# 853Q1CYpfHWfW3JEkLc3FslKf2Kl2zH14EBoLeUpTykhn8NZUeXhHsuuKjPx8mUA
-# LW/LglUjZXyJ3yBQ1PiOevpxTot8afXc6rlq9FJ2kgtM6ij2uW7f9at5yIcdwFM9
-# VUm0aCgiXvjvRkQeSUIIAm40LX2qve2kdPgNe/Zt8yb5zDcsJjHhZPtXiW3TnBUY
-# LqCsLnD6fVh6X5QvFbtjLlBIMt3XlvAQnuVEzhoyt3isww9w8t+oGCg4aNh94IdK
-# vUNS1ffxC+Q+XrsT3wDlSlqNSLfooxhsCu5gXKtzpfhx8+4l9rVHJxgZE9nwGKiA
-# bwNXxKFB3bVgmwodJbUxggdGMIIHQgIBATB4MGExCzAJBgNVBAYTAlVTMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
-# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASFV3ch50krf3AAAA
-# AABIMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
-# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTA1MDExNzU0
-# MzJaMC8GCSqGSIb3DQEJBDEiBCCD+zmJhDK+UXJuNiCD6RUedNrcOMrWcCjPf+J6
-# Kt3NpjCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEIOoqAVebTwjWn0P0gLwZ
-# 03YfjX3QvDtHZEl38m8i8x1BMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
-# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
-# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAASFV3ch50krf3AAAAAABI
-# MIIDYQYLKoZIhvcNAQkQAhIxggNQMIIDTKGCA0gwggNEMIICLAIBATCCAQmhgeGk
-# gd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQH
-# EwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJTAjBgNV
-# BAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlvbnMxJzAlBgNVBAsTHm5TaGll
-# bGQgVFNTIEVTTjpBNTAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1
-# YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3JpdHmiIwoBATAHBgUrDgMCGgMV
-# AOYSfUGUVzjpxDh59/qJiDRZaMMnoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
-# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBCwUAAgUA
-# 673iDDAiGA8yMDI1MDUwMTEyMDUzMloYDzIwMjUwNTAyMTIwNTMyWjB3MD0GCisG
-# AQQBhFkKBAExLzAtMAoCBQDrveIMAgEAMAoCAQACAjT+AgH/MAcCAQACAhJ0MAoC
-# BQDrvzOMAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
-# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAH+JFgCxVvralMnK
-# Oh5rsfswu/w5+sunju2tsj14NojuK4qaTgfAta6a2eqTDYAYFLEPB3cyxuls9g+x
-# uo1/FnuJL53hU9dir7ZAiLDqUbW/YdhzcXll5NXjBYhDooGH3lu99eUwhLuT8kOQ
-# c4P9aBRNp1bucycnIw/hc/D7WVgEzk8xmkxPLstfiVkMOC6lXn+eC4nbAnvzi9Yj
-# lMjMm4qVw+zPtgz1Vu4wPoqJHJTfecU0iZUTp0+0VYSAzZtVfBA/cOlRDv/tB2+D
-# KCk9x1bqQeLCoVn6IDu7aZJIXEF2XkxhetEY3igY3B66SIB8axYDDtZrvk2imWqq
-# 9ls1BFIwDQYJKoZIhvcNAQEBBQAEggIAygJ1yKMw75mz1noyCP3ZF8sBSoiewUNd
-# vduNk/Sgeta2pWDcwUCL2kH+7QX7Y8VjBi1dPSj1qQi0dv0w4PAVbcF9p9MiTr+2
-# RK/ipTNBDty2FfCDZt17Dxdejtjw1h2qwRB9bm60/M0ikYUtYE3UMiiGS4GFOT2Q
-# 6Xy97MsDB15h4KzykyOiNT3oT22RdFpqUfixOkcy9jIGkhvEmaEV5ZxxYvM0O2lQ
-# DeNA8kjux+5mNksOTpHvyVpF3KDbMCGK7xD1SL+4LLgfS+ry8QAL60Y1JdYZMw+F
-# TyVvAZ36uh9RjRbn60eckTU2YORuKSIp/OAEIGYqTmVJ6GfcLxw9MQTrAMYd0jAV
-# zFrzwYzSmGdhtsX2u/3ZBisWciO/8YtVo+/8RLSBIS/FDxOxWfBboDIgtNQwYBL0
-# 3kiUElY5HciAjtdaNnfjZP5icHVZEZZOXm0tIsErw3GXK829edsMX6k7++wgWb7V
-# 2/f3wiSvMvVOQS92FmNpuPVEKEQG3tckk9cKJDFv/5178deiABGR/O39K+bVSky3
-# mG9LH7vJ5oVhX40oxfjfVlLnjv2uZ93PkVAy43xW4dk0Gxt1cS7DQcgePkgU5mQJ
-# IXAdJKtfUEI2IHcorTspNalKhv2hSPVWc4BdR5NwlKgDF6JqcQmvbo2vXHaJuOVU
-# tJegwXE1zfQ=
+# cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBF
+# U046QkI3My05NkZELTc3RUYxNTAzBgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNB
+# IFRpbWUgU3RhbXBpbmcgQXV0aG9yaXR5oIIPIDCCB4IwggVqoAMCAQICEzMAAAAF
+# 5c8P/2YuyYcAAAAAAAUwDQYJKoZIhvcNAQEMBQAwdzELMAkGA1UEBhMCVVMxHjAc
+# BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjFIMEYGA1UEAxM/TWljcm9zb2Z0
+# IElkZW50aXR5IFZlcmlmaWNhdGlvbiBSb290IENlcnRpZmljYXRlIEF1dGhvcml0
+# eSAyMDIwMB4XDTIwMTExOTIwMzIzMVoXDTM1MTExOTIwNDIzMVowYTELMAkGA1UE
+# BhMCVVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMp
+# TWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwggIiMA0G
+# CSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCefOdSY/3gxZ8FfWO1BiKjHB7X55cz
+# 0RMFvWVGR3eRwV1wb3+yq0OXDEqhUhxqoNv6iYWKjkMcLhEFxvJAeNcLAyT+XdM5
+# i2CgGPGcb95WJLiw7HzLiBKrxmDj1EQB/mG5eEiRBEp7dDGzxKCnTYocDOcRr9Kx
+# qHydajmEkzXHOeRGwU+7qt8Md5l4bVZrXAhK+WSk5CihNQsWbzT1nRliVDwunuLk
+# X1hyIWXIArCfrKM3+RHh+Sq5RZ8aYyik2r8HxT+l2hmRllBvE2Wok6IEaAJanHr2
+# 4qoqFM9WLeBUSudz+qL51HwDYyIDPSQ3SeHtKog0ZubDk4hELQSxnfVYXdTGncaB
+# nB60QrEuazvcob9n4yR65pUNBCF5qeA4QwYnilBkfnmeAjRN3LVuLr0g0FXkqfYd
+# Umj1fFFhH8k8YBozrEaXnsSL3kdTD01X+4LfIWOuFzTzuoslBrBILfHNj8RfOxPg
+# juwNvE6YzauXi4orp4Sm6tF245DaFOSYbWFK5ZgG6cUY2/bUq3g3bQAqZt65Kcae
+# wEJ3ZyNEobv35Nf6xN6FrA6jF9447+NHvCjeWLCQZ3M8lgeCcnnhTFtyQX3XgCoc
+# 6IRXvFOcPVrr3D9RPHCMS6Ckg8wggTrtIVnY8yjbvGOUsAdZbeXUIQAWMs0d3cRD
+# v09SvwVRd61evQIDAQABo4ICGzCCAhcwDgYDVR0PAQH/BAQDAgGGMBAGCSsGAQQB
+# gjcVAQQDAgEAMB0GA1UdDgQWBBRraSg6NS9IY0DPe9ivSek+2T3bITBUBgNVHSAE
+# TTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQu
+# Y29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBMGA1UdJQQMMAoGCCsGAQUF
+# BwMIMBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBBMA8GA1UdEwEB/wQFMAMBAf8w
+# HwYDVR0jBBgwFoAUyH7SaoUqG8oZmAQHJ89QEE9oqKIwgYQGA1UdHwR9MHsweaB3
+# oHWGc2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29m
+# dCUyMElkZW50aXR5JTIwVmVyaWZpY2F0aW9uJTIwUm9vdCUyMENlcnRpZmljYXRl
+# JTIwQXV0aG9yaXR5JTIwMjAyMC5jcmwwgZQGCCsGAQUFBwEBBIGHMIGEMIGBBggr
+# BgEFBQcwAoZ1aHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0cy9N
+# aWNyb3NvZnQlMjBJZGVudGl0eSUyMFZlcmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0
+# aWZpY2F0ZSUyMEF1dGhvcml0eSUyMDIwMjAuY3J0MA0GCSqGSIb3DQEBDAUAA4IC
+# AQBfiHbHfm21WhV150x4aPpO4dhEmSUVpbixNDmv6TvuIHv1xIs174bNGO/ilWMm
+# +Jx5boAXrJxagRhHQtiFprSjMktTliL4sKZyt2i+SXncM23gRezzsoOiBhv14YSd
+# 1Klnlkzvgs29XNjT+c8hIfPRe9rvVCMPiH7zPZcw5nNjthDQ+zD563I1nUJ6y59T
+# bXWsuyUsqw7wXZoGzZwijWT5oc6GvD3HDokJY401uhnj3ubBhbkR83RbfMvmzdp3
+# he2bvIUztSOuFzRqrLfEvsPkVHYnvH1wtYyrt5vShiKheGpXa2AWpsod4OJyT4/y
+# 0dggWi8g/tgbhmQlZqDUf3UqUQsZaLdIu/XSjgoZqDjamzCPJtOLi2hBwL+KsCh0
+# Nbwc21f5xvPSwym0Ukr4o5sCcMUcSy6TEP7uMV8RX0eH/4JLEpGyae6Ki8JYg5v4
+# fsNGif1OXHJ2IWG+7zyjTDfkmQ1snFOTgyEX8qBpefQbF0fx6URrYiarjmBprwP6
+# ZObwtZXJ23jK3Fg/9uqM3j0P01nzVygTppBabzxPAh/hHhhls6kwo3QLJ6No803j
+# UsZcd4JQxiYHHc+Q/wAMcPUnYKv/q2O444LO1+n6j01z5mggCSlRwD9faBIySAcA
+# 9S8h22hIAcRQqIGEjolCK9F6nK9ZyX4lhthsGHumaABdWzCCB5YwggV+oAMCAQIC
+# EzMAAABF33vn5wwJFp4AAAAAAEUwDQYJKoZIhvcNAQEMBQAwYTELMAkGA1UEBhMC
+# VVMxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWlj
+# cm9zb2Z0IFB1YmxpYyBSU0EgVGltZXN0YW1waW5nIENBIDIwMjAwHhcNMjQxMTI2
+# MTg0ODQ3WhcNMjUxMTE5MTg0ODQ3WjCB2jELMAkGA1UEBhMCVVMxEzARBgNVBAgT
+# Cldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29m
+# dCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJpY2EgT3BlcmF0
+# aW9uczEmMCQGA1UECxMdVGhhbGVzIFRTUyBFU046QkI3My05NkZELTc3RUYxNTAz
+# BgNVBAMTLE1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWUgU3RhbXBpbmcgQXV0aG9y
+# aXR5MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwI7T9DdCYDUnYfj4
+# va+Mk9tdPmx23cLwlHHIA8ZEIuTEgrFV8F5gIAHDzvgdrLpaAfNYt5y+Vtpx5RHb
+# FVJnRgnwWE3FrDKGO1r+kFXcXRCxzajb7rv7n+pBSwhwwKmQeiTA8UZNujosLQ1W
+# 0ojOEL7xMc4l5mzLugA6CL618wL7gaZWwaOGq6RROC7Yv1r18+y1O2mSoEMzM3lV
+# r3PvIj3UTmtbovReZOc7NlPuGPTAwjXtqpS16GU7Df4CrBvC9a5n9M15oqCtWjZE
+# ZlsgfMzA28KvSKqqS/UyRBUwbLEC0kP6d/rOzyy0uxCgP259ntzUF6c+N7XmC5X0
+# 4PFo7OSnKcsJ004j9W4gki6MtRHBlPW1hB3EUlPzMfx7vPVk+/0erh3DKe5UUiZ5
+# 4aC6hclk3qc74OoRcXkRiqheE7fDLMmkGzGziMfii8o1K0fcDUhL1Etff2GL6G0N
+# 3qs/2stJrtm4oyoURJawlTN5yJ85zzcF1XSaM7P595jhFz8gB4QBTvs67wQa5nrM
+# JRHNWTlvqYbImoYYX7yhzmAULFO3essnrvIriGpi1pv4NvoPSsvgoQ70DjVUrDbi
+# f8gwOlIefpcunbGYzCKNZC3rOexU6JGeU0NlZLA9UPaF3pxenjEFqsZWVr3JKf6/
+# sbstAIFsyM2ZOMivlI8pfaWS4W8CAwEAAaOCAcswggHHMB0GA1UdDgQWBBQl0Nvq
+# 9SXQRMmn8B3Grz2HYyuV8jAfBgNVHSMEGDAWgBRraSg6NS9IY0DPe9ivSek+2T3b
+# ITBsBgNVHR8EZTBjMGGgX6BdhltodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtp
+# b3BzL2NybC9NaWNyb3NvZnQlMjBQdWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmcl
+# MjBDQSUyMDIwMjAuY3JsMHkGCCsGAQUFBwEBBG0wazBpBggrBgEFBQcwAoZdaHR0
+# cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0cy9NaWNyb3NvZnQlMjBQ
+# dWJsaWMlMjBSU0ElMjBUaW1lc3RhbXBpbmclMjBDQSUyMDIwMjAuY3J0MAwGA1Ud
+# EwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUHAwgwDgYDVR0PAQH/BAQDAgeA
+# MGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEWM2h0dHA6
+# Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAI
+# BgZngQwBBAIwDQYJKoZIhvcNAQEMBQADggIBAGy9tedaeCT4seFHGLKgQteRiPy0
+# twNtoLqOU80gWazoi0L5DHQGhXiVDMVJb9zu1IU3J5unNxwad9hA6/4jeu/kHgZF
+# z3EEszczT480nzwx69zWtVPuCH//b7h1qNZ0p7YKpamUDu1ZjBWuSmgPhK/GgVLX
+# LO1TQ6ntrjbz8bMJf35HsUFWvCRrbPpX4hhNepUbL0jU3l1YECHoleDhtrnqV5v+
+# rz/lXQxhGyVSjPh+NTg80Xwk8Of/7saYnvMdW28xoelULIYnFqTxPn+1vKJX1Qnl
+# HzBBUtWKVDPU/fMERcU2UF052chin0TCQayP8cABd1jYYILQMatiYJzSLAAdNiPM
+# x/clpoD0w13egpMD9B3bx0qyruz2MQK31KR4ZwoKGLfCwuuayzB2aEDcp3Q+SVGg
+# ngYn8SaTjneUZLohh/Wk9A4LOkZhDBYjFQ1BotbTc9KYUV05JXNaheMSwRiFQuCe
+# ZnTtqwhN+UpTO+lZGzBjxPYTXObQYrY6vsB4jzmgzV2+UkE6J2nczJP6LdijGr2P
+# KPpQ3bVG8dpqnOaY8ahKtQouoTfJPHG25BrrX2whPch8xZBYSWn0NYj/yZKje/cr
+# qJYvUoEALhomQbuBU5+Fv4U/R8xzMUGJgoeHIh8n9OoNN2JEtMOeypI6oTrGVRtK
+# YtHyZmb4a5gUM8TXMYID1DCCA9ACAQEweDBhMQswCQYDVQQGEwJVUzEeMBwGA1UE
+# ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUHVi
+# bGljIFJTQSBUaW1lc3RhbXBpbmcgQ0EgMjAyMAITMwAAAEXfe+fnDAkWngAAAAAA
+# RTANBglghkgBZQMEAgEFAKCCAS0wGgYJKoZIhvcNAQkDMQ0GCyqGSIb3DQEJEAEE
+# MC8GCSqGSIb3DQEJBDEiBCBPjrZ2cRFh+m8A+JENTc2MfN08zQqPS3AeV8tnDcdS
+# hDCB3QYLKoZIhvcNAQkQAi8xgc0wgcowgccwgaAEILgEVTrIyIo/ceMv5rhPHM70
+# iM9F0uvKQRUOfiHf0m5xMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVN
+# aWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJsaWMg
+# UlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAARd975+cMCRaeAAAAAABFMCIE
+# IHjZeOFAskwhBfULNCR6E0rKPkMFzgneKilfYFbcL2DkMA0GCSqGSIb3DQEBCwUA
+# BIICAAJSi9dRA0gjYPwoI+bMGyjgy1C7XMCHxENLGK2r460ri/TtLJnLydO80aG9
+# FdDplmSjfuqjCTDxxVPlNzGIe1fY28fz0LrDqDSb2y7YZq59VvF7+CSTISGgauc2
+# 3yMcxchlVkIsfmVBtujUADsMxJoqZZo7Mvxg5wR4e+UVHFRD446C2f4qqKRxwm69
+# KWAZ2TC+PjWjB3N8q6ZOAfEmHW24lzA5gPtj368NFalN1TjEMBbcic9aCYA7jsps
+# qmm8uhOC9trgog7qgbFyjmPCEdtzmgs9wB4GB9qbnN/Vrf/I7il5FwN0vPh6kRi3
+# 7DzsV1KXvNb4lDIIABMhMNesTXJySvZSdWdrCpxZbpA6mjtUKyBPT+vHHbP+c4y5
+# Z6PuxbAn12m78htWSysLPE8k7EHuk1Ib8a2JrNJQXnFRizeceHUZpVKXWhfjF95s
+# 8Ny/O2MVgn2fFcwuquu+mDDu+Itt73cEoVQ4WpiNCfl8OinAUnHTJBUDc6kHgEeR
+# CdpM9T75vjNKJkmRFwXAW4nqtWCZHlAidLcWxAHy4FNk/plQmMmJsv8J+OfATPb7
+# UgMH6n6m9oLFMjksOIdq11BxLHDVSESnMAmfyL0KFvSyMxQkmwml0xZ+/9ZS12we
+# oxDlNvc95eqE26isHGDt2JS1TVW9uJSZ9MkckW78Fq5LIsyp
 # SIG # End signature block
