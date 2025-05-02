@@ -346,7 +346,18 @@ function AssessDeviceState()
         [ValidateSet('PropperEnrollmentVerification', 'NextUserReadiness', 'TroubleShooting')]
         [string]$AssessmentType
     )
-    
+
+    #region Write verbose log of received parameters.
+    Write-Verbose "Received parameters:"
+    Write-Verbose "Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)"
+    Write-Verbose "Assessment type: $AssessmentType"
+    Write-Verbose "Settings: $($settings | ConvertTo-Json -Depth 10)"
+    $returnValue = [ordered] @{}
+    $readinessState = $null
+    $action = $null
+    $device = $null
+    #endregion
+
     Write-Verbose "Type of assessment: $AssessmentType"
     switch ($AssessmentType)
     {
@@ -354,7 +365,6 @@ function AssessDeviceState()
         {
             Write-Host "Place holder text..."
             Write-Host "Checking if the device is properly enrolled..."
-            return $true
         }
         'NextUserReadiness'
         {
@@ -369,7 +379,6 @@ function AssessDeviceState()
                 Write-Host "Assigned profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayname)"
                 Write-Host "Checking enrollment state..."
                 Write-Verbose "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
-
                 switch ($enrollmentState.autopilot.device.enrollmentState) 
                 {
                     notContacted 
@@ -398,21 +407,29 @@ function AssessDeviceState()
                                     if ($enrollmentState.managedDevice.users.azureUser)
                                     {
                                         $normalizedUsername = ConvertUserDisplayName -UserDisplayName $enrollmentState.managedDevice.device.userDisplayName
-                                        Write-Host "This device was previously registered to $normalizedUsername ($($enrollmentState.managedDevice.users.user.userPrincipalName))"
+                                        Write-Host "This device is registered to $normalizedUsername ($($enrollmentState.managedDevice.users.user.userPrincipalName))"
                                         Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $($enrollmentState.managedDevice.users.lastLogonDateTime | FormatDateWithTimeZone))"
                                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                                        $readinessState = 'NotReady'
+                                        $action = 'WipeOrClean'
+                                        $device = $enrollmentState.managedDevice.device.id
                                     }
                                     else 
                                     {
                                         Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
                                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                                        $readinessState = 'NotReady'
+                                        $action = 'WipeOrClean'
+                                        $device = $enrollmentState.managedDevice.device.id
                                     }
                                 }
                                 else
                                 {
                                     Write-Verbose "The managed device is not associated with a user."
                                     Write-Host "This is probably ok."
-                                    return $true
+                                    $readinessState = 'Ready'
+                                    $action = 'None'
+                                    $device = 'None'
                                 }
                             }
                             else
@@ -421,14 +438,18 @@ function AssessDeviceState()
                                 Write-Verbose "The device is an orphan device."
                                 Write-Host "The device was once associated with a managed device, but the association is no longer valid."
                                 Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                                Write-Host "The device to remove is $($enrollmentState.managedDevice.device.id)"
+                                $readinessState = 'NotReady'
+                                $action = 'WipeOrClean'
+                                $device = $enrollmentState.managedDevice.device.id
                             }
                         }
                         else 
                         {
                             Write-Host "No managed device is associated with this autopilot device."
                             Write-Host "the device is ready for the next user."
-                            return $true
+                            $readinessState = 'Ready'
+                            $action = 'None'
+                            $device = 'None'
                         }
                     }
                     enrolled 
@@ -459,28 +480,65 @@ function AssessDeviceState()
                                         $normalizedUsername = ConvertUserDisplayName -UserDisplayName $enrollmentState.managedDevice.device.userDisplayName
                                         Write-Host "This device is registered to $normalizedUsername ($($enrollmentState.managedDevice.users.user.userPrincipalName))"
                                         Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $($enrollmentState.managedDevice.users.lastLogonDateTime | FormatDateWithTimeZone)"
-                                        # Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $($enrollmentState.managedDevice.users.lastLogonDateTime)"
                                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                                        $readinessState = 'NotReady'
+                                        $action = 'WipeOrClean'
+                                        $device = $enrollmentState.managedDevice.device.id
                                     }
                                 }
                                 else
                                 {
                                     Write-Verbose "Device Id's do not match."
                                     Write-Host "The device is an orphan device."
+                                    Write-Host "The device was once associated with a managed device, but the association is no longer valid."
+                                    Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                                    $readinessState = 'NotReady'
+                                    $action = 'WipeOrClean'
+                                    $device = $enrollmentState.managedDevice.device.id
                                 }
                             }
+                            else
+                            {
+                                Write-Verbose "Device Id's do not match."
+                                Write-Host "The device is an orphan device."
+                                Write-Host "The device was once associated with a managed device, but the association is no longer valid."
+                                Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                                $readinessState = 'NotReady'
+                                $action = 'WipeOrClean'
+                                $device = $enrollmentState.managedDevice.device.id
+                            }
+                        }
+                        else 
+                        {
+                            Write-Host "No managed device is associated with this autopilot device even though it shows as being enrolled."
+                            Write-Host "you may want to contact an Intune admin."
+                            $readinessState = 'NotReady'
+                            $action = 'ContactAdmin'
+                            $device = $enrollmentState.managedDevice.device.id
                         }
                     }
                 }
+            }
+            else
+            {
+                Write-Host "The device is not registered in Autopilot."
+                Write-Host "You may want to contact an Intune admin."
+                $readinessState = 'NotReady'
+                $action = 'ContactAdmin'
+                $device = $enrollmentState.managedDevice.device.id
             }
         }
         'TroubleShooting'
         {
             Write-Host "Place holder text..."
             Write-Host "Troubleshooting the device..."
-            return $true
         }
-    }
+    }        
+    $returnValue.Add('ReadinessState', $readinessState)
+    $returnValue.Add('Action', $action)
+    $returnValue.Add('Device', $device)
+    Write-Host "Returning readiness state: $readinessState"
+    return $returnValue
 }
 
 # SIG # Begin signature block

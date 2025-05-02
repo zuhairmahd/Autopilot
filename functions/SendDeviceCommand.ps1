@@ -6,6 +6,13 @@ function SendDeviceCommand ()
         [string]$accessToken,
         [string]$Command = "clean"
     )
+    Write-Host "Are you sure you want to $command the device?"
+    $confirmation = Read-Host "Type 'yes' to confirm, or 'no' to cancel"
+    if ($confirmation -ne 'yes')
+    {
+        Write-Host "Operation cancelled."
+        return $false
+    }
     Write-Verbose "Device ID: $ManagedDeviceId"
     Write-Host "Sending $command command to device with ID $ManagedDeviceId"
     $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
