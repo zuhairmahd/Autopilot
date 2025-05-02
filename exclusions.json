@@ -3,11 +3,13 @@
         "exclusions": [
             "AssessDeviceState",
             "callGraph",
+            "CheckAutopilotState",
             "CleanExclusions",
             "ConnectMe",
             "ConnectToTenant",
             "CopyFiles",
             "CreateRelease",
+            "FindAssociatedManagedDevice",
             "FormatDateWithTimeZone",
             "GetAppAssignmentTypes",
             "GetAutopilotProfileAssignment",

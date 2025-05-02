@@ -45,6 +45,8 @@ function GetDeviceEnrollmentStatus()
     $inAutopilot = $false
     $hasDeviceObject = $false
     $azureUser = $false
+    $hasUserObject = $false
+    $hasUser = $false
     $returnedImportedDevice = [ordered] @{}
     $returnedAutopilotDevice = [ordered] @{}
     $returnedManagedDevice = [ordered] @{}
@@ -58,6 +60,7 @@ function GetDeviceEnrollmentStatus()
     $deviceManagementUri = "deviceManagement/managedDevices"
     $deviceUri = "devices"
     $userUri = "users"
+    $userLookupUri = "$deviceManagementUri/$($managedDevice.Id)/$userUri"
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
     #endregion
@@ -168,17 +171,17 @@ function GetDeviceEnrollmentStatus()
         $inManagedDevices = $true
         $returnedManagedDevice = $managedDevice
         Write-Verbose "Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
-        $users = $managedDevice.usersLoggedOn
-        Write-Verbose "Users logged on: $($users)"
-        Write-Verbose "Last logon: $($managedDevice.usersLoggedOn.lastLogonDateTime)"
-        if ($users)
+        Write-Verbose "managedDevice.usersLoggedOn: $($managedDevice.usersLoggedOn)"
+        Write-Verbose "managedDevice.userPrincipalName: $($managedDevice.userPrincipalName)"
+        Write-Verbose "managedDevice.emailAddress: $($managedDevice.emailAddress)"
+        Write-Verbose "ManagedDevice.userDisplayName: $($managedDevice.userDisplayName)"
+        if ($nnull -ne $managedDevice.usersLoggedOn )
         {
-            Write-Verbose "Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
-            Write-Verbose "Passing $deviceManagementUri/$($managedDevice.Id)/$userUri to graph."
-            $user = (CallGraphAPI -AccessToken $accessToken -ResourcePath "$deviceManagementUri/$($managedDevice.Id)/$userUri" -APIVersion 'beta').value
-            Write-Verbose "User Display Name: $($user.displayName)"
-            Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
-            Write-Verbose "Checking if the user principal name matches the domain $($settings.domain)"
+            Write-Verbose "Device has logged on users."
+            $hasUserObject = $true
+            $hasUser = $true
+            $lastLogonDateTime = $managedDevice.usersLoggedOn.lastLogonDateTime
+            Write-Verbose "Last logon date: $lastLogonDateTime"
             if ($user.userPrincipalName -match $settings.domain)
             {
                 Write-Verbose 'User is an Azure AD user'
@@ -188,11 +191,46 @@ function GetDeviceEnrollmentStatus()
             {
                 Write-Verbose 'User is not an Azure AD user'
             }
-
+        }
+        elseif ($null -ne $managedDevice.userPrincipalName -and $managedDevice.userPrincipalName -match $settings.domain)
+        {
+            Write-Verbose "Device has a userPrincipalName."
+            $users = $managedDevice.userPrincipalName
+            $azureUser = $true
+            $hasUser = $true
+            Write-Verbose "The last logon date is unavailable."
+        }
+        elseif ($null -ne $managedDevice.emailAddress -and $managedDevice.userPrincipalName -match $settings.domain) 
+        {
+            Write-Verbose "Device has an email address."
+            $users = $managedDevice.emailAddress
+            $azureUser = $true
+            $hasUser = $true
+            Write-Verbose "The last logon date is unavailable."
+        }
+        else
+        {
+            Write-Verbose 'No associated users found for device in Intune'
+        }
+        if ($hasUser)
+        {
             $loggedOnUsers = @{
                 AzureUser         = $azureUser
-                user              = $user
-                lastLogOnDateTime = $managedDevice.usersLoggedOn.lastLogonDateTime
+                lastLogOnDateTime = $lastLogonDateTime
+                userDisplayName   = $managedDevice.userDisplayName
+                userPrincipalName = $managedDevice.userPrincipalName
+                emailAddress      = $managedDevice.emailAddress
+            }
+        }
+        if ($hasUserObject)
+        {
+            Write-Verbose "Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
+            Write-Verbose "Passing $deviceManagementUri/$($managedDevice.Id)/$userUri to graph."
+            $user = (CallGraphAPI -AccessToken $accessToken -ResourcePath $userLookupUri -APIVersion 'beta').value
+            Write-Verbose "User Display Name: $($user.displayName)"
+            Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
+            $loggedOnUsers += @{
+                user = $user
             }
             Write-Verbose "LoggedOn Users: $($loggedOnUsers.Count)"
         }

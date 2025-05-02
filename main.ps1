@@ -35,7 +35,7 @@ $groupsToExclude = $init.groupsToExclude
 Write-Verbose "Groups to exclude: $($groupsToExclude | Out-String)"
 $settings = $init.settings
 Write-Verbose "Settings: $($settings | Out-String)"
-$backoutText = 'Backout'
+$backoutText = 'Returning to previous menu'
 #endregion Define variables
 
 #region Helper Functions (Consolidated and Corrected)
@@ -286,6 +286,10 @@ function ProcessSerialNumber
                     return $commandResult # Return the result of the command
                 } 
                 $result = ShowMenu -Menu $actionMenu                
+                if ($null -eq $result)
+                {
+                    return $backoutText
+                }
             }
         }
         'TroubleShooting'
