@@ -22,8 +22,6 @@ function InitializeConfiguration()
         [ordered] @{name = 'timeInSeconds'; value = '60'; description = 'How long to wait before initiating another check.'; devdefault = '60'; reldefault = '60'; default = '30'; type = 'string'},
         [ordered] @{name = 'NoUpdateCheck'; value = @('true', 'false'); description = 'skip checking for updates.'; devdefault = 'false'; reldefault = 'false'; default = 'true'; type = 'array'},
         [ordered] @{name = 'NoAdminCheck'; value = ('true', 'false'); description = 'skip checking for admin rights.'; devdefault = 'false'; reldefault = 'false'; default = 'false'; type = 'array'},
-        [ordered] @{name = 'NoSignatureVerify'; value = @('true', 'false'); description = 'skip verifying the signature of the script.'; devdefault = 'true'; reldefault = 'false'; default = 'false'; type = 'array'},
-        [ordered] @{name = 'NoHashVerify'; value = @('true', 'false'); description = 'skip verifying the hash of the script.'; devdefault = 'true'; reldefault = 'false'; default = 'false'; type = 'array'},
         [ordered] @{name = 'NoIntuneCheck'; value = @('true', 'false'); description = 'skip checking whether the device is present in Intune.'; devdefault = 'false'; reldefault = 'false'; default = 'false'; type = 'array'},
         [ordered] @{name = 'GetDeviceHash'; value = @('true', 'false'); description = 'Gets the hash of the device and exit.'; devdefault = 'false'; reldefault = 'false'; default = 'false'; type = 'array'},
         [ordered] @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; devdefault = 'Github'; reldefault = 'Github'; default = 'Github'; type = 'array'}, 
