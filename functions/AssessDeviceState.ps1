@@ -220,7 +220,7 @@ function AssessDeviceState()
                                     if ($enrollmentState.managedDevice.users.azureUser)
                                     {
                                         $normalizedUsername = ConvertUserDisplayName -UserDisplayName $enrollmentState.managedDevice.users.userDisplayName
-                                        Write-Host "This device is registered to $($normalizedUsername.FullName) ($($enrollmentState.managedDevice.users.user.userPrincipalName))"
+                                        Write-Host "This device is registered to $($normalizedUsername.FullName) ($($enrollmentState.managedDevice.users.userPrincipalName))"
                                         if ($null -ne $enrollmentState.managedDevice.users.lastLogOnDateTime)
                                         {
                                             Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $($enrollmentState.managedDevice.users.lastLogonDateTime | FormatDateWithTimeZone)"
