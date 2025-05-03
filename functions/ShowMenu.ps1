@@ -91,7 +91,7 @@ function AddMenuItem()
         throw "A menu item must have either an Action or a Submenu."
     }
     
-    $item = @{
+    $item = [ordered] @{
         Name         = $Name
         Action       = $Action
         Submenu      = $Submenu

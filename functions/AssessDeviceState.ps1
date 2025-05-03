@@ -286,7 +286,9 @@ function AssessDeviceState()
     $returnValue.Add('ReadinessState', $readinessState)
     $returnValue.Add('Action', $action)
     $returnValue.Add('Device', $device)
-    Write-Host "Returning readiness state: $readinessState"
+    Write-Verbose "Returning readiness state: $readinessState"
+    Write-Verbose "Returning action: $action"
+    Write-Verbose "Returning device: $device"
     return $returnValue
 }
 

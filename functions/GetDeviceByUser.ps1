@@ -59,7 +59,6 @@ function GetDeviceByUser()
             foreach ($device in $devices)
             {
                 # Create a display name for the menu
-                # $menuItemName = "Device: $($device.deviceName)  (Serial number: $($device.serialNumber))"
                 $menuItemName = "Device: $($device.deviceName) ($($device.manufacturer) $($device.model) SN: $($device.serialNumber)) ($($device.complianceState))"
                 # Create a scriptblock action that returns this specific device's serial number when selected
                 $serialNumber = $device.serialNumber
