@@ -3,7 +3,7 @@
     "configurations": [
       {
         "name": "exclusions",
-        "hash": "D4133C558307B09621DCCDAFD6672CEAF1DEBD94CFEED0F4FD7627BBB9BE3760"
+        "hash": "01D38A3425E8DB3ADFC023932F06F15E4AC2535C28AB3A0C56016E0D4376CC32"
       },
       {
         "name": "init",
@@ -16,20 +16,6 @@
       {
         "name": "vars",
         "hash": "4F2F08DBC74B034B24255604DAF2F60BD0C1B6B6333200828DB4D378C7D829B4"
-      }
-    ],
-    "Scripts": [
-      {
-        "name": "Register-Device",
-        "version": {
-          "Major": 2,
-          "Minor": 2,
-          "Build": 2,
-          "Revision": -1,
-          "MajorRevision": -1,
-          "MinorRevision": -1
-        },
-        "hash": "657A2E4B2CEEC7684BE9022990A61F7A8AE1212543C34515561654760C90DDFE"
       }
     ],
     "Cmds": [
@@ -417,7 +403,21 @@
           "MajorRevision": -1,
           "MinorRevision": -1
         },
-        "hash": "2C0CC4B47D57218C956316AEEF110D558DCCD383720C8D1016116358AB85A467"
+        "hash": "9EA2FFEF529BA8BA8DC4F5502AC0994BF23FC279CFE845E2AC46A19A2BF3CA5B"
+      }
+    ],
+    "Scripts": [
+      {
+        "name": "Register-Device",
+        "version": {
+          "Major": 2,
+          "Minor": 2,
+          "Build": 2,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "hash": "657A2E4B2CEEC7684BE9022990A61F7A8AE1212543C34515561654760C90DDFE"
       }
     ]
   }
