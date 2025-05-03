@@ -207,10 +207,10 @@ $application = ($MyInvocation.MyCommand.Name) -replace '.ps1', ''
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $Name = @('localhost')
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$manifestFile = "$PSScriptRoot\manifest.json"
+$manifestFile = "$pwd\manifest.json"
 $manifest = (Get-Content -Path $ManifestFile | ConvertFrom-Json).$Application
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
-$ExclusionsFile = "$PSScriptRoot\exclusions.json"
+$ExclusionsFile = "$pwd\exclusions.json"
 $exclusions = (Get-Content -Path $ExclusionsFile | ConvertFrom-Json).$Application.exclusions
 $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
 #endregion Define static and dynamic variables
@@ -253,7 +253,7 @@ if ($domain -eq 'arabictutor.com')
 if ($Reconfigure)
 {
     Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -DestinationFolder $PSScriptRoot -RootFolder $PSScriptRoot)
+    if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
     {
         Write-Host 'The script has been reconfigured.' -ForegroundColor Green
     }
@@ -268,7 +268,7 @@ if ($Reconfigure)
 if ($ReInitialize)
 {
     Write-Host 'Reinitializing the script...'
-    if (InitializeConfiguration -RootFolder $PSScriptRoot -overWrite)
+    if (InitializeConfiguration -RootFolder $pwd -overWrite)
     {
         Write-Host 'The script has been reinitialized.' -ForegroundColor Green
     }
@@ -277,95 +277,6 @@ if ($ReInitialize)
         Write-Host 'Failed to reinitialize the script.' -ForegroundColor Red
         exit 1
     }
-    exit 0
-}
-
-if (-not($NoSignatureVerify))
-{
-    Write-Host 'Verifying code signature.'
-    $codeAuthenticity = GetSignatureStatus -scriptFolders @("$PSScriptRoot", "$functionsFolder") -exclusions $exclusions
-    if ($codeAuthenticity.count -gt 0)
-    {
-        Write-Host "$($codeAuthenticity.count) scripts failed the signature check." -ForegroundColor Red
-        foreach ($Script in $codeAuthenticity.keys)
-        {
-            Write-Host "The script $script is $($codeAuthenticity[$script].status)."
-            Write-Verbose "The reason is $($codeAuthenticity[$script].reason)."
-        }
-        Write-Host 'You may not run this script because the code signature verification failed.' -ForegroundColor Red
-        Write-Host 'Exiting script.' -ForegroundColor Red
-        exit 1
-    }
-    else
-    {
-        Write-Host 'All scripts are signed.' -ForegroundColor Green
-    }
-}
-else
-{
-    Write-Host 'Skipping signature verification check.'
-}
-
-if (-not($NoHashVerify))
-{
-    Write-Host 'Verifying file integrity.'
-    $fileIntegrity = GetScriptIntegrity -scriptFolders @("$PSScriptRoot", "$functionsFolder") -RootFolder $PSScriptRoot -exclusions $exclusions
-    Write-Verbose "The file integrity check returned $($fileIntegrity.count) scripts."
-    if (-not $fileIntegrity)
-    {
-        Write-Host 'You may not run this script because the integrity check failed.' -ForegroundColor Red
-        Write-Host 'Exiting script.' -ForegroundColor Red
-        exit 1
-    }
-    else
-    {
-        Write-Host 'All scripts passed integrity verification.' -ForegroundColor Green
-    }
-}
-else
-{
-    Write-Host 'Skipping integrity verification check.'
-}
-
-if (-not($NoUpdateCheck))
-{
-    Write-Host 'Checking for script updates.'
-    $remoteManifest = CheckForScriptUpdates -RemoteManifestPath $remoteVersionURL -LocalManifestContent $Manifest
-    if ($remoteManifest.functions.count -gt 0 -or $remoteManifest.scripts.count -gt 0 -or $remoteManifest.cmds.count -gt 0)
-    {
-        Write-Host "$($remoteManifest.functions.count) functions, $($remoteManifest.scripts.count) scripts, and $($remoteManifest.cmds.count) cmds have an update available."
-        Write-Host 'Would you like to download the latest version of the scripts? (Y/N)' -ForegroundColor Yellow
-        $response = Read-Host
-        if ($response -eq 'Y')
-        {
-            Write-Host 'Downloading the latest version of the script.'
-            if (DownloadScriptUpdates -scriptsToUpdate $remoteManifest -scriptURI $updateURL -ScriptRoot $PSScriptRoot)
-            {
-                Write-Host 'All scripts have been updated.' -ForegroundColor Green
-            }
-            else
-            {
-                Write-Host 'Failed to update scripts.' -ForegroundColor Red
-            }
-        }
-        else
-        {
-            Write-Host 'Updates will not be downloaded.' -ForegroundColor Red
-        }
-    }
-    else
-    {
-        Write-Host 'All scripts are up to date.' -ForegroundColor Green
-    }
-}
-else
-{
-    Write-Host 'Skipping script update check.'
-}
-
-if ($UpdateOnly)
-{
-    Write-Host 'Update check complete.'
     exit 0
 }
 

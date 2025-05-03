@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$configFile = "$PSScriptRoot\.secrets\config.json",
-    [string]$InitFile = "$PSScriptRoot\initVerify.json"
+    [string]$configFile = "$pwd\.secrets\config.json",
+    [string]$InitFile = "$pwd\initVerify.json"
 )
 
 
