@@ -72,6 +72,12 @@ function GetDeviceByUser()
             # Show the menu and return the selected device's serial number
             $selectedSerialNumber = ShowMenu -Menu $deviceMenu
             Write-Verbose "Returning selected serial number: $selectedSerialNumber"
+            # Check if the user selected 0 (Exit)
+            if ($selectedSerialNumber -eq $null)
+            {
+                Write-Verbose "User selected Exit option (0). Returning 0 instead of null."
+                return 0
+            }
             return $selectedSerialNumber
         }
     }
