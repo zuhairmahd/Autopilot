@@ -69,30 +69,6 @@
     "type": "array"
   },
   {
-    "name": "NoSignatureVerify",
-    "value": [
-      "true",
-      "false"
-    ],
-    "description": "skip verifying the signature of the script.",
-    "devdefault": "true",
-    "reldefault": "false",
-    "default": "false",
-    "type": "array"
-  },
-  {
-    "name": "NoHashVerify",
-    "value": [
-      "true",
-      "false"
-    ],
-    "description": "skip verifying the hash of the script.",
-    "devdefault": "true",
-    "reldefault": "false",
-    "default": "false",
-    "type": "array"
-  },
-  {
     "name": "NoIntuneCheck",
     "value": [
       "true",

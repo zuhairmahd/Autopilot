@@ -205,7 +205,7 @@ $application = ($MyInvocation.MyCommand.Name) -replace '.ps1', ''
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $Name = @('localhost')
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/manifest.json"
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
 #endregion Define static and dynamic variables
 
@@ -270,8 +270,17 @@ if ($ReInitialize)
 
 if (-not($NoUpdateCheck))
 {
-    Write-Host "Checking for script updates at $remoteVersionURL"
-    Write-Host "Downloading script updates from $updateURL"
+    Write-Host "Checking for script updates..."
+    if (GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL)
+    {
+        Write-Host 'The script has been updated.' -ForegroundColor Green
+        Write-Host 'Please restart the script.' -ForegroundColor Green
+        exit 0
+    }
+    else
+    {
+        Write-Host 'The script is up to date.' -ForegroundColor Green
+    }
 }
 else
 {

@@ -1,0 +1,13 @@
+{
+  "NoUpdateCheck": "false",
+  "configFile": ".\\\\.secrets\\\\config.json",
+  "timeInSeconds": "60",
+  "maxWaitTime": "60",
+  "NoIntuneCheck": "false",
+  "Release": "2.5",
+  "GetDeviceHash": "false",
+  "NoAdminCheck": "false",
+  "Repo": "Github",
+  "configuration": "vars.json",
+  "GroupTag": "MSB01"
+}
