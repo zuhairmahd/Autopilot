@@ -206,7 +206,14 @@ $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertF
 $Name = @('localhost')
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
-$scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
+$settings = $null
+$backoutText = 'Returning to previous menu'
+# $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
+if ($domain -eq 'arabictutor.com')
+{
+    Write-Verbose "Changing groupTag to 'entra'."
+    $GroupTag = 'entra'
+}
 #endregion Define static and dynamic variables
 
 #region logging
@@ -229,17 +236,469 @@ Write-Verbose "Domain: $domain"
 Write-Verbose "Application name: $application"
 Write-Verbose "Functions folder: $functionsFolder"
 Write-Verbose "Base source URL: $baseSourceURL"
+Write-Verbose "Backout text: $backoutText"
+Write-Verbose "settings: $settings"
 #endregion logging
 
-#region Perform checks
-if ($domain -eq 'arabictutor.com')
+#region Helper Functions (Consolidated and Corrected)
+function validateInput()
 {
-    Write-Verbose "Changing groupTag to 'entra'."
-    $GroupTag = 'entra'
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $true)]
+        [string]$UserInput
+    )
+
+    $MaxSerialNumberLength = '11'
+    $MinSerialNumberLength = '7'
+    Write-Verbose "MaxSerialNumberLength: $MaxSerialNumberLength"
+    Write-Verbose "MinSerialNumberLength: $MinSerialNumberLength"
+    # Trim input to remove any leading or trailing spaces
+    $UserInput = $UserInput.Trim()
+    Write-Verbose "Trimmed input: '$UserInput'"
+    Write-Verbose "Checking serial number length: $($UserInput.Length)"
+    if ($UserInput.Length -gt $MaxSerialNumberLength)
+    {
+        Write-Verbose "Serial number exceeds maximum length of $MaxSerialNumberLength characters"
+        Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
+    }
+    elseif ($UserInput.Length -lt $MinSerialNumberLength)
+    {
+        Write-Verbose "Serial number is shorter than minimum length of $MinSerialNumberLength characters"
+        Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
+    }
+    elseif ($UserInput -match '^[a-zA-Z0-9]+$') 
+    {
+        Write-Verbose "Serial number validation passed"
+        $returnValue.valid = $true
+        $returnValue.value = $UserInput
+    }
+    else
+    {
+        Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
+    }
+    Write-Verbose "Returning validation result: $($returnValue.valid)"
+    Write-Verbose "Returning validation value: $($returnValue.value)"
+    return $returnValue
 }
 
-if ($Reconfigure)
+function GetUserInput()
 {
+    [CmdletBinding()]
+    param(
+        [string]$Message,
+        [string]$Prompt
+    )
+    Write-Verbose "Message: $Message"
+    Write-Verbose "Prompt: $Prompt"
+    Write-Host $Message
+    # Updated instruction
+    Write-Host "Press Enter without typing anything to return to the previous menu." 
+    while ($true) # Loop indefinitely until valid input or Enter is pressed
+    {
+        $inputItem = Read-Host $Prompt
+        Write-Verbose "Item entered: '$inputItem'" # Added quotes for clarity
+        # Check if the user just pressed Enter (empty string OR null)
+        if ($null -eq $inputItem -or $inputItem -eq '')
+        {
+            Write-Verbose "User pressed Enter. Returning $BackoutText."
+            return $null # Return null to signal going back
+        }
+        # Validate the input if it's not empty
+        $validationResult = validateInput -UserInput $inputItem
+        $inputResultValid = $validationResult.valid
+        $inputResult = $validationResult.value
+        if ($inputResultValid)
+        {
+            Write-Verbose "Valid $inputType entered: $inputResultValid"
+            Write-Verbose "Input result: $inputResult"
+            return $inputResult # Return the validated input
+        }
+        else
+        {
+            # Beep and show error if validation failed
+            [console]::beep(1000, 500)
+            # Updated error message
+            Write-Host "Invalid $inputType. Please try again or press Enter to return." -ForegroundColor Red 
+            # The loop will continue, prompting the user again
+        }
+    }
+}
+
+function ProcessDevice()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$accessToken,
+        [Parameter(Mandatory = $true)]
+        $DeviceObject,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('import', 'check')]
+        [string]$action
+    )
+    
+    #region check and initialize variables
+    Write-Verbose "Checking access token..."
+    if ($accessToken)
+    {
+        Write-Verbose "Access token provided."
+    }
+    else
+    {
+        Write-Verbose "Access token not provided. Returning Null."
+        return $null
+        return $null
+    }
+    Write-Verbose "Processing serial number: $($deviceObject.SerialNumber)."
+    Write-Verbose "Action: $action"
+    $serialNumber = $deviceObject.serialNumber
+    Write-Verbose "The serial number is $serialNumber."
+    $make = $deviceObject.manufacturer
+    Write-Verbose "The manufacturer is $make"
+    $model = $deviceObject.model
+    Write-Verbose "The model is $model"
+    $returnValues = [ordered] @{}
+    $returnValues.add('EnrolledMessage', 'The device is enrolled.')
+    $returnValues.add('notContactedMessage', 'The device has not contacted the enrollment service.')
+    $returnValues.add('PendingResetMessage', 'The device is pending a reset.')
+    $returnValues.add('EnrollmentFailedMessage', 'The device enrollment failed.')
+    $returnValues.add('UnassignedMessage', 'The device is not assigned to a deployment profile.')
+    $returnValues.add('PendingMessage', 'The device is pending assignment to a deployment profile.')
+    $returnValues.add('notInIntuneMessage', 'The device is not in Intune.')
+    $returnValues.add('ImportSuccessMessage', 'The device was imported successfully.')
+    $returnValues.add('ImportFailedMessage', 'The device import failed.')
+    #endregion check and initialize variables
+
+    switch ($action)
+    {
+        'import'
+        {
+            Write-Host "Checking to make sure the device hash is not already in Intune..."
+            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            Write-Verbose "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
+            if ($deviceAssignment)
+            {
+                if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
+                {
+                    Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
+                    Write-Verbose "The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
+                    $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
+                    Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
+                    Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
+                }
+                elseif ($deviceAssignment.deploymentProfileAssignmentStatus -eq 'unassigned')
+                {
+                    Write-Host 'The device is not assigned to a deployment profile.' -ForegroundColor Red
+                    Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+                    return $returnValues.UnassignedMessage
+                }
+                else 
+                {
+                    Write-Host "The device is Intune but there is an issue with its profile assignment."
+                    Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+                    return $returnValues.UnassignedMessage
+                }
+            }
+            #region Add the device to Intune
+            $importStart = Get-Date
+            $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+            if ($device.state.deviceImportStatus -eq 'complete')
+            {
+                $serialNumber = $device.SerialNumber
+                Write-Host "The import of device with serial number $serialNumber completed successfully." -ForegroundColor Green
+                Write-Host 'Checking device assignment.'
+                $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+                Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
+                if ($assignment)
+                {
+                    Write-Verbose "The assignment status is $($assignment.deploymentProfileAssignmentStatus)"    
+                    if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
+                    {
+                        $assignment.deploymentProfileAssignedDateTime
+                        $profileAssignmentDate = if ($enrollmentState.managedDevice.device.enrolledDateTime)
+                        {
+                            $assignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
+                        }
+                        Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
+                        Write-Host "The device is successfully assigned to the deployment profile $($assignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
+                        Write-Host "The device enrollment state is $($assignment.enrollmentState). " -ForegroundColor Green -NoNewline
+                        if ($assignment.enrollmentState -eq 'notContacted')
+                        {
+                            Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
+                        }
+                        $importDuration = (Get-Date) - $importStart
+                        $importMinutes = [int]$importDuration.TotalMinutes
+                        $importSeconds = $importDuration.Seconds
+                        Write-Host "Elapsed time to complete: $importMinutes minutes, $importSeconds seconds"
+                        if (-not (RestartDevice))
+                        {
+                            return $importValues.ImportSuccessMessage
+                        }
+                    }
+                    else
+                    {
+                        Write-Host 'The device could not be assigned to a deployment profile.' -ForegroundColor Red
+                        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+                        Write-Host "The device current assignment status is $($assignment.deploymentProfileAssignmentStatus)."
+                        Write-Host "The device assignment profile name is $($assignment.deploymentProfile.displayName)."
+                        Write-Host "The device profile assignment date is $($assignment.deploymentProfileAssignmentDateTime)."
+                        return $importValues.ImportFailedMessage
+                    }
+                }
+                else
+                {
+                    Write-Host 'The device cannot be found in Intune.'
+                    Write-Host 'Please check the Intune Portal or contact an Intune administrator.'
+                    return $returnValues.notInIntuneMessage
+                }
+            }
+            elseif ($device.state.deviceImportStatus -eq 'error')
+            {
+                Write-Host 'The device import failed with the following error:' -ForegroundColor Red
+                Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
+                return $returnValues.ImportFailedMessage
+            }
+            else
+            {
+                Write-Host 'The device import failed with the following error:' -ForegroundColor Red
+                Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
+                return $returnValues.ImportFailedMessage
+            }
+            #endregion Add the device to Intune.
+        }
+        'check'
+        {
+            Write-Host "Checking device with serial number $SerialNumber..."
+            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            Write-Verbose "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
+            if ($deviceAssignment)
+            {
+                if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
+                {
+                    Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
+                    Write-Verbose "The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
+                    $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
+                    Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
+                    Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
+                    switch ($deviceAssignment.enrollmentState)
+                    {
+                        'notContacted'
+                        {
+                            Write-Host 'The device has not contacted the enrollment service.' -ForegroundColor Green
+                            Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
+                            Write-Verbose "Returning the message $($returnValues.notContactedMessage)"
+                            return $returnValues.notContactedMessage
+                        }
+                        'enrolled'
+                        {
+                            Write-Host 'The device appears to have been enrolled.' -ForegroundColor Red
+                            Write-Host "Looking up user information..."
+                            $deviceManagementUri = "deviceManagement/managedDevices"
+                            $managedDeviceFilter = "serialNumber eq '$serialNumber'"
+                            # $extraparameters = "select=userPrincipalName,userDisplayName,lastLogOnDateTime&orderby=userDisplayName"
+                            $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -Filter $managedDeviceFilter).value
+                            Write-Verbose "Managed device user principal name: $($managedDevice.userPrincipalName)"
+                            Write-Verbose "Managed device user display name: $($managedDevice.userDisplayName)"
+                            Write-Verbose "Managed device last logon date: $($managedDevice.usersLoggedOn.lastLogOnDateTime)"
+                            if ($managedDevice.userPrincipalName -match $domain)
+                            {
+                                $normalizedUser = NormalizeADUserDisplayName -UserDisplayName $managedDevice.userDisplayName
+                                Write-Host "The device is registered to the user $($normalizedUser.Fullname) with the email address $($managedDevice.userPrincipalName)." -ForegroundColor Red
+                                $hasUser = $true
+                            }
+                            else 
+                            {
+                                Write-Host "Cannot determine logged on user."
+                            }
+                            if ($null -ne $managedDevice.usersLoggedOn.lastLogOnDateTime)
+                            {
+                                $LastLogonDate = ($managedDevice.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
+                                if ($hasUser)
+                                {
+                                    Write-Host "The last logon date for $($normalizedUser.FirstName) was $LastLogonDate." -ForegroundColor Red
+                                }
+                                else
+                                {
+                                    Write-Host "The last logon date was $LastLogonDate." -ForegroundColor Red
+                                }
+                            }
+                            else 
+                            {
+                                Write-Host "The last logon date is not available." -ForegroundColor Red
+                            }
+                            Write-Host "The device needs to be cleaned before giving to another user.." -ForegroundColor Red
+                            return $returnValues.EnrolledMessage
+                        }
+                        'pendingReset'
+                        {
+                            Write-Host 'The device is pending a reset.' -ForegroundColor Yellow
+                            Write-Host "The device needs to be allowed to finish the reset." -ForegroundColor Yellow
+                            Write-Host "It is likely the next user may experience issues when logging on for the first time." -ForegroundColor Yellow
+                            Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Yellow
+                            return $returnValues.PendingResetMessage
+                        }
+                        'enrollmentFailed'
+                        {
+                            Write-Host 'The device enrollment failed.' -ForegroundColor Red
+                            Write-Host 'This may cause issues when the user loggs on for the first time.' -ForegroundColor Red
+                            Write-Host "This means someone has already unsuccessfully tried to enroll the device." -ForegroundColor Red
+                            Write-Host "It is likely the next user may experience issues when logging on for the first time." -ForegroundColor Red
+                            Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
+                            return $returnValues.EnrollmentFailedMessage
+                        }
+                        default
+                        {
+                            Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Red
+                            Write-Host 'Please check the Intune portal or contact an Intune administrator before you give the device to a user.' -ForegroundColor Red
+                            return $null
+                        }
+                    }
+                }
+                if ($deviceAssignment.enrollmentState -ne 'enrolled' -and $deviceAssignment.deploymentProfileAssignmentStatus -notin @('assignedInSync', 'assignedUnkownSyncState'))
+                {
+                    switch ($deviceAssignment.deploymentProfileAssignmentStatus)
+                    {
+                        'unassigned'
+                        {
+                            Write-Host 'The device is not assigned to a deployment profile.' -ForegroundColor Red
+                            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+                            return $returnValues.UnassignedMessage
+                        }
+                        'pending'
+                        {
+                            Write-Host 'The device is pending assignment to a deployment profile.' -ForegroundColor Yellow
+                            Write-Host 'Please check again after a little while.' -ForegroundColor Yellow
+                            return $returnValues.PendingMessage
+                        }
+                        default
+                        {
+                            Write-Host "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)."
+                            return $false
+                        }
+                    }
+                    Write-Host "What would you like to do?"
+                    $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
+                    $choice = DisplayNumericMenu -Choices $choices 
+                    switch ($choice)
+                    {
+                        'Restart the device'
+                        {
+                            Write-Host 'Restarting the device...'
+                            RestartDevice
+                        }
+                        'Continue to wait for profile assignment'
+                        {
+                            Write-Host 'Continuing to wait for profile assignment...'
+                            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+                        }
+                        'Delete from Autopilot'
+                        {
+                            Write-Host 'Deleting the device from Autopilot...'
+                            if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+                            {
+                                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                            }
+                            else
+                            {
+                                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                                return $null
+                            }
+                        }
+                    }
+                    return $true
+                }
+            }
+            else
+            {
+                Write-Host 'The device is not in Intune.'
+            }
+        }
+        default
+        {
+            Write-Verbose "Invalid action: $action"
+            return $false
+        }
+    }
+}
+#endregion Helper Functions
+
+#region Menu Definitions
+$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune device registration menu.  What would you like to do?"
+$serialNumberMenu = newMenu -Title "Check device registration" -Description "How would you like to enter the serial number?."
+$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
+    Write-Host 'Please enter the serial number of the device.'
+    Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
+    $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number'
+    # Check if user entered 'back'
+    if ($null -eq $serialNumber)
+    {
+        Write-Verbose "User pressed Enter. Returning $BackoutText."
+        return $backoutText
+    } 
+    else # Process only if a serial number was entered
+    {
+        Write-Verbose "Got serial number: $SerialNumber"
+        Write-Host "Checking device with serial number $($SerialNumber)..."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
+        $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
+    }
+}
+$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
+    Write-Verbose "Getting the serial number for this device..."
+    Write-Verbose 'Checking whether the script has sufficient permissions to run.'
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose 'The script is running with sufficient permissions.'
+        Write-Verbose "Getting device object."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
+    }
+    Write-Verbose "Device object: $($deviceObject)"
+    if ($deviceObject)
+    {
+        Write-Host "Checking device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'check'
+    }
+    else
+    {
+        Write-Host "Could not obtain the serial number." -ForegroundColor Red
+    }
+}
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device registration status" -Submenu $serialNumberMenu
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Import current device into Intune" -Action {
+    Write-Host "Importing device with serial number $($serialNumber) into Intune..."
+    Write-Verbose "Getting the serial number for this device..."
+    Write-Verbose 'Checking whether the script has sufficient permissions to run.'
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose 'The script is running with sufficient permissions.'
+        Write-Verbose "Getting device object."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
+    }
+    Write-Verbose "Device object: $($deviceObject)"
+    if ($deviceObject)
+    {
+        Write-Host "Importing device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import'
+    }
+    else
+    {
+        Write-Host "Could not obtain the serial number." -ForegroundColor Red
+    }
+}
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Action {
     Write-Host 'Reconfiguring the script...'
     if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
     {
@@ -248,10 +707,25 @@ if ($Reconfigure)
     else
     {
         Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
-        exit 1
     }
-    exit 0
-}   
+}
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+    Write-Host "Checking for script updates..."
+    if (GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL)
+    {
+        Write-Host 'The script has been updated.' -ForegroundColor Green
+        Write-Host 'Please restart the script.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'The script is up to date.' -ForegroundColor Green
+    }
+}
+ShowMenu -Menu $mainMenu
+#endregion Menu Definitions
+
+exit 0
+#region other code
 
 if ($ReInitialize)
 {
@@ -268,427 +742,97 @@ if ($ReInitialize)
     exit 0
 }
 
-if (-not($NoUpdateCheck))
-{
-    Write-Host "Checking for script updates..."
-    if (GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL)
-    {
-        Write-Host 'The script has been updated.' -ForegroundColor Green
-        Write-Host 'Please restart the script.' -ForegroundColor Green
-        exit 0
-    }
-    else
-    {
-        Write-Host 'The script is up to date.' -ForegroundColor Green
-    }
-}
-else
-{
-    Write-Host 'Skipping script update check.'
-}
 
-if ($UpdateOnly)
-{
-    Write-Host 'Update check complete.'
-    exit 0
-}
 
-if (-not($NoAdminCheck -or $UpdateOnly -or $Reconfigure -or $check -or $serialNumber -ne ''))
-{
-    Write-Host 'Checking whether the script has sufficient permissions to run.'
-    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Warning 'You do not have sufficient permissions to run this script. Please run this script as an administrator.'
-        exit 1
-    }
-    else
-    {
-        Write-Host 'The script has sufficient permissions. Continuing.'
-    }
-}
-else
-{
-    Write-Host 'Skipping administrator check.'
-}
-#endregion Perform checks
 
-#region Gather device information.
-if ($serialNumber -eq '')
-{
-    Write-Host 'Using the local device serial number.'
-    if ($check)
-    {
-        Write-Verbose "Retrieving device info without hash"
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
-    }
-    else
-    {
-        Write-Verbose "Retrieving device info with hash"
-        $deviceObject = GetDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    }
-    $serialNumber = $deviceObject.serialNumber
-    Write-Verbose "The serial number is $serialNumber."
-    $hash = $deviceObject.hardwareHas
-    Write-Verbose "The hardware hash is $hash"
-    $make = $deviceObject.manufacturer
-    Write-Verbose "The manufacturer is $make"
-    $model = $deviceObject.model
-    Write-Verbose "The model is $model"
-    $parentDir = (Get-Item -Path $PWD).Parent.FullName
-    Write-Verbose "The parent directory is $parentDir"
-    $outputFile = "$parentDir\device_$serial.csv"
-    Write-Verbose "The output file is $outputFile"
-    Write-Host "Processing device with serial number $serialNumber, manufacturer $make, and model $model."
-    if ($GetDeviceHash)
-    {
-        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-        exit 0
-    }
-}
-else
-{
-    Write-Host "Using the provided serial number $serialNumber."
-}
-#endregion Gather device information.
 
-$accessToken = GetGraphAccessToken -configFile $configFile
-if ($null -eq $accessToken)
+$choices = @('Clean the device', 'Wipe the device')
+$choice = DisplayNumericMenu -Choices $choices 
+switch ($choice)
 {
-    Write-Host 'Failed to retrieve access token.' -ForegroundColor Red
-    Write-Host 'Functions that require direct access to the API will not work.' -ForegroundColor Red
-}
-
-#region Check if the device is already in Intune
-if (-not $NoIntuneCheck)
-{
-    $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-    Write-Verbose "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
-    if ($deviceAssignment)
+    $choices[0]
     {
-        if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
+        Write-Host "Cleaning the device is a distructive action and cannot be undone" -ForegroundColor Red
+        Write-Host "Are you sure you want to clean the device?" -ForegroundColor Red
+        $subchoices = @('Yes', 'No')
+        $subchoice = DisplayNumericMenu -Choices $subchoices
+        switch ($subchoice)
         {
-            Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
-            Write-Verbose "The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
-            $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
-            Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
-            Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
-            switch ($deviceAssignment.enrollmentState)
+            'yes'
             {
-                'notContacted'
-                {
-                    Write-Host 'The device has not contacted the enrollment service.' -ForegroundColor Green
-                    Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
-                    $choices = @('Restart the device', 'Delete from Autopilot')
-                    switch ($choice)
-                    {
-                        'Restart the device'
-                        {
-                            Write-Host 'Restarting the device...'
-                            RestartDevice
-                        }
-                        'Delete from Autopilot'
-                        {
-                            Write-Host 'Deleting the device from Autopilot...'
-                            if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
-                            {
-                                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                            }
-                            else
-                            {
-                                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                                exit 1
-                            }
-                        }
-                    }
-                    Write-Verbose "Exitting script as requested."
-                    exit 0
-                }
-                'enrolled'
-                {
-                    Write-Host 'The device appears to have been enrolled.' -ForegroundColor Red
-                    Write-Host "Looking up user information..."
-                    $deviceManagementUri = "deviceManagement/managedDevices"
-                    $managedDeviceFilter = "serialNumber eq '$serialNumber'"
-                    # $extraparameters = "select=userPrincipalName,userDisplayName,lastLogOnDateTime&orderby=userDisplayName"
-                    $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -Filter $managedDeviceFilter).value
-                    Write-Host "The device is registered to the user $($managedDevice.userDisplayName) with the email address $($managedDevice.userPrincipalName)." -ForegroundColor Red
-                    $LastLogonDate = ($managedDevice.usersLoggedOn.lastLogOnDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
-                    Write-Host "The last logon date was $LastLogonDate." -ForegroundColor Red
-                    Write-Host "The device needs to be cleaned before giving to another user.." -ForegroundColor Red
-                    $choices = @('Clean the device', 'Wipe the device')
-                    $choice = DisplayNumericMenu -Choices $choices 
-                    switch ($choice)
-                    {
-                        $choices[0]
-                        {
-                            Write-Host "Cleaning the device is a distructive action and cannot be undone" -ForegroundColor Red
-                            Write-Host "Are you sure you want to clean the device?" -ForegroundColor Red
-                            $subchoices = @('Yes', 'No')
-                            $subchoice = DisplayNumericMenu -Choices $subchoices
-                            switch ($subchoice)
-                            {
-                                'yes'
-                                {
-                                    Write-Host "Cleaning device..."
-                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
-                                    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
-                                }
-                                'no'
-                                {
-                                    Write-Host "Exitting... Come back when you are sure."
-                                }
-                            }
-                        }
-                        $choices[1]
-                        {
-                            Write-Host "Wiping device..."
-                            Write-Host "This will remove all data from the device." -ForegroundColor Red
-                            Write-Host "Are you sure you want to wipe the device?" -ForegroundColor Red
-                            Write-Host "This is a destructive action and cannot be undone." -ForegroundColor Red
-                            $subchoices = @('Yes', 'No')
-                            $subchoice = DisplayNumericMenu -Choices $subchoices
-                            switch ($subchoice)
-                            {
-                                'yes'
-                                {
-                                    Write-Host "Wiping device..."
-                                    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
-                                    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
-                                }
-                                'no'
-                                {
-                                    Write-Host "Exitting... Come back when you are sure."
-                                }
-                            }
-                        }
-                    }
-                }
-                'pendingReset'
-                {
-                    Write-Host 'The device is pending a reset.' -ForegroundColor Yellow
-                    Write-Host "The device needs to be allowed to finish the reset." -ForegroundColor Yellow
-                    Write-Host "It is likely the next user may experience issues when logging on for the first time." -ForegroundColor Yellow
-                    Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Yellow
-                    exit 1
-                }
-                'enrollmentFailed'
-                {
-                    Write-Host 'The device enrollment failed.' -ForegroundColor Red
-                    Write-Host 'This may cause issues when the user loggs on for the first time.' -ForegroundColor Red
-                    Write-Host "This means someone has already unsuccessfully tried to enroll the device." -ForegroundColor Red
-                    Write-Host "It is likely the next user may experience issues when logging on for the first time." -ForegroundColor Red
-                    Write-Host "Please check the Intune portal or contact an Intune administrator." -ForegroundColor Red
-                    exit 1
-                }
-                default
-                {
-                    Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Red
-                    Write-Host 'Please check the Intune portal or contact an Intune administrator before you give the device to a user.' -ForegroundColor Red
-                    exit 1
-                }
+                Write-Host "Cleaning device..."
+                $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
+                SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
             }
-            if ($deviceAssignment.enrollmentState -ne 'enrolled' -and $deviceAssignment.deploymentProfileAssignmentStatus -notin @('assignedInSync', 'assignedUnkownSyncState'))
+            'no'
             {
-                switch ($deviceAssignment.deploymentProfileAssignmentStatus)
-                {
-                    'unassigned'
-                    {
-                        Write-Host 'The device is not assigned to a deployment profile.' -ForegroundColor Red
-                        Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-                        Write-Host "You can also choose to start a check every minute for the next $maxWaitTime minutes." -ForegroundColor Red
-                    }
-                    'pending'
-                    {
-                        Write-Host 'The device is pending assignment to a deployment profile.' -ForegroundColor Yellow
-                        Write-Host 'Please check again after a little while.' -ForegroundColor Yellow
-                        Write-Host "You can also choose to start a check every minute for the next $maxWaitTime minutes." -ForegroundColor Red
-                    }
-                    default
-                    {
-                        Write-Host "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)."
-                        Write-Host "You can also choose to start a check every minute for the next $maxWaitTime minutes." -ForegroundColor Red
-                    }
-                }
-                Write-Host "What would you like to do?"
-                $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
-                $choice = DisplayNumericMenu -Choices $choices 
-                switch ($choice)
-                {
-                    'Restart the device'
-                    {
-                        Write-Host 'Restarting the device...'
-                        RestartDevice
-                    }
-                    'Continue to wait for profile assignment'
-                    {
-                        Write-Host 'Continuing to wait for profile assignment...'
-                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-                    }
-                    'Delete from Autopilot'
-                    {
-                        Write-Host 'Deleting the device from Autopilot...'
-                        if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
-                        {
-                            Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                        }
-                        else
-                        {
-                            Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                            exit 1
-                        }
-                    }
-                }
-                exit 0
+                Write-Host "Exitting... Come back when you are sure."
             }
         }
     }
-    else
+    $choices[1]
     {
-        Write-Host 'The device is not in Intune.'
-        Write-Verbose "Checking if the user wants to enroll the device."
-        if (-not $check)
+        Write-Host "Wiping device..."
+        Write-Host "This will remove all data from the device." -ForegroundColor Red
+        Write-Host "Are you sure you want to wipe the device?" -ForegroundColor Red
+        Write-Host "This is a destructive action and cannot be undone." -ForegroundColor Red
+        $subchoices = @('Yes', 'No')
+        $subchoice = DisplayNumericMenu -Choices $subchoices
+        switch ($subchoice)
         {
-            Write-Host "Would you like to continue to import the device to Intune?" -ForegroundColor Yellow
-            $choices = @('Import the device')
-            $choice = DisplayNumericMenu -Choices $choices
-            Write-Verbose "Got choice $choice"
-            if ($choice -eq $choices[0])
+            'yes'
             {
-                Write-Host 'Continuing to import the device.'
+                Write-Host "Wiping device..."
+                $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
+                SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
             }
-            else
+            'no'
             {
-                Write-Host 'Exitting script.' -ForegroundColor Red
-                exit 1
+                Write-Host "Exitting... Come back when you are sure."
             }
         }
     }
 }
-else
-{
-    Write-Host 'Skipping Intune check.'
-}
 
-if ($check)
+$choices = @('Restart the device', 'Delete from Autopilot')
+switch ($choice)
 {
-    if ($deviceAssignment)
+    'Restart the device'
     {
-        if ($deviceAssignment.deploymentProfileAssignmentStatus -notin @('assignedInSync', 'assignedUnkownSyncState'))
+        Write-Host 'Restarting the device...'
+        RestartDevice
+    }
+    'Delete from Autopilot'
+    {
+        Write-Host 'Deleting the device from Autopilot...'
+        if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
         {
-            $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
+            Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
         }
         else
         {
-            $choices = @('Restart the device', 'Delete from Autopilot')
+            Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+            exit 1
         }
-        $choice = DisplayNumericMenu -Choices $choices 
-        switch ($choice)
-        {
-            'Restart the device'
-            {
-                Write-Host 'Restarting the device...'
-                RestartDevice
-            }
-            'Continue to wait for profile assignment'
-            {
-                Write-Host 'Continuing to wait for profile assignment...'
-                $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-            }
-            'Delete from Autopilot'
-            {
-                Write-Host 'Deleting the device from Autopilot...'
-                if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
-                {
-                    Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                }
-                else
-                {
-                    Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                    exit 1
-                }
-            }
-        }
-    }
-    exit 0
-}
-#endregion Check if the device is already in Intune
-
-#region Add the device to Intune
-$importStart = Get-Date
-$device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-if ($device.state.deviceImportStatus -eq 'complete')
-{
-    $serialNumber = $device.SerialNumber
-    Write-Host "The import of device with serial number $serialNumber completed successfully." -ForegroundColor Green
-    Write-Host 'Checking device assignment.'
-    $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-    Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
-    if ($assignment)
-    {
-        Write-Verbose "The assignment status is $($assignment.deploymentProfileAssignmentStatus)"    
-        if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
-        {
-            $assignment.deploymentProfileAssignedDateTime
-            $profileAssignmentDate = if ($enrollmentState.managedDevice.device.enrolledDateTime)
-            {
-                $assignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
-            }
-            Write-Host 'Congratulations!!! ' -ForegroundColor Magenta
-            Write-Host "The device is successfully assigned to the deployment profile $($assignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
-            Write-Host "The device enrollment state is $($assignment.enrollmentState). " -ForegroundColor Green -NoNewline
-            if ($assignment.enrollmentState -eq 'notContacted')
-            {
-                Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
-            }
-            $importDuration = (Get-Date) - $importStart
-            $importMinutes = [int]$importDuration.TotalMinutes
-            $importSeconds = $importDuration.Seconds
-            Write-Host "Elapsed time to complete: $importMinutes minutes, $importSeconds seconds"
-            $importSeconds = [Math]::Ceiling($importDuration.TotalSeconds)
-            Write-Host "Elapsed time to complete: $importSeconds seconds"
-            if (-not (RestartDevice))
-            {
-                exit 0
-            }
-        }
-        else
-        {
-            Write-Host 'The device could not be assigned to a deployment profile.' -ForegroundColor Red
-            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
-            Write-Host "The device current assignment status is $($assignment.deploymentProfileAssignmentStatus)."
-            Write-Host "The device assignment profile name is $($assignment.deploymentProfile.displayName)."
-            Write-Host "The device profile assignment date is $($assignment.deploymentProfileAssignmentDateTime)."
-        }
-    }
-    else
-    {
-        Write-Host 'The device cannot be found in Intune.'
-        Write-Host 'Please check the Intune Portal or contact an Intune administrator.'
-        GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-        exit 1
     }
 }
-elseif ($device.state.deviceImportStatus -eq 'error')
+                            
+    
+if ($GetDeviceHash)
 {
-    Write-Host 'The device import failed with the following error:' -ForegroundColor Red
-    Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
     GetDeviceHash -Device $deviceObject -OutputFile $outputFile
+    exit 0
+}
+
+$createHash = GetDeviceHash -Device $deviceObject -OutputFile $outputFile
+if ($createHash)
+{
+    Write-Verbose 'Device hash created successfully.'
+    exit 0
+}
+else
+{
+    Write-Verbose 'Failed to create device hash.'
     exit 1
 }
-else
-{
-    Write-Host 'The device import failed with the following error:' -ForegroundColor Red
-    Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
-    $createHash = GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-    if ($createHash)
-    {
-        Write-Verbose 'Device hash created successfully.'
-        exit 0
-    }
-    else
-    {
-        Write-Verbose 'Failed to create device hash.'
-        exit 1
-    }
-}
-#endregion Add the device to Intune.
+#endregion other code
