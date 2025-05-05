@@ -198,8 +198,7 @@ else
 $application = 'Register'
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$localVersion = Get-Content -Path version.txt -Raw -Force -ErrorAction SilentlyContinue
-$localVersion = $localVersion.Trim()
+$localVersion = (Get-Content -Path version.txt -Raw -Force -ErrorAction SilentlyContinue).trim()
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 $backoutText = 'Returning to previous menu'
 # $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"

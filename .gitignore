@@ -40,3 +40,4 @@ Modules/
 pwsh/
 *.bat
 *.csv
+*.exe

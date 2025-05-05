@@ -1,6 +1,6 @@
 {
     "configFile":  ".\\\\.secrets\\\\config.json",
-    "maxWaitTime":  "60",
+    "maxWaitTime":  "30",
     "timeInSeconds":  "60",
     "Release":  "2.5",
     "Repo":  "Github",
