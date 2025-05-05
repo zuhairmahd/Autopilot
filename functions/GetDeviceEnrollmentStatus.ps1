@@ -97,22 +97,20 @@ function GetDeviceEnrollmentStatus()
             Filter       = $autopilotDeviceFilter
         }
     }
-
     $autopilotDevice = CallGraphAPI @params
     $autopilotDeviceValue = $autopilotDevice.value
-    if ($autopilotDeviceValue.count -eq 0)
+    if ($autopilotDeviceValue.'@odata.context' -match 'https://graph.microsoft.com/')
+    {
+        Write-Verbose "Using modified device value returned by function."
+        $autopilotDevice = $autopilotDeviceValue
+    }
+    else
     {
         Write-Verbose "Using original device value returned by function."
         $autopilotDevice = $autopilotDevice
     }
-    else
-    {
-        Write-Verbose "Using modified device value returned by function."
-        $autopilotDevice = $autopilotDeviceValue 
-    }
-    Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
-    Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
-    if ($autopilotDevice)
+    Write-Verbose "Found $($autopilotDevice.'@odata.count') Autopilot devices."
+    if ($autopilotDevice -and $autopilotDevice.'@odata.count' -gt 0)
     {
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
         Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
