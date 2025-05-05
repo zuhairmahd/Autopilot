@@ -1,6 +1,7 @@
 function GetUpdates()
 {
     param (
+        $returnValues = $returnValues,
         [Parameter(Mandatory = $false)]
         [string]$RootFolder,
         [Parameter(Mandatory = $false)]
@@ -106,30 +107,40 @@ function GetUpdates()
     $remoteVersion = [System.Version]::Parse($remoteVersion)
     #endregion
     
-    #check if the remote version is greater than the local version.
+    #region compare versions
     Write-Verbose "Comparing local version $localVersion with remote version $remoteVersion"
     if ($remoteVersion -gt $localVersion)
     {
         Write-Verbose "Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
         Write-Host "An update is available to version $remoteVersion. Downloading update from $updateURL."
-        #download the update file.
-        # $updateFile = Join-Path -Path $RootFolder -ChildPath "update.zip"
-        # Invoke-WebRequest -Uri $updateURL -OutFile $updateFile -Method Get -ErrorAction Stop
-        #check the return code.
-        if ($LASTEXITCODE -ne 0)
+        #make a backup of register.exe.
+        $backupFile = Join-Path -Path $RootFolder -ChildPath "register.exe.bak"
+        if (Test-Path $backupFile)
         {
-            Write-Error "Failed to download update from $updateURL. Status code: $($LASTEXITCODE)"
-            return
+            Write-Host "Backup file already exists. Deleting old backup file."
+            Remove-Item -Path $backupFile -Force
         }
-        #unzip the file.
-        # Expand-Archive -Path $updateFile -DestinationPath $RootFolder -Force
-        #remove the zip file.
-        # Remove-Item -Path $updateFile -Force
+        Write-Host "Backing up current register.exe to $backupFile."
+        Copy-Item -Path "$RootFolder\register.exe" -Destination $backupFile -Force
+        #download the update file.
+        $updateFile = Join-Path -Path $RootFolder -ChildPath "register.exe"
+        $response = Invoke-WebRequest -Uri $updateURL -OutFile $updateFile -Method Get -ErrorAction Stop -PassThru
+        #check the return code.
+        if ($response.StatusCode -ne 200)
+        {
+            Write-Host "Failed to download update from $updateURL. Status code: $($response.StatusCode)"
+            return $returnValues.UpdateFailedMessage
+        }
+        else
+        {
+            Write-Verbose "Update downloaded successfully to $updateFile."
+            return $returnValues.UpdateSuccessMessage
+        }
     }
     else
     {
         Write-Verbose "Local version $localVersion is up to date with remote version $remoteVersion. No update required."
-        Write-Host "No update required. Local version $localVersion is up to date with remote version $remoteVersion."
+        return $returnValues.UpdateNotNeededMessage
     }
-    return $true
+    #endregion
 }

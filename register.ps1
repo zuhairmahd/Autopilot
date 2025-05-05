@@ -215,6 +215,9 @@ $returnValues.add('ImportSuccessMessage', 'The device was imported successfully.
 $returnValues.add('ImportFailedMessage', 'The device import failed.')
 $returnValues.add('DeleteSuccessMessage', 'The device was deleted successfully.')
 $returnValues.add('DeleteFailedMessage', 'The device deletion failed.')
+$returnValues.add('UpdateFailedMessage', 'Could not download update.')
+$returnValues.add('UpdateSuccessMessage', 'The script was updated successfully.')
+$returnValues.add('UpdateNotNeededMessage', 'The script is already up to date.')
 if ($domain -eq 'arabictutor.com')
 {
     Write-Verbose "Changing groupTag to 'entra'."
@@ -841,14 +844,29 @@ if ($showAdvancedOptions)
 }
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    if (GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL)
+    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
+    switch ($updateResult)
+    
     {
-        Write-Host 'The script has been updated.' -ForegroundColor Green
-        Write-Host 'Please restart the script.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'The script is up to date.' -ForegroundColor Green
+        $returnValues.UpdateSuccessMessage
+        {
+            Write-Host 'The script has been updated.' -ForegroundColor Green
+            Write-Host 'Please restart the script.' -ForegroundColor Green
+            exit 0
+        }
+        $returnValues.UpdateFailedMessage
+        {
+            Write-Host 'The script update failed.' -ForegroundColor Red
+            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
+        }
+        $returnValues.UpdateNotNeededMessage
+        {
+            Write-Host 'The script is up to date.' -ForegroundColor Green
+        }
+        default
+        {
+            Write-Host 'An unknown error occurred while checking for updates.' -ForegroundColor Red
+        }
     }
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
