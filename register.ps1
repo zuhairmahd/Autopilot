@@ -750,7 +750,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
     else
     {
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
     }
     Write-Verbose "Device object: $($deviceObject)"
     if ($deviceObject)
@@ -816,8 +816,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Get device hash for manual upload
     else
     {
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
-        exit 1
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
     }
     if ($deviceObject)
     {
