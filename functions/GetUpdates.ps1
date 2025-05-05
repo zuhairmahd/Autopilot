@@ -49,7 +49,7 @@ function GetUpdates()
     }
     else 
     {
-        Write-Verbose "LocalVersion is not null. Using provided local version: $LocalVersion"
+        Write-Verbose "LocalVersion provided in variable. Using provided local version: $LocalVersion"
     }
     Write-Host "LocalVersion: $LocalVersion"
     $localVersion = [System.Version]::Parse($LocalVersion)
@@ -65,12 +65,8 @@ function GetUpdates()
     {
         Write-Verbose "Remote version response: $($remoteVersionResponse.Content)"
         Write-Verbose "Remote version status code: $($remoteVersionResponse.StatusCode)"
-    }
-    #check the return code.
-    if ($remoteVersionResponse.StatusCode -ne 200)
-    {
-        Write-Verbose "Failed to get remote version from $remoteVersionURL. Status code: $($remoteVersionResponse.StatusCode)"
-        Write-Verbose "Response: $($remoteVersionResponse.Content)"
+        return $null
+        Write-Verbose "Response: $($remoteVersionResponse)"
         #Try to get the version number from the remote script.
         Write-Verbose "Attempting to get version number from the remote script."
         Write-Verbose "Making a web request to $updateURL/register.ps1"
@@ -94,6 +90,8 @@ function GetUpdates()
             return
         }
     }
+    $remoteVersion = $remoteVersionResponse.content
+    Write-Verbose "remoteVersion = $remoteVersion"
     Write-Verbose "Returned remote version: $remoteVersion"
     Write-Verbose "Found remote version string: $remoteVersion"
     Write-Host "Remote version: $remoteVersion"
@@ -102,7 +100,7 @@ function GetUpdates()
         Write-Host "Failed to get remote version from response. Please provide a valid remote version."
         return
     }
-    $remoteVersion = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
+    $remoteVersion = [regex]::Match($remoteVersion, '\d+\.\d+\.\d').Value
     Write-Verbose "processed remote version: $remoteVersion"
     #convert the content to a version object.
     $remoteVersion = [System.Version]::Parse($remoteVersion)
