@@ -255,6 +255,7 @@ function validateInput()
     Write-Verbose "MinSerialNumberLength: $MinSerialNumberLength"
     # Trim input to remove any leading or trailing spaces
     $UserInput = $UserInput.Trim()
+    $returnValue = @{}
     Write-Verbose "Trimmed input: '$UserInput'"
     Write-Verbose "Checking serial number length: $($UserInput.Length)"
     if ($UserInput.Length -gt $MaxSerialNumberLength)
@@ -730,7 +731,8 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     {
         Write-Verbose "Got serial number: $SerialNumber"
         Write-Host "Checking device with serial number $($SerialNumber)..."
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
+        $deviceObject = @{SerialNumber = $serialNumber}
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
         $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
     }
 }
