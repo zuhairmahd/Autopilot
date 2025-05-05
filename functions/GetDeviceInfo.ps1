@@ -4,22 +4,19 @@ function GetDeviceInfo()
     param
     (
         [Parameter(Mandatory = $false)]
-        [string]$name,
-        [Parameter(Mandatory = $false)]
         [string]$GroupTag,
         [Parameter(Mandatory = $false)]
         [string]$AssignedUser = '',
+        [string]$Name,
         [switch]$NoHash
     )
     #Print verbose logs of the received parameters.
-    Write-Verbose "Name: $name"
     Write-Verbose "GroupTag: $GroupTag"
     Write-Verbose "AssignedUser: $AssignedUser"
     Write-Verbose "NoHash: $NoHash"
 
     $device = @{}
     $session = New-CimSession
-    #Get other -NoTypeInformation
     $serial = (Get-CimInstance -CimSession $session -Class Win32_BIOS).SerialNumber
     #Add the serial number to the hash table.
     $device.Add('SerialNumber', $serial)
@@ -39,7 +36,7 @@ function GetDeviceInfo()
     $device.add('AssignedUser', $AssignedUser)
     if (-not $NoHash)
     {
-        Write-Verbose "Checking $name for hardware hash."
+        Write-Verbose "Checking for hardware hash."
         $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
         Write-Verbose "The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
         if ($devDetail)
@@ -51,7 +48,7 @@ function GetDeviceInfo()
         else
         {
             Write-Error 'No hardware hash was found.'
-            exit 1
+            return $null
         }
     }
     else

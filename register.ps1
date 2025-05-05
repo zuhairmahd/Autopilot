@@ -89,17 +89,11 @@ param (
     [string]$Configuration = 'vars.json',
     [String] $GroupTag = 'MSB01',
     [String] $AssignedUser = '',
-    [switch]$NoAdminCheck,
-    [Parameter(ParameterSetName = 'intune')] [switch]$NoIntuneCheck,
-    [Parameter(ParameterSetName = 'intune')] [switch]$check,
-    [Parameter(ParameterSetName = 'intune')] [string]$SerialNumber = '',
-    [switch]$GetDeviceHash,
     [switch]$Reconfigure,
     [switch]$ReInitialize,
-    [Parameter(Mandatory = $False, ParameterSetName = 'NoUpdateCheckSet')] [switch]$NoUpdateCheck,
-    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateOnlySet')] [switch]$UpdateOnly,
-    [Parameter(ParameterSetName = 'UpdateOnlySet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
-    [Parameter(ParameterSetName = 'UpdateOnlySet')]
+    [switch]$showAdvancedOptions,
+    [Parameter(Mandatory = $False, ParameterSetName = 'UpdateSet')] [switch]$Update,
+    [Parameter(ParameterSetName = 'UpdateSet')][ValidateSet('github', 'gitlab')][string]$Repo = 'github',
     [Parameter(Mandatory = $False, ParameterSetName = 'github')]
     [Parameter(ParameterSetName = 'gitlab')]
     [string]$Release = 'main'
@@ -201,14 +195,24 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.'
     $latestRelease = 'main'
 }
-$application = ($MyInvocation.MyCommand.Name) -replace '.ps1', ''
+$application = 'Register'
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-$Name = @('localhost')
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
-$settings = $null
 $backoutText = 'Returning to previous menu'
 # $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
+$returnValues = [ordered] @{}
+$returnValues.add('EnrolledMessage', 'The device is enrolled.')
+$returnValues.add('notContactedMessage', 'The device has not contacted the enrollment service.')
+$returnValues.add('PendingResetMessage', 'The device is pending a reset.')
+$returnValues.add('EnrollmentFailedMessage', 'The device enrollment failed.')
+$returnValues.add('UnassignedMessage', 'The device is not assigned to a deployment profile.')
+$returnValues.add('PendingMessage', 'The device is pending assignment to a deployment profile.')
+$returnValues.add('notInIntuneMessage', 'The device is not in Intune.')
+$returnValues.add('ImportSuccessMessage', 'The device was imported successfully.')
+$returnValues.add('ImportFailedMessage', 'The device import failed.')
+$returnValues.add('DeleteSuccessMessage', 'The device was deleted successfully.')
+$returnValues.add('DeleteFailedMessage', 'The device deletion failed.')
 if ($domain -eq 'arabictutor.com')
 {
     Write-Verbose "Changing groupTag to 'entra'."
@@ -224,11 +228,6 @@ Write-Verbose "Initial values file: $initialValues"
 Write-Verbose "Computer name: $Name"
 Write-Verbose "Group tag: $GroupTag"
 Write-Verbose "Assigned user: $AssignedUser"
-Write-Verbose "Check: $check"
-Write-Verbose "No update check: $NoUpdateCheck"
-Write-Verbose "Update only: $UpdateOnly"
-Write-Verbose "No admin check: $NoAdminCheck"
-Write-Verbose "Get device hash: $GetDeviceHash"
 Write-Verbose "Reconfigure: $Reconfigure"
 Write-Verbose "Repository: $Repo"
 Write-Verbose "Release: $Release"
@@ -237,7 +236,6 @@ Write-Verbose "Application name: $application"
 Write-Verbose "Functions folder: $functionsFolder"
 Write-Verbose "Base source URL: $baseSourceURL"
 Write-Verbose "Backout text: $backoutText"
-Write-Verbose "settings: $settings"
 #endregion logging
 
 #region Helper Functions (Consolidated and Corrected)
@@ -333,6 +331,7 @@ function ProcessDevice()
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         $DeviceObject,
+        $returnValues = $returnValues,
         [Parameter(Mandatory = $true)]
         [ValidateSet('import', 'check', 'delete')]
         [string]$action
@@ -357,18 +356,6 @@ function ProcessDevice()
     Write-Verbose "The manufacturer is $make"
     $model = $deviceObject.model
     Write-Verbose "The model is $model"
-    $returnValues = [ordered] @{}
-    $returnValues.add('EnrolledMessage', 'The device is enrolled.')
-    $returnValues.add('notContactedMessage', 'The device has not contacted the enrollment service.')
-    $returnValues.add('PendingResetMessage', 'The device is pending a reset.')
-    $returnValues.add('EnrollmentFailedMessage', 'The device enrollment failed.')
-    $returnValues.add('UnassignedMessage', 'The device is not assigned to a deployment profile.')
-    $returnValues.add('PendingMessage', 'The device is pending assignment to a deployment profile.')
-    $returnValues.add('notInIntuneMessage', 'The device is not in Intune.')
-    $returnValues.add('ImportSuccessMessage', 'The device was imported successfully.')
-    $returnValues.add('ImportFailedMessage', 'The device import failed.')
-    $returnValues.add('DeleteSuccessMessage', 'The device was deleted successfully.')
-    $returnValues.add('DeleteFailedMessage', 'The device deletion failed.')
     #endregion check and initialize variables
 
     switch ($action)
@@ -642,8 +629,90 @@ function ProcessDevice()
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune device registration menu.  What would you like to do?"
 $serialNumberMenu = newMenu -Title "Check device registration" -Description "How would you like to enter the serial number?."
-$autopilotMenu = newMenu -Title "Autopilot menu" -Description "Please choose from the following options."
-$deviceMenu = newMenu -Title "Device menu" -Description "Please choose from the following options."
+$deviceMenu = NewMenu -Title "Device Menu" -Description "What would you like to do with the device?"
+$settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
+
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
+    Write-Host 'Reconfiguring the script...'
+    if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
+    {
+        Write-Host 'The script has been reconfigured.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
+    }
+}
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
+    Write-Host 'Restoring the script to its default settings...'
+    if (InitializeConfiguration -RootFolder $pwd -overWrite)
+    {
+        Write-Host 'The script defaults have been restored.' -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host 'Failed to restore script defaults..' -ForegroundColor Red
+    }
+}
+
+$deviceMenu = AddMenuItem -menu $deviceMenu -name "Delete device from Autopilot" -action {
+    Write-Host 'Deleting the device from Autopilot...'
+    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
+    if ($deviceObject)
+    {
+        Write-Host "This will delete the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
+        $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
+        while ($choice -notin @('yes', 'no'))
+        {
+            Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+            #beep
+            [console]::beep(1000, 500)
+            $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
+        }
+        if ($choice -eq 'no')
+        {
+            Write-Host "Exiting..."
+            return $backoutText
+        }
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
+    }
+}
+$deviceMenu = AddMenuItem -menu $deviceMenu -name "Clean device" -action {
+    Write-Host 'Cleaning the device...'
+    $choice = Read-Host "Are you sure you want to clean the device? (yes/no)"
+    while ($choice -notin @('yes', 'no'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+        #beep
+        [console]::beep(1000, 500)
+        $choice = Read-Host "Are you sure you want to clean the device? (yes/no)"
+    }
+    if ($choice -eq 'no')
+    {
+        Write-Host "Exiting..."
+        return $backoutText
+    }
+
+}   
+$deviceMenu = AddMenuItem -menu $deviceMenu -name "Wipe device" -action {
+    Write-Host 'Wiping the device...'
+    $choice = Read-Host "Are you sure you want to wipe the device? (yes/no)"
+    while ($choice -notin @('yes', 'no'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+        #beep
+        [console]::beep(1000, 500)
+        $choice = Read-Host "Are you sure you want to wipe the device? (yes/no)"
+    }
+    if ($choice -eq 'no')
+    {
+        Write-Host "Exiting..."
+        return $backoutText
+    }
+    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
+    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
+}
 
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
@@ -689,26 +758,8 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
     }
 }
-$deviceMenu = AddMenuItem -Menu $deviceMenu -Name "Check device status" -Submenu $serialNumberMenu
-$deviceMenu = AddMenuItem -menu $deviceMenu -name "Get device hash" -action {
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose 'The script is running with sufficient permissions.'
-        Write-Verbose "Getting device object."
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
-        exit 1
-    }
-    if ($deviceObject)
-    {
-        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-    }
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot." -Action {
+
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Import device into Autopilot." -Action {
     Write-Verbose "Getting the serial number for this device..."
     Write-Verbose 'Checking whether the script has sufficient permissions to run.'
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -748,41 +799,41 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Auto
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
-    Write-Host 'Deleting the device from Autopilot...'
-    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
-    if ($deviceObject)
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device Autopilot status" -Submenu $serialNumberMenu
+$mainMenu = AddMenuItem -menu $mainMenu -name "Get device hash for manual upload to Autopilot" -action {
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
-        Write-Host "This will delete the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
-        $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
-        while ($choice -notin @('yes', 'no'))
-        {
-            Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-            #beep
-            [console]::beep(1000, 500)
-            $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
-        }
-        if ($choice -eq 'no')
-        {
-            Write-Host "Exiting..."
-            return $backoutText
-        }
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
-        $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
-    }
-}
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Device menu" -Submenu $deviceMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Action {
-    Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
-    {
-        Write-Host 'The script has been reconfigured.' -ForegroundColor Green
+        Write-Verbose 'The script is running with sufficient permissions.'
+        Write-Verbose "Getting device object."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
     }
     else
     {
-        Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
+        exit 1
     }
+    if ($deviceObject)
+    {
+        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+        $outputFile = "\device_$($deviceObject.serialNumber).csv"
+        if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
+        {
+            Write-Host 'Device hash created successfully.' -ForegroundColor Green
+            Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
+            Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
+            Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host 'Failed to create device hash.' -ForegroundColor Red
+        }
+    }
+}
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+if ($showAdvancedOptions)
+{
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Advanced options" -Submenu $deviceMenu
 }
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
@@ -796,95 +847,22 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         Write-Host 'The script is up to date.' -ForegroundColor Green
     }
 }
+$mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
+    Write-Host 'Restarting the device...'
+    $choice = Read-Host "Are you sure you want to restart the device? (yes/no)"
+    while ($choice -notin @('yes', 'no'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+        #beep
+        [console]::beep(1000, 500)
+        $choice = Read-Host "Are you sure you want to restart the device? (yes/no)"
+    }
+    if ($choice -eq 'no')
+    {
+        Write-Host 'Exiting...'
+        return $backoutText
+    }
+    RestartDevice
+}
 ShowMenu -Menu $mainMenu
 #endregion Menu Definitions
-
-exit 0
-#region other code
-
-if ($ReInitialize)
-{
-    Write-Host 'Reinitializing the script...'
-    if (InitializeConfiguration -RootFolder $pwd -overWrite)
-    {
-        Write-Host 'The script has been reinitialized.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'Failed to reinitialize the script.' -ForegroundColor Red
-        exit 1
-    }
-    exit 0
-}
-
-$choices = @('Clean the device', 'Wipe the device')
-$choice = DisplayNumericMenu -Choices $choices 
-switch ($choice)
-{
-    $choices[0]
-    {
-        Write-Host "Cleaning the device is a distructive action and cannot be undone" -ForegroundColor Red
-        Write-Host "Are you sure you want to clean the device?" -ForegroundColor Red
-        $subchoices = @('Yes', 'No')
-        $subchoice = DisplayNumericMenu -Choices $subchoices
-        switch ($subchoice)
-        {
-            'yes'
-            {
-                Write-Host "Cleaning device..."
-                $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
-                SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
-            }
-            'no'
-            {
-                Write-Host "Exitting... Come back when you are sure."
-            }
-        }
-    }
-    $choices[1]
-    {
-        Write-Host "Wiping device..."
-        Write-Host "This will remove all data from the device." -ForegroundColor Red
-        Write-Host "Are you sure you want to wipe the device?" -ForegroundColor Red
-        Write-Host "This is a destructive action and cannot be undone." -ForegroundColor Red
-        $subchoices = @('Yes', 'No')
-        $subchoice = DisplayNumericMenu -Choices $subchoices
-        switch ($subchoice)
-        {
-            'yes'
-            {
-                Write-Host "Wiping device..."
-                $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes
-                SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
-            }
-            'no'
-            {
-                Write-Host "Exitting... Come back when you are sure."
-            }
-        }
-    }
-}
-
-$choices = @('Restart the device', 'Delete from Autopilot')
-switch ($choice)
-{
-    'Restart the device'
-    {
-        Write-Host 'Restarting the device...'
-        RestartDevice
-    }
-}
-    
-$createHash = GetDeviceHash -Device $deviceObject -OutputFile $outputFile
-if ($createHash)
-{
-    Write-Verbose 'Device hash created successfully.'
-    exit 0
-}
-else
-{
-    Write-Verbose 'Failed to create device hash.'
-    exit 1
-}
-
-#endregion other code
