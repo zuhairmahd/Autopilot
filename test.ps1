@@ -41,16 +41,15 @@ else
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 # $accessToken = GetGraphAccessToken -configFile $configFile
-# $autopilotDevices = (CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken).value
-# $managedDevices = (CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter).value
-# $importedDevices = (CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken).value
-# $unmanagedDevices = (CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken).value
+# $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
+# $managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter
+# $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken
+# $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken -filter
 # $global:enrollments = [ordered] @{
-#     "autopilot" = $autopilotDevices
-#     "managed"   = $managedDevices
-#     "imported"  = $importedDevices
-#     "unmanaged" = $unmanagedDevices
+# "autopilot" = $autopilotDevices
+# "managed" = $managedDevices
+# "imported"  = $importedDevices
+# "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
-
 

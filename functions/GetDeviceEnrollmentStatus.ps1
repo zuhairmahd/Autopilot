@@ -97,24 +97,15 @@ function GetDeviceEnrollmentStatus()
             Filter       = $autopilotDeviceFilter
         }
     }
-    $autopilotDevice = CallGraphAPI @params
-    $autopilotDeviceValue = $autopilotDevice.value
-    if ($autopilotDeviceValue.'@odata.context' -match 'https://graph.microsoft.com/')
+    $autopilotDeviceResponse = CallGraphAPI @params
+    if ($null -ne $autopilotDeviceResponse -and $autopilotDeviceResponse.'@odata.count' -gt 0)
     {
-        Write-Verbose "Using modified device value returned by function."
-        $autopilotDevice = $autopilotDeviceValue
-    }
-    else
-    {
-        Write-Verbose "Using original device value returned by function."
-        $autopilotDevice = $autopilotDevice
-    }
-    Write-Verbose "Found $($autopilotDevice.'@odata.count') Autopilot devices."
-    if ($autopilotDevice -and $autopilotDevice.'@odata.count' -gt 0)
-    {
+        $autopilotDevice = $autopilotDeviceResponse.value
+        Write-Verbose "Found $($autopilotDevice.'@odata.count') Autopilot devices."
         Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
         Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
-        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)`?`$expand=deploymentProfile"
+        # $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)?`$expand=deploymentProfile(`$select=displayName)"
+        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)?`$expand=deploymentProfile"
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
         Write-Verbose "Got $($autopilotDevice.count) devices from Autopilot."
         Write-Verbose "Enrollment Profile name: $($autopilotDevice.deploymentProfile.displayname)"
