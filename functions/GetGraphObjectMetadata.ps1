@@ -1,6 +1,6 @@
 #region help
 <#PSScriptInfo
-.VERSION 1.0.0
+.VERSION 1.1.0
 .GUID c4205f1e-35d8-4f3a-bc41-a03d7c2c70d3
 .AUTHOR Zuhair Mahmoud
 .DESCRIPTION Parses OData metadata from Microsoft Graph API responses
@@ -49,13 +49,20 @@ function GetGraphObjectMetadata()
     
     # Initialize output containers
     $metadata = @{
-        EntityType           = $null
-        Properties           = @()
-        NavigationProperties = @()
-        Operations           = @()
-        Functions            = @()
-        QueryOptions         = @("filter", "select", "expand", "orderby", "top", "skip", "count")
-        FilterOperators      = @("eq", "ne", "gt", "ge", "lt", "le", "and", "or", "not", "contains", "startswith", "endswith")
+        EntityType            = $null
+        Properties            = @()
+        NavigationProperties  = @()
+        Operations            = @()
+        Functions             = @()
+        ComplexTypes          = @()
+        EnumTypes             = @()
+        EntityTypeInheritance = @{
+            BaseType     = $null
+            DerivedTypes = @()
+        }
+        Annotations           = @()
+        QueryOptions          = @("filter", "select", "expand", "orderby", "top", "skip", "count")
+        FilterOperators       = @("eq", "ne", "gt", "ge", "lt", "le", "and", "or", "not", "contains", "startswith", "endswith")
     }
     #endregion
 
@@ -194,6 +201,28 @@ function GetGraphObjectMetadata()
             {
                 Write-Verbose "Found EntityType definition for '$entityTypeName'"
                 
+                # Extract inheritance information
+                if ($entityTypeElement.BaseType)
+                {
+                    $baseTypeFull = $entityTypeElement.BaseType
+                    $baseTypeName = $baseTypeFull -replace "^$namespace\.", ""
+                    $metadata.EntityTypeInheritance.BaseType = $baseTypeName
+                    Write-Verbose "Entity '$entityTypeName' inherits from base type: $baseTypeName"
+                }
+                
+                # Look for derived types (entities that have this entity as their base type)
+                $derivedTypes = $metadataResponse.Edmx.DataServices.Schema.EntityType | 
+                    Where-Object { $_.BaseType -eq "$namespace.$entityTypeName" }
+                
+                if ($derivedTypes)
+                {
+                    foreach ($derivedType in $derivedTypes)
+                    {
+                        $metadata.EntityTypeInheritance.DerivedTypes += $derivedType.Name
+                        Write-Verbose "Found derived type: $($derivedType.Name)"
+                    }
+                }
+                
                 # Extract properties
                 if ($entityTypeElement.Property)
                 {
@@ -209,18 +238,93 @@ function GetGraphObjectMetadata()
                     }
                 }
                 
-                # Extract navigation properties
-                if ($entityTypeElement.NavigationProperty)
+                # Extract complex types referenced by this entity
+                Write-Verbose "Extracting complex types referenced by entity properties"
+                $complexTypesReferenced = @()
+                
+                # Find complex types from property types
+                foreach ($prop in $metadata.Properties)
                 {
-                    foreach ($navProp in $entityTypeElement.NavigationProperty)
+                    if ($prop.Type -notmatch "^Edm\.")
                     {
-                        $navDetails = @{
-                            Name           = $navProp.Name
-                            Type           = $navProp.Type
-                            ContainsTarget = $navProp.ContainsTarget -eq 'true'
+                        $complexTypeName = $prop.Type -replace "^Collection\((.*)\)$", '$1' -replace "^$namespace\.", ""
+                        if ($complexTypeName -ne $prop.Type)
+                        {
+                            $complexTypesReferenced += $complexTypeName
                         }
-                        $metadata.NavigationProperties += $navDetails
-                        Write-Verbose "Found navigation property: $($navProp.Name) (Type: $($navProp.Type))"
+                    }
+                }
+                
+                # Find the complex type definitions
+                foreach ($complexTypeName in $complexTypesReferenced | Select-Object -Unique)
+                {
+                    $complexTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
+                        Where-Object { $_.Name -eq $complexTypeName }
+                        
+                    if ($complexTypeElement)
+                    {
+                        $complexTypeDetails = @{
+                            Name       = $complexTypeName
+                            Properties = @()
+                        }
+                        
+                        # Extract properties of the complex type
+                        foreach ($prop in $complexTypeElement.Property)
+                        {
+                            $complexTypeDetails.Properties += @{
+                                Name     = $prop.Name
+                                Type     = $prop.Type
+                                Nullable = $prop.Nullable -eq 'true'
+                            }
+                        }
+                        
+                        $metadata.ComplexTypes += $complexTypeDetails
+                        Write-Verbose "Added complex type: $complexTypeName with $($complexTypeDetails.Properties.Count) properties"
+                    }
+                }
+                
+                # Extract enum types
+                Write-Verbose "Extracting enum types referenced by entity properties"
+                $enumTypes = $metadataResponse.Edmx.DataServices.Schema.EnumType
+                
+                foreach ($enumType in $enumTypes)
+                {
+                    $enumTypeName = $enumType.Name
+                    $enumTypeDetails = @{
+                        Name           = $enumTypeName
+                        UnderlyingType = $enumType.UnderlyingType
+                        IsFlags        = $enumType.IsFlags -eq 'true'
+                        Members        = @()
+                    }
+                    
+                    # Extract enum members
+                    foreach ($member in $enumType.Member)
+                    {
+                        $enumTypeDetails.Members += @{
+                            Name  = $member.Name
+                            Value = $member.Value
+                        }
+                    }
+                    
+                    $metadata.EnumTypes += $enumTypeDetails
+                    Write-Verbose "Added enum type: $enumTypeName with $($enumTypeDetails.Members.Count) members"
+                }
+                
+                # Extract annotations
+                Write-Verbose "Extracting annotations for entity type"
+                if ($entityTypeElement.Annotation)
+                {
+                    foreach ($annotation in $entityTypeElement.Annotation)
+                    {
+                        $annotationDetails = @{
+                            Term   = $annotation.Term
+                            String = $annotation.String
+                            Bool   = $annotation.Bool
+                            Int    = $annotation.Int
+                        }
+                        
+                        $metadata.Annotations += $annotationDetails
+                        Write-Verbose "Added annotation: $($annotation.Term)"
                     }
                 }
             }
@@ -282,6 +386,112 @@ function GetGraphObjectMetadata()
     }
     #endregion
     
+    #region detect navigation properties from response
+    # Also detect navigation properties by examining the actual response for links
+    Write-Verbose "Looking for navigation properties in the actual response data"
+    
+    # Function to extract navigation links from an entity
+    function Get-NavigationLinksFromEntity
+    {
+        param (
+            [Parameter(Mandatory = $true)]
+            [object]$Entity,
+            
+            [string]$EntityPath = ""
+        )
+        
+        $navLinks = @()
+        
+        foreach ($propName in $Entity.PSObject.Properties.Name)
+        {
+            # Look for @odata.navigationLink or @odata.associationLink
+            if ($propName -eq "@odata.navigationLink" -or $propName -eq "@odata.associationLink")
+            {
+                foreach ($linkProp in $Entity.$propName.PSObject.Properties)
+                {
+                    $navLinks += @{
+                        Name = $linkProp.Name
+                        Url  = $linkProp.Value
+                        Type = $propName
+                    }
+                    Write-Verbose "Found navigation link in response: $($linkProp.Name) -> $($linkProp.Value)"
+                }
+            }
+            # Also look for any property that looks like a URL to another entity
+            elseif ($propName -notlike '@odata*' -and $propName -like '*@odata.context' -or 
+                $propName -like '*@odata.nextLink' -or $Entity.$propName -is [hashtable] -or 
+                $Entity.$propName -is [PSCustomObject])
+            {
+                $navLinks += @{
+                    Name = $propName
+                    Type = "Embedded"
+                    Path = if ([string]::IsNullOrEmpty($EntityPath))
+                    {
+                        $propName 
+                    }
+                    else
+                    {
+                        "$EntityPath/$propName" 
+                    }
+                }
+                Write-Verbose "Found potential embedded navigation property in response: $propName"
+            }
+        }
+        
+        return $navLinks
+    }
+    
+    # Check for navigation links in single entity response
+    if ($ApiResponse -and -not ($ApiResponse -is [array]) -and -not ($ApiResponse.value -is [array]))
+    {
+        $responseNavLinks = Get-NavigationLinksFromEntity -Entity $ApiResponse
+        
+        foreach ($navLink in $responseNavLinks)
+        {
+            # Check if we already have this navigation property from metadata
+            $existingNavProp = $metadata.NavigationProperties | Where-Object { $_.Name -eq $navLink.Name }
+            
+            if (-not $existingNavProp)
+            {
+                $metadata.NavigationProperties += @{
+                    Name             = $navLink.Name
+                    Type             = "Unknown"
+                    TargetEntityType = "Unknown"
+                    IsCollection     = $false  # We can't determine this from just the response
+                    FromResponse     = $true
+                    NavigationPath   = $navLink.Path
+                }
+                Write-Verbose "Added navigation property from response: $($navLink.Name)"
+            }
+        }
+    }
+    # If we have a collection response, look at the first item
+    elseif ($ApiResponse.value -and $ApiResponse.value.Count -gt 0)
+    {
+        $firstItem = $ApiResponse.value[0]
+        $responseNavLinks = Get-NavigationLinksFromEntity -Entity $firstItem
+        
+        foreach ($navLink in $responseNavLinks)
+        {
+            # Check if we already have this navigation property from metadata
+            $existingNavProp = $metadata.NavigationProperties | Where-Object { $_.Name -eq $navLink.Name }
+            
+            if (-not $existingNavProp)
+            {
+                $metadata.NavigationProperties += @{
+                    Name             = $navLink.Name
+                    Type             = "Unknown"
+                    TargetEntityType = "Unknown"
+                    IsCollection     = $false  # We can't determine this from just the response
+                    FromResponse     = $true
+                    NavigationPath   = $navLink.Path
+                }
+                Write-Verbose "Added navigation property from response: $($navLink.Name)"
+            }
+        }
+    }
+    #endregion
+    
     #region enhance with additional info
     # If we have a single entity response, try to extract additional properties from the actual response
     if ($ApiResponse -and -not ($ApiResponse -is [array]) -and -not ($ApiResponse.value -is [array]))
@@ -296,9 +506,14 @@ function GetGraphObjectMetadata()
         {
             if (-not ($metadata.Properties | Where-Object { $_.Name -eq $propName }))
             {
+                # Add null check before calling GetType()
                 $propType = if ($ApiResponse.$propName -is [array])
                 {
                     "Collection" 
+                }
+                elseif ($null -eq $ApiResponse.$propName)
+                {
+                    "Unknown"
                 }
                 else
                 {
@@ -330,9 +545,14 @@ function GetGraphObjectMetadata()
         {
             if (-not ($metadata.Properties | Where-Object { $_.Name -eq $propName }))
             {
+                # Add null check before calling GetType()
                 $propType = if ($firstItem.$propName -is [array])
                 {
                     "Collection" 
+                }
+                elseif ($null -eq $firstItem.$propName)
+                {
+                    "Unknown"
                 }
                 else
                 {
@@ -346,7 +566,7 @@ function GetGraphObjectMetadata()
                     FromResponse = $true
                 }
                 
-                Write-Verbose "Added property from first collection item: $propName (Type: $propType)"
+                Write-Verbose "Added property from response: $propName (Type: $propType)"
             }
         }
     }
@@ -372,11 +592,73 @@ function GetGraphObjectMetadata()
             }
         }
         NavigationProperties = $metadata.NavigationProperties | ForEach-Object {
-            [PSCustomObject]@{
-                Name           = $_.Name
-                Type           = $_.Type
-                ContainsTarget = $_.ContainsTarget
+            $navPropObj = [PSCustomObject]@{
+                Name             = $_.Name
+                Type             = $_.Type
+                TargetEntityType = if ($_.ContainsKey('TargetEntityType'))
+                {
+                    $_.TargetEntityType 
+                }
+                else
+                {
+                    "Unknown" 
+                }
+                IsCollection     = if ($_.ContainsKey('IsCollection'))
+                {
+                    $_.IsCollection 
+                }
+                else
+                {
+                    $false 
+                }
+                ContainsTarget   = if ($_.ContainsKey('ContainsTarget'))
+                {
+                    $_.ContainsTarget 
+                }
+                else
+                {
+                    $false 
+                }
+                FromResponse     = if ($_.ContainsKey('FromResponse'))
+                {
+                    $_.FromResponse 
+                }
+                else
+                {
+                    $false 
+                }
+                NavigationPath   = if ($_.ContainsKey('NavigationPath'))
+                {
+                    $_.NavigationPath 
+                }
+                else
+                {
+                    "$($metadata.EntityType)/$($_.Name)" 
+                }
             }
+            
+            # Add additional properties if they exist
+            if ($_.ContainsKey('Partner') -and $null -ne $_.Partner)
+            {
+                $navPropObj | Add-Member -MemberType NoteProperty -Name 'Partner' -Value $_.Partner
+            }
+            
+            if ($_.ContainsKey('ReferentialConstraint') -and $null -ne $_.ReferentialConstraint)
+            {
+                $navPropObj | Add-Member -MemberType NoteProperty -Name 'ReferentialConstraint' -Value $_.ReferentialConstraint
+            }
+            
+            if ($_.ContainsKey('OnDelete') -and $null -ne $_.OnDelete)
+            {
+                $navPropObj | Add-Member -MemberType NoteProperty -Name 'OnDelete' -Value $_.OnDelete
+            }
+            
+            if ($_.ContainsKey('TargetEntityDetails') -and $null -ne $_.TargetEntityDetails)
+            {
+                $navPropObj | Add-Member -MemberType NoteProperty -Name 'TargetEntityDetails' -Value $_.TargetEntityDetails
+            }
+            
+            $navPropObj
         }
         Operations           = $metadata.Operations | ForEach-Object {
             [PSCustomObject]@{
@@ -416,7 +698,7 @@ function GetGraphObjectMetadata()
         }
     }
     
-    Write-Verbose "Metadata extraction complete"
+    Write-Verbose "Metadata extraction complete with enhanced navigation properties"
     return $formattedResults
     #endregion
 }
