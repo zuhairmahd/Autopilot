@@ -390,7 +390,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Verbose "Getting access token..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
-        if ($groups)
+        if ($groups.HasCorrectMemberships -eq $true)
         {
             Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
             Write-Host "We will now check the device state." -ForegroundColor Green

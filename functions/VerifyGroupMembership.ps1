@@ -26,6 +26,7 @@ function VerifyGroupMembership()
     $missingIncludeGroups = @()
     $invalidExcludeGroups = @()
     $groupsToReturn = @{}
+    $hasCorrectMemberships = $false
     #endregion
 
     #region get the user id and group membership
@@ -66,18 +67,18 @@ function VerifyGroupMembership()
     else
     {
         Write-Verbose "The user $userName is a member of the following groups: $($groups -join ', ')"
-        Write-Verbose "Checking whether the user $userName is a member of the required groups."
+        Write-Host "Checking memberships for user $userName in required groups."
         foreach ($group in $groupsToInclude)
         {
-            Write-Verbose "Checking membership in $group"
+            Write-Host "Checking membership in $group"
             if (-not ($groups -contains $group))
             {
-                Write-Verbose "The user $userName is not a member of the required group $group"
+                Write-Host "The user $userName is not a member of the required group $group"
                 $missingIncludeGroups += $group
             }
             else
             {
-                Write-Verbose "The user $userName is a member of the required group $group"
+                Write-Host "The user $userName is a member of the required group $group"
             }
         }
     }
@@ -106,10 +107,12 @@ function VerifyGroupMembership()
     }
     #endregion
 
+    Write-Host "Missing include groups: $($missingIncludeGroups.count)"
+    Write-Host "Invalid exclude groups: $($invalidExcludeGroups.count)"
     if (($missingIncludeGroups.Count -eq 0) -and ($invalidExcludeGroups.Count -eq 0))
     {
         Write-Verbose "The user $userName is a member of all required groups and not a member of any excluded groups."
-        return $true
+        $hasCorrectMemberships = $true
     }
     else
     {
@@ -123,6 +126,7 @@ function VerifyGroupMembership()
             Write-Verbose "The user $userName is a member of the following excluded groups: $($invalidExcludeGroups -join ', ')"
             $groupsToReturn.add('invalidExcludeGroups', $invalidExcludeGroups)
         }
+        $groupsToReturn.add('HasCorrectMemberships', $hasCorrectMemberships)
         return $groupsToReturn
     }
 }
