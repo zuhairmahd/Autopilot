@@ -33,7 +33,7 @@ Author: Zuhair Mahmoud
     Write-Verbose "The fields to decrypt are $($FieldsToDecrypt -join ',')"
     foreach ($prop in $encryptedObject.PSObject.Properties)
     {
-        Write-Verbose "Checking if $($prop.Name) is in the exclude list."
+        Write-Verbose "Checking if $($prop.Name) is in the fields to decrypt list."
         if ($FieldsToDecrypt -contains $prop.Name)
         {
             Write-Verbose "Decrypting $($prop.Name)."

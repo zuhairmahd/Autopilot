@@ -31,26 +31,28 @@ else
 # $serialNumber = '5R3SBZ3'
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
-$importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
-$unmanagedDeviceUri = "devices"
-$managedDeviceUri = "deviceManagement/managedDevices"
-$autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+# $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+# $unmanagedDeviceUri = "devices"
+# $managedDeviceUri = "deviceManagement/managedDevices"
+# $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $managedDeviceFilter = "startswith(deviceName,'w11-')"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 $accessToken = GetGraphAccessToken -configFile $configFile
-$autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
-$managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken 
-$importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken
-$unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
-$global:enrollments = [ordered] @{
-    "autopilot" = $autopilotDevices
-    "managed"   = $managedDevices
-    "imported"  = $importedDevices
-    "unmanaged" = $unmanagedDevices
-}
+# $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
+# $managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken 
+# $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken
+# $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
+# $global:enrollments = [ordered] @{
+#     "autopilot" = $autopilotDevices
+#     "managed"   = $managedDevices
+#     "imported"  = $importedDevices
+#     "unmanaged" = $unmanagedDevices
+# }
 #endregion variables
 
-$global:objects = GetGraphObjectMetadata -accessToken $accessToken -ApiResponse $global:enrollments.autopilot
+
+$groupUri = "users/mahmoudz@gao.gov/memberOf/microsoft.graph.group"
+$global:myGroups = CallGraphAPI -ResourcePath $groupUri -accessToken $accessToken -extraparameters "count=true"

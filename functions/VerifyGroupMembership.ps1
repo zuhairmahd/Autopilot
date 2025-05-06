@@ -1,4 +1,4 @@
-function VerifyGroupMembership()
+function VerifyGroupMembership
 {
     [CmdletBinding()]
     param(
@@ -6,129 +6,196 @@ function VerifyGroupMembership()
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         [string]$userName,
+        [Parameter()]
         [string[]]$groupsToInclude,
+        [Parameter()]
         [string[]]$groupsToExclude
     )
 
-    #region write a verbose log of the received parameters and define variables.
-    if ($accessToken)
-    {
-        Write-Verbose "Access token was provided"
+    #region Initialize result object and logging
+    Write-Verbose "[$($MyInvocation.MyCommand)] Starting VerifyGroupMembership function"
+    
+    # Create a consistent return object structure that will always be returned
+    $result = [PSCustomObject]@{
+        Success         = $false
+        UserInfo        = $null
+        MissingGroups   = @()
+        ForbiddenGroups = @()
+        UserGroups      = @()
+        Error           = $null
     }
-    else
+
+    if (-not $accessToken)
     {
-        Write-Verbose "Access token was not provided"
-        return $false
+        Write-Verbose "[$($MyInvocation.MyCommand)] Access token is empty or null"
+        Write-Host "Access token is required." -ForegroundColor Red
+        $result.Error = "Access token is required."
+        return $result
     }
-    Write-Verbose "The user name is $userName"
-    Write-Verbose "The groups to include are $($groupsToInclude -join ', ')"
-    Write-Verbose "The groups to exclude are $($groupsToExclude -join ', ')"
-    $missingIncludeGroups = @()
-    $invalidExcludeGroups = @()
-    $groupsToReturn = @{}
-    $hasCorrectMemberships = $false
+
+    Write-Verbose "[$($MyInvocation.MyCommand)] User name: $userName"
+    Write-Verbose "[$($MyInvocation.MyCommand)] Groups to include count: $(if ($groupsToInclude) { $groupsToInclude.Count } else { 0 })"
+    Write-Verbose "[$($MyInvocation.MyCommand)] Groups to exclude count: $(if ($groupsToExclude) { $groupsToExclude.Count } else { 0 })"
+    
+    if ($groupsToInclude)
+    {
+        Write-Verbose "[$($MyInvocation.MyCommand)] Groups to include: $($groupsToInclude -join ', ')"
+    }
+    
+    if ($groupsToExclude)
+    {
+        Write-Verbose "[$($MyInvocation.MyCommand)] Groups to exclude: $($groupsToExclude -join ', ')"
+    }
     #endregion
 
-    #region get the user id and group membership
-    Write-Verbose "Getting the user id for $userName"
-    $userUri = "users/$($userName)" 
-    $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri -extraparameters "select=displayName,mail,userPrincipalName"
-    #check if the user is a numeric string.
-    if ($user -is [string] -and $user -match '^\d+$')
+    #region Get user information
+    try
     {
-        Write-Verbose "The user $userName was not found in Azure AD."
-        Write-Host "The user $userName was not found in Azure AD." -ForegroundColor Red
-        Write-Host "Please check the user name and try again." -ForegroundColor Red
-        return $false
+        Write-Verbose "[$($MyInvocation.MyCommand)] Getting user information for $userName"
+        $userUri = "users/$($userName)" 
+        $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri -extraparameters "select=displayName,mail,userPrincipalName,id"
+        # Check if user was found
+        if ($user -is [string] -and $user -match '^\d+$')
+        {
+            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName not found in Azure AD (Error code: $user)"
+            Write-Host "The user $userName was not found in Azure AD." -ForegroundColor Red
+            Write-Host "Please check the user name and try again." -ForegroundColor Red
+            $result.Error = "User not found in Azure AD (Error code: $user)"
+            return $result
+        }
+        $result.UserInfo = $user
+        Write-Verbose "[$($MyInvocation.MyCommand)] Successfully retrieved user information for $userName (Display Name: $($user.DisplayName), ID: $($user.id))"
     }
-    Write-Verbose "The Azure Directory id for $userName ($($user.DisplayName)) is $($user.ID)."
-    Write-Verbose "Checking whether the user $userName is a member of the required groups."
-    Write-Host "Getting group membership for user $userName ($($user.displayName))."
-    $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
-    $groupSelection = "select=displayName&top=999&orderby=displayName"
-    $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters $groupSelection
-    if ($response -is [string] -and $response -match '^\d+$')
+    catch
     {
-        Write-Host "The group membership for $userName could not be determined."
-        Write-Host "Please try again or contact an intune administrator." -ForegroundColor Red
-        return $false
+        Write-Verbose "[$($MyInvocation.MyCommand)] Error getting user information: $_"
+        Write-Host "Error getting user information: $_" -ForegroundColor Red
+        $result.Error = "Error getting user information: $_"
+        return $result
     }
-    $groups = $response.value | Select-Object -ExpandProperty displayName | Sort-Object
-    Write-Host "The user $username is a member of $($groups.Count) groups."
-    Write-Verbose "The user $userName is a member of the following groups:`n$($groups -join "`n")"
+    #endregion
+
+    #region Get group membership
+    try
+    {
+        Write-Verbose "[$($MyInvocation.MyCommand)] Getting group membership for user $userName"
+        Write-Host "Getting group membership for user $userName ($($user.displayName))."
+        $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
+        $groupSelection = "select=displayName&top=999&orderby=displayName"
+        $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters $groupSelection
+        if ($response -is [string] -and $response -match '^\d+$')
+        {
+            Write-Verbose "[$($MyInvocation.MyCommand)] Failed to get group membership (Error code: $response)"
+            Write-Host "The group membership for $userName could not be determined." -ForegroundColor Red
+            Write-Host "Please try again or contact an Intune administrator." -ForegroundColor Red
+            $result.Error = "Failed to get group membership (Error code: $response)"
+            return $result
+        }
+        $groups = $response.value | Select-Object -ExpandProperty displayName | Sort-Object
+        $result.UserGroups = $groups
+        Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of $($groups.Count) groups"
+        Write-Host "User $userName is a member of $($groups.Count) groups."
+        Write-Verbose "[$($MyInvocation.MyCommand)] Groups: $($groups -join ', ')"
+    }
+    catch
+    {
+        Write-Verbose "[$($MyInvocation.MyCommand)] Error getting group membership: $_"
+        Write-Host "Error getting group membership: $_" -ForegroundColor Red
+        $result.Error = "Error getting group membership: $_"
+        return $result
+    }
     #endregion
     
-    #region check group membership
-    if ($groupsToInclude.Count -eq 0)
+    #region Check include group membership
+    $missingGroups = @()
+    if ($null -eq $groupsToInclude -or $groupsToInclude.Count -eq 0)
     {
-        Write-Verbose 'No groups to include were specified. Skipping this check.'
-        $groupsToInclude = $null
+        Write-Verbose "[$($MyInvocation.MyCommand)] No groups to include were specified. Skipping this check."
     }
     else
     {
-        Write-Verbose "The user $userName is a member of the following groups: $($groups -join ', ')"
-        Write-Host "Checking memberships for user $userName in required groups."
+        Write-Verbose "[$($MyInvocation.MyCommand)] Checking memberships for user $userName in $($groupsToInclude.Count) required groups"
         foreach ($group in $groupsToInclude)
         {
-            Write-Host "Checking membership in $group"
-            if (-not ($groups -contains $group))
+            Write-Verbose "[$($MyInvocation.MyCommand)] Checking membership in required group: $group"
+            if ($groups -notcontains $group)
             {
-                Write-Host "The user $userName is not a member of the required group $group"
-                $missingIncludeGroups += $group
+                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is NOT a member of the required group: $group"
+                $missingGroups += $group
             }
             else
             {
-                Write-Host "The user $userName is a member of the required group $group"
+                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of the required group: $group"
             }
         }
-    }
-
-    if ($groupsToExclude.Count -eq 0)
-    {
-        Write-Verbose 'No groups to exclude were specified. Skipping this check.'
-        $groupsToExclude = $null
-    }
-    else
-    {
-        Write-Verbose "Checking whether the user $userName is a member of the excluded groups."
-        foreach ($group in $groupsToExclude)
+        $result.MissingGroups = $missingGroups
+        if ($missingGroups.Count -gt 0)
         {
-            Write-Verbose "Checking membership in $group"
-            if ($groups -contains $group)
-            {
-                Write-Verbose "The user $userName is a member of the excluded group $group"
-                $invalidExcludeGroups += $group
-            }
-            else
-            {
-                Write-Verbose "The user $userName is not a member of the excluded group $group"
-            }
+            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is missing membership in $($missingGroups.Count) required groups: $($missingGroups -join ', ')"
+        }
+        else
+        {
+            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of all required groups"
         }
     }
     #endregion
-
-    Write-Host "Missing include groups: $($missingIncludeGroups.count)"
-    Write-Host "Invalid exclude groups: $($invalidExcludeGroups.count)"
-    if (($missingIncludeGroups.Count -eq 0) -and ($invalidExcludeGroups.Count -eq 0))
+    
+    #region Check exclude group membership
+    $forbiddenGroups = @()
+    if ($null -eq $groupsToExclude -or $groupsToExclude.Count -eq 0)
     {
-        Write-Verbose "The user $userName is a member of all required groups and not a member of any excluded groups."
-        $hasCorrectMemberships = $true
+        Write-Verbose "[$($MyInvocation.MyCommand)] No groups to exclude were specified. Skipping this check."
     }
     else
     {
-        if ($missingIncludeGroups.Count -gt 0)
+        Write-Verbose "[$($MyInvocation.MyCommand)] Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
+        foreach ($group in $groupsToExclude)
         {
-            Write-Verbose "The user $userName is missing membership in the following required groups: $($missingIncludeGroups -join ', ')"
-            $groupsToReturn.add('missingIncludeGroups', $missingIncludeGroups)
+            Write-Verbose "[$($MyInvocation.MyCommand)] Checking membership in excluded group: $group"
+            if ($groups -contains $group)
+            {
+                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of the excluded group: $group (should not be)"
+                $forbiddenGroups += $group
+            }
+            else
+            {
+                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is not a member of the excluded group: $group (correct)"
+            }
         }
-        if ($invalidExcludeGroups.Count -gt 0)
+        $result.ForbiddenGroups = $forbiddenGroups
+        if ($forbiddenGroups.Count -gt 0)
         {
-            Write-Verbose "The user $userName is a member of the following excluded groups: $($invalidExcludeGroups -join ', ')"
-            $groupsToReturn.add('invalidExcludeGroups', $invalidExcludeGroups)
+            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of $($forbiddenGroups.Count) excluded groups: $($forbiddenGroups -join ', ')"
         }
-        $groupsToReturn.add('HasCorrectMemberships', $hasCorrectMemberships)
-        return $groupsToReturn
+        else
+        {
+            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is not a member of any excluded groups"
+        }
     }
+    #endregion
+    
+    #region Determine result and return
+    if ($missingGroups.Count -eq 0 -and $forbiddenGroups.Count -eq 0)
+    {
+        Write-Verbose "[$($MyInvocation.MyCommand)] User $userName has correct group memberships"
+        $result.Success = $true
+    }
+    else
+    {
+        Write-Verbose "[$($MyInvocation.MyCommand)] User $userName does not have correct group memberships"
+        $result.Success = $false
+        if ($missingGroups.Count -gt 0)
+        {
+            Write-Host "User $userName is missing membership in the following required groups: $($missingGroups -join ', ')" -ForegroundColor Yellow
+        }
+        if ($forbiddenGroups.Count -gt 0)
+        {
+            Write-Host "User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')" -ForegroundColor Yellow
+        }
+    }
+    Write-Verbose "[$($MyInvocation.MyCommand)] Completed VerifyGroupMembership function with Success=$($result.Success)"
+    return $result
+    #endregion
 }
 # SIG # Begin signature block
 # MII6cAYJKoZIhvcNAQcCoII6YTCCOl0CAQExDzANBglghkgBZQMEAgEFADB5Bgor
@@ -172,7 +239,7 @@ function VerifyGroupMembership()
 # MDQzMjUyWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
 # BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
 # Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# pcnJUT3hW3mFvDfqF1GKV/hLeIJTDJqJlxt1OQR9iAEiUcldF1lMBokkf6Z13Dy+
+# pcnJUT3hW3mFvDfqF1GKV/hLeIJTDJqJlxt1OQR9iAEiUcldF1lMBokkf6Z13Dy+ 
 # cGhqqkYPmT3dbZ21FbQuIOtk56/Hb7onOJT3p/MLFXNMfiH3djn1lxux1Susscb5
 # kAsiR3EGAfDXbjlVC8bSiyfKxFgS07YWwyoxHxql4YkGnG6cBQvQmNuYx13yAhU/
 # ew4L9BWGDIRyvxBmftA4bzMbgFREMKqGE2TXPQhIqyQX2eCB+PcKbfoVAH5h9bru

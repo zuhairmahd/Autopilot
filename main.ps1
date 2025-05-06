@@ -390,9 +390,10 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Verbose "Getting access token..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
-        if ($groups.HasCorrectMemberships -eq $true)
+        if ($groups.success -eq $true)
         {
             Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
+            Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
             Write-Host "We will now check the device state." -ForegroundColor Green
             Write-Host "Enter the device's serial number."
             Write-Host "This would be the device you plan to give to the user."
@@ -411,19 +412,18 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
         else
         {
-            Write-Verbose "The function returned $($groups.missingIncludeGroups.Count) missing groups and $($groups.invalidExcludeGroups.Count) invalid groups."
-            Write-Verbose "Missing include groups: $($groups.missingIncludeGroups | Out-String)"
-            Write-Verbose "The function returned $($groups.invalidExcludeGroups.Count) invalid exclude groups."
-            Write-Verbose "Invalid exclude groups: $($groups.invalidExcludeGroups | Out-String)"
-            if ($groups.missingIncludeGroups.Count -gt 0)
+            Write-Verbose "The function returned $($groups.MissingGroups.Count) missing group membershipss and $($groups.ForbiddenGroups.Count) forbidden group membershipss."
+            Write-Verbose "Missing group memberships: $($groups.missingGroups | Out-String)"
+            Write-Verbose "Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
+            if ($groups.missingGroups.Count -gt 0)
             {
                 Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.missingIncludeGroups)
+                foreach ($group in $groups.missingGroups)
                 {
                     Write-Host $group -ForegroundColor Red
                 }
             }
-            if ($groups.invalidExcludeGroups.Count -gt 0)
+            if ($groups.ForbiddenGroups.Count -gt 0)
             {
                 Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
                 foreach ($group in $groups.invalidExcludeGroups)
@@ -432,7 +432,6 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
                 }
             }
             Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
-            # Removed exit 1 to allow returning to menu
         }
     } # Corrected: Closing brace for the -Action script block was missing
 }
