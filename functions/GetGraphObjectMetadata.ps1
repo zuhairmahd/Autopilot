@@ -327,6 +327,66 @@ function GetGraphObjectMetadata()
                         Write-Verbose "Added annotation: $($annotation.Term)"
                     }
                 }
+                
+                # Extract navigation properties from the entity type definition
+                Write-Verbose "Extracting navigation properties from entity type definition"
+                if ($entityTypeElement.NavigationProperty)
+                {
+                    foreach ($navProp in $entityTypeElement.NavigationProperty)
+                    {
+                        $targetType = $navProp.Type -replace "^Collection\((.*)\)$", '$1' -replace "^$namespace\.", ""
+                        $isCollection = $navProp.Type -match "^Collection\("
+                        
+                        $navPropDetails = @{
+                            Name             = $navProp.Name
+                            Type             = "NavigationProperty"
+                            TargetEntityType = $targetType
+                            IsCollection     = $isCollection
+                            ContainsTarget   = $navProp.ContainsTarget -eq 'true'
+                            NavigationPath   = "$entityTypeName/$($navProp.Name)"
+                        }
+                        
+                        # Add partner navigation property if defined
+                        if ($navProp.Partner)
+                        {
+                            $navPropDetails.Partner = $navProp.Partner
+                            Write-Verbose "Navigation property $($navProp.Name) has partner: $($navProp.Partner)"
+                        }
+                        
+                        # Add referential constraint if defined
+                        if ($navProp.ReferentialConstraint)
+                        {
+                            $navPropDetails.ReferentialConstraint = @{
+                                Property           = $navProp.ReferentialConstraint.Property
+                                ReferencedProperty = $navProp.ReferentialConstraint.ReferencedProperty
+                            }
+                            Write-Verbose "Navigation property $($navProp.Name) has referential constraint"
+                        }
+                        
+                        # Add OnDelete action if defined
+                        if ($navProp.OnDelete)
+                        {
+                            $navPropDetails.OnDelete = $navProp.OnDelete.Action
+                            Write-Verbose "Navigation property $($navProp.Name) has OnDelete action: $($navProp.OnDelete.Action)"
+                        }
+                        
+                        # Try to get additional details about the target entity type
+                        $targetEntityTypeElement = $metadataResponse.Edmx.DataServices.Schema.EntityType | 
+                            Where-Object { $_.Name -eq $targetType }
+                            
+                        if ($targetEntityTypeElement)
+                        {
+                            $navPropDetails.TargetEntityDetails = @{
+                                Name       = $targetType
+                                Properties = @($targetEntityTypeElement.Property | ForEach-Object { $_.Name })
+                            }
+                            Write-Verbose "Found target entity type details for $targetType with $($navPropDetails.TargetEntityDetails.Properties.Count) properties"
+                        }
+                        
+                        $metadata.NavigationProperties += $navPropDetails
+                        Write-Verbose "Added navigation property from metadata: $($navProp.Name) (Target: $targetType, IsCollection: $isCollection)"
+                    }
+                }
             }
         }
         
