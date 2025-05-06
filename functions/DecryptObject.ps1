@@ -15,36 +15,50 @@ Author: Zuhair Mahmoud
     [CmdletBinding()]
     param (
         [psObject]$encryptedObject,
+        [string[]]$FieldsToDecrypt = @(
+            'appId',
+            'appSecret',
+            'clientId',
+            'clientSecret',
+            'tenantId',
+            'refresh_token',
+            'password',
+            'thumbprint'
+        ),
         [string[]]$excludeFields
     )
+
     $decryptedObject = [ordered] @{}
     Write-Verbose "The exclude list is $($excludeFields -join ',')"
+    Write-Verbose "The fields to decrypt are $($FieldsToDecrypt -join ',')"
     foreach ($prop in $encryptedObject.PSObject.Properties)
     {
         Write-Verbose "Checking if $($prop.Name) is in the exclude list."
-        if ($excludeFields -contains $prop.Name)
+        if ($FieldsToDecrypt -contains $prop.Name)
         {
-            Write-Verbose "Skipping $($prop.Name) because it is in the exclude list."
-            Write-Verbose "Adding the raw entry $($prop.Name) with value $($prop.Value) to the decrypted object."            
-            $decryptedObject.Add($prop.Name, $prop.Value)
-            continue
-        }
-        Write-Verbose "Decrypting $($prop.Name)."
-        $propValue = $prop.Value.ToString()
-        #convert the value from base 64 to a regular string.
-        $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($propValue))
-        #check if the decoding was successful.
-        if ($null -ne $decodedValue)
-        {
-            Write-Verbose "Successfully decrypted $($prop.Name)."
-            #add the decoded dictionary to the hash table.
-            $decryptedObject.Add($prop.Name, $decodedValue)
+            Write-Verbose "Decrypting $($prop.Name)."
+            $propValue = $prop.Value.ToString()
+            #convert the value from base 64 to a regular string.
+            $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($propValue))
+            #check if the decoding was successful.
+            if ($null -ne $decodedValue)
+            {
+                Write-Verbose "Successfully decrypted $($prop.Name)."
+                #add the decoded dictionary to the hash table.
+                $decryptedObject.Add($prop.Name, $decodedValue)
+            }
+            else
+            {
+                Write-Verbose "Failed to decrypt $($prop.Name)."
+                #add the raw entry to the hash table.
+                $decryptedObject.Add($prop.Name, $propValue)
+            }
         }
         else
         {
-            Write-Verbose "Failed to decrypt $($prop.Name)."
-            #add the raw entry to the hash table.
-            $decryptedObject.Add($prop.Name, $propValue)
+            Write-Verbose "Skipping $($prop.Name) because it is not in the fields to decrypt list."
+            Write-Verbose "Adding the raw entry $($prop.Name) with value $($prop.Value) to the decrypted object."            
+            $decryptedObject.Add($prop.Name, $prop.Value)
         }
     }
     if ($decryptedObject)
