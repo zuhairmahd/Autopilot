@@ -1,6 +1,6 @@
 #region help
 <#PSScriptInfo
-.VERSION 1.1.0
+.VERSION 1.2.0
 .GUID c4205f1e-35d8-4f3a-bc41-a03d7c2c70d3
 .AUTHOR Zuhair Mahmoud
 .DESCRIPTION Parses OData metadata from Microsoft Graph API responses
@@ -16,16 +16,35 @@ Parses the @odata.context from Graph API responses to extract metadata.
     and parses the returned information to provide details about available properties,
     methods, filters, and capabilities of the object. This helps in constructing dynamic
     queries and exploring the object's capabilities.
+    
+    Enhanced capabilities include:
+    - Better handling of complex types and properties
+    - Recursive analysis of nested complex types
+    - Improved detection of OData functions and actions
+    - Support for OData type hierarchies and inheritance
+    - Generation of sample query templates for the entity
+    - Detection of collection properties and their element types
 .PARAMETER ApiResponse
     The response object returned from CallGraphAPI function.
 .PARAMETER AccessToken
     An optional access token to use for metadata requests. If not provided, the function
     will attempt to extract it from the ApiResponse object if possible.
+.PARAMETER IncludeSampleQueries
+    Include sample query templates for common operations on the entity.
+    Default is $true.
+.PARAMETER RecursionDepth
+    Maximum depth for recursively analyzing nested complex types.
+    Default is 3 to prevent excessive processing.
 .EXAMPLE
     $graphResponse = CallGraphAPI -accessToken $token -ResourcePath "users"
-    Get-GraphObjectMetadata -ApiResponse $graphResponse
+    GetGraphObjectMetadata -ApiResponse $graphResponse
     
     Extracts metadata for the users collection returned from Graph API.
+.EXAMPLE
+    $graphResponse = CallGraphAPI -accessToken $token -ResourcePath "groups"
+    GetGraphObjectMetadata -ApiResponse $graphResponse -RecursionDepth 4 -IncludeSampleQueries $true
+    
+    Extracts metadata with deeper complex type analysis and includes sample queries.
 .NOTES
     This function depends on the CallGraphAPI function for making additional API calls to
     retrieve metadata information.
@@ -41,11 +60,17 @@ function GetGraphObjectMetadata()
         [object]$ApiResponse,
         
         [Parameter(Mandatory = $false)]
-        [string]$AccessToken
+        [string]$AccessToken,
+        
+        [Parameter(Mandatory = $false)]
+        [bool]$IncludeSampleQueries = $true,
+        
+        [Parameter(Mandatory = $false)]
+        [int]$RecursionDepth = 3
     )
 
     #region variables and logs
-    Write-Verbose "Starting Get-GraphObjectMetadata function"
+    Write-Verbose "Starting GetGraphObjectMetadata function with RecursionDepth=$RecursionDepth"
     
     # Initialize output containers
     $metadata = @{
@@ -56,14 +81,21 @@ function GetGraphObjectMetadata()
         Functions             = @()
         ComplexTypes          = @()
         EnumTypes             = @()
+        CollectionTypes       = @()
         EntityTypeInheritance = @{
             BaseType     = $null
             DerivedTypes = @()
         }
         Annotations           = @()
-        QueryOptions          = @("filter", "select", "expand", "orderby", "top", "skip", "count")
-        FilterOperators       = @("eq", "ne", "gt", "ge", "lt", "le", "and", "or", "not", "contains", "startswith", "endswith")
+        QueryOptions          = @("filter", "select", "expand", "orderby", "top", "skip", "count", "search")
+        FilterOperators       = @("eq", "ne", "gt", "ge", "lt", "le", "and", "or", "not", "contains", "startswith", "endswith", "any", "all")
+        SampleQueries         = @()
+        TypeDefinitions       = @{}
+        GraphVersion          = "v1.0"
     }
+    
+    # Create a script-level variable to track processed types (prevents infinite recursion)
+    $script:processedTypes = @{}
     #endregion
 
     #region process response and extract context
@@ -87,6 +119,7 @@ function GetGraphObjectMetadata()
         {
             $apiVersion = $matches[1]
             Write-Verbose "API Version detected: $apiVersion"
+            $metadata.GraphVersion = $apiVersion
         }
         else
         {
@@ -109,6 +142,7 @@ function GetGraphObjectMetadata()
         else
         {
             Write-Verbose "Could not extract entity set name from context URL"
+            $entitySetName = "Unknown"
         }
         
         # Remove any trailing segments
@@ -136,7 +170,6 @@ function GetGraphObjectMetadata()
     {
         Write-Verbose "No access token provided, attempting to reuse token from original request"
         # Try to extract the access token if it wasn't provided
-        # This is a simplification - in real scenarios you might need to handle this differently
         if ($ApiResponse.PSObject.Properties.Name -contains 'AccessToken')
         {
             $AccessToken = $ApiResponse.AccessToken
@@ -160,9 +193,6 @@ function GetGraphObjectMetadata()
         
         $metadataResponse = Invoke-RestMethod -Uri $metadataUrl -Headers $headers -Method Get -ErrorAction Stop
         Write-Verbose "Successfully retrieved metadata document"
-        
-        # The metadata is an XML document that contains the full service definition
-        # We need to parse it to find details about our entity
     }
     catch 
     {
@@ -175,13 +205,327 @@ function GetGraphObjectMetadata()
     }
     #endregion
     
-    #region parse metadata XML
-    try 
+    #region helper functions for metadata processing
+    # Function to recursively process complex types
+    function Get-ComplexTypeDetails
+    {
+        param (
+            [Parameter(Mandatory = $true)]
+            [object]$TypeElement,
+            
+            [Parameter(Mandatory = $true)]
+            [string]$TypeName,
+            
+            [Parameter(Mandatory = $true)]
+            [int]$CurrentDepth,
+            
+            [Parameter(Mandatory = $false)]
+            [string]$Namespace = "Microsoft.Graph"
+        )
+        
+        # Check if we've already processed this type to prevent circular references
+        if ($script:processedTypes.ContainsKey($TypeName))
+        {
+            Write-Verbose "Type '$TypeName' already processed, returning reference"
+            return $script:processedTypes[$TypeName]
+        }
+        
+        # Check recursion depth
+        if ($CurrentDepth -gt $RecursionDepth)
+        {
+            Write-Verbose "Maximum recursion depth reached for type: $TypeName"
+            return @{
+                Name            = $TypeName
+                Properties      = @()
+                MaxDepthReached = $true
+            }
+        }
+        
+        Write-Verbose "Processing complex type: $TypeName (Depth: $CurrentDepth)"
+        
+        # Create complex type details
+        $complexTypeDetails = @{
+            Name       = $TypeName
+            Properties = @()
+            BaseType   = $null
+        }
+        
+        # Store reference to prevent recursion loops
+        $script:processedTypes[$TypeName] = $complexTypeDetails
+        
+        # Extract base type if any
+        if ($TypeElement.BaseType)
+        {
+            $baseTypeFull = $TypeElement.BaseType
+            $baseTypeName = $baseTypeFull -replace "^$Namespace\.", ""
+            $complexTypeDetails.BaseType = $baseTypeName
+            Write-Verbose "Complex type '$TypeName' inherits from base type: $baseTypeName"
+        }
+        
+        # Extract properties
+        if ($TypeElement.Property)
+        {
+            foreach ($prop in $TypeElement.Property)
+            {
+                $propDetails = @{
+                    Name          = $prop.Name
+                    Type          = $prop.Type
+                    Nullable      = $prop.Nullable -eq 'true'
+                    Documentation = $null
+                }
+                
+                # Extract property documentation if available
+                if ($prop.Annotation)
+                {
+                    $docAnnotation = $prop.Annotation | Where-Object { $_.Term -eq 'Org.OData.Core.V1.Description' }
+                    if ($docAnnotation -and $docAnnotation.String)
+                    {
+                        $propDetails.Documentation = $docAnnotation.String
+                    }
+                }
+                
+                # Identify if this is a complex type reference
+                if ($prop.Type -notmatch "^Edm\.")
+                {
+                    # Handle collection types
+                    $isCollection = $prop.Type -match "^Collection\((.*)\)$"
+                    if ($isCollection)
+                    {
+                        $innerTypeName = $matches[1] -replace "^$Namespace\.", ""
+                        $propDetails.IsCollection = $true
+                        $propDetails.ElementType = $innerTypeName
+                        
+                        # If it's not a primitive type, try to process it recursively
+                        if ($innerTypeName -notmatch "^Edm\.")
+                        {
+                            $innerTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
+                                Where-Object { $_.Name -eq $innerTypeName }
+                                
+                            if ($innerTypeElement)
+                            {
+                                $propDetails.ElementTypeDetails = Get-ComplexTypeDetails -TypeElement $innerTypeElement -TypeName $innerTypeName -CurrentDepth ($CurrentDepth + 1) -Namespace $Namespace
+                            }
+                        }
+                    }
+                    else
+                    {
+                        # It's a direct reference to another complex type
+                        $referencedTypeName = $prop.Type -replace "^$Namespace\.", ""
+                        
+                        if ($referencedTypeName -ne $prop.Type)
+                        {
+                            # Try to find and process the referenced complex type
+                            $referencedTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
+                                Where-Object { $_.Name -eq $referencedTypeName }
+                                
+                            if ($referencedTypeElement)
+                            {
+                                $propDetails.ComplexTypeDetails = Get-ComplexTypeDetails -TypeElement $referencedTypeElement -TypeName $referencedTypeName -CurrentDepth ($CurrentDepth + 1) -Namespace $Namespace
+                            }
+                        }
+                    }
+                }
+                
+                # Add to properties list
+                $complexTypeDetails.Properties += $propDetails
+            }
+        }
+        
+        return $complexTypeDetails
+    }
+    
+    # Helper function to generate sample queries
+    function Get-SampleQueries
+    {
+        param (
+            [Parameter(Mandatory = $true)]
+            [string]$EntityType,
+            
+            [Parameter(Mandatory = $true)]
+            [array]$Properties,
+            
+            [Parameter(Mandatory = $true)]
+            [array]$NavigationProperties
+        )
+        
+        $samples = @()        # Basic select query
+        $selectableProps = @($Properties | Where-Object { $_.Name -notlike '@*' } | Select-Object -First 5 | ForEach-Object { $_.Name })
+        if ($selectableProps -and $selectableProps.Count -gt 0)
+        {
+            $samples += @{
+                Name        = "Basic Select"
+                Template    = "/$EntityType?`$select=$($selectableProps -join ',')"
+                Description = "Retrieves specific fields from $EntityType entities"
+            }
+        }
+        
+        # Filter query if we have string properties
+        $stringProps = @($Properties | Where-Object { $_.Type -eq 'Edm.String' -and $_.Name -notlike '@*' } | Select-Object -First 3 | ForEach-Object { $_.Name })
+        if ($stringProps -and $stringProps.Count -gt 0)
+        {
+            $samples += @{
+                Name        = "Filter by String Property"
+                Template    = "/$EntityType?`$filter=$($stringProps[0]) eq '{value}'"
+                Description = "Filters $EntityType entities by $($stringProps[0]) equality"
+            }
+            
+            $samples += @{
+                Name        = "Filter with startsWith"
+                Template    = "/$EntityType?`$filter=startswith($($stringProps[0]), '{prefix}')"
+                Description = "Filters $EntityType entities where $($stringProps[0]) starts with a specific value"
+            }
+        }
+        # Expand navigation property if available
+        if ($null -ne $NavigationProperties -and @($NavigationProperties).Count -gt 0)
+        {
+            $navProp = $NavigationProperties[0].Name
+            if ($navProp)
+            {
+                $samples += @{
+                    Name        = "Expand Navigation Property"
+                    Template    = "/$EntityType?`$expand=$navProp"
+                    Description = "Retrieves $EntityType entities with expanded $navProp relationships"
+                }
+            }
+        }
+        # Combined query
+        if ($null -ne $selectableProps -and $null -ne $stringProps -and 
+            ($selectableProps.Count -gt 0) -and ($stringProps.Count -gt 0))
+        {
+            $samples += @{
+                Name        = "Combined Query"
+                Template    = "/$EntityType?`$select=$($selectableProps -join ',')&`$filter=$($stringProps[0]) eq '{value}'&`$orderby=$($selectableProps[0]) asc&`$top=10"
+                Description = "Combined query with select, filter, orderby and top"
+            }
+        }
+        
+        # Count query
+        $samples += @{
+            Name        = "Count Entities"
+            Template    = "/$EntityType/`$count"
+            Description = "Returns the total count of $EntityType entities"
+        }
+        
+        return $samples
+    }
+    
+    # Function to extract navigation links from an entity
+    function Get-NavigationLinksFromEntity
+    {
+        param (
+            [Parameter(Mandatory = $true)]
+            [object]$Entity,
+            
+            [string]$EntityPath = ""
+        )
+        
+        $navLinks = @()
+        
+        foreach ($propName in $Entity.PSObject.Properties.Name)
+        {
+            # Look for @odata.navigationLink or @odata.associationLink
+            if ($propName -eq "@odata.navigationLink" -or $propName -eq "@odata.associationLink")
+            {
+                foreach ($linkProp in $Entity.$propName.PSObject.Properties)
+                {
+                    $navLinks += @{
+                        Name = $linkProp.Name
+                        Url  = $linkProp.Value
+                        Type = $propName
+                    }
+                    Write-Verbose "Found navigation link in response: $($linkProp.Name) -> $($linkProp.Value)"
+                }
+            }
+            # Also look for any property that looks like a URL to another entity
+            elseif ($propName -notlike '@odata*' -and 
+                   ($propName -like '*@odata.context' -or 
+                $propName -like '*@odata.nextLink' -or 
+                $Entity.$propName -is [hashtable] -or 
+                $Entity.$propName -is [PSCustomObject]))
+            {
+                $navLinks += @{
+                    Name = $propName
+                    Type = "Embedded"
+                    Path = if ([string]::IsNullOrEmpty($EntityPath))
+                    {
+                        $propName 
+                    }
+                    else
+                    {
+                        "$EntityPath/$propName" 
+                    }
+                }
+                Write-Verbose "Found potential embedded navigation property in response: $propName"
+            }
+        }
+        
+        return $navLinks
+    }
+    
+    # Function to analyze property for complex type detection
+    function Get-PropertyTypeInfo
+    {
+        param (
+            [Parameter(Mandatory = $true)]
+            [string]$PropertyType,
+            
+            [Parameter(Mandatory = $false)]
+            [string]$Namespace = "Microsoft.Graph"
+        )
+        
+        $typeInfo = @{
+            OriginalType = $PropertyType
+            IsComplex    = $false
+            IsCollection = $false
+            IsPrimitive  = $false
+            ElementType  = $null
+            Namespace    = $Namespace
+        }
+        
+        # Check if it's a collection
+        if ($PropertyType -match "^Collection\((.*)\)$")
+        {
+            $typeInfo.IsCollection = $true
+            $innerType = $matches[1]
+            $typeInfo.ElementType = $innerType
+            
+            # Check if the element type is a primitive (Edm.*) or complex type
+            if ($innerType -match "^Edm\.")
+            {
+                $typeInfo.IsPrimitive = $true
+            }
+            else
+            {
+                $typeInfo.IsComplex = $true
+                # Strip namespace if present
+                $typeInfo.ElementType = $innerType -replace "^$Namespace\.", ""
+            }
+        }
+        else
+        {
+            # Not a collection, check if primitive or complex
+            if ($PropertyType -match "^Edm\.")
+            {
+                $typeInfo.IsPrimitive = $true
+            }
+            else
+            {
+                $typeInfo.IsComplex = $true
+                # Strip namespace if present
+                $typeInfo.ElementType = $PropertyType -replace "^$Namespace\.", ""
+            }
+        }
+        
+        return $typeInfo
+    }
+    #endregion helper functions
+    
+    #region parse metadata
+    try
     {
         Write-Verbose "Parsing metadata XML document"
         
         # Find the entity type definition in the metadata
-        # This is a simplified approach - full OData metadata parsing is complex
         $namespace = "Microsoft.Graph"
         
         # First, try to find the EntitySet that matches our entity set name
@@ -223,18 +567,56 @@ function GetGraphObjectMetadata()
                     }
                 }
                 
-                # Extract properties
+                # Extract properties with enhanced type analysis
                 if ($entityTypeElement.Property)
                 {
                     foreach ($prop in $entityTypeElement.Property)
                     {
+                        $propTypeInfo = Get-PropertyTypeInfo -PropertyType $prop.Type -Namespace $namespace
+                        
                         $propDetails = @{
-                            Name     = $prop.Name
-                            Type     = $prop.Type
-                            Nullable = $prop.Nullable -eq 'true'
+                            Name         = $prop.Name
+                            Type         = $prop.Type
+                            Nullable     = $prop.Nullable -eq 'true'
+                            IsCollection = $propTypeInfo.IsCollection
+                            IsPrimitive  = $propTypeInfo.IsPrimitive
+                            IsComplex    = $propTypeInfo.IsComplex
                         }
+                        
+                        # If complex type, add details about it
+                        if ($propTypeInfo.IsComplex)
+                        {
+                            $complexTypeName = if ($propTypeInfo.IsCollection)
+                            {
+                                $propTypeInfo.ElementType 
+                            }
+                            else
+                            {
+                                $propTypeInfo.ElementType 
+                            }
+                            
+                            # Find the complex type definition
+                            $complexTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
+                                Where-Object { $_.Name -eq $complexTypeName }
+                                
+                            if ($complexTypeElement)
+                            {
+                                $propDetails.ComplexTypeDetails = Get-ComplexTypeDetails -TypeElement $complexTypeElement -TypeName $complexTypeName -CurrentDepth 1 -Namespace $namespace
+                            }
+                        }
+                        
+                        # Extract documentation if available
+                        if ($prop.Annotation)
+                        {
+                            $docAnnotation = $prop.Annotation | Where-Object { $_.Term -eq 'Org.OData.Core.V1.Description' }
+                            if ($docAnnotation -and $docAnnotation.String)
+                            {
+                                $propDetails.Documentation = $docAnnotation.String
+                            }
+                        }
+                        
                         $metadata.Properties += $propDetails
-                        Write-Verbose "Found property: $($prop.Name) (Type: $($prop.Type))"
+                        Write-Verbose "Added property: $($prop.Name) (Type: $($prop.Type), Complex: $($propDetails.IsComplex))"
                     }
                 }
                 
@@ -245,39 +627,33 @@ function GetGraphObjectMetadata()
                 # Find complex types from property types
                 foreach ($prop in $metadata.Properties)
                 {
-                    if ($prop.Type -notmatch "^Edm\.")
+                    if ($prop.IsComplex)
                     {
-                        $complexTypeName = $prop.Type -replace "^Collection\((.*)\)$", '$1' -replace "^$namespace\.", ""
-                        if ($complexTypeName -ne $prop.Type)
+                        $complexTypeName = if ($prop.IsCollection)
+                        { 
+                            ($prop.Type -replace "^Collection\((.*)\)$", '$1') -replace "^$namespace\.", "" 
+                        }
+                        else
+                        { 
+                            $prop.Type -replace "^$namespace\.", "" 
+                        }
+                        
+                        if ($complexTypeName -notmatch "^Edm\.")
                         {
                             $complexTypesReferenced += $complexTypeName
                         }
                     }
                 }
                 
-                # Find the complex type definitions
-                foreach ($complexTypeName in $complexTypesReferenced | Select-Object -Unique)
+                # Process all referenced complex types
+                foreach ($complexTypeName in ($complexTypesReferenced | Select-Object -Unique))
                 {
                     $complexTypeElement = $metadataResponse.Edmx.DataServices.Schema.ComplexType | 
                         Where-Object { $_.Name -eq $complexTypeName }
                         
                     if ($complexTypeElement)
                     {
-                        $complexTypeDetails = @{
-                            Name       = $complexTypeName
-                            Properties = @()
-                        }
-                        
-                        # Extract properties of the complex type
-                        foreach ($prop in $complexTypeElement.Property)
-                        {
-                            $complexTypeDetails.Properties += @{
-                                Name     = $prop.Name
-                                Type     = $prop.Type
-                                Nullable = $prop.Nullable -eq 'true'
-                            }
-                        }
-                        
+                        $complexTypeDetails = Get-ComplexTypeDetails -TypeElement $complexTypeElement -TypeName $complexTypeName -CurrentDepth 1 -Namespace $namespace
                         $metadata.ComplexTypes += $complexTypeDetails
                         Write-Verbose "Added complex type: $complexTypeName with $($complexTypeDetails.Properties.Count) properties"
                     }
@@ -328,7 +704,7 @@ function GetGraphObjectMetadata()
                     }
                 }
                 
-                # Extract navigation properties from the entity type definition
+                # Extract navigation properties with enhanced details
                 Write-Verbose "Extracting navigation properties from entity type definition"
                 if ($entityTypeElement.NavigationProperty)
                 {
@@ -387,59 +763,94 @@ function GetGraphObjectMetadata()
                         Write-Verbose "Added navigation property from metadata: $($navProp.Name) (Target: $targetType, IsCollection: $isCollection)"
                     }
                 }
-            }
-        }
-        
-        # Look for operations (actions and functions) that apply to this entity type
-        $operations = $metadataResponse.Edmx.DataServices.Schema.Action + $metadataResponse.Edmx.DataServices.Schema.Function
-        foreach ($op in $operations)
-        {
-            # Check if this operation applies to our entity type
-            $paramIsEntityType = $op.Parameter | 
-                Where-Object { $_.Type -match "^$namespace\.$entityTypeName\b" -and $_.Name -eq "bindingParameter" }
                 
-            if ($paramIsEntityType)
-            {
-                $opDetails = @{
-                    Name       = $op.Name
-                    Type       = if ($op.LocalName -eq 'Action')
+                # Look for operations (actions and functions) that apply to this entity type
+                $operations = $metadataResponse.Edmx.DataServices.Schema.Action + $metadataResponse.Edmx.DataServices.Schema.Function
+                foreach ($op in $operations)
+                {
+                    # Check if this operation applies to our entity type
+                    $paramIsEntityType = $op.Parameter | 
+                        Where-Object { $_.Type -match "^$namespace\.$entityTypeName\b" -and $_.Name -eq "bindingParameter" }
+                        
+                    if ($paramIsEntityType)
                     {
-                        'Action' 
+                        $opDetails = @{
+                            Name       = $op.Name
+                            Type       = if ($op.LocalName -eq 'Action')
+                            {
+                                'Action' 
+                            }
+                            else
+                            {
+                                'Function' 
+                            }
+                            Parameters = @()
+                            ReturnType = $op.ReturnType
+                        }
+                        
+                        # Add parameters (excluding binding parameter)
+                        foreach ($param in $op.Parameter)
+                        {
+                            if ($param.Name -ne "bindingParameter")
+                            {
+                                $paramTypeInfo = Get-PropertyTypeInfo -PropertyType $param.Type -Namespace $namespace
+                                
+                                $paramDetails = @{
+                                    Name         = $param.Name
+                                    Type         = $param.Type
+                                    Nullable     = $param.Nullable -eq 'true'
+                                    IsCollection = $paramTypeInfo.IsCollection
+                                    IsPrimitive  = $paramTypeInfo.IsPrimitive
+                                    IsComplex    = $paramTypeInfo.IsComplex
+                                }
+                                
+                                $opDetails.Parameters += $paramDetails
+                            }
+                        }
+                        
+                        if ($op.LocalName -eq 'Action')
+                        {
+                            $metadata.Operations += $opDetails
+                        }
+                        else
+                        {
+                            $metadata.Functions += $opDetails    
+                        }
+                        
+                        Write-Verbose "Found $($op.LocalName): $($op.Name)"
                     }
-                    else
-                    {
-                        'Function' 
-                    }
-                    Parameters = @()
                 }
                 
-                # Add parameters (excluding binding parameter)
-                foreach ($param in $op.Parameter)
+                # Add sample queries if requested
+                if ($IncludeSampleQueries)
                 {
-                    if ($param.Name -ne "bindingParameter")
+                    Write-Verbose "Generating sample queries for entity type $entityTypeName"
+                    try
                     {
-                        $opDetails.Parameters += @{
-                            Name     = $param.Name
-                            Type     = $param.Type
-                            Nullable = $param.Nullable -eq 'true'
+                        Write-Verbose "Properties count: $(($metadata.Properties | Measure-Object).Count)"
+                        Write-Verbose "NavigationProperties count: $(($metadata.NavigationProperties | Measure-Object).Count)"
+                        
+                        if ($null -ne $metadata.Properties -and $null -ne $metadata.NavigationProperties)
+                        {
+                            $metadata.SampleQueries = Get-SampleQueries -EntityType $entityTypeName -Properties $metadata.Properties -NavigationProperties $metadata.NavigationProperties
+                            Write-Verbose "Generated $(($metadata.SampleQueries | Measure-Object).Count) sample queries"
+                        }
+                        else
+                        {
+                            Write-Verbose "Cannot generate sample queries: Properties or NavigationProperties is null"
+                            $metadata.SampleQueries = @()
                         }
                     }
+                    catch
+                    {
+                        Write-Verbose "Error generating sample queries: $($_.Exception.Message)"
+                        $metadata.SampleQueries = @()
+                    }
                 }
-                
-                if ($op.LocalName -eq 'Action')
-                {
-                    $metadata.Operations += $opDetails
-                }
-                else 
-                {
-                    $metadata.Functions += $opDetails    
-                }
-                
-                Write-Verbose "Found $($op.LocalName): $($op.Name)"
             }
         }
     }
-    catch 
+    catch
     {
         Write-Verbose "Error parsing metadata XML: $_"
         Write-Host "Error parsing metadata XML: $_" -ForegroundColor Red
@@ -449,57 +860,6 @@ function GetGraphObjectMetadata()
     #region detect navigation properties from response
     # Also detect navigation properties by examining the actual response for links
     Write-Verbose "Looking for navigation properties in the actual response data"
-    
-    # Function to extract navigation links from an entity
-    function Get-NavigationLinksFromEntity
-    {
-        param (
-            [Parameter(Mandatory = $true)]
-            [object]$Entity,
-            
-            [string]$EntityPath = ""
-        )
-        
-        $navLinks = @()
-        
-        foreach ($propName in $Entity.PSObject.Properties.Name)
-        {
-            # Look for @odata.navigationLink or @odata.associationLink
-            if ($propName -eq "@odata.navigationLink" -or $propName -eq "@odata.associationLink")
-            {
-                foreach ($linkProp in $Entity.$propName.PSObject.Properties)
-                {
-                    $navLinks += @{
-                        Name = $linkProp.Name
-                        Url  = $linkProp.Value
-                        Type = $propName
-                    }
-                    Write-Verbose "Found navigation link in response: $($linkProp.Name) -> $($linkProp.Value)"
-                }
-            }
-            # Also look for any property that looks like a URL to another entity
-            elseif ($propName -notlike '@odata*' -and $propName -like '*@odata.context' -or 
-                $propName -like '*@odata.nextLink' -or $Entity.$propName -is [hashtable] -or 
-                $Entity.$propName -is [PSCustomObject])
-            {
-                $navLinks += @{
-                    Name = $propName
-                    Type = "Embedded"
-                    Path = if ([string]::IsNullOrEmpty($EntityPath))
-                    {
-                        $propName 
-                    }
-                    else
-                    {
-                        "$EntityPath/$propName" 
-                    }
-                }
-                Write-Verbose "Found potential embedded navigation property in response: $propName"
-            }
-        }
-        
-        return $navLinks
-    }
     
     # Check for navigation links in single entity response
     if ($ApiResponse -and -not ($ApiResponse -is [array]) -and -not ($ApiResponse.value -is [array]))
@@ -569,7 +929,7 @@ function GetGraphObjectMetadata()
                 # Add null check before calling GetType()
                 $propType = if ($ApiResponse.$propName -is [array])
                 {
-                    "Collection" 
+                    "Collection"
                 }
                 elseif ($null -eq $ApiResponse.$propName)
                 {
@@ -577,7 +937,7 @@ function GetGraphObjectMetadata()
                 }
                 else
                 {
-                    $ApiResponse.$propName.GetType().Name 
+                    $ApiResponse.$propName.GetType().Name
                 }
                 
                 $metadata.Properties += @{
@@ -585,9 +945,42 @@ function GetGraphObjectMetadata()
                     Type         = $propType
                     Nullable     = $null -eq $ApiResponse.$propName
                     FromResponse = $true
+                    IsComplex    = $ApiResponse.$propName -is [PSCustomObject]
+                    IsCollection = $ApiResponse.$propName -is [array]
                 }
                 
                 Write-Verbose "Added property from response: $propName (Type: $propType)"
+                
+                # If the property is a complex object and not null, analyze its structure
+                if ($ApiResponse.$propName -is [PSCustomObject] -and $null -ne $ApiResponse.$propName)
+                {
+                    $complexObj = $ApiResponse.$propName
+                    $complexProps = @()
+                    
+                    foreach ($subProp in $complexObj.PSObject.Properties)
+                    {
+                        $complexProps += @{
+                            Name         = $subProp.Name
+                            Type         = if ($null -eq $subProp.Value)
+                            {
+                                "Unknown" 
+                            }
+                            else
+                            {
+                                $subProp.Value.GetType().Name 
+                            }
+                            FromResponse = $true
+                        }
+                    }
+                    
+                    $metadata.ComplexTypes += @{
+                        Name         = "$propName (from response)"
+                        Properties   = $complexProps
+                        FromResponse = $true
+                    }
+                    
+                    Write-Verbose "Added complex type from response: $propName with $($complexProps.Count) properties"
+                }
             }
         }
     }
@@ -608,7 +1001,7 @@ function GetGraphObjectMetadata()
                 # Add null check before calling GetType()
                 $propType = if ($firstItem.$propName -is [array])
                 {
-                    "Collection" 
+                    "Collection"
                 }
                 elseif ($null -eq $firstItem.$propName)
                 {
@@ -616,7 +1009,7 @@ function GetGraphObjectMetadata()
                 }
                 else
                 {
-                    $firstItem.$propName.GetType().Name 
+                    $firstItem.$propName.GetType().Name
                 }
                 
                 $metadata.Properties += @{
@@ -624,9 +1017,42 @@ function GetGraphObjectMetadata()
                     Type         = $propType
                     Nullable     = $null -eq $firstItem.$propName
                     FromResponse = $true
+                    IsComplex    = $firstItem.$propName -is [PSCustomObject]
+                    IsCollection = $firstItem.$propName -is [array]
                 }
                 
                 Write-Verbose "Added property from response: $propName (Type: $propType)"
+                
+                # If the property is a complex object and not null, analyze its structure
+                if ($firstItem.$propName -is [PSCustomObject] -and $null -ne $firstItem.$propName)
+                {
+                    $complexObj = $firstItem.$propName
+                    $complexProps = @()
+                    
+                    foreach ($subProp in $complexObj.PSObject.Properties)
+                    {
+                        $complexProps += @{
+                            Name         = $subProp.Name
+                            Type         = if ($null -eq $subProp.Value)
+                            {
+                                "Unknown" 
+                            }
+                            else
+                            {
+                                $subProp.Value.GetType().Name 
+                            }
+                            FromResponse = $true
+                        }
+                    }
+                    
+                    $metadata.ComplexTypes += @{
+                        Name         = "$propName (from response)"
+                        Properties   = $complexProps
+                        FromResponse = $true
+                    }
+                    
+                    Write-Verbose "Added complex type from response: $propName with $($complexProps.Count) properties"
+                }
             }
         }
     }
@@ -635,12 +1061,28 @@ function GetGraphObjectMetadata()
     #region format and return results
     # Organize the results in a user-friendly format
     $formattedResults = [PSCustomObject]@{
-        EntityType           = $metadata.EntityType
-        Properties           = $metadata.Properties | ForEach-Object {
-            [PSCustomObject]@{
+        EntityType            = $metadata.EntityType
+        Properties            = $metadata.Properties | ForEach-Object {
+            $propObj = [PSCustomObject]@{
                 Name         = $_.Name
                 Type         = $_.Type
                 Nullable     = $_.Nullable
+                IsComplex    = if ($_.ContainsKey('IsComplex'))
+                {
+                    $_.IsComplex 
+                }
+                else
+                {
+                    $false 
+                }
+                IsCollection = if ($_.ContainsKey('IsCollection'))
+                {
+                    $_.IsCollection 
+                }
+                else
+                {
+                    $false 
+                }
                 FromResponse = if ($_.ContainsKey('FromResponse'))
                 {
                     $_.FromResponse 
@@ -650,8 +1092,22 @@ function GetGraphObjectMetadata()
                     $false 
                 }
             }
+            
+            # Add complex type details if available
+            if ($_.ContainsKey('ComplexTypeDetails'))
+            {
+                $propObj | Add-Member -MemberType NoteProperty -Name 'ComplexTypeDetails' -Value $_.ComplexTypeDetails
+            }
+            
+            # Add documentation if available
+            if ($_.ContainsKey('Documentation'))
+            {
+                $propObj | Add-Member -MemberType NoteProperty -Name 'Documentation' -Value $_.Documentation
+            }
+            
+            $propObj
         }
-        NavigationProperties = $metadata.NavigationProperties | ForEach-Object {
+        NavigationProperties  = $metadata.NavigationProperties | ForEach-Object {
             $navPropObj = [PSCustomObject]@{
                 Name             = $_.Name
                 Type             = $_.Type
@@ -720,45 +1176,247 @@ function GetGraphObjectMetadata()
             
             $navPropObj
         }
-        Operations           = $metadata.Operations | ForEach-Object {
+        Operations            = $metadata.Operations | ForEach-Object {
             [PSCustomObject]@{
                 Name       = $_.Name
                 Type       = $_.Type
+                ReturnType = $_.ReturnType
                 Parameters = $_.Parameters | ForEach-Object {
                     [PSCustomObject]@{
-                        Name     = $_.Name
-                        Type     = $_.Type
-                        Nullable = $_.Nullable
+                        Name         = $_.Name
+                        Type         = $_.Type
+                        Nullable     = $_.Nullable
+                        IsCollection = if ($_.ContainsKey('IsCollection'))
+                        {
+                            $_.IsCollection 
+                        }
+                        else
+                        {
+                            $false 
+                        }
+                        IsComplex    = if ($_.ContainsKey('IsComplex'))
+                        {
+                            $_.IsComplex 
+                        }
+                        else
+                        {
+                            $false 
+                        }
                     }
                 }
             }
         }
-        Functions            = $metadata.Functions | ForEach-Object {
+        Functions             = $metadata.Functions | ForEach-Object {
             [PSCustomObject]@{
                 Name       = $_.Name
                 Type       = $_.Type
+                ReturnType = $_.ReturnType
                 Parameters = $_.Parameters | ForEach-Object {
                     [PSCustomObject]@{
-                        Name     = $_.Name
-                        Type     = $_.Type
-                        Nullable = $_.Nullable
+                        Name         = $_.Name
+                        Type         = $_.Type
+                        Nullable     = $_.Nullable
+                        IsCollection = if ($_.ContainsKey('IsCollection'))
+                        {
+                            $_.IsCollection 
+                        }
+                        else
+                        {
+                            $false 
+                        }
+                        IsComplex    = if ($_.ContainsKey('IsComplex'))
+                        {
+                            $_.IsComplex 
+                        }
+                        else
+                        {
+                            $false 
+                        }
                     }
                 }
             }
         }
-        QueryOptions         = $metadata.QueryOptions
-        FilterOperators      = $metadata.FilterOperators
-        Capabilities         = [PSCustomObject]@{
-            Filterable     = $metadata.Properties.Count -gt 0
-            Selectable     = $true
-            Expandable     = $metadata.NavigationProperties.Count -gt 0
-            Orderable      = $metadata.Properties.Count -gt 0
-            CountSupported = $true
-            Searchable     = $metadata.EntityType -in @('users', 'groups', 'sites', 'drives')
+        ComplexTypes          = $metadata.ComplexTypes | ForEach-Object {
+            $complexObj = [PSCustomObject]@{
+                Name       = $_.Name
+                BaseType   = $_.BaseType
+                Properties = $_.Properties | ForEach-Object {
+                    $propObj = [PSCustomObject]@{
+                        Name     = $_.Name
+                        Type     = $_.Type
+                        Nullable = $_.Nullable
+                    }
+                    
+                    if ($_.ContainsKey('IsCollection'))
+                    {
+                        $propObj | Add-Member -MemberType NoteProperty -Name 'IsCollection' -Value $_.IsCollection
+                    }
+                    
+                    if ($_.ContainsKey('ElementType'))
+                    {
+                        $propObj | Add-Member -MemberType NoteProperty -Name 'ElementType' -Value $_.ElementType
+                    }
+                    
+                    if ($_.ContainsKey('ElementTypeDetails'))
+                    {
+                        $propObj | Add-Member -MemberType NoteProperty -Name 'ElementTypeDetails' -Value $_.ElementTypeDetails
+                    }
+                    
+                    if ($_.ContainsKey('ComplexTypeDetails'))
+                    {
+                        $propObj | Add-Member -MemberType NoteProperty -Name 'ComplexTypeDetails' -Value $_.ComplexTypeDetails
+                    }
+                    
+                    if ($_.ContainsKey('Documentation'))
+                    {
+                        $propObj | Add-Member -MemberType NoteProperty -Name 'Documentation' -Value $_.Documentation
+                    }
+                    
+                    if ($_.ContainsKey('FromResponse'))
+                    {
+                        $propObj | Add-Member -MemberType NoteProperty -Name 'FromResponse' -Value $_.FromResponse
+                    }
+                    
+                    $propObj
+                }
+            }
+            
+            if ($_.ContainsKey('FromResponse'))
+            {
+                $complexObj | Add-Member -MemberType NoteProperty -Name 'FromResponse' -Value $_.FromResponse
+            }
+            
+            $complexObj
+        }
+        EnumTypes             = $metadata.EnumTypes | ForEach-Object {
+            [PSCustomObject]@{
+                Name           = $_.Name
+                UnderlyingType = $_.UnderlyingType
+                IsFlags        = $_.IsFlags
+                Members        = $_.Members | ForEach-Object {
+                    [PSCustomObject]@{
+                        Name  = $_.Name
+                        Value = $_.Value
+                    }
+                }
+            }
+        }
+        EntityTypeInheritance = [PSCustomObject]@{
+            BaseType     = $metadata.EntityTypeInheritance.BaseType
+            DerivedTypes = $metadata.EntityTypeInheritance.DerivedTypes
+        }
+        Annotations           = $metadata.Annotations | ForEach-Object {
+            [PSCustomObject]@{
+                Term   = $_.Term
+                String = $_.String
+                Bool   = $_.Bool
+                Int    = $_.Int
+            }
+        }
+        QueryOptions          = $metadata.QueryOptions
+        FilterOperators       = $metadata.FilterOperators
+        GraphVersion          = $metadata.GraphVersion
+
+        Capabilities          = [PSCustomObject]@{
+            Filterable             = $null -ne $metadata.Properties -and @($metadata.Properties).Count -gt 0
+            Selectable             = $true
+            Expandable             = $null -ne $metadata.NavigationProperties -and @($metadata.NavigationProperties).Count -gt 0
+            Orderable              = $null -ne $metadata.Properties -and @($metadata.Properties).Count -gt 0
+            CountSupported         = $true
+            Searchable             = $metadata.EntityType -in @('users', 'groups', 'sites', 'drives') -or ($metadata.QueryOptions -contains 'search')
+            SupportsChangeTracking = $false # Initialize to false to avoid null issues
         }
     }
-    
-    Write-Verbose "Metadata extraction complete with enhanced navigation properties"
+
+    # Safely determine if change tracking is supported
+    try
+    {
+        Write-Verbose "Checking for change tracking support via annotations..."
+        if ($null -ne $metadata.Annotations -and @($metadata.Annotations).Count -gt 0)
+        {
+            Write-Verbose "Found $(@($metadata.Annotations).Count) annotations to analyze"
+            foreach ($annotation in $metadata.Annotations)
+            {
+                Write-Verbose "Analyzing annotation with Term: $($annotation.Term), Bool: $($annotation.Bool)"
+                if ($annotation.Term -eq 'Microsoft.Graph.ChangeTracking' -or 
+                    $annotation.Term -like '*ChangeTracking*')
+                {
+                    Write-Verbose "Found change tracking annotation: $($annotation.Term)"
+                    if ($annotation.Bool -eq 'true' -or $annotation.Bool -eq $true)
+                    {
+                        $formattedResults.Capabilities.SupportsChangeTracking = $true
+                        Write-Verbose "Change tracking support detected for entity type: $($metadata.EntityType)"
+                        break
+                    }
+                }
+            }
+            
+            # Additional check for delta capability
+            if (-not $formattedResults.Capabilities.SupportsChangeTracking)
+            {
+                # Check operations for delta function
+                $deltaOperation = $metadata.Operations | Where-Object { $_.Name -eq 'delta' } | Select-Object -First 1
+                $deltaFunction = $metadata.Functions | Where-Object { $_.Name -eq 'delta' } | Select-Object -First 1
+                
+                if ($deltaOperation -or $deltaFunction)
+                {
+                    $formattedResults.Capabilities.SupportsChangeTracking = $true
+                    Write-Verbose "Change tracking support detected via delta operation/function for entity type: $($metadata.EntityType)"
+                }
+            }
+            
+            if (-not $formattedResults.Capabilities.SupportsChangeTracking)
+            {
+                Write-Verbose "No change tracking support detected for this entity type"
+            }
+        }
+        else
+        {
+            Write-Verbose "No annotations found to determine change tracking support"
+        }
+    }
+    catch
+    {
+        Write-Verbose "Error determining change tracking support: $($_.Exception.Message)"
+        Write-Verbose "Stack trace: $($_.ScriptStackTrace)"
+    }
+
+    # Add sample queries if generated
+    if ($IncludeSampleQueries -and $null -ne $metadata.SampleQueries -and @($metadata.SampleQueries).Count -gt 0)
+    {
+        try
+        {
+            Write-Verbose "Processing $(($metadata.SampleQueries | Measure-Object).Count) sample queries for output format"
+            $sampleQueries = @(
+                # Fixed ForEach-Object syntax to use proper script block with explicit scriptblock parameter
+                $metadata.SampleQueries | ForEach-Object -Process {
+                    if ($null -ne $_ -and $_.Name -and $_.Template -and $_.Description)
+                    {
+                        [PSCustomObject]@{
+                            Name        = $_.Name
+                            Template    = $_.Template
+                            Description = $_.Description
+                        }
+                    }
+                }
+            )
+            if ($null -ne $formattedResults -and $sampleQueries.Count -gt 0)
+            {
+                Write-Verbose "Adding $(($sampleQueries | Measure-Object).Count) formatted sample queries to results"
+                $formattedResults | Add-Member -MemberType NoteProperty -Name 'SampleQueries' -Value $sampleQueries
+            }
+            else
+            {
+                Write-Verbose "No sample queries to add or formatted results is null"
+            }
+        }
+        catch
+        {
+            Write-Verbose "Error processing sample queries for output: $($_.Exception.Message)"
+        }
+    }
+
+    Write-Verbose "Metadata extraction complete with enhanced property and complex type analysis"
     return $formattedResults
     #endregion
 }

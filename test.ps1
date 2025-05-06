@@ -29,6 +29,7 @@ else
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
+$userUri = "users"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -54,5 +55,5 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 #endregion variables
 
 
-$groupUri = "users/mahmoudz@gao.gov/memberOf/microsoft.graph.group"
-$global:myGroups = CallGraphAPI -ResourcePath $groupUri -accessToken $accessToken -extraparameters "count=true"
+$global:myUsers = CallGraphAPI -ResourcePath $userUri -accessToken $accessToken -extraparameters "count=true"
+$global:object = GetGraphObjectMetadata -accessToken $accessToken -ApiResponse $global:myUsers
