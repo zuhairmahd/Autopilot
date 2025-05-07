@@ -29,12 +29,12 @@ else
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
-$userUri = "users"
+# $userUri = "users"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $unmanagedDeviceUri = "devices"
-# $managedDeviceUri = "deviceManagement/managedDevices"
+$managedDeviceUri = "deviceManagement/managedDevices"
 # $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $managedDeviceFilter = "startswith(deviceName,'w11-')"
@@ -47,13 +47,13 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
 # $global:enrollments = [ordered] @{
-#     "autopilot" = $autopilotDevices
+# "autopilot" = $autopilotDevices
 #     "managed"   = $managedDevices
 #     "imported"  = $importedDevices
 #     "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
 
-
-$global:myUsers = CallGraphAPI -ResourcePath $userUri -accessToken $accessToken -extraparameters "count=true"
-$global:object = GetGraphObjectMetadata -accessToken $accessToken -ApiResponse $global:myUsers
+$uri = "$managedDeviceUri/$($enrollment.managedDevice.device.id)"
+$extraparameters = "select=hardwareInformation,physicalMemoryInBytes"
+$global:hardwareInfo = CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraparameters $extraparameters

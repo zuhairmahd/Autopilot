@@ -62,6 +62,7 @@ function GetDeviceEnrollmentStatus()
     $userUri = "users"
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
+    $deviceHardwareExtraparameters = "select=hardwareInformation,physicalMemoryInBytes"
     #endregion
 
     #region Get the autopilot device info
@@ -165,6 +166,23 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Device found in Intune with serial number $($managedDevice.serialNumber)"
         $inManagedDevices = $true
         $returnedManagedDevice = $managedDevice
+        Write-Verbose "Checking device memory information."
+        $hardwareResourcePath = "$deviceManagementUri/$($autopilotDevice.managedDeviceId)" 
+        Write-Verbose "Calling graph using the path $hardwareResourcePath with the extra parameters         $deviceHardwareExtraparameters"
+        $deviceMemory = (CallGraphAPI -AccessToken $accessToken -ResourcePath $hardwareResourcePath -APIVersion 'beta' -ExtraParameters $deviceHardwareExtraparameters).physicalMemoryInBytes
+        Write-Verbose "Device memory in bytes: $deviceMemory"
+        if ($deviceMemory -gt 0) 
+        {   
+            Write-Verbose "Converting memory to gigabytes."
+            $deviceMemory = [math]::round($deviceMemory / 1GB, 2)
+            Write-Verbose "Device memory: $deviceMemory GB"
+        }
+        else
+        {
+            Write-Verbose 'Device memory not found.'
+            $deviceMemory = $null
+        }
+        Write-Verbose "Got device memory: $deviceMemory"
         Write-Verbose "Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
         Write-Verbose "managedDevice.usersLoggedOn: $($managedDevice.usersLoggedOn)"
         Write-Verbose "managedDevice.userPrincipalName: $($managedDevice.userPrincipalName)"
@@ -251,6 +269,7 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose 'Device not found in Intune'
     }
+    #Getting the unmanaged device object from Intune
     if ($managedDevice )
     {
         Write-Verbose "Looking up device with Azure Active Directory id $($managedDevice.azureActiveDirectoryDeviceId)"
@@ -332,6 +351,7 @@ function GetDeviceEnrollmentStatus()
     $deviceState.add('Managed', $inManagedDevices)
     $managedDeviceData = [ordered] @{
         Device = $returnedManagedDevice
+        Memory = $deviceMemory
         Users  = $loggedOnUsers
     }
     $deviceState.add('managedDevice', $managedDeviceData)

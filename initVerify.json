@@ -17,6 +17,7 @@
         "MaxUserNameLength": 50,
         "MaxSerialNumberLength": 10,
         "MinSerialNumberLength": 7,
+        "MinimumDevicePhysicalMemoryInGB": 16,
         "MinUsernameLength": 3,
         "DesiredAutopilotProfiles": [
           "msb"
