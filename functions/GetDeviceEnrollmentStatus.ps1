@@ -60,7 +60,6 @@ function GetDeviceEnrollmentStatus()
     $deviceManagementUri = "deviceManagement/managedDevices"
     $deviceUri = "devices"
     $userUri = "users"
-    $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
     $deviceHardwareExtraparameters = "select=hardwareInformation,physicalMemoryInBytes"
     #endregion
@@ -101,9 +100,22 @@ function GetDeviceEnrollmentStatus()
     $autopilotDeviceResponse = CallGraphAPI @params
     if ($null -ne $autopilotDeviceResponse -and $autopilotDeviceResponse.'@odata.count' -gt 0)
     {
+        Write-Verbose "Got a device count of $($autopilotDeviceResponse.'@odata.count') from Autopilot."
         $autopilotDevice = $autopilotDeviceResponse.value
-        Write-Verbose "Found $($autopilotDevice.'@odata.count') Autopilot devices."
-        Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
+    }
+    elseif ($null -ne $autopilotDeviceResponse -and ($null -ne $autopilotDeviceResponse.id -or $autopilotDeviceResponse.id -ne '') )
+    {
+        Write-Verbose "Got a single autopilot device with id $($autopilotDeviceResponse.id)"
+        $autopilotDevice = $autopilotDeviceResponse
+    }
+    else
+    {
+        Write-Verbose "Did not get a good response for device with serial number $serialNumber"
+        $inAutopilot = $false
+    }
+    if ($autopilotDevice)
+    {
+        $inAutopilot = $true
         Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
         # $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)?`$expand=deploymentProfile(`$select=displayName)"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)?`$expand=deploymentProfile"
@@ -111,7 +123,6 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "Got $($autopilotDevice.count) devices from Autopilot."
         Write-Verbose "Enrollment Profile name: $($autopilotDevice.deploymentProfile.displayname)"
         Write-Verbose "Device is in Autopilot: $inAutopilot to true."
-        $inAutopilot = $true
         $returnedAutopilotDevice = $autopilotDevice 
         Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
         $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$($autopilotDevice.serialNumber)'"
@@ -131,6 +142,7 @@ function GetDeviceEnrollmentStatus()
     else
     {
         Write-Verbose 'Device is not an autopilot device.'
+        $inAutopilot = $false
     }
     if ($autopilotDevice)
     {
@@ -159,6 +171,13 @@ function GetDeviceEnrollmentStatus()
     #endregion
 
     #region Get the managed device info
+    #If the serial number contains spaces, remove them.
+    if ($serialNumber -match '\s')
+    {
+        Write-Verbose "Serial number contains spaces. Removing them."
+        $serialNumber = $serialNumber -replace '\s', ''
+    }
+    $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -APIVersion 'beta' -Filter $managedDeviceFilter).value
     Write-Verbose "Device serial number: $($managedDevice.serialNumber)"
     if ($managedDevice)

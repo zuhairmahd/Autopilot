@@ -88,6 +88,8 @@ function GetManagedDeviceRelevantProperties()
         $MinimumDevicePhysicalMemoryInGB = $settings.MinimumDevicePhysicalMemoryInGB
         Write-Verbose "Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB"
     }
+    Write-Host "Checking managed device..."
+    Write-Verbose "Managed device: $($enrollmentState.managed)"
     if ($enrollmentState.managed)
     {
         Write-Verbose "Found a managed device."
@@ -157,13 +159,117 @@ function GetManagedDeviceRelevantProperties()
             Write-Verbose "The device is an orphan device."
         }
     }
+
+    if ($OrphanDevice -eq $false -and $CorrectRam -and -not ($HasUser -and $ValidUser))
+    {
+        $readyForNextUser = $true
+        Write-Verbose "Device is ready for the next user"
+    }
+    else
+    {
+        $readyForNextUser = $false
+        Write-Verbose "Device is not ready for the next user"
+    }
     $managedDeviceProperties.Add('OrphanDevice', $orphanDevice)
     $managedDeviceProperties.Add('CorrectRam', $correctRam)
     $managedDeviceProperties.Add('HasUser', $hasUser)
     $managedDeviceProperties.Add('ValidUser', $validUser)
     $managedDeviceProperties.Add('LastLogonDate', $lastLogonDate)
+    $managedDeviceProperties.Add('ReadyForNextUser', $readyForNextUser)
     return $managedDeviceProperties
 }
+
+function GetAutopilotDeviceRelevantProperties()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $enrollmentState,
+        $settings = $settings
+    )
+
+    $autopilotDeviceProperties = [ordered] @{}
+    if ($null -eq $settings.DesiredAutopilotProfiles -or $settings.DesiredAutopilotProfiles.Count -eq 0)
+    {
+        Write-Verbose "No desired autopilot profiles specified in settings."
+        Write-Verbose "Setting default value to 'None'."
+        $desiredAutopilotProfiles = $null
+    }
+    else
+    {
+        $desiredAutopilotProfiles = $settings.DesiredAutopilotProfiles
+        Write-Verbose "Desired autopilot profiles specified in settings: $desiredAutopilotProfiles"
+    }
+    if ($null -ne $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -and $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedUnkownSyncState', 'assignedInSync'))
+    {
+        Write-Verbose "The device profile assignment state is valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        $profileAssigned = $true
+    }
+    else
+    {
+        Write-Verbose "The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        $profileAssigned = $false
+    }
+    if ($null -ne $desiredAutopilotProfiles -and $enrollmentState.autopilot.device.deploymentProfile.displayName -in $desiredAutopilotProfiles -and $profileAssigned -eq $true)
+    {
+        Write-Host "The device is assigned to the correct autopilot profile."
+        $correctProfile = $true
+    }
+    else
+    {
+        Write-Verbose "The device is not assigned to the correct autopilot profile."
+        $correctProfile = $false
+    }
+    Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+    Write-Host "Assigned profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayname)"
+    Write-Host "Assignment date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)"
+    #Check remediation state.
+    $lastRemediationDate = $enrollmentState.autopilot.device.remediationStateLastModifiedDateTime | FormatDateWithTimeZone
+    if ($null -ne $enrollmentState.autopilot.device.remediationState -and $enrollmentState.autopilot.device.remediationState -in @('noRemediationRequired', 'unknownFutureValue'))
+    {
+        Write-Verbose "The device profile remediation state is valid: $($enrollmentState.autopilot.device.remediationState)."
+        $remediationStateGood = $true
+        Write-Verbose "Remediation state last modified date: $lastRemediationDate"
+    }
+    else
+    {
+        Write-Verbose "The device profile remediation state is not valid: $($enrollmentState.autopilot.device.remediationState)."
+        $remediationStateGood = $false
+    }
+    Write-Host "Remediation state: $($enrollmentState.autopilot.device.remediationState)"
+    Write-Host "Remediation state last modified date: $lastRemediationDate"
+    #Now check enrollment status.
+    if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -in @('enrolled', 'notContacted'))
+    {
+        Write-Verbose "The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        $enrollmentStateGood = $true
+    }
+    else
+    {
+        Write-Verbose "The device enrollment state is not valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        $enrollmentStateGood = $false
+    }
+    Write-Host "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
+    if ($CorrectProfile -and $ProfileAssigned -and $RemediationStateGood -and $EnrollmentStateGood)
+    {
+        Write-Host "The device is ready for the next user."
+        $AutopilotAssignmentGood = $true
+    }
+    else
+    {
+        Write-Host "The device is not ready for the next user."
+        $AutopilotAssignmentGood = $false
+    }
+    Write-Verbose "Autopilot assignment good: $AutopilotAssignmentGood"
+    #Add what we got the the autopilotDeviceProperties hashtable
+    $autopilotDeviceProperties.Add('CorrectProfile', $correctProfile)
+    $autopilotDeviceProperties.Add('ProfileAssigned', $profileAssigned)
+    $autopilotDeviceProperties.Add('RemediationStateGood', $remediationStateGood)
+    $autopilotDeviceProperties.Add('EnrollmentStateGood', $enrollmentStateGood)
+    $autopilotDeviceProperties.Add('AutopilotAssignmentGood', $AutopilotAssignmentGood)
+    return $autopilotDeviceProperties
+}
+
 #endregion
 
 function AssessDeviceState() 
@@ -204,182 +310,86 @@ function AssessDeviceState()
             Write-Verbose "In Autopilot: $($enrollmentState.inAutopilot)"
             if ($enrollmentState.inAutopilot)
             {
-                Write-Host "The device is registered in Autopilot."
-                Write-Host "Checking whether the device is assigned to the correct autopilot profile..."
-                if ($enrollmentState.autopilot.device.deploymentProfile.displayName -in $settings.DesiredAutopilotProfiles)
+                $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
+                $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
                 {
-                    Write-Host "The device is assigned to the correct autopilot profile."
-                    $correctProfile = $true
+                    Write-Host "The device is ready for the next user."
+                    Write-Verbose "The device is not an orphan device."
+                    Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of RAM, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                    $readinessState = 'Ready'
+                    $action = 'None'
+                    $device = $enrollmentState.managedDevice.device.id
                 }
                 else
                 {
-                    Write-Host "The device is not assigned to the correct autopilot profile."
-                    Write-Host "You may want to contact an Intune admin."
-                    $correctProfile = $false
-                }
-                Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
-                Write-Host "Assignment date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)"
-                Write-Host "Assigned profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayname)"
-                if ($correctProfile -eq $false)
-                {
-                    Write-Host "The device is not assigned to the correct autopilot profile."
-                    Write-Host "You may want to contact an Intune admin."
-                    $readinessState = 'NotReady'
-                    $action = 'ContactAdmin'
-                    $device = 'None'
-                }
-                Write-Host "Checking enrollment state..."
-                Write-Verbose "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
-                switch ($enrollmentState.autopilot.device.enrollmentState) 
-                {
-                    notContacted 
+                    Write-Host "The device is not propperly enrolled in Autopilot."
+                    #let us explain to the user what the problem is.
+                    if ($autopilotReadiness.CorrectProfile -eq $false)
                     {
-                        Write-Host "The device has not contacted the Autopilot service."
-                        Write-Host "Checking for an associated managed device..."
-                        Write-Verbose "Managed device: $($enrollmentState.managed)"
-                        if ($enrollmentState.managed)
-                        {
-                            Write-Verbose "Found a managed device."
-                            Write-Verbose "Checking whether this is an orphan device..."
-                            Write-Verbose "Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
-                            Write-Verbose "Managed device id: $($enrollmentState.managedDevice.device.id)"
-                            Write-Verbose "Checking if they are the same..."
-                            if ($enrollmentState.managedDevice.device.id -eq $enrollmentState.autopilot.device.managedDeviceId)
-                            {
-                                Write-Verbose "Device Id's match."
-                                Write-Host "The device is not an orphan device."
-                                Write-Host "Checking for a user association on the manage device..."
-                                if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
-                                {
-                                    Write-Verbose "Found a user..."
-                                    Write-Verbose "User display name: $($enrollmentState.managedDevice.users.userDisplayName)"
-                                    Write-Verbose "User id: $($enrollmentState.managedDevice.device.userId)"
-                                    Write-Verbose "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)"
-                                    if ($enrollmentState.managedDevice.users.azureUser)
-                                    {
-                                        $normalizedUsername = ConvertUserDisplayName -UserDisplayName $enrollmentState.managedDevice.users.userDisplayName
-                                        Write-Host "This device is registered to $($normalizedUsername.FullName) ($($enrollmentState.managedDevice.users.userPrincipalName))"
-                                        if ($null -ne $enrollmentState.managedDevice.users.lastLogOnDateTime)
-                                        {
-                                            Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $($enrollmentState.managedDevice.users.lastLogonDateTime | FormatDateWithTimeZone)"
-                                        }
-                                        else
-                                        {
-                                            Write-Host "Cannot determine the last time $($normalizedUsername.FirstName) logged on..."
-                                        }
-                                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                                        $readinessState = 'NotReady'
-                                        $action = 'WipeOrClean'
-                                        $device = $enrollmentState.managedDevice.device.id
-                                    }
-                                    else 
-                                    {
-                                        Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
-                                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                                        $readinessState = 'NotReady'
-                                        $action = 'WipeOrClean'
-                                        $device = $enrollmentState.managedDevice.device.id
-                                    }
-                                }
-                                else
-                                {
-                                    Write-Verbose "The managed device is not associated with a user."
-                                    Write-Host "This is probably ok."
-                                    $readinessState = 'Ready'
-                                    $action = 'None'
-                                    $device = 'None'
-                                }
-                            }
-                            else
-                            {
-                                Write-Verbose "Device Id's do not match."
-                                Write-Verbose "The device is an orphan device."
-                                Write-Host "The device was once associated with a managed device, but the association is no longer valid."
-                                Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                                $readinessState = 'NotReady'
-                                $action = 'WipeOrClean'
-                                $device = $enrollmentState.managedDevice.device.id
-                            }
-                        }
-                        else 
-                        {
-                            Write-Host "No managed device is associated with this autopilot device."
-                            Write-Host "the device is ready for the next user."
-                            $readinessState = 'Ready'
-                            $action = 'None'
-                            $device = 'None'
-                        }
+                        Write-Host "The device is not assigned to the correct autopilot profile."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
                     }
-                    enrolled 
+                    elseif ($autopilotReadiness.ProfileAssigned -eq $false)
                     {
-                        Write-Host "The device is enrolled in Autopilot."
-                        Write-Host "Checking for an associated managed device..."
-                        Write-Verbose "Managed device: $($enrollmentState.managed)"
-                        if ($enrollmentState.managed)
-                        {
-                            Write-Verbose "Found a managed device."
-                            Write-Verbose "Checking whether this is an orphan device..."
-                            Write-Verbose "Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
-                            Write-Verbose "Managed device id: $($enrollmentState.managedDevice.device.id)"
-                            Write-Verbose "Checking if they are the same..."
-                            if ($enrollmentState.managedDevice.device.id -eq $enrollmentState.autopilot.device.managedDeviceId)
-                            {
-                                Write-Verbose "Device Id's match."
-                                Write-Host "Found a managed device..."
-                                Write-Host "Checking for a user association on the manage device..."
-                                if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
-                                {
-                                    Write-Verbose "Found a user..."
-                                    Write-Verbose "User display name: $($enrollmentState.managedDevice.device.userDisplayName)"
-                                    Write-Verbose "User id: $($enrollmentState.managedDevice.device.userId)"
-                                    Write-Verbose "User principal name: $($enrollmentState.managedDevice.device.userPrincipalName)"
-                                    Write-Verbose "Checking whether the user is an Azure user..."
-                                    if ($enrollmentState.managedDevice.users.azureUser)
-                                    {
-                                        $normalizedUsername = ConvertUserDisplayName -UserDisplayName $enrollmentState.managedDevice.users.userDisplayName
-                                        Write-Host "This device is registered to $($normalizedUsername.FullName) ($($enrollmentState.managedDevice.users.userPrincipalName))"
-                                        if ($null -ne $enrollmentState.managedDevice.users.lastLogOnDateTime)
-                                        {
-                                            Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $($enrollmentState.managedDevice.users.lastLogonDateTime | FormatDateWithTimeZone)"
-                                        }
-                                        else
-                                        {
-                                            Write-Host "Cannot determine the last time $($normalizedUsername.FirstName) logged on..."
-                                        }
-                                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                                        $readinessState = 'NotReady'
-                                        $action = 'WipeOrClean'
-                                        $device = $enrollmentState.managedDevice.device.id
-                                    }
-                                }
-                                else
-                                {
-                                    Write-Host "The device is not associated with a user."
-                                    Write-Host "You may give this device to the next user."
-                                    $readinessState = 'Ready'
-                                    $action = 'None'
-                                    $device = $enrollmentState.managedDevice.device.id
-                                }
-                            }
-                            else
-                            {
-                                Write-Verbose "Device Id's do not match."
-                                Write-Host "The device is an orphan device."
-                                Write-Host "The device was once associated with a managed device, but the association is no longer valid."
-                                Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                                $readinessState = 'NotReady'
-                                $action = 'WipeOrClean'
-                                $device = $enrollmentState.managedDevice.device.id
-                            }
-                        }
-                        else 
-                        {
-                            Write-Host "No managed device is associated with this autopilot device even though it shows as being enrolled."
-                            Write-Host "you may want to contact an Intune admin."
-                            $readinessState = 'NotReady'
-                            $action = 'ContactAdmin'
-                            $device = $enrollmentState.managedDevice.device.id
-                        }
+                        Write-Host "The device is not assigned to an autopilot profile."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($autopilotReadiness.RemediationStateGood -eq $false)
+                    {
+                        Write-Host "The device has a remediation state that is not valid."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($autopilotReadiness.EnrollmentStateGood -eq $false)
+                    {
+                        Write-Host "The device has an enrollment state that is not valid."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.OrphanDevice -eq $true)
+                    {
+                        Write-Host "The device is an orphan device."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.CorrectRam -eq $false)
+                    {
+                        Write-Host "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                        Write-Host "Contact Hardware and Logistics."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.HasUser)
+                    {
+                        Write-Host "The managed device is associated with a user."
+                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                        $readinessState = 'NotReady'
+                        $action = 'WipeOrClean'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.ValidUser -eq $false)
+                    {
+                        Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
+                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                        $readinessState = 'NotReady'
+                        $action = 'WipeOrClean'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    else
+                    {
+                        Write-Host "The device is not ready for the next user."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
                     }
                 }
             }

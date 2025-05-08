@@ -35,25 +35,22 @@ else
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $unmanagedDeviceUri = "devices"
 $managedDeviceUri = "deviceManagement/managedDevices"
-# $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+$autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $managedDeviceFilter = "startswith(deviceName,'w11-')"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
 $accessToken = GetGraphAccessToken -configFile $configFile
-# $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
+$autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
 # $managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken 
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
-# $global:enrollments = [ordered] @{
-# "autopilot" = $autopilotDevices
-#     "managed"   = $managedDevices
-#     "imported"  = $importedDevices
-#     "unmanaged" = $unmanagedDevices
-# }
+$global:enrollments = [ordered] @{
+    "autopilot" = $autopilotDevices
+    # "managed"   = $managedDevices
+    # "imported"  = $importedDevices
+    # "unmanaged" = $unmanagedDevices
+}
 #endregion variables
 
-$uri = "$managedDeviceUri/$($enrollment.managedDevice.device.id)"
-$extraparameters = "select=hardwareInformation,physicalMemoryInBytes"
-$global:hardwareInfo = CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraparameters $extraparameters
