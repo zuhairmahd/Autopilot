@@ -18,6 +18,8 @@
             "GetDeviceBySerialNumber",
             "GetDeviceByUser",
             "GetDeviceEnrollmentStatus",
+            "GetDeviceConfigsByGroup",
+            "GetDeviceConfigurationAssignments",
             "GetDevices",
             "GetDevicesByType",
             "GetRequiredModules",
