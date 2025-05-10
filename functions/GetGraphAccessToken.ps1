@@ -280,11 +280,11 @@ function GetGraphAccessToken()
                 else
                 {
                     Write-Verbose "Adding the refresh token..."
-                    $decryptedConfig.Add('refresh_token', $refreshToken)
+                    $decryptedConfig | Add-Member -MemberType NoteProperty -Name 'refresh_token' -Value $refreshToken
                 }
                 # Re-encrypt the config
                 Write-Verbose "Re-encrypting config with refresh token"
-                $Config = EncryptObject -PlainObject $decryptedConfig -excludeFields @('domain', 'name')
+                $Config = EncryptObject -DecryptedObject $decryptedConfig -excludeFields @('domain', 'name')
             }
             else
             {
@@ -298,7 +298,7 @@ function GetGraphAccessToken()
                 else
                 {
                     Write-Verbose "Adding the refresh token..."
-                    $config.Add('refresh_token', $refreshToken)
+                    $config | Add-Member -MemberType NoteProperty -Name 'refresh_token' -Value $refreshToken
                 }
             }
             # Save the updated config

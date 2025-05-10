@@ -41,7 +41,7 @@ $scopes = "offline_access Device.ReadWrite.All DeviceLocalCredential.Read.All De
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
-$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes
+$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -Interactive
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
 # $managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken 
@@ -55,7 +55,7 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $s
 # }
 #endregion variables
 
-$filter = "contains('@odataType','windows')"
-$global:deviceConfiguration = CallGraphApi -ResourcePath $deviceConfigurationUri -accessToken $accessToken -Method GET
+# $filter = "contains('@odataType','windows')"
+# $global:deviceConfiguration = CallGraphApi -ResourcePath $deviceConfigurationUri -accessToken $accessToken -Method GET
 
 # $deviceConfigurationAssignment = "deviceManagement/deviceConfigurations/$($deviceConfiguration.id)/assignments"
