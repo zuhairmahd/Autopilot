@@ -902,7 +902,7 @@ function GetGraphAccessToken()
             return $null
         }
     }   
-
+    
     function Get-ClientCredentialsToken
     {
         param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
