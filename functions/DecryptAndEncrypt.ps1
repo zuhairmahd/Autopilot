@@ -1,10 +1,24 @@
 $excludeFields = @('domain', 'name', 'scopes')
+
+
 function TestIsBase64String
 {
     param (
         [string]$Value
     )
-    
+
+    if ([string]::IsNullOrEmpty($Value))
+    {
+        return $false
+    }
+    # A common check: length must be a multiple of 4.
+    # And it should not contain characters outside the Base64 character set.
+    # This is a basic check; more robust validation might be needed for edge cases.
+    if (($Value.Length % 4 -ne 0) -or ($Value -notmatch "^[a-zA-Z0-9+/]*=*$"))
+    {
+        return $false
+    }
+
     try
     {
         $null = [Convert]::FromBase64String($Value)
@@ -15,6 +29,7 @@ function TestIsBase64String
         return $false
     }
 }
+
 
 function isEncrypted
 {
@@ -135,142 +150,129 @@ function DecryptObject
         param (
             [Parameter(ValueFromPipeline)]
             [object]$InputObject,
-            [string[]]$ExcludeFields = @('domain', 'appName', 'name'),
-            [string]$ParentPath = ""
+            [string[]]$ExcludeFields,
+            [string]$ParentPath = "",
+            [bool]$ParentIsExcluded = $false # New parameter
         )
-    
+
         if ($null -eq $InputObject)
         {
-            return $null
+            return $null 
         }
-    
-        # Check if current path is in excluded fields or parent path is excluded
-        $isPathExcluded = $false
-        if ($ParentPath)
-        {
-            Write-Verbose "[DECRYPT] Extracting base property from '$ParentPath'"
-            # Extract the base property name from the parent path
-            $baseProperty = $ParentPath -replace '.*\.' -replace '\[\d+\].*$'
-            Write-Verbose "[DECRYPT] Base property is '$baseProperty'"
-            $isPathExcluded = $ExcludeFields -contains $baseProperty
-            Write-Verbose "[DECRYPT] Path '$ParentPath' (base: '$baseProperty') is excluded: $isPathExcluded"
-        }
-    
-        # Handle array type
+        Write-Verbose "[DECRYPT] Path: '$ParentPath', ParentIsExcluded: $ParentIsExcluded, Type: $($InputObject.GetType().FullName)"
+
         if ($InputObject -is [array])
         {
-            Write-Verbose "[DECRYPT] Processing array of $($InputObject.Count) elements at path '$ParentPath' (excluded: $isPathExcluded)"
+            Write-Verbose "[DECRYPT] Processing array at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $resultArray = @()
             for ($i = 0; $i -lt $InputObject.Count; $i++)
             {
-                $currentPath = if ($ParentPath)
+                $element = $InputObject[$i]
+                $currentElementPath = if ($ParentPath)
                 {
-                    "$ParentPath[$i]"
+                    "$ParentPath[$i]" 
                 }
                 else
                 {
-                    "[$i]"
+                    "[$i]" 
                 }
-                Write-Verbose "[DECRYPT] Processing array element $i at path '$currentPath' (excluded: $isPathExcluded)"
-                $decryptedItem = Invoke-RecursiveDecryption -InputObject $InputObject[$i] -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                $resultArray += $decryptedItem
+                # Pass ParentIsExcluded status to array elements
+                $resultArray += Invoke-RecursiveDecryption -InputObject $element -ExcludeFields $ExcludeFields -ParentPath $currentElementPath -ParentIsExcluded $ParentIsExcluded
             }
-            Write-Verbose "[DECRYPT] Finished processing array at path '$ParentPath'"
             return $resultArray
         }
-        # Handle object type
         elseif ($InputObject -is [PSCustomObject] -or $InputObject -is [hashtable])
         {
-            Write-Verbose "[DECRYPT] Processing object at path '$ParentPath' (excluded: $isPathExcluded)"
+            Write-Verbose "[DECRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $result = [ordered]@{}
             foreach ($prop in $InputObject.PSObject.Properties)
             {
-                $currentPath = if ($ParentPath)
+                $currentPropertyPath = if ($ParentPath)
                 {
-                    "$ParentPath.$($prop.Name)"
+                    "$ParentPath.$($prop.Name)" 
                 }
                 else
                 {
-                    $prop.Name
+                    $prop.Name 
                 }
-                Write-Verbose "[DECRYPT] Processing property: $currentPath"
-                # Check if this property is excluded directly or via parent
-                $isExcluded = $ExcludeFields -contains $prop.Name -or $isPathExcluded
-                Write-Verbose "[DECRYPT] Property '$($prop.Name)' isExcluded: $isExcluded (parent excluded: $isPathExcluded)"
-                if ($isExcluded)
+                $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
+                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
+
+                Write-Verbose "[DECRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
+
+                if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
                 {
-                    Write-Verbose "[DECRYPT] Property $($prop.Name) is in exclude list or within excluded parent, skipping decryption."
-                    if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                    {
-                        Write-Verbose "[DECRYPT] Recursing into excluded property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = Invoke-RecursiveDecryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                    }
-                    else
-                    {
-                        Write-Verbose "[DECRYPT] Assigning excluded value for property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = $prop.Value
-                    }
+                    # Recurse for nested structures, passing the effective exclusion status
+                    $result[$prop.Name] = Invoke-RecursiveDecryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
                 }
-                else
+                elseif ($isEffectivelyExcluded)
                 {
-                    if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable])
+                    Write-Verbose "[DECRYPT] Property '$($prop.Name)' is effectively excluded. Assigning original value."
+                    $result[$prop.Name] = $prop.Value
+                }
+                else # Not effectively excluded, attempt to decrypt if it's a string
+                {
+                    if ($prop.Value -is [string] -and (TestIsBase64String -Value $prop.Value))
                     {
-                        Write-Verbose "[DECRYPT] Recursing into object property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = Invoke-RecursiveDecryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                    }
-                    elseif ($prop.Value -is [array])
-                    {
-                        Write-Verbose "[DECRYPT] Recursing into array property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = Invoke-RecursiveDecryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                    }
-                    elseif ($prop.Value -is [string] -and (Test-IsBase64String -Value $prop.Value))
-                    {
-                        Write-Verbose ("[DECRYPT] Decrypting string value for {0}: {1}" -f $currentPath, $prop.Value)
+                        Write-Verbose ("[DECRYPT] Attempting to decrypt string value for {0}" -f $currentPropertyPath)
                         try
                         {
                             $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($prop.Value))
-                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPath, $decodedValue)
                             $result[$prop.Name] = $decodedValue
+                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPropertyPath, $decodedValue)
                         }
                         catch
                         {
-                            Write-Verbose "[DECRYPT] Failed to decrypt value for $currentPath, keeping as is"
-                            $result[$prop.Name] = $prop.Value
+                            Write-Warning "[DECRYPT] Failed to decode Base64 string for property '$($prop.Name)' at path '$currentPropertyPath'. Value: '$($prop.Value)'. Assigning original value."
+                            $result[$prop.Name] = $prop.Value # Keep original if not valid Base64 or UTF8
                         }
                     }
                     else
                     {
-                        Write-Verbose "[DECRYPT] Assigning non-decrypted value for property '$($prop.Name)' at path '$currentPath'"
+                        # Not a string, not Base64, or some other primitive type that wasn't encrypted
+                        Write-Verbose "[DECRYPT] Property '$($prop.Name)' is not a decodable string. Assigning original value."
                         $result[$prop.Name] = $prop.Value
                     }
                 }
             }
-            Write-Verbose "[DECRYPT] Finished processing object at path '$ParentPath'"
             return [PSCustomObject]$result
         }
-        # Handle string (potential base64) - but skip if in excluded path
-        elseif ($InputObject -is [string] -and (Test-IsBase64String -Value $InputObject) -and !$isPathExcluded)
+        # Handle standalone primitive types (e.g., a string element directly in an array)
+        elseif ($InputObject -is [string])
         {
-            Write-Verbose ("[DECRYPT] Decrypting primitive value at path '{0}': {1}" -f $ParentPath, $InputObject)
-            try
+            if ($ParentIsExcluded) # If the parent (e.g. an array holding this string) was excluded
             {
-                $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($InputObject))
-                Write-Verbose ("[DECRYPT] Decrypted primitive value at path '{0}': {1}" -f $ParentPath, $decodedValue)
-                return $decodedValue
+                Write-Verbose "[DECRYPT] Primitive string at path '$ParentPath' is part of an excluded parent. Returning as-is."
+                return $InputObject
             }
-            catch
+            elseif (TestIsBase64String -Value $InputObject)
             {
-                Write-Verbose "[DECRYPT] Failed to decrypt primitive value at path '$ParentPath', keeping as is"
+                Write-Verbose ("[DECRYPT] Attempting to decrypt primitive string value at path '{0}'" -f $ParentPath)
+                try
+                {
+                    $decodedValuePrim = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($InputObject))
+                    Write-Verbose ("[DECRYPT] Decrypted primitive value at path '{0}': {1}" -f $ParentPath, $decodedValuePrim)
+                    return $decodedValuePrim
+                }
+                catch
+                {
+                    Write-Warning "[DECRYPT] Failed to decode Base64 string for primitive at path '$ParentPath'. Value: '$InputObject'. Returning original value."
+                    return $InputObject # Keep original if not valid Base64 or UTF8
+                }
+            }
+            else
+            {
+                # Not Base64, return as is
+                Write-Verbose "[DECRYPT] Primitive string at path '$ParentPath' is not Base64. Returning as-is."
                 return $InputObject
             }
         }
-        # Return as is for everything else or if excluded
-        else
+        else # Other primitive types (int, bool, etc.) or other object types, return as is
         {
-            Write-Verbose "[DECRYPT] Returning value as-is at path '$ParentPath' (excluded: $isPathExcluded)"
+            Write-Verbose "[DECRYPT] Value type '$($InputObject.GetType().FullName)' at path '$ParentPath' not a string or already handled. Returning as-is."
             return $InputObject
         }
-    }    
+    }
     
     $result = Invoke-RecursiveDecryption -InputObject $encryptedObject -ExcludeFields $excludeFields
     
@@ -292,42 +294,31 @@ function EncryptObject
         [string[]]$excludeFields
     )
     
+    
     function Invoke-RecursiveEncryption
     {
         param (
             [Parameter(ValueFromPipeline)]
             [object]$InputObject,
             [string[]]$ExcludeFields,
-            [string]$ParentPath = ""
+            [string]$ParentPath = "",
+            [bool]$ParentIsExcluded = $false # New parameter
         )
-        
+
         if ($null -eq $InputObject)
         {
-            return $null
+            Write-Verbose "[ENCRYPT] InputObject is null at path '$ParentPath'. Returning null."; return $null 
         }
-        #log verbose the type of the inputobject.
-        Write-Verbose "The type of the input object is $($InputObject.GetType().FullName)"
+        Write-Verbose "[ENCRYPT] Path: '$ParentPath', ParentIsExcluded: $ParentIsExcluded, Type: $($InputObject.GetType().FullName)"
 
-        # Check if current path is in excluded fields or parent path is excluded
-        $isPathExcluded = $false
-        if ($ParentPath)
-        {
-            Write-Verbose "[ENCRYPT] Extracting base property from '$ParentPath'"
-            # Extract the base property name from the parent path (handles both array.property and property.subproperty patterns)
-            $baseProperty = $ParentPath -replace '.*\.' -replace '\[\d+\].*$'
-            Write-Verbose "[ENCRYPT] Base property is '$baseProperty'"
-            $isPathExcluded = $ExcludeFields -contains $baseProperty
-            Write-Verbose "[ENCRYPT] Path '$ParentPath' (base: '$baseProperty') is excluded: $isPathExcluded"
-        }
-
-        # Handle array type
         if ($InputObject -is [array])
         {
-            Write-Verbose "[ENCRYPT] Processing array at path '$ParentPath' (excluded: $isPathExcluded)"
+            Write-Verbose "[ENCRYPT] Processing array at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $resultArray = @()
             for ($i = 0; $i -lt $InputObject.Count; $i++)
             {
-                $currentPath = if ($ParentPath)
+                $element = $InputObject[$i]
+                $currentElementPath = if ($ParentPath)
                 {
                     "$ParentPath[$i]" 
                 }
@@ -335,23 +326,18 @@ function EncryptObject
                 {
                     "[$i]" 
                 }
-                Write-Verbose "[ENCRYPT] Processing array element $i at path '$currentPath' (excluded: $isPathExcluded)"
-                # Pass the current exclusion status to child elements
-                $encryptedItem = Invoke-RecursiveEncryption -InputObject $InputObject[$i] -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                $resultArray += $encryptedItem
+                # Pass ParentIsExcluded status to array elements
+                $resultArray += Invoke-RecursiveEncryption -InputObject $element -ExcludeFields $ExcludeFields -ParentPath $currentElementPath -ParentIsExcluded $ParentIsExcluded
             }
-            Write-Verbose "[ENCRYPT] Finished processing array at path '$ParentPath'"
             return $resultArray
         }
-        # Handle object type
         elseif ($InputObject -is [PSCustomObject] -or $InputObject -is [hashtable])
         {
-            Write-Verbose "[ENCRYPT] Processing object at path '$ParentPath' (excluded: $isPathExcluded)"
+            Write-Verbose "[ENCRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $result = [ordered]@{}
-        
             foreach ($prop in $InputObject.PSObject.Properties)
             {
-                $currentPath = if ($ParentPath)
+                $currentPropertyPath = if ($ParentPath)
                 {
                     "$ParentPath.$($prop.Name)" 
                 }
@@ -359,74 +345,70 @@ function EncryptObject
                 {
                     $prop.Name 
                 }
-                Write-Verbose "[ENCRYPT] Processing property: $currentPath"
-            
-                # Check if this property is excluded directly or via parent
-                $isExcluded = $ExcludeFields -contains $prop.Name -or $isPathExcluded
-                Write-Verbose "[ENCRYPT] Property '$($prop.Name)' isExcluded: $isExcluded (parent excluded: $isPathExcluded)"
-                if ($isExcluded)
+                $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
+                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
+
+                Write-Verbose "[ENCRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
+
+                if ($null -eq $prop.Value)
                 {
-                    Write-Verbose "[ENCRYPT] Property $($prop.Name) is in exclude list or within excluded parent, skipping encryption."
-                    # For excluded fields, still process any nested objects/arrays but don't encrypt the value itself
-                    if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                    {
-                        Write-Verbose "[ENCRYPT] Recursing into excluded property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = Invoke-RecursiveEncryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                    }
-                    else
-                    {
-                        Write-Verbose "[ENCRYPT] Assigning excluded value for property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = $prop.Value
-                    }
+                    Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is null. Assigning null."
+                    $result[$prop.Name] = $null
                 }
-                else
+                elseif ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
                 {
-                    # Process based on value type
-                    if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable])
+                    # Recurse for nested structures, passing the effective exclusion status
+                    $result[$prop.Name] = Invoke-RecursiveEncryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
+                }
+                elseif ($isEffectivelyExcluded)
+                {
+                    Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is effectively excluded. Assigning original value."
+                    $result[$prop.Name] = $prop.Value
+                }
+                else # Not effectively excluded, encrypt appropriate types
+                {
+                    # Encrypt strings, numbers, booleans. Other complex types not directly handled here will be returned as-is by the final 'else'.
+                    if ($prop.Value -is [string] -or $prop.Value -is [int] -or $prop.Value -is [bool] -or $prop.Value -is [double])
                     {
-                        Write-Verbose "[ENCRYPT] Recursing into object property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = Invoke-RecursiveEncryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                    }
-                    elseif ($prop.Value -is [array])
-                    {
-                        Write-Verbose "[ENCRYPT] Recursing into array property '$($prop.Name)' at path '$currentPath'"
-                        $result[$prop.Name] = Invoke-RecursiveEncryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPath
-                    }
-                    elseif ($prop.Value -is [string] -or $prop.Value -is [int] -or $prop.Value -is [bool] -or $prop.Value -is [double])
-                    {
-                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}: {1}" -f $currentPath, $prop.Value)
-                        $stringValue = $prop.Value.ToString()
+                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}" -f $currentPropertyPath)
+                        $stringValue = $prop.Value.ToString() # Convert boolean/numbers to string before encoding
                         $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
-                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPath, $encodedValue)
                         $result[$prop.Name] = $encodedValue
+                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, $encodedValue)
                     }
                     else
                     {
-                        Write-Verbose "[ENCRYPT] Assigning non-encrypted value for property '$($prop.Name)' at path '$currentPath'"
+                        Write-Verbose "[ENCRYPT] Property '$($prop.Name)' type '$($prop.Value.GetType().FullName)' not directly encrypted. Assigning original value."
                         $result[$prop.Name] = $prop.Value
                     }
                 }
             }
-            Write-Verbose "[ENCRYPT] Finished processing object at path '$ParentPath'"
             return [PSCustomObject]$result
         }
-        # Handle primitive types (strings, numbers, booleans) - but skip if in excluded path
-        elseif (($InputObject -is [string] -or $InputObject -is [int] -or $InputObject -is [bool] -or $InputObject -is [double]) -and !$isPathExcluded)
+        # Handle standalone primitive types (e.g., a string/number/bool element directly in an array)
+        elseif (($InputObject -is [string] -or $InputObject -is [int] -or $InputObject -is [bool] -or $InputObject -is [double]))
         {
-            Write-Verbose ("[ENCRYPT] Encrypting primitive value at path '{0}': {1}" -f $ParentPath, $InputObject)
-            $stringValue = $InputObject.ToString()
-            $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
-            Write-Verbose ("[ENCRYPT] Encrypted primitive value at path '{0}': {1}" -f $ParentPath, $encodedValue)
-            return $encodedValue
+            if ($ParentIsExcluded) # If the parent (e.g. an array holding this primitive) was excluded
+            {
+                Write-Verbose "[ENCRYPT] Primitive value at path '$ParentPath' is part of an excluded parent. Returning as-is."
+                return $InputObject
+            }
+            else
+            {
+                Write-Verbose ("[ENCRYPT] Encrypting primitive value at path '{0}'" -f $ParentPath)
+                $stringValuePrim = $InputObject.ToString()
+                $encodedValuePrim = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValuePrim))
+                Write-Verbose ("[ENCRYPT] Encrypted primitive value at path '{0}': {1}" -f $ParentPath, $encodedValuePrim)
+                return $encodedValuePrim
+            }
         }
-        # Return as is for everything else or if excluded
-        else
+        else # Other types not explicitly handled (e.g. custom objects not PSCustomObject/hashtable, or other primitive types if any), return as is.
         {
-            Write-Verbose "[ENCRYPT] Returning value as-is at path '$ParentPath' (excluded: $isPathExcluded)"
+            Write-Verbose "[ENCRYPT] Value type '$($InputObject.GetType().FullName)' at path '$ParentPath' not processed for encryption. Returning as-is."
             return $InputObject
         }
     }
-    
+
     $result = Invoke-RecursiveEncryption -InputObject $decryptedObject -ExcludeFields $excludeFields
     
     if ($null -eq $result)
