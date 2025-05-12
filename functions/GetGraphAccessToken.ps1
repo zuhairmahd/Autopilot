@@ -1041,9 +1041,9 @@ function GetGraphAccessToken()
             Write-Verbose "Config file is encrypted. Decrypting."
             $config = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name')
             # Extract the refresh token if it exists
-            if ($config.refresh_token)
+            if ($config.deligatedCredentials.refresh_token)
             {
-                $configRefreshToken = $config.refresh_token
+                $configRefreshToken = $config.deligatedCredentials.refresh_token
                 Write-Verbose "Found refresh token in encrypted config."
             }
         }
@@ -1051,9 +1051,9 @@ function GetGraphAccessToken()
         {
             Write-Verbose "Config file is not encrypted. Using as is."
             # Extract the refresh token if it exists
-            if ($config.refresh_token)
+            if ($config.deligatedCredentials.refresh_token)
             {
-                $configRefreshToken = $config.refresh_token
+                $configRefreshToken = $config.deligatedCredentials.refresh_token
                 Write-Verbose "Found refresh token in config."
             }
         }
