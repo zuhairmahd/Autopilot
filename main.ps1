@@ -302,8 +302,59 @@ function ProcessSerialNumber
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
-$receiveMenu = NewMenu -Title "Receive Device" -Description "How would you like to lookup the device?"
+$CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
+$deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
+
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'autopilot'
+    if ($exported)
+    {
+        Write-Host "Exported Autopilot devices to $($outputFile)." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export Autopilot devices." -ForegroundColor Red
+    }
+}
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported Autopilot Devices" -Action {
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'imported'
+    if ($exported)
+    {
+        Write-Host "Exported Imported Autopilot devices to $($outputFile)." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
+    }
+}
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Devices" -Action {
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'managed'
+    if ($exported)
+    {
+        Write-Host "Exported Managed devices to $($outputFile)." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export Managed devices." -ForegroundColor Red
+    }
+}
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Devices" -Action {
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'unmanaged'
+    if ($exported)
+    {
+        Write-Host "Exported Unmanaged devices to $($outputFile)." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
+    }
+}
+
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
@@ -343,8 +394,8 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         # Removed exit 1 to allow returning to menu
     }
 }
-$receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
-$receiveMenu = AddMenuItem -Menu $receiveMenu -Name "Lookup device by User" -Action {
+$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
+$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
     if ($null -eq $userName)
@@ -435,8 +486,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
     } # Corrected: Closing brace for the -Action script block was missing
 }
-
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Receive a device from a user" -Submenu $receiveMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceExportMenu
 #endregion Menu Definitions
 
 #region Show Menu

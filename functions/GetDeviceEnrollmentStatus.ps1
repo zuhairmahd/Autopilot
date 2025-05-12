@@ -305,7 +305,7 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
         $hasDeviceObject = $true
-        $returnedDevice = $device.value
+        $returnedDevice = $device
     }
     else
     {

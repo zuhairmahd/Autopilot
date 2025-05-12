@@ -363,13 +363,14 @@ function CallGraphAPI()
             }
         }
         Write-Verbose "Failed to call the Graph API: $_"
-        Write-Verbose "Error: $statusMessage"
         Write-Verbose "The status code is $statusCode"
         Write-Verbose "$statusCode indicates $statusCodeMessage"
         Write-Verbose "Status message: $statusMessage"
         Write-Verbose 'The full error message follows below:'
         Write-Verbose '----------------------------------------------------------'
-        Write-Verbose "$_"
+        Write-Verbose "Error: $($_)"
+        Write-Verbose "Exception message: $($_.Exception.Message)"
+        Write-Verbose "Exception response: $($_.Exception.Response)"
         if ($_.Exception.Response -and $psversionTable.PSVersion.Major -ge 7)
         {
             {

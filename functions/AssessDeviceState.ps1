@@ -102,7 +102,7 @@ function GetManagedDeviceRelevantProperties()
             Write-Verbose "Device Id's match."
             Write-Host "The device is not an orphan device."
             $orphanDevice = $false
-            Write-Host ":Checking whether the device has enough RAM..."
+            Write-Host "Checking whether the device has enough RAM..."
             if ($enrollmentState.managedDevice.memory -ge $MinimumDevicePhysicalMemoryInGB)
             {
                 Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of ram, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
@@ -137,7 +137,6 @@ function GetManagedDeviceRelevantProperties()
                         $lastLogonDate = $null
                         Write-Host "Cannot determine the last time $($normalizedUsername.FirstName) logged on..."
                     }
-                    Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
                 }
                 else 
                 {
@@ -252,13 +251,14 @@ function GetAutopilotDeviceRelevantProperties()
     Write-Host "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
     if ($CorrectProfile -and $ProfileAssigned -and $RemediationStateGood -and $EnrollmentStateGood)
     {
-        Write-Host "The device is ready for the next user."
+        Write-Verbose "Autopilot assignment is good..."
         $AutopilotAssignmentGood = $true
     }
     else
     {
-        Write-Host "The device is not ready for the next user."
+        Write-Verbose "There are issues with this device's autopilot assignment."
         $AutopilotAssignmentGood = $false
+        
     }
     Write-Verbose "Autopilot assignment good: $AutopilotAssignmentGood"
     #Add what we got the the autopilotDeviceProperties hashtable
@@ -312,10 +312,10 @@ function AssessDeviceState()
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
                 $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                Write-Host "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
+                Write-Host "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
                 {
-                    Write-Host "The device is ready for the next user."
-                    Write-Verbose "The device is not an orphan device."
                     Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of RAM, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
                     $readinessState = 'Ready'
                     $action = 'None'
@@ -323,7 +323,8 @@ function AssessDeviceState()
                 }
                 else
                 {
-                    Write-Host "The device is not propperly enrolled in Autopilot."
+                    Write-Host "The device is not ready for the next user."
+                    Write-Host "See below for more information."
                     #let us explain to the user what the problem is.
                     if ($autopilotReadiness.CorrectProfile -eq $false)
                     {
