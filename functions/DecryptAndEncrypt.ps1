@@ -181,12 +181,80 @@ function DecryptObject
             }
             return $resultArray
         }
-        elseif ($InputObject -is [PSCustomObject] -or $InputObject -is [hashtable])
+        elseif ($InputObject -is [hashtable])
+        {
+            Write-Verbose "[DECRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
+            $result = [ordered]@{}
+            
+            # Process hashtable by enumerating through the key-value pairs directly
+            foreach ($entry in $InputObject.GetEnumerator())
+            {
+                $key = $entry.Key
+                $value = $entry.Value
+                
+                Write-Verbose "[DECRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
+                Write-Verbose "[DECRYPT] Value type: $($value.GetType().FullName)"
+                
+                $currentPropertyPath = if ($ParentPath)
+                {
+                    "$ParentPath.$key" 
+                }
+                else
+                {
+                    $key 
+                }
+                
+                $isPropertyItselfExcluded = $ExcludeFields -contains $key
+                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
+
+                Write-Verbose "[DECRYPT] Hashtable key: '$key' at path '$currentPropertyPath'. KeyItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
+
+                if ($value -is [PSCustomObject] -or $value -is [hashtable] -or $value -is [array])
+                {
+                    # Recurse for nested structures, passing the effective exclusion status
+                    $result[$key] = Invoke-RecursiveDecryption -InputObject $value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
+                }
+                elseif ($isEffectivelyExcluded)
+                {
+                    Write-Verbose "[DECRYPT] Hashtable key '$key' is effectively excluded. Assigning original value."
+                    $result[$key] = $value
+                }
+                else # Not effectively excluded, attempt to decrypt if it's a string
+                {
+                    if ($value -is [string] -and (TestIsBase64String -Value $value))
+                    {
+                        Write-Verbose ("[DECRYPT] Attempting to decrypt string value for {0}" -f $currentPropertyPath)
+                        try
+                        {
+                            $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($value))
+                            $result[$key] = $decodedValue
+                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPropertyPath, $decodedValue)
+                        }
+                        catch
+                        {
+                            Write-Warning "[DECRYPT] Failed to decode Base64 string for key '$key' at path '$currentPropertyPath'. Value: '$value'. Assigning original value."
+                            $result[$key] = $value # Keep original if not valid Base64 or UTF8
+                        }
+                    }
+                    else
+                    {
+                        # Not a string, not Base64, or some other primitive type that wasn't encrypted
+                        Write-Verbose "[DECRYPT] Hashtable key '$key' is not a decodable string. Assigning original value."
+                        $result[$key] = $value
+                    }
+                }
+            }
+            
+            return $result
+        }
+        elseif ($InputObject -is [PSCustomObject])
         {
             Write-Verbose "[DECRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $result = [ordered]@{}
             foreach ($prop in $InputObject.PSObject.Properties)
             {
+                Write-Verbose "[DECRYPT] Processing property '$($prop.Name)' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
+                Write-Verbose "[decrypt] Property type: $($prop.Value.GetType().FullName)"
                 $currentPropertyPath = if ($ParentPath)
                 {
                     "$ParentPath.$($prop.Name)" 
@@ -331,12 +399,83 @@ function EncryptObject
             }
             return $resultArray
         }
-        elseif ($InputObject -is [PSCustomObject] -or $InputObject -is [hashtable])
+        elseif ($InputObject -is [hashtable])
+        {
+            Write-Verbose "[ENCRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
+            $result = [ordered]@{}
+            
+            # Process hashtable by enumerating through the key-value pairs directly
+            foreach ($entry in $InputObject.GetEnumerator())
+            {
+                $key = $entry.Key
+                $value = $entry.Value
+                
+                Write-Verbose "[ENCRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
+                Write-Verbose "[ENCRYPT] Value type: $($value.GetType().FullName)"
+                Write-Verbose "[ENCRYPT] Value: $value"
+                
+                $currentPropertyPath = if ($ParentPath)
+                {
+                    "$ParentPath.$key" 
+                }
+                else
+                {
+                    $key 
+                }
+                
+                $isPropertyItselfExcluded = $ExcludeFields -contains $key
+                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
+
+                Write-Verbose "[ENCRYPT] Hashtable key: '$key' at path '$currentPropertyPath'. KeyItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
+
+                if ($null -eq $value)
+                {
+                    Write-Verbose "[ENCRYPT] Hashtable key '$key' has null value. Assigning null."
+                    $result[$key] = $null
+                }
+                elseif ($value -is [PSCustomObject] -or $value -is [hashtable] -or $value -is [array])
+                {
+                    # Recurse for nested structures, passing the effective exclusion status
+                    $result[$key] = Invoke-RecursiveEncryption -InputObject $value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
+                }
+                elseif ($isEffectivelyExcluded)
+                {
+                    Write-Verbose "[ENCRYPT] Hashtable key '$key' is effectively excluded. Assigning original value."
+                    $result[$key] = $value
+                }
+                else # Not effectively excluded, encrypt appropriate types
+                {
+                    # Encrypt strings, numbers, booleans. Other complex types not directly handled here will be returned as-is by the final 'else'.
+                    if ($value -is [string] -or $value -is [int] -or $value -is [bool] -or $value -is [double])
+                    {
+                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}" -f $currentPropertyPath)
+                        $stringValue = $value.ToString() # Convert boolean/numbers to string before encoding
+                        $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
+                        $result[$key] = $encodedValue
+                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, $encodedValue)
+                    }
+                    else
+                    {
+                        Write-Verbose "[ENCRYPT] Hashtable key '$key' value type '$($value.GetType().FullName)' not directly encrypted. Assigning original value."
+                        $result[$key] = $value
+                    }
+                }
+            }
+            
+            return $result
+        }
+        elseif ($InputObject -is [PSCustomObject])
         {
             Write-Verbose "[ENCRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $result = [ordered]@{}
             foreach ($prop in $InputObject.PSObject.Properties)
             {
+                Write-Verbose "[ENCRYPT] Processing property '$($prop.Name)' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
+                Write-Verbose "[ENCRYPT] Property type: $($prop.Value.GetType().FullName)"
+                if ($prop.Name -in $excludeFields)
+                {
+                    Write-Verbose "[ENCRYPT] Property value: $($prop.Value)"    
+                }
                 $currentPropertyPath = if ($ParentPath)
                 {
                     "$ParentPath.$($prop.Name)" 
@@ -347,9 +486,7 @@ function EncryptObject
                 }
                 $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
                 $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
                 Write-Verbose "[ENCRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
                 if ($null -eq $prop.Value)
                 {
                     Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is null. Assigning null."
@@ -374,7 +511,7 @@ function EncryptObject
                         $stringValue = $prop.Value.ToString() # Convert boolean/numbers to string before encoding
                         $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
                         $result[$prop.Name] = $encodedValue
-                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, $encodedValue)
+                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, 'redacted')
                     }
                     else
                     {

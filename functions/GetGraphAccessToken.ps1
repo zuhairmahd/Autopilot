@@ -28,10 +28,9 @@ function GetGraphAccessToken()
         )
 
         Write-Verbose "[FormatScopes] Called with AsIs=$AsIs, Reverse=$Reverse"
-
         #region Format scopes properly if necessary
         $scopesFormatted = $scopes
-        Write-Verbose "[FormatScopes] Original scope count: $($scopes.count)"
+        Write-Verbose "[FormatScopes] Received a scope string of length $($scopes.Length) characters"
         if (!$AsIs -and $scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
         {
             Write-Verbose "[FormatScopes] Formatting scopes to include Graph API prefix"
@@ -76,26 +75,17 @@ function GetGraphAccessToken()
             foreach ($scope in $scopesArray)
             {
                 Write-Verbose "[FormatScopes] Processing scope: $scope"
-                if ($scope -eq "offline_access" -or $scope -eq "openid")
+                if ($scope.StartsWith("https://graph.microsoft.com/"))
                 {
-                    Write-Verbose "[FormatScopes] Removing scope: $scope"
-                    $scopesArray = $scopesArray | Where-Object { $_ -ne $scope }
-                    $FormattedScopesArray += $scope
+                    Write-Verbose "[FormatScopes] Removing prefix from scope: $scope"
+                    $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
+                    $formattedScopesArray += $formattedScope
+                    Write-Verbose "[FormatScopes] Scope is now $formattedScope"
                 }
                 else
                 {
-                    if ($scope.StartsWith("https://graph.microsoft.com/"))
-                    {
-                        Write-Verbose "[FormatScopes] Removing prefix from scope: $scope"
-                        $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
-                        $formattedScopesArray += $formattedScope
-                        Write-Verbose "[FormatScopes] Scope is now $formattedScope"
-                    }
-                    else
-                    {
-                        $formattedScopesArray += $scope
-                        Write-Verbose "[FormatScopes] Added as is (no prefix): $scope"
-                    }
+                    $formattedScopesArray += $scope
+                    Write-Verbose "[FormatScopes] Added as is (no prefix): $scope"
                 }
             }
             $scopesFormatted = $FormattedScopesArray
@@ -400,7 +390,7 @@ function GetGraphAccessToken()
                 {
                     Write-Verbose "Creating new deligatedCredentials property"
                     $decryptedConfig | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $DeligatedCredentials
-                    $decryptedConfig.deligatedCredentials.refresh_token = $deligatedCredentials.refresh_token
+                    $decryptedConfig.deligatedCredentials.refresh_token = $refreshToken.refresh_token
                     if ($refreshToken.scope)
                     {
                         Write-Verbose "Adding scope to new deligatedCredentials"
@@ -408,10 +398,9 @@ function GetGraphAccessToken()
                         $decryptedConfig.deligatedCredentials.scope = $formattedScopes
                     }
                 }
-                $global:dc = $decryptedConfig
                 # Re-encrypt the config
                 Write-Verbose "Re-encrypting config with refresh token"
-                $Config = EncryptObject -DecryptedObject $decryptedConfig -excludeFields @('domain', 'name', 'scope') -verbose 
+                $Config = EncryptObject -DecryptedObject $decryptedConfig -excludeFields @('domain', 'name', 'scope')
             }
             else
             {
