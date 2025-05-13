@@ -59,6 +59,7 @@ function ExportDeviceList()
             Write-Verbose "[$functionName] Fetched $($devices.value.Count) managed devices."
         }
     }
+    
     Write-Verbose "[$functionName] Processing $($devices.value.Count) $deviceType devices for export."
     for ($i = 0; $i -lt $devices.value.count; $i++)
     {
@@ -73,6 +74,10 @@ function ExportDeviceList()
             'autopilot'
             {
                 Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
+                if ($null -ne $device.lastContactedDateTime)
+                {
+                    $lastContactedDateTime = $device.lastContactedDateTime | FormatDateWithTimeZone
+                }
                 $exportObject = [PSCustomObject] @{
                     serialNumber                      = $device.serialNumber
                     groupTag                          = $device.groupTag
@@ -81,6 +86,7 @@ function ExportDeviceList()
                     systemFamily                      = $device.systemFamily
                     enrollmentState                   = $device.enrollmentState
                     deploymentProfileAssignmentStatus = $device.deploymentProfileAssignmentStatus
+                    lastContactedDateTime             = $lastContactedDateTime
                 }
             }
             'imported'
@@ -99,6 +105,21 @@ function ExportDeviceList()
             'unmanaged'
             {
                 Write-Verbose "[$functionName] Preparing $devicetype device with display name $($device.displayName) for export."
+                $createdDateTime = $device.createdDateTime
+                $registrationDateTime = $device.registrationDateTime
+                $approximateLastSignInDateTime = $device.approximateLastSignInDateTime
+                if ($null -ne $device.createdDateTime)
+                {
+                    $createdDateTime = $device.createdDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.registrationDateTime)
+                {
+                    $registrationDateTime = $device.registrationDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.approximateLastSignInDateTime)
+                {
+                    $approximateLastSignInDateTime = $device.approximateLastSignInDateTime | FormatDateWithTimeZone
+                }
                 $exportObject = [PSCustomObject] @{
                     id                            = $device.id
                     displayName                   = $device.displayName
@@ -106,10 +127,10 @@ function ExportDeviceList()
                     model                         = $device.model
                     operatingSystemVersion        = $device.operatingSystemVersion
                     profileType                   = $device.profileType
-                    createdDateTime               = $device.createdDateTime
-                    registrationDateTime          = $device.registrationDateTime
+                    createdDateTime               = $createdDateTime
+                    registrationDateTime          = $registrationDateTime
                     accountEnabled                = $device.accountEnabled
-                    approximateLastSignInDateTime = $device.approximateLastSignInDateTime
+                    approximateLastSignInDateTime = $approximateLastSignInDateTime
                     enrollmentProfileName         = $device.enrollmentProfileName
                     enrollmentType                = $device.enrollmentType
                     isCompliant                   = $device.isCompliant
@@ -118,6 +139,21 @@ function ExportDeviceList()
             'managed'
             {
                 Write-Verbose "[$functionName] Preparing $devicetype device object for export."
+                $enrollmentDate = $device.enrolledDateTime
+                $LastSync = $device.lastSyncDateTime
+                $lastLoggedOn = $device.usersLoggedOn.lastLogOnDateTime
+                if ($null -ne $device.enrolledDateTime)
+                {
+                    $enrollmentDate = $device.enrolledDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.lastSyncDateTime)
+                {
+                    $LastSync = $device.lastSyncDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.usersLoggedOn.lastLogOnDateTime)
+                {
+                    $lastLoggedOn = $device.usersLoggedOn.lastLogOnDateTime | FormatDateWithTimeZone
+                }
                 $exportObject = [PSCustomObject] @{
                     serialNumber      = $device.serialNumber
                     deviceName        = $device.deviceName
@@ -125,12 +161,12 @@ function ExportDeviceList()
                     model             = $device.model
                     WindowsVersion    = $device.osVersion
                     autopilotEnrolled = $device.autopilotEnrolled
-                    enrollmentDate    = $device.enrolledDateTime
-                    LastSync          = $device.lastSyncDateTime
+                    enrollmentDate    = $enrollmentDate
+                    LastSync          = $LastSync
                     complianceState   = $device.complianceState
                     userPrincipalName = $device.userPrincipalName
                     userDisplayName   = $device.userDisplayName
-                    lastLoggedOn      = $device.usersLoggedOn.lastLogOnDateTime
+                    lastLoggedOn      = $lastLoggedOn
                 }
             }
         }

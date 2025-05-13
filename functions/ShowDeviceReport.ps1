@@ -28,64 +28,40 @@ function ShowDeviceReport()
     {
         $latestAutopilotEvent = $null
     }
+    
     $output = [ordered] @{
-        InputIdentifier          = $serialNumber
-        FoundDeviceName          = $enrollmentState.managedDevice.device.deviceName
-        FoundSerialNumber        = $enrollmentState.managedDevice.device.serialNumber
-        IntuneManagedDeviceId    = $enrollmentState.managedDevice.device.Id
-        IntuneEnrollmentDate     = if ($enrollmentState.managedDevice.device.enrolledDateTime)
-        {
-            $enrollmentState.managedDevice.device.enrolledDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
-        }
-        else
-        {
-            $null 
-        }
-        IntuneLastSync           = if ($enrollmentState.managedDevice.device.lastSyncDateTime)
-        {
-            $enrollmentState.managedDevice.device.lastSyncDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
-        }
-        else
-        {
-            $null 
-        }
-        IntuneEnrollmentProfile  = $enrollmentState.managedDevice.device.enrollmentProfileName
-        IntunePrimaryUserId      = $enrollmentState.managedDevice.device.userId # Note: Potential inconsistency
-        IntunePrimaryUPN         = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
-        IntuneActionResults      = $enrollmentState.managedDevice.device.deviceActionResults
-        IntuneCertExpiration     = $enrollmentState.managedDevice.device.managementCertificateExpirationDate
-        IntuneAutopilotEnrolled  = $enrollmentState.managedDevice.device.autopilotEnrolled
-        IntuneUserDisplayName    = $enrollmentState.managedDevice.device.userDisplayName
-        IntuneRegistrationState  = $enrollmentState.managedDevice.device.deviceRegistrationState
-        IntuneComplianceExpiry   = $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime
-        IntuneIsEncrypted        = $enrollmentState.managedDevice.device.isEncrypted
-        IntuneEnrollmentType     = $enrollmentState.managedDevice.device.deviceEnrollmentType
-        IntuneSVersion           = $enrollmentState.managedDevice.device.sVersion
-        IntuneComplianceState    = $enrollmentState.managedDevice.device.complianceState
-        IntuneManagementState    = $enrollmentState.managedDevice.device.managementState
-        IntuneOwnerType          = $enrollmentState.managedDevice.device.managedDeviceOwnerType
-        AutopilotDeviceId        = $enrollmentState.autopilot.device.id
-        AutopilotState           = $enrollmentState.autopilot.device.enrollmentState
-        AutopilotAssignedUser    = $enrollmentState.autopilot.device.userPrincipalName
-        AutopilotLastContacted   = if ($enrollmentState.autopilot.device.lastContactedDateTime)
-        {
-            $enrollmentState.autopilot.device.lastContactedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
-        }
-        else
-        {
-            $null 
-        }
-        LatestAutopilotEventTime = if ($latestAutopilotEvent.eventDateTime)
-        {
-            $latestAutopilotEvent.eventDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K" 
-        }
-        else
-        {
-            $null 
-        }
-        LatestAutopilotProfile   = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
-        LatestAutopilotStatus    = $latestAutopilotEvent.deploymentState
-        LatestAutopilotError     = $latestAutopilotEvent.enrollmentFailureDetails
+        InputIdentifier               = $serialNumber
+        IntuneDeviceName              = $enrollmentState.managedDevice.device.deviceName
+        IntuneSerialNumber            = $enrollmentState.managedDevice.device.serialNumber
+        IntuneDeviceMemory            = "$($enrollmentState.managedDevice.memory) GB"
+        IntuneManagedDeviceId         = $enrollmentState.managedDevice.device.Id
+        IntuneEnrollmentDate          = $enrollmentState.managedDevice.device.enrolledDateTime | FormatDateWithTimeZone
+        IntuneLastSync                = $enrollmentState.managedDevice.device.lastSyncDateTime | FormatDateWithTimeZone
+        IntuneEnrollmentProfile       = $enrollmentState.managedDevice.device.enrollmentProfileName
+        IntunePrimaryUPN              = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
+        IntuneAzureUser               = $enrollmentState.managedDevice.users.AzureUser
+        IntuneUserDisplayName         = $enrollmentState.managedDevice.users.userDisplayName                
+        IntuneReportedUserDisplayName = $enrollmentState.managedDevice.device.userDisplayName
+        IntuneLastLogon               = $enrollmentState.managedDevice.users.lastLogOnDateTime | FormatDateWithTimeZone
+        IntuneActionResults           = $enrollmentState.managedDevice.device.deviceActionResults
+        IntuneCertExpiration          = $enrollmentState.managedDevice.device.managementCertificateExpirationDate | FormatDateWithTimezone
+        IntuneComplianceExpiry        = $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime | FormatDateWithTimezone
+        IntuneAutopilotEnrolled       = $enrollmentState.managedDevice.device.autopilotEnrolled
+        IntuneRegistrationState       = $enrollmentState.managedDevice.device.deviceRegistrationState
+        IntuneIsEncrypted             = $enrollmentState.managedDevice.device.isEncrypted
+        IntuneEnrollmentType          = $enrollmentState.managedDevice.device.deviceEnrollmentType
+        IntunesVersion                = $enrollmentState.managedDevice.device.sVersion
+        IntuneComplianceState         = $enrollmentState.managedDevice.device.complianceState
+        IntuneManagementState         = $enrollmentState.managedDevice.device.managementState
+        IntuneOwnerType               = $enrollmentState.managedDevice.device.managedDeviceOwnerType
+        AutopilotDeviceId             = $enrollmentState.autopilot.device.id
+        AutopilotState                = $enrollmentState.autopilot.device.enrollmentState
+        AutopilotAssignedUser         = $enrollmentState.autopilot.device.userPrincipalName
+        AutopilotLastContacted        = $enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimezone
+        AutopilotLatestEventTime      = $latestAutopilotEvent.eventDateTime | FormatDateWithTimezone
+        AutopilotLatestProfile        = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
+        AutopilotLatestStatus         = $latestAutopilotEvent.deploymentState
+        AutopilotLatestError          = $latestAutopilotEvent.enrollmentFailureDetails
     }
     #endregion report content
     
