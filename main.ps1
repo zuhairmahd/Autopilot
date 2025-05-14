@@ -330,7 +330,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported A
         Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
     }
 }
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Devices" -Action {
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Windows Devices" -Action {
     $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'managed'
     if ($exported)
@@ -342,7 +342,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed De
         Write-Host "Failed to export Managed devices." -ForegroundColor Red
     }
 }
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Devices" -Action {
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Windows Devices" -Action {
     $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'unmanaged'
     if ($exported)
