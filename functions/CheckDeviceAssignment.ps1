@@ -35,54 +35,57 @@ function CheckDeviceAssignment()
     )
     
     #region variables and logs
-    Write-Verbose "Received parameters: serialNumber=$serialNumber."
+    #get the function name.
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Received parameters: serialNumber=$serialNumber."
     if ($AccessToken)
     {
-        Write-Verbose "Access token provided."
+        Write-Verbose "[$functionName] Access token provided."
     }
-    Write-Verbose "WaitForAssignment switch: $WaitForAssignment."
+    Write-Verbose "[$functionName] WaitForAssignment switch: $WaitForAssignment."
     if ($WaitForAssignment)
     {
-        Write-Verbose "Wait time in seconds: $waitTimeInSeconds."
-        Write-Verbose "Max wait time: $maxWaitTime."
+        Write-Verbose "[$functionName] Wait time in seconds: $waitTimeInSeconds."
+        Write-Verbose "[$functionName] Max wait time: $maxWaitTime."
     }
     $autoPilotDeviceURI = 'deviceManagement/windowsAutopilotDeviceIdentities'
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
     $assignment = $null
     #endregion
     
-    Write-Verbose "Checking whether the device with serial number $serialNumber is already in Intune."
+    Write-Verbose "[$functionName] Checking whether the device with serial number $serialNumber is already in Intune."
     if ($serialNumber -match 'vmware')
     {
-        Write-Verbose "VMware device detected."
+        Write-Verbose "[$functionName] VMware device detected."
         $autoPilotVMDevice = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
-        Write-Verbose "Received $($autoPilotVMDevice.count) devices from Autopilot."
+        Write-Verbose "[$functionName] Received $($autoPilotVMDevice.count) devices from Autopilot."
         if ($autoPilotVMDevice -ne '' -and $null -ne $autoPilotVMDevice)
         {
-            Write-Verbose "Got an Autopilot Device with device id $($autoPilotVMDevice)"
+            Write-Verbose "[$functionName] Got an Autopilot Device with device id $($autoPilotVMDevice)"
             $autopilotDeviceUriWithId = "$autopilotDeviceUri/$autoPilotVMDevice"
             $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceUriWithId
         }
         else
         {
-            Write-Verbose "No match for device with serial number $serialNumber found in Autopilot."
+            Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
             return $null
         }
     }
     else
     {
-        Write-Verbose "Not a VMWare device. Continuing"
+        Write-Verbose "[$functionName] Not a VMWare device. Continuing"
         $assignment = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceUri -filter $autopilotDeviceFilter).value
     }
-    Write-Verbose "Found $($assignment.count) Autopilot devices."
-    Write-Verbose "Assignment: $($assignment | ConvertTo-Json -Depth 10)"
+    Write-Verbose "[$functionName] Found $($assignment.count) Autopilot devices."
+    Write-Verbose "[$functionName] Assignment: $($assignment | ConvertTo-Json -Depth 10)"
     if ($null -ne $assignment -and $assignment -ne '')
     {
-        Write-Verbose "Found the device matching serial number $serialNumber."
-        Write-Verbose 'The device is registered in Intune.'
-        Write-Verbose 'Checking profile assignment'
-        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)?`$expand=deploymentProfile"
-        $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
+        Write-Verbose "[$functionName] Found the device matching serial number $serialNumber."
+        Write-Verbose "[$functionName] The device is registered in Intune."
+        Write-Verbose "[$functionName] Checking profile assignment"
+        $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)"
+        $extraProfileParameters = "expand=deploymentProfile"
+        $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -extraparameters $extraProfileParameters
         Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
         if ($WaitForAssignment -and ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync')))
         {
@@ -98,7 +101,7 @@ function CheckDeviceAssignment()
                 $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
                 Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
             }
-            Write-Verbose "Gop final device assignment status: $($assignment.deploymentProfileAssignmentStatus)."
+            Write-Verbose "[$functionName] Gop final device assignment status: $($assignment.deploymentProfileAssignmentStatus)."
             if ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -gt $maxWaitTime)
             {
                 Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
@@ -106,8 +109,8 @@ function CheckDeviceAssignment()
             }
             elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
-                Write-Verbose 'Congratulations!!! ' 
-                Write-Verbose "The device is successfully assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime)."
+                Write-Verbose "[$functionName] Congratulations!!! " 
+                Write-Verbose "[$functionName] The device is successfully assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime)."
             }
         }
         else
@@ -115,24 +118,24 @@ function CheckDeviceAssignment()
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
                 $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
-                Write-Verbose "Graph response: $($assignment)."
-                Write-Verbose "Device details: $($assignment | ConvertTo-Json -Depth 10)"
-                Write-Verbose "The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
-                Write-Verbose 'The device is ready for enrollment.'
+                Write-Verbose "[$functionName] Graph response: $($assignment)."
+                Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
+                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
+                Write-Verbose "[$functionName] The device is ready for enrollment."
             }
             else
             {
                 Write-Host "The device is not assigned to a deployment profile."
                 Write-Host "Please check the Intune portal or contact an Intune administrator."
-                Write-Verbose 'The device is not ready for enrollment.'
+                Write-Verbose "[$functionName] The device is not ready for enrollment."
             }
         }
     }
     else
     {
-        Write-Verbose 'The device is not found in Intune.'
+        Write-Verbose "[$functionName] The device is not found in Intune."
     }
-    Write-Verbose "Returning $assignment."
+    Write-Verbose "[$functionName] Returning $assignment."
     return $assignment
 }
 

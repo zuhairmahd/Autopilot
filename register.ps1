@@ -104,30 +104,30 @@ if (Test-Path -Path $Configuration)
 {
     Write-Host " Loading configuration values from $Configuration."
     $configData = Get-Content -Path $Configuration -Raw | ConvertFrom-Json
-    Write-Verbose "Found $($configData.PSObject.Properties.Name.count) configurations."
+    Write-Verbose "[$scriptName] Found $($configData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $configData.PSObject.Properties.Name)
     {
-        Write-Verbose "Checking if $($key) was provided on the command line."
+        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $configData.$key)
         {
-            Write-Verbose "Read parameter $key from the configuration file as $($configData.$key)"
-            Write-Verbose "Setting $key to $($configData.$key)"
+            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($configData.$key)"
+            Write-Verbose "[$scriptName] Setting $key to $($configData.$key)"
             if ($configData.$key -in ('true', 'false'))
             {
-                Write-Verbose "Converting $key to boolean."
+                Write-Verbose "[$scriptName] Converting $key to boolean."
                 $keyBooleanValue = [bool]::Parse($configData.$key)
-                Write-Verbose "Setting the value of $key to the boolean value ($keybooleanValue)."
+                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
                 Set-Variable -Name $key -Value $keyBooleanValue
             }
             else
             {
-                Write-Verbose "Setting the value of $key to the string value ($($configData.$key))."
+                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($configData.$key))."
                 Set-Variable -Name $key -Value $configData.$key
             }
         }
         else
         {
-            Write-Verbose "Read parameter $key from the commandline as $($PSBoundParameters[$key])"
+            Write-Verbose "[$scriptName] Read parameter $key from the commandline as $($PSBoundParameters[$key])"
         }
     }
 }
@@ -141,11 +141,11 @@ else
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
-    Write-Verbose "Importing functions from $functionsFolder"
+    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
     foreach ($function in $functions)
     {
-        Write-Verbose "Importing function $function"
+        Write-Verbose "[$scriptName] Importing function $function"
         . $function.FullName
     }
 }
@@ -157,6 +157,8 @@ else
 #endregion import functions.
 
 #region Define static and dynamic variables
+#Get the script name.
+$scriptName = $MyInvocation.MyCommand.Name
 if ($repo -eq 'github')
 {
     $baseSourceURL = 'https://raw.githubusercontent.com'
@@ -219,27 +221,27 @@ $returnValues.add('UpdateSuccessMessage', 'The script was updated successfully.'
 $returnValues.add('UpdateNotNeededMessage', 'The script is already up to date.')
 if ($domain -eq 'arabictutor.com')
 {
-    Write-Verbose "Changing groupTag to 'entra'."
+    Write-Verbose "[$scriptName] Changing groupTag to 'entra'."
     $GroupTag = 'entra'
 }
 #endregion Define static and dynamic variables
 
 #region logging
-Write-Verbose "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
-Write-Verbose "The current parameter set is $($PSCmdlet.ParameterSetName)"
-Write-Verbose "Configuration file: $configFile"
-Write-Verbose "Initial values file: $initialValues"
-Write-Verbose "Computer name: $Name"
-Write-Verbose "Group tag: $GroupTag"
-Write-Verbose "Assigned user: $AssignedUser"
-Write-Verbose "Reconfigure: $Reconfigure"
-Write-Verbose "Repository: $Repo"
-Write-Verbose "Release: $Release"
-Write-Verbose "Domain: $domain"
-Write-Verbose "Application name: $application"
-Write-Verbose "Functions folder: $functionsFolder"
-Write-Verbose "Base source URL: $baseSourceURL"
-Write-Verbose "Backout text: $backoutText"
+Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
+Write-Verbose "[$scriptName] The current parameter set is $($PSCmdlet.ParameterSetName)"
+Write-Verbose "[$scriptName] Configuration file: $configFile"
+Write-Verbose "[$scriptName] Initial values file: $initialValues"
+Write-Verbose "[$scriptName] Computer name: $Name"
+Write-Verbose "[$scriptName] Group tag: $GroupTag"
+Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
+Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
+Write-Verbose "[$scriptName] Repository: $Repo"
+Write-Verbose "[$scriptName] Release: $Release"
+Write-Verbose "[$scriptName] Domain: $domain"
+Write-Verbose "[$scriptName] Application name: $application"
+Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
+Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+Write-Verbose "[$scriptName] Backout text: $backoutText"
 #endregion logging
 
 #region Helper Functions (Consolidated and Corrected)
@@ -251,28 +253,30 @@ function validateInput()
         [string]$UserInput
     )
 
+    #Get the function name
+    $functionName = $MyInvocation.MyCommand.Name
     $MaxSerialNumberLength = '11'
     $MinSerialNumberLength = '7'
-    Write-Verbose "MaxSerialNumberLength: $MaxSerialNumberLength"
-    Write-Verbose "MinSerialNumberLength: $MinSerialNumberLength"
+    Write-Verbose "[$functionName] MaxSerialNumberLength: $MaxSerialNumberLength"
+    Write-Verbose "[$functionName] MinSerialNumberLength: $MinSerialNumberLength"
     # Trim input to remove any leading or trailing spaces
     $UserInput = $UserInput.Trim()
     $returnValue = @{}
-    Write-Verbose "Trimmed input: '$UserInput'"
-    Write-Verbose "Checking serial number length: $($UserInput.Length)"
+    Write-Verbose "[$functionName] Trimmed input: '$UserInput'"
+    Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
     if ($UserInput.Length -gt $MaxSerialNumberLength)
     {
-        Write-Verbose "Serial number exceeds maximum length of $MaxSerialNumberLength characters"
+        Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
         Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
     }
     elseif ($UserInput.Length -lt $MinSerialNumberLength)
     {
-        Write-Verbose "Serial number is shorter than minimum length of $MinSerialNumberLength characters"
+        Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
         Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
     }
     elseif ($UserInput -match '^[a-zA-Z0-9]+$') 
     {
-        Write-Verbose "Serial number validation passed"
+        Write-Verbose "[$functionName] Serial number validation passed"
         $returnValue.valid = $true
         $returnValue.value = $UserInput
     }
@@ -280,8 +284,8 @@ function validateInput()
     {
         Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
     }
-    Write-Verbose "Returning validation result: $($returnValue.valid)"
-    Write-Verbose "Returning validation value: $($returnValue.value)"
+    Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"
+    Write-Verbose "[$functionName] Returning validation value: $($returnValue.value)"
     return $returnValue
 }
 
@@ -292,19 +296,21 @@ function GetUserInput()
         [string]$Message,
         [string]$Prompt
     )
-    Write-Verbose "Message: $Message"
-    Write-Verbose "Prompt: $Prompt"
+    #Get the function name
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Message: $Message"
+    Write-Verbose "[$functionName] Prompt: $Prompt"
     Write-Host $Message
     # Updated instruction
     Write-Host "Press Enter without typing anything to return to the previous menu." 
     while ($true) # Loop indefinitely until valid input or Enter is pressed
     {
         $inputItem = Read-Host $Prompt
-        Write-Verbose "Item entered: '$inputItem'" # Added quotes for clarity
+        Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
-            Write-Verbose "User pressed Enter. Returning $BackoutText."
+            Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
             return $null # Return null to signal going back
         }
         # Validate the input if it's not empty
@@ -313,8 +319,8 @@ function GetUserInput()
         $inputResult = $validationResult.value
         if ($inputResultValid)
         {
-            Write-Verbose "Valid $inputType entered: $inputResultValid"
-            Write-Verbose "Input result: $inputResult"
+            Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
+            Write-Verbose "[$functionName] Input result: $inputResult"
             return $inputResult # Return the validated input
         }
         else
@@ -343,24 +349,25 @@ function ProcessDevice()
     )
     
     #region check and initialize variables
-    Write-Verbose "Checking access token..."
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Checking access token..."
     if ($accessToken)
     {
-        Write-Verbose "Access token provided."
+        Write-Verbose "[$functionName] Access token provided."
     }
     else
     {
-        Write-Verbose "Access token not provided. Returning Null."
+        Write-Verbose "[$functionName] Access token not provided. Returning Null."
         return $null
     }
-    Write-Verbose "Processing serial number: $($deviceObject.SerialNumber)."
-    Write-Verbose "Action: $action"
+    Write-Verbose "[$functionName] Processing serial number: $($deviceObject.SerialNumber)."
+    Write-Verbose "[$functionName] Action: $action"
     $serialNumber = $deviceObject.serialNumber
-    Write-Verbose "The serial number is $serialNumber."
+    Write-Verbose "[$functionName] The serial number is $serialNumber."
     $make = $deviceObject.manufacturer
-    Write-Verbose "The manufacturer is $make"
+    Write-Verbose "[$functionName] The manufacturer is $make"
     $model = $deviceObject.model
-    Write-Verbose "The model is $model"
+    Write-Verbose "[$functionName] The model is $model"
     #endregion check and initialize variables
 
     switch ($action)
@@ -369,13 +376,13 @@ function ProcessDevice()
         {
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            Write-Verbose "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
+            Write-Verbose "[$functionName] The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
             if ($deviceAssignment)
             {
                 if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
                 {
                     Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
-                    Write-Verbose "The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
+                    Write-Verbose "[$functionName] The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
                     $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
                     Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
                     Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
@@ -402,10 +409,10 @@ function ProcessDevice()
                 Write-Host "The import of device with serial number $serialNumber completed successfully." -ForegroundColor Green
                 Write-Host 'Checking device assignment.'
                 $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-                Write-Verbose "The assignment details are: $($assignment | ConvertTo-Json)"
+                Write-Verbose "[$functionName] The assignment details are: $($assignment | ConvertTo-Json)"
                 if ($assignment)
                 {
-                    Write-Verbose "The assignment status is $($assignment.deploymentProfileAssignmentStatus)"    
+                    Write-Verbose "[$functionName] The assignment status is $($assignment.deploymentProfileAssignmentStatus)"    
                     if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and $null -ne $assignment.deploymentProfile.displayName )
                     {
                         $assignment.deploymentProfileAssignedDateTime
@@ -464,13 +471,13 @@ function ProcessDevice()
         {
             Write-Host "Checking device with serial number $SerialNumber..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            Write-Verbose "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
+            Write-Verbose "[$functionName] The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
             if ($deviceAssignment)
             {
                 if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
                 {
                     Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
-                    Write-Verbose "The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
+                    Write-Verbose "[$functionName] The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
                     $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | FormatDateWithTimeZone) 
                     Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
                     Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
@@ -480,7 +487,7 @@ function ProcessDevice()
                         {
                             Write-Host 'The device has not contacted the enrollment service.' -ForegroundColor Green
                             Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
-                            Write-Verbose "Returning the message $($returnValues.notContactedMessage)"
+                            Write-Verbose "[$functionName] Returning the message $($returnValues.notContactedMessage)"
                             return $returnValues.notContactedMessage
                         }
                         'enrolled'
@@ -491,9 +498,9 @@ function ProcessDevice()
                             $managedDeviceFilter = "serialNumber eq '$serialNumber'"
                             # $extraparameters = "select=userPrincipalName,userDisplayName,lastLogOnDateTime&orderby=userDisplayName"
                             $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -Filter $managedDeviceFilter).value
-                            Write-Verbose "Managed device user principal name: $($managedDevice.userPrincipalName)"
-                            Write-Verbose "Managed device user display name: $($managedDevice.userDisplayName)"
-                            Write-Verbose "Managed device last logon date: $($managedDevice.usersLoggedOn.lastLogOnDateTime)"
+                            Write-Verbose "[$functionName] Managed device user principal name: $($managedDevice.userPrincipalName)"
+                            Write-Verbose "[$functionName] Managed device user display name: $($managedDevice.userDisplayName)"
+                            Write-Verbose "[$functionName] Managed device last logon date: $($managedDevice.usersLoggedOn.lastLogOnDateTime)"
                             if ($managedDevice.userPrincipalName -match $domain)
                             {
                                 $normalizedUser = NormalizeADUserDisplayName -UserDisplayName $managedDevice.userDisplayName
@@ -624,7 +631,7 @@ function ProcessDevice()
         }
         default
         {
-            Write-Verbose "Invalid action: $action"
+            Write-Verbose "[$functionName] Invalid action: $action"
             return $false
         }
     }
@@ -726,12 +733,12 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     # Check if user entered 'back'
     if ($null -eq $serialNumber)
     {
-        Write-Verbose "User pressed Enter. Returning $BackoutText."
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
         return $backoutText
     } 
     else # Process only if a serial number was entered
     {
-        Write-Verbose "Got serial number: $SerialNumber"
+        Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         Write-Host "Checking device with serial number $($SerialNumber)..."
         $deviceObject = @{SerialNumber = $serialNumber}
         $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
@@ -739,12 +746,12 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     }
 }
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
-    Write-Verbose "Getting the serial number for this device..."
-    Write-Verbose 'Checking whether the script has sufficient permissions to run.'
+    Write-Verbose "[$scriptName] Getting the serial number for this device..."
+    Write-Verbose "[$scriptName] Checking whether the script has sufficient permissions to run."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
-        Write-Verbose 'The script is running with sufficient permissions.'
-        Write-Verbose "Getting device object."
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Getting device object."
         $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
     }
     else
@@ -752,7 +759,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
     }
-    Write-Verbose "Device object: $($deviceObject)"
+    Write-Verbose "[$scriptName] Device object: $($deviceObject)"
     if ($deviceObject)
     {
         Write-Host "Checking device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
@@ -766,12 +773,12 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
 }
 
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Import device into Autopilot." -Action {
-    Write-Verbose "Getting the serial number for this device..."
-    Write-Verbose 'Checking whether the script has sufficient permissions to run.'
+    Write-Verbose "[$scriptName] Getting the serial number for this device..."
+    Write-Verbose "[$scriptName] Checking whether the script has sufficient permissions to run."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
-        Write-Verbose 'The script is running with sufficient permissions.'
-        Write-Verbose "Getting device object."
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Getting device object."
         $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
     }
     else
@@ -783,7 +790,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Import device into Autopilot." -A
     Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) to Intune."
     if ($deviceObject)
     {
-        Write-Verbose "Importing device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+        Write-Verbose "[$scriptName] Importing device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
         $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
         while ($choice -notin @('yes', 'no'))
         {
@@ -809,8 +816,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device Autopilot status" -S
 $mainMenu = AddMenuItem -menu $mainMenu -name "Get device hash for manual upload to Autopilot" -action {
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
-        Write-Verbose 'The script is running with sufficient permissions.'
-        Write-Verbose "Getting device object."
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Getting device object."
         $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
     }
     else
