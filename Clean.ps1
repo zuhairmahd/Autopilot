@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(
+        Mandatory = $true,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
         ValueFromRemainingArguments = $true,
@@ -26,28 +27,23 @@ else
         $files += Get-ChildItem -Path $item -Filter *.ps1
     }
 }
+Write-Host "Found $($files.Count) files in $($PathsToCheck -join ', ')."
 
 foreach ($file in $files)
 {
-    #add the full name to an array.
-    $filesToClean += $file.FullName
-}
-Write-Host "Cleaning $($filesToClean.Count) files."
-if ($filesToClean.count -eq 0)
-{
-    Write-Host "No files found in $Path."
-    exit 0
-}
-elseif ($filesToClean.count -eq 1)
-{
-    Write-Verbose "Checking one file in $Path for a valid signature."
-}
-else
-{
-    Write-Verbose "Checking $($filesToClean.count) files for valid signatures."
+    #add the full name to a comma-separated string.
+    if (-not $filesToClean)
+    {
+        $filesToClean = $file.FullName
+    }
+    else
+    {
+        $filesToClean += ",$($file.FullName)"
+    }
 }
 #endregion
 
+#Create a comma  delimitted string from the filesToClean array.
 
 function CheckForInvalidSignatureBlocks()
 {
@@ -67,44 +63,37 @@ function CheckForInvalidSignatureBlocks()
     Write-Verbose 'Checking for invalid signature blocks.'
     foreach ($file in $FilesToCheck)
     {
-        if ($file.extension -ne '.ps1')
+        Write-Verbose "Checking file $file for an invalid signature block."
+        $signature = Get-AuthenticodeSignature -FilePath $file -ErrorAction Stop
+        if ($signature.status -ne 'notSigned')
         {
-            Write-Verbose "The file $file is not a PowerShell script. Skipping."
+            Write-Verbose "The file $file is signed with an invalid signature."
+            Write-Verbose "The signature status is $($signature.status)."
+            Write-Verbose "Removing the invalid signature block"
+            $filesWithInvalidSignature += $file
+            try 
+            {
+                Write-Verbose "Reading content of file $file."
+                $signatureBlock = Get-Content -Path $file -Raw -Force -ErrorAction Stop
+                Write-Verbose "Removing the invalid signature block from file $file."
+                $signatureBlock = $signatureBlock -replace [regex]::Escape("$signatureBlock.*"), ''
+                Write-Verbose "Writing the cleaned content to file $file."
+                Set-Content -Path $file -Value $signatureBlock -Force
+                Write-Verbose "The signature block has been removed."
+                $cleanedFiles += $file
+                Write-Verbose "The file $file has been cleaned of the invalid signature block."
+            }
+            catch
+            {
+                Write-Host "An error occurred while removing the invalid signature block from $fileToSign."
+                Write-Verbose $_.Exception.Message
+                return $null
+            }
         }
         else
         {
-            Write-Verbose "Checking file $file for an invalid signature block."
-            $signature = Get-AuthenticodeSignature -FilePath $file -ErrorAction Stop
-            if ($signature.status -ne 'notSigned')
-            {
-                Write-Verbose "The file $file is signed with an invalid signature."
-                Write-Verbose "The signature status is $($signature.status)."
-                Write-Verbose "Removing the invalid signature block"
-                $filesWithInvalidSignature += $file
-                try 
-                {
-                    Write-Verbose "Reading content of file $file."
-                    $signatureBlock = Get-Content -Path $file -Raw -Force -ErrorAction Stop
-                    Write-Verbose "Removing the invalid signature block from file $file."
-                    $signatureBlock = $signatureBlock -replace [regex]::Escape("$signatureBlock.*"), ''
-                    Write-Verbose "Writing the cleaned content to file $file."
-                    Set-Content -Path $file -Value $signatureBlock -Force
-                    Write-Verbose "The signature block has been removed."
-                    $cleanedFiles += $file
-                    Write-Verbose "The file $file has been cleaned of the invalid signature block."
-                }
-                catch
-                {
-                    Write-Host "An error occurred while removing the invalid signature block from $fileToSign."
-                    Write-Verbose $_.Exception.Message
-                    return $null
-                }
-            }
-            else
-            {
-                Write-Verbose "The file $fileToSign is not signed."
-                Write-Verbose "The signature status is $($signature.status)."
-            }
+            Write-Verbose "The file $fileToSign is not signed."
+            Write-Verbose "The signature status is $($signature.status)."
         }
     }
     Write-Verbose "Finished checking for invalid signature blocks."

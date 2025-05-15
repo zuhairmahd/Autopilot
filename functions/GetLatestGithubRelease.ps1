@@ -333,3 +333,4 @@ function GetLatestGithubRelease()
 # EaQWzQ9CVNlw2j99Pcr3biFtiA2kzLyDB5JcF+h7oYWxBy9sQYcPOgFYYFIl4why
 # 6PgtJuNU3pQ7Pap5d+nsKRYKavetKtvCBLilOTohbk8LlDH0
 # SIG # End signature block
+

@@ -355,3 +355,4 @@ function GetLatestGitlabRelease()
 # caGoYLatEyIX7jqGDUOfwIhU5M5oNihT6eHb6CcBIZacpoUdyEIF3aVTlTdbpBvf
 # guBeHQIMDtRutO0vHHwmqH71RaRBOvulkAcs5HGBn51e5ZV+
 # SIG # End signature block
+
