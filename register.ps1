@@ -99,6 +99,7 @@ param (
     [string]$Release = 'main'
 )
 
+$scriptName = $MyInvocation.MyCommand.Name
 #region Load parameters from the configuration file if it exists
 if (Test-Path -Path $Configuration)
 {
@@ -157,8 +158,6 @@ else
 #endregion import functions.
 
 #region Define static and dynamic variables
-#Get the script name.
-$scriptName = $MyInvocation.MyCommand.Name
 if ($repo -eq 'github')
 {
     $baseSourceURL = 'https://raw.githubusercontent.com'
@@ -747,18 +746,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
 }
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
-    Write-Verbose "[$scriptName] Checking whether the script has sufficient permissions to run."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Getting device object."
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-    }
+    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -NoHash
     Write-Verbose "[$scriptName] Device object: $($deviceObject)"
     if ($deviceObject)
     {
