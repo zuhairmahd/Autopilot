@@ -15,29 +15,29 @@ function ImportAutopilotDevice()
     [Parameter(Mandatory = $false)]
     [int]$timeInSeconds = 60
   )
-
+  $functionName = $MyInvocation.MyCommand.Name
   #region print verbose log of the parameters and define variables
   if ($accessToken)
   {
-    Write-Verbose "AccessToken provided."
+    Write-Verbose "[$functionName] AccessToken provided."
   }
   else
   {
-    Write-Verbose "AccessToken not provided."
+    Write-Verbose "[$functionName] AccessToken not provided."
     return $false
   }
-  Write-Verbose "DeviceObject: $DeviceObject"
-  Write-Verbose "GroupTag: $GroupTag"
-  Write-Verbose "AssignedUser: $AssignedUser"
-  Write-Verbose "MaxWaitTime: $maxWaitTime"
-  Write-Verbose "TimeInSeconds: $timeInSeconds"
+  Write-Verbose "[$functionName] DeviceObject: $DeviceObject"
+  Write-Verbose "[$functionName] GroupTag: $GroupTag"
+  Write-Verbose "[$functionName] AssignedUser: $AssignedUser"
+  Write-Verbose "[$functionName] MaxWaitTime: $maxWaitTime"
+  Write-Verbose "[$functionName] TimeInSeconds: $timeInSeconds"
   $uri = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
   $serialNumber = $DeviceObject.serialNumber
-  Write-Verbose "Serial Number: $serialNumber"
+  Write-Verbose "[$functionName] Serial Number: $serialNumber"
   $make = $DeviceObject.manufacturer
-  Write-Verbose "Make: $make"
+  Write-Verbose "[$functionName] Make: $make"
   $model = $DeviceObject.model
-  Write-Verbose "Model: $model"
+  Write-Verbose "[$functionName] Model: $model"
   $hash = $DeviceObject.hardwareHash
   $json = @"
 {
@@ -74,7 +74,7 @@ function ImportAutopilotDevice()
   $index = 0
   while ($index -lt $maxWaitTime)
   {
-    Write-Verbose "The device import status is $($device.state.deviceImportStatus)"
+    Write-Verbose "[$functionName] The device import status is $($device.state.deviceImportStatus)"
     if (($device.state.deviceImportStatus -ne 'unknown') -or ($index -gt $maxWaitTime))
     {
       break
@@ -87,7 +87,7 @@ function ImportAutopilotDevice()
     $device = callGraphApi -AccessToken $AccessToken -ResourcePath "$uri/$($imported.id)" -Method GET
   }
   Write-Host "The device import status is $($device.state.deviceImportStatus)"
-  Write-Verbose "The index count is $index."
+  Write-Verbose "[$functionName] The index count is $index."
   if (($device.state.deviceImportStatus -eq 'unknown') -and ($index -gt $maxWaitTime))
   {
     Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
@@ -96,7 +96,7 @@ function ImportAutopilotDevice()
   }
   else
   {
-    Write-Verbose "The device import state is $($device.state.deviceImportStatus)"
+    Write-Verbose "[$functionName] The device import state is $($device.state.deviceImportStatus)"
     return $device
   }
 }

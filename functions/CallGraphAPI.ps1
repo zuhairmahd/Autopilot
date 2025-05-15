@@ -102,31 +102,31 @@ function CallGraphAPI()
     $functionName = $MyInvocation.MyCommand.Name
     if ($accessToken)
     {
-        Write-Verbose "[$functionName] [$functionName] Access token provided."
+        Write-Verbose "[$functionName] Access token provided."
     }
     else
     {
         Write-Host 'Access token not provided. Please provide a valid access token.' -ForegroundColor Red
         return
     }
-    Write-Verbose "[$functionName] [$functionName] Resource Path: $ResourcePath"
-    Write-Verbose "[$functionName] [$functionName] Method: $method"
-    Write-Verbose "[$functionName] [$functionName] Filter: $filter"
-    Write-Verbose "[$functionName] [$functionName] Extra Parameters: $ExtraParameters"
-    Write-Verbose "[$functionName] [$functionName] Version: $APIVersion"
-    Write-Verbose "[$functionName] [$functionName] Consistency Level: $consistencyLevel"
-    Write-Verbose "[$functionName] [$functionName] Body: $body"
-    Write-Verbose "[$functionName] [$functionName] SecureString: $secureString"
+    Write-Verbose "[$functionName] Resource Path: $ResourcePath"
+    Write-Verbose "[$functionName] Method: $method"
+    Write-Verbose "[$functionName] Filter: $filter"
+    Write-Verbose "[$functionName] Extra Parameters: $ExtraParameters"
+    Write-Verbose "[$functionName] Version: $APIVersion"
+    Write-Verbose "[$functionName] Consistency Level: $consistencyLevel"
+    Write-Verbose "[$functionName] Body: $body"
+    Write-Verbose "[$functionName] SecureString: $secureString"
     $uri = "https://graph.microsoft.com/$APIVersion/$ResourcePath"
     $statusCode = $null
-    Write-Verbose "[$functionName] [$functionName] Uri: $uri"
+    Write-Verbose "[$functionName] Uri: $uri"
     #endregion
 
     #region Encode filter and add headers
     if ($Filter)
     {
-        Write-Verbose "[$functionName] [$functionName] Processing filter string: $Filter"
-        Write-Verbose "[$functionName] [$functionName] Splitting filter by logical operators while preserving operators."
+        Write-Verbose "[$functionName] Processing filter string: $Filter"
+        Write-Verbose "[$functionName] Splitting filter by logical operators while preserving operators."
         $filterParts = [System.Collections.ArrayList]::new()
         $logicalOperators = [System.Collections.ArrayList]::new()
         # Pattern to match a logical operator with surrounding spaces
@@ -134,82 +134,82 @@ function CallGraphAPI()
         $lastIndex = 0
         # Find all logical operators and their positions
         $logicalOperaterMatches = [regex]::Matches($Filter, $pattern)
-        Write-Verbose "[$functionName] [$functionName] Found $($logicalOperaterMatches.Count) logical operators."
+        Write-Verbose "[$functionName] Found $($logicalOperaterMatches.Count) logical operators."
         # If no logical operators, process as a single condition
         if ($logicalOperaterMatches.Count -eq 0)
         {
-            Write-Verbose "[$functionName] [$functionName] No logical operators found. Processing as a single filter condition."
+            Write-Verbose "[$functionName] No logical operators found. Processing as a single filter condition."
             $processedFilter = ProcessFilterCondition -condition $Filter
-            Write-Verbose "[$functionName] [$functionName] Processed single filter condition: $processedFilter"
+            Write-Verbose "[$functionName] Processed single filter condition: $processedFilter"
             $encodedFilter = $processedFilter
-            Write-Verbose "[$functionName] [$functionName] Encoded filter: $encodedFilter"
+            Write-Verbose "[$functionName] Encoded filter: $encodedFilter"
         }
         else
         {
             # Process each part of the filter
-            Write-Verbose "[$functionName] [$functionName] Logical operators found. Processing filter as multiple conditions."
+            Write-Verbose "[$functionName] Logical operators found. Processing filter as multiple conditions."
             foreach ($logicalOperatorMatch in $logicalOperaterMatches)
             {
-                Write-Verbose "[$functionName] [$functionName] Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))"
+                Write-Verbose "[$functionName] Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))"
                 $condition = $Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex)
-                Write-Verbose "[$functionName] [$functionName] Condition to process: $condition"
+                Write-Verbose "[$functionName] Condition to process: $condition"
                 [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
-                Write-Verbose "[$functionName] [$functionName] Processed filter condition: $($filterParts[$filterParts.Count - 1])"
+                Write-Verbose "[$functionName] Processed filter condition: $($filterParts[$filterParts.Count - 1])"
                 # Store the logical operator (and, or)
                 [void]$logicalOperators.Add($logicalOperatorMatch.Value.Trim())
                 $lastIndex = $logicalOperatorMatch.Index + $logicalOperatorMatch.Length
-                Write-Verbose "[$functionName] [$functionName] Logical operators so far: $($logicalOperators -join ', ')"
+                Write-Verbose "[$functionName] Logical operators so far: $($logicalOperators -join ', ')"
             }
             # Don't forget the last part after the last logical operator
             if ($lastIndex -lt $Filter.Length)
             {
-                Write-Verbose "[$functionName] [$functionName] Processing filter condition after the last logical operator."
+                Write-Verbose "[$functionName] Processing filter condition after the last logical operator."
                 $condition = $Filter.Substring($lastIndex)
                 [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
-                Write-Verbose "[$functionName] [$functionName] Processed filter condition: $($filterParts[$filterParts.Count - 1])"
+                Write-Verbose "[$functionName] Processed filter condition: $($filterParts[$filterParts.Count - 1])"
             }
             # Rebuild the filter string with processed parts and original logical operators
-            Write-Verbose "[$functionName] [$functionName] Rebuilding the filter string with processed parts and logical operators."
+            Write-Verbose "[$functionName] Rebuilding the filter string with processed parts and logical operators."
             $encodedFilter = $filterParts[0]
             for ($i = 0; $i -lt $logicalOperators.Count; $i++)
             {
                 $encodedFilter += " $($logicalOperators[$i]) $($filterParts[$i+1])"
-                Write-Verbose "[$functionName] [$functionName] Adding logical operator: $($logicalOperators[$i])"
+                Write-Verbose "[$functionName] Adding logical operator: $($logicalOperators[$i])"
             }
-            Write-Verbose "[$functionName] [$functionName] Processed complex filter: $encodedFilter"
+            Write-Verbose "[$functionName] Processed complex filter: $encodedFilter"
         }
         $encodedUri = "$uri`?`$filter=$([uri]::EscapeUriString($encodedFilter))"
-        Write-Verbose "[$functionName] [$functionName] Uri after applying filters: $encodedUri"
+        Write-Verbose "[$functionName] Uri after applying filters: $encodedUri"
     }
     else
     {
-        Write-Verbose "[$functionName] [$functionName] No filter provided."
+        Write-Verbose "[$functionName] No filter provided."
         $encodedUri = $uri
     }
     
     if ($extraParameters)
     {
-        Write-Verbose "[$functionName] [$functionName] Extra parameters provided."
-        Write-Verbose "[$functionName] [$functionName] Splitting the extra parameters by ampersand to get individual key-value pairs."
+        Write-Verbose "[$functionName] Extra parameters provided."
+        Write-Verbose "[$functionName] Splitting the extra parameters by ampersand to get individual key-value pairs."
         # Initialize the parameter list
         $paramsList = @()
         # Split by ampersand to get individual key-value pairs
         $keyValuePairs = $extraParameters -split '&'
-        Write-Verbose "[$functionName] [$functionName] Found $($keyValuePairs.Count) key-value pairs."
+        Write-Verbose "[$functionName] Found $($keyValuePairs.Count) key-value pairs."
         foreach ($pair in $keyValuePairs)
         {
-            Write-Verbose "[$functionName] [$functionName] Processing key-value pair: $pair"
+            Write-Verbose "[$functionName] Processing key-value pair: $pair"
             # Split each pair by equals sign to separate key and value
             $keyAndValue = $pair -split '=', 2
             if ($keyAndValue.Count -eq 2)
             {
                 $key = $keyAndValue[0].Trim()
                 $value = $keyAndValue[1].Trim()
-                Write-Verbose "[$functionName] [$functionName] Key: $key"
-                Write-Verbose "[$functionName] [$functionName] Value: $value"
+                Write-Verbose "[$functionName] Key: $key"
+                Write-Verbose "[$functionName] Value: $value"
                 # Add the $ prefix to the key for OData parameters
                 $formattedKey = "`$$key"
-                Write-Verbose "[$functionName] [$functionName] Formatted Key with $ prefix: $formattedKey"
+                Write-Verbose "[$functionName] Formatted Key with $ prefix: $formattedKey"
                 # Add the formatted parameter to the list
                 $paramsList += "$formattedKey=$value"
             }
@@ -218,29 +218,29 @@ function CallGraphAPI()
                 Write-Warning "Invalid parameter format: $pair - skipping"
             }
         }
-        Write-Verbose "[$functionName] [$functionName] Final parameter list:"
+        Write-Verbose "[$functionName] Final parameter list:"
         $paramsList | ForEach-Object { Write-Verbose $_ }
         # Join the parameters with & to create a complete query string
         $queryString = $paramsList -join '&'
-        Write-Verbose "[$functionName] [$functionName] Final query string: $queryString"
+        Write-Verbose "[$functionName] Final query string: $queryString"
         if ($filter) 
         {
-            Write-Verbose "[$functionName] [$functionName] Adding extra parameters to the uri along with the filter."
+            Write-Verbose "[$functionName] Adding extra parameters to the uri along with the filter."
             $encodedUri = "$encodedUri`&$queryString"
         }
         else
         {
-            Write-Verbose "[$functionName] [$functionName] No filter provided. Adding extra parameters to the uri."
+            Write-Verbose "[$functionName] No filter provided. Adding extra parameters to the uri."
             $encodedUri = "$encodedUri`?$queryString"
         }
     }
     else
     {
-        Write-Verbose "[$functionName] [$functionName] No extra parameters provided."
+        Write-Verbose "[$functionName] No extra parameters provided."
     }
     if ($consistencyLevel)
     {
-        Write-Verbose "[$functionName] [$functionName] Adding consistency level to the headers."
+        Write-Verbose "[$functionName] Adding consistency level to the headers."
         $headers = @{
             Authorization    = "Bearer $accessToken"
             'Content-Type'   = 'application/json'
@@ -275,9 +275,9 @@ function CallGraphAPI()
     {
         $restParams['StatusCodeVariable'] = 'statusCode'
     }
-    Write-Verbose "[$functionName] [$functionName] Making the following call to Microsoft Graph:" 
-    Write-Verbose "[$functionName] [$functionName] URI: $encodedUri." 
-    Write-Verbose "[$functionName] [$functionName] Method: $method."
+    Write-Verbose "[$functionName] Making the following call to Microsoft Graph:" 
+    Write-Verbose "[$functionName] URI: $encodedUri." 
+    Write-Verbose "[$functionName] Method: $method."
     #endregion
     try
     {
@@ -294,16 +294,16 @@ function CallGraphAPI()
         Write-Verbose "[$functionName] The call was successful."
         if ($response.count)
         {
-            Write-Verbose "[$functionName] [$functionName] Number of objects returned: $($response.count)."
+            Write-Verbose "[$functionName] Number of objects returned: $($response.count)."
         }
         if ($response.value.Count)
         {
-            Write-Verbose "[$functionName] [$functionName] Number of items returned: $($response.value.Count)."
+            Write-Verbose "[$functionName] Number of items returned: $($response.value.Count)."
         }
         if ($PSVersionTable.PSVersion.Major -ge 7)
         {
-            Write-Verbose "[$functionName] [$functionName] Status code: $statusCode"
-            Write-Verbose "[$functionName] [$functionName] Status code message: $statusCodeMessage"
+            Write-Verbose "[$functionName] Status code: $statusCode"
+            Write-Verbose "[$functionName] Status code message: $statusCodeMessage"
         }
     }
     catch
@@ -311,9 +311,9 @@ function CallGraphAPI()
         if ($null -eq $_.Exception.statusCode)
         {
             $statusCode = [regex]::Match($_.Exception.Message, '\d+').Value
-            Write-Verbose "[$functionName] [$functionName] Status code: $statusCode"
+            Write-Verbose "[$functionName] Status code: $statusCode"
             $statusCodeMessage = $_.Exception | Out-String
-            Write-Verbose "[$functionName] [$functionName] Status code message: $statusCodeMessage"
+            Write-Verbose "[$functionName] Status code message: $statusCodeMessage"
             $statusMessage = $statusCodeMessage
         }
         else
@@ -326,22 +326,22 @@ function CallGraphAPI()
         {
             400
             {
-                Write-Verbose "[$functionName] [$functionName] Status code: $statusCode"
+                Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
             }
             401
             {
-                Write-Verbose "[$functionName] [$functionName] Status code: $statusCode"
+                Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Host 'Unauthorized. Please check your access token.' -ForegroundColor Red 
             }
             403
             {
-                Write-Verbose "[$functionName] [$functionName] Status code: $statusCode"
+                Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Host 'Forbidden. You do not have permission to access this resource.' -ForegroundColor Red 
             }
             404
             {
-                Write-Verbose "[$functionName] [$functionName] Status code: $statusCode"
+                Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Host 'Not found. The resource does not exist.' -ForegroundColor Red 
             }
             default
@@ -364,15 +364,15 @@ function CallGraphAPI()
                 }   
             }
         }
-        Write-Verbose "[$functionName] [$functionName] Failed to call the Graph API: $_"
-        Write-Verbose "[$functionName] [$functionName] The status code is $statusCode"
-        Write-Verbose "[$functionName] [$functionName] $statusCode indicates $statusCodeMessage"
-        Write-Verbose "[$functionName] [$functionName] Status message: $statusMessage"
-        Write-Verbose "[$functionName] [$functionName] The full error message follows below:"
-        Write-Verbose "[$functionName] [$functionName] ----------------------------------------------------------"
-        Write-Verbose "[$functionName] [$functionName] Error: $($_)"
-        Write-Verbose "[$functionName] [$functionName] Exception message: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] [$functionName] Exception response: $($_.Exception.Response)"
+        Write-Verbose "[$functionName] Failed to call the Graph API: $_"
+        Write-Verbose "[$functionName] The status code is $statusCode"
+        Write-Verbose "[$functionName] $statusCode indicates $statusCodeMessage"
+        Write-Verbose "[$functionName] Status message: $statusMessage"
+        Write-Verbose "[$functionName] The full error message follows below:"
+        Write-Verbose "[$functionName] ----------------------------------------------------------"
+        Write-Verbose "[$functionName] Error: $($_)"
+        Write-Verbose "[$functionName] Exception message: $($_.Exception.Message)"
+        Write-Verbose "[$functionName] Exception response: $($_.Exception.Response)"
         if ($_.Exception.Response -and $psversionTable.PSVersion.Major -ge 7)
         {
             {
@@ -380,14 +380,14 @@ function CallGraphAPI()
                 $streamReader = New-Object System.IO.StreamReader($errorResponse)
                 $errorMessage = $streamReader.ReadToEnd()
                 $streamReader.Close()
-                Write-Verbose "[$functionName] [$functionName] Server Response: $errorMessage"
+                Write-Verbose "[$functionName] Server Response: $errorMessage"
             }   
         }
         # return $statusCode
         return $null
     }
-    Write-Verbose "[$functionName] [$functionName] Response: $($response)"
-    Write-Verbose "[$functionName] [$functionName] Response value: $($response.value)"
+    Write-Verbose "[$functionName] Response: $($response)"
+    Write-Verbose "[$functionName] Response value: $($response.value)"
     return $response
 }
 

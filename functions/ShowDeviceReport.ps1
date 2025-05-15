@@ -13,10 +13,11 @@ function ShowDeviceReport()
         [ValidateSet("HTML", "CSV")]
         [string]$ExportFormat = "HTML"
     )
+    $functionName = $MyInvocation.MyCommand.Name
     #region write verbose log of received parameters
-    Write-Verbose "Received parameters: $($enrollmentState | Out-String)"
-    Write-Verbose "Export: $Export"
-    Write-Verbose "ExportFormat: $ExportFormat"
+    Write-Verbose "[$functionName] Received parameters: $($enrollmentState | Out-String)"
+    Write-Verbose "[$functionName] Export: $Export"
+    Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
     #endregion write verbose log of received parameters
     
     #region report content

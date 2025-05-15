@@ -8,20 +8,20 @@ function DeleteAutopilotDevice()
         [string]$IdentifyerType = 'SerialNumber',
         [string]$accessToken = $accessToken
     )
-
+    $functionName = $MyInvocation.MyCommand.Name
     #region variables and logs.
-    Write-Verbose "Received parameters:" 
+    Write-Verbose "[$functionName] Received parameters:" 
     if ($accessToken)
     {
-        Write-Verbose "    AccessToken provided."
+        Write-Verbose "[$functionName]     AccessToken provided."
     }
     else
     {
-        Write-Verbose "    No AccessToken provided."
+        Write-Verbose "[$functionName]     No AccessToken provided."
         return $null
     }
-    Write-Verbose "Device identifier: $DeviceIdentifyer."
-    Write-Verbose "Identifyer type: $IdentifyerType."
+    Write-Verbose "[$functionName] Device identifier: $DeviceIdentifyer."
+    Write-Verbose "[$functionName] Identifyer type: $IdentifyerType."
     $success = $false
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
     #endregion
@@ -31,58 +31,58 @@ function DeleteAutopilotDevice()
         'SerialNumber'
         {
             $autopilotDeviceFilter = "contains(serialNumber,'$DeviceIdentifyer')"
-            Write-Verbose "Identifyer Type is $IdentifyerType."
+            Write-Verbose "[$functionName] Identifyer Type is $IdentifyerType."
             if ($DeviceIdentifyer -match 'vmware')
             {
-                Write-Verbose "VMware device detected."
+                Write-Verbose "[$functionName] VMware device detected."
                 $autoPilotDeviceId = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $DeviceIdentifyer
-                Write-Verbose "Autopilot device Id for serial number $deviceIdentifyer is $autoPilotDeviceId"
+                Write-Verbose "[$functionName] Autopilot device Id for serial number $deviceIdentifyer is $autoPilotDeviceId"
                 if ($autoPilotDeviceId)
                 {
-                    Write-Verbose "Device with Id $autoPilotDeviceId found in Autopilot."
-                    Write-Verbose "Returning device id: $autoPilotDeviceId"
+                    Write-Verbose "[$functionName] Device with Id $autoPilotDeviceId found in Autopilot."
+                    Write-Verbose "[$functionName] Returning device id: $autoPilotDeviceId"
                 }
                 else
                 {
-                    Write-Verbose "No match for device with serial number $serialNumber found in Autopilot."
+                    Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
                 }
             }
             else
             {
-                Write-Verbose "Not a VMWare device. Continuing"
+                Write-Verbose "[$functionName] Not a VMWare device. Continuing"
                 $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
-                Write-Verbose "Found $($autopilotDevice.count) Autopilot devices."
-                Write-Verbose "Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+                Write-Verbose "[$functionName] Found $($autopilotDevice.count) Autopilot devices."
+                Write-Verbose "[$functionName] Autopilot Device serial number: $($autopilotDevice.serialNumber)"
                 $autoPilotDeviceId = $autopilotDevice.id
-                Write-Verbose "Autopilot Device Id: $($autoPilotDeviceId)"
+                Write-Verbose "[$functionName] Autopilot Device Id: $($autoPilotDeviceId)"
             }
         }
         'DeviceId'
         {
-            Write-Verbose "Parameter type is DeviceId."
-            Write-Verbose "$IdentifyerType is $deviceIdentifyer."
+            Write-Verbose "[$functionName] Parameter type is DeviceId."
+            Write-Verbose "[$functionName] $IdentifyerType is $deviceIdentifyer."
             $autoPilotDeviceId = $deviceIdentifyer
         }
     }
     if ($autoPilotDeviceId)
     {
-        Write-Verbose "Found device with id $autoPilotDeviceId in Autopilot."
-        Write-Verbose "Defining variables:"
+        Write-Verbose "[$functionName] Found device with id $autoPilotDeviceId in Autopilot."
+        Write-Verbose "[$functionName] Defining variables:"
         $deleteUri = "$autopilotDeviceURI/$autoPilotDeviceId"
-        Write-Verbose "Delete URI: $deleteUri"
+        Write-Verbose "[$functionName] Delete URI: $deleteUri"
         Write-Host "Deleting autopilot device..."
-        Write-Verbose "Calling Graph API to delete autopilot device with serial number $($autopilotDevice.serialNumber)"
-        Write-Verbose "Passing the uri $deleteUri"
+        Write-Verbose "[$functionName] Calling Graph API to delete autopilot device with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "[$functionName] Passing the uri $deleteUri"
         $deleteResponse = CallGraphAPI -AccessToken $accessToken -ResourcePath $deleteUri -Method DELETE
-        Write-Verbose "Delete response: $($deleteResponse | Out-String)"
+        Write-Verbose "[$functionName] Delete response: $($deleteResponse | Out-String)"
         if ($null -eq $deleteResponse -or $deleteResponse -eq '')
         {
-            Write-Verbose "Autopilot device with serial number $($autopilotDevice.serialNumber) deleted successfully."
+            Write-Verbose "[$functionName] Autopilot device with serial number $($autopilotDevice.serialNumber) deleted successfully."
             $success = $true
         }
         else
         {
-            Write-Verbose "Failed to delete autopilot device with serial number $($autopilotDevice.serialNumber)."
+            Write-Verbose "[$functionName] Failed to delete autopilot device with serial number $($autopilotDevice.serialNumber)."
         }
     }
     else

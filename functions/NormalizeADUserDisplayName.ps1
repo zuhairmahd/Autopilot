@@ -5,57 +5,58 @@ function normalizeADUserDisplayName()
         [Parameter(Mandatory = $true)]
         [string]$UserDisplayName
     )
+    $functionName = $MyInvocation.MyCommand.Name
     $processedUser = [ordered] @{}
     # Convert "Lastname, Firstname Middle (nickname)" to "Firstname Middle Lastname (nickname)" if nickname exists,
     # otherwise to "Firstname Middle Lastname"
     # Also handles "Lastname, Firstname M." format where M. is a middle initial
-    Write-Verbose "Converting user display name: $UserDisplayName"
+    Write-Verbose "[$functionName] Converting user display name: $UserDisplayName"
     if ($UserDisplayName -match '^(.*), (.*?)(?:\s([A-Z]\.?))?(?: \((.*?)\))?$')
     {
-        Write-Verbose "Extracting first name, last name, middle initial and nickname."
+        Write-Verbose "[$functionName] Extracting first name, last name, middle initial and nickname."
         $lastName = $matches[1].Trim()
-        Write-Verbose "Last name: $lastName"
+        Write-Verbose "[$functionName] Last name: $lastName"
         $firstName = $matches[2].Trim()
-        Write-Verbose "First name: $firstName"
+        Write-Verbose "[$functionName] First name: $firstName"
         $middleInitial = if ($matches[3])
         {
             $matches[3].Trim() 
-            Write-Verbose "Middle initial: $middleInitial"
+            Write-Verbose "[$functionName] Middle initial: $middleInitial"
         }
         else
         {
             $null 
-            Write-Verbose "No middle initial found."
+            Write-Verbose "[$functionName] No middle initial found."
         }
         $nickname = $matches[4]
-        Write-Verbose "Nickname: $nickname"
+        Write-Verbose "[$functionName] Nickname: $nickname"
         $fullName = if ($middleInitial)
         {
             "$firstName $middleInitial $lastName"
-            Write-Verbose "Full name with middle initial: $fullName"
+            Write-Verbose "[$functionName] Full name with middle initial: $fullName"
         }
         else
         {
             "$firstName $lastName"
-            Write-Verbose "Full name without middle initial: $fullName"
+            Write-Verbose "[$functionName] Full name without middle initial: $fullName"
         }
         if ($nickname)
         {
-            Write-Verbose "Nickname found: $nickname"
+            Write-Verbose "[$functionName] Nickname found: $nickname"
             $currentUser = "$fullName ($nickname)"
-            Write-Verbose "Current user with nickname: $currentUser"
+            Write-Verbose "[$functionName] Current user with nickname: $currentUser"
         }
         else
         {
-            Write-Verbose "No nickname found."
+            Write-Verbose "[$functionName] No nickname found."
             $currentUser = $fullName
-            Write-Verbose "Current user without nickname: $currentUser"
+            Write-Verbose "[$functionName] Current user without nickname: $currentUser"
         }
     }
     else
     {
-        Write-Verbose "No match found for user display name format."
-        Write-Verbose "Returning original display name."
+        Write-Verbose "[$functionName] No match found for user display name format."
+        Write-Verbose "[$functionName] Returning original display name."
         $currentUser = $UserDisplayName
     }
     #Add what we got the the processedUser hashtable

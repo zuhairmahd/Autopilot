@@ -1,23 +1,3 @@
-<#
-.SYNOPSIS
-Checks if a device with a given serial number is already in Intune and verifies its profile assignment status.
-
-.DESCRIPTION
-The CheckDeviceAssignment function takes a serial number as input and checks if the device is already imported into Intune. If the device is found, it further checks the deployment profile assignment status. If the device is assigned to a deployment profile, it outputs the profile name and indicates readiness for enrollment. Otherwise, it provides guidance for further action.
-
-.PARAMETER serial
-The serial number of the device to check.
-
-.EXAMPLE
-CheckDeviceAssignment -serial "123456789"
-Checks if the device with serial number 123456789 is in Intune and verifies its profile assignment status.
-
-.NOTES
-Version: 3.0.0
-Author: Zuhair Mahmoud
-GUID: 3f2504e0-4f89-11d3-9a0c-0305e82c3301
-Date: April 5, 2025
-#>
 function CheckDeviceAssignment()
 {
     [CmdletBinding()]
@@ -77,11 +57,10 @@ function CheckDeviceAssignment()
         $assignment = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceUri -filter $autopilotDeviceFilter).value
     }
     Write-Verbose "[$functionName] Found $($assignment.count) Autopilot devices."
-    Write-Verbose "[$functionName] Assignment: $($assignment | ConvertTo-Json -Depth 10)"
     if ($null -ne $assignment -and $assignment -ne '')
     {
         Write-Verbose "[$functionName] Found the device matching serial number $serialNumber."
-        Write-Verbose "[$functionName] The device is registered in Intune."
+        Write-Verbose "[$functionName] The device is registered in Autopilot."
         Write-Verbose "[$functionName] Checking profile assignment"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)"
         $extraProfileParameters = "expand=deploymentProfile"
@@ -117,8 +96,6 @@ function CheckDeviceAssignment()
         {
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
-                $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
-                Write-Verbose "[$functionName] Graph response: $($assignment)."
                 Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
                 Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
                 Write-Verbose "[$functionName] The device is ready for enrollment."

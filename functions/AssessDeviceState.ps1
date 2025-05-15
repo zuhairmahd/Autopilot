@@ -6,57 +6,58 @@ function ConvertUserDisplayName()
         [Parameter(Mandatory = $true)]
         [string]$UserDisplayName
     )
+    $functionName = $MyInvocation.MyCommand.Name
     $processedUser = [ordered] @{}
     # Convert "Lastname, Firstname Middle (nickname)" to "Firstname Middle Lastname (nickname)" if nickname exists,
     # otherwise to "Firstname Middle Lastname"
     # Also handles "Lastname, Firstname M." format where M. is a middle initial
-    Write-Verbose "Converting user display name: $UserDisplayName"
+    Write-Verbose "[$functionName] Converting user display name: $UserDisplayName"
     if ($UserDisplayName -match '^(.*), (.*?)(?:\s([A-Z]\.?))?(?: \((.*?)\))?$')
     {
-        Write-Verbose "Extracting first name, last name, middle initial and nickname."
+        Write-Verbose "[$functionName] Extracting first name, last name, middle initial and nickname."
         $lastName = $matches[1].Trim()
-        Write-Verbose "Last name: $lastName"
+        Write-Verbose "[$functionName] Last name: $lastName"
         $firstName = $matches[2].Trim()
-        Write-Verbose "First name: $firstName"
+        Write-Verbose "[$functionName] First name: $firstName"
         $middleInitial = if ($matches[3])
         {
             $matches[3].Trim() 
-            Write-Verbose "Middle initial: $middleInitial"
+            Write-Verbose "[$functionName] Middle initial: $middleInitial"
         }
         else
         {
             $null 
-            Write-Verbose "No middle initial found."
+            Write-Verbose "[$functionName] No middle initial found."
         }
         $nickname = $matches[4]
-        Write-Verbose "Nickname: $nickname"
+        Write-Verbose "[$functionName] Nickname: $nickname"
         $fullName = if ($middleInitial)
         {
             "$firstName $middleInitial $lastName"
-            Write-Verbose "Full name with middle initial: $fullName"
+            Write-Verbose "[$functionName] Full name with middle initial: $fullName"
         }
         else
         {
             "$firstName $lastName"
-            Write-Verbose "Full name without middle initial: $fullName"
+            Write-Verbose "[$functionName] Full name without middle initial: $fullName"
         }
         if ($nickname)
         {
-            Write-Verbose "Nickname found: $nickname"
+            Write-Verbose "[$functionName] Nickname found: $nickname"
             $currentUser = "$fullName ($nickname)"
-            Write-Verbose "Current user with nickname: $currentUser"
+            Write-Verbose "[$functionName] Current user with nickname: $currentUser"
         }
         else
         {
-            Write-Verbose "No nickname found."
+            Write-Verbose "[$functionName] No nickname found."
             $currentUser = $fullName
-            Write-Verbose "Current user without nickname: $currentUser"
+            Write-Verbose "[$functionName] Current user without nickname: $currentUser"
         }
     }
     else
     {
-        Write-Verbose "No match found for user display name format."
-        Write-Verbose "Returning original display name."
+        Write-Verbose "[$functionName] No match found for user display name format."
+        Write-Verbose "[$functionName] Returning original display name."
         $currentUser = $UserDisplayName
     }
     #Add what we got the the processedUser hashtable
@@ -76,30 +77,31 @@ function GetManagedDeviceRelevantProperties()
         $enrollmentState,
         $settings = $settings
     )
+    $functionName = $MyInvocation.MyCommand.Name
     $managedDeviceProperties = [ordered] @{}
     if ($null -eq $settings.MinimumDevicePhysicalMemoryInGB -or $settings.MinimumDevicePhysicalMemoryInGB -eq 0)
     {
-        Write-Verbose "No minimum device physical memory specified in settings."
-        Write-Verbose "Setting default value to 16GB."
+        Write-Verbose "[$functionName] No minimum device physical memory specified in settings."
+        Write-Verbose "[$functionName] Setting default value to 16GB."
         $MinimumDevicePhysicalMemoryInGB = 16
     }
     else
     {
         $MinimumDevicePhysicalMemoryInGB = $settings.MinimumDevicePhysicalMemoryInGB
-        Write-Verbose "Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB"
+        Write-Verbose "[$functionName] Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB"
     }
     Write-Host "Checking managed device..."
-    Write-Verbose "Managed device: $($enrollmentState.managed)"
+    Write-Verbose "[$functionName] Managed device: $($enrollmentState.managed)"
     if ($enrollmentState.managed)
     {
-        Write-Verbose "Found a managed device."
-        Write-Verbose "Checking whether this is an orphan device..."
-        Write-Verbose "Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
-        Write-Verbose "Managed device id: $($enrollmentState.managedDevice.device.id)"
-        Write-Verbose "Checking if they are the same..."
+        Write-Verbose "[$functionName] Found a managed device."
+        Write-Verbose "[$functionName] Checking whether this is an orphan device..."
+        Write-Verbose "[$functionName] Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
+        Write-Verbose "[$functionName] Managed device id: $($enrollmentState.managedDevice.device.id)"
+        Write-Verbose "[$functionName] Checking if they are the same..."
         if ($enrollmentState.managedDevice.device.id -eq $enrollmentState.autopilot.device.managedDeviceId)
         {
-            Write-Verbose "Device Id's match."
+            Write-Verbose "[$functionName] Device Id's match."
             Write-Host "The device is not an orphan device."
             $orphanDevice = $false
             Write-Host "Checking whether the device has enough RAM..."
@@ -117,10 +119,10 @@ function GetManagedDeviceRelevantProperties()
             Write-Host "Checking for a user association on the manage device..."
             if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
             {
-                Write-Verbose "Found a user..."
-                Write-Verbose "User display name: $($enrollmentState.managedDevice.users.userDisplayName)"
-                Write-Verbose "User id: $($enrollmentState.managedDevice.device.userId)"
-                Write-Verbose "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)"
+                Write-Verbose "[$functionName] Found a user..."
+                Write-Verbose "[$functionName] User display name: $($enrollmentState.managedDevice.users.userDisplayName)"
+                Write-Verbose "[$functionName] User id: $($enrollmentState.managedDevice.device.userId)"
+                Write-Verbose "[$functionName] User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)"
                 $hasUser = $true
                 if ($enrollmentState.managedDevice.users.azureUser)
                 {
@@ -147,27 +149,27 @@ function GetManagedDeviceRelevantProperties()
             }
             else
             {
-                Write-Verbose "The managed device is not associated with a user."
+                Write-Verbose "[$functionName] The managed device is not associated with a user."
                 $hasUser = $false
             }
         }
         else
         {
             $orphanDevice = $true
-            Write-Verbose "Device Id's do not match."
-            Write-Verbose "The device is an orphan device."
+            Write-Verbose "[$functionName] Device Id's do not match."
+            Write-Verbose "[$functionName] The device is an orphan device."
         }
     }
 
     if ($OrphanDevice -eq $false -and $CorrectRam -and -not ($HasUser -and $ValidUser))
     {
         $readyForNextUser = $true
-        Write-Verbose "Device is ready for the next user"
+        Write-Verbose "[$functionName] Device is ready for the next user"
     }
     else
     {
         $readyForNextUser = $false
-        Write-Verbose "Device is not ready for the next user"
+        Write-Verbose "[$functionName] Device is not ready for the next user"
     }
     $managedDeviceProperties.Add('OrphanDevice', $orphanDevice)
     $managedDeviceProperties.Add('CorrectRam', $correctRam)
@@ -186,27 +188,27 @@ function GetAutopilotDeviceRelevantProperties()
         $enrollmentState,
         $settings = $settings
     )
-
+    $functionName = $MyInvocation.MyCommand.Name
     $autopilotDeviceProperties = [ordered] @{}
     if ($null -eq $settings.DesiredAutopilotProfiles -or $settings.DesiredAutopilotProfiles.Count -eq 0)
     {
-        Write-Verbose "No desired autopilot profiles specified in settings."
-        Write-Verbose "Setting default value to 'None'."
+        Write-Verbose "[$functionName] No desired autopilot profiles specified in settings."
+        Write-Verbose "[$functionName] Setting default value to 'None'."
         $desiredAutopilotProfiles = $null
     }
     else
     {
         $desiredAutopilotProfiles = $settings.DesiredAutopilotProfiles
-        Write-Verbose "Desired autopilot profiles specified in settings: $desiredAutopilotProfiles"
+        Write-Verbose "[$functionName] Desired autopilot profiles specified in settings: $desiredAutopilotProfiles"
     }
     if ($null -ne $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -and $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedUnkownSyncState', 'assignedInSync'))
     {
-        Write-Verbose "The device profile assignment state is valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        Write-Verbose "[$functionName] The device profile assignment state is valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
         $profileAssigned = $true
     }
     else
     {
-        Write-Verbose "The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        Write-Verbose "[$functionName] The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
         $profileAssigned = $false
     }
     if ($null -ne $desiredAutopilotProfiles -and $enrollmentState.autopilot.device.deploymentProfile.displayName -in $desiredAutopilotProfiles -and $profileAssigned -eq $true)
@@ -216,7 +218,7 @@ function GetAutopilotDeviceRelevantProperties()
     }
     else
     {
-        Write-Verbose "The device is not assigned to the correct autopilot profile."
+        Write-Verbose "[$functionName] The device is not assigned to the correct autopilot profile."
         $correctProfile = $false
     }
     Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
@@ -226,13 +228,13 @@ function GetAutopilotDeviceRelevantProperties()
     $lastRemediationDate = $enrollmentState.autopilot.device.remediationStateLastModifiedDateTime | FormatDateWithTimeZone
     if ($null -ne $enrollmentState.autopilot.device.remediationState -and $enrollmentState.autopilot.device.remediationState -in @('noRemediationRequired', 'unknownFutureValue'))
     {
-        Write-Verbose "The device profile remediation state is valid: $($enrollmentState.autopilot.device.remediationState)."
+        Write-Verbose "[$functionName] The device profile remediation state is valid: $($enrollmentState.autopilot.device.remediationState)."
         $remediationStateGood = $true
-        Write-Verbose "Remediation state last modified date: $lastRemediationDate"
+        Write-Verbose "[$functionName] Remediation state last modified date: $lastRemediationDate"
     }
     else
     {
-        Write-Verbose "The device profile remediation state is not valid: $($enrollmentState.autopilot.device.remediationState)."
+        Write-Verbose "[$functionName] The device profile remediation state is not valid: $($enrollmentState.autopilot.device.remediationState)."
         $remediationStateGood = $false
     }
     Write-Host "Remediation state: $($enrollmentState.autopilot.device.remediationState)"
@@ -240,27 +242,27 @@ function GetAutopilotDeviceRelevantProperties()
     #Now check enrollment status.
     if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -in @('enrolled', 'notContacted'))
     {
-        Write-Verbose "The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
         $enrollmentStateGood = $true
     }
     else
     {
-        Write-Verbose "The device enrollment state is not valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        Write-Verbose "[$functionName] The device enrollment state is not valid: $($enrollmentState.autopilot.device.enrollmentState)."
         $enrollmentStateGood = $false
     }
     Write-Host "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
     if ($CorrectProfile -and $ProfileAssigned -and $RemediationStateGood -and $EnrollmentStateGood)
     {
-        Write-Verbose "Autopilot assignment is good..."
+        Write-Verbose "[$functionName] Autopilot assignment is good..."
         $AutopilotAssignmentGood = $true
     }
     else
     {
-        Write-Verbose "There are issues with this device's autopilot assignment."
+        Write-Verbose "[$functionName] There are issues with this device's autopilot assignment."
         $AutopilotAssignmentGood = $false
         
     }
-    Write-Verbose "Autopilot assignment good: $AutopilotAssignmentGood"
+    Write-Verbose "[$functionName] Autopilot assignment good: $AutopilotAssignmentGood"
     #Add what we got the the autopilotDeviceProperties hashtable
     $autopilotDeviceProperties.Add('CorrectProfile', $correctProfile)
     $autopilotDeviceProperties.Add('ProfileAssigned', $profileAssigned)
@@ -283,19 +285,19 @@ function AssessDeviceState()
         [ValidateSet('PropperEnrollmentVerification', 'NextUserReadiness', 'TroubleShooting')]
         [string]$AssessmentType
     )
-
+    $functionName = $MyInvocation.MyCommand.Name
     #region Write verbose log of received parameters.
-    Write-Verbose "Received parameters:"
-    Write-Verbose "Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)"
-    Write-Verbose "Assessment type: $AssessmentType"
-    Write-Verbose "Settings: $($settings | ConvertTo-Json -Depth 10)"
+    Write-Verbose "[$functionName] Received parameters:"
+    Write-Verbose "[$functionName] Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)"
+    Write-Verbose "[$functionName] Assessment type: $AssessmentType"
+    Write-Verbose "[$functionName] Settings: $($settings | ConvertTo-Json -Depth 10)"
     $returnValue = [ordered] @{}
     $readinessState = $null
     $action = $null
     $device = $null
     #endregion
 
-    Write-Verbose "Type of assessment: $AssessmentType"
+    Write-Verbose "[$functionName] Type of assessment: $AssessmentType"
     switch ($AssessmentType)
     {
         'PropperEnrollmentVerification'
@@ -306,8 +308,8 @@ function AssessDeviceState()
         'NextUserReadiness'
         {
             Write-Host "Checking if the device is ready for the next user..."
-            Write-Verbose "Checking if the device is registered in Autopilot..."
-            Write-Verbose "In Autopilot: $($enrollmentState.inAutopilot)"
+            Write-Verbose "[$functionName] Checking if the device is registered in Autopilot..."
+            Write-Verbose "[$functionName] In Autopilot: $($enrollmentState.inAutopilot)"
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
@@ -412,8 +414,8 @@ function AssessDeviceState()
     $returnValue.Add('ReadinessState', $readinessState)
     $returnValue.Add('Action', $action)
     $returnValue.Add('Device', $device)
-    Write-Verbose "Returning readiness state: $readinessState"
-    Write-Verbose "Returning action: $action"
-    Write-Verbose "Returning device: $device"
+    Write-Verbose "[$functionName] Returning readiness state: $readinessState"
+    Write-Verbose "[$functionName] Returning action: $action"
+    Write-Verbose "[$functionName] Returning device: $device"
     return $returnValue
 }

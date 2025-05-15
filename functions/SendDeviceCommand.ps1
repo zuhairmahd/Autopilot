@@ -6,6 +6,7 @@ function SendDeviceCommand ()
         [string]$accessToken,
         [string]$Command = "clean"
     )
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Host "Are you sure you want to $command the device?"
     $confirmation = Read-Host "Type 'yes' to confirm, or 'no' to cancel"
     if ($confirmation -ne 'yes')
@@ -13,7 +14,7 @@ function SendDeviceCommand ()
         Write-Host "Operation cancelled."
         return $false
     }
-    Write-Verbose "Device ID: $ManagedDeviceId"
+    Write-Verbose "[$functionName] Device ID: $ManagedDeviceId"
     Write-Host "Sending $command command to device with ID $ManagedDeviceId"
     $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
     $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
@@ -27,7 +28,7 @@ function SendDeviceCommand ()
             'keepUserData' = $false
         } | ConvertTo-Json
         $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' 
-        Write-Verbose "Response: $response"
+        Write-Verbose "[$functionName] Response: $response"
     }
     elseif ($command -eq 'wipe')
     {
@@ -38,7 +39,7 @@ function SendDeviceCommand ()
             'obliterationBehavior' = "doNotObliterate"
         } | ConvertTo-Json
         $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0' 
-        Write-Verbose "Response: $response"
+        Write-Verbose "[$functionName] Response: $response"
     }
     else
     {
@@ -49,12 +50,12 @@ function SendDeviceCommand ()
     {
         Write-Host "Success."
         $success = $true
-        Write-Verbose "Attempting to get the latest device action results."
+        Write-Verbose "[$functionName] Attempting to get the latest device action results."
         $action = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
-        Write-Verbose "Action: $action"
+        Write-Verbose "[$functionName] Action: $action"
         Write-Host "Attempting to perform a device sync."
         $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST
-        Write-Verbose "Sync Response: $syncResponse"
+        Write-Verbose "[$functionName] Sync Response: $syncResponse"
     }
     return $success
 }

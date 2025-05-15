@@ -14,12 +14,12 @@ function DisplayReport()
         [ValidateSet("HTML", "CSV")]
         [string]$ExportFormat = "HTML"
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name    
     #region write verbose log of received parameters
-    Write-Verbose "Export: $Export"
-    Write-Verbose "ExportFormat: $ExportFormat"
-    Write-Verbose "OutputFile: $OutputFile"
-    Write-Verbose "Prefix list: $PrefixList"
+    Write-Verbose "[$functionName] Export: $Export"
+    Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
+    Write-Verbose "[$functionName] OutputFile: $OutputFile"
+    Write-Verbose "[$functionName] Prefix list: $PrefixList"
     #endregion write verbose log of received parameters
     
     #region Format property names and display report

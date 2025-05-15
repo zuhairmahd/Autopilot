@@ -6,6 +6,7 @@ function FindAssociatedManagedDevice()
         $enrollmentState,
         $settings = $settings
     )
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Host "Checking associated managed device..."
     if ($enrollmentState.autopilot.device.managedDeviceId -eq $enrollmentState.managedDevice.device.id)
     #we can also potentially match on
