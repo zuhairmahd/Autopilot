@@ -2,7 +2,7 @@
 param
 (
     $configFile = "$pwd\.secrets\config.json",
-    [string]$deviceType = 'autopilot',
+    [string]$deviceType = 'managed',
     $outputFile = "$pwd\$deviceType-export.csv"
 )
 
@@ -26,6 +26,7 @@ else
 #endregion
 
 #region variables
+$CSVObject = [System.Collections.ArrayList]@()
 # $scopes = "offline_access Device.ReadWrite.All DeviceLocalCredential.Read.All DeviceManagementApps.Read.All DeviceManagementApps.ReadWrite.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All Directory.ReadWrite.All Domain.ReadWrite.All Group.Read.All GroupMember.ReadWrite.All Organization.ReadWrite.All"
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
@@ -36,11 +37,11 @@ else
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $importedAutopilotDeviceExtraParameters = "select=serialNumber,importId,groupTag,state"
 # $unmanagedDeviceUri = "devices"
-# $managedDeviceUri = "deviceManagement/managedDevices"
-$autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-$autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,systemFamily,enrollmentState,deploymentProfileAssignmentStatus&top=9999&skip=0&count=true"
+$managedDeviceUri = "deviceManagement/managedDevices"
+# $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+# $autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,systemFamily,enrollmentState,deploymentProfileAssignmentStatus&top=9999&skip=0&count=true"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
-# $managedDeviceFilter = "startswith(deviceName,'w11-')"
+$managedDeviceFilter = "startswith(deviceName,'w11-')"
 # $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
 # $importedDeviceFilter = "serialNumber eq '$serialNumber'"
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
@@ -48,16 +49,14 @@ $autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,sys
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -Interactive
 $accessToken = GetGraphAccessToken -configFile $configFile
-# $global:autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
-# $managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken 
+# $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
+$managedDevices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -Filter $managedDeviceFilter -consistencyLevel
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
-# $global:enrollments = [ordered] @{
-# "autopilot" = $autopilotDevices
-# "managed"   = $managedDevices
-# "imported"  = $importedDevices
-# "unmanaged" = $unmanagedDevices
-# }
+$global:enrollments = [ordered] @{
+    # "autopilot" = $autopilotDevices
+    "managed" = $managedDevices
+    # "imported"  = $importedDevices
+    # "unmanaged" = $unmanagedDevices
+}
 #endregion variables
-
-ExportDevices -accessToken $accessToken -OutputFile $outputFile -DeviceType $deviceType -verbose
