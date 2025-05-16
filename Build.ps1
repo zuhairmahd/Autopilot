@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$FileName
+    [string]$FileName,
+    [string]$outputFile = "$pwd\$FileName-consolodated",
+    [string]$functionsFolder = "$pwd\functions"
 )
 
 
@@ -11,8 +13,7 @@ function BuildFunctionTable()
 {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
+        [string]$Path = $functionsFolder
     )
     $functionName = $MyInvocation.MyCommand.Name
     $FunctionPattern = "^function\s+([A-Za-z0-9\-]+)" 
@@ -46,7 +47,7 @@ function BuildFunctionTable()
     return $functionToFile
 }
 
-function FindFunctionFile
+function FindFileContainingFunction()
 {
     [CmdletBinding()]
     param (
@@ -70,5 +71,37 @@ function FindFunctionFile
     }
 }
 
-$functionTable = BuildFunctionTable -Path "$pwd\functions"
+function FindFunctionsInFile()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$FileName,
+        [Parameter(Mandatory = $true)]
+        [string]$FunctionNameToFind
+    )
 
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Searching for function '$FunctionNameToFind' in file '$FileName'."
+    if (Test-Path -Path $FileName)
+    {
+        $content = Get-Content -Path $FileName
+        if ($content -match $FunctionNameToFind)
+        {
+            Write-Verbose "[$functionName] Function '$FunctionName' found in file '$FileName'."
+            return $true
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Function '$FunctionName' not found in file '$FileName'."
+            return $false
+        }
+    }
+    else
+    {
+        Write-Warning "File '$FileName' does not exist."
+        return $false
+    }
+}
+
+$functionTable = BuildFunctionTable -Path $functionsFolder
