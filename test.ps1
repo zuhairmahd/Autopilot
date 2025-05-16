@@ -59,4 +59,4 @@ $global:enrollments = [ordered] @{
 }
 #endregion variables
 
-ExportDeviceMemory -AccessToken $accessToken -OutputFile $outputFile -BatchSize 20 -IncludeStorageInfo -verbose
+ExportDeviceMemory -AccessToken $accessToken -OutputFile $outputFile -IncludeStorageInfo 

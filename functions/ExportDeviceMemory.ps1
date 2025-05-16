@@ -7,6 +7,8 @@ function ExportDeviceMemory()
         [Parameter(Mandatory = $true)]
         [string]$OutputFile,
         [Parameter(Mandatory = $false)]
+        [string]$Filter = $null,
+        [Parameter(Mandatory = $false)]
         [int]$BatchSize = 20,
         [Parameter(Mandatory = $false)]
         [switch]$IncludeStorageInfo
@@ -15,7 +17,15 @@ function ExportDeviceMemory()
     $managedDeviceUri = "deviceManagement/managedDevices"
     $managedDeviceFilter = "operatingSystem eq 'Windows'"
     $success = $false
-    
+    if ($filter)
+    {
+        Write-Verbose "[$functionName] - Using filter: $filter"
+        $managedDeviceFilter = $Filter
+    }
+    else 
+    {
+        Write-Verbose "[$functionName] - No filter provided, using default filter: $managedDeviceFilter"
+    }
     Write-Verbose "[$functionName] - Starting device memory export process"
     Write-Verbose "[$functionName] - Using batch size of $BatchSize for API requests"
     
