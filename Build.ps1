@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    # [Parameter(Mandatory = $true)]
-    # [string]$FileName
+    [Parameter(Mandatory = $true)]
+    [string]$FileName
 )
 
 
@@ -10,10 +10,13 @@ param(
 function BuildFunctionTable()
 {
     [CmdletBinding()]
-    param([string[]]$Path)
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
     $functionName = $MyInvocation.MyCommand.Name
     $FunctionPattern = "^function\s+([A-Za-z0-9\-]+)" 
-    $filesList = Get-ChildItem -Path "$Path\functions\*.ps1"
+    $filesList = Get-ChildItem -Path "$Path\*.ps1"
     # Create a hashtable for quick function-to-file lookups
     $functionToFile = @{}
     Write-Verbose "[$functionName] - Found $($filesList.Count) files in the current directory and subdirectories."
@@ -43,25 +46,29 @@ function BuildFunctionTable()
     return $functionToFile
 }
 
-
 function FindFunctionFile
 {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
-        [string]$FunctionNameToFind
+        [string]$FunctionNameToFind,
+        $FunctionTable
     )
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Looking for function: $FunctionNameToFind"
-    if ($global:functionMap.ContainsKey($FunctionNameToFind))
+    if ($functionTable.ContainsKey($FunctionNameToFind))
     {
-        return $functionMap[$FunctionNameToFind]
+        Write-Verbose "[$functionName] Found function: $FunctionNameToFind in file: $($functionTable[$FunctionNameToFind])"
+        return $functionTable[$FunctionNameToFind]
     }
     else
     {
-        Write-Warning "Function '$FunctionName' not found in any files."
+        Write-Verbose "[$functionName] Function: $FunctionNameToFind not found in the function table."
+        Write-Warning "Function '$FunctionNameToFind' not found in any files."
         return $null
     }
 }
+
+$functionTable = BuildFunctionTable -Path "$pwd\functions"
 
