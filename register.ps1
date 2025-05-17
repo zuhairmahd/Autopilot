@@ -346,7 +346,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     $result = PrepareImportDevice
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)." -Action {
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
     $result = PrepareImportDevice -CustomImport
     if ($result -eq $backoutText)
@@ -410,11 +410,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for man
 }
 
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 if ($showAdvancedOptions)
 {
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Advanced options" -Submenu $deviceMenu
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Device options" -Submenu $deviceMenu
 }
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
