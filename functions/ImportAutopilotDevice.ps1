@@ -124,8 +124,8 @@ function ImportAutopilotDevice()
       else
       {
         $ProceedWithImport = $false
-        Write-Host "Returning to the previous menu."
-        return $null
+        Write-Verbose "[$functionName] Returning to the previous menu."
+        return $backoutText
       }
     } while ($ProceedWithImport -eq $false)
   }

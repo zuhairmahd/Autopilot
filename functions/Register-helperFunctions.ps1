@@ -1,4 +1,156 @@
-#region Helper Functions for the autopilot import process
+#region Helper Functions 
+function validateInput()
+{
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $true)]
+        [string]$UserInput
+    )
+
+    #Get the function name
+    $functionName = $MyInvocation.MyCommand.Name
+    $MaxSerialNumberLength = '11'
+    $MinSerialNumberLength = '7'
+    Write-Verbose "[$functionName] MaxSerialNumberLength: $MaxSerialNumberLength"
+    Write-Verbose "[$functionName] MinSerialNumberLength: $MinSerialNumberLength"
+    # Trim input to remove any leading or trailing spaces
+    $UserInput = $UserInput.Trim()
+    $returnValue = @{}
+    Write-Verbose "[$functionName] Trimmed input: '$UserInput'"
+    Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
+    if ($UserInput.Length -gt $MaxSerialNumberLength)
+    {
+        Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
+        Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
+    }
+    elseif ($UserInput.Length -lt $MinSerialNumberLength)
+    {
+        Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
+        Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
+    }
+    elseif ($UserInput -match '^[a-zA-Z0-9]+$') 
+    {
+        Write-Verbose "[$functionName] Serial number validation passed"
+        $returnValue.valid = $true
+        $returnValue.value = $UserInput
+    }
+    else
+    {
+        Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
+    }
+    Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"
+    Write-Verbose "[$functionName] Returning validation value: $($returnValue.value)"
+    return $returnValue
+}
+
+function GetUserInput()
+{
+    [CmdletBinding()]
+    param(
+        [string]$Message,
+        [string]$Prompt
+    )
+    #Get the function name
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Message: $Message"
+    Write-Verbose "[$functionName] Prompt: $Prompt"
+    Write-Host $Message
+    # Updated instruction
+    Write-Host "Press Enter without typing anything to return to the previous menu." 
+    while ($true) # Loop indefinitely until valid input or Enter is pressed
+    {
+        $inputItem = Read-Host $Prompt
+        Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
+        # Check if the user just pressed Enter (empty string OR null)
+        if ($null -eq $inputItem -or $inputItem -eq '')
+        {
+            Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
+            return $null # Return null to signal going back
+        }
+        # Validate the input if it's not empty
+        $validationResult = validateInput -UserInput $inputItem
+        $inputResultValid = $validationResult.valid
+        $inputResult = $validationResult.value
+        if ($inputResultValid)
+        {
+            Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
+            Write-Verbose "[$functionName] Input result: $inputResult"
+            return $inputResult # Return the validated input
+        }
+        else
+        {
+            # Beep and show error if validation failed
+            [console]::beep(1000, 500)
+            # Updated error message
+            Write-Host "Invalid $inputType. Please try again or press Enter to return." -ForegroundColor Red 
+            # The loop will continue, prompting the user again
+        }
+    }
+}
+
+function PrepareImportDevice()
+{
+    [CmdletBinding()]
+    param(
+        [switch]$CustomImport
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Preparing to import device with serial number: $($deviceObject.serialNumber)."
+    Write-Verbose "[$functionName] Getting the serial number for this device..."
+    Write-Verbose "[$functionName] Checking whether the script has sufficient permissions to run."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$functionName] The script is running with sufficient permissions."
+        Write-Verbose "[$functionName] Getting device object."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    if ($deviceObject)
+    {
+        if ($customImport) 
+        {
+            Write-Verbose "[$functionName] Custom import is enabled."
+            $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+            $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import' -CustomImport
+            if ($result -eq $backoutText)
+            {
+                Write-Verbose "[$functionName] Custom import aborted. Returning $backoutText."
+                return $backoutText
+            }
+        }
+        else 
+        {
+            Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) to Intune."
+            Write-Verbose "[$functionName] Importing device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+            $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
+            while ($choice -notin @('yes', 'no'))
+            {
+                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                #beep
+                [console]::beep(1000, 500)
+                $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
+            }
+            if ($choice -eq 'no')
+            {
+                Write-Host "Exiting..."
+                return $backoutText
+            }
+            $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+            $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import'
+        }
+    }
+    else
+    {
+        Write-Host "Could not obtain the serial number." -ForegroundColor Red
+    }
+}
+
 function DisplayDeviceAssignmentStatus
 {
     [CmdletBinding()]
@@ -222,7 +374,6 @@ function ProcessImportResult
     )
     
     Write-Verbose "[$functionName] Processing import result with status: $($device.state.deviceImportStatus)"
-    
     if ($device.state.deviceImportStatus -eq 'complete')
     {
         $serialNumber = $device.SerialNumber
@@ -351,7 +502,6 @@ function ProcessDevice()
         {
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            
             if ($deviceAssignment)
             {
                 $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment -functionName $functionName
@@ -368,7 +518,11 @@ function ProcessDevice()
             #region Add the device to Intune
             $importStart = Get-Date
             $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
-            
+            if ($device -eq $backoutText)
+            {
+                Write-Verbose "[$functionName] The import function returned $device."
+                return $backoutText
+            }
             $importResult = ProcessImportResult -device $device -functionName $functionName -returnValues $returnValues
             if ($importResult -ne $true)
             {
@@ -485,4 +639,4 @@ function ProcessDevice()
         }
     }
 }
-#endregion Helper Functions for the autopilot import process
+#endregion Helper Functions 
