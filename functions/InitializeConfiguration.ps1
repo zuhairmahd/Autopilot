@@ -9,10 +9,11 @@ function InitializeConfiguration()
         [switch]$overwrite
     )
     
-    #print verbose log of received parameters
+    #region print verbose log of received parameters
     Write-Verbose "Root folder: $RootFolder"
     Write-Verbose "InitFile: $InitFile"
     Write-Verbose "Overwrite: $overwrite"
+    #endregion
     
     $initVars = @(
         [ordered] @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; devdefault = ".\\.secrets\\config.json"; reldefault = ".\\.secrets\\config.json"; default = ".\\.secrets\\config.json"; type = 'string'},

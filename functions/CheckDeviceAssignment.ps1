@@ -72,12 +72,12 @@ function CheckDeviceAssignment()
             $index = 0
             while ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -lt $maxWaitTime)
             {
-                Write-Host "Waiting for $waitTimeInSeconds  seconds before checking again..." -ForegroundColor Yellow
+                Write-Host "Waiting for $waitTimeInSeconds  more seconds before checking again..." -ForegroundColor Yellow
                 Start-Sleep -Seconds $waitTimeInSeconds
                 $index++
                 Write-Host "Checking again..."
                 Write-Host "Pass $index of $maxWaitTime"
-                $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI
+                $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -extraparameters $extraProfileParameters
                 Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
             }
             Write-Verbose "[$functionName] Gop final device assignment status: $($assignment.deploymentProfileAssignmentStatus)."

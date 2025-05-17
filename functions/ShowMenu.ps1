@@ -7,7 +7,7 @@ function DisplayNumericMenu()
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
-        [switch]$RequireEnter = $false
+        [switch]$RequireEnter
     )
     #region Print a verbose message with received parameters
     $functionName = $MyInvocation.MyCommand.Name
@@ -39,7 +39,7 @@ function DisplayNumericMenu()
         Write-Verbose "[$functionName] Using ReadLine for input (requires Enter key)..."
         Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
         $selection = $host.UI.ReadLine()
-        Start-Sleep -Milliseconds 100
+        Start-Sleep -Milliseconds 600
         # Clean input
         $selection = $selection.Trim()
         Write-Verbose "[$functionName] Raw user input received: '$selection'"
@@ -284,7 +284,7 @@ function ShowMenu()
     }
     
     # Display menu and get selection
-    $selectedOption = DisplayNumericMenu -choices $choices -banner $banner -Prompt "Please select an option"
+    $selectedOption = DisplayNumericMenu -choices $choices -banner $banner -Prompt "Please select an option" -RequireEnter
     
     # Handle navigation options
     if ($selectedOption -eq "Back")

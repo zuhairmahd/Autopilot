@@ -406,7 +406,8 @@ function ProcessDevice()
             {
                 $serialNumber = $device.SerialNumber
                 Write-Host "The import of device with serial number $serialNumber completed successfully." -ForegroundColor Green
-                Write-Host 'Checking device assignment.'
+                Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
+                Start-Sleep -Seconds $timeInSeconds
                 $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
                 Write-Verbose "[$functionName] The assignment details are: $($assignment | ConvertTo-Json)"
                 if ($assignment)
