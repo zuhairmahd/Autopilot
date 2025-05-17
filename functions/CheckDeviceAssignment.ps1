@@ -68,7 +68,7 @@ function CheckDeviceAssignment()
         Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
         if ($WaitForAssignment -and ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync')))
         {
-            Write-Host "Waiting for up to $maxWaitTime minutes for the device to be assigned to a deployment profile."
+            Write-Host "Checking up to $maxWaitTime times for the device to be assigned to a deployment profile."
             $index = 0
             while ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -lt $maxWaitTime)
             {
@@ -83,7 +83,8 @@ function CheckDeviceAssignment()
             Write-Verbose "[$functionName] Gop final device assignment status: $($assignment.deploymentProfileAssignmentStatus)."
             if ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -gt $maxWaitTime)
             {
-                Write-Host "The device assignment is taking too long (over $maxWaitTime minutes)."
+                Write-Host "Finished checking $maxWaitTime times."
+                Write-Host "The device assignment is taking too long."
                 Write-Host 'Please check the Intune portal or contact an Intune administrator.'
             }
             elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
