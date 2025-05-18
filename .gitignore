@@ -11,6 +11,7 @@ Desktop.ini
 .secrets/
 .vscode/
 release/
+build/
 
 # PowerShell-specific files
 
