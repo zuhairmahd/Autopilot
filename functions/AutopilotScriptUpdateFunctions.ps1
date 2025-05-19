@@ -4,40 +4,41 @@ function GetLatestGitlabRelease()
     param (
         [string]$ProjectID
     )
+    $functionName = $MyInvocation.MyCommand.Name
     $gitlabURL = 'https://git.gao.gov'
     $gitlabAPIEndpoint = "$gitlabURL/api/v4"
     $gitlabAPIProjectEndpoint = "$gitlabAPIEndpoint/projects/$ProjectID"
     $gitlabAPILatestReleaseEndpoint = "$gitlabAPIProjectEndpoint/releases/permalink/latest"
     $returnValue = $null
-    Write-Verbose "GitLab URL: $gitlabURL"
-    Write-Verbose "GitLab API Endpoint: $gitlabAPIEndpoint"
-    Write-Verbose "GitLab API Project Endpoint: $gitlabAPIProjectEndpoint"
-    Write-Verbose "GitLab API Latest Release Endpoint: $gitlabAPILatestReleaseEndpoint"
-    Write-Verbose "Project ID: $ProjectID"
-    Write-Verbose 'Attempting to retrieve the latest release from GitLab...'
-    Write-Verbose "getting latest release from $gitlabAPILatestReleaseEndpoint"
+    Write-Verbose "[$functionName] GitLab URL: $gitlabURL"
+    Write-Verbose "[$functionName] GitLab API Endpoint: $gitlabAPIEndpoint"
+    Write-Verbose "[$functionName] GitLab API Project Endpoint: $gitlabAPIProjectEndpoint"
+    Write-Verbose "[$functionName] GitLab API Latest Release Endpoint: $gitlabAPILatestReleaseEndpoint"
+    Write-Verbose "[$functionName] Project ID: $ProjectID"
+    Write-Verbose "[$functionName] Attempting to retrieve the latest release from GitLab..."
+    Write-Verbose "[$functionName] getting latest release from $gitlabAPILatestReleaseEndpoint"
     $response = Invoke-RestMethod -Uri $gitlabAPILatestReleaseEndpoint -Method Get -ErrorAction SilentlyContinue
     if ($response)
     {
-        Write-Verbose "Successfully retrieved the latest release. Tag Name: $($response.tag_name)"
+        Write-Verbose "[$functionName] Successfully retrieved the latest release. Tag Name: $($response.tag_name)"
         $returnValue = $response.tag_name
     }
     else 
     {
-        Write-Verbose 'Failed to retrieve the latest release from GitLab. Trying to get the default branch instead.'
-        Write-Verbose "Attempting to retrieve project details from: $gitlabAPIProjectEndpoint"
+        Write-Verbose "[$functionName] Failed to retrieve the latest release from GitLab. Trying to get the default branch instead."
+        Write-Verbose "[$functionName] Attempting to retrieve project details from: $gitlabAPIProjectEndpoint"
         $response = Invoke-RestMethod -Uri $gitlabAPIProjectEndpoint -Method Get -ErrorAction SilentlyContinue
         if ($response)
         {
-            Write-Verbose "Successfully retrieved project details. Default Branch: $($response.default_branch)"
+            Write-Verbose "[$functionName] Successfully retrieved project details. Default Branch: $($response.default_branch)"
             $returnValue = $response.default_branch
         }
         else
         {
-            Write-Verbose 'Failed to retrieve project details from GitLab.'
+            Write-Verbose "[$functionName] Failed to retrieve project details from GitLab."
         }
     }
-    Write-Verbose "Returning value: $returnValue"
+    Write-Verbose "[$functionName] Returning value: $returnValue"
     return $returnValue
 }
 
@@ -47,11 +48,12 @@ function GetLatestGithubRelease()
     param (
         [string]$Repository
     )
-    Write-Verbose "Checking the latest release for Repository: $Repository"
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Checking the latest release for Repository: $Repository"
     $url = "https://api.github.com/repos/$Repository/releases/latest"
-    Write-Verbose "Requesting URL: $url"
+    Write-Verbose "[$functionName] Requesting URL: $url"
     $response = Invoke-RestMethod -Uri $url -Method Get 
-    Write-Verbose "Got response: $($response.tag_name)"
+    Write-Verbose "[$functionName] Got response: $($response.tag_name)"
     if (($null -eq $response) -or ($null -eq $response.tag_name ))
     {
         Write-Host "Failed to retrieve the latest release information from GitHub."
@@ -73,107 +75,71 @@ function GetUpdates()
         [Parameter(Mandatory = $true)]
         [string]$updateURL
     )
+    $functionName = $MyInvocation.MyCommand.Name
     #region write a verbose log of received parameters.
-    Write-Verbose "RootFolder: $RootFolder"
-    Write-Verbose "LocalVersion: $LocalVersion"
-    Write-Verbose "remoteVersionURL: $remoteVersionURL"
-    Write-Verbose "updateURL: $updateURL"
+    Write-Verbose "[$functionName] RootFolder: $RootFolder"
+    Write-Verbose "[$functionName] LocalVersion: $LocalVersion"
+    Write-Verbose "[$functionName] remoteVersionURL: $remoteVersionURL"
+    Write-Verbose "[$functionName] updateURL: $updateURL"
     #endregion
 
     #region get local version
-    Write-Verbose "Checking if we received a local version."
+    Write-Verbose "[$functionName] Checking if we received a local version."
     if ($null -eq $LocalVersion -or $LocalVersion -eq '')
     {
-        Write-Verbose "LocalVersion is null or empty. Attempting to get the local version from the version file."
+        Write-Verbose "[$functionName] LocalVersion is null or empty. Attempting to get the local version from the version file."
         # Get the local version from the version file
         $localVersionFile = "$RootFolder\version.txt"
         if (Test-Path $localVersionFile)
         {
-            Write-Verbose "Local version file found at $localVersionFile. Reading version."
+            Write-Verbose "[$functionName] Local version file found at $localVersionFile. Reading version."
             $LocalVersion = Get-Content -Path $localVersionFile -Force
         }
         else
         {
-            Write-Verbose "Local version file not found at $localVersionFile."
-            Write-Verbose "Attempting to get version number from the script."
-            $versionString = Select-String -Path "$rootFolder\register.ps1" -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-            Write-Verbose "Version string returned from script: $versionString"
-            if ($versionString)
-            {
-                $LocalVersion = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
-                Write-Verbose "Local version extracted from script: $LocalVersion"
-            }
-            else
-            {
-                Write-Host "Failed to get local version from version file or script. Please provide a valid local version."
-                return
-            }
+            Write-Verbose "[$functionName] Local version file not found at $localVersionFile."
         }
     }
     else 
     {
-        Write-Verbose "LocalVersion provided in variable. Using provided local version: $LocalVersion"
+        Write-Verbose "[$functionName] LocalVersion provided in variable. Using provided local version: $LocalVersion"
     }
     Write-Host "LocalVersion: $LocalVersion"
     $localVersion = [System.Version]::Parse($LocalVersion)
     #endregion
 
     #region get the remote version.
-    Write-Verbose "Getting remote version from $remoteVersionURL"
+    Write-Verbose "[$functionName] Getting remote version from $remoteVersionURL"
     try 
     {
         $remoteVersionResponse = Invoke-WebRequest -Uri $remoteVersionURL -Method Get -ErrorAction Stop
     }
     catch 
     {
-        Write-Verbose "Remote version response: $($remoteVersionResponse.Content)"
-        Write-Verbose "Remote version status code: $($remoteVersionResponse.StatusCode)"
+        Write-Verbose "[$functionName] Response: $($remoteVersionResponse)"
+        Write-Verbose "[$functionName] Remote version response content: $($remoteVersionResponse.Content)"
+        Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
         return $null
-        Write-Verbose "Response: $($remoteVersionResponse)"
-        #Try to get the version number from the remote script.
-        Write-Verbose "Attempting to get version number from the remote script."
-        Write-Verbose "Making a web request to $updateURL/register.ps1"
-        $versionString = Invoke-WebRequest -Uri "$updateURL/register.ps1" -Method Get -UseBasicParsing -ErrorAction Stop
-        Write-Verbose "Status code: $($versionString.StatusCode)"
-        if ($versionString.StatusCode -ne 200)
-        {
-            Write-Verbose "Failed to get remote version from $updateURL. Status code: $($versionString.StatusCode)"
-            Write-Verbose "Response: $($versionString.Content)"
-            return
-        }
-        $versionString = $versionString.Content | Select-String -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-        if ($versionString)
-        {
-            $remoteVersion = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
-            Write-Verbose "Remote version extracted from script: $remoteVersion"
-        }
-        else
-        {
-            Write-Host "Failed to get remote version from response. Please provide a valid remote version."
-            return
-        }
-    }
+    }    
+    Write-Verbose "[$functionName] Returned remote version response: $remoteVersion"
     $remoteVersion = $remoteVersionResponse.content
-    Write-Verbose "remoteVersion = $remoteVersion"
-    Write-Verbose "Returned remote version: $remoteVersion"
-    Write-Verbose "Found remote version string: $remoteVersion"
-    Write-Host "Remote version: $remoteVersion"
+    Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     if ($null -eq $remoteVersion -or $remoteVersion -eq '')
     {
         Write-Host "Failed to get remote version from response. Please provide a valid remote version."
         return
     }
     $remoteVersion = [regex]::Match($remoteVersion, '\d+\.\d+\.\d').Value
-    Write-Verbose "processed remote version: $remoteVersion"
+    Write-Verbose "[$functionName] processed remote version: $remoteVersion"
     #convert the content to a version object.
     $remoteVersion = [System.Version]::Parse($remoteVersion)
     #endregion
     
     #region compare versions
-    Write-Verbose "Comparing local version $localVersion with remote version $remoteVersion"
+    Write-Verbose "[$functionName] Comparing local version $localVersion with remote version $remoteVersion"
     if ($remoteVersion -gt $localVersion)
     {
-        Write-Verbose "Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
+        Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
         Write-Host "An update is available to version $remoteVersion. Downloading update from $updateURL."
         #make a backup of register.exe.
         $backupFile = Join-Path -Path $RootFolder -ChildPath "register.exe.bak"
@@ -195,13 +161,13 @@ function GetUpdates()
         }
         else
         {
-            Write-Verbose "Update downloaded successfully to $updateFile."
+            Write-Verbose "[$functionName] Update downloaded successfully to $updateFile."
             return $returnValues.UpdateSuccessMessage
         }
     }
     else
     {
-        Write-Verbose "Local version $localVersion is up to date with remote version $remoteVersion. No update required."
+        Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
