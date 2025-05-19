@@ -273,6 +273,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action
         Write-Host 'Failed to restore script defaults..' -ForegroundColor Red
     }
 }
+
 $deviceMenu = AddMenuItem -menu $deviceMenu -name "Clean device" -action {
     Write-Host 'Cleaning the device...'
     $choice = Read-Host "Are you sure you want to clean the device? (yes/no)"
@@ -308,6 +309,7 @@ $deviceMenu = AddMenuItem -menu $deviceMenu -name "Wipe device" -action {
     $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
     SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
 }
+
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
@@ -342,6 +344,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
     }
 }
+
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     $result = PrepareImportDevice
