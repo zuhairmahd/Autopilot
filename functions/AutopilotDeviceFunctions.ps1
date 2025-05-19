@@ -150,7 +150,7 @@ function PrepareImportDevice()
   }
 }
 
-function DisplayDeviceAssignmentStatus
+function DisplayDeviceAssignmentStatus()
 {
   [CmdletBinding()]
   param(
@@ -191,7 +191,7 @@ function DisplayDeviceAssignmentStatus
   }
 }
 
-function HandleDeviceEnrollmentState
+function HandleDeviceEnrollmentState()
 {
   [CmdletBinding()]
   param(
@@ -290,7 +290,7 @@ function HandleDeviceEnrollmentState
   }
 }
 
-function HandleCustomImportSettings
+function HandleCustomImportSettings()
 {
   [CmdletBinding()]
   param(
@@ -360,7 +360,7 @@ function HandleCustomImportSettings
   return $null
 }
 
-function ProcessImportResult
+function ProcessImportResult()
 {
   [CmdletBinding()]
   param(
@@ -513,7 +513,6 @@ function ProcessDevice()
       {
         Write-Host "The device is not in Intune." 
       }
-            
       #region Add the device to Intune
       $importStart = Get-Date
       $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
@@ -527,21 +526,22 @@ function ProcessDevice()
       {
         return $importResult
       }
-            
-      # Handle CustomImport settings if needed
-      if ($CustomImport)
-      {
-        $maxWaitTimeRef = [ref]$maxWaitTime
-        $timeInSecondsRef = [ref]$timeInSeconds
-        $customResult = HandleCustomImportSettings -functionName $functionName -maxWaitTimeRef $maxWaitTimeRef -timeInSecondsRef $timeInSecondsRef -returnValues $returnValues
-        if ($customResult)
-        {
-          return $customResult
-        }
-        $maxWaitTime = $maxWaitTimeRef.Value
-        $timeInSeconds = $timeInSecondsRef.Value
-      }
-            
+      
+      #region Handle CustomImport settings if needed
+      # if ($CustomImport)
+      # {
+      #   $maxWaitTimeRef = [ref]$maxWaitTime
+      #   $timeInSecondsRef = [ref]$timeInSeconds
+      #   $customResult = HandleCustomImportSettings -functionName $functionName -maxWaitTimeRef $maxWaitTimeRef -timeInSecondsRef $timeInSecondsRef -returnValues $returnValues
+      #   if ($customResult)
+      #   {
+      #     return $customResult
+      #   }
+      #   $maxWaitTime = $maxWaitTimeRef.Value
+      #   $timeInSeconds = $timeInSecondsRef.Value
+      # }
+      #endregion Handle CustomImport settings if needed
+
       Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
       Start-Sleep -Seconds $timeInSeconds
             
