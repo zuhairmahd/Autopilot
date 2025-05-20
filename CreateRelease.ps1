@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$InputFile,
     [string]$outputFile = '',
-    [string]$Version = '3.0.0',
+    [string]$Version = '',
     [string]$CompanyName = 'Zuhair Mahmoud',
     [switch]$MergeOnly,
     [switch]$Overwrite
@@ -345,8 +345,8 @@ function CopySecrets()
 #endregion
 
 #region Define variables
-$initFile = "$PSScriptRoot\init.json"
-$versionFile = "$psscriptroot\version.txt"
+$initFile = "init.json"
+$versionFile = 'version.txt'
 $functionsToMerge = @(
     "$pwd\functions\AutopilotDeviceFunctions.ps1",
     "$pwd\functions\AutopilotMiscFunctions.ps1",
@@ -398,13 +398,43 @@ else
 #Check if the version file exists.  If not, create it.
 if (-not (Test-Path -Path $versionFile))
 {
-    Write-Host "Cannot find the version file $($versionFile). Creating..."
+    Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
+    if ($Version -eq '')
+    {
+        Write-Host 'No version specified. Using default version'
+        $Version = '1.0.0'
+    }
+    else
+    {
+        Write-Host "Using version $($Version)"
+    }
     Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
     Write-Host 'Version file created successfully.'
 }
 else
 {
     Write-Host "Found version file $($versionFile)..."
+    $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
+    $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
+    Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
+    $versionObject = [System.Version]::Parse($Version)
+    Write-Verbose "[$scriptName] Version object: $versionObject"
+    if ($VersionFileContentObject -lt $versionObject)
+    {
+        Write-Host "Version file content is less than the specified version. Updating file..."
+        Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
+        Write-Host 'Version file updated successfully.'
+    }
+    elseif ($VersionFileContentObject -gt $versionObject)
+    {
+        Write-Host "Version file content is greater than the specified version. Updating the local variable."
+        $Version = $VersionFileContentObject.ToString()
+        Write-Verbose "[$scriptName] Version updated to: $Version"
+    }
+    else
+    {
+        Write-Host "Version file content matches the specified version."
+    }
 }
 
 if (-not $Overwrite)
@@ -622,7 +652,7 @@ if (Test-Path -Path "parentFolder\.secrets\config.json")
             else
             {
                 Write-Host 'Failed to copy secrets.'
-                Write-Host 'Run the script with the -verbose switch for more information.'
+                Write-Host 'Run the script with the -Verbose switch for more information.'
             }
         }
         N
@@ -641,7 +671,7 @@ else
     else
     {
         Write-Host 'Failed to copy secrets.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
+        Write-Host 'Run the script with the -Verbose switch for more information.'
     }
 }
 
