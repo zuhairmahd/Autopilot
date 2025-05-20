@@ -197,6 +197,7 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.'
     $latestRelease = 'main'
 }
+# $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
 $application = 'Register'
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
@@ -204,7 +205,6 @@ $version = '3.0.0'
 $versionFile = 'version.txt'
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 $backoutText = 'Returning to previous menu'
-# $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
 $returnValues = [ordered] @{}
 $returnValues.add('EnrolledMessage', 'The device is enrolled.')
 $returnValues.add('notContactedMessage', 'The device has not contacted the enrollment service.')
@@ -236,18 +236,18 @@ if (Test-Path -Path $versionFile)
     Write-Verbose "[$scriptName] Version object: $versionObject"
     if ($versionObject -le $localVersionObject)
     {
-        Write-Host "Version file $versionFile is up to date."
+        Write-Verbose "[$scriptName] Version file $versionFile is up to date."
     }
     else
     {
-        Write-Host "Version file $versionFile is not up to date. Updating version file."
+        Write-Verbose "[$scriptName] Version file $versionFile is not up to date. Updating version file."
         Set-Content -Path $versionFile -Value $version -Force
         $localVersion = $version
     }
 }
 else
 {
-    Write-Host "Version file $versionFile not found. Creating version file."
+    Write-Verbose "[$scriptName] Version file $versionFile not found. Creating version file."
     Set-Content -Path $versionFile -Value $version -Force
     $localVersion = $version
 }
@@ -316,7 +316,8 @@ $deviceMenu = AddMenuItem -menu $deviceMenu -name "Clean device" -action {
         Write-Host "Exiting..."
         return $backoutText
     }
-
+    $accessToken = GetGraphAccessToken -configFile $configFile
+    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
 }   
 $deviceMenu = AddMenuItem -menu $deviceMenu -name "Wipe device" -action {
     Write-Host 'Wiping the device...'
@@ -333,7 +334,7 @@ $deviceMenu = AddMenuItem -menu $deviceMenu -name "Wipe device" -action {
         Write-Host "Exiting..."
         return $backoutText
     }
-    $accessToken = GetGraphAccessToken -configFile $configFile -Deligated -Scope $scopes -ForceNewToken
+    $accessToken = GetGraphAccessToken -configFile $configFile
     SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
 }
 

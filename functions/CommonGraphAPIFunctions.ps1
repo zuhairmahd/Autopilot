@@ -9,6 +9,12 @@ function FormatScopes()
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] [FormatScopes] Called with AsIs=$AsIs, Reverse=$Reverse"
+    #Check for null or empty scopes.
+    if (-not $scopes)
+    {
+        Write-Verbose "[$functionName] [FormatScopes] No scopes provided. Returning empty string."
+        return ""
+    }
     #region Format scopes properly if necessary
     $scopesFormatted = $scopes
     Write-Verbose "[$functionName] [FormatScopes] Received a scope string of length $($scopes.Length) characters"
@@ -134,7 +140,7 @@ function Get-TokenFromResponse
         
     return $cachedToken
 }
-    
+
 function Start-HttpListener
 {
     param (
@@ -312,7 +318,7 @@ function Start-HttpListener
     }
     return $result
 }
-    
+
 function Save-TokenToCache
 {
     param($cachedToken, $cacheType, $cacheTokenFile, $cacheFolder)
@@ -335,7 +341,7 @@ function Save-TokenToCache
         Write-Verbose "[$functionName] Access token saved to $cacheTokenFile"
     }
 }
-    
+
 function Save-RefreshTokenToConfig
 {
     param($refreshToken, $configFilePath)
@@ -402,7 +408,7 @@ function Save-RefreshTokenToConfig
         Write-Error "Failed to save refresh token to config: $_"
     }
 }
-    
+
 function Format-TokenOutput
 {
     param($token, $secureString)
@@ -420,7 +426,7 @@ function Format-TokenOutput
         return $token
     }
 }
-    
+
 function Test-RefreshTokenValidity
 {
     param(
@@ -474,7 +480,7 @@ function Test-RefreshTokenValidity
         return $false, $null
     }
 }
-    
+
 function Get-RefreshToken
 {
     param(
@@ -524,7 +530,7 @@ function Get-RefreshToken
         return $null
     }
 }
-    
+
 function Get-TokenFromCache
 {
     param(
@@ -718,7 +724,7 @@ function Get-TokenFromCache
         
     return $null
 }
-    
+
 function Get-DelegatedToken
 {
     param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken)
@@ -743,11 +749,9 @@ function Get-DelegatedToken
             Write-Verbose "[$functionName] Existing refresh token is invalid. Will proceed with new authorization."
         }
     }
-        
     # Generate a random state string
     Write-Verbose "[$functionName] Generating random state string."
     $state = [System.Guid]::NewGuid().ToString()
-        
     if ($interactive)
     {
         $redirectUri = "http://localhost:8080/"
@@ -760,7 +764,6 @@ function Get-DelegatedToken
     # Encode parameters
     $encodedScopes = [uri]::EscapeDataString($scopesFormatted)
     $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
-        
     # Attempt to fetch token using HTTP listener first
     $automaticFlowSuccess = $false
     $code = $null
