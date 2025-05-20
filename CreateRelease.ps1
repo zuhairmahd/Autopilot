@@ -401,8 +401,18 @@ if (-not (Test-Path -Path $versionFile))
     Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
     if ($Version -eq '')
     {
-        Write-Host 'No version specified. Using default version'
-        $Version = '1.0.0'
+        Write-Host 'No version specified. Attempting to read version from input file.'
+        $versionString = Select-String -Path $InputFile -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
+        if ($versionString -match '(\d+\.\d+\.\d+)')
+        {
+            $Version = $matches[1]
+            Write-Host "Found version $($Version) in input file."
+        }
+        else
+        {
+            Write-Host 'No version found in input file. Using default version 1.0.0.'
+            $Version = '1.0.0'
+        }
     }
     else
     {
@@ -417,7 +427,6 @@ else
     $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
     $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
     Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
-    # $versionString = Select-String -Path "$rootFolder\register.ps1" -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
     $versionObject = [System.Version]::Parse($Version)
     Write-Verbose "[$scriptName] Version object: $versionObject"
     if ($VersionFileContentObject -lt $versionObject)
