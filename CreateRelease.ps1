@@ -417,6 +417,7 @@ else
     $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
     $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
     Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
+    # $versionString = Select-String -Path "$rootFolder\register.ps1" -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
     $versionObject = [System.Version]::Parse($Version)
     Write-Verbose "[$scriptName] Version object: $versionObject"
     if ($VersionFileContentObject -lt $versionObject)
