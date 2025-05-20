@@ -200,7 +200,8 @@ else
 $application = 'Register'
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$localVersion = (Get-Content -Path version.txt -Raw -Force -ErrorAction SilentlyContinue).trim()
+$version = '3.0.0'
+$versionFile = 'version.txt'
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 $backoutText = 'Returning to previous menu'
 # $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
@@ -223,6 +224,32 @@ if ($domain -eq 'arabictutor.com')
 {
     Write-Verbose "[$scriptName] Changing groupTag to 'entra'."
     $GroupTag = 'entra'
+}
+if (Test-Path -Path $versionFile)
+{
+    Write-Verbose "[$scriptName] Version file $versionFile found. Reading version."
+    $localVersion = Get-Content -Path $versionFile -Raw -ErrorAction Stop
+    Write-Verbose "[$scriptName] Local version: $localVersion"
+    $localVersionObject = [System.Version]::Parse($LocalVersion)
+    Write-Verbose "[$scriptName] Local version object: $localVersionObject"
+    $versionObject = [System.Version]::Parse($version)
+    Write-Verbose "[$scriptName] Version object: $versionObject"
+    if ($versionObject -le $localVersionObject)
+    {
+        Write-Host "Version file $versionFile is up to date."
+    }
+    else
+    {
+        Write-Host "Version file $versionFile is not up to date. Updating version file."
+        Set-Content -Path $versionFile -Value $version -Force
+        $localVersion = $version
+    }
+}
+else
+{
+    Write-Host "Version file $versionFile not found. Creating version file."
+    Set-Content -Path $versionFile -Value $version -Force
+    $localVersion = $version
 }
 #endregion Define static and dynamic variables
 
