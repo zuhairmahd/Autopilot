@@ -395,29 +395,31 @@ else
     Write-Host "Found initialization file $($initFile)..."
 }
 
+#Define the version variable.
+if ($Version -eq '')
+{
+    Write-Host 'No version specified. Attempting to read version from input file.'
+    $versionString = Select-String -Path $InputFile -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
+    if ($versionString -match '(\d+\.\d+\.\d+)')
+    {
+        $Version = $matches[1]
+        Write-Host "Found version $($Version) in input file."
+    }
+    else
+    {
+        Write-Host 'No version found in input file. Using default version 1.0.0.'
+        $Version = '1.0.0'
+    }
+}
+else
+{
+    Write-Host "Using version $($Version)"
+}
+
 #Check if the version file exists.  If not, create it.
 if (-not (Test-Path -Path $versionFile))
 {
     Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
-    if ($Version -eq '')
-    {
-        Write-Host 'No version specified. Attempting to read version from input file.'
-        $versionString = Select-String -Path $InputFile -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-        if ($versionString -match '(\d+\.\d+\.\d+)')
-        {
-            $Version = $matches[1]
-            Write-Host "Found version $($Version) in input file."
-        }
-        else
-        {
-            Write-Host 'No version found in input file. Using default version 1.0.0.'
-            $Version = '1.0.0'
-        }
-    }
-    else
-    {
-        Write-Host "Using version $($Version)"
-    }
     Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
     Write-Host 'Version file created successfully.'
 }
@@ -506,10 +508,16 @@ if (-not $Overwrite)
 else
 {
     Write-Host "Overwriting $parentFolder"
-    Remove-Item -Path $parentFolder -Recurse -Force | Out-Null
+    if (Test-Path -Path $parentFolder)
+    {
+        Write-Host "Removing $parentFolder"
+        Remove-Item -Path $parentFolder -Recurse -Force | Out-Null
+    }
+    else
+    {
+        Write-Host "Creating folder $parentFolder"
+    }
     New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
-    Write-Verbose 'Creating functions folder'
-    New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
 }
 #endregion
 

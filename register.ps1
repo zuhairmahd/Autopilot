@@ -289,6 +289,30 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settin
         Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
     }
 }
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application credentials" -Action {
+    $AppId = Read-Host "Enter the application ID"
+    $AppSecret = Read-Host "Enter the application secret"
+    $TenantId = Read-Host "Enter the tenant ID"
+    $appDomain = Read-Host "Enter the application domain"
+    $appName = Read-Host "Enter the application name"
+    $AppId = $AppId.Trim()
+    $AppSecret = $AppSecret.Trim()
+    $TenantId = $TenantId.Trim()
+    $appDomain = $appDomain.Trim()
+    $appName = $appName.Trim()
+    $configObject = [PSCustomObject]@{
+        AppId     = $AppId
+        AppSecret = $AppSecret
+        TenantId  = $TenantId
+        domain    = $appDomain
+        name      = $appName
+    }
+    $encryptedConfigObject = EncryptObject -decryptedObject $configObject -excludeFields @('name', 'domain')
+    $json = $encryptedConfigObject | ConvertTo-Json -Depth 10
+    Write-Host "Saving configuration to $configFile"
+    Set-Content -Path $configFile -Value $json -Force
+    Write-Host 'The application credentials have been changed.' -ForegroundColor Green
+}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
     Write-Host 'Restoring the script to its default settings...'
     if (InitializeConfiguration -RootFolder $pwd -overWrite)
