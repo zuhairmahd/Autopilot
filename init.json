@@ -5,6 +5,7 @@
         "description":  "The path to the authentication configuration file.",
         "devdefault":  ".\\\\.secrets\\\\config.json",
         "reldefault":  ".\\\\.secrets\\\\config.json",
+        "default":  ".\\\\.secrets\\\\config.json",
         "type":  "string"
     },
     {
@@ -13,6 +14,7 @@
         "description":  "The path to the configuration file.",
         "devdefault":  "vars.json",
         "reldefault":  "vars.json",
+        "default":  "vars.json",
         "type":  "string"
     },
     {
@@ -21,6 +23,7 @@
         "description":  "The Autopilot group tag.",
         "devdefault":  "MSB01",
         "reldefault":  "MSB01",
+        "default":  "",
         "type":  "string"
     },
     {
@@ -29,6 +32,7 @@
         "description":  "How long to wait before giving up on importing a device.",
         "devdefault":  "60",
         "reldefault":  "60",
+        "default":  "30",
         "type":  "string"
     },
     {
@@ -37,73 +41,8 @@
         "description":  "How long to wait before initiating another check.",
         "devdefault":  "60",
         "reldefault":  "60",
+        "default":  "30",
         "type":  "string"
-    },
-    {
-        "name":  "NoUpdateCheck",
-        "value":  [
-                      "true",
-                      "false"
-                  ],
-        "description":  "skip checking for updates.",
-        "devdefault":  "false",
-        "reldefault":  "false",
-        "type":  "array"
-    },
-    {
-        "name":  "NoAdminCheck",
-        "value":  [
-                      "true",
-                      "false"
-                  ],
-        "description":  "skip checking for admin rights.",
-        "devdefault":  "false",
-        "reldefault":  "false",
-        "type":  "array"
-    },
-    {
-        "name":  "NoSignatureVerify",
-        "value":  [
-                      "true",
-                      "false"
-                  ],
-        "description":  "skip verifying the signature of the script.",
-        "devdefault":  "true",
-        "reldefault":  "false",
-        "type":  "array"
-    },
-    {
-        "name":  "NoHashVerify",
-        "value":  [
-                      "true",
-                      "false"
-                  ],
-        "description":  "skip verifying the hash of the script.",
-        "devdefault":  "true",
-        "reldefault":  "false",
-        "type":  "array"
-    },
-    {
-        "name":  "NoIntuneCheck",
-        "value":  [
-                      "true",
-                      "false"
-                  ],
-        "description":  "skip checking whether the device is present in Intune.",
-        "devdefault":  "false",
-        "reldefault":  "false",
-        "type":  "array"
-    },
-    {
-        "name":  "GetDeviceHash",
-        "value":  [
-                      "true",
-                      "false"
-                  ],
-        "description":  "Gets the hash of the device and exit.",
-        "devdefault":  "false",
-        "reldefault":  "false",
-        "type":  "array"
     },
     {
         "name":  "Repo",
@@ -113,18 +52,17 @@
                   ],
         "description":  "The repository provider to use.",
         "devdefault":  "Github",
-        "reldefault":  "Gitlab",
+        "reldefault":  "Github",
+        "default":  "Github",
         "type":  "array"
     },
     {
         "name":  "Release",
-        "value":  [
-                      "main",
-                      "auto"
-                  ],
+        "value":  "2.2",
         "description":  "The release branch to use.",
         "devdefault":  "main",
-        "reldefault":  "main",
-        "type":  "array"
+        "reldefault":  "2.2",
+        "default":  "main",
+        "type":  "string"
     }
 ]

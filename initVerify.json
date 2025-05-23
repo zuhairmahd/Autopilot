@@ -11,6 +11,14 @@
       ],
       "groupsToExclude": [],
       "settings": {
+        "domain": "gao.gov",
+        "deviceNamePrefix": "w11-",
+        "operatingSystem": "Windows",
+        "MaxUserNameLength": 50,
+        "MaxSerialNumberLength": 100,
+        "MinSerialNumberLength": 7,
+        "MinimumDevicePhysicalMemoryInGB": 16,
+        "MinUsernameLength": 3,
         "DesiredAutopilotProfiles": [
           "msb"
         ]
@@ -20,6 +28,14 @@
       "groupsToInclude": [],
       "groupsToExclude": [],
       "settings": {
+        "domain": "arabictutor.com",
+        "deviceNamePrefix": "vmware",
+        "operatingSystem": "Windows",
+        "MaxUserNameLength": 50,
+        "MinUsernameLength": 3,
+        "MaxSerialNumberLength": 100,
+        "MinSerialNumberLength": 7,
+        "MinimumDevicePhysicalMemoryInGB": 8,
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",
           "Hybrid join profile"

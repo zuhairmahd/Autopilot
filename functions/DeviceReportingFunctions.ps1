@@ -1,0 +1,1188 @@
+function ExportDeviceMemory()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$OutputFile,
+        [Parameter(Mandatory = $false)]
+        [string]$Filter = $null,
+        [Parameter(Mandatory = $false)]
+        [int]$BatchSize = 20,
+        [Parameter(Mandatory = $false)]
+        [switch]$IncludeStorageInfo
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    $managedDeviceUri = "deviceManagement/managedDevices"
+    $managedDeviceFilter = "operatingSystem eq 'Windows'"
+    $success = $false
+    if ($filter)
+    {
+        Write-Verbose "[$functionName] - Using filter: $filter"
+        $managedDeviceFilter = $Filter
+    }
+    else 
+    {
+        Write-Verbose "[$functionName] - No filter provided, using default filter: $managedDeviceFilter"
+    }
+    Write-Verbose "[$functionName] - Starting device memory export process"
+    Write-Verbose "[$functionName] - Using batch size of $BatchSize for API requests"
+    
+    # Store all devices in an array
+    $allDevices = [System.Collections.ArrayList]@()
+    
+    try
+    {
+        Write-Verbose "[$functionName] - Getting device list from Graph API"
+        $deviceListResponse = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $AccessToken -Filter $managedDeviceFilter -consistencyLevel -extraParameters "top=999"
+        
+        if ($null -eq $deviceListResponse -or $null -eq $deviceListResponse.value -or $deviceListResponse.value.count -eq 0)
+        {
+            Write-Host "[$functionName] - No devices found. Exiting script." -ForegroundColor Red
+            return $false
+        }
+        
+        # Add all devices to our collection (pagination already handled by CallGraphApi)
+        $deviceListResponse.value | ForEach-Object { $null = $allDevices.Add($_) }
+        
+        Write-Verbose "[$functionName] - Retrieved a total of $($allDevices.Count) devices"
+        
+        # Create CSV object to store the results
+        $CSVObject = [System.Collections.ArrayList]@()
+        
+        # Process devices in batches to reduce API calls
+        for ($batchIndex = 0; $batchIndex -lt $allDevices.Count; $batchIndex += $BatchSize)
+        {
+            $batch = $allDevices | Select-Object -Skip $batchIndex -First $BatchSize
+            
+            # Create batch request
+            $batchRequestBody = @{
+                requests = @()
+            }
+            
+            foreach ($device in $batch)
+            {
+                $deviceId = $device.id
+                if ($null -eq $deviceId)
+                {
+                    continue 
+                }
+                
+                $batchRequestBody.requests += @{
+                    id     = $deviceId
+                    method = "GET"
+                    url    = "/deviceManagement/managedDevices/$deviceId`?`$select=id,hardwareInformation,physicalMemoryInBytes,totalStorageSpaceInBytes,freeStorageSpaceInBytes"
+                }
+            }
+            
+            Write-Verbose "[$functionName] - Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)"
+            $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth 10)
+            
+            # Process batch responses
+            if ($null -ne $batchResponse -and $null -ne $batchResponse.responses)
+            {
+                foreach ($response in $batchResponse.responses)
+                {
+                    if ($response.status -eq 200)
+                    {
+                        $deviceDetail = $response.body
+                        $deviceBasic = $batch | Where-Object { $_.id -eq $response.id } | Select-Object -First 1
+                        
+                        if ($null -ne $deviceBasic)
+                        {
+                            $memoryGB = if ($deviceDetail.physicalMemoryInBytes)
+                            {
+                                [math]::Round($deviceDetail.physicalMemoryInBytes / 1GB, 2)
+                            }
+                            else
+                            {
+                                0 
+                            }
+                            
+                            $totalStorageGB = if ($deviceDetail.totalStorageSpaceInBytes)
+                            {
+                                [math]::Round($deviceDetail.totalStorageSpaceInBytes / 1GB, 2)
+                            }
+                            else
+                            {
+                                0 
+                            }
+                            
+                            $freeStorageGB = if ($deviceDetail.freeStorageSpaceInBytes)
+                            {
+                                [math]::Round($deviceDetail.freeStorageSpaceInBytes / 1GB, 2)
+                            }
+                            else
+                            {
+                                0 
+                            }
+                            
+                            $usedStorageGB = if ($totalStorageGB -gt 0 -and $freeStorageGB -gt 0)
+                            {
+                                [math]::Round($totalStorageGB - $freeStorageGB, 2)
+                            }
+                            else
+                            {
+                                0 
+                            }
+                            
+                            $usedStoragePercent = if ($totalStorageGB -gt 0)
+                            {
+                                [math]::Round(($usedStorageGB / $totalStorageGB) * 100, 2)
+                            }
+                            else
+                            {
+                                0 
+                            }
+                            
+                            $osVersion = if ($deviceBasic.operatingSystem -match "Windows")
+                            {
+                                "$($deviceBasic.operatingSystem) $($deviceBasic.osVersion)"
+                            }
+                            else
+                            {
+                                $deviceBasic.operatingSystem 
+                            }
+                            
+                            # Create export object with expanded properties
+                            $exportObject = [PSCustomObject]@{
+                                DeviceId              = $deviceBasic.id
+                                SerialNumber          = $deviceBasic.serialNumber
+                                DeviceName            = $deviceBasic.deviceName
+                                Manufacturer          = $deviceBasic.manufacturer
+                                Model                 = $deviceBasic.model
+                                SystemFamily          = $deviceBasic.systemFamily
+                                UserPrincipalName     = $deviceBasic.userPrincipalName
+                                UserDisplayName       = $deviceBasic.userDisplayName
+                                OperatingSystem       = $osVersion
+                                LastSyncDateTime      = $deviceBasic.lastSyncDateTime
+                                MemoryGB              = $memoryGB
+                                TotalStorageGB        = $totalStorageGB
+                                FreeStorageGB         = $freeStorageGB
+                                UsedStorageGB         = $usedStorageGB
+                                UsedStoragePercent    = $usedStoragePercent
+                                EnrollmentProfileName = $deviceBasic.enrollmentProfileName
+                                JoinType              = $deviceBasic.joinType
+                                ComplianceState       = $deviceBasic.complianceState
+                            }
+                            
+                            Write-Verbose "[$functionName] - Processed device: $($deviceBasic.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)"
+                            $null = $CSVObject.Add($exportObject)
+                        }
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] - Failed to get details for device ID $($response.id). Status: $($response.status)"
+                    }
+                }
+            }
+            
+            # Add a slight delay to prevent throttling
+            Start-Sleep -Milliseconds 900
+        }
+        
+        # Export results to CSV
+        if ($CSVObject.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] - Exporting data for $($CSVObject.Count) devices to file $OutputFile"
+            $CSVObject | Export-Csv -Path $OutputFile -NoTypeInformation -Force
+            Write-Host "[$functionName] - Successfully exported device information to $OutputFile" -ForegroundColor Green
+            Write-Host "[$functionName] - Exported $($CSVObject.Count) devices with memory and storage information" -ForegroundColor Green
+            $success = $true
+        }
+        else
+        {
+            Write-Host "[$functionName] - No device information was collected to export" -ForegroundColor Yellow
+            $success = $false
+        }
+    }
+    catch
+    {
+        Write-Host "[$functionName] - Error processing device information: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Verbose "[$functionName] - Exception detail: $($_.Exception | Format-List -Force | Out-String)"
+        $success = $false
+    }
+    return $success
+}
+
+function ExportDeviceList()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$outputPath,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('autopilot', 'imported', 'unmanaged', 'managed')]
+        [string]$deviceType,
+        [ValidateSet('Append', 'Overwrite')]
+        [string]$fileMode = 'overwrite'
+    )
+
+    #region Define variables.
+    $functionName = $MyInvocation.MyCommand
+    $currentDateTime = (Get-Date -Format "yyyyMMdd-HHmmss")
+    $outputFile = "$outputPath\$deviceType-DeviceList-$currentDateTime.csv"
+    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+    # $autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,systemFamily,enrollmentState,deploymentProfileAssignmentStatus"
+    $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
+    $importedAutopilotExtraParameters = "select=serialNumber,importId,groupTag,state"
+    $unmanagedDeviceUri = "devices"
+    $unmanagedDeviceFilter = "operatingSystem eq 'Windows'"
+    $unmanagedDeviceExtraParameters = "select=id,displayName,manufacturer,model,operatingSystemVersion,profileType,createdDateTime,registrationDateTime,accountEnabled,approximateLastSignInDateTime,enrollmentProfileName,enrollmentType,isCompliant"
+    $managedDeviceUri = "deviceManagement/managedDevices"
+    $managedDeviceFilter = "operatingSystem eq Windows"
+    $managedDeviceExtraParameters = "select=serialNumber,deviceName,manufacturer,model,osVersion,autopilotEnrolled,enrolledDateTime,lastSyncDateTime,complianceState,userPrincipalName,userDisplayName,usersLoggedOn"
+    $CSVObject = [System.Collections.ArrayList]@()
+    $success = $false
+    #endregion
+
+    #region Prepare export object
+    switch ($deviceType )
+    {
+        'autopilot'
+        {
+            Write-Verbose "[$functionName] fetching Autopilot devices."
+            $devices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
+            Write-Verbose "[$functionName] Fetched $($devices.value.Count) Autopilot devices."
+        }
+        'imported'
+        {
+            Write-Verbose "[$functionName] fetching Imported Autopilot devices."
+            $devices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -extraParameters $importedAutopilotExtraParameters
+            Write-Verbose "[$functionName] Fetched $($devices.value.Count) imported Autopilot devices."
+        }
+        'unmanaged'
+        {
+            Write-Verbose "[$functionName] fetching Unmanaged devices."
+            $devices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken -filter $unmanagedDeviceFilter -extraParameters $unmanagedDeviceExtraParameters
+            Write-Verbose "[$functionName] Fetched $($devices.value.Count) unmanaged devices."
+        }
+        'managed'
+        {
+            Write-Verbose "[$functionName] fetching Managed devices."
+            $devices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter -extraParameters $managedDeviceExtraParameters
+            Write-Verbose "[$functionName] Fetched $($devices.value.Count) managed devices."
+        }
+    }
+    
+    Write-Verbose "[$functionName] Processing $($devices.value.Count) $deviceType devices for export."
+    for ($i = 0; $i -lt $devices.value.count; $i++)
+    {
+        $device = $devices.value[$i]
+        if (-not $device)
+        {
+            Write-Verbose "[$functionName] Skipping null or invalid $deviceType device at index $i."
+            continue
+        }
+        switch ($deviceType)
+        {
+            'autopilot'
+            {
+                Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
+                if ($null -ne $device.lastContactedDateTime)
+                {
+                    $lastContactedDateTime = $device.lastContactedDateTime | FormatDateWithTimeZone
+                }
+                $exportObject = [PSCustomObject] @{
+                    serialNumber                      = $device.serialNumber
+                    groupTag                          = $device.groupTag
+                    manufacturer                      = $device.manufacturer
+                    model                             = $device.model
+                    systemFamily                      = $device.systemFamily
+                    enrollmentState                   = $device.enrollmentState
+                    deploymentProfileAssignmentStatus = $device.deploymentProfileAssignmentStatus
+                    lastContactedDateTime             = $lastContactedDateTime
+                }
+            }
+            'imported'
+            {
+                Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
+                $exportObject = [PSCustomObject] @{
+                    serialNumber         = $device.serialNumber
+                    importId             = $device.importId
+                    groupTag             = $device.groupTag
+                    importStatus         = $device.state.deviceImportStatus
+                    deviceRegistrationId = $device.state.deviceRegistrationId
+                    deviceErrorCode      = $device.state.deviceErrorCode
+                    deviceErrorName      = $device.state.deviceErrorName
+                }
+            }
+            'unmanaged'
+            {
+                Write-Verbose "[$functionName] Preparing $devicetype device with display name $($device.displayName) for export."
+                $createdDateTime = $device.createdDateTime
+                $registrationDateTime = $device.registrationDateTime
+                $approximateLastSignInDateTime = $device.approximateLastSignInDateTime
+                if ($null -ne $device.createdDateTime)
+                {
+                    $createdDateTime = $device.createdDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.registrationDateTime)
+                {
+                    $registrationDateTime = $device.registrationDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.approximateLastSignInDateTime)
+                {
+                    $approximateLastSignInDateTime = $device.approximateLastSignInDateTime | FormatDateWithTimeZone
+                }
+                $exportObject = [PSCustomObject] @{
+                    id                            = $device.id
+                    displayName                   = $device.displayName
+                    manufacturer                  = $device.manufacturer
+                    model                         = $device.model
+                    operatingSystemVersion        = $device.operatingSystemVersion
+                    profileType                   = $device.profileType
+                    createdDateTime               = $createdDateTime
+                    registrationDateTime          = $registrationDateTime
+                    accountEnabled                = $device.accountEnabled
+                    approximateLastSignInDateTime = $approximateLastSignInDateTime
+                    enrollmentProfileName         = $device.enrollmentProfileName
+                    enrollmentType                = $device.enrollmentType
+                    isCompliant                   = $device.isCompliant
+                }
+            }
+            'managed'
+            {
+                Write-Verbose "[$functionName] Preparing $devicetype device object for export."
+                $enrollmentDate = $device.enrolledDateTime
+                $LastSync = $device.lastSyncDateTime
+                $lastLoggedOn = $device.usersLoggedOn.lastLogOnDateTime
+                if ($null -ne $device.enrolledDateTime)
+                {
+                    $enrollmentDate = $device.enrolledDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.lastSyncDateTime)
+                {
+                    $LastSync = $device.lastSyncDateTime | FormatDateWithTimeZone
+                }
+                if ($null -ne $device.usersLoggedOn.lastLogOnDateTime)
+                {
+                    $lastLoggedOn = $device.usersLoggedOn.lastLogOnDateTime | FormatDateWithTimeZone
+                }
+                $exportObject = [PSCustomObject] @{
+                    serialNumber      = $device.serialNumber
+                    deviceName        = $device.deviceName
+                    manufacturer      = $device.manufacturer
+                    model             = $device.model
+                    WindowsVersion    = $device.osVersion
+                    autopilotEnrolled = $device.autopilotEnrolled
+                    enrollmentDate    = $enrollmentDate
+                    LastSync          = $LastSync
+                    complianceState   = $device.complianceState
+                    userPrincipalName = $device.userPrincipalName
+                    userDisplayName   = $device.userDisplayName
+                    lastLoggedOn      = $lastLoggedOn
+                }
+            }
+        }
+        $CSVObject.Add($exportObject) | Out-Null
+    }
+    #endregion    
+
+    if ($CSVObject.Count -gt 0)
+    {
+        Write-Verbose "[$functionName] exporting $($CSVObject.Count) $deviceType devices to $outputFile."
+        #Check if the file exists and ask if the user wants to overwrite.
+        if (Test-Path $outputFile)
+        {
+            if ($fileMode -eq 'Append')
+            {
+                Write-Verbose "[$functionName] Appending to existing file $outputFile."
+                $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Overwriting existing file $outputFile."
+                $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+            }
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Creating new file $outputFile."
+        }
+        $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No devices found for export."
+    }
+    #check if the csv file exists.
+    if (Test-Path $outputFile)
+    {
+        Write-Verbose "[$functionName] CSV file $outputFile created successfully."
+        $success = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Failed to create CSV file $outputFile."
+        $success = $false
+    }
+    return $success, $outputFile
+}
+
+function DisplayReport()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [hashtable]$report,
+        [string[]]$PrefixList,
+        [parameter(ParameterSetName = 'export')]
+        [switch]$Export,
+        [parameter(ParameterSetName = 'export')]
+        [string]$OutputFile = "$pwd\DeviceReport.csv",
+        [parameter(ParameterSetName = 'export')]
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("HTML", "CSV")]
+        [string]$ExportFormat = "HTML"
+    )
+    $functionName = $MyInvocation.MyCommand.Name    
+    #region write verbose log of received parameters
+    Write-Verbose "[$functionName] Export: $Export"
+    Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
+    Write-Verbose "[$functionName] OutputFile: $OutputFile"
+    Write-Verbose "[$functionName] Prefix list: $PrefixList"
+    #endregion write verbose log of received parameters
+    
+    #region Format property names and display report
+    $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
+    foreach ($key in $output.Keys)
+    {
+        # Format the property name to be more readable
+        $readableKey = $key
+        # Handle common prefixes separately
+        $matchedPrefix = $null
+        foreach ($prefix in $PrefixList)
+        {
+            if ($key -match "^($prefix)(.+)$")
+            {
+                $matchedPrefix = $prefix
+                break
+            }
+        }
+        if ($matchedPrefix) 
+        {
+            $prefix = $matches[1]
+            $remainder = $matches[2]
+            # Insert spaces before capital letters in the remainder
+            $formattedRemainder = [regex]::Replace($remainder, '(?<=[a-z])(?=[A-Z])', ' ')
+            $readableKey = "$prefix $formattedRemainder"
+        }
+        else
+        {
+            # Insert spaces before capital letters
+            $readableKey = [regex]::Replace($key, '(?<=[a-z])(?=[A-Z])', ' ')
+        }
+        #if the value is a date, pipe it to the FormatDateWithTimeZone function.
+        if ($output[$key] -is [DateTime])
+        {
+            $formattedOutput[$readableKey] = FormatDateWithTimeZone -DateTime $output[$key]
+        }
+        else
+        {
+            $formattedOutput[$readableKey] = $output[$key]
+        }
+        # Print each property and value
+        Write-Host "$readableKey`: $($output[$key])"
+    }
+    #endregion Format property names and display report
+    
+    #region export
+    if (-not $Export)    
+    {
+        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
+        if ($choice -eq 'Export to HTML')
+        {
+            $Export = $true
+            $ExportFormat = "HTML"
+        }
+        elseif ($choice -eq 'Export to CSV')
+        {
+            $Export = $true
+            $ExportFormat = "CSV"
+        }
+        else
+        {
+            Write-Host "No export selected."
+            return $null
+        }
+    }
+    # Export the report if requested
+    if ($Export)
+    {
+        $deviceName = $enrollmentState.managedDevice.device.deviceName
+        if (-not $deviceName)
+        {
+            $deviceName = "Device"
+        }
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $fileName = "$deviceName`_Report_$timestamp"
+        if ($ExportFormat -eq "HTML")
+        {
+            $htmlPath = "$pwd\$fileName.html"
+            $htmlHeader = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Report: $deviceName</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        tr:hover { background-color: #f5f5f5; }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Device Report: $deviceName</h1>
+    <p>Generated on $(Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")</p>
+    <table>
+        <tr>
+            <th>Property</th>
+            <th>Value</th>
+        </tr>
+"@
+
+            $htmlRows = ""
+            foreach ($key in $formattedOutput.Keys)
+            {
+                $value = $formattedOutput[$key]
+                $htmlRows += "<tr><td>$key</td><td>$value</td></tr>`n"
+            }
+
+            $htmlFooter = @"
+    </table>
+</body>
+</html>
+"@
+
+            $htmlHeader + $htmlRows + $htmlFooter | Out-File -FilePath $htmlPath -Encoding UTF8
+            Write-Host "HTML report exported to: $htmlPath"
+        }
+        elseif ($ExportFormat -eq "CSV")
+        {
+            $csvPath = "$pwd\$fileName.csv"
+            
+            $csvData = foreach ($key in $formattedOutput.Keys)
+            {
+                [PSCustomObject]@{
+                    Property = $key
+                    Value    = $formattedOutput[$key]
+                }
+            }
+            
+            $csvData | Export-Csv -Path $csvPath -NoTypeInformation
+            Write-Host "CSV report exported to: $csvPath"
+        }
+    }
+    #endregion export
+}
+
+function ConvertUserDisplayName()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$UserDisplayName
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    $processedUser = [ordered] @{}
+    # Convert "Lastname, Firstname Middle (nickname)" to "Firstname Middle Lastname (nickname)" if nickname exists,
+    # otherwise to "Firstname Middle Lastname"
+    # Also handles "Lastname, Firstname M." format where M. is a middle initial
+    Write-Verbose "[$functionName] Converting user display name: $UserDisplayName"
+    if ($UserDisplayName -match '^(.*), (.*?)(?:\s([A-Z]\.?))?(?: \((.*?)\))?$')
+    {
+        Write-Verbose "[$functionName] Extracting first name, last name, middle initial and nickname."
+        $lastName = $matches[1].Trim()
+        Write-Verbose "[$functionName] Last name: $lastName"
+        $firstName = $matches[2].Trim()
+        Write-Verbose "[$functionName] First name: $firstName"
+        $middleInitial = if ($matches[3])
+        {
+            $matches[3].Trim() 
+            Write-Verbose "[$functionName] Middle initial: $middleInitial"
+        }
+        else
+        {
+            $null 
+            Write-Verbose "[$functionName] No middle initial found."
+        }
+        $nickname = $matches[4]
+        Write-Verbose "[$functionName] Nickname: $nickname"
+        $fullName = if ($middleInitial)
+        {
+            "$firstName $middleInitial $lastName"
+            Write-Verbose "[$functionName] Full name with middle initial: $fullName"
+        }
+        else
+        {
+            "$firstName $lastName"
+            Write-Verbose "[$functionName] Full name without middle initial: $fullName"
+        }
+        if ($nickname)
+        {
+            Write-Verbose "[$functionName] Nickname found: $nickname"
+            $currentUser = "$fullName ($nickname)"
+            Write-Verbose "[$functionName] Current user with nickname: $currentUser"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No nickname found."
+            $currentUser = $fullName
+            Write-Verbose "[$functionName] Current user without nickname: $currentUser"
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No match found for user display name format."
+        Write-Verbose "[$functionName] Returning original display name."
+        $currentUser = $UserDisplayName
+    }
+    #Add what we got the the processedUser hashtable
+    $processedUser.Add('FullName', $currentUser)
+    $processedUser.Add('FirstName', $firstName)
+    $processedUser.Add('LastName', $lastName)
+    $processedUser.Add('MiddleInitial', $middleInitial)
+    $processedUser.Add('Nickname', $nickname)
+    return $processedUser
+}
+
+function GetManagedDeviceRelevantProperties()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $enrollmentState,
+        $settings = $settings
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    $managedDeviceProperties = [ordered] @{}
+    if ($null -eq $settings.MinimumDevicePhysicalMemoryInGB -or $settings.MinimumDevicePhysicalMemoryInGB -eq 0)
+    {
+        Write-Verbose "[$functionName] No minimum device physical memory specified in settings."
+        Write-Verbose "[$functionName] Setting default value to 16GB."
+        $MinimumDevicePhysicalMemoryInGB = 16
+    }
+    else
+    {
+        $MinimumDevicePhysicalMemoryInGB = $settings.MinimumDevicePhysicalMemoryInGB
+        Write-Verbose "[$functionName] Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB"
+    }
+    Write-Host "Checking managed device..."
+    Write-Verbose "[$functionName] Managed device: $($enrollmentState.managed)"
+    if ($enrollmentState.managed)
+    {
+        Write-Verbose "[$functionName] Found a managed device."
+        Write-Verbose "[$functionName] Checking whether this is an orphan device..."
+        Write-Verbose "[$functionName] Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
+        Write-Verbose "[$functionName] Managed device id: $($enrollmentState.managedDevice.device.id)"
+        Write-Verbose "[$functionName] Checking if they are the same..."
+        if ($enrollmentState.managedDevice.device.id -eq $enrollmentState.autopilot.device.managedDeviceId)
+        {
+            Write-Verbose "[$functionName] Device Id's match."
+            Write-Host "The device is not an orphan device."
+            $orphanDevice = $false
+            Write-Host "Checking whether the device has enough RAM..."
+            if ($enrollmentState.managedDevice.memory -ge $MinimumDevicePhysicalMemoryInGB)
+            {
+                Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of ram, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                $correctRam = $true
+            }
+            else
+            {
+                Write-Host "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                Write-Host "Contact Hardware and Logistics."
+                $correctRam = $false
+            }   
+            Write-Host "Checking for a user association on the manage device..."
+            if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
+            {
+                Write-Verbose "[$functionName] Found a user..."
+                Write-Verbose "[$functionName] User display name: $($enrollmentState.managedDevice.users.userDisplayName)"
+                Write-Verbose "[$functionName] User id: $($enrollmentState.managedDevice.device.userId)"
+                Write-Verbose "[$functionName] User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)"
+                $hasUser = $true
+                if ($enrollmentState.managedDevice.users.azureUser)
+                {
+                    $validUser = $true
+                    $normalizedUsername = ConvertUserDisplayName -UserDisplayName $enrollmentState.managedDevice.users.userDisplayName
+                    Write-Host "This device is registered to $($normalizedUsername.FullName) ($($enrollmentState.managedDevice.users.userPrincipalName))"
+                    if ($null -ne $enrollmentState.managedDevice.users.lastLogOnDateTime)
+                    {
+                        $lastLogonDate = $enrollmentState.managedDevice.users.lastLogonDateTime | FormatDateWithTimeZone
+                        Write-Host "$($enrollmentState.managedDevice.users.user.givenName) last logged on on $lastLogonDate."
+                    }
+                    else
+                    {
+                        $lastLogonDate = $null
+                        Write-Host "Cannot determine the last time $($normalizedUsername.FirstName) logged on..."
+                    }
+                }
+                else 
+                {
+                    Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
+                    Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                    $validUser = $false
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] The managed device is not associated with a user."
+                $hasUser = $false
+            }
+        }
+        else
+        {
+            $orphanDevice = $true
+            Write-Verbose "[$functionName] Device Id's do not match."
+            Write-Verbose "[$functionName] The device is an orphan device."
+        }
+    }
+
+    if ($OrphanDevice -eq $false -and $CorrectRam -and -not ($HasUser -and $ValidUser))
+    {
+        $readyForNextUser = $true
+        Write-Verbose "[$functionName] Device is ready for the next user"
+    }
+    else
+    {
+        $readyForNextUser = $false
+        Write-Verbose "[$functionName] Device is not ready for the next user"
+    }
+    $managedDeviceProperties.Add('OrphanDevice', $orphanDevice)
+    $managedDeviceProperties.Add('CorrectRam', $correctRam)
+    $managedDeviceProperties.Add('HasUser', $hasUser)
+    $managedDeviceProperties.Add('ValidUser', $validUser)
+    $managedDeviceProperties.Add('LastLogonDate', $lastLogonDate)
+    $managedDeviceProperties.Add('ReadyForNextUser', $readyForNextUser)
+    return $managedDeviceProperties
+}
+
+function GetAutopilotDeviceRelevantProperties()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $enrollmentState,
+        $settings = $settings
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    $autopilotDeviceProperties = [ordered] @{}
+    if ($null -eq $settings.DesiredAutopilotProfiles -or $settings.DesiredAutopilotProfiles.Count -eq 0)
+    {
+        Write-Verbose "[$functionName] No desired autopilot profiles specified in settings."
+        Write-Verbose "[$functionName] Setting default value to 'None'."
+        $desiredAutopilotProfiles = $null
+    }
+    else
+    {
+        $desiredAutopilotProfiles = $settings.DesiredAutopilotProfiles
+        Write-Verbose "[$functionName] Desired autopilot profiles specified in settings: $desiredAutopilotProfiles"
+    }
+    if ($null -ne $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -and $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedUnkownSyncState', 'assignedInSync'))
+    {
+        Write-Verbose "[$functionName] The device profile assignment state is valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        $profileAssigned = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        $profileAssigned = $false
+    }
+    if ($null -ne $desiredAutopilotProfiles -and $enrollmentState.autopilot.device.deploymentProfile.displayName -in $desiredAutopilotProfiles -and $profileAssigned -eq $true)
+    {
+        Write-Host "The device is assigned to the correct autopilot profile."
+        $correctProfile = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] The device is not assigned to the correct autopilot profile."
+        $correctProfile = $false
+    }
+    Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+    Write-Host "Assigned profile name: $($enrollmentState.autopilot.device.deploymentProfile.displayname)"
+    Write-Host "Assignment date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)"
+    #Check remediation state.
+    $lastRemediationDate = $enrollmentState.autopilot.device.remediationStateLastModifiedDateTime | FormatDateWithTimeZone
+    if ($null -ne $enrollmentState.autopilot.device.remediationState -and $enrollmentState.autopilot.device.remediationState -in @('noRemediationRequired', 'unknownFutureValue'))
+    {
+        Write-Verbose "[$functionName] The device profile remediation state is valid: $($enrollmentState.autopilot.device.remediationState)."
+        $remediationStateGood = $true
+        Write-Verbose "[$functionName] Remediation state last modified date: $lastRemediationDate"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] The device profile remediation state is not valid: $($enrollmentState.autopilot.device.remediationState)."
+        $remediationStateGood = $false
+    }
+    Write-Host "Remediation state: $($enrollmentState.autopilot.device.remediationState)"
+    Write-Host "Remediation state last modified date: $lastRemediationDate"
+    #Now check enrollment status.
+    if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -in @('enrolled', 'notContacted'))
+    {
+        Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        $enrollmentStateGood = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] The device enrollment state is not valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        $enrollmentStateGood = $false
+    }
+    Write-Host "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
+    if ($CorrectProfile -and $ProfileAssigned -and $RemediationStateGood -and $EnrollmentStateGood)
+    {
+        Write-Verbose "[$functionName] Autopilot assignment is good..."
+        $AutopilotAssignmentGood = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] There are issues with this device's autopilot assignment."
+        $AutopilotAssignmentGood = $false
+        
+    }
+    Write-Verbose "[$functionName] Autopilot assignment good: $AutopilotAssignmentGood"
+    #Add what we got the the autopilotDeviceProperties hashtable
+    $autopilotDeviceProperties.Add('CorrectProfile', $correctProfile)
+    $autopilotDeviceProperties.Add('ProfileAssigned', $profileAssigned)
+    $autopilotDeviceProperties.Add('RemediationStateGood', $remediationStateGood)
+    $autopilotDeviceProperties.Add('EnrollmentStateGood', $enrollmentStateGood)
+    $autopilotDeviceProperties.Add('AutopilotAssignmentGood', $AutopilotAssignmentGood)
+    return $autopilotDeviceProperties
+}
+
+function AssessDeviceState() 
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $enrollmentState,
+        $settings = $settings,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('PropperEnrollmentVerification', 'NextUserReadiness', 'TroubleShooting')]
+        [string]$AssessmentType
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #region Write verbose log of received parameters.
+    Write-Verbose "[$functionName] Received parameters:"
+    Write-Verbose "[$functionName] Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)"
+    Write-Verbose "[$functionName] Assessment type: $AssessmentType"
+    Write-Verbose "[$functionName] Settings: $($settings | ConvertTo-Json -Depth 10)"
+    $returnValue = [ordered] @{}
+    $readinessState = $null
+    $action = $null
+    $device = $null
+    #endregion
+
+    Write-Verbose "[$functionName] Type of assessment: $AssessmentType"
+    switch ($AssessmentType)
+    {
+        'PropperEnrollmentVerification'
+        {
+            Write-Host "Place holder text..."
+            Write-Host "Checking if the device is properly enrolled..."
+        }
+        'NextUserReadiness'
+        {
+            Write-Host "Checking if the device is ready for the next user..."
+            Write-Verbose "[$functionName] Checking if the device is registered in Autopilot..."
+            Write-Verbose "[$functionName] In Autopilot: $($enrollmentState.inAutopilot)"
+            if ($enrollmentState.inAutopilot)
+            {
+                $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
+                $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                Write-Host "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
+                Write-Host "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
+                if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
+                {
+                    Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of RAM, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                    $readinessState = 'Ready'
+                    $action = 'None'
+                    $device = $enrollmentState.managedDevice.device.id
+                }
+                else
+                {
+                    Write-Host "The device is not ready for the next user."
+                    Write-Host "See below for more information."
+                    #let us explain to the user what the problem is.
+                    if ($autopilotReadiness.CorrectProfile -eq $false)
+                    {
+                        Write-Host "The device is not assigned to the correct autopilot profile."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($autopilotReadiness.ProfileAssigned -eq $false)
+                    {
+                        Write-Host "The device is not assigned to an autopilot profile."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($autopilotReadiness.RemediationStateGood -eq $false)
+                    {
+                        Write-Host "The device has a remediation state that is not valid."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($autopilotReadiness.EnrollmentStateGood -eq $false)
+                    {
+                        Write-Host "The device has an enrollment state that is not valid."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.OrphanDevice -eq $true)
+                    {
+                        Write-Host "The device is an orphan device."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.CorrectRam -eq $false)
+                    {
+                        Write-Host "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                        Write-Host "Contact Hardware and Logistics."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.HasUser)
+                    {
+                        Write-Host "The managed device is associated with a user."
+                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                        $readinessState = 'NotReady'
+                        $action = 'WipeOrClean'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    elseif ($managedDeviceReadiness.ValidUser -eq $false)
+                    {
+                        Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
+                        Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
+                        $readinessState = 'NotReady'
+                        $action = 'WipeOrClean'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                    else
+                    {
+                        Write-Host "The device is not ready for the next user."
+                        $readinessState = 'NotReady'
+                        $action = 'ContactAdmin'
+                        $device = $enrollmentState.managedDevice.device.id
+                    }
+                }
+            }
+            else
+            {
+                Write-Host "The device is not registered in Autopilot."
+                Write-Host "You may want to contact an Intune admin."
+                $readinessState = 'NotReady'
+                $action = 'ContactAdmin'
+                $device = $enrollmentState.managedDevice.device.id
+            }
+        }
+        'TroubleShooting'
+        {
+            Write-Host "Place holder text..."
+            Write-Host "Troubleshooting the device..."
+        }
+    }        
+    $returnValue.Add('ReadinessState', $readinessState)
+    $returnValue.Add('Action', $action)
+    $returnValue.Add('Device', $device)
+    Write-Verbose "[$functionName] Returning readiness state: $readinessState"
+    Write-Verbose "[$functionName] Returning action: $action"
+    Write-Verbose "[$functionName] Returning device: $device"
+    return $returnValue
+}
+
+function ShowDeviceReport()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        $enrollmentState,
+        [parameter(ParameterSetName = 'export')]
+        [switch]$Export,
+        [parameter(ParameterSetName = 'export')]
+        [string]$OutputFile = "$pwd\DeviceReport.csv",
+        [parameter(ParameterSetName = 'export')]
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("HTML", "CSV")]
+        [string]$ExportFormat = "HTML"
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #region write verbose log of received parameters
+    Write-Verbose "[$functionName] Received parameters: $($enrollmentState | Out-String)"
+    Write-Verbose "[$functionName] Export: $Export"
+    Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
+    #endregion write verbose log of received parameters
+    
+    #region report content
+    if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
+    {
+        $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
+    }
+    else
+    {
+        $latestAutopilotEvent = $null
+    }
+    
+    $output = [ordered] @{
+        InputIdentifier               = $serialNumber
+        IntuneDeviceName              = $enrollmentState.managedDevice.device.deviceName
+        IntuneSerialNumber            = $enrollmentState.managedDevice.device.serialNumber
+        IntuneDeviceMemory            = "$($enrollmentState.managedDevice.memory) GB"
+        IntuneManagedDeviceId         = $enrollmentState.managedDevice.device.Id
+        IntuneEnrollmentDate          = $enrollmentState.managedDevice.device.enrolledDateTime | FormatDateWithTimeZone
+        IntuneLastSync                = $enrollmentState.managedDevice.device.lastSyncDateTime | FormatDateWithTimeZone
+        IntuneEnrollmentProfile       = $enrollmentState.managedDevice.device.enrollmentProfileName
+        IntunePrimaryUPN              = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
+        IntuneAzureUser               = $enrollmentState.managedDevice.users.AzureUser
+        IntuneUserDisplayName         = $enrollmentState.managedDevice.users.userDisplayName                
+        IntuneReportedUserDisplayName = $enrollmentState.managedDevice.device.userDisplayName
+        IntuneLastLogon               = $enrollmentState.managedDevice.users.lastLogOnDateTime | FormatDateWithTimeZone
+        IntuneActionResults           = $enrollmentState.managedDevice.device.deviceActionResults
+        IntuneCertExpiration          = $enrollmentState.managedDevice.device.managementCertificateExpirationDate | FormatDateWithTimezone
+        IntuneComplianceExpiry        = $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime | FormatDateWithTimezone
+        IntuneAutopilotEnrolled       = $enrollmentState.managedDevice.device.autopilotEnrolled
+        IntuneRegistrationState       = $enrollmentState.managedDevice.device.deviceRegistrationState
+        IntuneIsEncrypted             = $enrollmentState.managedDevice.device.isEncrypted
+        IntuneEnrollmentType          = $enrollmentState.managedDevice.device.deviceEnrollmentType
+        IntunesVersion                = $enrollmentState.managedDevice.device.sVersion
+        IntuneComplianceState         = $enrollmentState.managedDevice.device.complianceState
+        IntuneManagementState         = $enrollmentState.managedDevice.device.managementState
+        IntuneOwnerType               = $enrollmentState.managedDevice.device.managedDeviceOwnerType
+        AutopilotDeviceId             = $enrollmentState.autopilot.device.id
+        AutopilotState                = $enrollmentState.autopilot.device.enrollmentState
+        AutopilotAssignedUser         = $enrollmentState.autopilot.device.userPrincipalName
+        AutopilotLastContacted        = $enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimezone
+        AutopilotLatestEventTime      = $latestAutopilotEvent.eventDateTime | FormatDateWithTimezone
+        AutopilotLatestProfile        = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
+        AutopilotLatestStatus         = $latestAutopilotEvent.deploymentState
+        AutopilotLatestError          = $latestAutopilotEvent.enrollmentFailureDetails
+    }
+    #endregion report content
+    
+    #region Format property names and display report
+    $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
+    foreach ($key in $output.Keys)
+    {
+        # Format the property name to be more readable
+        $readableKey = $key
+        # Handle common prefixes separately
+        if ($key -match '^(Intune|Autopilot)(.+)$')
+        {
+            $prefix = $matches[1]
+            $remainder = $matches[2]
+            # Insert spaces before capital letters in the remainder
+            $formattedRemainder = [regex]::Replace($remainder, '(?<=[a-z])(?=[A-Z])', ' ')
+            $readableKey = "$prefix $formattedRemainder"
+        }
+        else
+        {
+            # Insert spaces before capital letters
+            $readableKey = [regex]::Replace($key, '(?<=[a-z])(?=[A-Z])', ' ')
+        }
+        $formattedOutput[$readableKey] = $output[$key]
+        # Print each property and value
+        Write-Host "$readableKey`: $($output[$key])"
+    }
+    #endregion Format property names and display report
+
+    #region export
+    if (-not $Export)    
+    {
+        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
+        if ($choice -eq 'Export to HTML')
+        {
+            $Export = $true
+            $ExportFormat = "HTML"
+        }
+        elseif ($choice -eq 'Export to CSV')
+        {
+            $Export = $true
+            $ExportFormat = "CSV"
+        }
+        else
+        {
+            Write-Host "No export selected."
+            return $null
+        }
+    }
+    # Export the report if requested
+    if ($Export)
+    {
+        $deviceName = $enrollmentState.managedDevice.device.deviceName
+        if (-not $deviceName)
+        {
+            $deviceName = "Device"
+        }
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $fileName = "$deviceName`_Report_$timestamp"
+        if ($ExportFormat -eq "HTML")
+        {
+            $htmlPath = "$pwd\$fileName.html"
+            $htmlHeader = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Report: $deviceName</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        tr:hover { background-color: #f5f5f5; }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Device Report: $deviceName</h1>
+    <p>Generated on $(Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")</p>
+    <table>
+        <tr>
+            <th>Property</th>
+            <th>Value</th>
+        </tr>
+"@
+
+            $htmlRows = ""
+            foreach ($key in $formattedOutput.Keys)
+            {
+                $value = $formattedOutput[$key]
+                $htmlRows += "<tr><td>$key</td><td>$value</td></tr>`n"
+            }
+
+            $htmlFooter = @"
+    </table>
+</body>
+</html>
+"@
+
+            $htmlHeader + $htmlRows + $htmlFooter | Out-File -FilePath $htmlPath -Encoding UTF8
+            Write-Host "HTML report exported to: $htmlPath"
+        }
+        elseif ($ExportFormat -eq "CSV")
+        {
+            $csvPath = "$pwd\$fileName.csv"
+            
+            $csvData = foreach ($key in $formattedOutput.Keys)
+            {
+                [PSCustomObject]@{
+                    Property = $key
+                    Value    = $formattedOutput[$key]
+                }
+            }
+            
+            $csvData | Export-Csv -Path $csvPath -NoTypeInformation
+            Write-Host "CSV report exported to: $csvPath"
+        }
+    }
+    #endregion export
+}

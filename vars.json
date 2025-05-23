@@ -1,15 +1,10 @@
 {
-    "NoAdminCheck":  "false",
-    "NoIntuneCheck":  "false",
-    "Repo":  "Github",
-    "timeInSeconds":  "60",
-    "NoSignatureVerify":  "true",
-    "NoUpdateCheck":  "true",
-    "maxWaitTime":  "30",
-    "GetDeviceHash":  "false",
-    "NoHashVerify":  "true",
-    "GroupTag":  "entra",
-    "Release":  "main",
-    "configFile":  ".\\\\.secrets\\\\config.json",
-    "configuration":  "vars.json"
+    "configFile": ".\\\\.secrets\\\\config.json",
+    "maxWaitTime": "30",
+    "timeInSeconds": "60",
+    "Release": "2.5",
+    "Repo": "Github",
+    "configuration": "vars.json",
+    "ShowAdvancedOptions": "true",
+    "GroupTag": "MSB01"
 }

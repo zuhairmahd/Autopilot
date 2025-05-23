@@ -1,82 +1,20 @@
-<#region PSScriptInfo
-.VERSION 1.0.0
-.GUID d973dfdd-190f-48ca-97de-a99d8e9cbd37
-.AUTHOR Zuhair Mahmoud
-.DESCRIPTION Creates a release package
-.COMPANYNAME Government Accountability Office
-.COPYRIGHT GPL
-.PROJECTURI https://github.com/zuhairmahd/Autopilot
-.EXTERNALMODULEDEPENDENCIES, Microsoft.Graph.Authentication, Microsoft.Graph.Groups', Microsoft.Graph.Identity.DirectoryManagement, WindowsAutoPilotIntune
-.EXTERNALSCRIPTDEPENDENCIES, Invoke-TrustedSigning
-.REQUIREDSCRIPTS
-.SYNOPSIS 
-    Creates a release package
-.DESCRIPTION 
-    This script creates a release package by copying files from the source folder to the release folder, signing the scripts, and creating a manifest file.
-.PARAMETER SourceFolder The folder containing the scripts to be copied. Defaults to the script root folder.
-.PARAMETER ReleaseFolder The folder where the release package will be created. Defaults to a "Release" folder in the current working directory.
-.PARAMETER ManifestFile The path to the manifest file. Defaults to "manifest.json" in the release folder.
-.PARAMETER Sign A switch to sign the scripts in the specified folders.
-.PARAMETER Copy A switch to copy the files from the source folder to the release folder.
-.PARAMETER Manifest A switch to create or update the manifest file.
-.PARAMETER Overwrite A switch to overwrite the release folder if it already exists.
-.PARAMETER FullRelease A switch to perform all actions: signing, copying, and manifest creation.
-.EXAMPLE
-    .\CreateRelease.ps1 -SourceFolder C:\Scripts -ReleaseFolder C:\Release -ManifestFile C:\Release\manifest.json -Sign -Copy -Manifest
-    Creates a release package by signing the scripts in the specified folders, copying the files from the source folder to the release folder, and creating a manifest file.
-.EXAMPLE
-    .\CreateRelease.ps1 -SourceFolder C:\Scripts -ReleaseFolder C:\Release -ManifestFile C:\Release\manifest.json -FullRelease
-    Creates a release package by signing the scripts in the specified folders, copying the files from the source folder to the release folder, and creating a manifest file.
-    .NOTES
-#>
-#endregion PSScriptInfo
-
 [CmdletBinding()]
 param(
-    [string]$SourceFolder = $PSScriptRoot,
-    [string]$ReleaseFolder = "$($pwd)\Release",
-    [string]$ManifestFile = "$ReleaseFolder\manifest.json",
-    [switch]$Sign,
-    [switch]$Copy,
-    [switch]$Manifest,
-    [switch]$Overwrite,
-    [switch]$FullRelease,
-    [switch]$Secrets,
-    [switch]$Config
+    [Parameter(Mandatory = $true)]
+    [string]$InputFile,
+    [string]$outputFile = '',
+    [string]$Version = '',
+    [string]$CompanyName = 'Zuhair Mahmoud',
+    [switch]$MergeOnly,
+    [switch]$Overwrite
 )
-
-$initFile = "$PSScriptRoot\init.json"
-$foldersToSign = @(
-    $PSScriptRoot,
-    "$PSScriptRoot\functions"
-)
-
-#region Variable logs
-Write-Verbose 'Received the following parameters:'
-Write-Verbose "SourceFolder: $SourceFolder"
-Write-Verbose "ReleaseFolder: $ReleaseFolder"
-Write-Verbose "ManifestFile: $ManifestFile"
-Write-Verbose 'The following switches were passed:'
-Write-Verbose "Sign: $Sign"
-Write-Verbose "Copy: $Copy"
-Write-Verbose "Overwrite: $Overwrite"
-Write-Verbose "FullRelease: $FullRelease"
-Write-Verbose "Secrets: $Secrets"
-Write-Verbose "Config: $Config"
-#endregion Variables
-
-if (-not ($Copy -or $Sign -or $Manifest -or $FullRelease -or $Secrets -or $Config))
-{
-    throw 'At least one of the following switches must be provided: -Copy, -Sign, -Manifest, -Secrets or -FullRelease.'
-}
 
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*Configuration.ps1' -ErrorAction Stop
-    Write-Host "Importing $($functions.Count) functions."
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
     foreach ($function in $functions)
     {
         Write-Verbose "Importing function $function"
@@ -90,46 +28,234 @@ else
 }
 #endregion import functions.
 
-function isEncrypted
+#region helper functions
+function SignScripts()
 {
     [CmdletBinding()]
-    param (
-        [psObject]$data
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Path,
+        [string]$exclusions = ''
     )
-    $isEncrypted = $false
-    $encryptedCount = 0
-    $unencryptedCount = 0
-    Write-Verbose 'Checking if the data is encrypted.'
-    foreach ($prop in $data.PSObject.Properties)
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Got $($Path.Count) folders to sign."
+    $success = $false
+    $filesToSign = @()
+    foreach ($folder in $Path)
     {
-        Write-Verbose "Checking if the value of $($prop.Name) $($prop.Value) is encrypted."
-        if ($(try
-                {
-                    $null = [Convert]::FromBase64String($prop.Value); $true 
-                }
-                catch
-                {
-                    $false 
-                }))
+        $files = Get-ChildItem -Path $path -Filter *.exe
+        Write-Verbose "[$functionName] Signing $($files.count) files in $folder and excluding $($exclusions.Count) files."
+        if ($files.Count -gt 0)
         {
-            Write-Verbose "The value $($prop.Value) is encrypted."
-            $encryptedCount++
+            Write-Host "Found $($files.Count) executable files in $Path"
+            foreach ($file in $files)
+            {
+                Write-Verbose "[$functionName] Processing file: $file"
+                if ($file.BaseName -in $exclusions)
+                {
+                    Write-Verbose "[$functionName] Skipping $($file.BaseName) because it is in the exclusions list"
+                    continue
+                }
+                #Check if the file is already signed
+                $signature = Get-AuthenticodeSignature -FilePath $file.FullName -ErrorAction SilentlyContinue
+                Write-Verbose "[$functionName] The signature status is $($signature.Status)"
+                if ($signature.Status -ne 'Valid')
+                {
+                    Write-Verbose "[$functionName] $($file.FullName) is not signed."
+                    Write-Verbose "[$functionName] Adding the file to the list of files to sign."
+                    $filesToSign += $file.FullName
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] $($file.FullName) is already signed."
+                }
+            }
         }
         else
         {
-            Write-Verbose "The value $($prop.Value) is not encrypted."
-            $unencryptedCount++
+            Write-Host "No PowerShell scripts found in $Path"
         }
     }
-    Write-Verbose "The number of encrypted values is $encryptedCount"
-    Write-Verbose "The number of unencrypted values is $unencryptedCount"
-    #If the number of encrypted values is greater than the number of unencrypted values, the data is encrypted.
-    if ($encryptedCount -gt $unencryptedCount)
+    if ($filesToSign.Count -gt 0)
     {
-        $isEncrypted = $true
+        Write-Verbose "[$functionName] Signing $($filesToSign.Count) files..."
+        $filesToSign = $filesToSign -join ","
+        $params = @{
+            'Endpoint'               = 'https://eus.codesigning.azure.net/'
+            'CodeSigningAccountName' = 'zuhairmahd'
+            'CertificateProfileName' = 'Cert1'
+            'FileDigest'             = 'SHA256'
+            'TimestampRfc3161'       = 'http://timestamp.acs.microsoft.com'
+            'TimestampDigest'        = 'SHA256'
+            files                    = $filesToSign
+        }
+        Write-Verbose "[$functionName] Signing $($filesToSign.count) files."
+        try
+        {
+            Invoke-TrustedSigning @params
+            Write-Verbose "[$functionName] Signing process complete."
+            $success = $true
+        }
+        catch
+        {
+            $success = $false
+            Write-Host "An error occurred during the signing process."
+            Write-Error $_
+        }
     }
-    Write-Verbose "The data is encrypted: $isEncrypted"
-    return $isEncrypted
+    else
+    {
+        Write-Host "No files to sign."
+        $success = $true
+    }
+    return $success
+}
+
+function CopyFiles()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Source,
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    $success = $false
+    Write-Host "Copying $($source.count) files to $Destination"
+    foreach ($file in $Source)
+    {
+        #Check if any of the source file is in a subfolder, if so, append the subfolder to the destination and create it if needed.
+        $subfolder = Split-Path -Parent $file
+        if ($subfolder -ne $file)
+        {
+            $subfolder = Split-Path -Parent $file
+            $destinationFolder = Join-Path -Path $Destination -ChildPath $subfolder
+            if (-not (Test-Path -Path $destinationFolder))
+            {
+                Write-Host "Creating folder: $destinationFolder"
+                New-Item -ItemType Directory -Path $destinationFolder -Force | Out-Null
+            }
+            $Destination = Join-Path -Path $Destination -ChildPath $subfolder
+        }
+        else
+        {
+            Write-Host "No subfolder found for file: $file"
+        }
+        Write-Verbose "[$functionName] Processing file: $file"
+        try
+        {
+            Copy-Item -Path $file -Destination $Destination -Force
+            Write-Host "Copied $file to $Destination"
+        }
+        catch
+        {
+            Write-Host "Failed to copy $file to $Destination"
+            Write-Error $_
+        }
+    }
+    $success = $true
+    return $success
+}
+
+function MergeFunctions()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string[]]$FilesToMerge,
+        [string]$DestinationFile = "build\merged.ps1",
+        [Parameter(Mandatory = $false)]
+        [switch]$AddComments
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    $success = $false
+    $AddComments = $true # Set default to true for backward compatibility with PS 5.1
+    Write-Verbose "[$functionName] Starting to merge functions from $(($FilesToMerge | Measure-Object).Count) files."
+    $mergedContent = New-Object System.Text.StringBuilder
+    # Add header to the merged content
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    [void]$mergedContent.AppendLine("#region Inlined Functions")
+    [void]$mergedContent.AppendLine("# This section contains inlined functions from multiple files")
+    [void]$mergedContent.AppendLine("# Generated on: $timestamp")
+    [void]$mergedContent.AppendLine("# Source files:")
+    foreach ($file in $FilesToMerge)
+    {
+        [void]$mergedContent.AppendLine("#   - $file")
+    }
+    [void]$mergedContent.AppendLine("")
+    # Process each file
+    foreach ($filePath in $FilesToMerge)
+    {
+        try
+        {
+            if (Test-Path -Path $filePath)
+            {
+                Write-Verbose "[$functionName] Processing file: $filePath"
+                # Add file header comment if requested
+                if ($AddComments)
+                {
+                    $fileName = Split-Path -Path $filePath -Leaf
+                    [void]$mergedContent.AppendLine("")
+                    [void]$mergedContent.AppendLine("#region Functions from $fileName")
+                    [void]$mergedContent.AppendLine("# Source: $filePath")
+                    [void]$mergedContent.AppendLine("")
+                }
+                # Read and append file content
+                $content = Get-Content -Path $filePath -Raw
+                [void]$mergedContent.AppendLine($content)
+                # Add file footer comment if requested
+                if ($AddComments)
+                {
+                    [void]$mergedContent.AppendLine("")
+                    [void]$mergedContent.AppendLine("#endregion Functions from $fileName")
+                }
+            }
+            else
+            {
+                $errorMsg = "File not found: $filePath"
+                Write-Warning "[$functionName] $errorMsg"
+                Write-Error $errorMsg
+                return $false # Return false immediately if a file is missing
+            }
+        }
+        catch
+        {
+            $errorMsg = "Error processing file $filePath`: $_"
+            Write-Error "[$functionName] $errorMsg"
+            return $false # Return false immediately if there's an error
+        }
+    }
+    # Add footer to the merged content
+    [void]$mergedContent.AppendLine("")
+    [void]$mergedContent.AppendLine("#endregion Inlined Functions")
+    
+    try
+    {
+        # Ensure the destination directory exists
+        $destinationDir = Split-Path -Parent $DestinationFile
+        if (-not (Test-Path -Path $destinationDir))
+        {
+            Write-Verbose "[$functionName] Creating destination directory: $destinationDir"
+            New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+        }
+        
+        # Save the merged content to the destination file
+        Write-Verbose "[$functionName] Saving content to: $DestinationFile"
+        $mergedContent.ToString() | Set-Content -Path $DestinationFile -Force
+        Write-Host "Merged functions saved to: $DestinationFile"
+        $success = $true
+    }
+    catch
+    {
+        $errorMsg = "Error saving to destination file $DestinationFile`: $_"
+        Write-Error "[$functionName] $errorMsg"
+        $success = $false
+    }
+    Write-Verbose "[$functionName] Returning success: $success"
+    return $success
 }
 
 function CopySecrets()
@@ -161,6 +287,7 @@ function CopySecrets()
         {
             $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
             $domain = $data.domain
+            $name = $data.name
             $encrypted = (isEncrypted -data $data)
             if ($encrypted)
             {
@@ -174,7 +301,11 @@ function CopySecrets()
             {
                 $domain = 'Unknown'
             }
-            Write-Host "$i. $domain ($encryption)"
+            if (-not $name)
+            {
+                $name = 'Unknown'
+            }
+            Write-Host "$i. $($name): $domain ($encryption)"
         }
         $index = Read-Host 'Enter the number of the secret you would like to copy. (99 to quit)'
         $secret = $secrets[$index]
@@ -211,467 +342,39 @@ function CopySecrets()
     }
     return $true
 }
+#endregion
 
-function GetExclusions()
+#region Define variables
+$initFile = "init.json"
+$versionFile = 'version.txt'
+$functionsToMerge = @(
+    "$pwd\functions\AutopilotDeviceFunctions.ps1",
+    "$pwd\functions\AutopilotMiscFunctions.ps1",
+    "$pwd\functions\AutopilotScriptUpdateFunctions.ps1",
+    "$pwd\functions\CommonGraphAPIFunctions.ps1",
+    "$pwd\functions\CommonMenuFunctions.ps1",
+    "$pwd\functions\CommonMiscFunctions.ps1"
+)
+$filesToCopy = @('vars.json', 'version.txt', 'init.json') 
+$successMessage = "$OutputFile written"
+$scriptName = $MyInvocation.MyCommand.Name
+$todaysDate = Get-Date -Format "yyyy-MM-dd"
+Write-Host "Starting build script on $todaysDate"
+if ($outputFile -eq '')
 {
-    [CmdletBinding()]
-    param(
-        [string]$ExclusionsFile = "$PSScriptRoot\exclusions.json"
-    )
-    Write-Verbose "ExclusionsFile: $ExclusionsFile"
-    if (Test-Path -Path $ExclusionsFile)
-    {
-        $filesToExclude = (Get-Content -Path $ExclusionsFile | ConvertFrom-Json).exclusions
-        Write-Host "Reading $($filesToExclude.Count) exclusions from $($ExclusionsFile)..."
-        if ($filesToExclude.Count -gt 0)
-        {
-            Write-Verbose 'Files to exclude:'
-            $filesToExclude | ForEach-Object { Write-Verbose $_ }
-        }
-        else
-        {
-            Write-Host "No exclusions found in $($ExclusionsFile)"
-        }
-    }
-    else
-    {
-        Write-Host "Cannot find the exclusion file $($ExclusionsFile)."
-        $filesToExclude = ''
-    }
-    return $filesToExclude
+    Write-Verbose "[$scriptName] No output file specified. Using default output file name."
+    $leafName = Split-Path -Leaf $InputFile
+    Write-Verbose "[$scriptName] Leaf name is: $leafName"
+    $exeName = $leafName.Replace('.ps1', '.exe')
+    Write-Verbose "[$scriptName] Executable name is: $exeName"
+    $outputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
+    Write-Verbose "[$scriptName] Output file set to: $outputFile"
+    Write-Host "No output file specified. Output file set to: $outputFile"
 }
+$parentFolder = Split-Path -Parent $outputFile
+#endregion
 
-function SignScripts()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Path
-    )
-    Write-Verbose "Signing files in $Path"
-    $success = $false
-    $files = Get-ChildItem -Path $path -Filter *.ps1
-    if ($files.Count -eq 0)
-    {
-        Write-Host "No files found in $Path"
-        return $false
-    }
-    else
-    {
-        Write-Host "Found $($files.Count) PowerShell scripts in $Path"
-    }
-    $filesToSign = @()
-    $filesToExclude = GetExclusions
-    foreach ($file in $files)
-    {
-        Write-Verbose "Processing file: $file"
-        if ($file.BaseName -in $filesToExclude)
-        {
-            Write-Verbose "Skipping $($file.BaseName) because it is in the exclusions list"
-            continue
-        }
-        #Check if the file is already signed
-        $signature = Get-AuthenticodeSignature -FilePath $file.FullName -ErrorAction SilentlyContinue
-        if ($signature.Status -ne 'Valid')
-        {
-            Write-Verbose "$($file.FullName) is not signed."
-            #Add it to the list of files to sign.
-            $filesToSign += $file.FullName
-        }
-    }
-    if ($filesToSign.Count -gt 0)
-    {
-        Write-Verbose "Signing $($filesToSign.Count) files..."
-        $filesToSign | ForEach-Object { Write-Verbose $_ }
-        $filesToSign = $filesToSign -join ','
-        $params = @{
-            'Endpoint'               = 'https://eus.codesigning.azure.net/'
-            'CodeSigningAccountName' = 'zuhairmahd'
-            'CertificateProfileName' = 'Cert1'
-            'FileDigest'             = 'SHA256'
-            'TimestampRfc3161'       = 'http://timestamp.acs.microsoft.com'
-            'TimestampDigest'        = 'SHA256'
-            files                    = $filesToSign
-        }
-        Write-Verbose 'Signing the following files:'
-        $filesToSign | ForEach-Object { Write-Verbose $_ }
-        try
-        {
-            Invoke-TrustedSigning @params
-            Write-Host 'Signing process complete.'
-            $success = $true
-        }
-        catch
-        {
-            $success = $false
-            Write-Host 'An error occurred during the signing process.'
-            Write-Host $_.Exception.Message
-        }
-    }
-    else
-    {
-        Write-Host 'No files to sign.'
-        $success = $true
-    }
-    return $success
-}
-
-function CopyFiles()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$SourceFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$DestinationFolder = "$sourceFolder\Release",
-        [Parameter(Mandatory = $false)]
-        [string]$FunctionsFolder = "$sourceFolder\functions",
-        [Parameter(Mandatory = $false)]
-        [string]$PowerShellFolder = "$sourceFolder\pwsh",
-        [Parameter(Mandatory = $true)]
-        [string]$manifestFile = "$SourceFolder\manifest.json"
-    )
-
-    #region Variable logs and definitions
-    Write-Verbose 'Received the following parameters:'
-    Write-Verbose "SourceFolder: $SourceFolder"
-    Write-Verbose "DestinationFolder: $DestinationFolder"
-    Write-Verbose "FunctionsFolder: $FunctionsFolder"
-    Write-Verbose "PowerShellFolder: $PowerShellFolder"
-    Write-Verbose "Manifest: $manifestFile"
-    $success = $false
-    $destinationFunctionsFolder = "$DestinationFolder\functions"
-    #endregion Variable logs and definitions
-
-    if (-not (Test-Path -Path $DestinationFolder) -or -not (Test-Path -Path $manifestFile) -or -not (Test-Path -Path $FunctionsFolder) -or -not (Test-Path -Path $PowerShellFolder))
-    {
-        Write-Host "Cannot find one or more required paths: DestinationFolder ($DestinationFolder), ManifestFile ($manifest), or FunctionsFolder ($FunctionsFolder)."
-        return $success
-    }
-    # Get the manifest file and convert it to a hashtable.
-    $manifest = Get-Content -Path $manifestFile | ConvertFrom-Json
-    Write-Host "Read $($manifest.functions.Count) functions, $($manifest.scripts.Count) scripts, $($manifest.cmds.Count) command files and $($manifest.configurations.Count) configurations from $($manifestFile)."
-    foreach ($category in $manifest.PSObject.Properties)
-    {
-        Write-Host "Copying $($category.Value.Count) $($category.Name)s"
-        switch ($category.Name)
-        {
-            functions
-            {
-                foreach ($function in $category.Value)
-                {
-                    Write-Verbose "Copying $($function.name) to $destinationFunctionsFolder"
-                    try
-                    {
-                        Copy-Item -Path "$FunctionsFolder\$($function.name).ps1" -Destination $destinationFunctionsFolder -Force    
-                    }
-                    catch
-                    {
-                        Write-Error "Failed to copy $($function.name) to $destinationFunctionsFolder"
-                        Write-Error $_.Exception.Message
-                        $success = $false
-                        return $success
-                    }
-                }
-                Write-Host "Copied $($category.Value.Count) functions."
-            }
-            scripts
-            {
-                foreach ($script in $category.Value)
-                {
-                    Write-Verbose "Copying $($script.name) to $DestinationFolder"
-                    try
-                    {
-                        Copy-Item -Path "$SourceFolder\$($script.name).ps1" -Destination $DestinationFolder -Force    
-                    }
-                    catch
-                    {
-                        Write-Error "Failed to copy $($script.name) to $DestinationFolder"
-                        Write-Error $_.Exception.Message
-                        $success = $false
-                        return $success
-                    }
-                }
-                Write-Host "Copied $($category.Value.Count) scripts."
-            }
-            cmds
-            {
-                foreach ($cmd in $category.Value)
-                {
-                    Write-Verbose "Copying $($cmd.name) to $DestinationFolder"
-                    try
-                    {
-                        Copy-Item -Path "$SourceFolder\$($cmd.name).cmd" -Destination $DestinationFolder -Force    
-                    }
-                    catch
-                    {
-                        Write-Error "Failed to copy $($cmd.name) to $DestinationFolder"
-                        Write-Error $_.Exception.Message
-                        $success = $false
-                        return $success
-                    }
-                }
-                Write-Host "Copied $($category.Value.Count) command files."
-            }
-            configurations
-            {
-                foreach ($configuration in $category.Value)
-                {
-                    Write-Verbose "Copying $($configuration.name) to $DestinationFolder"
-                    try
-                    {
-                        Copy-Item -Path "$SourceFolder\$($configuration.name).json" -Destination $DestinationFolder -Force    
-                    }
-                    catch
-                    {
-                        Write-Error "Failed to copy $($configuration.name) to $DestinationFolder"
-                        Write-Error $_.Exception.Message
-                        $success = $false
-                        return $success
-                    }
-                }
-            }
-            Default
-            {
-                Write-Host 'Unknown category'
-            }
-        }
-    }
-    $success = $true
-    return $success
-}
-
-function CopyManifest()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$SourceFolder,
-        [Parameter(Mandatory = $true)]
-        [string]$DestinationFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$manifestFile = "$SourceFolder\manifest.json",
-        [switch]$NoPrompt
-    )
-    
-    #write a verbose log of all received parameters
-    Write-Verbose "SourceFolder: $SourceFolder"
-    Write-Verbose "DestinationFolder: $DestinationFolder"
-    Write-Verbose "ManifestFile: $manifestFile"
-    Write-Verbose "NoPrompt: $NoPrompt"
-    $manifestFileName = Split-Path -Path $manifestFile -Leaf
-    Write-Verbose "ManifestFileName: $manifestFileName"
-    $success = $false
-    
-    if (-not $NoPrompt)
-    {
-        $response = Read-Host "Would you like to copy the manifest from the release folder to the root folder at $($PSScriptRoot)? (Y/N)"
-        while ($response -notin 'Y', 'N')
-        {
-            $response = Read-Host "Invalid input. Please enter Y or N: "
-            [console]::beep(500, 300)
-        }
-    }
-    if ($response -eq 'Y' -or $NoPrompt)
-    {
-        Write-Host "Copying the $manifestFileName from $SourceFolder to $DestinationFolder"
-        try
-        {
-            Copy-Item -Path "$sourceFolder\$manifestFileName" -Destination "$destinationFolder\$manifestFileName" -Force 
-            Write-Verbose 'Manifest copied successfully.'
-        }
-        catch
-        {
-            Write-Error "Failed to copy manifest to $PSScriptRoot"
-            Write-Error $_.Exception.Message
-            $success = $false
-            return $success
-        }
-    }
-    else
-    {
-        Write-Verbose 'The manifest will not be copied to the root folder.'
-        return $success
-    }
-    #Check if the file was really copied.
-    if (Test-Path -Path "$destinationFolder\$manifestFileName")
-    {
-        $success = $true
-    }
-    return $success
-}
-
-function CreateManifest()
-{
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$rootFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$functionsFolder = "$($rootFolder)\functions",
-        [Parameter(Mandatory = $false)]
-        [string]$ManifestFile
-    )
-    Write-Verbose 'Received the following parameters:'
-    Write-Verbose "rootFolder: $rootFolder"
-    Write-Verbose "functionsFolder: $functionsFolder"
-    Write-Verbose "ManifestFile: $ManifestFile"
-    $success = $false
-    if (Test-Path -Path $ManifestFile)
-    {
-        Write-Host "Updating $($ManifestFile)..."
-    }
-    else
-    {
-        Write-Host "Creating $($ManifestFile)..."
-    }
-    $version = @{'Functions' = @(); 'Scripts' = @(); 'Cmds' = @(); 'configurations' = @() }
-    $version | ConvertTo-Json | Set-Content -Path $ManifestFile -Force
-    $functionFiles = Get-ChildItem -File -Path $functionsFolder -Recurse -Include *.ps1 -Force
-    $scriptFiles = Get-ChildItem -Path "$pwd" *.ps1 -Force
-    $cmdFiles = Get-ChildItem -File -Path "$pwd" *.cmd -Force
-    $configurationFiles = Get-ChildItem -File -Path $pwd -Filter '*.json' -Force
-    $fileTypes = @('functions', 'scripts', 'cmds', 'configurations' )
-    $functions = @()
-    $scripts = @()
-    $cmds = @()
-    $configurations = @()
-    $filesToExclude = GetExclusions
-    foreach ($filetype in $fileTypes)
-    {
-        Write-Host "Processing $filetype"
-        switch ($filetype)
-        {
-            functions
-            {  
-                foreach ($function in $functionFiles)
-                {
-                    Write-Verbose "Checking if $($function.BaseName) is in the exclusion list."
-                    if ($function.BaseName -notin $filesToExclude)
-                    {
-                        Write-Verbose "Getting the version number for $($function.BaseName)"
-                        $versionString = Select-String -Path $function.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-                        if ($versionString)
-                        {
-                            $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
-                            $versionNumber = [System.Version]$versionNumber
-                        }
-                        else
-                        {
-                            $versionNumber = $versionNumber = [System.Version]'0.0.0'
-                        }
-                        Write-Verbose "The version of $($function.BaseName) is $versionNumber"
-                        Write-Verbose "Computing hash for $($function.BaseName)"
-                        $hash = Get-FileHash -Path $function.FullName -Algorithm SHA256
-                        Write-Verbose "The hash of $($function.BaseName) is $($hash.Hash)"
-                        Write-Verbose "Adding $($function.BaseName) to $manifestFile"
-                        $functions += [ordered]@{'name' = $function.BaseName; 'version' = $versionNumber; 'hash' = $hash.Hash }
-                    }
-                    else
-                    {
-                        Write-Verbose "Skipping $($function.BaseName)"
-                    }
-                }
-                Write-Host "Processed $($functions.Count) Functions."
-            }
-            scripts
-            {  
-                foreach ($script in $scriptFiles)
-                {
-                    Write-Verbose "Checking if $($script.BaseName) is in the exclusion list."
-                    if ($script.BaseName -notin $filesToExclude)
-                    {
-                        Write-Verbose "Getting the version number for $($script.BaseName)"
-                        $versionString = Select-String -Path $script.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-                        if ($versionString)
-                        {
-                            $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
-                            $versionNumber = [System.Version]$versionNumber
-                        }
-                        else
-                        {
-                            $versionNumber = [System.Version]'0.0.0'
-                        }
-                        Write-Verbose "The version of $($script.BaseName) is $versionNumber"
-                        Write-Verbose "Computing hash for $($script.BaseName)"                        
-                        $hash = Get-FileHash -Path $script.FullName -Algorithm SHA256
-                        Write-Verbose "The hash of $($script.BaseName) is $($hash.Hash)"
-                        Write-Verbose "Adding $($script.BaseName) to $manifestFile"
-                        $scripts += [ordered]@{'name' = $script.BaseName; 'version' = $versionNumber; 'hash' = $hash.Hash }
-                    }
-                    else
-                    {
-                        Write-Verbose "Skipping $($script.BaseName)"
-                    }
-                }
-                Write-Host "Processed $($scripts.Count)Scripts."
-            }
-            cmds
-            {  
-                foreach ($cmd in $cmdFiles)
-                {
-                    Write-Verbose "Checking if $($cmd.BaseName) is in the exclusion list."
-                    if ($cmd.BaseName -notin $filesToExclude)
-                    {
-                        Write-Verbose "Getting the version number for $($cmd.BaseName)"
-                        $versionString = Select-String -Path $cmd.FullName -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-                        if ($versionString)
-                        {
-                            $versionNumber = [regex]::Match($versionString, '\d+\.\d+\.\d').Value
-                            $versionNumber = [System.Version]$versionNumber
-                        }
-                        else
-                        {
-                            $versionNumber = [System.Version]'0.0.0'
-                        }
-                        Write-Verbose "The version of $($cmd.BaseName) is $versionNumber"
-                        Write-Verbose "Computing hash for $($cmd.BaseName)"                        
-                        $hash = Get-FileHash -Path $cmd.FullName -Algorithm SHA256
-                        Write-Verbose "The hash of $($cmd.BaseName) is $($hash.Hash)"
-                        Write-Verbose "Adding $($cmd.BaseName) to $manifestFile"
-                        $cmds += [ordered]@{'name' = $cmd.BaseName; 'version' = $versionNumber; 'hash' = $hash.Hash }
-                    }
-                    else
-                    {
-                        Write-Verbose "Skipping $($cmd.BaseName)"
-                    }
-                }
-                Write-Host "Processed $($cmds.Count) Cmds."
-            }
-            configurations
-            {
-                foreach ($configuration in $configurationFiles)
-                {
-                    Write-Verbose "Checking if $($configuration.BaseName) is in the exclusion list."
-                    if ($configuration.BaseName -notin $filesToExclude)
-                    {
-                        Write-Verbose "Computing hash for $($cmd.BaseName)"                        
-                        $hash = Get-FileHash -Path $configuration.FullName -Algorithm SHA256
-                        Write-Verbose "The hash for $($configuration.BaseName) is $($hash.Hash)"
-                        Write-Verbose "Adding $($configuration.BaseName) to $manifestFile"
-                        $configurations += [ordered]@{'name' = $configuration.BaseName; 'hash' = $hash.Hash }
-                    }
-                    else
-                    {
-                        Write-Verbose "Skipping $($configuration.BaseName)"
-                    }
-                }
-                Write-Host "Processed $($configurations.Count) configurations."
-            }
-            Default
-            {
-                Write-Host 'Unknown filetype'
-            }
-        }        
-    }
-    $combined = @{'Functions' = $functions; 'Scripts' = $scripts; 'Cmds' = $cmds; configurations = $configurations }    
-    $combined | ConvertTo-Json -Depth 5 | Set-Content -Path $ManifestFile -Force    
-    Write-Host "Successfully updated $($ManifestFile)"
-    $success = $true
-    return $success
-}
-
-### Main script ###
+#region initial checks
 #Check if the initialization file exists.  If not, create it.
 if (-not (Test-Path -Path $initFile))
 {
@@ -692,11 +395,65 @@ else
     Write-Host "Found initialization file $($initFile)..."
 }
 
+#Define the version variable.
+if ($Version -eq '')
+{
+    Write-Host 'No version specified. Attempting to read version from input file.'
+    $versionString = Select-String -Path $InputFile -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
+    if ($versionString -match '(\d+\.\d+\.\d+)')
+    {
+        $Version = $matches[1]
+        Write-Host "Found version $($Version) in input file."
+    }
+    else
+    {
+        Write-Host 'No version found in input file. Using default version 1.0.0.'
+        $Version = '1.0.0'
+    }
+}
+else
+{
+    Write-Host "Using version $($Version)"
+}
+
+#Check if the version file exists.  If not, create it.
+if (-not (Test-Path -Path $versionFile))
+{
+    Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
+    Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
+    Write-Host 'Version file created successfully.'
+}
+else
+{
+    Write-Host "Found version file $($versionFile)..."
+    $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
+    $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
+    Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
+    $versionObject = [System.Version]::Parse($Version)
+    Write-Verbose "[$scriptName] Version object: $versionObject"
+    if ($VersionFileContentObject -lt $versionObject)
+    {
+        Write-Host "Version file content is less than the specified version. Updating file..."
+        Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
+        Write-Host 'Version file updated successfully.'
+    }
+    elseif ($VersionFileContentObject -gt $versionObject)
+    {
+        Write-Host "Version file content is greater than the specified version. Updating the local variable."
+        $Version = $VersionFileContentObject.ToString()
+        Write-Verbose "[$scriptName] Version updated to: $Version"
+    }
+    else
+    {
+        Write-Host "Version file content matches the specified version."
+    }
+}
+
 if (-not $Overwrite)
 {
-    if (Test-Path -Path $ReleaseFolder)
+    if (Test-Path -Path $parentFolder)
     {
-        Write-Host "Destination folder $releaseFolder already exists."
+        Write-Host "Destination folder $parentFolder already exists."
         Write-Host 'What would you like to do?'
         do
         {
@@ -707,28 +464,28 @@ if (-not $Overwrite)
         {
             O
             {
-                Write-Host "Removing $ReleaseFolder"
-                Remove-Item -Path $ReleaseFolder -Recurse -Force | Out-Null
-                Write-Host "Creating folder $ReleaseFolder"
-                New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
+                Write-Host "Removing $parentFolder"
+                Remove-Item -Path $parentFolder -Recurse -Force | Out-Null
+                Write-Host "Creating folder $parentFolder"
+                New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
                 Write-Verbose 'Creating functions folder'
-                New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
+                New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
                 Write-Host 'Creating secrets folder.'
-                New-Item -Path "$ReleaseFolder\.secrets" -ItemType Directory -Force | Out-Null
+                New-Item -Path "$parentFolder\.secrets" -ItemType Directory -Force | Out-Null
             }
             C
             {
                 Write-Host 'Continuing with the existing folder.'
                 #Check to make sure all subfolders exist.
-                if (-not (Test-Path -Path "$ReleaseFolder\functions"))
+                if (-not (Test-Path -Path "$parentFolder\functions"))
                 {
                     Write-Host 'Creating functions folder'
-                    New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
+                    New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
                 }
-                if (-not (Test-Path -Path "$ReleaseFolder\.secrets"))
+                if (-not (Test-Path -Path "$parentFolder\.secrets"))
                 {
                     Write-Host 'Creating secrets folder'
-                    New-Item -Path "$ReleaseFolder\.secrets" -ItemType Directory -Force | Out-Null
+                    New-Item -Path "$parentFolder\.secrets" -ItemType Directory -Force | Out-Null
                 }
             }
             E
@@ -740,521 +497,213 @@ if (-not $Overwrite)
     }
     else
     {
-        Write-Host "Creating folder $ReleaseFolder"
-        New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
+        Write-Host "Creating folder $parentFolder"
+        New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
         Write-Verbose 'Creating functions folder'
-        New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
+        New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
         Write-Verbose 'Creating secrets folder'
-        New-Item -Path "$ReleaseFolder\.secrets" -ItemType Directory -Force | Out-Null
+        New-Item -Path "$parentFolder\.secrets" -ItemType Directory -Force | Out-Null
     }
 }
 else
 {
-    Write-Host "Overwriting $ReleaseFolder"
-    Remove-Item -Path $ReleaseFolder -Recurse -Force | Out-Null
-    New-Item -Path $ReleaseFolder -ItemType Directory -Force | Out-Null
-    Write-Verbose 'Creating functions folder'
-    New-Item -Path "$ReleaseFolder\functions" -ItemType Directory -Force | Out-Null
-}
-
-if ($sign -or $FullRelease)
-{
-    foreach ($folder in $foldersToSign)
+    Write-Host "Overwriting $parentFolder"
+    if (Test-Path -Path $parentFolder)
     {
-        $folder | ForEach-Object { Write-Verbose $_ }
-        if (SignScripts -Path $folder)
-        {
-            Write-Host "File signature for folder $folder is complete."
-        }
-        else
-        {
-            Write-Host "Failed to sign files in $folder"
-            Write-Host 'Run the script with the -verbose switch for more information.'
-        }
-    }
-}
-else
-{
-    Write-Host 'Skipping signing process.'
-}
-
-if ($Manifest -or $FullRelease)
-{
-    Write-Host "Creating manifest in $ReleaseFolder"
-    if (CreateManifest -rootFolder $pwd -ManifestFile $ManifestFile)
-    {
-        Write-Host 'Manifest created successfully.'
-        if (CopyManifest -SourceFolder $ReleaseFolder -DestinationFolder $PSScriptRoot -ManifestFile $ManifestFile -NoPrompt)
-        {
-            Write-Host 'Manifest copied successfully.'
-        }
-        else
-        {
-            Write-Host 'The manifest was not copied.'
-        }
+        Write-Host "Removing $parentFolder"
+        Remove-Item -Path $parentFolder -Recurse -Force | Out-Null
     }
     else
     {
-        Write-Host 'Failed to create manifest.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
+        Write-Host "Creating folder $parentFolder"
     }
+    New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
 }
-else
-{
-    Write-Host 'Skipping manifest creation process.'
-}
+#endregion
 
-if ($Copy -or $FullRelease)
+#region Merge functions
+$mergeOutputFile = Join-Path -Path "$pwd\build" -ChildPath 'merged.ps1'
+$mergeParentFolder = Split-Path -Parent $mergeOutputFile
+# Ensure destination directory exists
+if (-not (Test-Path -Path $mergeParentFolder))
 {
-    Write-Host "Copying files from $SourceFolder to $ReleaseFolder using $ManifestFile"
-    if (CopyFiles -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -Manifest $ManifestFile)
+    Write-Verbose "[$scriptName] Creating parent folder: $mergeParentFolder"
+    New-Item -ItemType Directory -Path $mergeParentFolder -Force | Out-Null
+}
+if ($InputFile -ne $outputFile)
+{
+    Write-Verbose "[$scriptName] Copying input file to parent folder: $mergeParentFolder"
+    $newscriptFile = "$mergeParentFolder\$($InputFile.Split('\')[-1])"
+    Write-Verbose "[$scriptName] New script file path: $newscriptFile"
+    Copy-Item -Path $InputFile -Destination $mergeParentFolder -Force
+}
+Write-Verbose "[$scriptName] Calling MergeFunctions with destination: $mergeOutputFile"
+Write-Host "Merging sourced functions in $inputFile to $mergeOutputFile"
+$mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $mergeOutputFile
+Write-Verbose "[$scriptName] MergeFunctions returned: $mergeResult"
+if ($mergeResult -eq $true)
+{
+    Write-Host "Functions merged successfully to $mergeOutputFile"
+    Write-Host "Creating master script at $newscriptFile"
+    #read the newscript into a variable.
+    Write-Verbose "[$scriptName] Reading new script content into variable."
+    $newscriptContent = Get-Content -Path $newscriptFile -Raw
+    Write-Verbose "[$scriptName] New script content read successfully."        #read the merged script into a variable.
+    Write-Verbose "[$scriptName] Reading merged script content into variable."
+    $mergedContent = Get-Content -Path $mergeOutputFile -Raw
+    Write-Verbose "[$scriptName] Merged script content read from: $mergeOutputFile"
+    # Find the positions of the region markers
+    Write-Verbose "[$scriptName] Finding region markers in the script."
+    $startMarker = "#region import functions."
+    $endMarker = "#endregion import functions."
+    $startPosition = $newscriptContent.IndexOf($startMarker)
+    $endPosition = $newscriptContent.IndexOf($endMarker, $startPosition)
+    if ($startPosition -ge 0 -and $endPosition -gt $startPosition)
     {
-        Write-Host 'Files copied successfully.'
+        Write-Verbose "[$scriptName] Found start marker at position $startPosition and end marker at position $endPosition."
+        # Extract portions before, between, and after markers
+        $beforeRegion = $newscriptContent.Substring(0, $startPosition + $startMarker.Length)
+        $afterRegion = $newscriptContent.Substring($endPosition)
+        # Construct the new content by concatenating the parts with the merged content
+        $newscriptContent = $beforeRegion + "`r`n" + $mergedContent + "`r`n" + $afterRegion
+        Write-Verbose "[$scriptName] Replaced content between import functions markers."
     }
     else
     {
-        Write-Host 'Failed to copy files.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
+        Write-Warning "[$scriptName] Could not find region markers in the script. Script will not be modified."
+    }
+    #write the newscriptContent to the newscriptFile
+    Write-Verbose "[$scriptName] Writing new script content to: $newscriptFile"
+    try
+    {
+        $newscriptContent | Set-Content -Path $newscriptFile -Force
+        Write-Verbose "[$scriptName] New script content written successfully."
+        Write-Host "New script content written to $newscriptFile"
+    }
+    catch
+    {
+        Write-Host "Failed to write new script content to $newscriptFile"
+        Write-Error $_
+        exit 1
     }
 }
 else
 {
-    Write-Host 'Skipping copy process.'
+    Write-Host "Failed to merge functions to $OutputFile"
+    exit 1
 }
+#endregion
 
-if ($Secrets -or $FullRelease)
+if (Test-Path $outputFile)
 {
-    Write-Verbose 'Checking if the secrets folder exists.'
-    #Check if there are any secrets in the destination folder.
-    if (Test-Path -Path "$ReleaseFolder\.secrets\config.json")
+    Write-Host "The output file $outputFile already exists. Do you want to replace it? (Y/N)"
+    $response = Read-Host
+    while ($response -ne 'Y' -and $response -ne 'N')
     {
-        Write-Host 'Secrets already exist in the destination folder.'
-        $response = Read-Host 'Would you like to overwrite them? (Y/N)'
-        while ($response -notin 'Y', 'N')
-        {
-            $response = Read-Host 'Invalid input. Please enter Y or N: '
-            [console]::beep(500, 300)
-        }
-        switch ($response)
-        {
-            Y
-            { 
-                Write-Host 'Overwriting secrets...' 
-                if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
-                {
-                    Write-Host 'Secrets copied successfully.'
-                }
-                else
-                {
-                    Write-Host 'Failed to copy secrets.'
-                    Write-Host 'Run the script with the -verbose switch for more information.'
-                }
-            }
-            N
-            {
-                Write-Host 'No secrets will be copied.'
-            }
-        }
+        Write-Host "Invalid response. Please enter Y or N."
+        [console]::beep(1000, 500)
+        $response = Read-Host
+    }
+    if ($response -ne 'Y')
+    {
+        Write-Host "Exiting script."
+        exit 0
     }
     else
     {
-        Write-Host 'Secrets do not exist in the destination folder.'
-        if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $ReleaseFolder)
-        {
-            Write-Host 'Secrets copied successfully.'
-        }
-        else
-        {
-            Write-Host 'Failed to copy secrets.'
-            Write-Host 'Run the script with the -verbose switch for more information.'
-        }
+        Write-Host "Replacing $outputFile"
     }
+}
+
+Write-Host "Building executable from $newscriptFile to $OutputFile"
+$result = Invoke-ps2exe -inputFile $newscriptFile -outputFile $OutputFile -x64 -version $Version -title "Intune Registration" -description "Register devices in Intune and perform other Autopilot device functions" -company $CompanyName -product "Intune Autopilot Registration" -copyright '2025'
+if ($result -match $successMessage)
+{
+    Write-Host "Executable created successfully: $OutputFile"
 }
 else
 {
-    Write-Host 'Skipping secrets copy process.'
+    Write-Host "Failed to create executable: $OutputFile"
+    exit 1
 }
 
-if ($Config -or $FullRelease)
+Write-Host "Signing executable at $OutputFile"
+if (SignScripts -path "$pwd\build")
 {
-    Write-Host "Choose the type of configuration you want to create:"
-    Write-Host "(1) Create Release Configuration"
-    Write-Host "(2) Create Dev Configuration"
-    Write-Host "(0) Skip Configuration"
-    $configChoice = Read-Host "Enter your choice (1, 2, or 0 to skip)"
-    while ($configChoice -notin ('0', '1', '2'))
+    Write-Host "Executable signed successfully: $OutputFile"
+}
+else
+{
+    Write-Host "Failed to sign executable: $OutputFile"
+    exit 1
+}
+
+if (CopyFiles -Source $filesToCopy -Destination $parentFolder)
+{
+    Write-Host "Files copied successfully to $parentFolder"
+}
+else
+{
+    Write-Host "Failed to copy files to $parentFolder"
+    exit 1
+}
+
+Write-Verbose 'Checking if the secrets folder exists.'
+if (Test-Path -Path "parentFolder\.secrets\config.json")
+{
+    Write-Host 'Secrets already exist in the destination folder.'
+    $response = Read-Host 'Would you like to overwrite them? (Y/N)'
+    while ($response -notin 'Y', 'N')
     {
-        Write-Host "Invalid choice. Please enter 1, 2 or 3, or enter 0 to skip."
+        $response = Read-Host 'Invalid input. Please enter Y or N: '
         [console]::beep(500, 300)
-        $configChoice = Read-Host "Enter your choice (1 or 2)"
     }
-    switch ($configChoice)
+    switch ($response)
     {
-        1
+        Y
         { 
-            Write-Host 'Creating Release configuration file.' 
-            $configSuccess = CreateConfiguration -RootFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -ConfigurationType 'Release'
+            Write-Host 'Overwriting secrets...' 
+            if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder)
+            {
+                Write-Host 'Secrets copied successfully.'
+            }
+            else
+            {
+                Write-Host 'Failed to copy secrets.'
+                Write-Host 'Run the script with the -Verbose switch for more information.'
+            }
         }
-        2
-        { 
-            Write-Host 'Creating Development configuration file.' 
-            $configSuccess = CreateConfiguration -RootFolder $PSScriptRoot -DestinationFolder $ReleaseFolder -ConfigurationType 'Dev'
+        N
+        {
+            Write-Host 'No secrets will be copied.'
         }
-        0
-        { 
-            Write-Host 'Skipping configuration file creation process.' 
-            $configSuccess = $true
-        }
-    }
-    if ($configSuccess -and $configChoice -ne 0)
-    {
-        Write-Host 'Configuration file created successfully.'
-    }
-    elseif ($configChoice -eq 0)
-    {
-        Write-Host 'Skipping configuration file creation process.'
-    }
-    else
-    {
-        Write-Host 'Configuration file was not created.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
     }
 }
 else
 {
-    Write-Host 'Skipping configuration file creation process.'
+    Write-Host 'Secrets do not exist in the destination folder.'
+    if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder)
+    {
+        Write-Host 'Secrets copied successfully.'
+    }
+    else
+    {
+        Write-Host 'Failed to copy secrets.'
+        Write-Host 'Run the script with the -Verbose switch for more information.'
+    }
 }
 
-# SIG # Begin signature block
-# MII95AYJKoZIhvcNAQcCoII91TCCPdECAQExDzANBglghkgBZQMEAgEFADB5Bgor
-# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAdQAz4uiCScbuh
-# wZ7wpfLJq+5rpcvKTfg3PDqyhQrX7qCCIqYwggXMMIIDtKADAgECAhBUmNLR1FsZ
-# lUgTecgRwIeZMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4wHAYDVQQK
-# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29mdCBJZGVu
-# dGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkgMjAy
-# MDAeFw0yMDA0MTYxODM2MTZaFw00NTA0MTYxODQ0NDBaMHcxCzAJBgNVBAYTAlVT
-# MR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jv
-# c29mdCBJZGVudGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRo
-# b3JpdHkgMjAyMDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBALORKgeD
-# Bmf9np3gx8C3pOZCBH8Ppttf+9Va10Wg+3cL8IDzpm1aTXlT2KCGhFdFIMeiVPvH
-# or+Kx24186IVxC9O40qFlkkN/76Z2BT2vCcH7kKbK/ULkgbk/WkTZaiRcvKYhOuD
-# PQ7k13ESSCHLDe32R0m3m/nJxxe2hE//uKya13NnSYXjhr03QNAlhtTetcJtYmrV
-# qXi8LW9J+eVsFBT9FMfTZRY33stuvF4pjf1imxUs1gXmuYkyM6Nix9fWUmcIxC70
-# ViueC4fM7Ke0pqrrBc0ZV6U6CwQnHJFnni1iLS8evtrAIMsEGcoz+4m+mOJyoHI1
-# vnnhnINv5G0Xb5DzPQCGdTiO0OBJmrvb0/gwytVXiGhNctO/bX9x2P29Da6SZEi3
-# W295JrXNm5UhhNHvDzI9e1eM80UHTHzgXhgONXaLbZ7LNnSrBfjgc10yVpRnlyUK
-# xjU9lJfnwUSLgP3B+PR0GeUw9gb7IVc+BhyLaxWGJ0l7gpPKWeh1R+g/OPTHU3mg
-# trTiXFHvvV84wRPmeAyVWi7FQFkozA8kwOy6CXcjmTimthzax7ogttc32H83rwjj
-# O3HbbnMbfZlysOSGM1l0tRYAe1BtxoYT2v3EOYI9JACaYNq6lMAFUSw0rFCZE4e7
-# swWAsk0wAly4JoNdtGNz764jlU9gKL431VulAgMBAAGjVDBSMA4GA1UdDwEB/wQE
-# AwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTIftJqhSobyhmYBAcnz1AQ
-# T2ioojAQBgkrBgEEAYI3FQEEAwIBADANBgkqhkiG9w0BAQwFAAOCAgEAr2rd5hnn
-# LZRDGU7L6VCVZKUDkQKL4jaAOxWiUsIWGbZqWl10QzD0m/9gdAmxIR6QFm3FJI9c
-# Zohj9E/MffISTEAQiwGf2qnIrvKVG8+dBetJPnSgaFvlVixlHIJ+U9pW2UYXeZJF
-# xBA2CFIpF8svpvJ+1Gkkih6PsHMNzBxKq7Kq7aeRYwFkIqgyuH4yKLNncy2RtNwx
-# AQv3Rwqm8ddK7VZgxCwIo3tAsLx0J1KH1r6I3TeKiW5niB31yV2g/rarOoDXGpc8
-# FzYiQR6sTdWD5jw4vU8w6VSp07YEwzJ2YbuwGMUrGLPAgNW3lbBeUU0i/OxYqujY
-# lLSlLu2S3ucYfCFX3VVj979tzR/SpncocMfiWzpbCNJbTsgAlrPhgzavhgplXHT2
-# 6ux6anSg8Evu75SjrFDyh+3XOjCDyft9V77l4/hByuVkrrOj7FjshZrM77nq81YY
-# uVxzmq/FdxeDWds3GhhyVKVB0rYjdaNDmuV3fJZ5t0GNv+zcgKCf0Xd1WF81E+Al
-# GmcLfc4l+gcK5GEh2NQc5QfGNpn0ltDGFf5Ozdeui53bFv0ExpK91IjmqaOqu/dk
-# ODtfzAzQNb50GQOmxapMomE2gj4d8yu8l13bS3g7LfU772Aj6PXsCyM2la+YZr9T
-# 03u4aUoqlmZpxJTG9F9urJh4iIAGXKKy7aIwggbnMIIEz6ADAgECAhMzAAM1skIm
-# 5t4Y5itQAAAAAzWyMA0GCSqGSIb3DQEBDAUAMFoxCzAJBgNVBAYTAlVTMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJ
-# RCBWZXJpZmllZCBDUyBBT0MgQ0EgMDEwHhcNMjUwNDA0MDYwODQxWhcNMjUwNDA3
-# MDYwODQxWjBmMQswCQYDVQQGEwJVUzERMA8GA1UECBMIVmlyZ2luaWExEjAQBgNV
-# BAcTCUFybGluZ3RvbjEXMBUGA1UEChMOWnVoYWlyIE1haG1vdWQxFzAVBgNVBAMT
-# Dlp1aGFpciBNYWhtb3VkMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA
-# uqspbx8MXZXVSoBUd6U6NGyAHNHAI/F4Sy22FhwfsozNvfuPhJOVLU7czPUJGd2G
-# YkqkZrQU3kD8uXv2PpPm6YbU+FVQc8++4ZfjmwHFOpbybWTrn0WzDALvVdpXlLgr
-# U3WJvkSPuc8MfFNeR/Z1TlKZyGs8H311PC6vRaRnMQZudluEfTR8LTeaNzxrQG0B
-# EV5AXhA9fXxdINVTt2BU4kkMcDD8WmC0Jir5UWdxMjDgrnwV0BE6HJG5SI7JDQ/9
-# uxJlypyN/GfqGRHE8TWFP0I8/wm9x64xADf6wYihmZSmkhzaV27YTWheiqUprzBK
-# vTeY/JxOBJ3/gkTysTsGka6wClOOFL3xwVy8We4hXAZZcp2gPUwz3ltRjE/k3HJr
-# oXubmX35eO9hJyjBc9mziuXrPIE7Yp7wBo6JWfUk3ZxN/MvZahxL3Hagf9fGli7/
-# wU/gMCrr+rXEGXhak1gUjMOCFB+4+CA+BjZ0KOQO36iLsqykXEZLAHGFzCrraeQr
-# AgMBAAGjggIYMIICFDAMBgNVHRMBAf8EAjAAMA4GA1UdDwEB/wQEAwIHgDA7BgNV
-# HSUENDAyBgorBgEEAYI3YQEABggrBgEFBQcDAwYaKwYBBAGCN2GBmtGaFtje9WuB
-# vfqFXPmA7xswHQYDVR0OBBYEFG9nQS7mKgt2/VkQeyOkS8mNurH+MB8GA1UdIwQY
-# MBaAFOiDxDPX3J8MnHaaCqbU34emXljuMGcGA1UdHwRgMF4wXKBaoFiGVmh0dHA6
-# Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY3Jvc29mdCUyMElEJTIw
-# VmVyaWZpZWQlMjBDUyUyMEFPQyUyMENBJTIwMDEuY3JsMIGlBggrBgEFBQcBAQSB
-# mDCBlTBkBggrBgEFBQcwAoZYaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9w
-# cy9jZXJ0cy9NaWNyb3NvZnQlMjBJRCUyMFZlcmlmaWVkJTIwQ1MlMjBBT0MlMjBD
-# QSUyMDAxLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9zb2Z0
-# LmNvbS9vY3NwMGYGA1UdIARfMF0wUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUH
-# AgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0
-# b3J5Lmh0bTAIBgZngQwBBAEwDQYJKoZIhvcNAQEMBQADggIBAHoRqOnawpplL/d1
-# g5h8IxTkYtqBPi7+94PNDg4B40rt6lt855KabIa4sWbwvig7NtUG4ROOlGRWP6Os
-# ZDfaHQXsAbEC9siBWGCsoyGJ85V2gLPMm8UZwLgrrrxAkZFfZd4kmn7EJDfcE3sB
-# Kiae0XIRhUh/x/pwvpq0tPeMEl4MUcIJIZyq1FjYf04b1fQOWGwagL7H51CnDRiP
-# vWiOz1tVwoyOHyiryX1nGcIx74gczDttdcgRtaOlocYIk5CRwmBID47DjD9U96im
-# oE15ayYjRxlY4eok5/CSq4gl0yDR1Dv5tukzlahbjJI9MhufA/Yz5rO7cSKzzh+f
-# tIbdB9s/waX7D03YnxXX2yodNQYGie3mmDFbv3fTk1Qcp02jP+oUrnO7wtpJxhRX
-# 5BA9if5s2gaO7b9gEjvDNPbOtTpo8rGG6FoYRJN/YKVr5tL35RQCaPw7uDtDI/02
-# cpgPfT91E4YLXBS0ralIZojLo6NCciQ5abQ6xKYcuuEIif0W40fBKi/BFSolDF7B
-# MYmL9OgOT67no4LxYYEGn3JlqOIWyecD7rhYO/tQMSgufhuPXubzp1ToLn7cAw9C
-# /oBuD8v1aqtx8bBM36CANIfRzC4KQ657ahAYL67oZvA8an3BS4ng0CcEQR0TDFti
-# QS0sAlDvMlpHwwmIXtYg2P5y0wC8MIIG5zCCBM+gAwIBAgITMwADNbJCJubeGOYr
-# UAAAAAM1sjANBgkqhkiG9w0BAQwFADBaMQswCQYDVQQGEwJVUzEeMBwGA1UEChMV
-# TWljcm9zb2Z0IENvcnBvcmF0aW9uMSswKQYDVQQDEyJNaWNyb3NvZnQgSUQgVmVy
-# aWZpZWQgQ1MgQU9DIENBIDAxMB4XDTI1MDQwNDA2MDg0MVoXDTI1MDQwNzA2MDg0
-# MVowZjELMAkGA1UEBhMCVVMxETAPBgNVBAgTCFZpcmdpbmlhMRIwEAYDVQQHEwlB
-# cmxpbmd0b24xFzAVBgNVBAoTDlp1aGFpciBNYWhtb3VkMRcwFQYDVQQDEw5adWhh
-# aXIgTWFobW91ZDCCAaIwDQYJKoZIhvcNAQEBBQADggGPADCCAYoCggGBALqrKW8f
-# DF2V1UqAVHelOjRsgBzRwCPxeEstthYcH7KMzb37j4STlS1O3Mz1CRndhmJKpGa0
-# FN5A/Ll79j6T5umG1PhVUHPPvuGX45sBxTqW8m1k659FswwC71XaV5S4K1N1ib5E
-# j7nPDHxTXkf2dU5SmchrPB99dTwur0WkZzEGbnZbhH00fC03mjc8a0BtARFeQF4Q
-# PX18XSDVU7dgVOJJDHAw/FpgtCYq+VFncTIw4K58FdAROhyRuUiOyQ0P/bsSZcqc
-# jfxn6hkRxPE1hT9CPP8JvceuMQA3+sGIoZmUppIc2ldu2E1oXoqlKa8wSr03mPyc
-# TgSd/4JE8rE7BpGusApTjhS98cFcvFnuIVwGWXKdoD1MM95bUYxP5Nxya6F7m5l9
-# +XjvYScowXPZs4rl6zyBO2Ke8AaOiVn1JN2cTfzL2WocS9x2oH/XxpYu/8FP4DAq
-# 6/q1xBl4WpNYFIzDghQfuPggPgY2dCjkDt+oi7KspFxGSwBxhcwq62nkKwIDAQAB
-# o4ICGDCCAhQwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwOwYDVR0lBDQw
-# MgYKKwYBBAGCN2EBAAYIKwYBBQUHAwMGGisGAQQBgjdhgZrRmhbY3vVrgb36hVz5
-# gO8bMB0GA1UdDgQWBBRvZ0Eu5ioLdv1ZEHsjpEvJjbqx/jAfBgNVHSMEGDAWgBTo
-# g8Qz19yfDJx2mgqm1N+Hpl5Y7jBnBgNVHR8EYDBeMFygWqBYhlZodHRwOi8vd3d3
-# Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJRCUyMFZlcmlm
-# aWVkJTIwQ1MlMjBBT0MlMjBDQSUyMDAxLmNybDCBpQYIKwYBBQUHAQEEgZgwgZUw
-# ZAYIKwYBBQUHMAKGWGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2Vy
-# dHMvTWljcm9zb2Z0JTIwSUQlMjBWZXJpZmllZCUyMENTJTIwQU9DJTIwQ0ElMjAw
-# MS5jcnQwLQYIKwYBBQUHMAGGIWh0dHA6Ly9vbmVvY3NwLm1pY3Jvc29mdC5jb20v
-# b2NzcDBmBgNVHSAEXzBdMFEGDCsGAQQBgjdMg30BATBBMD8GCCsGAQUFBwIBFjNo
-# dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL0RvY3MvUmVwb3NpdG9yeS5o
-# dG0wCAYGZ4EMAQQBMA0GCSqGSIb3DQEBDAUAA4ICAQB6Eajp2sKaZS/3dYOYfCMU
-# 5GLagT4u/veDzQ4OAeNK7epbfOeSmmyGuLFm8L4oOzbVBuETjpRkVj+jrGQ32h0F
-# 7AGxAvbIgVhgrKMhifOVdoCzzJvFGcC4K668QJGRX2XeJJp+xCQ33BN7ASomntFy
-# EYVIf8f6cL6atLT3jBJeDFHCCSGcqtRY2H9OG9X0DlhsGoC+x+dQpw0Yj71ojs9b
-# VcKMjh8oq8l9ZxnCMe+IHMw7bXXIEbWjpaHGCJOQkcJgSA+Ow4w/VPeopqBNeWsm
-# I0cZWOHqJOfwkquIJdMg0dQ7+bbpM5WoW4ySPTIbnwP2M+azu3Eis84fn7SG3Qfb
-# P8Gl+w9N2J8V19sqHTUGBont5pgxW79305NUHKdNoz/qFK5zu8LaScYUV+QQPYn+
-# bNoGju2/YBI7wzT2zrU6aPKxhuhaGESTf2Cla+bS9+UUAmj8O7g7QyP9NnKYD30/
-# dROGC1wUtK2pSGaIy6OjQnIkOWm0OsSmHLrhCIn9FuNHwSovwRUqJQxewTGJi/To
-# Dk+u56OC8WGBBp9yZajiFsnnA+64WDv7UDEoLn4bj17m86dU6C5+3AMPQv6Abg/L
-# 9WqrcfGwTN+ggDSH0cwuCkOue2oQGC+u6GbwPGp9wUuJ4NAnBEEdEwxbYkEtLAJQ
-# 7zJaR8MJiF7WINj+ctMAvDCCB1owggVCoAMCAQICEzMAAAAHN4xbodlbjNQAAAAA
-# AAcwDQYJKoZIhvcNAQEMBQAwYzELMAkGA1UEBhMCVVMxHjAcBgNVBAoTFU1pY3Jv
-# c29mdCBDb3Jwb3JhdGlvbjE0MDIGA1UEAxMrTWljcm9zb2Z0IElEIFZlcmlmaWVk
-# IENvZGUgU2lnbmluZyBQQ0EgMjAyMTAeFw0yMTA0MTMxNzMxNTRaFw0yNjA0MTMx
-# NzMxNTRaMFoxCzAJBgNVBAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9y
-# YXRpb24xKzApBgNVBAMTIk1pY3Jvc29mdCBJRCBWZXJpZmllZCBDUyBBT0MgQ0Eg
-# MDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQC398ADKAfFuj6PEDTi
-# E0jxvP4Spta9K711GABrCMJlq7VjnghBqXkCuklaLxwiPRYD6anCLHyJNGC6r0kQ
-# tm9MyjZnVToC0TVOfea+rebLBn1J7FV36s85Ov651roZWDAsDzQuFF/zYC+tLDGZ
-# mkIf+VpPTx2fv4a3RxdhU0ok5GbWFKsCOMNCJnUmKr9KqIOgc3o8aZPmFcqzbYTv
-# 0x4VZgHjLRSU2pbRnYs825ryTStsRF2I1L6dM//GwRJlSetubJdloe9zIQpgrzlY
-# HPdKvoS3xWVt2J3+mMGlwcj4fK2hpQAYTqtJaqaHv9oRl4MNSTP24wo4ZqwiBid6
-# dSTkTRvZT/9tCoO/ep2GP1QlhYAM1gL/eLeLFxbVUQtpT7BOpdPEsAV6UKL+VEdK
-# NpaKkN4T9NsFvTNMKIudz2eY6Nk8qW60w2Gj3XDGjiK1wmgiTZs+i3234BX5TA1o
-# NEhtwRpBoHJyX2lxjBaZ/RsnggWf8KZgxUbV6QIHEHLJE2QWQea4xctfo8xdy94T
-# jqMyv2zILczwkdF11HjNWN38XEGdLkc6ujemDpK24Q+yGunsj8qTVxMbzI5aXxqp
-# /o4l4BXIbiXIn1X5nEKViZpTnK+0pgqTUUsGcQF8NbD5QDNBXS9wunoBXHYVzyfS
-# +mjK52vdLBmZyQm7PtH5Lv0HMwIDAQABo4ICDjCCAgowDgYDVR0PAQH/BAQDAgGG
-# MBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTog8Qz19yfDJx2mgqm1N+Hpl5Y
-# 7jBUBgNVHSAETTBLMEkGBFUdIAAwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5t
-# aWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBkGCSsGAQQB
-# gjcUAgQMHgoAUwB1AGIAQwBBMBIGA1UdEwEB/wQIMAYBAf8CAQAwHwYDVR0jBBgw
-# FoAU2UEpsA8PY2zvadf1zSmepEhqMOYwcAYDVR0fBGkwZzBloGOgYYZfaHR0cDov
-# L3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jcmwvTWljcm9zb2Z0JTIwSUQlMjBW
-# ZXJpZmllZCUyMENvZGUlMjBTaWduaW5nJTIwUENBJTIwMjAyMS5jcmwwga4GCCsG
-# AQUFBwEBBIGhMIGeMG0GCCsGAQUFBzAChmFodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
-# b20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUyMElEJTIwVmVyaWZpZWQlMjBDb2Rl
-# JTIwU2lnbmluZyUyMFBDQSUyMDIwMjEuY3J0MC0GCCsGAQUFBzABhiFodHRwOi8v
-# b25lb2NzcC5taWNyb3NvZnQuY29tL29jc3AwDQYJKoZIhvcNAQEMBQADggIBAHf+
-# 60si2TAtOng1+H32+tulKwvw3A8iPb5MGdkYvcLx61MZiz4dlTE0b6s15lr5HO72
-# gRwBkkOIaMRbK3Mxq8PoGKHecRYWwhbhoaHiAHif+lE955WsriLUsbuMneQ8tGE0
-# 4dmItRC2asXhXojG1QWO8GeKNpn2gjGxJJA/yIcyM/3amNCscEVYcYNuSbH7I7oh
-# qfdA3diZt197DNK+dCYpuSJOJsmBwnUvRNnsHCawO+b7RdGw858WCfOEtWpl0TJb
-# DDXRt+U54EqqRvdJoI1BPPyeyFpRmGvFVTmo2BiNpoNBCb4/ZISkEXtGiUQLeWWV
-# +4vgA4YK2g1085avH28FlNcBV1MTavQgOTz7nLWQsZMsrOY0WfqRUJzkF10zvGgN
-# ZDhpSgJFdywF5GGxyWTuRVc/7MkY85fCNQlufPYq32IX/wHoUM7huUa4auiAynJe
-# S7AILZnhdx/IyM8OGplgA8YZNQg0y0Vtq7lG0YbUM5YT150JqG248wOAHJ8+LG+H
-# LeyfvNQeAgL9iw5MzFW4xCL9uBqZ6aj9U0pmuxlpLSfOY7EqmD2oN5+Pl8n2Agdd
-# ynYXQ4dxXB7cqcRdrySrMwN+tGX/DAqs1IWfenuDRvjgB3U40OZa3rUwtC8Xngsb
-# raLp9+FMJ6gVP1n2ltSjaDGXJMWDsGbR+A6WdF8YMIIHnjCCBYagAwIBAgITMwAA
-# AAeHozSje6WOHAAAAAAABzANBgkqhkiG9w0BAQwFADB3MQswCQYDVQQGEwJVUzEe
-# MBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMUgwRgYDVQQDEz9NaWNyb3Nv
-# ZnQgSWRlbnRpdHkgVmVyaWZpY2F0aW9uIFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9y
-# aXR5IDIwMjAwHhcNMjEwNDAxMjAwNTIwWhcNMzYwNDAxMjAxNTIwWjBjMQswCQYD
-# VQQGEwJVUzEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMTQwMgYDVQQD
-# EytNaWNyb3NvZnQgSUQgVmVyaWZpZWQgQ29kZSBTaWduaW5nIFBDQSAyMDIxMIIC
-# IjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAsvDArxmIKOLdVHpMSWxpCFUJ
-# tFL/ekr4weslKPdnF3cpTeuV8veqtmKVgok2rO0D05BpyvUDCg1wdsoEtuxACEGc
-# gHfjPF/nZsOkg7c0mV8hpMT/GvB4uhDvWXMIeQPsDgCzUGzTvoi76YDpxDOxhgf8
-# JuXWJzBDoLrmtThX01CE1TCCvH2sZD/+Hz3RDwl2MsvDSdX5rJDYVuR3bjaj2Qfz
-# ZFmwfccTKqMAHlrz4B7ac8g9zyxlTpkTuJGtFnLBGasoOnn5NyYlf0xF9/bjVRo4
-# Gzg2Yc7KR7yhTVNiuTGH5h4eB9ajm1OCShIyhrKqgOkc4smz6obxO+HxKeJ9bYmP
-# f6KLXVNLz8UaeARo0BatvJ82sLr2gqlFBdj1sYfqOf00Qm/3B4XGFPDK/H04kteZ
-# EZsBRc3VT2d/iVd7OTLpSH9yCORV3oIZQB/Qr4nD4YT/lWkhVtw2v2s0TnRJubL/
-# hFMIQa86rcaGMhNsJrhysLNNMeBhiMezU1s5zpusf54qlYu2v5sZ5zL0KvBDLHtL
-# 8F9gn6jOy3v7Jm0bbBHjrW5yQW7S36ALAt03QDpwW1JG1Hxu/FUXJbBO2AwwVG4F
-# re+ZQ5Od8ouwt59FpBxVOBGfN4vN2m3fZx1gqn52GvaiBz6ozorgIEjn+PhUXILh
-# AV5Q/ZgCJ0u2+ldFGjcCAwEAAaOCAjUwggIxMA4GA1UdDwEB/wQEAwIBhjAQBgkr
-# BgEEAYI3FQEEAwIBADAdBgNVHQ4EFgQU2UEpsA8PY2zvadf1zSmepEhqMOYwVAYD
-# VR0gBE0wSzBJBgRVHSAAMEEwPwYIKwYBBQUHAgEWM2h0dHA6Ly93d3cubWljcm9z
-# b2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTAZBgkrBgEEAYI3FAIE
-# DB4KAFMAdQBiAEMAQTAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFMh+0mqF
-# KhvKGZgEByfPUBBPaKiiMIGEBgNVHR8EfTB7MHmgd6B1hnNodHRwOi8vd3d3Lm1p
-# Y3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3NvZnQlMjBJZGVudGl0eSUyMFZl
-# cmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0aWZpY2F0ZSUyMEF1dGhvcml0eSUyMDIw
-# MjAuY3JsMIHDBggrBgEFBQcBAQSBtjCBszCBgQYIKwYBBQUHMAKGdWh0dHA6Ly93
-# d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMvTWljcm9zb2Z0JTIwSWRlbnRp
-# dHklMjBWZXJpZmljYXRpb24lMjBSb290JTIwQ2VydGlmaWNhdGUlMjBBdXRob3Jp
-# dHklMjAyMDIwLmNydDAtBggrBgEFBQcwAYYhaHR0cDovL29uZW9jc3AubWljcm9z
-# b2Z0LmNvbS9vY3NwMA0GCSqGSIb3DQEBDAUAA4ICAQB/JSqe/tSr6t1mCttXI0y6
-# XmyQ41uGWzl9xw+WYhvOL47BV09Dgfnm/tU4ieeZ7NAR5bguorTCNr58HOcA1tcs
-# HQqt0wJsdClsu8bpQD9e/al+lUgTUJEV80Xhco7xdgRrehbyhUf4pkeAhBEjABvI
-# UpD2LKPho5Z4DPCT5/0TlK02nlPwUbv9URREhVYCtsDM+31OFU3fDV8BmQXv5hT2
-# RurVsJHZgP4y26dJDVF+3pcbtvh7R6NEDuYHYihfmE2HdQRq5jRvLE1Eb59PYwIS
-# FCX2DaLZ+zpU4bX0I16ntKq4poGOFaaKtjIA1vRElItaOKcwtc04CBrXSfyL2Op6
-# mvNIxTk4OaswIkTXbFL81ZKGD+24uMCwo/pLNhn7VHLfnxlMVzHQVL+bHa9KhTyz
-# wdG/L6uderJQn0cGpLQMStUuNDArxW2wF16QGZ1NtBWgKA8Kqv48M8HfFqNifN6+
-# zt6J0GwzvU8g0rYGgTZR8zDEIJfeZxwWDHpSxB5FJ1VVU1LIAtB7o9PXbjXzGifa
-# IMYTzU4YKt4vMNwwBmetQDHhdAtTPplOXrnI9SI6HeTtjDD3iUN/7ygbahmYOHk7
-# VB7fwT4ze+ErCbMh6gHV1UuXPiLciloNxH6K4aMfZN1oLVk6YFeIJEokuPgNPa6E
-# nTiOL60cPqfny+Fq8UiuZzGCGpQwghqQAgEBMHEwWjELMAkGA1UEBhMCVVMxHjAc
-# BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjErMCkGA1UEAxMiTWljcm9zb2Z0
-# IElEIFZlcmlmaWVkIENTIEFPQyBDQSAwMQITMwADNbJCJubeGOYrUAAAAAM1sjAN
-# BglghkgBZQMEAgEFAKBeMBAGCisGAQQBgjcCAQwxAjAAMBkGCSqGSIb3DQEJAzEM
-# BgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCD/BkbM0WqitmQlnNHYqddZqvQR
-# oKL0jCNLf+LXYPTLiTANBgkqhkiG9w0BAQEFAASCAYC6He9NT74p23jdIv5XJ1z1
-# xvTYGSIlKKYI1oT6WG7pQeJR3T/ykifFtH0RMC6w8zFnYyCX1FJEcYX1gidq6RMT
-# RI2j8ecdpl0RVuKfCXHJod0e/xF8FpvVatyi+xFu/BiYdDtldIHke5Tspe5X4uqL
-# ffJ5sYIzpIwrR9ERNqVXc+ZWVwZMr6VG28VpHmYNnnseyb7p7X98hb7Aq6OWTOxZ
-# JQkglvPcJnDbdytG6N/fAH7Co+ZAiJsQrVmtpERJhup1TLyZmkOngp9snyRyhfXO
-# x+tk8YuHDuJXrsesrRRDfvSWaymhgKk7A5jBrD3GL3HkexhokHInEsUx/ttFa8AP
-# GDBa+mE6169yO4yDEQ2X9VlJ20hHo1WYjE8NlYryeQ1/6nl/chvti4B4SEfNdncD
-# UER5OARPkWv1GQkDlF+u1FjqLV5AB77AFXnngGgQorjJGt6AlWbJyFLFnxj6kTb2
-# 4FCu0aUgV+e1hl1XceUXplkeeNq3Aess33FMFVXRV1WhghgUMIIYEAYKKwYBBAGC
-# NwMDATGCGAAwghf8BgkqhkiG9w0BBwKgghftMIIX6QIBAzEPMA0GCWCGSAFlAwQC
-# AQUAMIIBYgYLKoZIhvcNAQkQAQSgggFRBIIBTTCCAUkCAQEGCisGAQQBhFkKAwEw
-# MTANBglghkgBZQMEAgEFAAQgReZQHUOpKBLlcna6N+Bj7D3D5N4O9K25JInRlg1o
-# 2V4CBmfnvgyztxgTMjAyNTA0MDUwMDU3MzIuMjc1WjAEgAIB9KCB4aSB3jCB2zEL
-# MAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1v
-# bmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWlj
-# cm9zb2Z0IEFtZXJpY2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1Mg
-# RVNOOjdBMDAtMDVFMC1EOTQ3MTUwMwYDVQQDEyxNaWNyb3NvZnQgUHVibGljIFJT
-# QSBUaW1lIFN0YW1waW5nIEF1dGhvcml0eaCCDyEwggeCMIIFaqADAgECAhMzAAAA
-# BeXPD/9mLsmHAAAAAAAFMA0GCSqGSIb3DQEBDAUAMHcxCzAJBgNVBAYTAlVTMR4w
-# HAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xSDBGBgNVBAMTP01pY3Jvc29m
-# dCBJZGVudGl0eSBWZXJpZmljYXRpb24gUm9vdCBDZXJ0aWZpY2F0ZSBBdXRob3Jp
-# dHkgMjAyMDAeFw0yMDExMTkyMDMyMzFaFw0zNTExMTkyMDQyMzFaMGExCzAJBgNV
-# BAYTAlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMT
-# KU1pY3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMIICIjAN
-# BgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAnnznUmP94MWfBX1jtQYioxwe1+eX
-# M9ETBb1lRkd3kcFdcG9/sqtDlwxKoVIcaqDb+omFio5DHC4RBcbyQHjXCwMk/l3T
-# OYtgoBjxnG/eViS4sOx8y4gSq8Zg49REAf5huXhIkQRKe3Qxs8Sgp02KHAznEa/S
-# sah8nWo5hJM1xznkRsFPu6rfDHeZeG1Wa1wISvlkpOQooTULFm809Z0ZYlQ8Lp7i
-# 5F9YciFlyAKwn6yjN/kR4fkquUWfGmMopNq/B8U/pdoZkZZQbxNlqJOiBGgCWpx6
-# 9uKqKhTPVi3gVErnc/qi+dR8A2MiAz0kN0nh7SqINGbmw5OIRC0EsZ31WF3Uxp3G
-# gZwetEKxLms73KG/Z+MkeuaVDQQheangOEMGJ4pQZH55ngI0Tdy1bi69INBV5Kn2
-# HVJo9XxRYR/JPGAaM6xGl57Ei95HUw9NV/uC3yFjrhc087qLJQawSC3xzY/EXzsT
-# 4I7sDbxOmM2rl4uKK6eEpurRduOQ2hTkmG1hSuWYBunFGNv21Kt4N20AKmbeuSnG
-# nsBCd2cjRKG79+TX+sTehawOoxfeOO/jR7wo3liwkGdzPJYHgnJ54UxbckF914Aq
-# HOiEV7xTnD1a69w/UTxwjEugpIPMIIE67SFZ2PMo27xjlLAHWW3l1CEAFjLNHd3E
-# Q79PUr8FUXetXr0CAwEAAaOCAhswggIXMA4GA1UdDwEB/wQEAwIBhjAQBgkrBgEE
-# AYI3FQEEAwIBADAdBgNVHQ4EFgQUa2koOjUvSGNAz3vYr0npPtk92yEwVAYDVR0g
-# BE0wSzBJBgRVHSAAMEEwPwYIKwYBBQUHAgEWM2h0dHA6Ly93d3cubWljcm9zb2Z0
-# LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5Lmh0bTATBgNVHSUEDDAKBggrBgEF
-# BQcDCDAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTAPBgNVHRMBAf8EBTADAQH/
-# MB8GA1UdIwQYMBaAFMh+0mqFKhvKGZgEByfPUBBPaKiiMIGEBgNVHR8EfTB7MHmg
-# d6B1hnNodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNyb3Nv
-# ZnQlMjBJZGVudGl0eSUyMFZlcmlmaWNhdGlvbiUyMFJvb3QlMjBDZXJ0aWZpY2F0
-# ZSUyMEF1dGhvcml0eSUyMDIwMjAuY3JsMIGUBggrBgEFBQcBAQSBhzCBhDCBgQYI
-# KwYBBQUHMAKGdWh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvY2VydHMv
-# TWljcm9zb2Z0JTIwSWRlbnRpdHklMjBWZXJpZmljYXRpb24lMjBSb290JTIwQ2Vy
-# dGlmaWNhdGUlMjBBdXRob3JpdHklMjAyMDIwLmNydDANBgkqhkiG9w0BAQwFAAOC
-# AgEAX4h2x35ttVoVdedMeGj6TuHYRJklFaW4sTQ5r+k77iB79cSLNe+GzRjv4pVj
-# JviceW6AF6ycWoEYR0LYhaa0ozJLU5Yi+LCmcrdovkl53DNt4EXs87KDogYb9eGE
-# ndSpZ5ZM74LNvVzY0/nPISHz0Xva71QjD4h+8z2XMOZzY7YQ0Psw+etyNZ1Cesuf
-# U211rLslLKsO8F2aBs2cIo1k+aHOhrw9xw6JCWONNboZ497mwYW5EfN0W3zL5s3a
-# d4Xtm7yFM7Ujrhc0aqy3xL7D5FR2J7x9cLWMq7eb0oYioXhqV2tgFqbKHeDick+P
-# 8tHYIFovIP7YG4ZkJWag1H91KlELGWi3SLv10o4KGag42pswjybTi4toQcC/irAo
-# dDW8HNtX+cbz0sMptFJK+KObAnDFHEsukxD+7jFfEV9Hh/+CSxKRsmnuiovCWIOb
-# +H7DRon9TlxydiFhvu88o0w35JkNbJxTk4MhF/KgaXn0GxdH8elEa2Imq45gaa8D
-# +mTm8LWVydt4ytxYP/bqjN49D9NZ81coE6aQWm88TwIf4R4YZbOpMKN0CyejaPNN
-# 41LGXHeCUMYmBx3PkP8ADHD1J2Cr/6tjuOOCztfp+o9Nc+ZoIAkpUcA/X2gSMkgH
-# APUvIdtoSAHEUKiBhI6JQivRepyvWcl+JYbYbBh7pmgAXVswggeXMIIFf6ADAgEC
-# AhMzAAAAR+OVCzehYN3HAAAAAABHMA0GCSqGSIb3DQEBDAUAMGExCzAJBgNVBAYT
-# AlVTMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1p
-# Y3Jvc29mdCBQdWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMB4XDTI0MTEy
-# NjE4NDg1MFoXDTI1MTExOTE4NDg1MFowgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
-# EwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3Nv
-# ZnQgQ29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJh
-# dGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjo3QTAwLTA1RTAtRDk0NzE1
-# MDMGA1UEAxMsTWljcm9zb2Z0IFB1YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRo
-# b3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDocLpu99z/+NeI
-# ZmR32GJg2VT/jd96pYLsvNngeH4qXwK1qVmFaXXkkVbxb1fOQJMukYkba3WEc69W
-# /Z4BszAuxguThDVlY9sk4ZYkGMgxoq1Z5inUPvj4Qh8xVvlhiAS6Of/uLwDsbsKl
-# g2fGpmvztiPSOL9P15k00I4bsl1vlmRSut2tNwJQ5sXpoT7GI/2T2A0GnWbFECKR
-# CyGW9rsny9o0LNIUl4NYAd4awGSs6OIzKPpIK1JfK90wXHvaXwGJcN9P8QPRJIHK
-# uFoVGzIUG/C0jQC4rQ62yTGvc2sZ4AxTQwflfVBBaiHq8gn/YDHpZileGkB2IQaz
-# ZEiEc5Or5Xer9mUDU+2FEe66w8e2WkLXanqxaD5+Zco+E+QdwcTYGo78jFxPDvNr
-# aTr5QAgITc4dY/PBC3cYFzcgDyUx2xOVCBvgabqJxj7rXrj4Bhd2S/ZTYOVHhi8c
-# DWBaefM8JgiO8GCIIRvlNWng8FKFt09ZfNxmsSdCJlWw3rNAwsBY1xp8pmmv9r2M
-# 9rNIRkZ+sh0xd3GuASWs2bOrqBi0aTzgY9b3CxY+/m+RU+UTim5JkmpJM/AIP68/
-# S+1NwFqXK5yxTJBIInhoEgdEHi+a2JR2SlV3AkpJa0/B6sZaoEa+zgshIfFa66XB
-# mnnsydV4uG7W1INoaNVwxBKDdmqNRwIDAQABo4IByzCCAccwHQYDVR0OBBYEFORU
-# dlggOj7vT7m2XvFhSEW8ht1oMB8GA1UdIwQYMBaAFGtpKDo1L0hjQM972K9J6T7Z
-# PdshMGwGA1UdHwRlMGMwYaBfoF2GW2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9w
-# a2lvcHMvY3JsL01pY3Jvc29mdCUyMFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGlu
-# ZyUyMENBJTIwMjAyMC5jcmwweQYIKwYBBQUHAQEEbTBrMGkGCCsGAQUFBzAChl1o
-# dHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NlcnRzL01pY3Jvc29mdCUy
-# MFB1YmxpYyUyMFJTQSUyMFRpbWVzdGFtcGluZyUyMENBJTIwMjAyMC5jcnQwDAYD
-# VR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAOBgNVHQ8BAf8EBAMC
-# B4AwZgYDVR0gBF8wXTBRBgwrBgEEAYI3TIN9AQEwQTA/BggrBgEFBQcCARYzaHR0
-# cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRt
-# MAgGBmeBDAEEAjANBgkqhkiG9w0BAQwFAAOCAgEADSJUQ9XamDh0gkC1XvrhVz6A
-# MwGVKuKJA+tklJzBa4UVYP3Y9r1RLU08RYJIjPEkpwiwDWitK58gsZxwNh4Nc4fF
-# iQrZUJZ9BInfnodv8WOO83zY8YQdJMcpgBzeYVXiNCedumqFKXj0mMMuWaBynv7w
-# wn7FnHJwzLru4jt4VLeef+BycnYwPoMa75LF/9xZo/0TJ371qtBYdbsceKmNhQUT
-# D2vIvvPkHTPH/NA2IkLsQ1Am51nzh52WEDzRCoXeld6+/KClnfsEB1/vfR6pYPxw
-# ZTvTZ7uh7y8D6g4hDpEcjIses754W2aRpxTPru6n+z2EzkvHF70B/g5oAodmVTUB
-# b+pxpu77UHm0TraVodjfXJJNs+h1RjnCu9Miku2KhPmpBrsSne31y3gXstm5vctp
-# 1tFox9amTWvhIV88l1EIC3yX+BN9cGKtL65REl/y8yqa2PIW2i18JMRIr4T7liHf
-# X0A6sdPsl7GudLyEVHAWsW8NFVzt/vdyRhzMUpsxhPL1qGQgD45Q+3bgTlel5MWl
-# WgYG+b+LLUXR5uiybbIswnORTU/jDycNAx8u4c5+14sen5/fmqcrQa316l7WqcQ6
-# rOcoxDFym7k2RVuEhZNQ4XNXCKI7kb8PMrRtMbobV0mryd0UlbQUbPsJuN9nUE2A
-# DmgnO3bQGyERvppedCExggdGMIIHQgIBATB4MGExCzAJBgNVBAYTAlVTMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
-# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAR+OVCzehYN3HAAAA
-# AABHMA0GCWCGSAFlAwQCAQUAoIIEnzARBgsqhkiG9w0BCRACDzECBQAwGgYJKoZI
-# hvcNAQkDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNTA0MDUwMDU3
-# MzJaMC8GCSqGSIb3DQEJBDEiBCCeudbs8QBwZpktindy7uwY+AF0eRsNP+hQxERK
-# Lw4JcDCBuQYLKoZIhvcNAQkQAi8xgakwgaYwgaMwgaAEIJNm85ZyhQAGGe9QPhd3
-# +xvmMKCvfjHhf8tl6mRICsynMHwwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYDVQQK
-# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQdWJs
-# aWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwAhMzAAAAR+OVCzehYN3HAAAAAABH
-# MIIDYQYLKoZIhvcNAQkQAhIxggNQMIIDTKGCA0gwggNEMIICLAIBATCCAQmhgeGk
-# gd4wgdsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQH
-# EwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJTAjBgNV
-# BAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlvbnMxJzAlBgNVBAsTHm5TaGll
-# bGQgVFNTIEVTTjo3QTAwLTA1RTAtRDk0NzE1MDMGA1UEAxMsTWljcm9zb2Z0IFB1
-# YmxpYyBSU0EgVGltZSBTdGFtcGluZyBBdXRob3JpdHmiIwoBATAHBgUrDgMCGgMV
-# ACAF09m+ILyMNydZT7P3lOLNVFzdoGcwZaRjMGExCzAJBgNVBAYTAlVTMR4wHAYD
-# VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBQ
-# dWJsaWMgUlNBIFRpbWVzdGFtcGluZyBDQSAyMDIwMA0GCSqGSIb3DQEBCwUAAgUA
-# 65rOMTAiGA8yMDI1MDQwNDIxMzEyOVoYDzIwMjUwNDA1MjEzMTI5WjB3MD0GCisG
-# AQQBhFkKBAExLzAtMAoCBQDrms4xAgEAMAoCAQACAjICAgH/MAcCAQACAhM4MAoC
-# BQDrnB+xAgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEA
-# AgMHoSChCjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBANUkqjnbXp8g9c/w
-# lmuG9iipvT6XdA9Rji2ioRNsAybJniwHu4JBom9UL6M2RsLWRgQ6IbqHJKBrcklI
-# LR4b3ilJVsM7Ycg7XcQ6nEDRVjJygqZfelhkOBMcj8Sbw6cYiJwqmriSQgAMNu/r
-# ZgLKwKNbBoS9E+nNKrsL1Sv+6nzLhwiwlzjUcsetmHtvvehhglh4WQ+X67uWdUYw
-# zquVcV4OPdaGz1wCdArxVpG0leZY5B+LW09nEl4ouMWrG3yLa4eQ2jU8KLahAVD5
-# v8tMGlO5khthr72mkFE/7XdE1X3pdxRyVg9oWKve3O/XAUypfPbM/TDtdEgxEliC
-# PwJZ3dswDQYJKoZIhvcNAQEBBQAEggIAsKTdF3OSTucFZuCe2YIZpwj/LJz4/pY3
-# kk+kM0/fzMQ/jocW8TMplwRJbqVe+7U6Qoxz3K/dI99hIPRuQAFB70KwTox7MRsV
-# 1OMfbUA4hXvtzpwyi8VRy5TNl+3EPteo+q8r6TXAccqSfc/ocFM2C8buwSROy/vm
-# bBlTZfUjfXetLFEEGzGmsZxXi9TRAryM2hITP4YfkoUeZvb9MyimC2DmFwqk2agS
-# 6yIXr0ra0JuhtTW/xeZ6V9ASPHmvK18ABesyAkq9pzlbLX1EuHsma9Pwof24Fq4y
-# yCh+bb9yYCMIBTATXxrKlDrTHCu5Ci7sbF/djD85sIrdt8nBVgcmIOq1LMrt7kIE
-# M6iXwpmBni4T9THOvhaK+wvbt0FA3n0z3Zs8TDEWzJlmWZkGmSE0yUW2nLxikoJo
-# wpPgOSDWmFHUJAImj6SGQMDFWs9l6nyce1jFHpoK2pZHUwPXxR/ouTcNQWoN4IbM
-# 0HDL8AnrX4cwklwqZTap28hL+pPnKzerWD7oNZV3XUJ3JqA8mTd4wpdF/Mlkj9t0
-# 21LZLHOhVHDaKnV8b8JpDAn3I5eIIlsNiFcz+K2a2GvsWbJpNW2+tnoHfUB6YO1i
-# CkSyeZGJ9jrIO1LtqEQBj4yhyp5pTp4H8OrJIewRvd6qz+/Z3xMHsMRg0+ouxz2U
-# g5eAiNKiz5A=
-# SIG # End signature block
+Write-Host "Cleaning up..."
+if (Test-Path -Path $mergeOutputFile)
+{
+    Write-Host "Removing $mergeOutputFile"
+    Remove-Item -Path $mergeOutputFile -Force | Out-Null
+}
+if (Test-Path -Path $newscriptFile)
+{
+    Write-Host "Removing $newscriptFile"
+    Remove-Item -Path $newscriptFile -Force | Out-Null
+}
+
+Write-Host "Build process completed successfully."
+Write-Host "Executable and files are located in $parentFolder"
