@@ -298,6 +298,7 @@ function GetDeviceEnrollmentStatus()
     )
 
     #region Define variables
+    $FunctionName = $MyInvocation.MyCommand.Name
     Write-Verbose "Serial Number: $serialNumber"
     if ($accessToken)
     {
@@ -360,7 +361,10 @@ function GetDeviceEnrollmentStatus()
             Filter       = $autopilotDeviceFilter
         }
     }
-    $autopilotDeviceResponse = CallGraphAPI @params
+    if ($null -ne $params)
+    {
+        $autopilotDeviceResponse = CallGraphAPI @params
+    }
     if ($null -ne $autopilotDeviceResponse -and $autopilotDeviceResponse.'@odata.count' -gt 0)
     {
         Write-Verbose "Got a device count of $($autopilotDeviceResponse.'@odata.count') from Autopilot."
