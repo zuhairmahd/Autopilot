@@ -353,6 +353,7 @@ $functionsToMerge = @(
     "$pwd\functions\AutopilotScriptUpdateFunctions.ps1",
     "$pwd\functions\CommonGraphAPIFunctions.ps1",
     "$pwd\functions\CommonMenuFunctions.ps1",
+    "$pwd\functions\CommonDeviceFunctions.ps1",
     "$pwd\functions\CommonMiscFunctions.ps1"
 )
 $filesToCopy = @('vars.json', 'version.txt', 'init.json') 
