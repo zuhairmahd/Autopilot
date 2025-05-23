@@ -299,10 +299,10 @@ function GetDeviceEnrollmentStatus()
 
     #region Define variables
     $FunctionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "Serial Number: $serialNumber"
+    Write-Verbose "[$functionName] Serial Number: $serialNumber"
     if ($accessToken)
     {
-        Write-Verbose 'Received Access Token'
+        Write-Verbose "[$functionName] Received Access Token"
     }
     $imported = $false
     $inManagedDevices = $false
@@ -331,16 +331,16 @@ function GetDeviceEnrollmentStatus()
     #region Get the autopilot device info
     if ($serialNumber -match 'vmware')
     {
-        Write-Verbose "VMware device detected."
+        Write-Verbose "[$functionName] VMware device detected."
         # $autopilotDeviceFilter = "AzureActiveDirectoryDeviceId eq '$($managedDevice.AzureAdDeviceId)'"
         # Alternative approach if the above doesn't work
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)'"
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)' or AzureActiveDirectoryDeviceId eq '$AzureActiveDirectoryDeviceId'"
         $autoPilotVMDevice = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
-        Write-Verbose "Received $($autoPilotVMDevice.count) devices from Autopilot."
+        Write-Verbose "[$functionName] Received $($autoPilotVMDevice.count) devices from Autopilot."
         if ($autoPilotVMDevice -and $autoPilotVMDevice.count -gt 0)
         {
-            Write-Verbose "Got an Autopilot Device with device id $($autoPilotVMDevice)"
+            Write-Verbose "[$functionName] Got an Autopilot Device with device id $($autoPilotVMDevice)"
             $autopilotDeviceUriWithId = "$autopilotDeviceUri/$autoPilotVMDevice"
             $params = @{
                 AccessToken  = $accessToken
@@ -349,12 +349,12 @@ function GetDeviceEnrollmentStatus()
         }
         else
         {
-            Write-Verbose "No match for device with serial number $serialNumber found in Autopilot."
+            Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
         }
     }
     else
     {
-        Write-Verbose "Not a VMWare device. Continuing"
+        Write-Verbose "[$functionName] Not a VMWare device. Continuing"
         $params = @{
             AccessToken  = $accessToken
             ResourcePath = $autoPilotDeviceURI
@@ -367,72 +367,72 @@ function GetDeviceEnrollmentStatus()
     }
     if ($null -ne $autopilotDeviceResponse -and $autopilotDeviceResponse.'@odata.count' -gt 0)
     {
-        Write-Verbose "Got a device count of $($autopilotDeviceResponse.'@odata.count') from Autopilot."
+        Write-Verbose "[$functionName] Got a device count of $($autopilotDeviceResponse.'@odata.count') from Autopilot."
         $autopilotDevice = $autopilotDeviceResponse.value
     }
     elseif ($null -ne $autopilotDeviceResponse -and ($null -ne $autopilotDeviceResponse.id -or $autopilotDeviceResponse.id -ne '') )
     {
-        Write-Verbose "Got a single autopilot device with id $($autopilotDeviceResponse.id)"
+        Write-Verbose "[$functionName] Got a single autopilot device with id $($autopilotDeviceResponse.id)"
         $autopilotDevice = $autopilotDeviceResponse
     }
     else
     {
-        Write-Verbose "Did not get a good response for device with serial number $serialNumber"
+        Write-Verbose "[$functionName] Did not get a good response for device with serial number $serialNumber"
         $inAutopilot = $false
     }
     if ($autopilotDevice)
     {
         $inAutopilot = $true
-        Write-Verbose "Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "[$functionName] Getting deployment profile information for device with serial number $($autopilotDevice.serialNumber)"
         # $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)?`$expand=deploymentProfile(`$select=displayName)"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($autopilotDevice.id)?`$expand=deploymentProfile"
         $autopilotDevice = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -APIVersion 'beta' 
-        Write-Verbose "Got $($autopilotDevice.count) devices from Autopilot."
-        Write-Verbose "Enrollment Profile name: $($autopilotDevice.deploymentProfile.displayname)"
-        Write-Verbose "Device is in Autopilot: $inAutopilot to true."
+        Write-Verbose "[$functionName] Got $($autopilotDevice.count) devices from Autopilot."
+        Write-Verbose "[$functionName] Enrollment Profile name: $($autopilotDevice.deploymentProfile.displayname)"
+        Write-Verbose "[$functionName] Device is in Autopilot: $inAutopilot to true."
         $returnedAutopilotDevice = $autopilotDevice 
-        Write-Verbose "Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "[$functionName] Getting latest events for device with serial number $($autopilotDevice.serialNumber)"
         $autopilotDeviceEventsFilter = "deviceSerialNumber eq '$($autopilotDevice.serialNumber)'"
         $autopilotEvents = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotEventsURI -filter $autopilotDeviceEventsFilter
-        Write-Verbose "Found $($autopilotEvents.value.count) Autopilot events."
+        Write-Verbose "[$functionName] Found $($autopilotEvents.value.count) Autopilot events."
         if ($autopilotEvents)
         {
-            Write-Verbose "Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilot.serialNumber)"
+            Write-Verbose "[$functionName] Returning $($autopilotEvents.value.count) Events found for device with serial number $($autopilot.serialNumber)"
             $returnedAutopilotEvents = ($autopilotEvents | Sort-Object createdDateTime -Descending).value 
-            Write-Verbose "Autopilot Events: $($returnedAutopilotEvents.count)"
+            Write-Verbose "[$functionName] Autopilot Events: $($returnedAutopilotEvents.count)"
         }
         else
         {
-            Write-Verbose 'No events found for device in Autopilot'
+            Write-Verbose "[$functionName] No events found for device in Autopilot"
         }
     }
     else
     {
-        Write-Verbose 'Device is not an autopilot device.'
+        Write-Verbose "[$functionName] Device is not an autopilot device."
         $inAutopilot = $false
     }
     if ($autopilotDevice)
     {
-        Write-Verbose "Getting imported Autopilot device info for serial number $($autopilotDevice.serialNumber) from autopilot object."
+        Write-Verbose "[$functionName] Getting imported Autopilot device info for serial number $($autopilotDevice.serialNumber) from autopilot object."
         $importedDeviceFilter = "serialNumber eq '$($autopilotDevice.serialNumber)'"
     }
     else
     {
-        Write-Verbose "Getting imported Autopilot device info for serial number $serialNumber from serial number."
+        Write-Verbose "[$functionName] Getting imported Autopilot device info for serial number $serialNumber from serial number."
         $importedDeviceFilter = "serialNumber eq '$serialNumber'"
         $importedAutopilotDeviceResult = CallGraphAPI -AccessToken $accessToken -ResourcePath $importedAutopilotDeviceURI -Filter $importedDeviceFilter
         $importedAutopilotDevice = $importedAutopilotDeviceResult.value
-        Write-Verbose "Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+        Write-Verbose "[$functionName] Returned Imported Autopilot Device serial number: $($autopilotDevice.serialNumber)"
         if ($importedAutopilotDevice)
         {
-            Write-Verbose "Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
+            Write-Verbose "[$functionName] Device found in Imported Autopilot device list with serial number $($importedAutopilotDevice.serialNumber)"
             $imported = $true
             $returnedImportedDevice = $importedAutopilotDevice
         }
         else
         {
-            Write-Verbose 'Device not found in the list of imported Autopilot devices'
-            Write-Verbose "This means the device may have already been registered."
+            Write-Verbose "[$functionName] Device not found in the list of imported Autopilot devices"
+            Write-Verbose "[$functionName] This means the device may have already been registered."
         }
     }
     #endregion
@@ -441,76 +441,76 @@ function GetDeviceEnrollmentStatus()
     #If the serial number contains spaces, remove them.
     if ($serialNumber -match '\s')
     {
-        Write-Verbose "Serial number contains spaces. Removing them."
+        Write-Verbose "[$functionName] Serial number contains spaces. Removing them."
         $serialNumber = $serialNumber -replace '\s', ''
     }
     $managedDeviceFilter = "serialNumber eq '$serialNumber'"
     $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -APIVersion 'beta' -Filter $managedDeviceFilter).value
-    Write-Verbose "Device serial number: $($managedDevice.serialNumber)"
+    Write-Verbose "[$functionName] Device serial number: $($managedDevice.serialNumber)"
     if ($managedDevice)
     {
-        Write-Verbose "Device found in Intune with serial number $($managedDevice.serialNumber)"
+        Write-Verbose "[$functionName] Device found in Intune with serial number $($managedDevice.serialNumber)"
         $inManagedDevices = $true
         $returnedManagedDevice = $managedDevice
-        Write-Verbose "Checking device memory information."
+        Write-Verbose "[$functionName] Checking device memory information."
         $hardwareResourcePath = "$deviceManagementUri/$($autopilotDevice.managedDeviceId)" 
-        Write-Verbose "Calling graph using the path $hardwareResourcePath with the extra parameters         $deviceHardwareExtraparameters"
+        Write-Verbose "[$functionName] Calling graph using the path $hardwareResourcePath with the extra parameters         $deviceHardwareExtraparameters"
         $deviceMemory = (CallGraphAPI -AccessToken $accessToken -ResourcePath $hardwareResourcePath -APIVersion 'beta' -ExtraParameters $deviceHardwareExtraparameters).physicalMemoryInBytes
-        Write-Verbose "Device memory in bytes: $deviceMemory"
+        Write-Verbose "[$functionName] Device memory in bytes: $deviceMemory"
         if ($deviceMemory -gt 0) 
         {   
-            Write-Verbose "Converting memory to gigabytes."
+            Write-Verbose "[$functionName] Converting memory to gigabytes."
             $deviceMemory = [math]::round($deviceMemory / 1GB, 2)
-            Write-Verbose "Device memory: $deviceMemory GB"
+            Write-Verbose "[$functionName] Device memory: $deviceMemory GB"
         }
         else
         {
-            Write-Verbose 'Device memory not found.'
+            Write-Verbose "Device memory not found."
             $deviceMemory = $null
         }
-        Write-Verbose "Got device memory: $deviceMemory"
-        Write-Verbose "Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
-        Write-Verbose "managedDevice.usersLoggedOn: $($managedDevice.usersLoggedOn)"
-        Write-Verbose "managedDevice.userPrincipalName: $($managedDevice.userPrincipalName)"
-        Write-Verbose "managedDevice.emailAddress: $($managedDevice.emailAddress)"
-        Write-Verbose "ManagedDevice.userDisplayName: $($managedDevice.userDisplayName)"
+        Write-Verbose "[$functionName] Got device memory: $deviceMemory"
+        Write-Verbose "[$functionName] Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
+        Write-Verbose "[$functionName] managedDevice.usersLoggedOn: $($managedDevice.usersLoggedOn)"
+        Write-Verbose "[$functionName] managedDevice.userPrincipalName: $($managedDevice.userPrincipalName)"
+        Write-Verbose "[$functionName] managedDevice.emailAddress: $($managedDevice.emailAddress)"
+        Write-Verbose "[$functionName] ManagedDevice.userDisplayName: $($managedDevice.userDisplayName)"
         if ($nnull -ne $managedDevice.usersLoggedOn )
         {
-            Write-Verbose "Device has logged on users."
+            Write-Verbose "[$functionName] Device has logged on users."
             $hasUserObject = $true
             $hasUser = $true
             $lastLogonDateTime = $managedDevice.usersLoggedOn.lastLogonDateTime
-            Write-Verbose "Last logon date: $lastLogonDateTime"
+            Write-Verbose "[$functionName] Last logon date: $lastLogonDateTime"
         }
         elseif ($null -ne $managedDevice.userPrincipalName -and $managedDevice.userPrincipalName -match $settings.domain)
         {
-            Write-Verbose "Device has a userPrincipalName."
+            Write-Verbose "[$functionName] Device has a userPrincipalName."
             $azureUser = $true
             $hasUser = $true
-            Write-Verbose "The last logon date is unavailable."
+            Write-Verbose "[$functionName] The last logon date is unavailable."
         }
         elseif ($null -ne $managedDevice.emailAddress -and $managedDevice.userPrincipalName -match $settings.domain) 
         {
-            Write-Verbose "Device has an email address."
+            Write-Verbose "[$functionName] Device has an email address."
             $azureUser = $true
             $hasUser = $true
-            Write-Verbose "The last logon date is unavailable."
+            Write-Verbose "[$functionName] The last logon date is unavailable."
         }
         else
         {
-            Write-Verbose 'No associated users found for device in Intune'
+            Write-Verbose "[$functionName] No associated users found for device in Intune"
         }
         if ($hasUser -and $hasUserObject -eq $false)
         {
-            Write-Verbose "No user object detected.  Returning device values."
+            Write-Verbose "[$functionName] No user object detected.  Returning device values."
             if ($managedDevice.userPrincipalName -match $settings.domain)
             {
-                Write-Verbose 'User is an Azure AD user'
+                Write-Verbose "[$functionName] User is an Azure AD user"
                 $azureUser = $true
             }
             else
             {
-                Write-Verbose 'User is not an Azure AD user'
+                Write-Verbose "[$functionName] User is not an Azure AD user"
             }
             $loggedOnUsers = @{
                 AzureUser         = $azureUser
@@ -522,19 +522,19 @@ function GetDeviceEnrollmentStatus()
         }
         if ($hasUserObject)
         {
-            Write-Verbose "Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
-            Write-Verbose "Passing $deviceManagementUri/$($managedDevice.Id)/$userUri to graph."
+            Write-Verbose "[$functionName] Retrieving the logged on user for device with serial number $($managedDevice.serialNumber) and ID $($managedDevice.Id)"
+            Write-Verbose "[$functionName] Passing $deviceManagementUri/$($managedDevice.Id)/$userUri to graph."
             $user = (CallGraphAPI -AccessToken $accessToken -ResourcePath "$deviceManagementUri/$($managedDevice.Id)/$userUri" -APIVersion 'beta').value
-            Write-Verbose "User Display Name: $($user.displayName)"
-            Write-Verbose "userPrincipalName: $($user.userPrincipalName)"
+            Write-Verbose "[$functionName] User Display Name: $($user.displayName)"
+            Write-Verbose "[$functionName] userPrincipalName: $($user.userPrincipalName)"
             if ($user.userPrincipalName -match $settings.domain)
             {
-                Write-Verbose 'User is an Azure AD user'
+                Write-Verbose "[$functionName] User is an Azure AD user"
                 $azureUser = $true
             }
             else
             {
-                Write-Verbose 'User is not an Azure AD user'
+                Write-Verbose "[$functionName] User is not an Azure AD user"
             }
             $loggedOnUsers = @{
                 AzureUser         = $azureUser
@@ -544,86 +544,86 @@ function GetDeviceEnrollmentStatus()
                 emailAddress      = $user.emailAddress
                 user              = $user
             }
-            Write-Verbose "LoggedOn Users: $($loggedOnUsers.Count)"
+            Write-Verbose "[$functionName] LoggedOn Users: $($loggedOnUsers.Count)"
         }
         else
         {
-            Write-Verbose 'No logged on users found for device in Intune'
+            Write-Verbose "[$functionName] No logged on users found for device in Intune"
         }
     }
     else
     {
-        Write-Verbose 'Device not found in Intune'
+        Write-Verbose "[$functionName] Device not found in Intune"
     }
     #Getting the unmanaged device object from Intune
     if ($managedDevice )
     {
-        Write-Verbose "Looking up device with Azure Active Directory id $($managedDevice.azureActiveDirectoryDeviceId)"
+        Write-Verbose "[$functionName] Looking up device with Azure Active Directory id $($managedDevice.azureActiveDirectoryDeviceId)"
         $deviceId = $managedDevice.azureActiveDirectoryDeviceId
         $deviceFilter = "deviceId eq '$deviceId'"
     }
     else
     {
-        Write-Verbose "Attempting to find device with serial number."
+        Write-Verbose "[$functionName] Attempting to find device with serial number."
         $deviceFilter = "endswith(displayName, '$serialNumber')"
     }
     $device = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceUri -filter $deviceFilter -consistencyLevel).value
     if ($device -and $device.count -gt 0)
     {
-        Write-Verbose "Device found in Intune with serial number $($device.serialNumber)"
+        Write-Verbose "[$functionName] Device found in Intune with serial number $($device.serialNumber)"
         $hasDeviceObject = $true
         $returnedDevice = $device
     }
     else
     {
-        Write-Verbose 'Device not found in Intune'
+        Write-Verbose "[$functionName] Device not found in Intune"
     }
     #endregion
     
     #region Verbose logging
     if ($inAutopilot)
     {
-        Write-Verbose "Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
-        Write-Verbose "Autopilot Registered: $inAutopilot"
+        Write-Verbose "[$functionName] Device found in Autopilot with serial number $($autopilotDevice.serialNumber)"
+        Write-Verbose "[$functionName] Autopilot Registered: $inAutopilot"
         if ($returnedAutopilotEvents)
         {
-            Write-Verbose "The device has had $($returnedAutopilotEvents.count) events."
+            Write-Verbose "[$functionName] The device has had $($returnedAutopilotEvents.count) events."
         }
         else
         {
-            Write-Verbose 'No Autopilot events found'
+            Write-Verbose "[$functionName] No Autopilot events found"
         }
     }
     else
     {
-        Write-Verbose 'Device not found in Autopilot'
+        Write-Verbose "[$functionName] Device not found in Autopilot"
     }
     if ($inManagedDevices)
     {
-        Write-Verbose "Device is managed in Intune with serial number $($device.serialNumber)"
-        Write-Verbose "Device managed: $inManagedDevices"
+        Write-Verbose "[$functionName] Device is managed in Intune with serial number $($device.serialNumber)"
+        Write-Verbose "[$functionName] Device managed: $inManagedDevices"
     }
     else
     {
-        Write-Verbose 'Device not managed in Intune'
+        Write-Verbose "[$functionName] Device not managed in Intune"
     }
     if ($imported)
     {
-        Write-Verbose "Device is imported into Autopilot with serial number $($importedAutopilotDevice.serialNumber)"
-        Write-Verbose "Device Imported: $imported"
+        Write-Verbose "[$functionName] Device is imported into Autopilot with serial number $($importedAutopilotDevice.serialNumber)"
+        Write-Verbose "[$functionName] Device Imported: $imported"
     }
     else
     {
-        Write-Verbose 'Device not imported into Autopilot'
+        Write-Verbose "[$functionName] Device not imported into Autopilot"
     }
     if ($hasDeviceObject)
     {
-        Write-Verbose "Device found in Intune with display name: $($device.displayName)"
-        Write-Verbose "Device has device object: $hasDeviceObject"
+        Write-Verbose "[$functionName] Device found in Intune with display name: $($device.displayName)"
+        Write-Verbose "[$functionName] Device has device object: $hasDeviceObject"
     }
     else
     {
-        Write-Verbose 'Device not found in Intune'
+        Write-Verbose "[$functionName] Device not found in Intune"
     }
     #endregion
 
