@@ -207,95 +207,128 @@ function GetUserInput()
     }
 }
 
+function DisplayDeviceHealth {
+    [CmdletBinding()]
+    param (
+        [string]$SerialNumber,
+        [string]$AccessToken
+    )
+    
+    Write-Host "`nRetrieving comprehensive device health information..." -ForegroundColor Yellow
+    
+    # Use existing CheckDeviceAssignment function which returns rich device info
+    $deviceAssignment = CheckDeviceAssignment -serialNumber $SerialNumber -AccessToken $AccessToken
+    
+    if ($deviceAssignment) {
+        Write-Host "`n=== Device Health & Status Report ===" -ForegroundColor Cyan
+        Write-Host "Serial Number: $SerialNumber"
+        Write-Host "Device ID: $($deviceAssignment.id)"
+        Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
+        Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
+        Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
+        
+        if ($deviceAssignment.deploymentProfileAssignedDateTime) {
+            $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+            Write-Host "Profile Assigned On: $assignmentDate"
+        }
+        
+        # Get additional managed device details if available
+        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
+        if ($enrollmentState.managed) {
+            Write-Host "`n--- Managed Device Details ---" -ForegroundColor Green
+            Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
+            Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
+            Write-Host "Manufacturer: $($enrollmentState.managedDevice.device.manufacturer)"
+            Write-Host "OS Version: $($enrollmentState.managedDevice.device.osVersion)"
+            Write-Host "Compliance State: $($enrollmentState.managedDevice.device.complianceState)"
+            Write-Host "Management State: $($enrollmentState.managedDevice.device.managementState)"
+            Write-Host "Last Sync: $($enrollmentState.managedDevice.device.lastSyncDateTime)"
+        }
+        
+        Write-Host "========================================`n" -ForegroundColor Cyan
+        return $true
+    } else {
+        Write-Host "`nDevice not found in Autopilot/Intune." -ForegroundColor Red
+        return $false
+    }
+}
+
 function ProcessSerialNumber
 {
     [CmdletBinding()]
     param (
         [string]$SerialNumber,
         $AccessToken,
-        $Settings = $settings, # Use the script-level $settings by default
-        [string]$AssessmentType = 'GeneralCheck' # Default assessment type
+        $Settings = $settings
     )
-    Write-Verbose "Trimming serial number: $SerialNumber"
+    
+    Write-Verbose "Processing device lookup for serial number: $SerialNumber"
     $SerialNumber = $SerialNumber.Trim()
-    Write-Verbose "Trimmed serial number: $SerialNumber"
-    Write-Host "Checking deployment status for device with serial number $SerialNumber."
+    
+    Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
     $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
-    Write-Verbose "The management state is: $($enrollmentState.managed)"
-    Write-Verbose "The Autopilot registration state is: $($enrollmentState.InAutopilot)"
-    Write-Verbose "The imported state is: $($enrollmentState.imported)"
-    Write-Verbose "Has device object: $($enrollmentState.hasDeviceObject)"
-    if ($enrollmentState.managed)
-    {
-        Write-Host "Device name: $($enrollmentState.managedDevice.device.deviceName)"
-        Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
-        Write-Host "Manufacturer: $($enrollmentState.managedDevice.device.manufacturer)"
+    
+    # Display basic device information
+    Write-Host "`n=== Device Information ===" -ForegroundColor Green
+    Write-Host "Serial Number: $SerialNumber"
+    
+    if ($enrollmentState.managed) {
+        $deviceName = $enrollmentState.managedDevice.device.deviceName
+        $model = $enrollmentState.managedDevice.device.model
+        $manufacturer = $enrollmentState.managedDevice.device.manufacturer
+        $managedDeviceId = $enrollmentState.managedDevice.device.id
+        
+        Write-Host "Device Name: $deviceName"
+        Write-Host "Model: $model"
+        Write-Host "Manufacturer: $manufacturer"
+        Write-Host "Status: Managed by Intune" -ForegroundColor Green
+        Write-Host "=============================`n" -ForegroundColor Green
+        
+        # Create and show device actions menu using main.ps1 menu structure
+        $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
+        
+        # Add menu items for each device action
+        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
+            Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe'
+            Read-Host "`nPress Enter to continue"
+        }
+        
+        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
+            Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean'
+            Read-Host "`nPress Enter to continue"
+        }
+        
+        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
+            Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
+            Read-Host "`nPress Enter to continue"
+        }
+        
+        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
+            Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart'
+            Read-Host "`nPress Enter to continue"
+        }
+        
+        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
+            DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
+            Read-Host "`nPress Enter to continue"
+        }
+        
+        # Show the device actions menu
+        $result = ShowMenu -Menu $deviceActionsMenu
+        return $result
     }
-    $deviceState = AssessDeviceState -enrollmentState $enrollmentState -Settings $Settings -AssessmentType $AssessmentType
-    Write-Verbose "Assessment type: $assessmentType"
-    switch ($AssessmentType)
-    {
-        'PropperEnrollmentVerification'
-        {
-            Write-Verbose "Checking device for propper enrollment verification."
-        }
-        'NextUserReadiness'
-        {
-            Write-Verbose "Checking device for next user readiness."
-            if ($deviceState.ReadinessState -eq 'Ready')
-            {
-                Write-Host 'The device is ready for the next user.' -ForegroundColor Green
-                Write-Host 'You may proceed with enrollment.' -ForegroundColor Green
-            }
-            elseif ($deviceState.ReadinessState -eq 'NotReady' -and $deviceState.Action -eq 'ContactAdmin') 
-            {
-                Write-Host "The device is not ready for the next user."
-                Write-Host "We suggest you generate a report and contact your Intune admin."
-            }
-            elseif ($deviceState.ReadinessState -eq 'NotReady' -and $deviceState.Action -eq 'WipeOrClean') 
-            {
-                Write-Host "The device is not ready for the next user."
-                Write-Host "You should reset or clean the device before giving it to the next user."
-                $actionMenu = NewMenu -Title "Device Actions" -Description "What action would you like to perform on the device?"
-                $actionMenu = AddMenuItem -Menu $actionMenu -name "Wipe device" -ReturnsValue -Action {
-                    Write-Host "Wiping device with serial number $($serialNumber)..."
-                    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
-                    $commandResult = SendDeviceCommand -AccessToken $accessToken -ManagedDeviceId $deviceState.device -Command 'Wipe'
-                    if ($commandResult)
-                    {
-                        Write-Host "Device with serial number $($serialNumber) has been wiped." -ForegroundColor Green
-                    }
-                    else
-                    {
-                        Write-Host "Failed to wipe device with serial number $($serialNumber)." -ForegroundColor Red
-                    }
-                    return $commandResult # Return the result of the command
-                }
-                $actionMenu = AddMenuItem -Menu $actionMenu -name "Clean device" -ReturnsValue -Action {
-                    Write-Host "Cleaning device with serial number $($serialNumber)..."
-                    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
-                    $commandResult = SendDeviceCommand -AccessToken $accessToken -ManagedDeviceId $deviceState.device -Command 'Clean'
-                    if ($commandResult)
-                    {
-                        Write-Host "Device with serial number $($serialNumber) has been cleaned." -ForegroundColor Green
-                    }
-                    else
-                    {
-                        Write-Host "Failed to clean device with serial number $($serialNumber)." -ForegroundColor Red
-                    }
-                    return $commandResult # Return the result of the command
-                } 
-                $result = ShowMenu -Menu $actionMenu                
-                if ($null -eq $result)
-                {
-                    return $backoutText
-                }
-            }
-        }
-        'TroubleShooting'
-        {
-            Write-Verbose "Checking device for troubleshooting."
-        }
+    else {
+        Write-Host "Status: Not managed by Intune" -ForegroundColor Yellow
+        Write-Host "=============================`n" -ForegroundColor Yellow
+        
+        # For unmanaged devices, show limited information
+        DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
+        Read-Host "`nPress Enter to continue"
+        return $null
     }
 }
 #endregion Helper Functions
@@ -357,72 +390,72 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged 
 
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
-    Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
+    Write-Host 'The serial number is typically a combination of letters and numbers.'
     $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-    # Check if user entered 'back'
+    
     if ($null -eq $serialNumber)
     {
         Write-Verbose "User pressed Enter. Returning $BackoutText."
         return $backoutText
     } 
-    else # Process only if a serial number was entered
+    else
     {
         Write-Verbose "Got serial number: $SerialNumber"
-        Write-Host "Checking device with serial number $($SerialNumber)..."
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
-        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness' 
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
     }
 }
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
     Write-Verbose "Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
     Write-Verbose "Device object: $($deviceObject)"
+    
     if ($deviceObject)
     {
         $serialNumber = $deviceObject.serialNumber
-        Write-Verbose "The serial number is $serialNumber."
         $make = $deviceObject.manufacturer
-        Write-Verbose "The manufacturer is $make"
         $model = $deviceObject.model
-        Write-Host "Checking device with serial number $($serialNumber): $make $model "
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
-        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
+        Write-Host "Found local device: $make $model (Serial: $serialNumber)"
+        
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
     }
     else
     {
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
-        # Removed exit 1 to allow returning to menu
+        Read-Host "Press Enter to continue"
     }
 }
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    # Check if user entered 'back'
+    
     if ($null -eq $userName)
     {
         Write-Verbose "User pressed Enter. Returning $BackoutText."
         return $backoutText
     } 
-    else # Process only if a username was entered
+    else
     {
         Write-Verbose "Got user name: $UserName"
-        Write-Verbose "Getting access token..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
         $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem
         Write-Verbose "Serial number: $($serialNumber)"
+        
         if ($serialNumber -ne '0' -and $null -ne $serialNumber)
         {
-            Write-Host "Checking device with serial number $($serialNumber)..."
-            ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
+            Write-Host "Found device for user $userName with serial number: $serialNumber"
+            ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         }
         elseif ($serialNumber -eq '0')
         {
             Write-Verbose "User selected Exit option (0). Returning $BackoutText."
-            return $backoutText # Return to the previous menu
+            return $backoutText
         }
         else
         {
             Write-Host "No device found for user $userName." -ForegroundColor Red
+            Read-Host "Press Enter to continue"
         }
     }
 }
@@ -457,8 +490,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             } 
             else # Process only if a serial number was entered
             {
-                Write-Host "Checking device with serial number $($serialNumber)..."
-                ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -AssessmentType 'NextUserReadiness'
+                ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
             }
         }
         else

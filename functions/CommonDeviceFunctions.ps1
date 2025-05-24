@@ -4,6 +4,7 @@ function SendDeviceCommand ()
     param (
         [string]$ManagedDeviceId,
         [string]$accessToken,
+        [ValidateSet("clean", "wipe", "sync", "restart")]
         [string]$Command = "clean",
         [int]$MaxRetries = 20,
         [int]$RetryDelaySeconds = 15,
@@ -27,61 +28,86 @@ function SendDeviceCommand ()
     }
     #endregion
 
-    if ($NoConfirmation)
+    # Confirmation for destructive operations only
+    if (-not $NoConfirmation -and ($Command -eq "clean" -or $Command -eq "wipe" -or $Command -eq "restart"))
     {
-        Write-Host "Are you sure you want to $command the device?"
+        Write-Host "Are you sure you want to $Command the device?" -ForegroundColor Yellow
         $confirmation = Read-Host "Type 'yes' to confirm, or 'no' to cancel"
         if ($confirmation -ne 'yes')
         {
-            Write-Host "Operation cancelled."
+            Write-Host "Operation cancelled." -ForegroundColor Gray
             return $false
         }
     }
 
-    Write-Host "Sending $command command to device with identifyer $ManagedDeviceId"
+    Write-Host "Sending $Command command to device with identifier $ManagedDeviceId" -ForegroundColor Cyan
     $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
-    $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
-    $wipeURI = "$deviceManagementUri/wipe"
-    $syncUri = "$deviceManagementUri/syncDevice"
     $success = $false
     $actionType = ""
+    $response = ""
   
-    if ($command -eq "clean")
-    {
-        Write-Host 'Cleaning the device...'
-        $body = @{
-            'keepUserData' = $false
-        } | ConvertTo-Json
-        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' 
-        Write-Verbose "[$functionName] [$functionName] Response: $response"
-        $actionType = "cleanWindows"
-    }
-    elseif ($command -eq 'wipe')
-    {
-        Write-Host 'Wiping the device...'
-        $body = @{
-            'keepEnrollmentData'   = $false
-            'keepUserData'         = $false
-            'obliterationBehavior' = "doNotObliterate"
-        } | ConvertTo-Json
-        $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0' 
-        Write-Verbose "[$functionName] [$functionName] Response: $response"
-        $actionType = "wipe"
-    }
-    else
-    {
-        Write-Host "Invalid command. Please use 'clean' or 'wipe'." -ForegroundColor Red
-        return $success
+    switch ($Command) {
+        "clean" {
+            Write-Host 'Cleaning the device...' -ForegroundColor Yellow
+            $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
+            $body = @{ 'keepUserData' = $false } | ConvertTo-Json
+            $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' 
+            Write-Verbose "[$functionName] [$functionName] Response: $response"
+            $actionType = "cleanWindows"
+        }
+        "wipe" {
+            Write-Host 'Wiping the device...' -ForegroundColor Yellow
+            $wipeURI = "$deviceManagementUri/wipe"
+            $body = @{
+                'keepEnrollmentData'   = $false
+                'keepUserData'         = $false
+                'obliterationBehavior' = "doNotObliterate"
+            } | ConvertTo-Json
+            $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0' 
+            Write-Verbose "[$functionName] [$functionName] Response: $response"
+            $actionType = "wipe"
+        }
+        "sync" {
+            Write-Host 'Syncing the device...' -ForegroundColor Yellow
+            $syncUri = "$deviceManagementUri/syncDevice"
+            $response = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
+            if ($response -eq '') {
+                Write-Host "Device sync command sent successfully." -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "Failed to send sync command." -ForegroundColor Red
+                return $false
+            }
+        }
+        "restart" {
+            Write-Host 'Restarting the device...' -ForegroundColor Yellow
+            $restartUri = "$deviceManagementUri/rebootNow"
+            $response = callGraphApi -AccessToken $accessToken -Method 'POST' -ResourcePath $restartUri -apiVersion 'v1.0'
+            if ($response -eq '') {
+                Write-Host "Device restart command sent successfully." -ForegroundColor Green
+                return $true
+            } else {
+                Write-Host "Failed to send restart command." -ForegroundColor Red
+                return $false
+            }
+        }
+        default {
+            Write-Host "Invalid command. Please use 'clean', 'wipe', 'sync', or 'restart'." -ForegroundColor Red
+            return $false
+        }
     }
   
-    if ($response -eq '')
-    {
-        Write-Host "Command sent successfully. Attempting to perform a device sync..." -ForegroundColor Green
-        $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST
+    # For clean and wipe operations, continue with monitoring logic
+    if ($Command -eq "clean" -or $Command -eq "wipe") {
+        if ($response -eq '')
+        {
+            Write-Host "Command sent successfully. Performing automatic device sync..." -ForegroundColor Green
+            $syncUri = "$deviceManagementUri/syncDevice"
+            $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
         Write-Verbose "[$functionName] [$functionName] Sync Response: $syncResponse"
     
         # Begin monitoring the action status
-        Write-Host "Starting to monitor $command action status..." -ForegroundColor Yellow
+        Write-Host "Starting to monitor $Command action status..." -ForegroundColor Yellow
         $retryCount = 0
         $actionCompleted = $false
         $actionFailed = $false
@@ -91,7 +117,7 @@ function SendDeviceCommand ()
         while (-not $actionCompleted -and -not $actionFailed -and $retryCount -lt $MaxRetries)
         {
             $retryCount++
-            Write-Host "Checking $command status, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
+            Write-Host "Checking $Command status, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
             Write-Verbose "[$functionName] [$functionName] Checking action results (Attempt $retryCount of $MaxRetries)"
       
             # Wait before checking
@@ -117,7 +143,7 @@ function SendDeviceCommand ()
                 if ($actionResult)
                 {
                     $actionState = $actionResult.status
-                    Write-Host "Current $command status: $actionState" -ForegroundColor Cyan
+                    Write-Host "Current $Command status: $actionState" -ForegroundColor Cyan
                     Write-Verbose "[$functionName] [$functionName] Action start time: $($actionResult.startDateTime)"
                     Write-Verbose "[$functionName] [$functionName] Action last updated: $($actionResult.lastUpdatedDateTime)"
           
@@ -126,13 +152,13 @@ function SendDeviceCommand ()
                     {
                         "succeeded"
                         {
-                            Write-Host "$command action completed successfully!" -ForegroundColor Green
+                            Write-Host "$Command action completed successfully!" -ForegroundColor Green
                             $actionCompleted = $true
                             $success = $true
                         }
                         "failed"
                         {
-                            Write-Host "$command action failed with error: $($actionResult.errorCode)" -ForegroundColor Red
+                            Write-Host "$Command action failed with error: $($actionResult.errorCode)" -ForegroundColor Red
                             if ($actionResult.errorDescription)
                             {
                                 Write-Host "Error description: $($actionResult.errorDescription)" -ForegroundColor Red
@@ -142,13 +168,13 @@ function SendDeviceCommand ()
                         }
                         "timeout"
                         {
-                            Write-Host "$command action timed out." -ForegroundColor Red
+                            Write-Host "$Command action timed out." -ForegroundColor Red
                             $actionFailed = $true
                             $success = $false
                         }
                         "canceled"
                         {
-                            Write-Host "$command action was canceled." -ForegroundColor Red
+                            Write-Host "$Command action was canceled." -ForegroundColor Red
                             $actionFailed = $true
                             $success = $false
                         }
@@ -179,7 +205,7 @@ function SendDeviceCommand ()
                 {
                     Write-Host "Device is no longer accessible. This could be expected for wipe operations." -ForegroundColor Yellow
                     # For wipe operations, this might be expected behavior as device is reset
-                    if ($command -eq 'wipe')
+                    if ($Command -eq 'wipe')
                     {
                         Write-Host "Wipe command appears to have succeeded as device is no longer accessible." -ForegroundColor Green
                         $actionCompleted = $true
@@ -192,23 +218,24 @@ function SendDeviceCommand ()
         # Final status report
         if ($actionCompleted)
         {
-            Write-Host "$command action has completed successfully." -ForegroundColor Green
+            Write-Host "$Command action has completed successfully." -ForegroundColor Green
         }
         elseif ($actionFailed)
         {
-            Write-Host "$command action has failed with status: $actionState" -ForegroundColor Red
+            Write-Host "$Command action has failed with status: $actionState" -ForegroundColor Red
         }
         else
         {
-            Write-Host "$command action monitoring timed out after $MaxRetries attempts." -ForegroundColor Yellow
+            Write-Host "$Command action monitoring timed out after $MaxRetries attempts." -ForegroundColor Yellow
             Write-Host "Last known status: $actionState" -ForegroundColor Yellow
             Write-Warning "The action may still be in progress. You can check the device status in the Intune portal."
         }
-    }
-    else
-    {
-        Write-Host "Failed to send $command command to device." -ForegroundColor Red
-        Write-Verbose "[$functionName] [$functionName] Failed to send command. Response: $response"
+        }
+        else
+        {
+            Write-Host "Failed to send $Command command to device." -ForegroundColor Red
+            Write-Verbose "[$functionName] [$functionName] Failed to send command. Response: $response"
+        }
     }
   
     return $success
