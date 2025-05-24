@@ -216,39 +216,69 @@ function DisplayDeviceHealth {
     
     Write-Host "`nRetrieving comprehensive device health information..." -ForegroundColor Yellow
     
-    # Use existing CheckDeviceAssignment function which returns rich device info
+    # First check if device is managed by Intune (regardless of Autopilot status)
+    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
+    
+    # Also check Autopilot assignment for additional details
     $deviceAssignment = CheckDeviceAssignment -serialNumber $SerialNumber -AccessToken $AccessToken
     
-    if ($deviceAssignment) {
+    if ($enrollmentState.managed) {
         Write-Host "`n=== Device Health & Status Report ===" -ForegroundColor Cyan
         Write-Host "Serial Number: $SerialNumber"
-        Write-Host "Device ID: $($deviceAssignment.id)"
-        Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
-        Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
-        Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
         
-        if ($deviceAssignment.deploymentProfileAssignedDateTime) {
-            $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-            Write-Host "Profile Assigned On: $assignmentDate"
-        }
+        # Display managed device information
+        Write-Host "`n--- Managed Device Details ---" -ForegroundColor Green
+        Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
+        Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
+        Write-Host "Manufacturer: $($enrollmentState.managedDevice.device.manufacturer)"
+        Write-Host "OS Version: $($enrollmentState.managedDevice.device.osVersion)"
+        Write-Host "Compliance State: $($enrollmentState.managedDevice.device.complianceState)"
+        Write-Host "Management State: $($enrollmentState.managedDevice.device.managementState)"
+        Write-Host "Last Sync: $($enrollmentState.managedDevice.device.lastSyncDateTime)"
+        Write-Host "Managed Device ID: $($enrollmentState.managedDevice.device.id)"
         
-        # Get additional managed device details if available
-        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
-        if ($enrollmentState.managed) {
-            Write-Host "`n--- Managed Device Details ---" -ForegroundColor Green
-            Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
-            Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
-            Write-Host "Manufacturer: $($enrollmentState.managedDevice.device.manufacturer)"
-            Write-Host "OS Version: $($enrollmentState.managedDevice.device.osVersion)"
-            Write-Host "Compliance State: $($enrollmentState.managedDevice.device.complianceState)"
-            Write-Host "Management State: $($enrollmentState.managedDevice.device.managementState)"
-            Write-Host "Last Sync: $($enrollmentState.managedDevice.device.lastSyncDateTime)"
+        # Display Autopilot information if available
+        if ($deviceAssignment) {
+            Write-Host "`n--- Autopilot Details ---" -ForegroundColor Blue
+            Write-Host "Autopilot Device ID: $($deviceAssignment.id)"
+            Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
+            Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
+            Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
+            
+            if ($deviceAssignment.deploymentProfileAssignedDateTime) {
+                $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+                Write-Host "Profile Assigned On: $assignmentDate"
+            }
+        } else {
+            Write-Host "`n--- Autopilot Status ---" -ForegroundColor Yellow
+            Write-Host "This device is managed by Intune but is not registered in Autopilot."
+            Write-Host "This is normal for devices enrolled through other methods (manual enrollment, bulk enrollment, etc.)."
         }
         
         Write-Host "========================================`n" -ForegroundColor Cyan
         return $true
     } else {
-        Write-Host "`nDevice not found in Autopilot/Intune." -ForegroundColor Red
+        Write-Host "`n=== Device Status ===" -ForegroundColor Yellow
+        Write-Host "Serial Number: $SerialNumber"
+        
+        if ($deviceAssignment) {
+            Write-Host "`n--- Autopilot Details ---" -ForegroundColor Blue
+            Write-Host "This device is registered in Autopilot but not yet enrolled in Intune management."
+            Write-Host "Device ID: $($deviceAssignment.id)"
+            Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
+            Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
+            Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
+            
+            if ($deviceAssignment.deploymentProfileAssignedDateTime) {
+                $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
+                Write-Host "Profile Assigned On: $assignmentDate"
+            }
+        } else {
+            Write-Host "`nDevice not found in Autopilot or Intune management." -ForegroundColor Red
+            Write-Host "This device may not be enrolled in your organization's management system."
+        }
+        
+        Write-Host "========================================`n" -ForegroundColor Yellow
         return $false
     }
 }
@@ -283,33 +313,28 @@ function ProcessSerialNumber
         Write-Host "Manufacturer: $manufacturer"
         Write-Host "Status: Managed by Intune" -ForegroundColor Green
         Write-Host "=============================`n" -ForegroundColor Green
-        
-        # Create and show device actions menu using main.ps1 menu structure
+          # Create and show device actions menu using main.ps1 menu structure
         $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
         
         # Add menu items for each device action
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
             Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe'
-            Read-Host "`nPress Enter to continue"
+            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
         }
         
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
             Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean'
-            Read-Host "`nPress Enter to continue"
+            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' | Out-Null
         }
         
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
             Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
-            Read-Host "`nPress Enter to continue"
+            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' | Out-Null
         }
         
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
             Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            $result = SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart'
-            Read-Host "`nPress Enter to continue"
+            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
         }
         
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
@@ -317,7 +342,10 @@ function ProcessSerialNumber
             Read-Host "`nPress Enter to continue"
         }
         
-        # Show the device actions menu
+        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Back" -Action {
+            return $null
+        }
+          # Show the device actions menu
         $result = ShowMenu -Menu $deviceActionsMenu
         return $result
     }
@@ -327,7 +355,6 @@ function ProcessSerialNumber
         
         # For unmanaged devices, show limited information
         DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
-        Read-Host "`nPress Enter to continue"
         return $null
     }
 }
