@@ -50,38 +50,16 @@ BeforeAll {
     Set-Content -Path $mockConfigPath -Value $mockConfig -Force
     Set-Content -Path $mockInitPath -Value $mockInit -Force
     
-    # Mock functions directory and create dummy function files
-    $functionsDir = Join-Path $PSScriptRoot "functions"
-    if (-not (Test-Path $functionsDir)) {
-        New-Item -Path $functionsDir -ItemType Directory -Force
-    }
-    
-    # Create minimal function files to avoid import errors
-    $functionFiles = @(
-        "AutopilotDeviceFunctions.ps1",
-        "AutopilotMiscFunctions.ps1", 
-        "AutopilotScriptUpdateFunctions.ps1",
-        "CommonDeviceFunctions.ps1",
-        "CommonGraphAPIFunctions.ps1",
-        "CommonMenuFunctions.ps1",
-        "CommonMiscFunctions.ps1",
-        "DeviceAndUserLookupFunctions.ps1",
-        "DeviceReportingFunctions.ps1"
-    )
-    
-    foreach ($file in $functionFiles) {
-        $filePath = Join-Path $functionsDir $file
-        if (-not (Test-Path $filePath)) {
-            # Create minimal mock functions
-            $mockContent = @"
-# Mock function file for testing
-function Get-MockFunction { return `$true }
-"@
-            Set-Content -Path $filePath -Value $mockContent -Force
+    # Import all actual function files from the functions directory
+    $functionsFolder = Join-Path $PSScriptRoot "functions"
+    if (Test-Path $functionsFolder) {
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+        foreach ($function in $functions) {
+            . $function.FullName
         }
     }
     
-    # Mock external functions that would be imported
+    # Mock external functions that would be imported - but do this AFTER importing the real functions
     Mock GetGraphAccessToken { return "mock-token" }
     Mock GetDeviceEnrollmentStatus { 
         return @{
@@ -121,6 +99,9 @@ function Get-MockFunction { return `$true }
     }
     Mock GetDeviceByUser { return "TEST12345" }
     Mock ExportDeviceList { return @($true, "test-export.csv") }
+    Mock Read-Host { return "" }
+    Mock Write-Host { }
+    Mock Start-Sleep { }
     
     # Now dot-source the script with parameters
     try {
@@ -135,7 +116,6 @@ AfterAll {
     # Clean up temporary files
     $mockConfigPath = Join-Path $PSScriptRoot ".secrets\config.json"
     $mockInitPath = Join-Path $PSScriptRoot "initVerify.json"
-    $functionsDir = Join-Path $PSScriptRoot "functions"
     
     if (Test-Path $mockConfigPath) { Remove-Item $mockConfigPath -Force }
     if (Test-Path $mockInitPath) { Remove-Item $mockInitPath -Force }
@@ -212,8 +192,11 @@ Describe "validateInput Function" {
     Context "Serial Number Validation" {
         BeforeEach {
             $mockSettings = @{
+                domain = "contoso.com"
                 MaxSerialNumberLength = 20
                 MinSerialNumberLength = 8
+                MaxUserNameLength = 50
+                MinUsernameLength = 3
             }
         }
         
@@ -257,6 +240,8 @@ Describe "validateInput Function" {
                 domain = "contoso.com"
                 MaxUserNameLength = 50
                 MinUsernameLength = 3
+                MaxSerialNumberLength = 20
+                MinSerialNumberLength = 8
             }
         }
         

@@ -103,21 +103,24 @@ function validateInput()
             {
                 Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
                 Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
+                return $returnValue
             }
             elseif ($UserInput.Length -lt $MinSerialNumberLength)
             {
                 Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
                 Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
+                return $returnValue
             }
             elseif ($UserInput -match '^[a-zA-Z0-9-\s]+$') 
             {
                 Write-Verbose "[$functionName] Serial number validation passed"
-                $returnValue.valid = $true
+                return $returnValue
                 $returnValue.value = $UserInput
             }
             else
             {
                 Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
+                return $returnValue
             }
         }
         'userName'
@@ -128,6 +131,7 @@ function validateInput()
                 Write-Verbose "[$functionName] Username exceeds maximum length of $MaxUserNameLength characters"
                 Write-Host "Username needs to have a minimum of $minUsernameLength characters and cannot exceed $MaxUserNameLength characters." -ForegroundColor Red
                 Write-Host "The username cannot start with a digit." -ForegroundColor Red
+                return $returnValue
             }
             else
             {
@@ -143,6 +147,7 @@ function validateInput()
                 {
                     Write-Verbose "[$functionName] Username validation failed - must be a valid email format (e.g., user@$domain)"
                     Write-Host "Invalid user name format. Please enter a valid email address (e.g., user@$domain)." -ForegroundColor Red
+                    return $returnValue
                 }
             }
         }
@@ -150,6 +155,7 @@ function validateInput()
         {
             Write-Verbose "[$functionName] Unknown validation type: '$type'"
             Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
+            return $returnValue
         }
     }
     Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"

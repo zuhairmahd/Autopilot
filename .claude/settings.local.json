@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pwsh:*)",
+      "Bash(powershell:*)",
+      "Bash(ls:*)",
+      "Bash(pkill:*)"
     ],
     "deny": []
   }
