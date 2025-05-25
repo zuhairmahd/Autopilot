@@ -207,7 +207,8 @@ function GetUserInput()
     }
 }
 
-function DisplayDeviceHealth {
+function DisplayDeviceHealth
+{
     [CmdletBinding()]
     param (
         [string]$SerialNumber,
@@ -222,7 +223,8 @@ function DisplayDeviceHealth {
     # Also check Autopilot assignment for additional details
     $deviceAssignment = CheckDeviceAssignment -serialNumber $SerialNumber -AccessToken $AccessToken
     
-    if ($enrollmentState.managed) {
+    if ($enrollmentState.managed)
+    {
         Write-Host "`n=== Device Health & Status Report ===" -ForegroundColor Cyan
         Write-Host "Serial Number: $SerialNumber"
         
@@ -238,18 +240,22 @@ function DisplayDeviceHealth {
         Write-Host "Managed Device ID: $($enrollmentState.managedDevice.device.id)"
         
         # Display Autopilot information if available
-        if ($deviceAssignment) {
+        if ($deviceAssignment)
+        {
             Write-Host "`n--- Autopilot Details ---" -ForegroundColor Blue
             Write-Host "Autopilot Device ID: $($deviceAssignment.id)"
             Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
             Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
             Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
             
-            if ($deviceAssignment.deploymentProfileAssignedDateTime) {
+            if ($deviceAssignment.deploymentProfileAssignedDateTime)
+            {
                 $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
                 Write-Host "Profile Assigned On: $assignmentDate"
             }
-        } else {
+        }
+        else
+        {
             Write-Host "`n--- Autopilot Status ---" -ForegroundColor Yellow
             Write-Host "This device is managed by Intune but is not registered in Autopilot."
             Write-Host "This is normal for devices enrolled through other methods (manual enrollment, bulk enrollment, etc.)."
@@ -257,11 +263,14 @@ function DisplayDeviceHealth {
         
         Write-Host "========================================`n" -ForegroundColor Cyan
         return $true
-    } else {
+    }
+    else
+    {
         Write-Host "`n=== Device Status ===" -ForegroundColor Yellow
         Write-Host "Serial Number: $SerialNumber"
         
-        if ($deviceAssignment) {
+        if ($deviceAssignment)
+        {
             Write-Host "`n--- Autopilot Details ---" -ForegroundColor Blue
             Write-Host "This device is registered in Autopilot but not yet enrolled in Intune management."
             Write-Host "Device ID: $($deviceAssignment.id)"
@@ -269,11 +278,14 @@ function DisplayDeviceHealth {
             Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
             Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
             
-            if ($deviceAssignment.deploymentProfileAssignedDateTime) {
+            if ($deviceAssignment.deploymentProfileAssignedDateTime)
+            {
                 $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
                 Write-Host "Profile Assigned On: $assignmentDate"
             }
-        } else {
+        }
+        else
+        {
             Write-Host "`nDevice not found in Autopilot or Intune management." -ForegroundColor Red
             Write-Host "This device may not be enrolled in your organization's management system."
         }
@@ -283,7 +295,7 @@ function DisplayDeviceHealth {
     }
 }
 
-function ProcessSerialNumber
+function ProcessSerialNumber()
 {
     [CmdletBinding()]
     param (
@@ -302,7 +314,8 @@ function ProcessSerialNumber
     Write-Host "`n=== Device Information ===" -ForegroundColor Green
     Write-Host "Serial Number: $SerialNumber"
     
-    if ($enrollmentState.managed) {
+    if ($enrollmentState.managed)
+    {
         $deviceName = $enrollmentState.managedDevice.device.deviceName
         $model = $enrollmentState.managedDevice.device.model
         $manufacturer = $enrollmentState.managedDevice.device.manufacturer
@@ -313,7 +326,7 @@ function ProcessSerialNumber
         Write-Host "Manufacturer: $manufacturer"
         Write-Host "Status: Managed by Intune" -ForegroundColor Green
         Write-Host "=============================`n" -ForegroundColor Green
-          # Create and show device actions menu using main.ps1 menu structure
+        # Create and show device actions menu using main.ps1 menu structure
         $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
         
         # Add menu items for each device action
@@ -345,11 +358,12 @@ function ProcessSerialNumber
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Back" -Action {
             return $null
         }
-          # Show the device actions menu
+        # Show the device actions menu
         $result = ShowMenu -Menu $deviceActionsMenu
         return $result
     }
-    else {
+    else
+    {
         Write-Host "Status: Not managed by Intune" -ForegroundColor Yellow
         Write-Host "=============================`n" -ForegroundColor Yellow
         
