@@ -12,6 +12,9 @@ Desktop.ini
 .vscode/
 release/
 build/
+TestResults/
+TestReports/
+
 
 # PowerShell-specific files
 
