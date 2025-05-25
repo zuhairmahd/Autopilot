@@ -340,8 +340,20 @@ $deviceMenu = AddMenuItem -menu $deviceMenu -name "Clean device" -action {
         Write-Host "Exiting..."
         return $backoutText
     }
+    $serialNumber = (GetDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash).serialNumber
+    Write-Verbose "[$scriptName] Got serial number $($serialNumber)"
     $accessToken = GetGraphAccessToken -configFile $configFile
-    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'clean'
+    $deviceId = GetDeviceIdFromSerial -serialNumber $serialNumber -accessToken $accessToken
+    if ($null -ne $deviceId)
+    {
+        Write-Host "Device ID: $($deviceId)"
+        SendDeviceCommand -ManagedDeviceId $deviceId -AccessToken $accessToken -Command 'clean' -noConfirmation 
+    }
+    else
+    {
+        Write-Host "Failed to get device ID for serial number $($serialNumber)." -ForegroundColor Red -NoNewline
+        Write-Host "The device may not be registered in Intune." -ForegroundColor Red
+    }
 }   
 $deviceMenu = AddMenuItem -menu $deviceMenu -name "Wipe device" -action {
     Write-Host 'Wiping the device...'
@@ -358,8 +370,20 @@ $deviceMenu = AddMenuItem -menu $deviceMenu -name "Wipe device" -action {
         Write-Host "Exiting..."
         return $backoutText
     }
+    $serialNumber = (GetDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash).serialNumber
     $accessToken = GetGraphAccessToken -configFile $configFile
-    SendDeviceCommand -ManagedDeviceId $deviceAssignment.managedDeviceId -AccessToken $accessToken -Command 'wipe'
+    Write-Verbose "[$scriptName] Got serial number $($serialNumber)"
+    $deviceId = GetDeviceIdFromSerial -serialNumber $serialNumber -accessToken $accessToken -noConfirmation
+    if ($null -ne $deviceId)
+    {
+        Write-Host "Device ID: $($deviceId)"
+        SendDeviceCommand -ManagedDeviceId $deviceId -AccessToken $accessToken -Command 'wipe' -noConfirmation
+    }
+    else
+    {
+        Write-Host "Failed to get device ID for serial number $($serialNumber)." -ForegroundColor Red -NoNewline
+        Write-Host "The device may not be registered in Intune." -ForegroundColor Red
+    }
 }
 
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
