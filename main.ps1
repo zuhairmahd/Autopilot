@@ -478,6 +478,19 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged 
         Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
     }
 }
+$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export device storage report" -Action {
+    $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
+    $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
+    {
+        Write-Host "Exported device storage report to $($storageOutputFileName)." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export device storage report." -ForegroundColor Red
+    }
+}
 #endregion export menu
 
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
