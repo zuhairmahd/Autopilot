@@ -228,6 +228,8 @@ function DisplayDeviceHealth()
     
     if ($enrollmentState.managed)
     {
+        Write-Verbose "[$functionName] Device is managed by Intune."
+        Write-Verbose "[$functionName] Device enrollment state: $($enrollmentState.managedDevice.enrollmentState)"
         Write-Host "`n=== Device Health & Status Report ===" -ForegroundColor Cyan
         Write-Host "Serial Number: $SerialNumber"
         
@@ -298,17 +300,58 @@ function DisplayDeviceHealth()
     }
 }
 
+# ProcessSerialNumber function - Enhanced with navigation parameter support
+# This function creates a device actions menu when a managed device is found.
+# Navigation parameters (Depth, History, MenuHistory) are passed through to maintain
+# seamless menu navigation and allow users to go back or return to main menu.
 function ProcessSerialNumber()
 {
     [CmdletBinding()]
     param (
         [string]$SerialNumber,
         $AccessToken,
-        $Settings = $settings
-    )
-
-    $functionName = $MyInvocation.MyCommand.Name
+        $Settings = $settings,
+        [Parameter(Mandatory = $false)]
+        [int]$Depth = 0,
+        [Parameter(Mandatory = $false)]
+        [System.Collections.ArrayList]$History = $null,
+        [Parameter(Mandatory = $false)]
+        [System.Collections.ArrayList]$MenuHistory = $null
+    )    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
+    
+    # Log navigation context for debugging
+    $historyCount = if ($History)
+    {
+        $History.Count 
+    }
+    else
+    {
+        'null' 
+    }
+    $menuHistoryCount = if ($MenuHistory)
+    {
+        $MenuHistory.Count 
+    }
+    else
+    {
+        'null' 
+    }
+    Write-Verbose "[$functionName] Navigation context - Depth: $Depth, History count: $historyCount, MenuHistory count: $menuHistoryCount"
+    
+    # Initialize navigation parameters if not provided
+    if ($null -eq $History)
+    {
+        Write-Verbose "[$functionName] Initializing History ArrayList"
+        $History = New-Object System.Collections.ArrayList
+    }
+    
+    if ($null -eq $MenuHistory)
+    {
+        Write-Verbose "[$functionName] Initializing MenuHistory ArrayList"
+        $MenuHistory = New-Object System.Collections.ArrayList
+    }
+    
     $SerialNumber = $SerialNumber.Trim()
     
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
@@ -355,11 +398,11 @@ function ProcessSerialNumber()
         
         $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
             DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
-            Read-Host "`nPress Enter to continue"
-        }
+            Read-Host "`nPress Enter to continue"        }
         
-        # Show the device actions menu
-        $result = ShowMenu -Menu $deviceActionsMenu
+        # Show the device actions menu with navigation context
+        Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
+        $result = ShowMenu -Menu $deviceActionsMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
         return $result
     }
     else
@@ -380,6 +423,7 @@ $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you li
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
 $deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
 
+#region export menu
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
     $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'autopilot'
@@ -428,12 +472,12 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged 
         Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
     }
 }
+#endregion export menu
 
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers.'
     $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-    
     if ($null -eq $serialNumber)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
@@ -443,23 +487,35 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        # Pass navigation context to ProcessSerialNumber
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        # Check if ProcessSerialNumber returned an exit signal
+        if ($null -eq $result)
+        {
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+            return "EXIT_APPLICATION"
+        }
     }
 }
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
     Write-Verbose "[$scriptName] Device object: $($deviceObject)"
-    
     if ($deviceObject)
     {
         $serialNumber = $deviceObject.serialNumber
         $make = $deviceObject.manufacturer
         $model = $deviceObject.model
         Write-Host "Found local device: $make $model (Serial: $serialNumber)"
-        
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        # Pass navigation context to ProcessSerialNumber
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        # Check if ProcessSerialNumber returned an exit signal
+        if ($null -eq $result)
+        {
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+            return "EXIT_APPLICATION"
+        }
     }
     else
     {
@@ -470,23 +526,37 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    
     if ($null -eq $userName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
         return $backoutText
-    } 
+    }
     else
     {
-        Write-Verbose "[$scriptName] Got user name: $UserName"
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        $serialNumber = GetDeviceByUser -AccessToken $accessToken -UserName $userName -OperatingSystem $settings.operatingSystem
-        Write-Verbose "[$scriptName] Serial number: $($serialNumber)"
+        Write-Verbose "[$scriptName] Got user name: $userName"
+        $accessToken = GetGraphAccessToken -ConfigFile $configFile 
         
-        if ($serialNumber -ne '0' -and $null -ne $serialNumber)
+        # Call GetDeviceByUser to find devices for the specified user
+        Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
+        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
+        
+        if ($serialNumber -eq "EXIT_APPLICATION")
+        {
+            Write-Verbose "[$scriptName] User requested application exit from device selection."
+            return "EXIT_APPLICATION"
+        }
+        elseif ($serialNumber -ne '0' -and $null -ne $serialNumber)
         {
             Write-Host "Found device for user $userName with serial number: $serialNumber"
-            ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+            # Pass navigation context to ProcessSerialNumber
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+            # Check if ProcessSerialNumber returned an exit signal
+            if ($null -eq $result)
+            {
+                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                return "EXIT_APPLICATION"
+            }
         }
         elseif ($serialNumber -eq '0')
         {
@@ -528,10 +598,17 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             {
                 Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
                 return $backoutText # Return to the previous menu
-            } 
+            }
             else # Process only if a serial number was entered
             {
-                ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                # Pass navigation context to ProcessSerialNumber
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+                # Check if ProcessSerialNumber returned an exit signal
+                if ($null -eq $result)
+                {
+                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                    return "EXIT_APPLICATION"
+                }
             }
         }
         else
@@ -564,5 +641,9 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 #endregion Menu Definitions
 
 #region Show Menu
-ShowMenu -Menu $mainMenu
+$result = ShowMenu -Menu $mainMenu
+if ($null -eq $result)
+{
+    Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+}
 #endregion Show Menu

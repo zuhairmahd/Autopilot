@@ -102,8 +102,7 @@ function DisplayNumericMenu()
             $selection = $keyInfo.Character.ToString()
         }
     }
-    
-    if ($selection -ne 0)
+      if ($selection -ne "0")
     {
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
@@ -114,7 +113,8 @@ function DisplayNumericMenu()
     else
     {
         Write-Verbose "[$functionName] Exiting script with selection: $selection"
-        return $selection
+        # Return integer 0 for exit option to ensure proper type matching
+        return [int]$selection
     }
 }
 
@@ -199,6 +199,7 @@ function ShowMenu()
         [System.Collections.ArrayList]$MenuHistory = $null,
         [string]$BackoutText = $backoutText
     )
+    #region Validate parameters
     $functionName = $MyInvocation.MyCommand.Name#region Print a verbose message with received parameters
     Write-Verbose "[$functionName] Received parameters: $($Menu | Out-String)"
     Write-Verbose "[$functionName] Depth: $Depth"
@@ -206,6 +207,7 @@ function ShowMenu()
     Write-Verbose "[$functionName] MenuHistory: $($MenuHistory | Out-String)"
     Write-Verbose "[$functionName] BackoutText: $BackoutText"
     #endregion
+    
     # Initialize history if not provided
     if ($null -eq $History)
     {
@@ -266,7 +268,6 @@ function ShowMenu()
         Write-Verbose "[$functionName] Cleaning history to remove duplicates."
         $cleanHistory = [System.Collections.ArrayList]@()
         $previousItem = ""
-        
         foreach ($item in $History)
         {
             if ($item -ne $previousItem)
@@ -276,7 +277,6 @@ function ShowMenu()
                 $previousItem = $item
             }
         }
-        
         $path = $cleanHistory -join " > "
         $banner += "`n[$path]"
     }
@@ -324,32 +324,56 @@ function ShowMenu()
         $selectedIndex = $choices.IndexOf($selectedOption)
         Write-Verbose "[$functionName] Selected index: $selectedIndex"
         $selectedItem = $menuItems[$selectedIndex]
-        Write-Verbose "[$functionName] Selected item: $($selectedItem |Out-String)"
-        # Handle action or submenu
+        Write-Verbose "[$functionName] Selected item: $($selectedItem |Out-String)"        # Handle action or submenu        
         if ($selectedItem.Action)
         {
             Write-Verbose "[$functionName] Executing action for selected item."
-            # Execute the action
+            # Navigation enhancement: Add current menu to history before executing action
+            # This ensures that actions can access the full navigation path
+            $tempHistory = $History.Clone()
+            $tempMenuHistory = $MenuHistory.Clone()
+            $tempHistory.Add($Menu.Title)
+            $tempMenuHistory.Add($Menu)
+            
+            # Make navigation parameters available to the action script block via script scope variables
+            # This allows action script blocks to access current navigation context when needed
+            $script:CurrentMenuDepth = $Depth + 1  # Increment depth for the action
+            $script:CurrentMenuHistory = $tempHistory
+            $script:CurrentMenuHistory_Menu = $tempMenuHistory            # Execute the action
             $result = & $selectedItem.Action
-            # Always display press any key to continue, regardless of whether action returns a value
-            Write-Host "`n"
+            
             #If you get the special return boolean, return the value directly.
             if ($selectedItem.ReturnsValue)
             {
                 Write-Verbose "[$functionName] Action returned a value: $result"
                 return $result
             }
-            # If the action returned a value, display it
+            
+            # Check if the action returned a signal to exit the application
+            # This happens when actions internally handle exit requests from submenus
+            if ($result -eq "EXIT_APPLICATION")
+            {
+                Write-Verbose "[$functionName] Action requested application exit, propagating exit signal"
+                return $null
+            }
+            
+            # If the action returned the backout text, respect it and don't show "press any key"
+            if ($result -eq $backoutText)
+            {
+                Write-Verbose "[$functionName] Action returned backout text, returning to menu"
+                return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
+            }
+            
+            # Display action result if any
             if ($null -ne $result)
             {
-                Write-Host "$result`n" -ForegroundColor Cyan
+                Write-Host "`n$result" -ForegroundColor Cyan
             }
-            if (-not ($result -eq $backoutText)) 
-            {
-                Write-Verbose "[$functionName] Action executed: $($selectedItem.Name)"
-                Write-Host "Press any key to continue..." -ForegroundColor Yellow
-                $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            }
+            
+            Write-Verbose "[$functionName] Action executed: $($selectedItem.Name)"
+            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
+            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            
             return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
         }
         elseif ($selectedItem.Submenu)
@@ -362,3 +386,4 @@ function ShowMenu()
         }
     }
 }
+
