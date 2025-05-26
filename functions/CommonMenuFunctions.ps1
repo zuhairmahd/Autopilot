@@ -99,7 +99,7 @@ function DisplayNumericMenu()
             # Re-prompt
             $selection = $null
             $keyInfo = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            $selection = $keyInfo.Character.ToString()
+            $selection = [string]$keyInfo.Character.ToString()
         }
     }
       if ($selection -ne "0")
