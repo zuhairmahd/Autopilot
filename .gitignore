@@ -14,6 +14,7 @@ release/
 build/
 TestReports/
 TestResults/
+.claude/
 
 
 # PowerShell-specific files
@@ -21,6 +22,7 @@ TestResults/
 # PowerShell data files
 *.psd1
 *.psm1
+*claud*.*
 
 # PowerShell script logs
 *.log

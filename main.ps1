@@ -114,8 +114,9 @@ function validateInput()
             elseif ($UserInput -match '^[a-zA-Z0-9-\s]+$') 
             {
                 Write-Verbose "[$functionName] Serial number validation passed"
-                return $returnValue
                 $returnValue.value = $UserInput
+                $returnValue.valid = $true
+                return $returnValue
             }
             else
             {
