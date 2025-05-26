@@ -1222,18 +1222,15 @@ function RestartDevice()
   $functionName = $MyInvocation.MyCommand.Name
   $reboot = Read-Host -Prompt $question
   while ($reboot -notin ('Y', 'N'))
-  {
-    Write-Host "Invalid input. Please enter 'Y' or 'N'."
-    [console]::beep(1000, 500)
     $reboot = Read-Host -Prompt $question
-  }
-  if ($reboot -eq 'Y')
   {
+    Write-Verbose "[$functionName] User chose to reboot the device."
     Write-Host $bootMessage -ForegroundColor Green
     Restart-Computer -Force
   }
   else
   {
+    Write-Verbose "[$functionName] User chose not to reboot the device."
     Write-Host $reminderMessage -ForegroundColor Red
     return $false
   }

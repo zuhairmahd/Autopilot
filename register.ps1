@@ -205,21 +205,22 @@ $version = '3.0.0'
 $versionFile = 'version.txt'
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 $backoutText = 'Returning to previous menu'
-$returnValues = [ordered] @{}
-$returnValues.add('EnrolledMessage', 'The device is enrolled.')
-$returnValues.add('notContactedMessage', 'The device has not contacted the enrollment service.')
-$returnValues.add('PendingResetMessage', 'The device is pending a reset.')
-$returnValues.add('EnrollmentFailedMessage', 'The device enrollment failed.')
-$returnValues.add('UnassignedMessage', 'The device is not assigned to a deployment profile.')
-$returnValues.add('PendingMessage', 'The device is pending assignment to a deployment profile.')
-$returnValues.add('notInIntuneMessage', 'The device is not in Intune.')
-$returnValues.add('ImportSuccessMessage', 'The device was imported successfully.')
-$returnValues.add('ImportFailedMessage', 'The device import failed.')
-$returnValues.add('DeleteSuccessMessage', 'The device was deleted successfully.')
-$returnValues.add('DeleteFailedMessage', 'The device deletion failed.')
-$returnValues.add('UpdateFailedMessage', 'Could not download update.')
-$returnValues.add('UpdateSuccessMessage', 'The script was updated successfully.')
-$returnValues.add('UpdateNotNeededMessage', 'The script is already up to date.')
+$returnValues = [ordered] @{
+    EnrolledMessage         = 'The device is enrolled.'
+    notContactedMessage     = 'The device has not contacted the enrollment service.'
+    PendingResetMessage     = 'The device is pending a reset.'
+    EnrollmentFailedMessage = 'The device enrollment failed.'
+    UnassignedMessage       = 'The device is not assigned to a deployment profile.'
+    PendingMessage          = 'The device is pending assignment to a deployment profile.'
+    notInIntuneMessage      = 'The device is not in Intune.'
+    ImportSuccessMessage    = 'The device was imported successfully.'
+    ImportFailedMessage     = 'The device import failed.'
+    DeleteSuccessMessage    = 'The device was deleted successfully.'
+    DeleteFailedMessage     = 'The device deletion failed.'
+    UpdateFailedMessage     = 'Could not download update.'
+    UpdateSuccessMessage    = 'The script was updated successfully.'
+    UpdateNotNeededMessage  = 'The script is already up to date.'
+}
 if ($domain -eq 'arabictutor.com')
 {
     Write-Verbose "[$scriptName] Changing groupTag to 'entra'."
@@ -232,9 +233,9 @@ if (Test-Path -Path $versionFile)
     Write-Verbose "[$scriptName] Local version: $localVersion"
     $localVersionObject = [System.Version]::Parse($LocalVersion)
     Write-Verbose "[$scriptName] Local version object: $localVersionObject"
-    $versionObject = [System.Version]::Parse($version)
-    Write-Verbose "[$scriptName] Version object: $versionObject"
-    if ($versionObject -le $localVersionObject)
+    $versionVariableObject = [System.Version]::Parse($version)
+    Write-Verbose "[$scriptName] Version object: $versionVariableObject"
+    if ($versionVariableObject -le $localVersionObject)
     {
         Write-Verbose "[$scriptName] Version file $versionFile is up to date."
     }
@@ -252,6 +253,7 @@ else
     $localVersion = $version
 }
 #endregion Define static and dynamic variables
+
 
 #region logging
 Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
@@ -496,9 +498,9 @@ if ($showAdvancedOptions)
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
+    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues -verbose
+    Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
-    
     {
         $returnValues.UpdateSuccessMessage
         {
@@ -509,7 +511,6 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         $returnValues.UpdateFailedMessage
         {
             Write-Host 'The script update failed.' -ForegroundColor Red
-            Write-Host 'Please check the Intune portal or contact an Intune administrator.' -ForegroundColor Red
         }
         $returnValues.UpdateNotNeededMessage
         {
@@ -523,20 +524,11 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
-    $choice = Read-Host "Are you sure you want to restart the device? (yes/no)"
-    while ($choice -notin @('yes', 'no'))
+    if (-not (RestartDevice))
     {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-        #beep
-        [console]::beep(1000, 500)
-        $choice = Read-Host "Are you sure you want to restart the device? (yes/no)"
-    }
-    if ($choice -eq 'no')
-    {
-        Write-Host 'Exiting...'
+        Write-Verbose "[$scriptName] RestartDevice function failed."
         return $backoutText
     }
-    RestartDevice
 }
 ShowMenu -Menu $mainMenu
 #endregion Menu Definitions
