@@ -87,22 +87,8 @@ function GetUpdates()
     Write-Verbose "[$functionName] Checking if we received a local version."
     if ($null -eq $LocalVersion -or $LocalVersion -eq '')
     {
-        Write-Verbose "[$functionName] LocalVersion is null or empty. Attempting to get the local version from the version file."
-        # Get the local version from the version file
-        $localVersionFile = "$RootFolder\version.txt"
-        if (Test-Path $localVersionFile)
-        {
-            Write-Verbose "[$functionName] Local version file found at $localVersionFile. Reading version."
-            $LocalVersion = Get-Content -Path $localVersionFile -Force
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Local version file not found at $localVersionFile."
-        }
-    }
-    else 
-    {
-        Write-Verbose "[$functionName] LocalVersion provided in variable. Using provided local version: $LocalVersion"
+        Write-Verbose "[$functionName] LocalVersion is null or empty. Returning to calling function."
+        return $null
     }
     Write-Host "LocalVersion: $LocalVersion"
     $localVersion = [System.Version]::Parse($LocalVersion)
@@ -127,11 +113,10 @@ function GetUpdates()
     if ($null -eq $remoteVersion -or $remoteVersion -eq '')
     {
         Write-Host "Failed to get remote version from response. Please provide a valid remote version."
-        return
+        return $null
     }
     $remoteVersion = [regex]::Match($remoteVersion, '\d+\.\d+\.\d').Value
     Write-Verbose "[$functionName] processed remote version: $remoteVersion"
-    #convert the content to a version object.
     $remoteVersion = [System.Version]::Parse($remoteVersion)
     #endregion
     
