@@ -12,6 +12,10 @@ Desktop.ini
 .vscode/
 release/
 build/
+TestReports/
+TestResults/
+.claude/
+
 TestResults/
 TestReports/
 
@@ -21,6 +25,7 @@ TestReports/
 # PowerShell data files
 *.psd1
 *.psm1
+*claud*.*
 
 # PowerShell script logs
 *.log
