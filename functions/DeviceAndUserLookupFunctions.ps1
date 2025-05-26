@@ -207,12 +207,26 @@ function GetDeviceByUser()
         [parameter(Mandatory = $true)]
         [string]$OperatingSystem,
         [parameter(Mandatory = $true)]
-        [string]$AccessToken
-    )
-    $functionName = $MyInvocation.MyCommand.Name    
+        [string]$AccessToken,
+        # Navigation enhancement: Optional parameters for seamless menu navigation
+        [int]$Depth = 0,
+        [System.Collections.ArrayList]$History = $null,
+        [System.Collections.ArrayList]$MenuHistory = $null
+    )    $functionName = $MyInvocation.MyCommand.Name    
+    # Navigation enhancement: Initialize null navigation parameters
+    if ($null -eq $History)
+    {
+        $History = New-Object System.Collections.ArrayList
+    }
+    if ($null -eq $MenuHistory)
+    {
+        $MenuHistory = New-Object System.Collections.ArrayList
+    }
+    
     #region write verbose log of all parameters
     Write-Verbose "[$functionName] UserName: $UserName"
     Write-Verbose "[$functionName] Operating system: $OperatingSystem"
+    Write-Verbose "[$functionName] Navigation - Depth: $Depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
     if ($null -ne $AccessToken)
     {
         Write-Verbose "[$functionName] AccessToken provided."
@@ -268,15 +282,14 @@ function GetDeviceByUser()
                 }.GetNewClosure()
                 # Add the menu item with the action
                 $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action -ReturnsValue
-            }
-            # Show the menu and return the selected device's serial number
-            $selectedSerialNumber = ShowMenu -Menu $deviceMenu
-            Write-Verbose "[$functionName] Returning selected serial number: $selectedSerialNumber"
-            # Check if the user selected 0 (Exit)
-            if ($selectedSerialNumber -eq $null)
+            }            # Show the menu and return the selected device's serial number
+            # Navigation enhancement: Pass navigation parameters to ShowMenu for seamless navigation
+            $selectedSerialNumber = ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
+            Write-Verbose "[$functionName] Returning selected serial number: $selectedSerialNumber"            # Check if the user selected 0 (Exit)
+            if ($null -eq $selectedSerialNumber)
             {
-                Write-Verbose "[$functionName] User selected Exit option (0). Returning 0 instead of null."
-                return 0
+                Write-Verbose "[$functionName] User selected Exit option (0). Returning EXIT_APPLICATION signal."
+                return "EXIT_APPLICATION"
             }
             return $selectedSerialNumber
         }

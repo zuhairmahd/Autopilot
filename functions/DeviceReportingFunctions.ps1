@@ -1,4 +1,4 @@
-function ExportDeviceMemory()
+function ExportDeviceStorage()
 {
     [CmdletBinding()]
     param(
