@@ -13,6 +13,7 @@
       "settings": {
         "domain": "gao.gov",
         "deviceNamePrefix": "w11-",
+        "maxNumberOfDevicesAllowed": 20,
         "operatingSystem": "Windows",
         "MaxUserNameLength": 50,
         "MaxSerialNumberLength": 100,

@@ -30,7 +30,7 @@ else
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
-# $userUri = "users"
+$userUri = "users"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -51,12 +51,13 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
-$global:enrollments = [ordered] @{
-    # "autopilot" = $autopilotDevices
-    "managed" = $managedDevices
-    # "imported"  = $importedDevices
-    # "unmanaged" = $unmanagedDevices
-}
+# $global:enrollments = [ordered] @{
+# "autopilot" = $autopilotDevices
+# "managed" = $managedDevices
+# "imported"  = $importedDevices
+# "unmanaged" = $unmanagedDevices
+# }
 #endregion variables
 
-ExportDeviceMemory -AccessToken $accessToken -OutputFile $outputFile -IncludeStorageInfo 
+$uri = "$userUri/BoucherR@gao.gov/registeredDevices"
+$global:registeredDevices = CallGraphApi -ResourcePath $uri -accessToken $accessToken 

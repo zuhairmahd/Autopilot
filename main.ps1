@@ -562,6 +562,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     } 
     else # Continue only if a username was entered
     {
+        $hasCorrectGroups = $false
+        $hasCorrectNumberOfDevices = $false
         Write-Host "Checking group membership for user $userName."
         Write-Verbose "[$scriptName] Getting access token..."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
@@ -570,27 +572,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         {
             Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
             Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
-            Write-Host "We will now check the device state." -ForegroundColor Green
-            Write-Host "Enter the device's serial number."
-            Write-Host "This would be the device you plan to give to the user."
-            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-            # Check if user entered 'back'
-            if ($null -eq $serialNumber)
-            {
-                Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-                return $backoutText # Return to the previous menu
-            }
-            else # Process only if a serial number was entered
-            {
-                # Pass navigation context to ProcessSerialNumber
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
-                # Check if ProcessSerialNumber returned an exit signal
-                if ($null -eq $result)
-                {
-                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                    return "EXIT_APPLICATION"
-                }
-            }
+            $hasCorrectGroups = $true
         }
         else
         {
@@ -615,7 +597,48 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
         }
-    } # Corrected: Closing brace for the -Action script block was missing
+        Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
+        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken 
+        if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
+        {
+            Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
+            $hasCorrectNumberOfDevices = $true
+        }
+        else
+        {
+            Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
+            Write-Host "No additional devices can be assigned to this user."
+        }        
+        if ($hasCorrectGroups -and $hasCorrectNumberOfDevices)
+        {
+            Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
+            Write-Host "We will now check the device state." -ForegroundColor Green
+            Write-Host "Enter the device's serial number."
+            Write-Host "This would be the device you plan to give to the user."
+            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+            # Check if user entered 'back'
+            if ($null -eq $serialNumber)
+            {
+                Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
+                return $backoutText # Return to the previous menu
+            }
+            else # Process only if a serial number was entered
+            {
+                # Pass navigation context to ProcessSerialNumber
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+                # Check if ProcessSerialNumber returned an exit signal
+                if ($null -eq $result)
+                {
+                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                    return "EXIT_APPLICATION"
+                }
+            }
+        }
+        else
+        {
+            Write-Host "The user $userName is not ready to receive a Windows 11 device." -ForegroundColor Red
+        }
+    }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceExportMenu
