@@ -288,7 +288,7 @@ function GetDeviceByUser()
             }            # Show the menu and return the selected device's serial number
             # Navigation enhancement: Pass navigation parameters to ShowMenu for seamless navigation
             Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
-            $global:selectedSerialNumber = (ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
+            $selectedSerialNumber = (ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
             Write-Verbose "[$functionName] ShowMenu returned: '$selectedSerialNumber' (Type: $($selectedSerialNumber.GetType().Name))"
             
             # Validate that we got a proper serial number, not a navigation option
