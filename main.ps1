@@ -341,7 +341,7 @@ function ProcessSerialNumber()
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
-                DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
+                ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
                 Read-Host "`nPress Enter to continue"        }
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
