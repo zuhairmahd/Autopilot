@@ -37,6 +37,7 @@
         "MaxSerialNumberLength": 100,
         "MinSerialNumberLength": 7,
         "MinimumDevicePhysicalMemoryInGB": 8,
+        "maxNumberOfDevicesAllowed": 15,
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",
           "Hybrid join profile"
