@@ -323,32 +323,26 @@ function ProcessSerialNumber()
             Write-Host "=============================`n" -ForegroundColor Green
             # Create and show device actions menu using main.ps1 menu structure
             $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
-        
             # Add menu items for each device action
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
                 Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
             }
-        
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
                 Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
             }
-        
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
                 Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' -MonitorAction
             }
-        
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
             }
-        
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
                 Read-Host "`nPress Enter to continue"        }
-        
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             $result = ShowMenu -Menu $deviceActionsMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
@@ -629,12 +623,9 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 
 #region Show Menu
 # Only show menu if not in test mode
-if (-not $global:TestMode)
+$result = ShowMenu -Menu $mainMenu
+if ($null -eq $result)
 {
-    $result = ShowMenu -Menu $mainMenu
-    if ($null -eq $result)
-    {
-        Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
-    }
+    Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
 }
 #endregion Show Menu

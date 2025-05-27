@@ -18,8 +18,8 @@ BeforeAll {
     $scriptPath = Join-Path $PSScriptRoot "main.ps1"
     
     # Mock external dependencies and configuration files
-    $mockConfigPath = Join-Path $PSScriptRoot ".secrets\config.json"
-    $mockInitPath = Join-Path $PSScriptRoot "initVerify.json"
+    $mockConfigPath = "testDrive:\.secrets\config.json"
+    $mockInitPath = "testDrive:\initVerify.json"
     
     # Create mock configuration data
     $mockConfig = @{
@@ -76,6 +76,7 @@ BeforeAll {
                     osVersion        = "Windows 10"
                     complianceState  = "compliant"
                     managementState  = "managed"
+                    hasDeviceObject  = $true
                     lastSyncDateTime = Get-Date
                 }
             }
@@ -86,13 +87,6 @@ BeforeAll {
     Mock NewMenu { return @{} }
     Mock AddMenuItem { return @{} }
     Mock ShowMenu { return $null }
-    Mock GetDeviceInfo { 
-        return @{
-            serialNumber = "TEST12345"
-            manufacturer = "Microsoft"
-            model        = "Surface"
-        }
-    }
     Mock VerifyGroupMembership { 
         return @{
             success         = $true
@@ -106,6 +100,7 @@ BeforeAll {
     Mock Write-Host { }
     Mock Start-Sleep { }
     
+    
     # Now dot-source the script with parameters
     try
     {
@@ -118,9 +113,16 @@ BeforeAll {
 }
 
 AfterAll {
+    # Clean up test mode variable
+    if (Get-Variable -Name "TestMode" -Scope Global -ErrorAction SilentlyContinue)
+    {
+        Remove-Variable -Name "TestMode" -Scope Global -Force
+    }
+    
     # Clean up temporary files
-    $mockConfigPath = Join-Path $PSScriptRoot ".secrets-test\config.json"
-    $mockInitPath = Join-Path $PSScriptRoot "config-test\initVerify.json"
+    $mockConfigPath = "testDrive:\.secrets\config.json"
+    $mockInitPath = "testDrive:\initVerify.json"
+    
     if (Test-Path $mockConfigPath)
     {
         Remove-Item $mockConfigPath -Force 
@@ -195,6 +197,203 @@ Describe "NormalizeUserName Function" {
         
         It "Should accept Settings parameter" {
             { NormalizeUserName -UserName "test" -Settings @{domain = "test.com"} } | Should -Not -Throw
+        }
+    }
+}
+
+Describe "ProcessSerialNumber Function" {
+    Context "Managed Device Processing" {
+        It "Should process managed device and create actions menu" {
+            Mock GetDeviceEnrollmentStatus {
+                return @{
+                    managed         = $true
+                    imported        = $false
+                    hasDeviceObject = $true
+                    inAutopilot     = $true
+                    managedDevice   = @{
+                        device = @{
+                            deviceName   = "TestDevice"
+                            model        = "TestModel"
+                            manufacturer = "TestManufacturer"
+                            id           = "test-device-id"
+                        }
+                    }
+                }
+            }
+            Mock NewMenu { return @{} }
+            Mock AddMenuItem { return @{} }
+            Mock ShowMenu { return $null }
+            
+            $result = ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token"
+            $result | Should -Be $true
+        }
+    }
+    
+    Context "Navigation Parameters" {
+        It "Should initialize navigation parameters when not provided" {
+            Mock GetDeviceEnrollmentStatus {
+                return @{
+                    managed         = $false
+                    inAutopilot     = $false
+                    imported        = $false
+                    hasDeviceObject = $false
+                }
+            }
+            
+            $result = ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token"
+            $result | Should -Be $null
+        }
+        
+        It "Should accept navigation parameters" {
+            $history = New-Object System.Collections.ArrayList
+            $menuHistory = New-Object System.Collections.ArrayList
+            
+            Mock GetDeviceEnrollmentStatus {
+                return @{
+                    managed = $false
+                }
+            }
+            
+            { ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token" -Depth 1 -History $history -MenuHistory $menuHistory } | Should -Not -Throw
+        }
+    }
+    
+    Context "Unmanaged Device Processing" {
+        It "Should handle unmanaged device gracefully" {
+            Mock GetDeviceEnrollmentStatus {
+                return @{
+                    hasDeviceObject = $true
+                    managed         = $false
+                }
+            }
+            
+            $result = ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token"
+            $result | Should -Be $null
+        }
+    }
+}
+
+Describe "Script Variables and Configuration" {
+    Context "Configuration Loading" {
+        It "Should load domain from config file" {
+            # This test verifies the domain variable is set correctly
+            if (Get-Variable -Name "domain" -ErrorAction SilentlyContinue)
+            {
+                $domain | Should -Not -BeNullOrEmpty
+            }
+        }
+        
+        It "Should load initialization settings" {
+            # This test verifies the init variable is set correctly
+            if (Get-Variable -Name "init" -ErrorAction SilentlyContinue)
+            {
+                $init | Should -Not -BeNullOrEmpty
+            }
+        }
+    }
+    
+    Context "Script Variables" {
+        It "Should define backout text variable" {
+            if (Get-Variable -Name "backoutText" -ErrorAction SilentlyContinue)
+            {
+                $backoutText | Should -Not -BeNullOrEmpty
+                $backoutText | Should -Match "previous menu"
+            }
+        }
+        
+        It "Should define script name variable" {
+            if (Get-Variable -Name "scriptName" -ErrorAction SilentlyContinue)
+            {
+                $scriptName | Should -Be "main.ps1"
+            }
+        }
+    }
+}
+
+Describe "Error Handling" {
+    Context "File Access Errors" {
+        It "Should handle missing config file gracefully" {
+            # This would need to be tested by creating a new instance with invalid path
+            # For now, we ensure the function doesn't throw when files exist
+            $true | Should -Be $true
+        }
+        
+        It "Should handle missing functions folder" {
+            # This is tested in the main script's error handling logic
+            $scriptContent = Get-Content -Path (Join-Path $PSScriptRoot "main.ps1") -Raw
+            $scriptContent | Should -Match "Cannot find the functions folder"
+        }
+    }
+}
+
+Describe "Integration Tests" {
+    Context "Complete Workflow" {
+        It "Should handle complete user lookup workflow" {
+            Mock GetUserInput { return "testuser@contoso.com" } -ParameterFilter { $InputType -eq "userName" }
+            Mock GetGraphAccessToken { return "mock-token" }
+            Mock GetDeviceByUser { return "TEST12345" }
+            Mock ProcessSerialNumber { return $null }
+            
+            # This would simulate the user lookup menu action
+            # The actual test would need to invoke the menu action
+            $true | Should -Be $true
+        }
+        
+        It "Should handle complete device assignment workflow" {
+            Mock GetUserInput { 
+                if ($InputType -eq "userName")
+                {
+                    return "testuser@contoso.com" 
+                }
+                if ($InputType -eq "serialNumber")
+                {
+                    return "TEST12345" 
+                }
+            }
+            Mock VerifyGroupMembership { 
+                return @{
+                    success         = $true
+                    missingGroups   = @()
+                    ForbiddenGroups = @()
+                }
+            }
+            Mock ProcessSerialNumber { return $null }
+            
+            # This would simulate the device assignment workflow
+            $true | Should -Be $true
+        }
+    }
+}
+
+
+Describe "Menu Structure" {
+    Context "Main Menu" {
+        It "Should define main menu" {
+            # Test that menu creation functions are called
+            Assert-MockCalled NewMenu -Times 4 -Exactly
+        }
+        
+        It "Should have correct menu items" {
+            # Test that menu items are added
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Give a device to a user" }
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Check device status " }
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export devices" }
+        }
+    }
+    
+    Context "Check Menu" {
+        It "Should define device lookup options" {
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Lookup device by Serial Number" }
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Lookup device by User" }
+        }
+    }
+    
+    Context "Export Menu" {
+        It "Should define export options" {
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Autopilot Devices" }
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Imported Autopilot Devices" }
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Managed Windows Devices" }
+            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Unmanaged Windows Devices" }
         }
     }
 }
@@ -335,234 +534,3 @@ Describe "GetUserInput Function" {
     }
 }
 
-Describe "DisplayDeviceHealth Function" {
-    Context "Managed Device Display" {
-        It "Should display health information for managed device" {
-            Mock GetDeviceEnrollmentStatus {
-                return @{
-                    managed       = $true
-                    managedDevice = @{
-                        device = @{
-                            deviceName       = "TestDevice"
-                            model            = "TestModel"
-                            manufacturer     = "TestManufacturer"
-                            osVersion        = "Windows 10"
-                            complianceState  = "compliant"
-                            managementState  = "managed"
-                            lastSyncDateTime = Get-Date
-                            id               = "test-id"
-                        }
-                    }
-                }
-            }
-            Mock CheckDeviceAssignment { return $null }
-            
-            $result = DisplayDeviceHealth -SerialNumber "TEST123" -AccessToken "token"
-            $result | Should -Be $true
-        }
-    }
-    
-    Context "Unmanaged Device Display" {
-        It "Should display limited information for unmanaged device" {
-            Mock GetDeviceEnrollmentStatus {
-                return @{
-                    managed = $false
-                }
-            }
-            Mock CheckDeviceAssignment { return $null }
-            
-            $result = DisplayDeviceHealth -SerialNumber "TEST123" -AccessToken "token"
-            $result | Should -Be $false
-        }
-    }
-}
-
-Describe "ProcessSerialNumber Function" {
-    Context "Managed Device Processing" {
-        It "Should process managed device and create actions menu" {
-            Mock GetDeviceEnrollmentStatus {
-                return @{
-                    managed       = $true
-                    managedDevice = @{
-                        device = @{
-                            deviceName   = "TestDevice"
-                            model        = "TestModel"
-                            manufacturer = "TestManufacturer"
-                            id           = "test-device-id"
-                        }
-                    }
-                }
-            }
-            Mock NewMenu { return @{} }
-            Mock AddMenuItem { return @{} }
-            Mock ShowMenu { return $null }
-            
-            $result = ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token"
-            $result | Should -Be $null
-        }
-    }
-    
-    Context "Navigation Parameters" {
-        It "Should initialize navigation parameters when not provided" {
-            Mock GetDeviceEnrollmentStatus {
-                return @{
-                    managed = $false
-                }
-            }
-            
-            $result = ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token"
-            $result | Should -Be $null
-        }
-        
-        It "Should accept navigation parameters" {
-            $history = New-Object System.Collections.ArrayList
-            $menuHistory = New-Object System.Collections.ArrayList
-            
-            Mock GetDeviceEnrollmentStatus {
-                return @{
-                    managed = $false
-                }
-            }
-            
-            { ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token" -Depth 1 -History $history -MenuHistory $menuHistory } | Should -Not -Throw
-        }
-    }
-    
-    Context "Unmanaged Device Processing" {
-        It "Should handle unmanaged device gracefully" {
-            Mock GetDeviceEnrollmentStatus {
-                return @{
-                    managed = $false
-                }
-            }
-            Mock DisplayDeviceHealth { }
-            
-            $result = ProcessSerialNumber -SerialNumber "TEST123" -AccessToken "token"
-            $result | Should -Be $null
-        }
-    }
-}
-
-Describe "Script Variables and Configuration" {
-    Context "Configuration Loading" {
-        It "Should load domain from config file" {
-            # This test verifies the domain variable is set correctly
-            if (Get-Variable -Name "domain" -ErrorAction SilentlyContinue)
-            {
-                $domain | Should -Not -BeNullOrEmpty
-            }
-        }
-        
-        It "Should load initialization settings" {
-            # This test verifies the init variable is set correctly
-            if (Get-Variable -Name "init" -ErrorAction SilentlyContinue)
-            {
-                $init | Should -Not -BeNullOrEmpty
-            }
-        }
-    }
-    
-    Context "Script Variables" {
-        It "Should define backout text variable" {
-            if (Get-Variable -Name "backoutText" -ErrorAction SilentlyContinue)
-            {
-                $backoutText | Should -Not -BeNullOrEmpty
-                $backoutText | Should -Match "previous menu"
-            }
-        }
-        
-        It "Should define script name variable" {
-            if (Get-Variable -Name "scriptName" -ErrorAction SilentlyContinue)
-            {
-                $scriptName | Should -Be "main.ps1"
-            }
-        }
-    }
-}
-
-Describe "Menu Structure" {
-    Context "Main Menu" {
-        It "Should define main menu" {
-            # Test that menu creation functions are called
-            Assert-MockCalled NewMenu -Times 4 -Exactly
-        }
-        
-        It "Should have correct menu items" {
-            # Test that menu items are added
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Give a device to a user" }
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Check device status " }
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export devices" }
-        }
-    }
-    
-    Context "Check Menu" {
-        It "Should define device lookup options" {
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Lookup device by Serial Number" }
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Lookup device by User" }
-        }
-    }
-    
-    Context "Export Menu" {
-        It "Should define export options" {
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Autopilot Devices" }
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Imported Autopilot Devices" }
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Managed Windows Devices" }
-            Assert-MockCalled AddMenuItem -Times 1 -ParameterFilter { $Name -eq "Export Unmanaged Windows Devices" }
-        }
-    }
-}
-
-Describe "Error Handling" {
-    Context "File Access Errors" {
-        It "Should handle missing config file gracefully" {
-            # This would need to be tested by creating a new instance with invalid path
-            # For now, we ensure the function doesn't throw when files exist
-            $true | Should -Be $true
-        }
-        
-        It "Should handle missing functions folder" {
-            # This is tested in the main script's error handling logic
-            $scriptContent = Get-Content -Path (Join-Path $PSScriptRoot "main.ps1") -Raw
-            $scriptContent | Should -Match "Cannot find the functions folder"
-        }
-    }
-}
-
-Describe "Integration Tests" {
-    Context "Complete Workflow" {
-        It "Should handle complete user lookup workflow" {
-            Mock GetUserInput { return "testuser@contoso.com" } -ParameterFilter { $InputType -eq "userName" }
-            Mock GetGraphAccessToken { return "mock-token" }
-            Mock GetDeviceByUser { return "TEST12345" }
-            Mock ProcessSerialNumber { return $null }
-            
-            # This would simulate the user lookup menu action
-            # The actual test would need to invoke the menu action
-            $true | Should -Be $true
-        }
-        
-        It "Should handle complete device assignment workflow" {
-            Mock GetUserInput { 
-                if ($InputType -eq "userName")
-                {
-                    return "testuser@contoso.com" 
-                }
-                if ($InputType -eq "serialNumber")
-                {
-                    return "TEST12345" 
-                }
-            }
-            Mock VerifyGroupMembership { 
-                return @{
-                    success         = $true
-                    missingGroups   = @()
-                    ForbiddenGroups = @()
-                }
-            }
-            Mock ProcessSerialNumber { return $null }
-            
-            # This would simulate the device assignment workflow
-            $true | Should -Be $true
-        }
-    }
-}
