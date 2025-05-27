@@ -366,12 +366,14 @@ function GetDeviceEnrollmentStatus()
     $userUri = "users"
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
     $deviceHardwareExtraparameters = "select=hardwareInformation,physicalMemoryInBytes"
+    $isVMWareDevice = $false
     #endregion
 
     #region Get the autopilot device info
     if ($serialNumber -match 'vmware')
     {
         Write-Verbose "[$functionName] VMware device detected."
+        $isVMWareDevice = $true
         # $autopilotDeviceFilter = "AzureActiveDirectoryDeviceId eq '$($managedDevice.AzureAdDeviceId)'"
         # Alternative approach if the above doesn't work
         # $autopilotDeviceFilter = "managedDeviceId eq '$($managedDevice.id)'"
@@ -405,12 +407,14 @@ function GetDeviceEnrollmentStatus()
     {
         $autopilotDeviceResponse = CallGraphAPI @params
     }
+    Write-Verbose "[$functionName] Autopilot Device Response: $($autopilotDeviceResponse | Out-String)"
+    Write-Verbose "[$functionName] Autopilot Device Response Count: $($autopilotDeviceResponse.'@odata.count')"
     if ($null -ne $autopilotDeviceResponse -and $autopilotDeviceResponse.'@odata.count' -gt 0)
     {
         Write-Verbose "[$functionName] Got a device count of $($autopilotDeviceResponse.'@odata.count') from Autopilot."
         $autopilotDevice = $autopilotDeviceResponse.value
     }
-    elseif ($null -ne $autopilotDeviceResponse -and ($null -ne $autopilotDeviceResponse.id -or $autopilotDeviceResponse.id -ne '') )
+    elseif ($isVMWareDevice -and $null -ne $autopilotDeviceResponse -and ($null -ne $autopilotDeviceResponse.id -and $autopilotDeviceResponse.id -ne ''))
     {
         Write-Verbose "[$functionName] Got a single autopilot device with id $($autopilotDeviceResponse.id)"
         $autopilotDevice = $autopilotDeviceResponse
