@@ -1222,8 +1222,8 @@ function RestartDevice()
   $functionName = $MyInvocation.MyCommand.Name
   $reboot = Read-Host -Prompt $question
   while ($reboot -notin ('Y', 'N'))
-    $reboot = Read-Host -Prompt $question
   {
+    $reboot = Read-Host -Prompt $question
     Write-Verbose "[$functionName] User chose to reboot the device."
     Write-Host $bootMessage -ForegroundColor Green
     Restart-Computer -Force

@@ -102,7 +102,7 @@ function DisplayNumericMenu()
             $selection = [string]$keyInfo.Character.ToString()
         }
     }
-      if ($selection -ne "0")
+    if ($selection -ne "0")
     {
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
@@ -280,7 +280,6 @@ function ShowMenu()
         $path = $cleanHistory -join " > "
         $banner += "`n[$path]"
     }
-    
     # Display menu and get selection
     $selectedOption = DisplayNumericMenu -choices $choices -banner $banner -Prompt "Please select an option" -RequireEnter
     
@@ -319,12 +318,46 @@ function ShowMenu()
     }
     else
     {
-        # Find the selected item
-        Write-Verbose "[$functionName] Finding selected item."
+        # Find the selected item - check if it's a navigation option first
+        Write-Verbose "[$functionName] Finding selected item. Selected option: '$selectedOption'"
         $selectedIndex = $choices.IndexOf($selectedOption)
         Write-Verbose "[$functionName] Selected index: $selectedIndex"
+        Write-Verbose "[$functionName] Total choices count: $($choices.Count), Menu items count: $($menuItems.Count)"
+        
+        # Check if the selection is beyond the actual menu items (i.e., a navigation option)
+        if ($selectedIndex -ge $menuItems.Count)
+        {
+            Write-Verbose "[$functionName] Selected option '$selectedOption' is a navigation option at index $selectedIndex, not a menu item."
+            # The selected option is a navigation option ("Back" or "Main Menu")
+            # This should be handled by the navigation logic above, but adding as safety
+            if ($selectedOption -eq "Back")
+            {
+                Write-Verbose "[$functionName] Processing 'Back' navigation option."
+                if ($History.Count -gt 0)
+                {
+                    $History.RemoveAt($History.Count - 1)
+                    $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
+                    $MenuHistory.RemoveAt($MenuHistory.Count - 1)
+                    return ShowMenu -Menu $previousMenu -Depth ($Depth - 1) -History $History -MenuHistory $MenuHistory
+                }
+            }
+            elseif ($selectedOption -eq "Main Menu")
+            {
+                Write-Verbose "[$functionName] Processing 'Main Menu' navigation option."
+                if ($MenuHistory.Count -gt 0)
+                {
+                    $mainMenu = $MenuHistory[0]
+                    $History.Clear()
+                    $MenuHistory.Clear()
+                    $MenuHistory.Add($mainMenu)
+                    return ShowMenu -Menu $mainMenu -Depth 0 -History $History -MenuHistory $MenuHistory
+                }
+            }
+            return $null
+        }
+        
         $selectedItem = $menuItems[$selectedIndex]
-        Write-Verbose "[$functionName] Selected item: $($selectedItem |Out-String)"        # Handle action or submenu        
+        Write-Verbose "[$functionName] Selected item: $($selectedItem |Out-String)"# Handle action or submenu        
         if ($selectedItem.Action)
         {
             Write-Verbose "[$functionName] Executing action for selected item."
@@ -346,6 +379,33 @@ function ShowMenu()
             if ($selectedItem.ReturnsValue)
             {
                 Write-Verbose "[$functionName] Action returned a value: $result"
+                # Special handling: if the result is a navigation option that somehow got returned,
+                # don't treat it as a return value but process it as navigation
+                if ($result -eq "Back" -or $result -eq "Main Menu" -or $result -eq 0)
+                {
+                    Write-Verbose "[$functionName] Action returned navigation option: $result, processing as navigation instead of value"
+                    # Process as navigation
+                    if ($result -eq "Back" -and $Depth -gt 0 -and $History.Count -gt 0)
+                    {
+                        $History.RemoveAt($History.Count - 1)
+                        $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
+                        $MenuHistory.RemoveAt($MenuHistory.Count - 1)
+                        return ShowMenu -Menu $previousMenu -Depth ($Depth - 1) -History $History -MenuHistory $MenuHistory
+                    }
+                    elseif ($result -eq "Main Menu" -and $MenuHistory.Count -gt 0)
+                    {
+                        $mainMenu = $MenuHistory[0]
+                        $History.Clear()
+                        $MenuHistory.Clear()
+                        $MenuHistory.Add($mainMenu)
+                        return ShowMenu -Menu $mainMenu -Depth 0 -History $History -MenuHistory $MenuHistory
+                    }
+                    elseif ($result -eq 0)
+                    {
+                        return $null
+                    }
+                }
+                Write-Verbose "[$functionName] Returning action result: $result"
                 return $result
             }
             

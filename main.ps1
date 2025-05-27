@@ -558,7 +558,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         
         # Call GetDeviceByUser to find devices for the specified user
         Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
-        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        $global:serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu -verbose
         Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
         
         if ($serialNumber -eq "EXIT_APPLICATION")
@@ -661,9 +661,13 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 #endregion Menu Definitions
 
 #region Show Menu
-$result = ShowMenu -Menu $mainMenu
-if ($null -eq $result)
+# Only show menu if not in test mode
+if (-not $global:TestMode)
 {
-    Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+    $result = ShowMenu -Menu $mainMenu
+    if ($null -eq $result)
+    {
+        Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+    }
 }
 #endregion Show Menu

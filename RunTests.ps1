@@ -79,9 +79,12 @@ try {
         $pesterConfig.TestResult.OutputPath = Join-Path $OutputPath "TestResults.xml"
         $pesterConfig.TestResult.OutputFormat = 'NUnitXml'
         $pesterConfig.CodeCoverage.Enabled = $false  # Disable for now as it may cause issues with dot-sourced scripts
-        
-        # Run tests
+          # Run tests
         $testResults = Invoke-Pester -Configuration $pesterConfig
+        
+        # Debug: Log the result object type and available properties
+        Write-Verbose "Pester result object type: $($testResults.GetType().FullName)"
+        Write-Verbose "Available properties: $($testResults | Get-Member -MemberType Property | Select-Object -ExpandProperty Name | Out-String)"
     }
     else {
         # Pester 4.x configuration
@@ -92,22 +95,53 @@ try {
             -OutputFormat NUnitXml `
             -PassThru
     }
-    
-    # Display results summary
+      # Display results summary
     Write-Host "`n=== Test Results Summary ===" -ForegroundColor Cyan
-    Write-Host "Total Tests: $($testResults.TotalCount)" -ForegroundColor White
-    Write-Host "Passed: $($testResults.PassedCount)" -ForegroundColor Green
-    Write-Host "Failed: $($testResults.FailedCount)" -ForegroundColor $(if ($testResults.FailedCount -gt 0) { 'Red' } else { 'Green' })
-    Write-Host "Skipped: $($testResults.SkippedCount)" -ForegroundColor Yellow
     
-    if ($testResults.FailedCount -gt 0) {
-        Write-Host "`n=== Failed Tests ===" -ForegroundColor Red
-        foreach ($failedTest in $testResults.Failed) {
-            Write-Host "❌ $($failedTest.Describe) - $($failedTest.Context) - $($failedTest.Name)" -ForegroundColor Red
-            if ($Detailed) {
-                Write-Host "   Error: $($failedTest.FailureMessage)" -ForegroundColor DarkRed
+    # Handle different Pester result object structures
+    if ($pesterVersion -ge 5) {
+        # Pester 5.x uses different property names
+        $totalTests = if ($testResults.Tests) { $testResults.Tests.Count } else { $testResults.TotalCount }
+        $passedTests = if ($testResults.Tests) { ($testResults.Tests | Where-Object { $_.Result -eq 'Passed' }).Count } else { $testResults.PassedCount }
+        $failedTests = if ($testResults.Tests) { ($testResults.Tests | Where-Object { $_.Result -eq 'Failed' }).Count } else { $testResults.FailedCount }
+        $skippedTests = if ($testResults.Tests) { ($testResults.Tests | Where-Object { $_.Result -eq 'Skipped' }).Count } else { $testResults.SkippedCount }
+        
+        Write-Host "Total Tests: $totalTests" -ForegroundColor White
+        Write-Host "Passed: $passedTests" -ForegroundColor Green
+        Write-Host "Failed: $failedTests" -ForegroundColor $(if ($failedTests -gt 0) { 'Red' } else { 'Green' })
+        Write-Host "Skipped: $skippedTests" -ForegroundColor Yellow
+        
+        if ($failedTests -gt 0) {
+            Write-Host "`n=== Failed Tests ===" -ForegroundColor Red
+            $failedTestList = $testResults.Tests | Where-Object { $_.Result -eq 'Failed' }
+            foreach ($failedTest in $failedTestList) {
+                Write-Host "❌ $($failedTest.ExpandedName)" -ForegroundColor Red
+                if ($Detailed -and $failedTest.ErrorRecord) {
+                    Write-Host "   Error: $($failedTest.ErrorRecord.Exception.Message)" -ForegroundColor DarkRed
+                }
             }
         }
+        
+        $hasFailures = $failedTests -gt 0
+    }
+    else {
+        # Pester 4.x properties
+        Write-Host "Total Tests: $($testResults.TotalCount)" -ForegroundColor White
+        Write-Host "Passed: $($testResults.PassedCount)" -ForegroundColor Green
+        Write-Host "Failed: $($testResults.FailedCount)" -ForegroundColor $(if ($testResults.FailedCount -gt 0) { 'Red' } else { 'Green' })
+        Write-Host "Skipped: $($testResults.SkippedCount)" -ForegroundColor Yellow
+        
+        if ($testResults.FailedCount -gt 0) {
+            Write-Host "`n=== Failed Tests ===" -ForegroundColor Red
+            foreach ($failedTest in $testResults.Failed) {
+                Write-Host "❌ $($failedTest.Describe) - $($failedTest.Context) - $($failedTest.Name)" -ForegroundColor Red
+                if ($Detailed) {
+                    Write-Host "   Error: $($failedTest.FailureMessage)" -ForegroundColor DarkRed
+                }
+            }
+        }
+        
+        $hasFailures = $testResults.FailedCount -gt 0
     }
     
     # Check for test result file
@@ -120,9 +154,8 @@ try {
     if ($PassThru) {
         return $testResults
     }
-    
-    # Exit with appropriate code
-    if ($testResults.FailedCount -gt 0) {
+      # Exit with appropriate code
+    if ($hasFailures) {
         Write-Host "`nTests completed with failures." -ForegroundColor Red
         exit 1
     }

@@ -269,13 +269,16 @@ function GetDeviceByUser()
             $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
             # Store devices in an array to reference later
             $devices = $deviceInfo.value
+            Write-Verbose "[$functionName] Creating device menu with $($devices.Count) devices"
             # Add each device as a menu item
             foreach ($device in $devices)
             {
                 # Create a display name for the menu
                 $menuItemName = "Device: $($device.deviceName) ($($device.manufacturer) $($device.model) SN: $($device.serialNumber)) ($($device.complianceState))"
+                Write-Verbose "[$functionName] Adding menu item: $menuItemName"
                 # Create a scriptblock action that returns this specific device's serial number when selected
                 $serialNumber = $device.serialNumber
+                Write-Verbose "[$functionName] Creating action for serial number: $serialNumber"
                 $action = {
                     Write-Verbose "[$functionName] Returning Serial Number: $serialNumber"
                     return $serialNumber
@@ -284,19 +287,43 @@ function GetDeviceByUser()
                 $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action -ReturnsValue
             }            # Show the menu and return the selected device's serial number
             # Navigation enhancement: Pass navigation parameters to ShowMenu for seamless navigation
-            $selectedSerialNumber = ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
-            Write-Verbose "[$functionName] Returning selected serial number: $selectedSerialNumber"            # Check if the user selected 0 (Exit)
-            if ($null -eq $selectedSerialNumber)
+            Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
+            $global:selectedSerialNumber = (ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
+            Write-Verbose "[$functionName] ShowMenu returned: '$selectedSerialNumber' (Type: $($selectedSerialNumber.GetType().Name))"
+            
+            # Validate that we got a proper serial number, not a navigation option
+            if ($selectedSerialNumber -eq "Back" -or $selectedSerialNumber -eq "Main Menu" -or $selectedSerialNumber -eq 0 -or $selectedSerialNumber -eq "0")
             {
-                Write-Verbose "[$functionName] User selected Exit option (0). Returning EXIT_APPLICATION signal."
-                return "EXIT_APPLICATION"
+                Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selectedSerialNumber', treating as navigation"
+                return $selectedSerialNumber
             }
+            
+            # Additional validation: check if the returned value is actually a serial number from one of our devices
+            $isValidSerialNumber = $false
+            foreach ($device in $devices)
+            {
+                if ($selectedSerialNumber -match $device.serialNumber)
+                {
+                    $selectedSerialNumber = $device.serialNumber
+                    Write-Verbose "[$functionName] Valid serial number found: $selectedSerialNumber"
+                    $isValidSerialNumber = $true
+                    break
+                }
+            }
+            
+            if (-not $isValidSerialNumber)
+            {
+                Write-Verbose "[$functionName] ShowMenu returned invalid serial number: '$selectedSerialNumber', this might be a navigation option or error"
+                Write-Warning "Unexpected return value from device selection: '$selectedSerialNumber'. Please try again."
+                return $null
+            }            
+            Write-Verbose "[$functionName] Returning valid selected serial number: $selectedSerialNumber"
             return $selectedSerialNumber
         }
     }
     else
     {
-        Write-Host "No device found for user: $UserName" -ForegroundColor Red
+        Write-Host "An error occured looking up device for user: $UserName" -ForegroundColor Red
         return $null
     }
 }

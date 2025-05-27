@@ -31,10 +31,10 @@ BeforeAll {
             "contoso.com" = @{
                 groupsToInclude = @("Group1", "Group2")
                 groupsToExclude = @("ExcludedGroup")
-                settings = @{
-                    domain = "contoso.com"
-                    MaxUserNameLength = 50
-                    MinUsernameLength = 3
+                settings        = @{
+                    domain                = "contoso.com"
+                    MaxUserNameLength     = 50
+                    MinUsernameLength     = 3
                     MaxSerialNumberLength = 20
                     MinSerialNumberLength = 8
                 }
@@ -44,7 +44,8 @@ BeforeAll {
     
     # Create temporary config files
     $configDir = Split-Path $mockConfigPath -Parent
-    if (-not (Test-Path $configDir)) {
+    if (-not (Test-Path $configDir))
+    {
         New-Item -Path $configDir -ItemType Directory -Force
     }
     Set-Content -Path $mockConfigPath -Value $mockConfig -Force
@@ -52,9 +53,11 @@ BeforeAll {
     
     # Import all actual function files from the functions directory
     $functionsFolder = Join-Path $PSScriptRoot "functions"
-    if (Test-Path $functionsFolder) {
+    if (Test-Path $functionsFolder)
+    {
         $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-        foreach ($function in $functions) {
+        foreach ($function in $functions)
+        {
             . $function.FullName
         }
     }
@@ -63,16 +66,16 @@ BeforeAll {
     Mock GetGraphAccessToken { return "mock-token" }
     Mock GetDeviceEnrollmentStatus { 
         return @{
-            managed = $true
+            managed       = $true
             managedDevice = @{
                 device = @{
-                    deviceName = "TestDevice"
-                    model = "TestModel"
-                    manufacturer = "TestManufacturer"
-                    id = "test-device-id"
-                    osVersion = "Windows 10"
-                    complianceState = "compliant"
-                    managementState = "managed"
+                    deviceName       = "TestDevice"
+                    model            = "TestModel"
+                    manufacturer     = "TestManufacturer"
+                    id               = "test-device-id"
+                    osVersion        = "Windows 10"
+                    complianceState  = "compliant"
+                    managementState  = "managed"
                     lastSyncDateTime = Get-Date
                 }
             }
@@ -87,13 +90,13 @@ BeforeAll {
         return @{
             serialNumber = "TEST12345"
             manufacturer = "Microsoft"
-            model = "Surface"
+            model        = "Surface"
         }
     }
     Mock VerifyGroupMembership { 
         return @{
-            success = $true
-            missingGroups = @()
+            success         = $true
+            missingGroups   = @()
             ForbiddenGroups = @()
         }
     }
@@ -104,22 +107,30 @@ BeforeAll {
     Mock Start-Sleep { }
     
     # Now dot-source the script with parameters
-    try {
+    try
+    {
         . $scriptPath -configFile $mockConfigPath -InitFile $mockInitPath
     }
-    catch {
+    catch
+    {
         Write-Warning "Failed to dot-source main.ps1: $($_.Exception.Message)"
     }
 }
 
 AfterAll {
     # Clean up temporary files
-    $mockConfigPath = Join-Path $PSScriptRoot ".secrets\config.json"
-    $mockInitPath = Join-Path $PSScriptRoot "initVerify.json"
-    
-    if (Test-Path $mockConfigPath) { Remove-Item $mockConfigPath -Force }
-    if (Test-Path $mockInitPath) { Remove-Item $mockInitPath -Force }
-    if (Test-Path (Split-Path $mockConfigPath -Parent)) { 
+    $mockConfigPath = Join-Path $PSScriptRoot ".secrets-test\config.json"
+    $mockInitPath = Join-Path $PSScriptRoot "config-test\initVerify.json"
+    if (Test-Path $mockConfigPath)
+    {
+        Remove-Item $mockConfigPath -Force 
+    }
+    if (Test-Path $mockInitPath)
+    {
+        Remove-Item $mockInitPath -Force 
+    }
+    if (Test-Path (Split-Path $mockConfigPath -Parent))
+    { 
         Remove-Item (Split-Path $mockConfigPath -Parent) -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
@@ -179,11 +190,11 @@ Describe "NormalizeUserName Function" {
     
     Context "Parameter Validation" {
         It "Should accept UserName parameter" {
-            { NormalizeUserName -UserName "test" -Settings @{domain="test.com"} } | Should -Not -Throw
+            { NormalizeUserName -UserName "test" -Settings @{domain = "test.com"} } | Should -Not -Throw
         }
         
         It "Should accept Settings parameter" {
-            { NormalizeUserName -UserName "test" -Settings @{domain="test.com"} } | Should -Not -Throw
+            { NormalizeUserName -UserName "test" -Settings @{domain = "test.com"} } | Should -Not -Throw
         }
     }
 }
@@ -192,11 +203,11 @@ Describe "validateInput Function" {
     Context "Serial Number Validation" {
         BeforeEach {
             $mockSettings = @{
-                domain = "contoso.com"
+                domain                = "contoso.com"
                 MaxSerialNumberLength = 20
                 MinSerialNumberLength = 8
-                MaxUserNameLength = 50
-                MinUsernameLength = 3
+                MaxUserNameLength     = 50
+                MinUsernameLength     = 3
             }
         }
         
@@ -237,9 +248,9 @@ Describe "validateInput Function" {
     Context "Username Validation" {
         BeforeEach {
             $mockSettings = @{
-                domain = "contoso.com"
-                MaxUserNameLength = 50
-                MinUsernameLength = 3
+                domain                = "contoso.com"
+                MaxUserNameLength     = 50
+                MinUsernameLength     = 3
                 MaxSerialNumberLength = 20
                 MinSerialNumberLength = 8
             }
@@ -308,7 +319,7 @@ Describe "GetUserInput Function" {
     Context "Input Processing" {
         It "Should return null when user presses Enter" {
             Mock Read-Host { return "" }
-            Mock validateInput { return @{valid=$false; value=$null} }
+            Mock validateInput { return @{valid = $false; value = $null} }
             
             $result = GetUserInput -Message "Test" -Prompt "Test:" -InputType "userName"
             $result | Should -Be $null
@@ -316,7 +327,7 @@ Describe "GetUserInput Function" {
         
         It "Should process valid input" {
             Mock Read-Host { return "validinput" } -ParameterFilter { $true }
-            Mock validateInput { return @{valid=$true; value="processed-input"} }
+            Mock validateInput { return @{valid = $true; value = "processed-input"} }
             
             $result = GetUserInput -Message "Test" -Prompt "Test:" -InputType "serialNumber"
             $result | Should -Be "processed-input"
@@ -329,17 +340,17 @@ Describe "DisplayDeviceHealth Function" {
         It "Should display health information for managed device" {
             Mock GetDeviceEnrollmentStatus {
                 return @{
-                    managed = $true
+                    managed       = $true
                     managedDevice = @{
                         device = @{
-                            deviceName = "TestDevice"
-                            model = "TestModel"
-                            manufacturer = "TestManufacturer"
-                            osVersion = "Windows 10"
-                            complianceState = "compliant"
-                            managementState = "managed"
+                            deviceName       = "TestDevice"
+                            model            = "TestModel"
+                            manufacturer     = "TestManufacturer"
+                            osVersion        = "Windows 10"
+                            complianceState  = "compliant"
+                            managementState  = "managed"
                             lastSyncDateTime = Get-Date
-                            id = "test-id"
+                            id               = "test-id"
                         }
                     }
                 }
@@ -371,13 +382,13 @@ Describe "ProcessSerialNumber Function" {
         It "Should process managed device and create actions menu" {
             Mock GetDeviceEnrollmentStatus {
                 return @{
-                    managed = $true
+                    managed       = $true
                     managedDevice = @{
                         device = @{
-                            deviceName = "TestDevice"
-                            model = "TestModel"
+                            deviceName   = "TestDevice"
+                            model        = "TestModel"
                             manufacturer = "TestManufacturer"
-                            id = "test-device-id"
+                            id           = "test-device-id"
                         }
                     }
                 }
@@ -436,14 +447,16 @@ Describe "Script Variables and Configuration" {
     Context "Configuration Loading" {
         It "Should load domain from config file" {
             # This test verifies the domain variable is set correctly
-            if (Get-Variable -Name "domain" -ErrorAction SilentlyContinue) {
+            if (Get-Variable -Name "domain" -ErrorAction SilentlyContinue)
+            {
                 $domain | Should -Not -BeNullOrEmpty
             }
         }
         
         It "Should load initialization settings" {
             # This test verifies the init variable is set correctly
-            if (Get-Variable -Name "init" -ErrorAction SilentlyContinue) {
+            if (Get-Variable -Name "init" -ErrorAction SilentlyContinue)
+            {
                 $init | Should -Not -BeNullOrEmpty
             }
         }
@@ -451,14 +464,16 @@ Describe "Script Variables and Configuration" {
     
     Context "Script Variables" {
         It "Should define backout text variable" {
-            if (Get-Variable -Name "backoutText" -ErrorAction SilentlyContinue) {
+            if (Get-Variable -Name "backoutText" -ErrorAction SilentlyContinue)
+            {
                 $backoutText | Should -Not -BeNullOrEmpty
                 $backoutText | Should -Match "previous menu"
             }
         }
         
         It "Should define script name variable" {
-            if (Get-Variable -Name "scriptName" -ErrorAction SilentlyContinue) {
+            if (Get-Variable -Name "scriptName" -ErrorAction SilentlyContinue)
+            {
                 $scriptName | Should -Be "main.ps1"
             }
         }
@@ -528,13 +543,19 @@ Describe "Integration Tests" {
         
         It "Should handle complete device assignment workflow" {
             Mock GetUserInput { 
-                if ($InputType -eq "userName") { return "testuser@contoso.com" }
-                if ($InputType -eq "serialNumber") { return "TEST12345" }
+                if ($InputType -eq "userName")
+                {
+                    return "testuser@contoso.com" 
+                }
+                if ($InputType -eq "serialNumber")
+                {
+                    return "TEST12345" 
+                }
             }
             Mock VerifyGroupMembership { 
                 return @{
-                    success = $true
-                    missingGroups = @()
+                    success         = $true
+                    missingGroups   = @()
                     ForbiddenGroups = @()
                 }
             }
