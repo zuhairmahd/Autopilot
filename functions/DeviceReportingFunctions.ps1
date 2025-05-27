@@ -864,7 +864,14 @@ function ShowDeviceReport()
         [Parameter(Mandatory = $false)]
         [string]$SerialNumber
     )
-    
+    #region usage info
+    # Use with enrollment state (original ShowDeviceReport functionality)
+    #ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
+    # Use with hashtable (original DisplayReport functionality)
+    #Show-DeviceReport -report $myHashtable -PrefixList @('Custom', 'Prefix')
+    # Direct export without prompting
+    #Show-DeviceReport -enrollmentState $state -Export -ExportFormat "CSV"   
+    #endregion usage info
     $functionName = $MyInvocation.MyCommand.Name
     
     #region write verbose log of received parameters
