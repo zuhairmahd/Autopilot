@@ -364,7 +364,11 @@ function ProcessSerialNumber()
             Write-Host "This device does not have an associated object in Intune." -ForegroundColor Red
         }
     }
-    return $success
+    else
+    {
+        # Explicitly return $null if no enrollmentState
+        return $null
+    }
 }
 #endregion Helper Functions
 
