@@ -222,100 +222,6 @@ function GetUserInput()
     }
 }
 
-function DisplayDeviceHealth()
-{
-    [CmdletBinding()]
-    param (
-        [string]$SerialNumber,
-        [string]$AccessToken
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Host "`nRetrieving comprehensive device health information..." -ForegroundColor Yellow
-    
-    # First check if device is managed by Intune (regardless of Autopilot status)
-    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
-    
-    # Also check Autopilot assignment for additional details
-    $deviceAssignment = CheckDeviceAssignment -serialNumber $SerialNumber -AccessToken $AccessToken
-    
-    if ($enrollmentState.managed)
-    {
-        Write-Verbose "[$functionName] Device is managed by Intune."
-        Write-Verbose "[$functionName] Device enrollment state: $($enrollmentState.managedDevice.enrollmentState)"
-        Write-Host "`n=== Device Health & Status Report ===" -ForegroundColor Cyan
-        Write-Host "Serial Number: $SerialNumber"
-        
-        # Display managed device information
-        Write-Host "`n--- Managed Device Details ---" -ForegroundColor Green
-        Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
-        Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
-        Write-Host "Manufacturer: $($enrollmentState.managedDevice.device.manufacturer)"
-        Write-Host "OS Version: $($enrollmentState.managedDevice.device.osVersion)"
-        Write-Host "Compliance State: $($enrollmentState.managedDevice.device.complianceState)"
-        Write-Host "Management State: $($enrollmentState.managedDevice.device.managementState)"
-        Write-Host "Last Sync: $($enrollmentState.managedDevice.device.lastSyncDateTime)"
-        Write-Host "Managed Device ID: $($enrollmentState.managedDevice.device.id)"
-        
-        # Display Autopilot information if available
-        if ($deviceAssignment)
-        {
-            Write-Host "`n--- Autopilot Details ---" -ForegroundColor Blue
-            Write-Host "Autopilot Device ID: $($deviceAssignment.id)"
-            Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
-            Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
-            Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
-            
-            if ($deviceAssignment.deploymentProfileAssignedDateTime)
-            {
-                $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-                Write-Host "Profile Assigned On: $assignmentDate"
-            }
-        }
-        else
-        {
-            Write-Host "`n--- Autopilot Status ---" -ForegroundColor Yellow
-            Write-Host "This device is managed by Intune but is not registered in Autopilot."
-            Write-Host "This is normal for devices enrolled through other methods (manual enrollment, bulk enrollment, etc.)."
-        }
-        
-        Write-Host "========================================`n" -ForegroundColor Cyan
-        return $true
-    }
-    else
-    {
-        Write-Host "`n=== Device Status ===" -ForegroundColor Yellow
-        Write-Host "Serial Number: $SerialNumber"
-        
-        if ($deviceAssignment)
-        {
-            Write-Host "`n--- Autopilot Details ---" -ForegroundColor Blue
-            Write-Host "This device is registered in Autopilot but not yet enrolled in Intune management."
-            Write-Host "Device ID: $($deviceAssignment.id)"
-            Write-Host "Autopilot Profile: $($deviceAssignment.deploymentProfile.displayName)"
-            Write-Host "Profile Assignment Status: $($deviceAssignment.deploymentProfileAssignmentStatus)"
-            Write-Host "Enrollment State: $($deviceAssignment.enrollmentState)"
-            
-            if ($deviceAssignment.deploymentProfileAssignedDateTime)
-            {
-                $assignmentDate = $deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K"
-                Write-Host "Profile Assigned On: $assignmentDate"
-            }
-        }
-        else
-        {
-            Write-Host "`nDevice not found in Autopilot or Intune management." -ForegroundColor Red
-            Write-Host "This device may not be enrolled in your organization's management system."
-        }
-        
-        Write-Host "========================================`n" -ForegroundColor Yellow
-        return $false
-    }
-}
-
-# ProcessSerialNumber function - Enhanced with navigation parameter support
-# This function creates a device actions menu when a managed device is found.
-# Navigation parameters (Depth, History, MenuHistory) are passed through to maintain
-# seamless menu navigation and allow users to go back or return to main menu.
 function ProcessSerialNumber()
 {
     [CmdletBinding()]
@@ -332,7 +238,7 @@ function ProcessSerialNumber()
     )    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
     
-    # Log navigation context for debugging
+    #region Log navigation context for debugging
     $historyCount = if ($History)
     {
         $History.Count 
@@ -350,8 +256,9 @@ function ProcessSerialNumber()
         'null' 
     }
     Write-Verbose "[$functionName] Navigation context - Depth: $Depth, History count: $historyCount, MenuHistory count: $menuHistoryCount"
-    
-    # Initialize navigation parameters if not provided
+    #endregion Log navigation context for debugging
+
+    #region Initialize navigation parameters if not provided
     if ($null -eq $History)
     {
         Write-Verbose "[$functionName] Initializing History ArrayList"
@@ -363,69 +270,106 @@ function ProcessSerialNumber()
         Write-Verbose "[$functionName] Initializing MenuHistory ArrayList"
         $MenuHistory = New-Object System.Collections.ArrayList
     }
-    
+    #endregion Initialize navigation parameters if not provided
+
+    $success = $false
     $SerialNumber = $SerialNumber.Trim()
-    
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
     $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
-    
-    # Display basic device information
-    Write-Host "`n=== Device Information ===" -ForegroundColor Green
-    Write-Host "Serial Number: $SerialNumber"
-    
-    if ($enrollmentState.managed)
+    if ($enrollmentState)
     {
-        $deviceName = $enrollmentState.managedDevice.device.deviceName
-        $model = $enrollmentState.managedDevice.device.model
-        $manufacturer = $enrollmentState.managedDevice.device.manufacturer
-        $managedDeviceId = $enrollmentState.managedDevice.device.id
-        Write-Host "Device Name: $deviceName"
-        Write-Host "Model: $model"
-        Write-Host "Manufacturer: $manufacturer"
-        Write-Host "Status: Managed by Intune" -ForegroundColor Green
-        Write-Host "=============================`n" -ForegroundColor Green
-        # Create and show device actions menu using main.ps1 menu structure
-        $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
-        
-        # Add menu items for each device action
-        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
-            Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
+        $success = $true
+        # Display basic device information
+        Write-Host "`n=== Device Information ===" -ForegroundColor Green
+        Write-Host "Serial Number: $SerialNumber"
+        Write-Verbose "[$scriptName] Device is managed: $($enrollmentState.managed)"
+        Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
+        Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
+        Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
+        if ($enrollmentState.Imported)
+        {
+            Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
+            Write-Verbose "[$scriptName] Imported count: $($enrollmentState.ImportedAutopilotDevice.Count)"
+            if ($enrollmentState.ImportedAutopilotDevice.Count -gt 1)
+            {
+                Write-Host "This device was imported into Autopilot $($enrollmentState.ImportedAutopilotDevice.Count) times." -ForegroundColor Green
+                $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice[$enrollmentState.ImportedAutopilotDevice.Count - 1]
+            }
+            else
+            {
+                Write-Host "This device was recently imported into Autopilot." -ForegroundColor Green
+                $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice
+            }
+            if (!$enrollmentState.managed)
+            {
+                Write-Host "However, this device is not currently managed in Intune."
+            }
+            Write-Host "Here is the latest known import information:"
+            Write-Host "Imported Device ID: $($importedDeviceInfo.id)"
+            Write-Host "Last import registration id: $($importedDeviceInfo.state.deviceRegistrationId)"
+            Write-Host "Last import status: $($importedDeviceInfo.state.deviceImportStatus)"
+            Write-Host "Last import error: $($importedDeviceInfo.state.deviceErrorName)"
+            Write-Host "Last import error code: $($importedDeviceInfo.state.deviceErrorCode)"
         }
-        
-        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
-            Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' | Out-Null
+        else
+        {
+            Write-Verbose "This device was not recently imported into Autopilot."
         }
-        
-        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
-            Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' | Out-Null
+        if ($enrollmentState.managed)
+        {
+            $deviceName = $enrollmentState.managedDevice.device.deviceName
+            $model = $enrollmentState.managedDevice.device.model
+            $manufacturer = $enrollmentState.managedDevice.device.manufacturer
+            $managedDeviceId = $enrollmentState.managedDevice.device.id
+            Write-Host "Device Name: $deviceName"
+            Write-Host "Model: $model"
+            Write-Host "Manufacturer: $manufacturer"
+            Write-Host "Status: Managed by Intune" -ForegroundColor Green
+            Write-Host "=============================`n" -ForegroundColor Green
+            # Create and show device actions menu using main.ps1 menu structure
+            $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
+            # Add menu items for each device action
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
+                Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
+                Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
+                Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' -MonitorAction
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
+                Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
+                DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
+                Read-Host "`nPress Enter to continue"        }
+            # Show the device actions menu with navigation context
+            Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
+            $result = ShowMenu -Menu $deviceActionsMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
+            return $result
         }
-        
-        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
-            Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-            SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
+        else
+        {
+            Write-Host "This device is not managed in Intune." -ForegroundColor Yellow
         }
-        
-        $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
-            DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
-            Read-Host "`nPress Enter to continue"        }
-        
-        # Show the device actions menu with navigation context
-        Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-        $result = ShowMenu -Menu $deviceActionsMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
-        return $result
+        if ($enrollmentState.hasDeviceObject)
+        {
+            Write-Host "`nDevice object found in Intune." -ForegroundColor Green
+            Write-Host "Device ID: $($enrollmentState.managedDevice.device.id)"
+            Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
+            Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
+        }
+        else
+        {
+            Write-Host "This device does not have an associated object in Intune." -ForegroundColor Red
+        }
     }
-    else
-    {
-        Write-Host "Status: Not managed by Intune" -ForegroundColor Yellow
-        Write-Host "=============================`n" -ForegroundColor Yellow
-        
-        # For unmanaged devices, show limited information
-        DisplayDeviceHealth -SerialNumber $SerialNumber -AccessToken $AccessToken
-        return $null
-    }
+    return $success
 }
 #endregion Helper Functions
 
@@ -531,15 +475,24 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $serialNumber = $deviceObject.serialNumber
         $make = $deviceObject.manufacturer
         $model = $deviceObject.model
-        Write-Host "Found local device: $make $model (Serial: $serialNumber)"
+        Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
         # Pass navigation context to ProcessSerialNumber
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        Write-Verbose "Result returned: $result"
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
         {
             Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
             return "EXIT_APPLICATION"
+        }
+        elseif ($result -eq $true)
+        {
+            Write-Host "Device information for device with serial number: $serialNumber was retrieved successfully." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
         }
     }
     else
@@ -576,11 +529,19 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
             Write-Host "Found device for user $userName with serial number: $serialNumber"
             # Pass navigation context to ProcessSerialNumber
             $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
-            # Check if ProcessSerialNumber returned an exit signal
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
             if ($null -eq $result)
             {
                 Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
                 return "EXIT_APPLICATION"
+            }
+            elseif ($result -eq $true)
+            {
+                Write-Host "Device information for device with serial number: $serialNumber was retrieved successfully." -ForegroundColor Green
+            }
+            else
+            {
+                Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
             }
         }
         elseif ($serialNumber -eq '0')
@@ -671,6 +632,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 #endregion Menu Definitions
 
 #region Show Menu
+# Only show menu if not in test mode
 $result = ShowMenu -Menu $mainMenu
 if ($null -eq $result)
 {
