@@ -245,8 +245,10 @@ function GetDeviceByUser()
         [int]$Depth = 0,
         [System.Collections.ArrayList]$History = $null,
         [System.Collections.ArrayList]$MenuHistory = $null
-    )    $functionName = $MyInvocation.MyCommand.Name    
-    # Navigation enhancement: Initialize null navigation parameters
+    )    
+    
+    $functionName = $MyInvocation.MyCommand.Name    
+    #region Navigation enhancement: Initialize null navigation parameters
     if ($null -eq $History)
     {
         $History = New-Object System.Collections.ArrayList
@@ -255,7 +257,8 @@ function GetDeviceByUser()
     {
         $MenuHistory = New-Object System.Collections.ArrayList
     }
-    
+    #endregion
+
     #region write verbose log of all parameters
     Write-Verbose "[$functionName] UserName: $UserName"
     Write-Verbose "[$functionName] Operating system: $OperatingSystem"
@@ -275,7 +278,7 @@ function GetDeviceByUser()
     $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
     $managedDeviceUri = "deviceManagement/managedDevices"
     #endregion
-
+    
     $deviceInfo = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
     Write-Verbose "[$functionName] Device value count: $($deviceInfo.value.Count)"
     Write-Verbose "[$functionName] Device Info: $($deviceInfo | Out-String)"

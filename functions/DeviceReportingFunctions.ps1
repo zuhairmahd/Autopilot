@@ -862,7 +862,10 @@ function ShowDeviceReport()
         [Parameter(Mandatory = $false)]
         [string]$DeviceName,
         [Parameter(Mandatory = $false)]
-        [string]$SerialNumber
+        [string]$SerialNumber,
+        [int]$Depth = 0,
+        [System.Collections.ArrayList]$History = $null,
+        [System.Collections.ArrayList]$MenuHistory = $null
     )
     #region usage info
     # Use with enrollment state (original ShowDeviceReport functionality)
@@ -889,7 +892,23 @@ function ShowDeviceReport()
     {
         Write-Verbose "[$functionName] Report hashtable provided with $($report.Keys.Count) properties"
     }
+    Write-Verbose "[$functionName] DeviceName: $DeviceName"
+    Write-Verbose "[$functionName] SerialNumber: $SerialNumber"
+    Write-Verbose "[$functionName] History: $($History.Count) items"
+    Write-Verbose "[$functionName] MenuHistory: $($MenuHistory.Count) items"
+    Write-Verbose "[$functionName] Depth: $Depth"
     #endregion write verbose log of received parameters
+    
+    #region Navigation enhancement: Initialize null navigation parameters
+    if ($null -eq $History)
+    {
+        $History = New-Object System.Collections.ArrayList
+    }
+    if ($null -eq $MenuHistory)
+    {
+        $MenuHistory = New-Object System.Collections.ArrayList
+    }
+    #endregion
     
     #region Build report data
     $output = [ordered]@{}
@@ -1073,7 +1092,7 @@ function ShowDeviceReport()
     }
     Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"
     #endregion Format property names and display report
-
+    
     #region Handle export decision
     $shouldExport = $Export
     $finalExportFormat = $ExportFormat
@@ -1081,30 +1100,28 @@ function ShowDeviceReport()
     if (-not $shouldExport)
     {
         Write-Verbose "[$functionName] Prompting user for export decision"
-        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again." -RequireEnter
-        
-        if ($choice -eq 'Export to HTML')
-        {
+        $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
+        $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action {
             $shouldExport = $true
             $finalExportFormat = "HTML"
             Write-Verbose "[$functionName] User selected HTML export"
         }
-        elseif ($choice -eq 'Export to CSV')
-        {
+        $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action {
             $shouldExport = $true
             $finalExportFormat = "CSV"
             Write-Verbose "[$functionName] User selected CSV export"
         }
-        else
-        {
-            Write-Host "No export selected."
-            Write-Verbose "[$functionName] User declined export"
-            return 0
-        }
+        $selection = (ShowMenu -Menu $exportMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
+        Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
     }
     #endregion Handle export decision
     
     #region Export report
+    if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
+    {
+        Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selection', treating as navigation"
+        return $selection
+    }
     if ($shouldExport)
     {
         Write-Verbose "[$functionName] Starting export process in $finalExportFormat format"
@@ -1211,5 +1228,5 @@ function ShowDeviceReport()
     #endregion Export report
     
     Write-Verbose "[$functionName] Device report generation completed"
-    return $formattedOutput
+    return $true
 }

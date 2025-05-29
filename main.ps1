@@ -230,8 +230,15 @@ function ProcessSerialNumber()
         [System.Collections.ArrayList]$History = $null,
         [Parameter(Mandatory = $false)]
         [System.Collections.ArrayList]$MenuHistory = $null
-    )    $functionName = $MyInvocation.MyCommand.Name
+    )
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
+    Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
+    if ([string]::IsNullOrWhiteSpace($SerialNumber))
+    {
+        Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
+        return $null # Return null to signal no valid serial number
+    }
     
     #region Log navigation context for debugging
     $historyCount = if ($History)
@@ -341,7 +348,7 @@ function ProcessSerialNumber()
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
-                ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
+                ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber -Depth $Depth -History $History -MenuHistory $MenuHistory
             }
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
@@ -519,7 +526,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
         Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
         
-        if ($serialNumber -eq "EXIT_APPLICATION")
+        if ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
         {
             Write-Verbose "[$scriptName] User requested application exit from device selection."
             return "EXIT_APPLICATION"
