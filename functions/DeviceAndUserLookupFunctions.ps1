@@ -330,28 +330,30 @@ function GetDeviceByUser()
                 Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selectedSerialNumber', treating as navigation"
                 return $selectedSerialNumber
             }
-            
-            # Additional validation: check if the returned value is actually a serial number from one of our devices
-            $isValidSerialNumber = $false
-            foreach ($device in $devices)
-            {
-                if ($selectedSerialNumber -match $device.serialNumber)
-                {
-                    $selectedSerialNumber = $device.serialNumber
-                    Write-Verbose "[$functionName] Valid serial number found: $selectedSerialNumber"
-                    $isValidSerialNumber = $true
-                    break
-                }
-            }
-            
-            if (-not $isValidSerialNumber)
-            {
-                Write-Verbose "[$functionName] ShowMenu returned invalid serial number: '$selectedSerialNumber', this might be a navigation option or error"
-                Write-Warning "Unexpected return value from device selection: '$selectedSerialNumber'. Please try again."
-                return $null
-            }            
             Write-Verbose "[$functionName] Returning valid selected serial number: $selectedSerialNumber"
             return $selectedSerialNumber
+            # #region Additional validation: check if the returned value is actually a serial number from one of our devices
+            ##This section may be removed in the future if we are confident that ShowMenu always returns a valid serial number
+            # $isValidSerialNumber = $false
+            # foreach ($device in $devices)
+            # {
+            #     if ($selectedSerialNumber -match $device.serialNumber)
+            #     {
+            #         $selectedSerialNumber = $device.serialNumber
+            #         Write-Verbose "[$functionName] Valid serial number found: $selectedSerialNumber"
+            #         $isValidSerialNumber = $true
+            #         break
+            #     }
+            # }
+            # if (-not $isValidSerialNumber)
+            # {
+            #     Write-Verbose "[$functionName] ShowMenu returned invalid serial number: '$selectedSerialNumber', this might be a navigation option or error"
+            #     Write-Warning "Unexpected return value from device selection: '$selectedSerialNumber'. Please try again."
+            #     return $null
+            # }            
+            # Write-Verbose "[$functionName] Returning valid selected serial number: $selectedSerialNumber"
+            # return $selectedSerialNumber
+            # #endregion
         }
     }
     else
