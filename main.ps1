@@ -342,10 +342,11 @@ function ProcessSerialNumber()
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
-                Read-Host "`nPress Enter to continue"        }
+            }
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             $result = ShowMenu -Menu $deviceActionsMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
+            Write-Verbose "Returning from device actions menu with result: $result"
             return $result
         }
         else

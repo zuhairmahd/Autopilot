@@ -1081,7 +1081,7 @@ function ShowDeviceReport()
     if (-not $shouldExport)
     {
         Write-Verbose "[$functionName] Prompting user for export decision"
-        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
+        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again." -RequireEnter
         
         if ($choice -eq 'Export to HTML')
         {
@@ -1099,7 +1099,7 @@ function ShowDeviceReport()
         {
             Write-Host "No export selected."
             Write-Verbose "[$functionName] User declined export"
-            return $null
+            return 0
         }
     }
     #endregion Handle export decision
