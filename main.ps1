@@ -271,9 +271,8 @@ function ProcessSerialNumber()
     {
         Write-Verbose "[$functionName] Initializing MenuHistory ArrayList"
         $MenuHistory = New-Object System.Collections.ArrayList
-    }
-    #endregion Initialize navigation parameters if not provided
-
+    }    #endregion Initialize navigation parameters if not provided
+    
     $success = $false
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
@@ -281,6 +280,7 @@ function ProcessSerialNumber()
     if ($enrollmentState)
     {
         $success = $true
+        Write-Verbose "[$functionName] Device lookup successful"
         # Display basic device information
         Write-Host "`n=== Device Information ===" -ForegroundColor Green
         Write-Host "Serial Number: $SerialNumber"
@@ -375,8 +375,12 @@ function ProcessSerialNumber()
     else
     {
         # Explicitly return $null if no enrollmentState
+        Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
         return $null
     }
+    
+    # Return success status for calling functions
+    return $success
 }
 #endregion Helper Functions
 
@@ -458,13 +462,52 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
         return $backoutText
-    } 
+    }
     else
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        
+        # Create enhanced navigation context (PowerShell 5.1 compatible)
+        $actionHistory = New-Object System.Collections.ArrayList
+        $actionMenuHistory = New-Object System.Collections.ArrayList
+        
+        # Copy current navigation context
+        foreach ($item in $script:CurrentMenuHistory)
+        {
+            try
+            {
+                [void]$actionHistory.Add($item) 
+            }
+            catch
+            {
+                $actionHistory += $item 
+            }
+        }
+        foreach ($menu in $script:CurrentMenuHistory_Menu)
+        {
+            try
+            {
+                [void]$actionMenuHistory.Add($menu) 
+            }
+            catch
+            {
+                $actionMenuHistory += $menu 
+            }
+        }
+        
+        # Add the current action to the navigation history
+        try
+        {
+            [void]$actionHistory.Add("Enter a serial number") 
+        }
+        catch
+        {
+            $actionHistory += "Enter a serial number" 
+        }
+        
         # Pass navigation context to ProcessSerialNumber
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
         {
@@ -484,8 +527,47 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $model = $deviceObject.model
         Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        
+        # Create enhanced navigation context (PowerShell 5.1 compatible)
+        $actionHistory = New-Object System.Collections.ArrayList
+        $actionMenuHistory = New-Object System.Collections.ArrayList
+        
+        # Copy current navigation context
+        foreach ($item in $script:CurrentMenuHistory)
+        {
+            try
+            {
+                [void]$actionHistory.Add($item) 
+            }
+            catch
+            {
+                $actionHistory += $item 
+            }
+        }
+        foreach ($menu in $script:CurrentMenuHistory_Menu)
+        {
+            try
+            {
+                [void]$actionMenuHistory.Add($menu) 
+            }
+            catch
+            {
+                $actionMenuHistory += $menu 
+            }
+        }
+        
+        # Add the current action to the navigation history
+        try
+        {
+            [void]$actionHistory.Add("Use this device's serial number") 
+        }
+        catch
+        {
+            $actionHistory += "Use this device's serial number" 
+        }
+        
         # Pass navigation context to ProcessSerialNumber
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
         Write-Verbose "Result returned: $result"
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
@@ -520,22 +602,70 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     {
         Write-Verbose "[$scriptName] Got user name: $userName"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile 
-        
         # Call GetDeviceByUser to find devices for the specified user
-        Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
-        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        # First, enhance the navigation context to include the current action
+        $actionHistory = New-Object System.Collections.ArrayList
+        $actionMenuHistory = New-Object System.Collections.ArrayList
+        # Copy current navigation context (PowerShell 5.1 compatible)
+        foreach ($item in $script:CurrentMenuHistory)
+        {
+            try
+            {
+                [void]$actionHistory.Add($item) 
+            }
+            catch
+            {
+                $actionHistory += $item 
+            }
+        }
+        foreach ($menu in $script:CurrentMenuHistory_Menu)
+        {
+            try
+            {
+                [void]$actionMenuHistory.Add($menu) 
+            }
+            catch
+            {
+                $actionMenuHistory += $menu 
+            }
+        }
+        
+        # Add the current action to the navigation history so it shows in breadcrumb
+        try
+        {
+            [void]$actionHistory.Add("Lookup device by User") 
+        }
+        catch
+        {
+            $actionHistory += "Lookup device by User" 
+        }
+        
+        Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName with enhanced navigation context"
+        Write-Verbose "[$scriptName] Enhanced navigation history: $($actionHistory -join ' > ')"
+        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory 
         Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
         
-        if ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
+        # Handle navigation responses from GetDeviceByUser
+        if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+            return $backoutText
+        }
+        elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+            return "EXIT_APPLICATION"
+        }
+        elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
         {
             Write-Verbose "[$scriptName] User requested application exit from device selection."
             return "EXIT_APPLICATION"
-        }
-        elseif ($serialNumber -ne '0' -and $null -ne $serialNumber)
+        }        
+        elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu")
         {
             Write-Host "Found device for user $userName with serial number: $serialNumber"
             # Pass navigation context to ProcessSerialNumber
-            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
             Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
             if ($null -eq $result)
             {
@@ -636,8 +766,46 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             else # Process only if a serial number was entered
             {
+                # Create enhanced navigation context (PowerShell 5.1 compatible)
+                $actionHistory = New-Object System.Collections.ArrayList
+                $actionMenuHistory = New-Object System.Collections.ArrayList
+                
+                # Copy current navigation context
+                foreach ($item in $script:CurrentMenuHistory)
+                {
+                    try
+                    {
+                        [void]$actionHistory.Add($item) 
+                    }
+                    catch
+                    {
+                        $actionHistory += $item 
+                    }
+                }
+                foreach ($menu in $script:CurrentMenuHistory_Menu)
+                {
+                    try
+                    {
+                        [void]$actionMenuHistory.Add($menu) 
+                    }
+                    catch
+                    {
+                        $actionMenuHistory += $menu 
+                    }
+                }
+                
+                # Add the current action to the navigation history
+                try
+                {
+                    [void]$actionHistory.Add("Check if User ready for device") 
+                }
+                catch
+                {
+                    $actionHistory += "Check if User ready for device" 
+                }
+                
                 # Pass navigation context to ProcessSerialNumber
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
                 # Check if ProcessSerialNumber returned an exit signal
                 if ($null -eq $result)
                 {
@@ -657,8 +825,25 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 #endregion Menu Definitions
 
 #region Show Menu
+# Initialize navigation context for the main menu - PowerShell 5.1 compatible
+$script:MainMenuHistory = New-Object System.Collections.ArrayList
+$script:MainMenuHistory_Menu = New-Object System.Collections.ArrayList
+
+# Add the main menu title to the title history (for breadcrumb display) and menu object to menu history (for navigation)
+try
+{
+    [void]$script:MainMenuHistory.Add("Main Menu")
+    [void]$script:MainMenuHistory_Menu.Add($mainMenu)
+}
+catch
+{
+    # Fallback for older PowerShell versions
+    $script:MainMenuHistory += "Main Menu"
+    $script:MainMenuHistory_Menu += $mainMenu
+}
+
 # Only show menu if not in test mode
-$result = ShowMenu -Menu $mainMenu
+$result = ShowMenu -Menu $mainMenu -Depth 0 -History $script:MainMenuHistory -MenuHistory $script:MainMenuHistory_Menu
 if ($null -eq $result)
 {
     Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green

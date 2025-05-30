@@ -321,10 +321,28 @@ function GetDeviceByUser()
                 }.GetNewClosure()
                 # Add the menu item with the action
                 $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action -ReturnsValue
-            }            # Show the menu and return the selected device's serial number
-            # Navigation enhancement: Pass navigation parameters to ShowMenu for seamless navigation
+            }            # Show the menu and return the selected device's serial number            # Navigation enhancement: Build upon existing navigation context rather than starting fresh
             Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
-            $selectedSerialNumber = (ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
+            Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
+            
+            # Create a copy of the current navigation history and add our context
+            $tempHistory = New-Object System.Collections.ArrayList
+            $tempMenuHistory = New-Object System.Collections.ArrayList
+            
+            # Copy existing history (PowerShell 5.1 compatible)
+            foreach ($item in $History)
+            {
+                try { [void]$tempHistory.Add($item) } catch { $tempHistory += $item }
+            }
+            foreach ($menu in $MenuHistory)
+            {
+                try { [void]$tempMenuHistory.Add($menu) } catch { $tempMenuHistory += $menu }
+            }
+            
+            # Don't add "Device Selection" to history here - the ShowMenu function will handle breadcrumb display
+            # We pass the current history and let ShowMenu handle the breadcrumb generation
+            Write-Verbose "[$functionName] Enhanced navigation - History: $($tempHistory -join ' > ')"
+            $selectedSerialNumber = (ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $tempHistory -MenuHistory $tempMenuHistory) | Out-String
             Write-Verbose "[$functionName] ShowMenu returned: '$selectedSerialNumber' (Type: $($selectedSerialNumber.GetType().Name))"
             
             # Validate that we got a proper serial number, not a navigation option
