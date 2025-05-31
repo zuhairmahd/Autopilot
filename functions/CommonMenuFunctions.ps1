@@ -192,11 +192,6 @@ function ShowMenu()
         [Parameter(Mandatory = $true)]
         [hashtable]$Menu,
         [Parameter(Mandatory = $false)]
-        [int]$Depth = 0,
-        [Parameter(Mandatory = $false)]
-        [System.Collections.ArrayList]$History = $null,
-        [Parameter(Mandatory = $false)]
-        [System.Collections.ArrayList]$MenuHistory = $null,
         [string]$BackoutText = $backoutText
     )
     #region Validate parameters
@@ -210,23 +205,13 @@ function ShowMenu()
     {
         Write-Verbose "[$functionName] History Contents: $($History -join ' > ')"
     }
+    if ($MenuHistory -and $MenuHistory.Count -gt 0)
+    {
+        Write-Verbose "[$functionName] MenuHistory Contents: $($MenuHistory -join ' > ')"
+    }
     Write-Verbose "[$functionName] BackoutText: $BackoutText"
     Write-Verbose "[$functionName] =================================="
     #endregion
-    # Initialize history if not provided - PowerShell 5.1 compatible
-    if ($null -eq $History)
-    {
-        Write-Verbose "[$functionName] Initializing history."
-        $History = New-Object System.Collections.ArrayList
-    }
-    
-    # Initialize menu history if not provided - PowerShell 5.1 compatible
-    if ($null -eq $MenuHistory)
-    {
-        Write-Verbose "[$functionName] Initializing menu history."
-        $MenuHistory = New-Object System.Collections.ArrayList
-    }
-    
     # Clear screen for better readability
     # Clear-Host
     Write-Verbose "[$functionName] Clearing the screen for better readability." 
@@ -316,13 +301,14 @@ function ShowMenu()
                 Write-Verbose "[$functionName] Removing last menu from MenuHistory since count is $($MenuHistory.Count)"
                 $MenuHistory.RemoveAt($MenuHistory.Count - 1)
                 Write-Verbose "[$functionName] Returning to previous menu: $($previousMenu.Title)"
-                return ShowMenu -Menu $previousMenu -Depth ($Depth - 1) -History $History -MenuHistory $MenuHistory
+                $Depth = ($Depth - 1) 
+                return ShowMenu -Menu $previousMenu 
             }
         }
         else
         {
             Write-Verbose "[$functionName] Cannot go back - no previous menu available"
-            return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
+            return ShowMenu -Menu $Menu 
         }
     }
     elseif ($selectedOption -eq "Main Menu" -or $selectedOption -eq "main menu")
@@ -336,12 +322,12 @@ function ShowMenu()
             $History.Clear()
             $MenuHistory.Clear()
             [void]$MenuHistory.Add($mainMenu)
-            return ShowMenu -Menu $mainMenu -Depth 0 -History $History -MenuHistory $MenuHistory
+            return ShowMenu -Menu $mainMenu
         }
         else
         {
             Write-Verbose "[$functionName] Cannot go to main menu - no main menu available"
-            return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
+            return ShowMenu -Menu $Menu 
         }
     }
     elseif ($selectedOption -eq 0 -or $selectedOption -eq "0")
@@ -367,40 +353,6 @@ function ShowMenu()
         
         Write-Verbose "[$functionName] Selected index: $selectedIndex"
         Write-Verbose "[$functionName] Total choices count: $($choices.Count), Menu items count: $($menuItems.Count)"
-        
-        # Check if the selection is beyond the actual menu items (i.e., a navigation option)
-        if ($selectedIndex -ge $menuItems.Count -or $selectedIndex -lt 0)
-        {
-            Write-Verbose "[$functionName] Selected option '$selectedOption' is a navigation option at index $selectedIndex, not a menu item."
-            # The selected option is a navigation option ("Back" or "Main Menu")
-            # This should be handled by the navigation logic above, but adding as safety
-            if ($selectedOption -eq "Back" -or $selectedOption -eq "back")
-            {
-                Write-Verbose "[$functionName] Processing 'Back' navigation option."
-                if ($History.Count -gt 0 -and $MenuHistory.Count -gt 0)
-                {
-                    $History.RemoveAt($History.Count - 1)
-                    $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
-                    $MenuHistory.RemoveAt($MenuHistory.Count - 1)
-                    return ShowMenu -Menu $previousMenu -Depth ($Depth - 1) -History $History -MenuHistory $MenuHistory
-                }
-            }
-            elseif ($selectedOption -eq "Main Menu" -or $selectedOption -eq "main menu")
-            {
-                Write-Verbose "[$functionName] Processing 'Main Menu' navigation option."
-                if ($MenuHistory.Count -gt 0)
-                {
-                    $mainMenu = $MenuHistory[0]
-                    $History.Clear()
-                    $MenuHistory.Clear()
-                    [void]$MenuHistory.Add($mainMenu)
-                    return ShowMenu -Menu $mainMenu -Depth 0 -History $History -MenuHistory $MenuHistory
-                }
-            }
-            # If we get here, stay on current menu
-            return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
-        }
-        
         $selectedItem = $menuItems[$selectedIndex]
         Write-Verbose "[$functionName] Selected item: $($selectedItem | Out-String)"        # Handle action or submenu        
         if ($selectedItem.Action)
@@ -408,8 +360,6 @@ function ShowMenu()
             Write-Verbose "[$functionName] Executing action for selected item."
             # Navigation enhancement: Add current menu to history before executing action
             # This ensures that actions can access the full navigation path
-            $tempHistory = New-Object System.Collections.ArrayList
-            $tempMenuHistory = New-Object System.Collections.ArrayList
             
             # Copy current history to temp arrays for PowerShell 5.1 compatibility
             foreach ($item in $History)
@@ -434,26 +384,6 @@ function ShowMenu()
                     $tempMenuHistory += $menu 
                 }
             }
-            # Add current menu context - but avoid duplicates
-            $shouldAddToHistory = $true
-            if ($tempHistory.Count -gt 0 -and $tempHistory[$tempHistory.Count - 1] -eq $Menu.Title)
-            {
-                Write-Verbose "[$functionName] Current menu '$($Menu.Title)' already at end of history, not adding duplicate"
-                $shouldAddToHistory = $false
-            }
-            
-            if ($shouldAddToHistory)
-            {
-                Write-Verbose "[$functionName] Adding current menu '$($Menu.Title)' to action context history"
-                try 
-                { 
-                    [void]$tempHistory.Add($Menu.Title)
-                } 
-                catch 
-                { 
-                    $tempHistory += $Menu.Title
-                }
-            }
             
             # Always add menu object to menu history for navigation
             try 
@@ -464,13 +394,8 @@ function ShowMenu()
             { 
                 $tempMenuHistory += $Menu
             }
-            # Make navigation parameters available to the action script block via script scope variables
-            # This allows action script blocks to access current navigation context when needed
-            $script:CurrentMenuDepth = $Depth + 1  # Increment depth for the action
-            $script:CurrentMenuHistory = $tempHistory
-            $script:CurrentMenuHistory_Menu = $tempMenuHistory
             
-            Write-Verbose "[$functionName] Action context - Depth: $($script:CurrentMenuDepth), History: $($script:CurrentMenuHistory -join ' > ')"
+            Write-Verbose "[$functionName] Action context - Depth: $depth History: $($MenuHistory -join ' > ')"
             
             # Execute the action
             $result = & $selectedItem.Action
@@ -490,7 +415,8 @@ function ShowMenu()
                         $History.RemoveAt($History.Count - 1)
                         $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
                         $MenuHistory.RemoveAt($MenuHistory.Count - 1)
-                        return ShowMenu -Menu $previousMenu -Depth ($Depth - 1) -History $History -MenuHistory $MenuHistory
+                        $Depth = ($Depth - 1) 
+                        return ShowMenu -Menu $previousMenu 
                     }
                     elseif ($result -eq "Main Menu" -and $MenuHistory.Count -gt 0)
                     {
@@ -498,7 +424,8 @@ function ShowMenu()
                         $History.Clear()
                         $MenuHistory.Clear()
                         [void]$MenuHistory.Add($mainMenu)
-                        return ShowMenu -Menu $mainMenu -Depth 0 -History $History -MenuHistory $MenuHistory
+                        $depth = 0
+                        return ShowMenu -Menu $mainMenu 
                     }
                     elseif ($result -eq 0)
                     {
@@ -534,7 +461,7 @@ function ShowMenu()
             Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
             $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
             
-            return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
+            return ShowMenu -Menu $Menu 
         }
         elseif ($selectedItem.Submenu)
         {
@@ -553,7 +480,8 @@ function ShowMenu()
                 $History += $Menu.Title
                 $MenuHistory += $Menu
             }
-            return ShowMenu -Menu $selectedItem.Submenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
+            $Depth = ($Depth + 1)
+            return ShowMenu -Menu $selectedItem.Submenu 
         }
     }
 }

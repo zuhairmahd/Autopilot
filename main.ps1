@@ -475,6 +475,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         # Copy current navigation context
         foreach ($item in $script:CurrentMenuHistory)
         {
+            Write-Verbose "[$scriptName] Adding item to action history: $item"
             try
             {
                 [void]$actionHistory.Add($item) 
@@ -488,6 +489,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         {
             try
             {
+                Write-Verbose "[$scriptName] Adding menu to action menu history: $menu"
                 [void]$actionMenuHistory.Add($menu) 
             }
             catch
@@ -826,14 +828,15 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 
 #region Show Menu
 # Initialize navigation context for the main menu - PowerShell 5.1 compatible
-$script:MainMenuHistory = New-Object System.Collections.ArrayList
-$script:MainMenuHistory_Menu = New-Object System.Collections.ArrayList
+$script:History = New-Object System.Collections.ArrayList
+$script:MenuHistory = New-Object System.Collections.ArrayList
+$script:depth = 0
 
 # Add the main menu title to the title history (for breadcrumb display) and menu object to menu history (for navigation)
 try
 {
-    [void]$script:MainMenuHistory.Add("Main Menu")
-    [void]$script:MainMenuHistory_Menu.Add($mainMenu)
+    [void]$script:History.Add("Main Menu")
+    [void]$script:MenuHistory.Add($mainMenu)
 }
 catch
 {
@@ -843,9 +846,18 @@ catch
 }
 
 # Only show menu if not in test mode
-$result = ShowMenu -Menu $mainMenu -Depth 0 -History $script:MainMenuHistory -MenuHistory $script:MainMenuHistory_Menu
-if ($null -eq $result)
+if ($settings.testMode -eq $false)
 {
-    Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+    Write-Verbose "Test mode: $($settings.testMode)" 
+    $result = ShowMenu -Menu $mainMenu -verbose 
+    if ($null -eq $result)
+    {
+        Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+    }
+}
+else
+{
+    Write-Host "Test mode: $($settings.testMode). No menu will be shown." -ForegroundColor Yellow
+    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion Show Menu

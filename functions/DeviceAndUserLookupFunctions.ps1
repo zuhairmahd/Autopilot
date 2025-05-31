@@ -242,9 +242,6 @@ function GetDeviceByUser()
         [parameter(Mandatory = $true)]
         [string]$AccessToken,
         # Navigation enhancement: Optional parameters for seamless menu navigation
-        [int]$Depth = 0,
-        [System.Collections.ArrayList]$History = $null,
-        [System.Collections.ArrayList]$MenuHistory = $null
     )    
     
     $functionName = $MyInvocation.MyCommand.Name    
@@ -332,11 +329,25 @@ function GetDeviceByUser()
             # Copy existing history (PowerShell 5.1 compatible)
             foreach ($item in $History)
             {
-                try { [void]$tempHistory.Add($item) } catch { $tempHistory += $item }
+                try
+                {
+                    [void]$tempHistory.Add($item) 
+                }
+                catch
+                {
+                    $tempHistory += $item 
+                }
             }
             foreach ($menu in $MenuHistory)
             {
-                try { [void]$tempMenuHistory.Add($menu) } catch { $tempMenuHistory += $menu }
+                try
+                {
+                    [void]$tempMenuHistory.Add($menu) 
+                }
+                catch
+                {
+                    $tempMenuHistory += $menu 
+                }
             }
             
             # Don't add "Device Selection" to history here - the ShowMenu function will handle breadcrumb display
