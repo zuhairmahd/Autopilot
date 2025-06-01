@@ -1751,6 +1751,7 @@ function GetGraphAccessToken()
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
     )
+    
     #region Main function logic
     $functionName = $MyInvocation.MyCommand.Name
     # Read and process configuration file
@@ -1759,54 +1760,52 @@ function GetGraphAccessToken()
         Write-Error "Config file not found. Please provide a valid config file."
         return $null
     }
-    
     Write-Verbose "[$functionName] Reading config file $configFile"
     try
     {
         $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
         Write-Verbose "[$functionName] Config file loaded successfully"
-        Write-Verbose "[$functionName] Decrypting values from $configFile"
-        $configRefreshToken = $null
-        if (isEncrypted -data $config)
-        {
-            Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-            $config = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name')
-            # Extract the refresh token if it exists
-            if ($config.deligatedCredentials.refresh_token)
-            {
-                $configRefreshToken = $config.deligatedCredentials.refresh_token
-                Write-Verbose "[$functionName] Found refresh token in encrypted config."
-            }
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
-            # Extract the refresh token if it exists
-            if ($config.deligatedCredentials.refresh_token)
-            {
-                $configRefreshToken = $config.deligatedCredentials.refresh_token
-                Write-Verbose "[$functionName] Found refresh token in config."
-            }
-        }
-    
-        $tenantId = $config.tenantId
-        $clientId = $config.appId
-        $clientSecret = $config.appSecret
-        $domain = $config.domain
-    
-        Write-Verbose "[$functionName] Config file values:"
-        Write-Verbose "[$functionName]   Domain: $domain"
-        Write-Verbose "[$functionName]   Tenant ID: $tenantId"
-        Write-Verbose "[$functionName]   Client ID: $clientId" 
-        Write-Verbose "[$functionName]   Client Secret: [REDACTED]"
-        Write-Verbose "[$functionName]   Has refresh token: $($null -ne $configRefreshToken)"
     }
     catch
     {
         Write-Error "Failed to read or process config file: $_"
         return $null
     }
-    
+
+    Write-Verbose "[$functionName] Decrypting values from $configFile"
+    $configRefreshToken = $null
+    if (isEncrypted -data $config)
+    {
+        Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
+        $config = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name')
+        # Extract the refresh token if it exists
+        if ($config.deligatedCredentials.refresh_token)
+        {
+            $configRefreshToken = $config.deligatedCredentials.refresh_token
+            Write-Verbose "[$functionName] Found refresh token in encrypted config."
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
+        # Extract the refresh token if it exists
+        if ($config.deligatedCredentials.refresh_token)
+        {
+            $configRefreshToken = $config.deligatedCredentials.refresh_token
+            Write-Verbose "[$functionName] Found refresh token in config."
+        }
+    }
+    $tenantId = $config.tenantId
+    $clientId = $config.appId
+    $clientSecret = $config.appSecret
+    $domain = $config.domain
+    Write-Verbose "[$functionName] Config file values:"
+    Write-Verbose "[$functionName]   Domain: $domain"
+    Write-Verbose "[$functionName]   Tenant ID: $tenantId"
+    Write-Verbose "[$functionName]   Client ID: $clientId" 
+    Write-Verbose "[$functionName]   Client Secret: [REDACTED]"
+    Write-Verbose "[$functionName]   Has refresh token: $($null -ne $configRefreshToken)"
+
     #region Log parameters
     Write-Verbose "[$functionName] Received parameters:"
     Write-Verbose "[$functionName] Configuration File: $configFile"
@@ -1843,27 +1842,32 @@ function GetGraphAccessToken()
     {
         Write-Host "Force new token requested. Ignoring cache."
     }
-    
-    # Get new token if we don't have a valid cached token
-    if ($tenantId -and $clientId -and $clientSecret)
+
+
+    if ($deligated)
     {
-        if ($Deligated)
+        switch ($AuthType)
         {
-            return Get-DelegatedToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -scopes $Scopes -domain $domain -cacheType $CacheType `
-                -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFile `
-                -configRefreshToken $configRefreshToken
-        }
-        else
-        {
-            return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            'PublicAuthFlow'
+            {
+            }
+            'Interactive'
+            {
+            }
         }
     }
     else
     {
-        Write-Error "Missing required authentication parameters (tenantId, clientId, or clientSecret)"
-        return $null
+        if ($tenantId -and $clientId -and $clientSecret)
+        {
+            return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
+                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+        }
+        else
+        {
+            Write-Error "Missing required authentication parameters (tenantId, clientId, or clientSecret)"
+            return $null
+        }
     }
     #endregion Main function logic
 }
