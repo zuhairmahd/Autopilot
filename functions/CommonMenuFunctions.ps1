@@ -204,11 +204,9 @@ function ShowMenu()
     if ($History -and $History.Count -gt 0)
     {
         Write-Verbose "[$functionName] History Contents: $($History -join ' > ')"
+        $depth = $History.Count
     }
-    if ($MenuHistory -and $MenuHistory.Count -gt 0)
-    {
-        Write-Verbose "[$functionName] MenuHistory Contents: $($MenuHistory -join ' > ')"
-    }
+    Write-Verbose "[$functionName] MenuHistory title: $($MenuHistory.Title)"
     Write-Verbose "[$functionName] BackoutText: $BackoutText"
     Write-Verbose "[$functionName] =================================="
     #endregion
@@ -269,16 +267,16 @@ function ShowMenu()
         if ($cleanHistory.Count -gt 0)
         {
             $path = $cleanHistory -join " > "
-            $banner += "`nBreadcrumb: [$path > $($Menu.Title)]"
+            $banner += "`n[$path > $($Menu.Title)]"
         }
         else
         {
-            $banner += "`nBreadcrumb: [$($Menu.Title)]"
+            $banner += "`n[$($Menu.Title)]"
         }
     }
     else
     {
-        $banner += "`nBreadcrumb: [$($Menu.Title)]"
+        $banner += "`n[$($Menu.Title)]"
     }
     
     # Display menu and get selection
@@ -297,11 +295,15 @@ function ShowMenu()
             Write-Verbose "[$functionName] Getting previous menu from MenuHistory since count is $($MenuHistory.Count)"
             if ($MenuHistory.Count -gt 0)
             {
+                Write-Verbose "[$functionName] Finding previous menu by removing last item from MenuHistory."
                 $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
+                Write-Verbose "[$functionName] Previous menu found: $($previousMenu.Title)"
                 Write-Verbose "[$functionName] Removing last menu from MenuHistory since count is $($MenuHistory.Count)"
                 $MenuHistory.RemoveAt($MenuHistory.Count - 1)
-                Write-Verbose "[$functionName] Returning to previous menu: $($previousMenu.Title)"
+                Write-Verbose "[$functionName] Decreasing depth since we are going back."
                 $Depth = ($Depth - 1) 
+                Write-Verbose "[]$functionName] Current depth after going back: $Depth"
+                Write-Verbose "[$functionName] Returning to previous menu: $($previousMenu.Title)"
                 return ShowMenu -Menu $previousMenu 
             }
         }
@@ -322,6 +324,8 @@ function ShowMenu()
             $History.Clear()
             $MenuHistory.Clear()
             [void]$MenuHistory.Add($mainMenu)
+            Write-Verbose "[$functionName] Setting depth to 0 since we are going to main menu."
+            $Depth = 0
             return ShowMenu -Menu $mainMenu
         }
         else
@@ -358,48 +362,29 @@ function ShowMenu()
         if ($selectedItem.Action)
         {
             Write-Verbose "[$functionName] Executing action for selected item."
-            # Navigation enhancement: Add current menu to history before executing action
-            # This ensures that actions can access the full navigation path
+            Write-Verbose "[$functionName] Updating menu context"
             
-            # Copy current history to temp arrays for PowerShell 5.1 compatibility
-            foreach ($item in $History)
+            try
             {
-                try
-                {
-                    [void]$tempHistory.Add($item) 
-                }
-                catch
-                {
-                    $tempHistory += $item 
-                }
+                [void]$History.Add($Menu.Title)
+                Write-Verbose "[$functionName] Added current menu to history: $($Menu.Title)"
+                [void]$MenuHistory.Add($Menu)
             }
-            foreach ($menu in $MenuHistory)
+            catch
             {
-                try
-                {
-                    [void]$tempMenuHistory.Add($menu) 
-                }
-                catch
-                {
-                    $tempMenuHistory += $menu 
-                }
+                Write-Verbose "[$functionName] Error adding to history: $_"
+                # Fallback for PowerShell 5.1 compatibility
+                Write-Verbose "[$functionName] Fallback for PowerShell 5.1 compatibility - using += operator"
+                $History += $Menu.Title
+                Write-Verbose "[$functionName] Added current menu to history using += operator: $($Menu.Title)"
+                $MenuHistory += $Menu
             }
-            
-            # Always add menu object to menu history for navigation
-            try 
-            { 
-                [void]$tempMenuHistory.Add($Menu)
-            } 
-            catch 
-            { 
-                $tempMenuHistory += $Menu
-            }
-            
-            Write-Verbose "[$functionName] Action context - Depth: $depth History: $($MenuHistory -join ' > ')"
+            Write-Verbose "[$functionName] Increasing depth for action execution."
+            $Depth = ($Depth + 1)
+            Write-Verbose "[$functionName] Current depth after action execution: $Depth"
             
             # Execute the action
             $result = & $selectedItem.Action
-            
             #If you get the special return boolean, return the value directly.
             if ($selectedItem.ReturnsValue)
             {
@@ -412,18 +397,25 @@ function ShowMenu()
                     # Process as navigation
                     if ($result -eq "Back" -and $Depth -gt 0 -and $History.Count -gt 0)
                     {
+                        Write-Verbose "[$functionName] Going back to previous menu from action result."
                         $History.RemoveAt($History.Count - 1)
                         $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
+                        Write-Verbose "[$functionName] Previous menu found: $($previousMenu.Title)"
                         $MenuHistory.RemoveAt($MenuHistory.Count - 1)
+                        Write-Verbose "[$functionName] Decreasing depth since we are going back from action result."
                         $Depth = ($Depth - 1) 
+                        Write-Verbose "[$functionName] Current depth after going back: $Depth"
                         return ShowMenu -Menu $previousMenu 
                     }
                     elseif ($result -eq "Main Menu" -and $MenuHistory.Count -gt 0)
                     {
+                        Write-Verbose "[$functionName] Going to main menu from action result."
                         $mainMenu = $MenuHistory[0]
+                        Write-Verbose "[$functionName] Main menu found: $($mainMenu.Title)"
                         $History.Clear()
                         $MenuHistory.Clear()
                         [void]$MenuHistory.Add($mainMenu)
+                        Write-Verbose "[$functionName] Setting depth to 0 since we are going to main menu from action result."
                         $depth = 0
                         return ShowMenu -Menu $mainMenu 
                     }
@@ -448,7 +440,7 @@ function ShowMenu()
             if ($result -eq $backoutText)
             {
                 Write-Verbose "[$functionName] Action returned backout text, returning to menu"
-                return ShowMenu -Menu $Menu -Depth $Depth -History $History -MenuHistory $MenuHistory
+                return ShowMenu -Menu $Menu
             }
             
             # Display action result if any
@@ -468,8 +460,10 @@ function ShowMenu()
             Write-Verbose "[$functionName] Navigating to submenu: $($selectedItem.Submenu.Title)"
             # Navigate to submenu - add current menu to navigation history
             # Use PowerShell 5.1 compatible method for ArrayList operations
+            
             try
             {
+                Write-Verbose "[$functionName] Adding current menu to history: $($Menu.Title)"
                 [void]$History.Add($Menu.Title)
                 [void]$MenuHistory.Add($Menu)
             }
@@ -477,10 +471,14 @@ function ShowMenu()
             {
                 Write-Verbose "[$functionName] Error adding to history: $_"
                 # Fallback for PowerShell 5.1 compatibility
+                Write-Verbose "[$functionName] Fallback for PowerShell 5.1 compatibility - using += operator"
                 $History += $Menu.Title
+                Write-Verbose "[$functionName] Added current menu to history using += operator: $($Menu.Title)"
                 $MenuHistory += $Menu
             }
+            Write-Verbose "[$functionName] Increasing depth for submenu navigation."
             $Depth = ($Depth + 1)
+            Write-Verbose "[$functionName] Current depth after submenu navigation: $Depth"
             return ShowMenu -Menu $selectedItem.Submenu 
         }
     }

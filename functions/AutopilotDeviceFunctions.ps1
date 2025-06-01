@@ -1224,6 +1224,15 @@ function RestartDevice()
   while ($reboot -notin ('Y', 'N'))
   {
     $reboot = Read-Host -Prompt $question
+    Write-Verbose "[$functionName] User input: $reboot"
+    if ($reboot -notin ('Y', 'N'))
+    {
+      Write-Host "Invalid input. Please enter 'Y' for Yes or 'N' for No." -ForegroundColor Red
+      [console]::beep(1000, 500)
+    }
+  }
+  if ($reboot -eq 'Y')
+  {
     Write-Verbose "[$functionName] User chose to reboot the device."
     Write-Host $bootMessage -ForegroundColor Green
     Restart-Computer -Force
