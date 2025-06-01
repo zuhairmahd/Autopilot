@@ -1,4 +1,3 @@
-#region Helper functions
 function FormatScopes()
 {
     [CmdletBinding()]
@@ -727,7 +726,7 @@ function Get-TokenFromCache
 
 function Get-DelegatedToken
 {
-    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken)
+    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType)
     $functionName = $MyInvocation.MyCommand.Name
     # First check if we have a valid refresh token in config
     if ($configRefreshToken)
@@ -752,58 +751,139 @@ function Get-DelegatedToken
     # Generate a random state string
     Write-Verbose "[$functionName] Generating random state string."
     $state = [System.Guid]::NewGuid().ToString()
-    if ($interactive)
-    {
-        $redirectUri = "http://localhost:8080/"
-    }
-    else 
-    {
-        $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
-    }
     $scopesFormatted = FormatScopes -scopes $scopes
-    # Encode parameters
     $encodedScopes = [uri]::EscapeDataString($scopesFormatted)
-    $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
-    # Attempt to fetch token using HTTP listener first
+    
     $automaticFlowSuccess = $false
-    $code = $null
-    if (-not $Interactive)        
+    switch ($AuthType)
     {
-        Write-Verbose "[$functionName] Using non-interactive mode (manual code input)"
-        $automaticFlowSuccess = $false
-    }
-    else
-    {
-        # Try the automatic HTTP listener flow first
-        try
+        PublicAuthFlow
         {
-            Write-Verbose "[$functionName] Attempting automatic HTTP listener flow"
-            $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
-            Write-Verbose "[$functionName] Authorization URL: $authUrl"
-            Write-Host "Opening browser for user authentication and consent..."
-            Start-Process $authUrl
-            $listenerResult = Start-HttpListener -redirectUri $redirectUri
-            if ($listenerResult.Success)
-            {
-                Write-Verbose "[$functionName] HTTP listener successfully captured the authorization code"
-                $code = $listenerResult.Code
-                $automaticFlowSuccess = $true
+            Write-Verbose "[$functionName] Using device auth flow."
+            $deviceCodeRequestUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/devicecode"
+            Write-Verbose "[$functionName] Device code request URL: $deviceCodeRequestUrl"
+            $deviceCodeRequestBody = @{
+                client_id = $clientId
+                scope     = "$resource/DeviceManagementManagedDevices.ReadWrite.All $resource/offline_access openid profile email" # offline_access for refresh token if needed later
             }
-            else
+            Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)"
+            try
             {
-                Write-Warning "HTTP listener failed to capture the authorization code: $($listenerResult.ErrorMessage)"
+                $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri $deviceCodeRequestUrl -Body $deviceCodeRequestBody
+                Write-Verbose "[$functionName] Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth 3)"
+            }
+            catch
+            {
+                Write-Error "Error requesting device code: $($_.Exception.Message)"
+                Write-Error "Response: $($_.Exception.Response.GetResponseStream() | ForEach-Object { New-Object System.IO.StreamReader($_) } | ForEach-Object { $_.ReadToEnd() })"
+                return $null
+            }
+            Write-Host ""
+            Write-Host $deviceCodeResponse.message
+            Write-Host "Waiting for authentication..."
+            Write-Host ""
+            # --- Poll for Access Token ---
+            Write-Verbose "[$functionName] Polling for access token using device code."
+            $tokenRequestUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+            $tokenRequestBody = @{
+                grant_type  = "urn:ietf:params:oauth:grant-type:device_code"
+                client_id   = $clientId
+                device_code = $deviceCodeResponse.device_code
+            }
+            $accessToken = $null
+            $timeoutSeconds = $deviceCodeResponse.expires_in # Typically 15 minutes
+            Write-Verbose "[$functionName] Token request URL: $tokenRequestUrl"
+            Write-Verbose "[$functionName] Token request body: $($tokenRequestBody | ConvertTo-Json -Depth 3)"
+            Write-Verbose "Timeout for polling: $timeoutSeconds seconds"
+            $intervalSeconds = $deviceCodeResponse.interval # Typically 5 seconds
+            Write-Verbose "Polling interval: $intervalSeconds seconds"
+            $startTime = Get-Date
+            Write-Verbose "[$functionName] Start time for polling: $startTime"
+            while ((Get-Date -UFormat %s) -lt ($startTime.AddSeconds($timeoutSeconds) | Get-Date -UFormat %s))
+            {
+                Write-Verbose "[$functionName] Polling for access token..."
+                Start-Sleep -Seconds $intervalSeconds
+                try
+                {
+                    $tokenResponse = Invoke-RestMethod -Method POST -Uri $tokenRequestUrl -Body $tokenRequestBody -ErrorAction SilentlyContinue
+                    Write-Verbose "[$functionName] Polling attempt successful."
+                    Write-Verbose "[$functionName] Token response: $($tokenResponse | ConvertTo-Json -Depth 3)"
+                    if ($tokenResponse.access_token)
+                    {
+                        $accessToken = $tokenResponse.access_token
+                        Write-Host "Authentication successful. Access token acquired."
+                        break
+                    }
+                    elseif ($tokenResponse.error -ne "authorization_pending")
+                    {
+                        Write-Error "Error polling for token: $($tokenResponse.error_description)"
+                        return $null
+                    }
+                }
+                catch
+                {
+                    # Handle potential network errors during polling, but continue if it's just pending
+                    Write-Warning "Polling attempt failed: $($_.Exception.Message)"
+                }
+                Write-Host -NoNewline "."
+            }
+            if (-not $accessToken)
+            {
+                Write-Error "Authentication timed out or failed."
+                return $null
+            }
+        }
+        'interactive'
+        {
+            Write-Verbose "[$functionName] Using interactive authentication flow."
+            $redirectUri = "http://localhost:8080/"
+            Write-Verbose "[$functionName] Redirect URI: $redirectUri"
+            $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
+            Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+            Write-Verbose "[$functionName] Attempting automatic HTTP listener flow"
+            try
+            {
+                Write-Verbose "[$functionName] Starting HTTP listener at $redirectUri"
+                $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
+                Write-Verbose "[$functionName] Authorization URL: $authUrl"
+                Write-Host "Opening browser for user authentication and consent..."
+                Start-Process $authUrl
+                $listenerResult = Start-HttpListener -redirectUri $redirectUri
+                if ($listenerResult.Success)
+                {
+                    Write-Verbose "[$functionName] HTTP listener successfully captured the authorization code"
+                    $code = $listenerResult.Code
+                    $automaticFlowSuccess = $true
+                }
+                else
+                {
+                    Write-Warning "HTTP listener failed to capture the authorization code: $($listenerResult.ErrorMessage)"
+                    Write-Verbose "[$functionName] Will fall back to manual code input"
+                    $automaticFlowSuccess = $false
+                }
+            }
+            catch
+            {
+                Write-Warning "Error in automatic HTTP listener flow: $_"
                 Write-Verbose "[$functionName] Will fall back to manual code input"
                 $automaticFlowSuccess = $false
             }
         }
-        catch
+        'Private'
         {
-            Write-Warning "Error in automatic HTTP listener flow: $_"
-            Write-Verbose "[$functionName] Will fall back to manual code input"
-            $automaticFlowSuccess = $false
+            Write-Verbose "[$functionName] Using non-interactive mode (manual code input)"
+            $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+            Write-Verbose "[$functionName] Redirect URI: $redirectUri"
+            $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
+            Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+        }
+        default
+        {
+            Write-Error "Invalid AuthType specified. Use 'interactive' or 'device'."
+            return $null
         }
     }
-        
+    
     # Fall back to manual code input if automatic flow failed
     if (-not $automaticFlowSuccess)
     {
@@ -828,7 +908,7 @@ function Get-DelegatedToken
         }
     }           
     # Regardless of how we got the code, exchange it for a token
-    if ($code)
+    if ($code -and $AuthType -ne 'PublicAuthFlow')
     {
         Write-Verbose "[$functionName] Exchanging authorization code for access token"
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
@@ -846,40 +926,12 @@ function Get-DelegatedToken
         Write-Verbose "[$functionName]   Redirect URI: $redirectUri"
         Write-Verbose "[$functionName]   Grant Type: authorization_code"
         Write-Verbose "[$functionName]   Scopes: $scopesFormatted"
-        
         try
         {
             Write-Verbose "[$functionName] Sending token request to $tokenEndpoint"
             $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody -ErrorVariable tokenError
             Write-Verbose "[$functionName] Access token received successfully"
-            
-            # Log the token response properties (without exposing the actual token)
-            Write-Verbose "[$functionName] Token response contains the following properties:"
-            foreach ($prop in $tokenResponse.PSObject.Properties.Name)
-            {
-                if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
-                {
-                    $tokenLength = $tokenResponse.$prop.Length
-                    Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
-                }
-                else
-                {
-                    Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
-                }
-            }
-            
-            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            # Cache the access token based on cache type
-            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            
-            # Save the refresh token to config file regardless of cache type
-            if ($tokenResponse.refresh_token)
-            {
-                Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
-            }
-            
-            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
-        }
+        }            
         catch
         {
             Write-Error "Failed to get delegated access token: $_"
@@ -902,11 +954,9 @@ function Get-DelegatedToken
                     }
                 }
             }
-            
             if ($_.Exception.Response)
             {
                 Write-Verbose "[$functionName] Status code: $($_.Exception.Response.StatusCode)"
-                
                 # Try to get more information from the response
                 try
                 {
@@ -914,7 +964,6 @@ function Get-DelegatedToken
                     $responseBody = $reader.ReadToEnd()
                     $reader.Close()
                     Write-Verbose "[$functionName] Response body: $responseBody"
-                    
                     try
                     {
                         $responseJson = $responseBody | ConvertFrom-Json
@@ -934,29 +983,55 @@ function Get-DelegatedToken
             return $null
         }
     }
-    else
+    
+    # Log the token response properties (without exposing the actual token)
+    if ($tokenResponse)
     {
-        Write-Error "Failed to obtain authorization code. Cannot proceed with token request."
+        Write-Verbose "[$functionName] Token response contains the following properties:"
+        foreach ($prop in $tokenResponse.PSObject.Properties.Name)
+        {
+            if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
+            {
+                {
+                    $tokenLength = $tokenResponse.$prop.Length
+                    Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
+                }
+            }
+            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+            # Cache the access token based on cache type
+            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            # Save the refresh token to config file regardless of cache type
+            if ($tokenResponse.refresh_token)
+            {
+                Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
+            }
+            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        }
+    }
+    else 
+    {
+        Write-Verbose "[$functionName] Token response is null. Authorization code exchange failed."
         return $null
     }
-}   
-    
+}
+
 function Get-ClientCredentialsToken
 {
     param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Using non-delegated access..."
     Write-Verbose "[$functionName] Requesting new access token with client credentials flow"
-        
     $body = @{
         client_id     = $clientId
         scope         = 'https://graph.microsoft.com/.default'
         client_secret = $clientSecret
         grant_type    = 'client_credentials'
     }
-        
     Write-Verbose "[$functionName] Token request body: client_id=$clientId, scope=https://graph.microsoft.com/.default, grant_type=client_credentials"
-        
     try
     {
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
@@ -990,7 +1065,7 @@ function Get-ClientCredentialsToken
             $errorMessage = $streamReader.ReadToEnd()
             $streamReader.Close()
             Write-Error "Server Response: $errorMessage"
-                
+            
             try
             {
                 $errorJson = $errorMessage | ConvertFrom-Json
@@ -1005,8 +1080,8 @@ function Get-ClientCredentialsToken
         return $null
     }
 }
-#endregion Helper functions
 
+#region Encryption functions
 $excludeFields = @('domain', 'name', 'scopes')
 function TestIsBase64String
 {
@@ -1191,16 +1266,16 @@ function DecryptObject
         {
             Write-Verbose "[DECRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $result = [ordered]@{}
-            
+        
             # Process hashtable by enumerating through the key-value pairs directly
             foreach ($entry in $InputObject.GetEnumerator())
             {
                 $key = $entry.Key
                 $value = $entry.Value
-                
+            
                 Write-Verbose "[DECRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
                 Write-Verbose "[DECRYPT] Value type: $($value.GetType().FullName)"
-                
+            
                 $currentPropertyPath = if ($ParentPath)
                 {
                     "$ParentPath.$key" 
@@ -1209,7 +1284,7 @@ function DecryptObject
                 {
                     $key 
                 }
-                
+            
                 $isPropertyItselfExcluded = $ExcludeFields -contains $key
                 $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
 
@@ -1250,7 +1325,7 @@ function DecryptObject
                     }
                 }
             }
-            
+        
             return $result
         }
         elseif ($InputObject -is [PSCustomObject])
@@ -1367,8 +1442,8 @@ function EncryptObject
         [object]$decryptedObject,
         [string[]]$excludeFields
     )
-    
-    
+
+
     function Invoke-RecursiveEncryption
     {
         param (
@@ -1409,17 +1484,17 @@ function EncryptObject
         {
             Write-Verbose "[ENCRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
             $result = [ordered]@{}
-            
+        
             # Process hashtable by enumerating through the key-value pairs directly
             foreach ($entry in $InputObject.GetEnumerator())
             {
                 $key = $entry.Key
                 $value = $entry.Value
-                
+            
                 Write-Verbose "[ENCRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
                 Write-Verbose "[ENCRYPT] Value type: $($value.GetType().FullName)"
                 Write-Verbose "[ENCRYPT] Value: $value"
-                
+            
                 $currentPropertyPath = if ($ParentPath)
                 {
                     "$ParentPath.$key" 
@@ -1428,7 +1503,7 @@ function EncryptObject
                 {
                     $key 
                 }
-                
+            
                 $isPropertyItselfExcluded = $ExcludeFields -contains $key
                 $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
 
@@ -1467,7 +1542,7 @@ function EncryptObject
                     }
                 }
             }
-            
+        
             return $result
         }
         elseif ($InputObject -is [PSCustomObject])
@@ -1645,6 +1720,7 @@ function DecryptAndEncrypt()
         Write-Host "Processing data in $inputFile"
         Write-Host "Writing data to $outputFile"
         Write-Verbose "The encoded data is: $($encodedData | ConvertTo-Json)"
+       
         $encodedData | ConvertTo-Json | Set-Content -Path $outputFile -ErrorAction Stop
         Write-Host 'Data processed successfully.'
     }
@@ -1654,6 +1730,8 @@ function DecryptAndEncrypt()
         exit
     }
 }
+#endregion Encryption functions
+
 function GetGraphAccessToken()
 {
     [CmdletBinding()]
@@ -1667,7 +1745,8 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'Deligated')]
         [string]$Scopes,
         [parameter(parameterSetName = 'Deligated')]
-        [switch]$Interactive,
+        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
+        [string]$AuthType = 'Private',
         [switch]$ForceNewToken,
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
@@ -1709,12 +1788,12 @@ function GetGraphAccessToken()
                 Write-Verbose "[$functionName] Found refresh token in config."
             }
         }
-        
+    
         $tenantId = $config.tenantId
         $clientId = $config.appId
         $clientSecret = $config.appSecret
         $domain = $config.domain
-        
+    
         Write-Verbose "[$functionName] Config file values:"
         Write-Verbose "[$functionName]   Domain: $domain"
         Write-Verbose "[$functionName]   Tenant ID: $tenantId"
@@ -1734,6 +1813,8 @@ function GetGraphAccessToken()
     Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime"
     Write-Verbose "[$functionName] Secure String: $SecureString"
     Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
+    Write-Verbose "[$functionName] Use Public Auth Flow: $UsePublicAuthFlow"
+    Write-Verbose "[$functionName] Interactive: $Interactive"
     Write-Verbose "[$functionName] Cache Type: $CacheType"
     Write-Verbose "[$functionName] Domain: $domain"
     Write-Verbose "[$functionName] Deligated: $Deligated"
@@ -1786,7 +1867,6 @@ function GetGraphAccessToken()
     }
     #endregion Main function logic
 }
-
 
 function ProcessFilterCondition
 {
