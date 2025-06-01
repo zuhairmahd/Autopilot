@@ -14,17 +14,17 @@ function SendDeviceCommand ()
   
     #region variables and logs
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] [$functionName] Device ID:     $ManagedDeviceId"
-    Write-Verbose "[$functionName] [$functionName] Command: $Command"
-    Write-Verbose "[$functionName] [$functionName] MaxRetries: $MaxRetries"
-    Write-Verbose "[$functionName] [$functionName] RetryDelaySeconds: $RetryDelaySeconds"
+    Write-Verbose "[$functionName] Device ID:     $ManagedDeviceId"
+    Write-Verbose "[$functionName] Command: $Command"
+    Write-Verbose "[$functionName] MaxRetries: $MaxRetries"
+    Write-Verbose "[$functionName] RetryDelaySeconds: $RetryDelaySeconds"
     if ($accessToken)
     {
-        Write-Verbose "[$functionName] [$functionName] AccessToken provided."
+        Write-Verbose "[$functionName] AccessToken provided."
     }
     else
     {
-        Write-Verbose "[$functionName] [$functionName] No AccessToken provided."
+        Write-Verbose "[$functionName] No AccessToken provided."
         return $false
     }
     #endregion
@@ -55,7 +55,7 @@ function SendDeviceCommand ()
             $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
             $body = @{ 'keepUserData' = $false } | ConvertTo-Json
             $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' 
-            Write-Verbose "[$functionName] [$functionName] Response: $response"
+            Write-Verbose "[$functionName] Response: $response"
             $actionType = "cleanWindows"
         }
         "wipe"
@@ -68,7 +68,7 @@ function SendDeviceCommand ()
                 'obliterationBehavior' = "doNotObliterate"
             } | ConvertTo-Json
             $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] [$functionName] Response: $response"
+            Write-Verbose "[$functionName] Response: $response"
             $actionType = "wipe"
         }
         "sync"
@@ -76,7 +76,7 @@ function SendDeviceCommand ()
             Write-Host 'Syncing the device...' -ForegroundColor Yellow
             $syncUri = "$deviceManagementUri/syncDevice"
             $response = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] [$functionName] Response: $response"
+            Write-Verbose "[$functionName] Response: $response"
             $actionType = "syncDevice"
         }
         "restart"
@@ -84,7 +84,7 @@ function SendDeviceCommand ()
             Write-Host 'Restarting the device...' -ForegroundColor Yellow
             $restartUri = "$deviceManagementUri/rebootNow"
             $response = callGraphApi -AccessToken $accessToken -Method 'POST' -ResourcePath $restartUri -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] [$functionName] Response: $response"
+            Write-Verbose "[$functionName] Response: $response"
             $actionType = "rebootNow"
         }
         default
@@ -105,7 +105,7 @@ function SendDeviceCommand ()
             {
                 $syncUri = "$deviceManagementUri/syncDevice"
                 $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
-                Write-Verbose "[$functionName] [$functionName] Sync Response: $syncResponse"
+                Write-Verbose "[$functionName] Sync Response: $syncResponse"
             }
 
             # Begin monitoring the action status
@@ -120,14 +120,15 @@ function SendDeviceCommand ()
             {
                 $retryCount++
                 Write-Host "Checking $Command status, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
-                Write-Verbose "[$functionName] [$functionName] Checking action results (Attempt $retryCount of $MaxRetries)"
+                Write-Verbose "[$functionName] Checking action results (Attempt $retryCount of $MaxRetries)"
   
                 # Wait before checking
                 Start-Sleep -Seconds $RetryDelaySeconds
   
                 # Check action results
                 $deviceDetails = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
-                Write-Verbose "[$functionName] [$functionName] Device action results: $($deviceDetails | ConvertTo-Json -Depth 5)"
+                Write-Verbose "[$functionName] Device action results: $($deviceDetails | ConvertTo-Json -Depth 5)"
+                Write-Host "Action results: $($deviceDetails.deviceActionResults)"
   
                 if ($deviceDetails -and $deviceDetails.deviceActionResults)
                 {
@@ -141,14 +142,12 @@ function SendDeviceCommand ()
                             break
                         }
                     }
-    
                     if ($actionResult)
                     {
                         $actionState = $actionResult.status
                         Write-Host "Current $Command status: $actionState" -ForegroundColor Cyan
-                        Write-Verbose "[$functionName] [$functionName] Action start time: $($actionResult.startDateTime)"
-                        Write-Verbose "[$functionName] [$functionName] Action last updated: $($actionResult.lastUpdatedDateTime)"
-      
+                        Write-Verbose "[$functionName] Action start time: $($actionResult.startDateTime)"
+                        Write-Verbose "[$functionName] Action last updated: $($actionResult.lastUpdatedDateTime)"
                         # Check if action completed or failed
                         switch ($actionState)
                         {
@@ -182,25 +181,29 @@ function SendDeviceCommand ()
                             }
                             "notFound"
                             {
-                                Write-Verbose "[$functionName] [$functionName] Action not found yet or device may no longer be available."
-                                # Continue monitoring, this could mean the action hasn't been registered yet
+                                Write-Verbose "[$functionName] Action not found yet or device may no longer be available."
+                                if ($retryCount -gt 3)
+                                {
+                                    Write-Verbose "[$functionName] Action not found after multiple attempts, assuming device is no longer available."
+                                    $actionFailed = $false
+                                    $success = $true
+                                }
                             }
                             default
                             {
-                                Write-Verbose "[$functionName] [$functionName] Action status is '$actionState', continuing to monitor."
+                                Write-Verbose "[$functionName] Action status is '$actionState', continuing to monitor."
                                 # Continue monitoring for non-terminal states
                             }
                         }
                     }
                     else
                     {
-                        Write-Verbose "[$functionName] [$functionName] No action of type '$actionType' found yet."
+                        Write-Verbose "[$functionName] No action of type '$actionType' found yet."
                     }
                 }
                 else
                 {
-                    Write-Verbose "[$functionName] [$functionName] No device action results available or device might be offline/no longer accessible."
-    
+                    Write-Verbose "[$functionName] No device action results available or device might be offline/no longer accessible."
                     # If we can no longer get device details, check if device still exists
                     $deviceCheck = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0'
                     if (-not $deviceCheck)
@@ -236,7 +239,7 @@ function SendDeviceCommand ()
         else
         {
             Write-Host "Failed to send $Command command to device." -ForegroundColor Red
-            Write-Verbose "[$functionName] [$functionName] Failed to send command. Response: $response"
+            Write-Verbose "[$functionName] Failed to send command. Response: $response"
         }
     }
     return $success

@@ -13,6 +13,7 @@
       "settings": {
         "domain": "gao.gov",
         "deviceNamePrefix": "w11-",
+        "maxNumberOfDevicesAllowed": 20,
         "operatingSystem": "Windows",
         "MaxUserNameLength": 50,
         "MaxSerialNumberLength": 100,
@@ -36,6 +37,7 @@
         "MaxSerialNumberLength": 100,
         "MinSerialNumberLength": 7,
         "MinimumDevicePhysicalMemoryInGB": 8,
+        "maxNumberOfDevicesAllowed": 15,
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",
           "Hybrid join profile"

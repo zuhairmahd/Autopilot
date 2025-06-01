@@ -1,4 +1,4 @@
-function VerifyGroupMembership
+function VerifyGroupMembership()
 {
     [CmdletBinding()]
     param(
@@ -198,6 +198,39 @@ function VerifyGroupMembership
     #endregion
 }
 
+function GetTotalRegisteredDevicesByUser()
+{
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $true)]
+        [string]$UserName,
+        [parameter(Mandatory = $true)]
+        [string]$AccessToken
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $Uri = "users/$userName/registeredDevices"
+    Write-Verbose "[$functionName] Getting total registered devices for user: $UserName"
+    if ($null -eq $AccessToken)
+    {
+        Write-Verbose "[$functionName] AccessToken is null or empty. Cannot proceed."
+        return 0
+    }
+    Write-Verbose "[$functionName] AccessToken provided."
+    $registeredDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $Uri).value
+    Write-Verbose "[$functionName] Registered devices count: $($registeredDevices.Count)"
+    if ($registeredDevices -and $registeredDevices.Count -gt 0)
+    {
+        Write-Verbose "[$functionName] Returning count of registered devices: $($registeredDevices.Count)"
+        return $registeredDevices.Count
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No registered devices found for user: $UserName"
+        return 0
+    }
+}
+
 function GetDeviceByUser()
 {
     [CmdletBinding()]
@@ -212,8 +245,10 @@ function GetDeviceByUser()
         [int]$Depth = 0,
         [System.Collections.ArrayList]$History = $null,
         [System.Collections.ArrayList]$MenuHistory = $null
-    )    $functionName = $MyInvocation.MyCommand.Name    
-    # Navigation enhancement: Initialize null navigation parameters
+    )    
+    
+    $functionName = $MyInvocation.MyCommand.Name    
+    #region Navigation enhancement: Initialize null navigation parameters
     if ($null -eq $History)
     {
         $History = New-Object System.Collections.ArrayList
@@ -222,7 +257,8 @@ function GetDeviceByUser()
     {
         $MenuHistory = New-Object System.Collections.ArrayList
     }
-    
+    #endregion
+
     #region write verbose log of all parameters
     Write-Verbose "[$functionName] UserName: $UserName"
     Write-Verbose "[$functionName] Operating system: $OperatingSystem"
@@ -242,7 +278,7 @@ function GetDeviceByUser()
     $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
     $managedDeviceUri = "deviceManagement/managedDevices"
     #endregion
-
+    
     $deviceInfo = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
     Write-Verbose "[$functionName] Device value count: $($deviceInfo.value.Count)"
     Write-Verbose "[$functionName] Device Info: $($deviceInfo | Out-String)"
@@ -297,28 +333,30 @@ function GetDeviceByUser()
                 Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selectedSerialNumber', treating as navigation"
                 return $selectedSerialNumber
             }
-            
-            # Additional validation: check if the returned value is actually a serial number from one of our devices
-            $isValidSerialNumber = $false
-            foreach ($device in $devices)
-            {
-                if ($selectedSerialNumber -match $device.serialNumber)
-                {
-                    $selectedSerialNumber = $device.serialNumber
-                    Write-Verbose "[$functionName] Valid serial number found: $selectedSerialNumber"
-                    $isValidSerialNumber = $true
-                    break
-                }
-            }
-            
-            if (-not $isValidSerialNumber)
-            {
-                Write-Verbose "[$functionName] ShowMenu returned invalid serial number: '$selectedSerialNumber', this might be a navigation option or error"
-                Write-Warning "Unexpected return value from device selection: '$selectedSerialNumber'. Please try again."
-                return $null
-            }            
             Write-Verbose "[$functionName] Returning valid selected serial number: $selectedSerialNumber"
             return $selectedSerialNumber
+            # #region Additional validation: check if the returned value is actually a serial number from one of our devices
+            ##This section may be removed in the future if we are confident that ShowMenu always returns a valid serial number
+            # $isValidSerialNumber = $false
+            # foreach ($device in $devices)
+            # {
+            #     if ($selectedSerialNumber -match $device.serialNumber)
+            #     {
+            #         $selectedSerialNumber = $device.serialNumber
+            #         Write-Verbose "[$functionName] Valid serial number found: $selectedSerialNumber"
+            #         $isValidSerialNumber = $true
+            #         break
+            #     }
+            # }
+            # if (-not $isValidSerialNumber)
+            # {
+            #     Write-Verbose "[$functionName] ShowMenu returned invalid serial number: '$selectedSerialNumber', this might be a navigation option or error"
+            #     Write-Warning "Unexpected return value from device selection: '$selectedSerialNumber'. Please try again."
+            #     return $null
+            # }            
+            # Write-Verbose "[$functionName] Returning valid selected serial number: $selectedSerialNumber"
+            # return $selectedSerialNumber
+            # #endregion
         }
     }
     else

@@ -423,165 +423,6 @@ function ExportDeviceList()
     return $success, $outputFile
 }
 
-function DisplayReport()
-{
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [hashtable]$report,
-        [string[]]$PrefixList,
-        [parameter(ParameterSetName = 'export')]
-        [switch]$Export,
-        [parameter(ParameterSetName = 'export')]
-        [string]$OutputFile = "$pwd\DeviceReport.csv",
-        [parameter(ParameterSetName = 'export')]
-        [Parameter(Mandatory = $false)]
-        [ValidateSet("HTML", "CSV")]
-        [string]$ExportFormat = "HTML"
-    )
-    $functionName = $MyInvocation.MyCommand.Name    
-    #region write verbose log of received parameters
-    Write-Verbose "[$functionName] Export: $Export"
-    Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
-    Write-Verbose "[$functionName] OutputFile: $OutputFile"
-    Write-Verbose "[$functionName] Prefix list: $PrefixList"
-    #endregion write verbose log of received parameters
-    
-    #region Format property names and display report
-    $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
-    foreach ($key in $output.Keys)
-    {
-        # Format the property name to be more readable
-        $readableKey = $key
-        # Handle common prefixes separately
-        $matchedPrefix = $null
-        foreach ($prefix in $PrefixList)
-        {
-            if ($key -match "^($prefix)(.+)$")
-            {
-                $matchedPrefix = $prefix
-                break
-            }
-        }
-        if ($matchedPrefix) 
-        {
-            $prefix = $matches[1]
-            $remainder = $matches[2]
-            # Insert spaces before capital letters in the remainder
-            $formattedRemainder = [regex]::Replace($remainder, '(?<=[a-z])(?=[A-Z])', ' ')
-            $readableKey = "$prefix $formattedRemainder"
-        }
-        else
-        {
-            # Insert spaces before capital letters
-            $readableKey = [regex]::Replace($key, '(?<=[a-z])(?=[A-Z])', ' ')
-        }
-        #if the value is a date, pipe it to the FormatDateWithTimeZone function.
-        if ($output[$key] -is [DateTime])
-        {
-            $formattedOutput[$readableKey] = FormatDateWithTimeZone -DateTime $output[$key]
-        }
-        else
-        {
-            $formattedOutput[$readableKey] = $output[$key]
-        }
-        # Print each property and value
-        Write-Host "$readableKey`: $($output[$key])"
-    }
-    #endregion Format property names and display report
-    
-    #region export
-    if (-not $Export)    
-    {
-        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
-        if ($choice -eq 'Export to HTML')
-        {
-            $Export = $true
-            $ExportFormat = "HTML"
-        }
-        elseif ($choice -eq 'Export to CSV')
-        {
-            $Export = $true
-            $ExportFormat = "CSV"
-        }
-        else
-        {
-            Write-Host "No export selected."
-            return $null
-        }
-    }
-    # Export the report if requested
-    if ($Export)
-    {
-        $deviceName = $enrollmentState.managedDevice.device.deviceName
-        if (-not $deviceName)
-        {
-            $deviceName = "Device"
-        }
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $fileName = "$deviceName`_Report_$timestamp"
-        if ($ExportFormat -eq "HTML")
-        {
-            $htmlPath = "$pwd\$fileName.html"
-            $htmlHeader = @"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Device Report: $deviceName</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
-        th { background-color: #f2f2f2; }
-        tr:hover { background-color: #f5f5f5; }
-        h1 { color: #333; }
-    </style>
-</head>
-<body>
-    <h1>Device Report: $deviceName</h1>
-    <p>Generated on $(Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")</p>
-    <table>
-        <tr>
-            <th>Property</th>
-            <th>Value</th>
-        </tr>
-"@
-
-            $htmlRows = ""
-            foreach ($key in $formattedOutput.Keys)
-            {
-                $value = $formattedOutput[$key]
-                $htmlRows += "<tr><td>$key</td><td>$value</td></tr>`n"
-            }
-
-            $htmlFooter = @"
-    </table>
-</body>
-</html>
-"@
-
-            $htmlHeader + $htmlRows + $htmlFooter | Out-File -FilePath $htmlPath -Encoding UTF8
-            Write-Host "HTML report exported to: $htmlPath"
-        }
-        elseif ($ExportFormat -eq "CSV")
-        {
-            $csvPath = "$pwd\$fileName.csv"
-            
-            $csvData = foreach ($key in $formattedOutput.Keys)
-            {
-                [PSCustomObject]@{
-                    Property = $key
-                    Value    = $formattedOutput[$key]
-                }
-            }
-            
-            $csvData | Export-Csv -Path $csvPath -NoTypeInformation
-            Write-Host "CSV report exported to: $csvPath"
-        }
-    }
-    #endregion export
-}
-
 function ConvertUserDisplayName()
 {
     [CmdletBinding()]
@@ -1005,78 +846,220 @@ function ShowDeviceReport()
 {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true, ParameterSetName = 'EnrollmentState')]
         $enrollmentState,
-        [parameter(ParameterSetName = 'export')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'HashTable')]
+        [hashtable]$report,
+        [Parameter(Mandatory = $false)]
+        [string[]]$PrefixList = @('Intune', 'Autopilot'),
+        [Parameter(Mandatory = $false)]
         [switch]$Export,
-        [parameter(ParameterSetName = 'export')]
+        [Parameter(Mandatory = $false)]
         [string]$OutputFile = "$pwd\DeviceReport.csv",
-        [parameter(ParameterSetName = 'export')]
         [Parameter(Mandatory = $false)]
         [ValidateSet("HTML", "CSV")]
-        [string]$ExportFormat = "HTML"
+        [string]$ExportFormat = "HTML",
+        [Parameter(Mandatory = $false)]
+        [string]$DeviceName,
+        [Parameter(Mandatory = $false)]
+        [string]$SerialNumber,
+        [int]$Depth = 0,
+        [System.Collections.ArrayList]$History = $null,
+        [System.Collections.ArrayList]$MenuHistory = $null
     )
+    #region usage info
+    # Use with enrollment state (original ShowDeviceReport functionality)
+    #ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
+    # Use with hashtable (original DisplayReport functionality)
+    #Show-DeviceReport -report $myHashtable -PrefixList @('Custom', 'Prefix')
+    # Direct export without prompting
+    #Show-DeviceReport -enrollmentState $state -Export -ExportFormat "CSV"   
+    #endregion usage info
     $functionName = $MyInvocation.MyCommand.Name
+    
     #region write verbose log of received parameters
-    Write-Verbose "[$functionName] Received parameters: $($enrollmentState | Out-String)"
+    Write-Verbose "[$functionName] Starting device report generation"
+    Write-Verbose "[$functionName] Parameter Set: $($PSCmdlet.ParameterSetName)"
     Write-Verbose "[$functionName] Export: $Export"
     Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
-    #endregion write verbose log of received parameters
-    
-    #region report content
-    if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
+    Write-Verbose "[$functionName] OutputFile: $OutputFile"
+    Write-Verbose "[$functionName] PrefixList: $($PrefixList -join ', ')"
+    if ($PSCmdlet.ParameterSetName -eq 'EnrollmentState')
     {
-        $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
+        Write-Verbose "[$functionName] Enrollment state provided"
     }
     else
     {
-        $latestAutopilotEvent = $null
+        Write-Verbose "[$functionName] Report hashtable provided with $($report.Keys.Count) properties"
     }
+    Write-Verbose "[$functionName] DeviceName: $DeviceName"
+    Write-Verbose "[$functionName] SerialNumber: $SerialNumber"
+    Write-Verbose "[$functionName] History: $($History.Count) items"
+    Write-Verbose "[$functionName] MenuHistory: $($MenuHistory.Count) items"
+    Write-Verbose "[$functionName] Depth: $Depth"
+    #endregion write verbose log of received parameters
     
-    $output = [ordered] @{
-        InputIdentifier               = $serialNumber
-        IntuneDeviceName              = $enrollmentState.managedDevice.device.deviceName
-        IntuneSerialNumber            = $enrollmentState.managedDevice.device.serialNumber
-        IntuneDeviceMemory            = "$($enrollmentState.managedDevice.memory) GB"
-        IntuneManagedDeviceId         = $enrollmentState.managedDevice.device.Id
-        IntuneEnrollmentDate          = $enrollmentState.managedDevice.device.enrolledDateTime | FormatDateWithTimeZone
-        IntuneLastSync                = $enrollmentState.managedDevice.device.lastSyncDateTime | FormatDateWithTimeZone
-        IntuneEnrollmentProfile       = $enrollmentState.managedDevice.device.enrollmentProfileName
-        IntunePrimaryUPN              = $enrollmentState.managedDevice.device.userPrincipalName # Note: Potential inconsistency
-        IntuneAzureUser               = $enrollmentState.managedDevice.users.AzureUser
-        IntuneUserDisplayName         = $enrollmentState.managedDevice.users.userDisplayName                
-        IntuneReportedUserDisplayName = $enrollmentState.managedDevice.device.userDisplayName
-        IntuneLastLogon               = $enrollmentState.managedDevice.users.lastLogOnDateTime | FormatDateWithTimeZone
-        IntuneActionResults           = $enrollmentState.managedDevice.device.deviceActionResults
-        IntuneCertExpiration          = $enrollmentState.managedDevice.device.managementCertificateExpirationDate | FormatDateWithTimezone
-        IntuneComplianceExpiry        = $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime | FormatDateWithTimezone
-        IntuneAutopilotEnrolled       = $enrollmentState.managedDevice.device.autopilotEnrolled
-        IntuneRegistrationState       = $enrollmentState.managedDevice.device.deviceRegistrationState
-        IntuneIsEncrypted             = $enrollmentState.managedDevice.device.isEncrypted
-        IntuneEnrollmentType          = $enrollmentState.managedDevice.device.deviceEnrollmentType
-        IntunesVersion                = $enrollmentState.managedDevice.device.sVersion
-        IntuneComplianceState         = $enrollmentState.managedDevice.device.complianceState
-        IntuneManagementState         = $enrollmentState.managedDevice.device.managementState
-        IntuneOwnerType               = $enrollmentState.managedDevice.device.managedDeviceOwnerType
-        AutopilotDeviceId             = $enrollmentState.autopilot.device.id
-        AutopilotState                = $enrollmentState.autopilot.device.enrollmentState
-        AutopilotAssignedUser         = $enrollmentState.autopilot.device.userPrincipalName
-        AutopilotLastContacted        = $enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimezone
-        AutopilotLatestEventTime      = $latestAutopilotEvent.eventDateTime | FormatDateWithTimezone
-        AutopilotLatestProfile        = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
-        AutopilotLatestStatus         = $latestAutopilotEvent.deploymentState
-        AutopilotLatestError          = $latestAutopilotEvent.enrollmentFailureDetails
+    #region Navigation enhancement: Initialize null navigation parameters
+    if ($null -eq $History)
+    {
+        $History = New-Object System.Collections.ArrayList
     }
-    #endregion report content
+    if ($null -eq $MenuHistory)
+    {
+        $MenuHistory = New-Object System.Collections.ArrayList
+    }
+    #endregion
+    
+    #region Build report data
+    $output = [ordered]@{}
+    
+    if ($PSCmdlet.ParameterSetName -eq 'EnrollmentState')
+    {
+        Write-Verbose "[$functionName] Building report from enrollment state"
+        
+        # Get latest autopilot event
+        if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
+        {
+            $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
+            Write-Verbose "[$functionName] Found $($enrollmentState.autopilot.events.Count) autopilot events"
+        }
+        else
+        {
+            $latestAutopilotEvent = $null
+            Write-Verbose "[$functionName] No autopilot events found"
+        }
+        
+        $output = [ordered] @{
+            InputIdentifier               = $SerialNumber
+            IntuneDeviceName              = $enrollmentState.managedDevice.device.deviceName
+            IntuneSerialNumber            = $enrollmentState.managedDevice.device.serialNumber
+            IntuneDeviceMemory            = "$($enrollmentState.managedDevice.memory) GB"
+            IntuneManagedDeviceId         = $enrollmentState.managedDevice.device.Id
+            IntuneEnrollmentDate          = if ($enrollmentState.managedDevice.device.enrolledDateTime)
+            {
+                $enrollmentState.managedDevice.device.enrolledDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            IntuneLastSync                = if ($enrollmentState.managedDevice.device.lastSyncDateTime)
+            {
+                $enrollmentState.managedDevice.device.lastSyncDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            IntuneEnrollmentProfile       = $enrollmentState.managedDevice.device.enrollmentProfileName
+            IntunePrimaryUPN              = $enrollmentState.managedDevice.device.userPrincipalName
+            IntuneAzureUser               = $enrollmentState.managedDevice.users.AzureUser
+            IntuneUserDisplayName         = $enrollmentState.managedDevice.users.userDisplayName
+            IntuneReportedUserDisplayName = $enrollmentState.managedDevice.device.userDisplayName
+            IntuneLastLogon               = if ($enrollmentState.managedDevice.users.lastLogOnDateTime)
+            {
+                $enrollmentState.managedDevice.users.lastLogOnDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            IntuneActionResults           = $enrollmentState.managedDevice.device.deviceActionResults
+            IntuneCertExpiration          = if ($enrollmentState.managedDevice.device.managementCertificateExpirationDate)
+            {
+                $enrollmentState.managedDevice.device.managementCertificateExpirationDate | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            IntuneComplianceExpiry        = if ($enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime)
+            {
+                $enrollmentState.managedDevice.device.complianceGracePeriodExpirationDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            IntuneAutopilotEnrolled       = $enrollmentState.managedDevice.device.autopilotEnrolled
+            IntuneRegistrationState       = $enrollmentState.managedDevice.device.deviceRegistrationState
+            IntuneIsEncrypted             = $enrollmentState.managedDevice.device.isEncrypted
+            IntuneEnrollmentType          = $enrollmentState.managedDevice.device.deviceEnrollmentType
+            IntunesVersion                = $enrollmentState.managedDevice.device.sVersion
+            IntuneComplianceState         = $enrollmentState.managedDevice.device.complianceState
+            IntuneManagementState         = $enrollmentState.managedDevice.device.managementState
+            IntuneOwnerType               = $enrollmentState.managedDevice.device.managedDeviceOwnerType
+            AutopilotDeviceId             = $enrollmentState.autopilot.device.id
+            AutopilotState                = $enrollmentState.autopilot.device.enrollmentState
+            AutopilotProfileAssigned      = $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus
+            AutopilotProfileAssignedDate  = if ($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime)
+            {
+                $enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            AutopilotProfileName          = $enrollmentState.autopilot.device.deploymentProfile.displayName
+            AutopilotAssignedUser         = $enrollmentState.autopilot.device.userPrincipalName
+            AutopilotLastContacted        = if ($enrollmentState.autopilot.device.lastContactedDateTime)
+            {
+                $enrollmentState.autopilot.device.lastContactedDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            AutopilotLatestEventTime      = if ($latestAutopilotEvent -and $latestAutopilotEvent.eventDateTime)
+            {
+                $latestAutopilotEvent.eventDateTime | FormatDateWithTimeZone 
+            }
+            else
+            {
+                $null 
+            }
+            AutopilotLatestProfile        = $latestAutopilotEvent.windowsAutopilotDeploymentProfileDisplayName
+            AutopilotLatestStatus         = $latestAutopilotEvent.deploymentState
+            AutopilotLatestError          = $latestAutopilotEvent.enrollmentFailureDetails
+        }
+        
+        # Set device name for export if not provided
+        if (-not $DeviceName)
+        {
+            $DeviceName = $enrollmentState.managedDevice.device.deviceName
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Using provided report hashtable"
+        $output = $report
+    }
+    #endregion Build report data
     
     #region Format property names and display report
+    Write-Verbose "[$functionName] Formatting output for display"
     $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
+    
     foreach ($key in $output.Keys)
     {
+        Write-Verbose "[$functionName] Processing property: $key"
+        
         # Format the property name to be more readable
         $readableKey = $key
-        # Handle common prefixes separately
-        if ($key -match '^(Intune|Autopilot)(.+)$')
+        $matchedPrefix = $null
+        
+        # Check for prefix matches
+        foreach ($prefix in $PrefixList)
+        {
+            if ($key -match "^($prefix)(.+)$")
+            {
+                $matchedPrefix = $prefix
+                Write-Verbose "[$functionName] Found prefix '$prefix' for key '$key'"
+                break
+            }
+        }
+        
+        if ($matchedPrefix)
         {
             $prefix = $matches[1]
             $remainder = $matches[2]
@@ -1089,100 +1072,161 @@ function ShowDeviceReport()
             # Insert spaces before capital letters
             $readableKey = [regex]::Replace($key, '(?<=[a-z])(?=[A-Z])', ' ')
         }
-        $formattedOutput[$readableKey] = $output[$key]
-        # Print each property and value
-        Write-Host "$readableKey`: $($output[$key])"
+        
+        # Format the value based on type
+        $formattedValue = $output[$key]
+        if ($output[$key] -is [DateTime])
+        {
+            Write-Verbose "[$functionName] Formatting DateTime value for key '$key'"
+            $formattedValue = FormatDateWithTimeZone -DateTime $output[$key]
+        }
+        elseif ($null -eq $output[$key])
+        {
+            $formattedValue = "N/A"
+        }
+        
+        $formattedOutput[$readableKey] = $formattedValue
+        
+        # Display each property and value
+        Write-Host "$readableKey`: $formattedValue"
     }
+    Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"
     #endregion Format property names and display report
-
-    #region export
-    if (-not $Export)    
+    
+    #region Handle export decision
+    $shouldExport = $Export
+    $finalExportFormat = $ExportFormat
+    
+    if (-not $shouldExport)
     {
-        $choice = DisplayNumericMenu -Choices ('Export to HTML', 'Export to CSV') -Banner "Would you like to export the report?" -Prompt "Please select an option" -ErrorMessage "Invalid selection. Please try again."
-        if ($choice -eq 'Export to HTML')
-        {
-            $Export = $true
-            $ExportFormat = "HTML"
+        Write-Verbose "[$functionName] Prompting user for export decision"
+        $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
+        $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action {
+            $shouldExport = $true
+            $finalExportFormat = "HTML"
+            Write-Verbose "[$functionName] User selected HTML export"
         }
-        elseif ($choice -eq 'Export to CSV')
-        {
-            $Export = $true
-            $ExportFormat = "CSV"
+        $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action {
+            $shouldExport = $true
+            $finalExportFormat = "CSV"
+            Write-Verbose "[$functionName] User selected CSV export"
         }
-        else
-        {
-            Write-Host "No export selected."
-            return $null
-        }
+        $selection = (ShowMenu -Menu $exportMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
+        Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
     }
-    # Export the report if requested
-    if ($Export)
+    #endregion Handle export decision
+    
+    #region Export report
+    if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
     {
-        $deviceName = $enrollmentState.managedDevice.device.deviceName
-        if (-not $deviceName)
+        Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selection', treating as navigation"
+        return $selection
+    }
+    if ($shouldExport)
+    {
+        Write-Verbose "[$functionName] Starting export process in $finalExportFormat format"
+        
+        # Determine device name for file naming
+        if (-not $DeviceName)
         {
-            $deviceName = "Device"
+            $DeviceName = "Device"
+            Write-Verbose "[$functionName] Using default device name for export"
         }
+        
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $fileName = "$deviceName`_Report_$timestamp"
-        if ($ExportFormat -eq "HTML")
+        $fileName = "$DeviceName`_Report_$timestamp"
+        Write-Verbose "[$functionName] Generated filename: $fileName"
+        
+        if ($finalExportFormat -eq "HTML")
         {
             $htmlPath = "$pwd\$fileName.html"
+            Write-Verbose "[$functionName] Exporting to HTML: $htmlPath"
+            
             $htmlHeader = @"
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Device Report: $deviceName</title>
+    <title>Device Report: $DeviceName</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         table { border-collapse: collapse; width: 100%; }
         th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
         th { background-color: #f2f2f2; }
         tr:hover { background-color: #f5f5f5; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
         h1 { color: #333; }
+        .meta { color: #666; font-style: italic; margin-bottom: 20px; }
     </style>
 </head>
 <body>
-    <h1>Device Report: $deviceName</h1>
-    <p>Generated on $(Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")</p>
+    <h1>Device Report: $DeviceName</h1>
+    <div class="meta">Generated on $(Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")</div>
     <table>
-        <tr>
-            <th>Property</th>
-            <th>Value</th>
-        </tr>
+        <thead>
+            <tr>
+                <th>Property</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
 "@
 
             $htmlRows = ""
             foreach ($key in $formattedOutput.Keys)
             {
-                $value = $formattedOutput[$key]
-                $htmlRows += "<tr><td>$key</td><td>$value</td></tr>`n"
+                $value = [System.Web.HttpUtility]::HtmlEncode($formattedOutput[$key])
+                $htmlRows += "            <tr><td>$([System.Web.HttpUtility]::HtmlEncode($key))</td><td>$value</td></tr>`n"
             }
 
             $htmlFooter = @"
+        </tbody>
     </table>
 </body>
 </html>
 "@
 
-            $htmlHeader + $htmlRows + $htmlFooter | Out-File -FilePath $htmlPath -Encoding UTF8
-            Write-Host "HTML report exported to: $htmlPath"
-        }
-        elseif ($ExportFormat -eq "CSV")
-        {
-            $csvPath = "$pwd\$fileName.csv"
-            
-            $csvData = foreach ($key in $formattedOutput.Keys)
+            try
             {
-                [PSCustomObject]@{
-                    Property = $key
-                    Value    = $formattedOutput[$key]
-                }
+                $htmlContent = $htmlHeader + $htmlRows + $htmlFooter
+                $htmlContent | Out-File -FilePath $htmlPath -Encoding UTF8
+                Write-Host "HTML report exported to: $htmlPath" -ForegroundColor Green
+                Write-Verbose "[$functionName] Successfully exported HTML report to $htmlPath"
+            }
+            catch
+            {
+                Write-Error "[$functionName] Failed to export HTML report: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] HTML export error details: $($_.Exception)"
             }
             
-            $csvData | Export-Csv -Path $csvPath -NoTypeInformation
-            Write-Host "CSV report exported to: $csvPath"
+        }
+        elseif ($finalExportFormat -eq "CSV")
+        {
+            $csvPath = "$pwd\$fileName.csv"
+            Write-Verbose "[$functionName] Exporting to CSV: $csvPath"
+            
+            try
+            {
+                $csvData = foreach ($key in $formattedOutput.Keys)
+                {
+                    [PSCustomObject]@{
+                        Property = $key
+                        Value    = $formattedOutput[$key]
+                    }
+                }
+                
+                $csvData | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+                Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
+                Write-Verbose "[$functionName] Successfully exported CSV report to $csvPath"
+            }
+            catch
+            {
+                Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] CSV export error details: $($_.Exception)"
+            }
         }
     }
-    #endregion export
+    #endregion Export report
+    
+    Write-Verbose "[$functionName] Device report generation completed"
+    return $true
 }
