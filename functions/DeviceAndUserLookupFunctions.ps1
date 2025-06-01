@@ -240,29 +240,13 @@ function GetDeviceByUser()
         [parameter(Mandatory = $true)]
         [string]$OperatingSystem,
         [parameter(Mandatory = $true)]
-        [string]$AccessToken,
-        # Navigation enhancement: Optional parameters for seamless menu navigation
-        [int]$Depth = 0,
-        [System.Collections.ArrayList]$History = $null,
-        [System.Collections.ArrayList]$MenuHistory = $null
+        [string]$AccessToken
     )    
     
-    $functionName = $MyInvocation.MyCommand.Name    
-    #region Navigation enhancement: Initialize null navigation parameters
-    if ($null -eq $History)
-    {
-        $History = New-Object System.Collections.ArrayList
-    }
-    if ($null -eq $MenuHistory)
-    {
-        $MenuHistory = New-Object System.Collections.ArrayList
-    }
-    #endregion
-
     #region write verbose log of all parameters
+    $functionName = $MyInvocation.MyCommand.Name    
     Write-Verbose "[$functionName] UserName: $UserName"
     Write-Verbose "[$functionName] Operating system: $OperatingSystem"
-    Write-Verbose "[$functionName] Navigation - Depth: $Depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
     if ($null -ne $AccessToken)
     {
         Write-Verbose "[$functionName] AccessToken provided."
@@ -275,8 +259,11 @@ function GetDeviceByUser()
     $UserName = $UserName.Trim()
     Write-Verbose "[$functionName] Trimmed user name: $UserName"
     $extraparameters = "select=deviceName,serialNumber,userDisplayName,model,manufacturer,complianceState"
+    Write-Verbose "[$functionName] Extra parameters for API call: $extraparameters"
     $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
+    Write-Verbose "[$functionName] Filter for API call: $filter"
     $managedDeviceUri = "deviceManagement/managedDevices"
+    Write-Verbose "[$functionName] Managed device URI: $managedDeviceUri"
     #endregion
     
     $deviceInfo = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
@@ -321,11 +308,19 @@ function GetDeviceByUser()
                 }.GetNewClosure()
                 # Add the menu item with the action
                 $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action -ReturnsValue
-            }            # Show the menu and return the selected device's serial number
-            # Navigation enhancement: Pass navigation parameters to ShowMenu for seamless navigation
+            }            # Show the menu and return the selected device's serial number            # Navigation enhancement: Build upon existing navigation context rather than starting fresh
             Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
-            $selectedSerialNumber = (ShowMenu -Menu $deviceMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
-            Write-Verbose "[$functionName] ShowMenu returned: '$selectedSerialNumber' (Type: $($selectedSerialNumber.GetType().Name))"
+            Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
+            Write-Verbose "[$functionName] Current menu title: $($deviceMenu.Title)"
+            $selectedSerialNumber = ShowMenu -Menu $deviceMenu 
+            if ($null -ne $selectedSerialNumber -and $selectedSerialNumber -is [string])
+            {
+                Write-Verbose "[$functionName] Selected serial number: $selectedSerialNumber"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Selected serial number is null or not a string"
+            }
             
             # Validate that we got a proper serial number, not a navigation option
             if ($selectedSerialNumber -eq "Back" -or $selectedSerialNumber -eq "Main Menu" -or $selectedSerialNumber -eq 0 -or $selectedSerialNumber -eq "0")

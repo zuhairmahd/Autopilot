@@ -36,6 +36,11 @@ Write-Verbose "[$scriptName] Groups to exclude: $($groupsToExclude | Out-String)
 $settings = $init.settings
 Write-Verbose "[$scriptName] Settings: $($settings | Out-String)"
 $backoutText = 'Returning to previous menu'
+# Initialize navigation context variables
+$script:History = New-Object System.Collections.ArrayList
+$script:MenuHistory = New-Object System.Collections.ArrayList
+$script:previousMenu = New-Object System.Collections.Hashtable
+$script:depth = 0
 #endregion Define variables
 
 #region Helper Functions (Consolidated and Corrected)
@@ -221,16 +226,12 @@ function ProcessSerialNumber()
 {
     [CmdletBinding()]
     param (
+        [parameter(Mandatory = $true)]
         [string]$SerialNumber,
         $AccessToken,
-        $Settings = $settings,
-        [Parameter(Mandatory = $false)]
-        [int]$Depth = 0,
-        [Parameter(Mandatory = $false)]
-        [System.Collections.ArrayList]$History = $null,
-        [Parameter(Mandatory = $false)]
-        [System.Collections.ArrayList]$MenuHistory = $null
+        $Settings = $settings
     )
+    
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
     Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
@@ -240,40 +241,6 @@ function ProcessSerialNumber()
         return $null # Return null to signal no valid serial number
     }
     
-    #region Log navigation context for debugging
-    $historyCount = if ($History)
-    {
-        $History.Count 
-    }
-    else
-    {
-        'null' 
-    }
-    $menuHistoryCount = if ($MenuHistory)
-    {
-        $MenuHistory.Count 
-    }
-    else
-    {
-        'null' 
-    }
-    Write-Verbose "[$functionName] Navigation context - Depth: $Depth, History count: $historyCount, MenuHistory count: $menuHistoryCount"
-    #endregion Log navigation context for debugging
-
-    #region Initialize navigation parameters if not provided
-    if ($null -eq $History)
-    {
-        Write-Verbose "[$functionName] Initializing History ArrayList"
-        $History = New-Object System.Collections.ArrayList
-    }
-    
-    if ($null -eq $MenuHistory)
-    {
-        Write-Verbose "[$functionName] Initializing MenuHistory ArrayList"
-        $MenuHistory = New-Object System.Collections.ArrayList
-    }
-    #endregion Initialize navigation parameters if not provided
-
     $success = $false
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
@@ -281,6 +248,7 @@ function ProcessSerialNumber()
     if ($enrollmentState)
     {
         $success = $true
+        Write-Verbose "[$functionName] Device lookup successful"
         # Display basic device information
         Write-Host "`n=== Device Information ===" -ForegroundColor Green
         Write-Host "Serial Number: $SerialNumber"
@@ -351,8 +319,8 @@ function ProcessSerialNumber()
                 ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber -Depth $Depth -History $History -MenuHistory $MenuHistory
             }
             # Show the device actions menu with navigation context
-            Write-Verbose "[$functionName] Showing device actions menu with Depth: $($Depth + 1), History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-            $result = ShowMenu -Menu $deviceActionsMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory
+            Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
+            $result = ShowMenu -Menu $deviceActionsMenu
             Write-Verbose "Returning from device actions menu with result: $result"
             return $result
         }
@@ -375,8 +343,12 @@ function ProcessSerialNumber()
     else
     {
         # Explicitly return $null if no enrollmentState
+        Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
         return $null
     }
+    
+    # Return success status for calling functions
+    return $success
 }
 #endregion Helper Functions
 
@@ -458,13 +430,12 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
         return $backoutText
-    } 
+    }
     else
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        # Pass navigation context to ProcessSerialNumber
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
         {
@@ -484,8 +455,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $model = $deviceObject.model
         Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        # Pass navigation context to ProcessSerialNumber
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
         Write-Verbose "Result returned: $result"
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
@@ -520,22 +490,36 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     {
         Write-Verbose "[$scriptName] Got user name: $userName"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile 
-        
+        #Print the current navigation context prior too calling GetDeviceByUser
+        Write-Verbose "[$scriptName] Current navigation context:"
+        Write-Verbose "[$scriptName] Action History: $($actionHistory -join ' > ')"
+        Write-Verbose "[$scriptName] Menu History: $($actionMenuHistory -join ' > ')"
         # Call GetDeviceByUser to find devices for the specified user
         Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
-        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
         Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
         
-        if ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
+        # Handle navigation responses from GetDeviceByUser
+        if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+            return $backoutText
+        }
+        elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+            return "EXIT_APPLICATION"
+        }
+        elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
         {
             Write-Verbose "[$scriptName] User requested application exit from device selection."
             return "EXIT_APPLICATION"
-        }
-        elseif ($serialNumber -ne '0' -and $null -ne $serialNumber)
+        }        
+        elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu")
         {
             Write-Host "Found device for user $userName with serial number: $serialNumber"
-            # Pass navigation context to ProcessSerialNumber
-            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+            
             Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
             if ($null -eq $result)
             {
@@ -636,8 +620,46 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             else # Process only if a serial number was entered
             {
+                # Create enhanced navigation context (PowerShell 5.1 compatible)
+                $actionHistory = New-Object System.Collections.ArrayList
+                $actionMenuHistory = New-Object System.Collections.ArrayList
+                
+                # Copy current navigation context
+                foreach ($item in $script:CurrentMenuHistory)
+                {
+                    try
+                    {
+                        [void]$actionHistory.Add($item) 
+                    }
+                    catch
+                    {
+                        $actionHistory += $item 
+                    }
+                }
+                foreach ($menu in $script:CurrentMenuHistory_Menu)
+                {
+                    try
+                    {
+                        [void]$actionMenuHistory.Add($menu) 
+                    }
+                    catch
+                    {
+                        $actionMenuHistory += $menu 
+                    }
+                }
+                
+                # Add the current action to the navigation history
+                try
+                {
+                    [void]$actionHistory.Add("Check if User ready for device") 
+                }
+                catch
+                {
+                    $actionHistory += "Check if User ready for device" 
+                }
+                
                 # Pass navigation context to ProcessSerialNumber
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $script:CurrentMenuHistory -MenuHistory $script:CurrentMenuHistory_Menu
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
                 # Check if ProcessSerialNumber returned an exit signal
                 if ($null -eq $result)
                 {
@@ -657,10 +679,32 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 #endregion Menu Definitions
 
 #region Show Menu
-# Only show menu if not in test mode
-$result = ShowMenu -Menu $mainMenu
-if ($null -eq $result)
+# Add the main menu title to the title history (for breadcrumb display) and menu object to menu history (for navigation)
+try
 {
-    Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+    # [void]$script:History.Add("Main Menu")
+    [void]$script:MenuHistory.Add($mainMenu)
+}
+catch
+{
+    # Fallback for older PowerShell versions
+    $script:MainMenuHistory += "Main Menu"
+    $script:MainMenuHistory_Menu += $mainMenu
+}
+
+# Only show menu if not in test mode
+if ($settings.testMode -eq $false)
+{
+    Write-Verbose "Test mode: $($settings.testMode)" 
+    $result = ShowMenu -Menu $mainMenu
+    if ($null -eq $result)
+    {
+        Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+    }
+}
+else
+{
+    Write-Host "Test mode: $($settings.testMode). No menu will be shown." -ForegroundColor Yellow
+    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion Show Menu
