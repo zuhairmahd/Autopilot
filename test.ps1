@@ -59,12 +59,12 @@ else
 # }
 #endregion variables
 
-if ($accessToken)
-{
-    Write-Host "Access token retrieved successfully." -ForegroundColor Green
-}
-else
-{
-    Write-Host "Failed to retrieve access token." -ForegroundColor Red
-    exit 1
-}
+$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+$init = Get-Content -Path 'initVerify.json' -Raw -Force -ErrorAction Stop | ConvertFrom-Json 
+$groupsToInclude = $init.domains.$domain.groupsToInclude
+$groupsToExclude = $init.domains.$domain.groupsToExclude
+$domainSettings = $init.domains.$domain.settings
+$globalSettings = $init.globalSettings
+
+
+$settings = MergeSettings -settings $domainSettings -globalSettings $globalSettings

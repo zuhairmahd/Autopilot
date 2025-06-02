@@ -27,13 +27,17 @@ else
 #region Define variables
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 Write-Verbose "[$scriptName] Domain: $domain"
-$init = (Get-Content -Path $InitFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domains).$domain
+$init = Get-Content -Path 'initVerify.json' -Raw -Force -ErrorAction Stop | ConvertFrom-Json 
 Write-Verbose "[$scriptName] Init: $($init | Out-String)"
-$groupsToInclude = $init.groupsToInclude
+$groupsToInclude = $init.domains.$domain.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
-$groupsToExclude = $init.groupsToExclude
+$groupsToExclude = $init.domains.$domain.groupsToExclude
 Write-Verbose "[$scriptName] Groups to exclude: $($groupsToExclude | Out-String)"
-$settings = $init.settings
+$domainSettings = $init.domains.$domain.settings
+Write-Verbose "[$scriptName] Domain settings: $($domainSettings | Out-String)"
+$globalSettings = $init.globalSettings
+Write-Verbose "[$scriptName] Global settings: $($globalSettings | Out-String)"
+$settings = MergeSettings -settings $domainSettings -globalSettings $globalSettings
 Write-Verbose "[$scriptName] Settings: $($settings | Out-String)"
 $backoutText = 'Returning to previous menu'
 # Initialize navigation context variables

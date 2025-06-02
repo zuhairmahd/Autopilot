@@ -107,3 +107,47 @@ function GetVMAutopilotDeviceIdBySerialNumber()
     return $null
 }
 
+
+function MergeSettings
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $settings,
+        [Parameter(Mandatory = $true)]
+        $globalSettings
+    )
+    $merged = @{}
+
+    # Add all keys from $settings
+    foreach ($property in $settings.PSObject.Properties)
+    {
+        $merged[$property.Name] = $property.Value
+    }
+
+    # Add/merge all keys from $globalSettings
+    foreach ($property in $globalSettings.PSObject.Properties)
+    {
+        if ($merged.ContainsKey($property.Name))
+        {
+            # If both are arrays, merge arrays
+            if ($merged[$property.Name] -is [System.Collections.IEnumerable] -and
+                $property.Value -is [System.Collections.IEnumerable] -and
+                ($merged[$property.Name] -isnot [string]) -and
+                ($property.Value -isnot [string]))
+            {
+                $merged[$property.Name] = @($merged[$property.Name] + $property.Value)
+            }
+            else
+            {
+                # Otherwise, overwrite
+                $merged[$property.Name] = $property.Value
+            }
+        }
+        else
+        {
+            $merged[$property.Name] = $property.Value
+        }
+    }
+    return $merged
+}
