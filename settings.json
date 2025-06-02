@@ -5,6 +5,16 @@
     "operatingSystem": "Windows",
     "testMode": false
   },
+  "vars": {
+    "configFile": ".\\\\.secrets\\\\config.json",
+    "maxWaitTime": "30",
+    "timeInSeconds": "60",
+    "Release": "2.5",
+    "Repo": "Github",
+    "configuration": "vars.json",
+    "ShowAdvancedOptions": "true",
+    "GroupTag": "MSB01"
+  },
   "domains": {
     "gao.gov": {
       "groupsToInclude": [
