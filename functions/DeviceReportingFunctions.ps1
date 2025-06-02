@@ -862,10 +862,7 @@ function ShowDeviceReport()
         [Parameter(Mandatory = $false)]
         [string]$DeviceName,
         [Parameter(Mandatory = $false)]
-        [string]$SerialNumber,
-        [int]$Depth = 0,
-        [System.Collections.ArrayList]$History = $null,
-        [System.Collections.ArrayList]$MenuHistory = $null
+        [string]$SerialNumber
     )
     #region usage info
     # Use with enrollment state (original ShowDeviceReport functionality)
@@ -894,22 +891,7 @@ function ShowDeviceReport()
     }
     Write-Verbose "[$functionName] DeviceName: $DeviceName"
     Write-Verbose "[$functionName] SerialNumber: $SerialNumber"
-    Write-Verbose "[$functionName] History: $($History.Count) items"
-    Write-Verbose "[$functionName] MenuHistory: $($MenuHistory.Count) items"
-    Write-Verbose "[$functionName] Depth: $Depth"
     #endregion write verbose log of received parameters
-    
-    #region Navigation enhancement: Initialize null navigation parameters
-    if ($null -eq $History)
-    {
-        $History = New-Object System.Collections.ArrayList
-    }
-    if ($null -eq $MenuHistory)
-    {
-        $MenuHistory = New-Object System.Collections.ArrayList
-    }
-    #endregion
-    
     #region Build report data
     $output = [ordered]@{}
     
@@ -1111,7 +1093,7 @@ function ShowDeviceReport()
             $finalExportFormat = "CSV"
             Write-Verbose "[$functionName] User selected CSV export"
         }
-        $selection = (ShowMenu -Menu $exportMenu -Depth ($Depth + 1) -History $History -MenuHistory $MenuHistory) | Out-String
+        $selection = ShowMenu -Menu $exportMenu
         Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
     }
     #endregion Handle export decision

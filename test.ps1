@@ -30,7 +30,7 @@ else
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
-$userUri = "users"
+# $userUri = "users"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -46,8 +46,8 @@ $userUri = "users"
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -Interactive
-$accessToken = GetGraphAccessToken -configFile $configFile
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -AuthType 'PublicAuthFlow' -NoSaveRefreshToken
+# $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
@@ -59,5 +59,12 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 # }
 #endregion variables
 
-$uri = "$userUri/BoucherR@gao.gov/registeredDevices"
-$global:registeredDevices = CallGraphApi -ResourcePath $uri -accessToken $accessToken 
+if ($accessToken)
+{
+    Write-Host "Access token retrieved successfully." -ForegroundColor Green
+}
+else
+{
+    Write-Host "Failed to retrieve access token." -ForegroundColor Red
+    exit 1
+}
