@@ -45,9 +45,45 @@ $script:History = New-Object System.Collections.ArrayList
 $script:MenuHistory = New-Object System.Collections.ArrayList
 $script:previousMenu = New-Object System.Collections.Hashtable
 $script:depth = 0
+# Device enrollment state cache (serialNumber -> enrollmentState)
+$script:DeviceEnrollmentCache = @{}
 #endregion Define variables
 
 #region Helper Functions (Consolidated and Corrected)
+function GetCachedDeviceEnrollmentState
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SerialNumber,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        $Settings = $settings
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    if ($script:DeviceEnrollmentCache.ContainsKey($SerialNumber) -eq $false)
+    {
+        Write-Verbose "[$functionName] Cache miss for serial number: $SerialNumber. Fetching from API."
+        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
+        if ($enrollmentState)
+        {
+            $script:DeviceEnrollmentCache[$SerialNumber] = $enrollmentState
+            Write-Verbose "[$functionName] Cached enrollment state for serial number: $SerialNumber."
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No enrollment state found for serial number: $SerialNumber. Not caching."
+        }
+        return $enrollmentState
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Cache hit for serial number: $SerialNumber. Returning cached enrollment state."
+        Write-Host "Using cached enrollment state for serial number: $SerialNumber" -ForegroundColor Cyan
+        return $script:DeviceEnrollmentCache[$SerialNumber]
+    }
+}
+
 function NormalizeUserName()
 {
     [CmdletBinding()]
@@ -248,7 +284,7 @@ function ProcessSerialNumber()
     $success = $false
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
-    $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken
+    $enrollmentState = GetCachedDeviceEnrollmentState -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
     if ($enrollmentState)
     {
         $success = $true
