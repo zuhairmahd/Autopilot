@@ -30,13 +30,13 @@ else
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
-$userUri = "users"
+# $userUri = "users"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $importedAutopilotDeviceExtraParameters = "select=serialNumber,importId,groupTag,state"
 # $unmanagedDeviceUri = "devices"
-$managedDeviceUri = "deviceManagement/managedDevices"
+# $managedDeviceUri = "deviceManagement/managedDevices"
 # $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
 # $autopilotExtraParameters = "select=serialNumber,groupTag,manufacturer,model,systemFamily,enrollmentState,deploymentProfileAssignmentStatus&top=9999&skip=0&count=true"
 # $managedDeviceFilter = "serialNumber eq '$serialNumber'"
@@ -46,7 +46,7 @@ $managedDeviceUri = "deviceManagement/managedDevices"
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -AuthType ''
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -AuthType 'PublicAuthFlow' -NoSaveRefreshToken
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -58,3 +58,13 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $s
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
+
+if ($accessToken)
+{
+    Write-Host "Access token retrieved successfully." -ForegroundColor Green
+}
+else
+{
+    Write-Host "Failed to retrieve access token." -ForegroundColor Red
+    exit 1
+}
