@@ -316,7 +316,7 @@ function ProcessSerialNumber()
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
-                ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber -Depth $Depth -History $History -MenuHistory $MenuHistory
+                ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber 
             }
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
@@ -435,7 +435,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
         {
@@ -455,7 +455,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $model = $deviceObject.model
         Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
         $accessToken = GetGraphAccessToken -ConfigFile $configFile
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         Write-Verbose "Result returned: $result"
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
@@ -620,46 +620,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             else # Process only if a serial number was entered
             {
-                # Create enhanced navigation context (PowerShell 5.1 compatible)
-                $actionHistory = New-Object System.Collections.ArrayList
-                $actionMenuHistory = New-Object System.Collections.ArrayList
-                
-                # Copy current navigation context
-                foreach ($item in $script:CurrentMenuHistory)
-                {
-                    try
-                    {
-                        [void]$actionHistory.Add($item) 
-                    }
-                    catch
-                    {
-                        $actionHistory += $item 
-                    }
-                }
-                foreach ($menu in $script:CurrentMenuHistory_Menu)
-                {
-                    try
-                    {
-                        [void]$actionMenuHistory.Add($menu) 
-                    }
-                    catch
-                    {
-                        $actionMenuHistory += $menu 
-                    }
-                }
-                
-                # Add the current action to the navigation history
-                try
-                {
-                    [void]$actionHistory.Add("Check if User ready for device") 
-                }
-                catch
-                {
-                    $actionHistory += "Check if User ready for device" 
-                }
-                
                 # Pass navigation context to ProcessSerialNumber
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -Depth $script:CurrentMenuDepth -History $actionHistory -MenuHistory $actionMenuHistory
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
                 # Check if ProcessSerialNumber returned an exit signal
                 if ($null -eq $result)
                 {
