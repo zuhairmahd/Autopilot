@@ -1094,7 +1094,10 @@ function ShowDeviceReport()
             Write-Verbose "[$functionName] User selected CSV export"
         }
         $selection = ShowMenu -Menu $exportMenu
-        Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
+        if ($null -ne $selection )
+        {
+            Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
+        }
     }
     #endregion Handle export decision
     
