@@ -419,6 +419,8 @@ function PrepareImportDevice()
 {
     [CmdletBinding()]
     param(
+        [Parameter(Mandatory = $true)]
+        $accessToken,
         [switch]$CustomImport
     )
     
@@ -443,7 +445,6 @@ function PrepareImportDevice()
         if ($customImport) 
         {
             Write-Verbose "[$functionName] Custom import is enabled."
-            $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import' -CustomImport
             if ($result -eq $backoutText)
             {
@@ -468,7 +469,6 @@ function PrepareImportDevice()
                 Write-Host "Exiting..."
                 return $backoutText
             }
-            $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import'
         }
     }

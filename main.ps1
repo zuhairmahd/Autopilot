@@ -383,7 +383,8 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
-    $result = PrepareImportDevice
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
@@ -660,7 +661,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopil
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues -verbose
+    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
     Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
     {
