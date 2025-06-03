@@ -127,7 +127,6 @@ Write-Verbose "[$scriptName] Global settings: $($globalSettings | Out-String)"
 $settings = MergeSettings -settings $domainSettings -globalSettings $globalSettings
 Write-Verbose "[$scriptName] Settings: $($settings | Out-String)"
 $backoutText = 'Returning to previous menu'
-# $scopes = "offline_access Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
 $application = 'Register'
 Write-Verbose "[$scriptName] Application: $application"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
@@ -389,7 +388,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
-    $result = PrepareImportDevice -CustomImport
+    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $result = PrepareImportDevice -accessToken $accessToken -CustomImport
     if ($result -eq $backoutText)
     {
         Write-Verbose "[$scriptName] Custom import aborted. Returning $backoutText."

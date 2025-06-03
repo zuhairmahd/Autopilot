@@ -1834,6 +1834,7 @@ function Get-ClientCredentialsToken()
         return $null
     }
 }
+
 function GetGraphAccessToken()
 {
     [CmdletBinding()]

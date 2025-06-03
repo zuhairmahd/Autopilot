@@ -1,6 +1,21 @@
 {
   "description": "This is the configuration file for the Intune helpdesk script. It contains the settings for the script to run correctly.",
   "version": "1.0",
+  "auth": {
+    "Deligated": false,
+    "authType": "PublicAuthFlow",
+    "NoSaveRefreshToken": false,
+    "scopes": [
+      "offline_access",
+      "openid",
+      "Device.ReadWrite.All",
+      "DeviceManagementApps.Read.All",
+      "DeviceManagementConfiguration.ReadWrite.All",
+      "DeviceManagementManagedDevices.PrivilegedOperations.All",
+      "DeviceManagementManagedDevices.ReadWrite.All",
+      "DeviceManagementServiceConfig.ReadWrite.All"
+    ]
+  },
   "globalSettings": {
     "operatingSystem": "Windows",
     "testMode": false

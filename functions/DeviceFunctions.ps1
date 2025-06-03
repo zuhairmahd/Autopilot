@@ -854,7 +854,7 @@ function ProcessDevice()
             {
                 return $importResult
             }
-      
+            
             #region Handle CustomImport settings if needed
             # if ($CustomImport)
             # {
@@ -869,7 +869,7 @@ function ProcessDevice()
             #   $timeInSeconds = $timeInSecondsRef.Value
             # }
             #endregion Handle CustomImport settings if needed
-
+            
             Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
             Start-Sleep -Seconds $timeInSeconds
             
@@ -1011,7 +1011,6 @@ function ImportAutopilotDevice()
     Write-Verbose "[$functionName] Model: $model"
     $hash = $DeviceObject.hardwareHash
     #endregion  
-  
     #region prepare import object.
     if ($CustomImport -eq $true)
     {
