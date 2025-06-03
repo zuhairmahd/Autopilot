@@ -919,6 +919,33 @@ function ProcessSerialNumber()
         Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
         Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
         Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
+        if ($enrollmentState.inAutopilot)
+        {
+            Write-Host "This device is enrolled in Autopilot."
+            if (-not $enrollmentState.managed)
+            {
+                Write-Host "Model: $($enrollmentState.autopilot.device.model)"
+                Write-Host "Manufacturer: $($enrollmentState.autopilot.device.manufacturer)"
+                Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
+                Write-Host "=============================`n" -ForegroundColor Green
+            }
+            Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
+            if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
+            {
+                Write-Host "Deployment profile: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
+                Write-Host "Deployment Profile Assignment Date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | FormatDateWithTimeZone)"
+            }
+            else
+            {
+                Write-Host "This device is not assigned to a deployment profile." -ForegroundColor Yellow
+            }
+            
+        }
+        else
+        {
+            Write-Host "This device is not enrolled in Autopilot." -ForegroundColor Yellow
+            Write-Host "=============================`n" -ForegroundColor Yellow
+        }
         if ($enrollmentState.Imported)
         {
             Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
@@ -933,7 +960,7 @@ function ProcessSerialNumber()
                 Write-Host "This device was recently imported into Autopilot." -ForegroundColor Green
                 $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice
             }
-            if (!$enrollmentState.managed)
+            if (-not $enrollmentState.managed)
             {
                 Write-Host "However, this device is not currently managed in Intune."
             }
