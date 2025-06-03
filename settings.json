@@ -11,8 +11,7 @@
     "timeInSeconds": "60",
     "Release": "2.5",
     "Repo": "Github",
-    "configuration": "vars.json",
-    "ShowAdvancedOptions": "true",
+    "appMode": "full",
     "GroupTag": "MSB01"
   },
   "domains": {

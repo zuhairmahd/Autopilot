@@ -6,13 +6,13 @@ param(
     [int]$timeInSeconds = 30,
     [string]$Configuration = 'vars.json',
     [String] $GroupTag = 'MSB01',
-    [String] $AssignedUser = '',
     [switch]$Reconfigure,
     [switch]$ReInitialize,
-    [switch]$showAdvancedOptions,
     [switch]$Update,
     [string]$Repo = 'github',
-    [string]$Release = 'main'
+    [string]$Release = 'main',
+    [ValidateSet('full', 'helpDesk', 'registration')]
+    [string]$appMode
 )
 
 #region Load parameters from the configuration file if it exists
@@ -212,349 +212,6 @@ Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 Write-Verbose "[$scriptName] Backout text: $backoutText"
 #endregion logging
 
-#region Helper Functions
-function GetCachedDeviceEnrollmentState()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$SerialNumber,
-        [Parameter(Mandatory = $true)]
-        [string]$AccessToken,
-        $Settings = $settings
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    if ($script:DeviceEnrollmentCache.ContainsKey($SerialNumber) -eq $false)
-    {
-        Write-Verbose "[$functionName] Cache miss for serial number: $SerialNumber. Fetching from API."
-        $enrollmentState = GetDeviceEnrollmentStatus -serialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
-        if ($enrollmentState)
-        {
-            $script:DeviceEnrollmentCache[$SerialNumber] = $enrollmentState
-            Write-Verbose "[$functionName] Cached enrollment state for serial number: $SerialNumber."
-        }
-        else
-        {
-            Write-Verbose "[$functionName] No enrollment state found for serial number: $SerialNumber. Not caching."
-        }
-        return $enrollmentState
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Cache hit for serial number: $SerialNumber. Returning cached enrollment state."
-        Write-Host "Using cached enrollment state for serial number: $SerialNumber" -ForegroundColor Cyan
-        return $script:DeviceEnrollmentCache[$SerialNumber]
-    }
-}
-
-function NormalizeUserName()
-{
-    [CmdletBinding()]
-    param (
-        [string]$UserName,
-        $Settings = $settings # Use the script-level $settings by default
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    $domain = $settings.domain
-    Write-Verbose "[$functionName] Domain: $domain"
-    Write-Verbose "[$functionName] UserName: $UserName"
-    Write-Verbose "[$functionName] Normalizing user name: $UserName"
-    $UserName = $UserName.Trim()
-    Write-Verbose "[$functionName] Checking if the user name $username is missing the $domain suffix."
-    if ($userName -notmatch "@$domain$")
-    {
-        Write-Verbose "[$functionName] the user name $username is missing the $domain suffix."
-        $UserName = "$UserName@$domain"
-        Write-Verbose "[$functionName] The user name is now $userName"
-    }
-    else
-    {
-        Write-Verbose "[$functionName] The user name is already in the correct format: $UserName"
-    }
-    Write-Verbose "[$functionName] Final user name: $UserName"
-    Write-Verbose "[$functionName] Returning user name: $UserName"
-    return $UserName
-}
-
-function validateInput()
-{
-    [CmdletBinding()]
-    param (
-        [parameter(Mandatory = $true)]
-        [string]$UserInput,
-        [parameter(Mandatory = $true)]
-        [string]$type,
-        $settings = $settings # Use the script-level $settings by default
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    $domain = $settings.domain
-    $MaxUserNameLength = $settings.MaxUserNameLength
-    $MaxSerialNumberLength = $settings.MaxSerialNumberLength
-    $MinSerialNumberLength = $settings.MinSerialNumberLength
-    $minUsernameLength = $settings.MinUsernameLength
-    $returnValue = @{ valid = $false; value = $null } # Initialize return hash table
-    Write-Verbose "[$functionName] Validating input of type '$type': '$UserInput'"
-    Write-Verbose "[$functionName] Domain: $domain"
-    Write-Verbose "[$functionName] MaxUserNameLength: $MaxUserNameLength"
-    Write-Verbose "[$functionName] MinUserNameLength: $minUsernameLength"
-    Write-Verbose "[$functionName] MaxSerialNumberLength: $MaxSerialNumberLength"
-    Write-Verbose "[$functionName] MinSerialNumberLength: $MinSerialNumberLength"
-    # Trim input to remove any leading or trailing spaces
-    $UserInput = $UserInput.Trim()
-    Write-Verbose "[$functionName] Trimmed input: '$UserInput'"
-    switch ($type)
-    {
-        'serialNumber'
-        {
-            Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
-            if ($UserInput.Length -gt $MaxSerialNumberLength)
-            {
-                Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
-                Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
-                return $returnValue
-            }
-            elseif ($UserInput.Length -lt $MinSerialNumberLength)
-            {
-                Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
-                Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
-                return $returnValue
-            }
-            elseif ($UserInput -match '^[a-zA-Z0-9-\s]+$') 
-            {
-                Write-Verbose "[$functionName] Serial number validation passed"
-                $returnValue.value = $UserInput
-                $returnValue.valid = $true
-                return $returnValue
-            }
-            else
-            {
-                Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
-                return $returnValue
-            }
-        }
-        'userName'
-        {
-            Write-Verbose "[$functionName] Checking user name length: $($UserInput.Length)"
-            if ($UserInput.Length -gt $MaxUserNameLength -or $UserInput.Length -lt $minUsernameLength -or $UserInput -match '^\d' -and $null -ne $UserInput)
-            {
-                Write-Verbose "[$functionName] Username exceeds maximum length of $MaxUserNameLength characters"
-                Write-Host "Username needs to have a minimum of $minUsernameLength characters and cannot exceed $MaxUserNameLength characters." -ForegroundColor Red
-                Write-Host "The username cannot start with a digit." -ForegroundColor Red
-                return $returnValue
-            }
-            else
-            {
-                $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
-                # Basic email format check
-                if ($normalizedUserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-                {
-                    Write-Verbose "[$functionName] Username validation passed"
-                    $returnValue.valid = $true
-                    $returnValue.value = $normalizedUserInput
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Username validation failed - must be a valid email format (e.g., user@$domain)"
-                    Write-Host "Invalid user name format. Please enter a valid email address (e.g., user@$domain)." -ForegroundColor Red
-                    return $returnValue
-                }
-            }
-        }
-        default
-        {
-            Write-Verbose "[$functionName] Unknown validation type: '$type'"
-            Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
-            return $returnValue
-        }
-    }
-    Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"
-    Write-Verbose "[$functionName] Returning validation value: $($returnValue.value)"
-    return $returnValue
-}
-
-function GetUserInput()
-{
-    [CmdletBinding()]
-    param(
-        [string]$Message,
-        [string]$Prompt,
-        [validateSet('userName', 'serialNumber')]
-        [string]$InputType,
-        $settings = $settings # Use the script-level $settings by default
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Message: $Message"
-    Write-Verbose "[$functionName] Prompt: $Prompt"
-    Write-Verbose "[$functionName] InputType: $InputType"
-    Write-Host $Message
-    # Updated instruction
-    Write-Host "Press Enter without typing anything to return to the previous menu." 
-
-    while ($true) # Loop indefinitely until valid input or Enter is pressed
-    {
-        $inputItem = Read-Host $Prompt
-        Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
-
-        # Check if the user just pressed Enter (empty string OR null)
-        if ($null -eq $inputItem -or $inputItem -eq '')
-        {
-            Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
-            return $null # Return null to signal going back
-        }
-
-        # Validate the input if it's not empty
-        $validationResult = validateInput -UserInput $inputItem -type $InputType -settings $settings
-        $inputResultValid = $validationResult.valid
-        $inputResult = $validationResult.value
-
-        if ($inputResultValid)
-        {
-            Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
-            Write-Verbose "[$functionName] Input result: $inputResult"
-            return $inputResult # Return the validated input
-        }
-        else
-        {
-            # Beep and show error if validation failed
-            [console]::beep(1000, 500)
-            # Updated error message
-            Write-Host "Invalid $inputType. Please try again or press Enter to return." -ForegroundColor Red 
-            # The loop will continue, prompting the user again
-        }
-    }
-}
-
-function ProcessSerialNumber()
-{
-    [CmdletBinding()]
-    param (
-        [parameter(Mandatory = $true)]
-        [string]$SerialNumber,
-        $AccessToken,
-        $Settings = $settings
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
-    Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
-    if ([string]::IsNullOrWhiteSpace($SerialNumber))
-    {
-        Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
-        return $null # Return null to signal no valid serial number
-    }
-    
-    $success = $false
-    $SerialNumber = $SerialNumber.Trim()
-    Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
-    $enrollmentState = GetCachedDeviceEnrollmentState -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
-    if ($enrollmentState)
-    {
-        $success = $true
-        Write-Verbose "[$functionName] Device lookup successful"
-        # Display basic device information
-        Write-Host "`n=== Device Information ===" -ForegroundColor Green
-        Write-Host "Serial Number: $SerialNumber"
-        Write-Verbose "[$scriptName] Device is managed: $($enrollmentState.managed)"
-        Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
-        Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
-        Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
-        if ($enrollmentState.Imported)
-        {
-            Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
-            Write-Verbose "[$scriptName] Imported count: $($enrollmentState.ImportedAutopilotDevice.Count)"
-            if ($enrollmentState.ImportedAutopilotDevice.Count -gt 1)
-            {
-                Write-Host "This device was imported into Autopilot $($enrollmentState.ImportedAutopilotDevice.Count) times." -ForegroundColor Green
-                $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice[$enrollmentState.ImportedAutopilotDevice.Count - 1]
-            }
-            else
-            {
-                Write-Host "This device was recently imported into Autopilot." -ForegroundColor Green
-                $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice
-            }
-            if (!$enrollmentState.managed)
-            {
-                Write-Host "However, this device is not currently managed in Intune."
-            }
-            Write-Host "Here is the latest known import information:"
-            Write-Host "Imported Device ID: $($importedDeviceInfo.id)"
-            Write-Host "Last import registration id: $($importedDeviceInfo.state.deviceRegistrationId)"
-            Write-Host "Last import status: $($importedDeviceInfo.state.deviceImportStatus)"
-            Write-Host "Last import error: $($importedDeviceInfo.state.deviceErrorName)"
-            Write-Host "Last import error code: $($importedDeviceInfo.state.deviceErrorCode)"
-        }
-        else
-        {
-            Write-Verbose "This device was not recently imported into Autopilot."
-        }
-        if ($enrollmentState.managed)
-        {
-            $deviceName = $enrollmentState.managedDevice.device.deviceName
-            $model = $enrollmentState.managedDevice.device.model
-            $manufacturer = $enrollmentState.managedDevice.device.manufacturer
-            $managedDeviceId = $enrollmentState.managedDevice.device.id
-            Write-Host "Device Name: $deviceName"
-            Write-Host "Model: $model"
-            Write-Host "Manufacturer: $manufacturer"
-            Write-Host "Status: Managed by Intune" -ForegroundColor Green
-            Write-Host "=============================`n" -ForegroundColor Green
-            # Create and show device actions menu using main.ps1 menu structure
-            $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
-            # Add menu items for each device action
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
-                Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
-            }
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
-                Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
-            }
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
-                Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' -MonitorAction
-            }
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
-                Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
-            }
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
-                ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber 
-            }
-            # Show the device actions menu with navigation context
-            Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-            $result = ShowMenu -Menu $deviceActionsMenu
-            Write-Verbose "Returning from device actions menu with result: $result"
-            return $result
-        }
-        else
-        {
-            Write-Host "This device is not managed in Intune." -ForegroundColor Yellow
-        }
-        if ($enrollmentState.hasDeviceObject)
-        {
-            Write-Host "`nDevice object found in Intune." -ForegroundColor Green
-            Write-Host "Device ID: $($enrollmentState.managedDevice.device.id)"
-            Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
-            Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
-        }
-        else
-        {
-            Write-Host "This device does not have an associated object in Intune." -ForegroundColor Red
-        }
-    }
-    else
-    {
-        # Explicitly return $null if no enrollmentState
-        Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
-        return $null
-    }
-    
-    # Return success status for calling functions
-    return $success
-}
-#endregion Helper Functions
-
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
@@ -687,6 +344,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
 }
 #endregion serial number menu
 
+#region Autopilot menu   
 $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
@@ -704,6 +362,7 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
         $deviceObject = @{SerialNumber = $serialNumber}
         $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
         $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
+        Write-Verbose "[$scriptName] Result returned: $result"
     }
 }
 $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Use this device's serial number." -Action {
@@ -715,17 +374,17 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
         Write-Host "Checking device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
         $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
         $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'check'
+        Write-Verbose "[$scriptName] Result returned: $result"
     }
     else
     {
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
     }
 }
-
-#region Autopilot menu   
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     $result = PrepareImportDevice
+    Write-Verbose "[$scriptName] Result of quick import: $result"
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
