@@ -2322,10 +2322,11 @@ function CallGraphAPI()
     try
     {
         $response = Invoke-RestMethod @restParams
-        Write-Host "[$functionName] NextLink: $($response.'@odata.nextLink')"
-        Write-Host "[$functionName] Response count: $($response.value.count)"
+        Write-Verbose "[$functionName] NextLink: $($response.'@odata.nextLink')"
+        Write-Verbose "[$functionName] Response count: $($response.value.count)"
         if ($response.'@odata.nextLink')
         {
+            Write-Verbose "[$functionName] NextLink found. Fetching additional pages."
             # Initialize an array to hold all items
             $allItems = @()
             $allItems += $response.value
@@ -2333,14 +2334,17 @@ function CallGraphAPI()
             while ($nextLink)
             {
                 $nextGroup = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing
+                Write-Verbose "[$functionName] Fetched next page with $($nextGroup.value.Count) items."
                 if ($nextGroup.value)
                 {
+                    Write-Verbose "[$functionName] Adding items from next page to the collection."
                     $allItems += $nextGroup.value
                 }
                 $nextLink = $nextGroup.'@odata.nextLink'
             }
             # Optionally, reconstruct a response object if needed
             $response.value = $allItems
+            Write-Verbose "[$functionName] All items collected. Total count: $($Response.value.Count)"
         }
         else 
         {

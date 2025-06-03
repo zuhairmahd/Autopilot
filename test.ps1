@@ -60,4 +60,4 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 
 
 $extraParameters = "select=accountEnabled,givenName,surname,displayName,mail,userPrincipalName&top=999"
-$global:users = CallGraphApi -ResourcePath $userUri -accessToken $accessToken -filter $filter -consistencyLevel
+$global:users = CallGraphApi -ResourcePath $userUri -accessToken $accessToken -filter $filter -extraParameters $extraParameters
