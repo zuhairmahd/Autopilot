@@ -2295,6 +2295,7 @@ function CallGraphAPI()
 
     #region prepare the call
     # Create parameter hashtable for splatting
+    Write-Verbose "[$functionName] Preparing parameters for Invoke-RestMethod call."
     $restParams = @{
         Method          = $method
         Uri             = $encodedUri
@@ -2304,11 +2305,14 @@ function CallGraphAPI()
     # Only add Body parameter if it exists
     if ($body)
     {
+        Write-Verbose "[$functionName] Body parameter provided. Adding to the request."
         $restParams['Body'] = $body
     }
     #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
     {
+        Write-Verbose "[$functionName] PowerShell version is $($PSVersionTable.PSVersion.Major ). Adding StatusCodeVariable to the request."
+        Write-Verbose "[$functionName] Added StatusCodeVariable."
         $restParams['StatusCodeVariable'] = 'statusCode'
     }
     Write-Verbose "[$functionName] Making the following call to Microsoft Graph:" 
@@ -2318,14 +2322,29 @@ function CallGraphAPI()
     try
     {
         $response = Invoke-RestMethod @restParams
-        $response | ForEach-Object {
-            if ($_.'@odata.nextLink')
+        Write-Host "[$functionName] NextLink: $($response.'@odata.nextLink')"
+        Write-Host "[$functionName] Response count: $($response.value.count)"
+        if ($response.'@odata.nextLink')
+        {
+            # Initialize an array to hold all items
+            $allItems = @()
+            $allItems += $response.value
+            $nextLink = $response.'@odata.nextLink'
+            while ($nextLink)
             {
-                $nextLink = $_.'@odata.nextLink'
-                # $nextGroups = CallGraphAPI -accessToken $accessToken -ResourcePath $nextLink -Method GET
-                $nextGroups = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing 
-                $response.value += $nextGroups.value
+                $nextGroup = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing
+                if ($nextGroup.value)
+                {
+                    $allItems += $nextGroup.value
+                }
+                $nextLink = $nextGroup.'@odata.nextLink'
             }
+            # Optionally, reconstruct a response object if needed
+            $response.value = $allItems
+        }
+        else 
+        {
+            Write-Verbose "[$functionName] No nextLink found. Single page response received."
         }
         Write-Verbose "[$functionName] The call was successful."
         if ($response.count)
