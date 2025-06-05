@@ -13,12 +13,11 @@ function ExportDeviceReport()
 
     $functionName = "ExportDeviceReport"
     Write-Verbose "[$functionName] Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'"
-
     # Validate ExportFormat
     if ($ExportFormat -notin @("HTML", "CSV"))
     {
         Write-Error "[$functionName] Invalid ExportFormat specified: $ExportFormat. Valid options are 'HTML' or 'CSV'."
-        return
+        return $false
     }
     
     # Determine device name for file naming
@@ -96,6 +95,7 @@ function ExportDeviceReport()
         {
             Write-Error "[$functionName] Failed to export HTML report: $($_.Exception.Message)"
             Write-Verbose "[$functionName] HTML export error details: $($_.Exception)"
+            return $false
         }
     }
     elseif ($finalExportFormat -eq "CSV")
@@ -119,13 +119,16 @@ function ExportDeviceReport()
         {
             Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
             Write-Verbose "[$functionName] CSV export error details: $($_.Exception)"
+            return $false
         }
     }
     else
     {
         Write-Error "[$functionName] Unsupported export format: $finalExportFormat"
-        return
+        return $false
     }
+    Write-Verbose "[$functionName] Export completed successfully."
+    return $true
 }
 
 function ExportDeviceStorage()
@@ -1196,9 +1199,7 @@ function ShowDeviceReport()
     Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report
     
     #region Handle export decision
-    Write-Verbose "[$functionName] Prompting user for export decision"
-    $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
-    $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action {
+    $HTMLAction = {
         Write-Verbose "[$functionName] User selected HTML export"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
         if ($exportResult)
@@ -1209,8 +1210,9 @@ function ShowDeviceReport()
         {
             Write-Host "Failed to export report to HTML."
         }
-    }
-    $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action {
+        return $exportResult 
+    } 
+    $CSVAction = {
         Write-Verbose "[$functionName] User selected CSV export"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
         if ($exportResult)
@@ -1221,7 +1223,12 @@ function ShowDeviceReport()
         {
             Write-Host "Failed to export report to CSV."
         }
-    }
+        return $exportResult 
+    } 
+    Write-Verbose "[$functionName] Prompting user for export decision"
+    $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
+    $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
+    $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
     $selection = ShowMenu -Menu $exportMenu
     if ($null -ne $selection )
     {
@@ -1235,7 +1242,7 @@ function ShowDeviceReport()
     }
     else
     {
-        Write-Host "No export selected. Returning to previous menu."
+        Write-Verbose "[$functionName] No export selected. Exiting."
         return $null
     }
     #endregion Handle export decision

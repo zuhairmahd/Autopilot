@@ -1008,43 +1008,35 @@ function ProcessSerialNumber()
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
                 Write-Verbose "[$functionName] Device report: $deviceReport"
-                
-                if ($deviceReport)
+                # Handle navigation responses from ShowReport
+                if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
                 {
-                    Write-Verbose "[$functionName] Device report: $deviceReport"
-                    # Handle navigation responses from ShowReport
-                    if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
-                    {
-                        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-                        return $backoutText
-                    }
-                    elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
-                    {
-                        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
-                        return "EXIT_APPLICATION"
-                    }
-                    elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
-                    {
-                        Write-Verbose "[$scriptName] User requested application exit from device selection."
-                        return "EXIT_APPLICATION"
-                    }        
-                    elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
-                    {
-                        if ($deviceReport -eq $true)
-                        {
-                            Write-Host "`nDevice health status displayed successfully." -ForegroundColor Green
-                        }
-                        else
-                        {
-                            Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
-                        }
-                        Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
-                    }
+                    Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+                    return $backoutText
                 }
-                else
+                elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
                 {
-                    Write-Host "`nFailed to display device health status." -ForegroundColor Red
+                    Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+                    return "EXIT_APPLICATION"
                 }
+                elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
+                {
+                    Write-Verbose "[$scriptName] User requested application exit from device selection."
+                    return "EXIT_APPLICATION"
+                }        
+                elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
+                {
+                    if ($deviceReport -eq $true -or $deviceReport -in ("Export to HTML", "Export to CSV"))
+                    {
+                        Write-Host "`nDevice health status displayed successfully." -ForegroundColor Green
+                    }
+                    else
+                    {
+                        Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
+                    }
+                    Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
+                }
+                return $backoutText
             }
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"

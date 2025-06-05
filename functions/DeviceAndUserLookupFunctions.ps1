@@ -308,7 +308,7 @@ function GetDeviceByUser()
                 }.GetNewClosure()
                 # Add the menu item with the action
                 $deviceMenu = AddMenuItem -Menu $deviceMenu -Name $menuItemName -Action $action -ReturnsValue
-            }            # Show the menu and return the selected device's serial number            # Navigation enhancement: Build upon existing navigation context rather than starting fresh
+            }
             Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
             Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
             Write-Verbose "[$functionName] Current menu title: $($deviceMenu.Title)"
