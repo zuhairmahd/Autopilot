@@ -1,133 +1,3 @@
-function ExportDeviceReport()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [hashtable]$formattedOutput,
-        [Parameter(Mandatory = $false)]
-        [string]$outputFile,
-        [Parameter(Mandatory = $false)]
-        [ValidateSet("HTML", "CSV")]
-        [string]$ExportFormat = "HTML"
-    )
-
-    $functionName = "ExportDeviceReport"
-    Write-Verbose "[$functionName] Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'"
-
-    # Validate ExportFormat
-    if ($ExportFormat -notin @("HTML", "CSV"))
-    {
-        Write-Error "[$functionName] Invalid ExportFormat specified: $ExportFormat. Valid options are 'HTML' or 'CSV'."
-        return
-    }
-    
-    # Determine device name for file naming
-    if (-not $outputFile -or $null -eq $outputFile)
-    {
-        if (-not $DeviceName)
-        {
-            $DeviceName = "Device"
-            Write-Verbose "[$functionName] Using default device name for export"
-        }
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-        $fileName = "$DeviceName`_Report_$timestamp"
-        Write-Verbose "[$functionName] Generated filename: $fileName"
-    }
-    else
-    {
-        $fileName = [System.IO.Path]::GetFileNameWithoutExtension($outputFile)
-        Write-Verbose "[$functionName] Using provided output file name: $fileName"
-    }
-    
-    # Determine final export format
-    $finalExportFormat = $ExportFormat.ToUpper()
-    if ($finalExportFormat -eq "HTML")
-    {
-        $htmlPath = "$pwd\$fileName.html"
-        Write-Verbose "[$functionName] Exporting to HTML: $htmlPath"
-        $htmlHeader = @"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Device Report: $DeviceName</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
-        th { background-color: #f2f2f2; }
-        tr:hover { background-color: #f5f5f5; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        h1 { color: #333; }
-        .meta { color: #666; font-style: italic; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-    <h1>Device Report: $DeviceName</h1>
-    <div class="meta">Generated on $(Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K")</div>
-    <table>
-        <thead>
-            <tr>
-                <th>Property</th>
-                <th>Value</th>
-            </tr>
-        </thead>
-        <tbody>
-"@
-        $htmlRows = ""
-        foreach ($key in $formattedOutput.Keys)
-        {
-            $value = [System.Web.HttpUtility]::HtmlEncode($formattedOutput[$key])
-            $htmlRows += "            <tr><td>$([System.Web.HttpUtility]::HtmlEncode($key))</td><td>$value</td></tr>`n"
-        }
-        $htmlFooter = @"
-        </tbody>
-    </table>
-</body>
-</html>
-"@
-        try
-        {
-            $htmlContent = $htmlHeader + $htmlRows + $htmlFooter
-            $htmlContent | Out-File -FilePath $htmlPath -Encoding UTF8
-            Write-Host "HTML report exported to: $htmlPath" -ForegroundColor Green
-            Write-Verbose "[$functionName] Successfully exported HTML report to $htmlPath"
-        }
-        catch
-        {
-            Write-Error "[$functionName] Failed to export HTML report: $($_.Exception.Message)"
-            Write-Verbose "[$functionName] HTML export error details: $($_.Exception)"
-        }
-    }
-    elseif ($finalExportFormat -eq "CSV")
-    {
-        $csvPath = "$pwd\$fileName.csv"
-        Write-Verbose "[$functionName] Exporting to CSV: $csvPath"
-        try
-        {
-            $csvData = foreach ($key in $formattedOutput.Keys)
-            {
-                [PSCustomObject]@{
-                    Property = $key
-                    Value    = $formattedOutput[$key]
-                }
-            }
-            $csvData | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
-            Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
-            Write-Verbose "[$functionName] Successfully exported CSV report to $csvPath"
-        }
-        catch
-        {
-            Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
-            Write-Verbose "[$functionName] CSV export error details: $($_.Exception)"
-        }
-    }
-    else
-    {
-        Write-Error "[$functionName] Unsupported export format: $finalExportFormat"
-        return
-    }
-}
-
 function ExportDeviceStorage()
 {
     [CmdletBinding()]
@@ -982,6 +852,14 @@ function ShowDeviceReport()
         [hashtable]$report,
         [Parameter(Mandatory = $false)]
         [string[]]$PrefixList = @('Intune', 'Autopilot'),
+        [Parameter(Mandatory = $false)]
+        [switch]$Export,
+        [Parameter(Mandatory = $false)]
+        [string]$OutputFile = "$pwd\DeviceReport.csv",
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("HTML", "CSV")]
+        [string]$ExportFormat = "HTML",
+        [Parameter(Mandatory = $false)]
         [string]$DeviceName,
         [Parameter(Mandatory = $false)]
         [string]$SerialNumber
@@ -995,6 +873,7 @@ function ShowDeviceReport()
     #Show-DeviceReport -enrollmentState $state -Export -ExportFormat "CSV"   
     #endregion usage info
     $functionName = $MyInvocation.MyCommand.Name
+    
     #region write verbose log of received parameters
     Write-Verbose "[$functionName] Starting device report generation"
     Write-Verbose "[$functionName] Parameter Set: $($PSCmdlet.ParameterSetName)"
@@ -1193,50 +1072,66 @@ function ShowDeviceReport()
         # Display each property and value
         Write-Host "$readableKey`: $formattedValue"
     }
-    Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report
+    Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"
+    #endregion Format property names and display report
     
     #region Handle export decision
-    Write-Verbose "[$functionName] Prompting user for export decision"
-    $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
-    $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action {
-        Write-Verbose "[$functionName] User selected HTML export"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
-        if ($exportResult)
+    Write-Verbose "[$functionName] Export decision: $Export"    
+    Write-Verbose "[$functionName] Export format: $ExportFormat"
+    if (-not $Export)
+    {
+        # Determine device name for file naming
+        Write-Verbose "[$functionName] Determining device name for export"
+        if (-not $DeviceName)
         {
-            Write-Host "Report exported to HTML successfully."
+            $DeviceName = "Device"
+            Write-Verbose "[$functionName] Using default device name ($DeviceName) for export"
+        }
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $fileName = "$DeviceName`_Report_$timestamp"
+        Write-Verbose "[$functionName] Generated filename: $fileName"
+        Write-Verbose "[$functionName] Prompting user for export decision"
+        $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
+        Wr$exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action {
+            Write-Verbose "[$functionName] User selected CSV export"
+            $csvPath = "$pwd\$fileName.csv"
+            Write-Verbose "[$functionName] Exporting to CSV: $csvPath"
+            try
+            {
+                $csvData = foreach ($key in $formattedOutput.Keys)
+                {
+                    [PSCustomObject]@{
+                        Property = $key
+                        Value    = $formattedOutput[$key]
+                    }
+                }
+                $csvData | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
+                Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
+                Write-Verbose "[$functionName] Successfully exported CSV report to $csvPath"
+            }
+            catch
+            {
+                Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] CSV export error details: $($_.Exception)"
+            }
+            # Don't return a value - let the menu handle the flow normally
+        }
+        $selection = ShowMenu -Menu $exportMenu
+        Write-Verbose "[$functionName] User made a selection: $selection"
+        if ($null -ne $selection )
+        {
+            Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
+            if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
+            {
+                Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selection', treating as navigation"
+                return $selection
+            }
         }
         else
         {
-            Write-Host "Failed to export report to HTML."
+            Write-Verbose "[$functionName] ShowMenu returned null or empty selection."
+            return $null
         }
-    }
-    $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action {
-        Write-Verbose "[$functionName] User selected CSV export"
-        $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
-        if ($exportResult)
-        {
-            Write-Host "Report exported to CSV successfully."
-        }
-        else
-        {
-            Write-Host "Failed to export report to CSV."
-        }
-    }
-    $selection = ShowMenu -Menu $exportMenu
-    if ($null -ne $selection )
-    {
-        Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
-        # Validate that we got a proper selection, not a navigation option
-        if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
-        {
-            Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selection', treating as navigation"
-            return $selection
-        }
-    }
-    else
-    {
-        Write-Host "No export selected. Returning to previous menu."
-        return $null
     }
     #endregion Handle export decision
     Write-Verbose "[$functionName] Device report generation completed"
