@@ -214,7 +214,7 @@ function ShowMenu()
     # Clear-Host
     Write-Verbose "[$functionName] Clearing the screen for better readability." 
     
-    # Add navigation options based on depth
+    #display choices    
     $choices = @()
     $menuItems = @()
     Write-Verbose "[$functionName] Initializing choices and menu items."
@@ -267,7 +267,17 @@ function ShowMenu()
         if ($cleanHistory.Count -gt 0)
         {
             $path = $cleanHistory -join " > "
-            $banner += "`n[$path > $($Menu.Title)]"
+            # Check if the current menu title is already the last item in the clean history
+            # to prevent duplicate entries in the breadcrumb
+            if ($cleanHistory[-1] -eq $Menu.Title)
+            {
+                Write-Verbose "[$functionName] Current menu title already in breadcrumb, not duplicating"
+                $banner += "`n[$path]"
+            }
+            else
+            {
+                $banner += "`n[$path > $($Menu.Title)]"
+            }
         }
         else
         {

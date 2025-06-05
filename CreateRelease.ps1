@@ -347,16 +347,8 @@ function CopySecrets()
 #region Define variables
 $initFile = "init.json"
 $versionFile = 'version.txt'
-$functionsToMerge = @(
-    "$pwd\functions\AutopilotDeviceFunctions.ps1",
-    "$pwd\functions\AutopilotMiscFunctions.ps1",
-    "$pwd\functions\AutopilotScriptUpdateFunctions.ps1",
-    "$pwd\functions\CommonGraphAPIFunctions.ps1",
-    "$pwd\functions\CommonMenuFunctions.ps1",
-    "$pwd\functions\CommonDeviceFunctions.ps1",
-    "$pwd\functions\CommonMiscFunctions.ps1"
-)
-$filesToCopy = @('vars.json', 'version.txt', 'init.json') 
+$functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
+$filesToCopy = @('settings.json', 'version.txt', 'init.json') 
 $successMessage = "$OutputFile written"
 $scriptName = $MyInvocation.MyCommand.Name
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
@@ -408,8 +400,20 @@ if ($Version -eq '')
     }
     else
     {
-        Write-Host 'No version found in input file. Using default version 1.0.0.'
-        $Version = '1.0.0'
+        Write-Host "No version found in input file. Checking for version file $versionFile."
+        if (Test-Path -Path $versionFile)
+        {
+            $Version = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
+            Write-Host "Found version $($Version) in version file."
+            $versionFileFound = $true
+            Write-Host "Using version $($Version) from version file."
+        }
+        else
+        {
+            Write-Host "No version specified and no version file found. Using default version 1.0.0."
+            $Version = '1.0.0'
+            $versionFileFound = $false
+        }
     }
 }
 else
@@ -418,35 +422,38 @@ else
 }
 
 #Check if the version file exists.  If not, create it.
-if (-not (Test-Path -Path $versionFile))
+if (-not $versionFileFound)
 {
-    Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
-    Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
-    Write-Host 'Version file created successfully.'
-}
-else
-{
-    Write-Host "Found version file $($versionFile)..."
-    $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
-    $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
-    Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
-    $versionObject = [System.Version]::Parse($Version)
-    Write-Verbose "[$scriptName] Version object: $versionObject"
-    if ($VersionFileContentObject -lt $versionObject)
+    if (-not (Test-Path -Path $versionFile))
     {
-        Write-Host "Version file content is less than the specified version. Updating file..."
+        Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
         Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
-        Write-Host 'Version file updated successfully.'
-    }
-    elseif ($VersionFileContentObject -gt $versionObject)
-    {
-        Write-Host "Version file content is greater than the specified version. Updating the local variable."
-        $Version = $VersionFileContentObject.ToString()
-        Write-Verbose "[$scriptName] Version updated to: $Version"
+        Write-Host 'Version file created successfully.'
     }
     else
     {
-        Write-Host "Version file content matches the specified version."
+        Write-Host "Found version file $($versionFile)..."
+        $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
+        $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
+        Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
+        $versionObject = [System.Version]::Parse($Version)
+        Write-Verbose "[$scriptName] Version object: $versionObject"
+        if ($VersionFileContentObject -lt $versionObject)
+        {
+            Write-Host "Version file content is less than the specified version. Updating file..."
+            Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
+            Write-Host 'Version file updated successfully.'
+        }
+        elseif ($VersionFileContentObject -gt $versionObject)
+        {
+            Write-Host "Version file content is greater than the specified version. Updating the local variable."
+            $Version = $VersionFileContentObject.ToString()
+            Write-Verbose "[$scriptName] Version updated to: $Version"
+        }
+        else
+        {
+            Write-Host "Version file content matches the specified version."
+        }
     }
 }
 
