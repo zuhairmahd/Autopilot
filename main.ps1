@@ -2,13 +2,25 @@
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
-    [int]$maxWaitTime = 60,
-    [int]$timeInSeconds = 30,
-    [string]$Configuration = 'vars.json',
-    [String] $GroupTag = 'MSB01',
+    [int]$maxWaitTime,
+    [int]$timeInSeconds,
+    [String] $GroupTag,
     [switch]$Reconfigure,
     [switch]$ReInitialize,
     [switch]$Update,
+    [switch]$SecureString,
+    [switch]$ForceNewToken,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$Deligated,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$NoSaveRefreshToken,
+    [parameter(parameterSetName = 'Deligated')]
+    [string]$Scope,
+    [parameter(parameterSetName = 'Deligated')]
+    [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
+    [string]$AuthType,
+    [ValidateSet('file', 'memory')]
+    [string]$CacheType,
     [string]$Repo = 'github',
     [string]$Release = 'main',
     [ValidateSet('full', 'helpDesk', 'registration')]
@@ -17,40 +29,81 @@ param(
 
 #region Load parameters from the configuration file if it exists
 $scriptName = $MyInvocation.MyCommand.Name
+$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+Write-Verbose "[$scriptName] Domain: $domain"
 if (Test-Path -Path $InitFile)
 {
     Write-Host " Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    $configData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'vars'
-    Write-Verbose "[$scriptName] Found $($configData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $configData.PSObject.Properties.Name)
+    $global:globalSettings = @{}
+    $global:localSettings = @{}
+    $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
+    Write-Verbose "[$scriptName] Reading global settings..."
+    Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
+    foreach ($key in $globalConfigData.PSObject.Properties.Name)
     {
         Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $configData.$key)
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $globalConfigData.$key)
         {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($configData.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($configData.$key)"
-            if ($configData.$key -in ('true', 'false'))
+            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($globalConfigData.$key)"
+            Write-Verbose "[$scriptName] Setting $key to $($globalConfigData.$key)"
+            if ($globalConfigData.$key -in ('true', 'false'))
             {
                 Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($configData.$key)
+                $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
+                $globalSettings.add($key, $keyBooleanValue)
                 Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-                Set-Variable -Name $key -Value $keyBooleanValue
+                # Set-Variable -Name $key -Value $keyBooleanValue
             }
             else
             {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($configData.$key))."
-                Set-Variable -Name $key -Value $configData.$key
+                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($globalConfigData.$key))."
+                # Set-Variable -Name $key -Value $globalConfigData.$key
+                $globalSettings.add($key, $globalConfigData.$key)
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
+            #add it to the global settings hashtable.
+            $globalSettings.add($key, $PSBoundParameters[$key])
+        }
+    }
+    $localConfigData = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain
+    Write-Verbose "[$scriptName] Reading local settings for domain $domain..."
+    Write-Verbose "[$scriptName] Found $($localConfigData.PSObject.Properties.Name.count) configurations."
+    foreach ($key in $localConfigData.PSObject.Properties.Name)
+    {
+        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $localConfigData.$key)
+        {
+            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($localConfigData.$key)"
+            Write-Verbose "[$scriptName] Setting $key to $($localConfigData.$key)"
+            if ($localConfigData.$key -in ('true', 'false'))
+            {
+                Write-Verbose "[$scriptName] Converting $key to boolean."
+                $keyBooleanValue = [bool]::Parse($localConfigData.$key)
+                $localSettings.add($key, $keyBooleanValue)
+                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
+                # Set-Variable -Name $key -Value $keyBooleanValue
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($localConfigData.$key))."
+                # Set-Variable -Name $key -Value $localConfigData.$key
+                $localSettings.add($key, $localConfigData.$key)
             }
         }
         else
         {
             Write-Verbose "[$scriptName] Read parameter $key from the commandline as $($PSBoundParameters[$key])"
+            #add it to the local settings hashtable.
+            $localSettings.add($key, $PSBoundParameters[$key])
         }
-    }
+    }   
 }
 else
 {
-    Write-Host "Configuration file $Configuration not found. Using default values."
+    Write-Host "Configuration file $initFile not found. Using default values."
 }
 #endregion Load parameters from the configuration file if it exists
 
@@ -112,23 +165,25 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.'
     $latestRelease = 'main'
 }
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-Write-Verbose "[$scriptName] Domain: $domain"
-$init = Get-Content -Path $initFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json 
-Write-Verbose "[$scriptName] Init: $($init | Out-String)"
-$groupsToInclude = $init.domains.$domain.groupsToInclude
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
-$groupsToExclude = $init.domains.$domain.groupsToExclude
+$groupsToExclude = $settings.groupsToExclude
 Write-Verbose "[$scriptName] Groups to exclude: $($groupsToExclude | Out-String)"
-$domainSettings = $init.domains.$domain.settings
-Write-Verbose "[$scriptName] Domain settings: $($domainSettings | Out-String)"
-$globalSettings = $init.globalSettings
-Write-Verbose "[$scriptName] Global settings: $($globalSettings | Out-String)"
-$settings = MergeSettings -settings $domainSettings -globalSettings $globalSettings
-Write-Verbose "[$scriptName] Settings: $($settings | Out-String)"
+Write-Verbose "[$scriptName] Settings are as follows:"
+foreach ($key in $settings.Keys)
+{
+    Write-Verbose "[$scriptName] $($key): $($settings[$key])"
+}
+$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
+foreach ($key in $auth.Keys)
+{
+    Write-Verbose "[$scriptName] Auth key: $($key) = $($auth[$key])"
+}   
+$getTokenParams = BuildAuthSplatTable -auth $auth
 $backoutText = 'Returning to previous menu'
-$application = 'Register'
-Write-Verbose "[$scriptName] Application: $application"
+Write-Verbose "[$scriptName] Backout Text: $backoutText"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 $version = '3.0.0'
@@ -152,11 +207,6 @@ $returnValues = [ordered] @{
     UpdateFailedMessage     = 'Could not download update.'
     UpdateSuccessMessage    = 'The script was updated successfully.'
     UpdateNotNeededMessage  = 'The script is already up to date.'
-}
-if ($domain -eq 'arabictutor.com')
-{
-    Write-Verbose "[$scriptName] Changing groupTag to 'entra'."
-    $GroupTag = 'entra'
 }
 if (Test-Path -Path $versionFile)
 {
@@ -197,7 +247,6 @@ $script:DeviceEnrollmentCache = @{}
 Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
 Write-Verbose "[$scriptName] The current parameter set is $($PSCmdlet.ParameterSetName)"
 Write-Verbose "[$scriptName] Configuration file: $configFile"
-Write-Verbose "[$scriptName] Initial values file: $initialValues"
 Write-Verbose "[$scriptName] Computer name: $Name"
 Write-Verbose "[$scriptName] Group tag: $GroupTag"
 Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
@@ -205,7 +254,6 @@ Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
 Write-Verbose "[$scriptName] Repository: $Repo"
 Write-Verbose "[$scriptName] Release: $Release"
 Write-Verbose "[$scriptName] Domain: $domain"
-Write-Verbose "[$scriptName] Application name: $application"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 Write-Verbose "[$scriptName] Backout text: $backoutText"
@@ -222,7 +270,7 @@ $autopilotSerialNumberMenu = newMenu -Title "Check device registration" -Descrip
 
 #region export menu
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'autopilot'
     if ($exported)
     {
@@ -234,7 +282,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot 
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported Autopilot Devices" -Action {
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'imported'
     if ($exported)
     {
@@ -246,7 +294,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported A
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Windows Devices" -Action {
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'managed'
     if ($exported)
     {
@@ -258,7 +306,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Wi
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Windows Devices" -Action {
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'unmanaged'
     if ($exported)
     {
@@ -272,7 +320,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged 
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
     {
         Write-Host "Exported device storage report to $($storageOutputFileName)." -ForegroundColor Green
@@ -297,7 +345,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     else
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
@@ -317,7 +365,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $make = $deviceObject.manufacturer
         $model = $deviceObject.model
         Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         Write-Verbose "Result returned: $result"
         # Check if ProcessSerialNumber returned an exit signal
@@ -359,7 +407,7 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         Write-Host "Checking device with serial number $($SerialNumber)..."
         $deviceObject = @{SerialNumber = $serialNumber}
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
         Write-Verbose "[$scriptName] Result returned: $result"
     }
@@ -371,7 +419,7 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
     if ($deviceObject)
     {
         Write-Host "Checking device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'check'
         Write-Verbose "[$scriptName] Result returned: $result"
     }
@@ -382,13 +430,13 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
-    $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+    $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
     if ($result -eq $backoutText)
     {
@@ -416,7 +464,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
             Write-Host "Exiting..."
             return $backoutText
         }
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile # Ensure accessToken is available
+        $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
@@ -509,7 +557,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     else
     {
         Write-Verbose "[$scriptName] Got user name: $userName"
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile 
+        $accessToken = GetGraphAccessToken @getTokenParams
         #Print the current navigation context prior too calling GetDeviceByUser
         Write-Verbose "[$scriptName] Current navigation context:"
         Write-Verbose "[$scriptName] Action History: $($actionHistory -join ' > ')"
@@ -582,7 +630,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         $hasCorrectNumberOfDevices = $false
         Write-Host "Checking group membership for user $userName."
         Write-Verbose "[$scriptName] Getting access token..."
-        $accessToken = GetGraphAccessToken -ConfigFile $configFile
+        $accessToken = GetGraphAccessToken @getTokenParams
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
         if ($groups.success -eq $true)
         {
