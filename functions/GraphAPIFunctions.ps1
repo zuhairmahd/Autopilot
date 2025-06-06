@@ -1,5 +1,5 @@
 #region Encryption functions
-$excludeFields = @('domain', 'name', 'scope')
+$excludeFields = @('domain', 'name', 'scope', 'auth')
 function TestIsBase64String()
 {
     param (
@@ -1043,7 +1043,7 @@ function Save-RefreshTokenToConfig()
         if (isEncrypted -data $config)
         {
             Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-            $decryptedConfig = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name', 'scope')
+            $decryptedConfig = DecryptObject -encryptedObject $config
             if ($decryptedConfig.deligatedCredentials)
             {
                 Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
@@ -1069,7 +1069,7 @@ function Save-RefreshTokenToConfig()
             }
             # Re-encrypt the config
             Write-Verbose "[$functionName] Re-encrypting config with refresh token"
-            $Config = EncryptObject -DecryptedObject $decryptedConfig -excludeFields @('domain', 'name', 'scope')
+            $Config = EncryptObject -DecryptedObject $decryptedConfig 
         }
         else
         {
@@ -1410,9 +1410,110 @@ function Get-TokenFromCache()
     return $null
 }
 
+function LaunchBrowser()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string]$url,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Chrome", "Edge", "Firefox")]
+        [string]$browser
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    #print log of incoming parameters.
+    Write-Verbose "[$functionName] Launching browser with URL: $url"
+    Write-Verbose "[$functionName] Browser preference: $browser"
+    Write-Verbose "[$functionName] Launching browser with URL: $url"
+    Write-Verbose "[$functionName] Browser preference: $browser"
+    switch ($Browser)
+    {
+        'Edge'
+        {
+            Write-Verbose "[$functionName] Opening Edge browser for authentication"
+            if ($settings.privateSession)
+            {
+                Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                $urlParams = @{
+                    FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+                    ArgumentList = "--inprivate", $authUrl
+                }
+            }
+            else
+            {
+                $urlParams = @{
+                    FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+                    ArgumentList = $authUrl
+                }
+            }
+        }
+        'Chrome'
+        {
+            Write-Verbose "[$functionName] Opening Chrome browser for authentication"
+            if ($settings.privateSession)
+            {
+                Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+                    ArgumentList = "--incognito", $authUrl
+                }
+            }
+            else
+            {
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+                    ArgumentList = $authUrl
+                }
+            }
+        }
+        'Firefox'
+        {
+            Write-Verbose "[$functionName] Opening Firefox browser for authentication"
+            if ($settings.privateSession)
+            {
+                Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
+                    ArgumentList = "-private-window", $authUrl
+                }
+            }
+            else
+            {
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
+                    ArgumentList = $authUrl
+                }
+            }
+        }
+        default
+        {
+            Write-Verbose "[$functionName] Opening default browser for authentication"
+            $urlParams = @{
+                FilePath     = "start"
+                ArgumentList = $authUrl
+            }
+        }
+    }
+    Write-Verbose "[$functionName] Launching $browser with URL: $url"
+    try
+    {
+        # Start the browser with the specified URL
+        Start-Process @urlParams 
+        Write-Verbose "[$functionName] Browser launched successfully."
+    }
+    catch
+    {
+        Write-Error "Failed to launch browser: $_"
+        return $false
+    }
+    return $true
+}
+
 function Get-DelegatedToken()
 {
-    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken)
+    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $settings = $settings)
     $functionName = $MyInvocation.MyCommand.Name
     # First check if we have a valid refresh token in config
     if ($configRefreshToken)
@@ -1598,7 +1699,11 @@ function Get-DelegatedToken()
                 $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
                 Write-Verbose "[$functionName] Authorization URL: $authUrl"
                 Write-Host "Opening browser for user authentication and consent..."
-                Start-Process $authUrl
+                if (-not (LaunchBrowser -url $authUrl -browser $settings.preferredBrowser))
+                {
+                    Write-Error "Failed to launch browser. Please open the URL manually: $authUrl"
+                    return $null
+                }
                 $listenerResult = Start-HttpListener -redirectUri $redirectUri
                 if ($listenerResult.Success)
                 {
@@ -1642,7 +1747,11 @@ function Get-DelegatedToken()
         $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
         Write-Verbose "[$functionName] Authorization URL: $authUrl"
         Write-Host "Opening browser for user authentication and consent..."
-        Start-Process $authUrl
+        if (-not (LaunchBrowser -url $authUrl -browser $settings.preferredBrowser))
+        {
+            Write-Error "Failed to launch browser. Please open the URL manually: $authUrl"
+            return $null
+        }        
         Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
         $code = Read-Host "Enter the authorization code"
         Write-Verbose "[$functionName] Received authorization code input from user"
@@ -1835,6 +1944,170 @@ function Get-ClientCredentialsToken()
     }
 }
 
+function BuildAuthSplatTable()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $auth
+    )
+    
+    # Dynamic splatting approach - iterate over all auth properties
+    # Create clean splatting hashtable starting with required parameter
+    $getTokenParams = @{
+        configFile = $configFile
+    }
+    
+    # Define valid parameters for GetGraphAccessToken function
+    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'CacheType', 'configFile')
+    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
+    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType')    # Iterate over all properties in the auth object
+    foreach ($property in $auth.PSObject.Properties)
+    {
+        $paramName = $property.Name
+        $paramValue = $property.Value
+        # Skip if not a valid parameter for the function
+        if ($paramName -notin $validParams)
+        {
+            Write-Verbose "Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
+            continue
+        }
+        # Skip if value is null, empty, or false for switch parameters
+        if ($null -eq $paramValue -or $paramValue -eq '' -or $paramValue -eq $false)
+        {
+            Write-Verbose "Skipping parameter '$paramName' due to null/empty/false value"
+            continue
+        }
+        # Check if this is a delegated-only parameter
+        if ($paramName -in $deligatedOnlyParams)
+        {
+            # Only add if Deligated is true in the auth object
+            if ($auth.PSObject.Properties.Name -contains 'Deligated' -and $auth.Deligated)
+            {
+                Write-Verbose "Adding delegated parameter '$paramName' with value: $paramValue"
+                #Check if the parameter is an array, and if so convert it to a space seperated string
+                if ($paramValue -is [array])
+                {
+                    $paramValue = $paramValue -join ' '
+                    Write-Verbose "Converted array parameter '$paramName' to space-separated string: $paramValue"
+                }
+                $getTokenParams[$paramName] = $paramValue
+            }
+            else
+            {
+                Write-Verbose "Skipping delegated parameter '$paramName' because Deligated is not true"
+            }
+        }
+        else
+        {
+            # Add general parameters (not restricted to delegated mode)
+            Write-Verbose "Adding parameter '$paramName' with value: $paramValue"
+            $getTokenParams[$paramName] = $paramValue
+        }
+    }
+
+    # Log the final splatting parameters for verification
+    Write-Verbose "Final splatting parameters:"
+    foreach ($param in $getTokenParams.GetEnumerator())
+    {
+        if ($param.Key -eq 'configFile')
+        {
+            Write-Verbose "  $($param.Key): $($param.Value)"
+        }
+        elseif ($param.Value -is [bool])
+        {
+            Write-Verbose "  $($param.Key): $($param.Value)"
+        }
+        else
+        {
+            Write-Verbose "  $($param.Key): '$($param.Value)'"
+        }
+    }
+    # Return the splatting hashtable
+    return $getTokenParams
+}
+
+function ProcessFilterCondition()
+{
+    [CmdletBinding()]
+    param(
+        [string]$condition
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Processing filter condition: $condition"
+    # Check if this is a function-based filter (contains, startswith, endswith)
+    Write-Verbose "[$functionName] Checking for function-based filter..."
+    if ($condition -match '(startswith|contains|endswith)\s*\(([^,]+),\s*([^)]+)\)')
+    {
+        Write-Verbose "[$functionName] Found function-based filter: $($Matches[1])"
+        $filterOperator = $Matches[1]
+        Write-Verbose "[$functionName] Filter Operator: $filterOperator"
+        $filterKey = $Matches[2].Trim()
+        Write-Verbose "[$functionName] Filter Key: $filterKey"
+        $filterValue = $Matches[3].Trim()
+        Write-Verbose "[$functionName] Filter Value: $filterValue"
+        # Remove quotes if present in the value
+        Write-Verbose "[$functionName] Removing quotes from filter value..."
+        $filterValue = $filterValue -replace "^'|'$", ""
+        Write-Verbose "[$functionName] Filter Value after removing double quotes: $filterValue"
+        $filterValue = $filterValue -replace '^"|"$', ""
+        Write-Verbose "[$functionName] Filter Value after removing single quotes: $filterValue"
+        Write-Verbose "[$functionName] Filter Key after removing quotes: $FilterKey"
+        Write-Verbose "[$functionName] Filter Value: $FilterValue"
+        Write-Verbose "[$functionName] Filter Operator: $FilterOperator"
+        $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
+        Write-Verbose "[$functionName] Encoded Filter Value: $encodedFilterValue"
+        # Rebuild the function call with encoded value
+        $returnFilter = "$filterOperator($filterKey,'$encodedFilterValue')"
+        Write-Verbose "[$functionName] Returning filter: $returnFilter"
+        return $returnFilter
+    }
+    # Check for standard comparison operators
+    elseif ($condition -match '([^\s]+)\s+(eq|ne|gt|lt|ge|le)\s+(.+)')
+    {
+        Write-Verbose "[$functionName] Not a function based filter. Checking for standard comparison operators..."
+        $filterKey = $Matches[1].Trim()
+        $filterOperator = $Matches[2].Trim()
+        $filterValue = $Matches[3].Trim()
+        Write-Verbose "[$functionName] Filter Key: $FilterKey"
+        Write-Verbose "[$functionName] Filter Operator: $FilterOperator"
+        Write-Verbose "[$functionName] Filter Value: $FilterValue"
+        # Special handling for null and empty string
+        Write-Verbose "[$functionName] Checking for null or empty string..."
+        if ($filterValue -eq "null" -or $filterValue -eq "''" -or $filterValue -eq '""')
+        {
+            Write-Verbose "[$functionName] Filter value is null or empty string."
+            Write-Verbose "[$functionName] Returning filter without encoding: $filterKey $filterOperator $filterValue"
+            # Don't encode null or empty string values
+            return "$filterKey $filterOperator $filterValue"
+        }
+        else
+        {
+            # Remove quotes if present
+            Write-Verbose "[$functionName] Checking for quotes and removing from value if present..."
+            Write-Verbose "[$functionName] Value before processing: $filterValue"
+            $filterValue = $filterValue -replace "^'|'$", ""
+            Write-Verbose "[$functionName] Value after removing double quotes: $filterValue"
+            $filterValue = $filterValue -replace '^"|"$', ""
+            Write-Verbose "[$functionName] Value after removing single quotes: $filterValue"
+            Write-Verbose "[$functionName] Filter Key: $FilterKey"
+            Write-Verbose "[$functionName] Filter Value: $FilterValue"
+            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
+            Write-Verbose "[$functionName] Encoded Filter Value: $encodedFilterValue"
+            # Add quotes back for the encoded value
+            $returnFilter = "$filterKey $filterOperator '$encodedFilterValue'"
+            Write-Verbose "[$functionName] Returning filter: $returnFilter"
+            return $returnFilter
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Unrecognized filter condition format: $condition"
+        return $condition
+    }
+}
+
 function GetGraphAccessToken()
 {
     [CmdletBinding()]
@@ -1848,7 +2121,7 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'Deligated')]
         [switch]$Deligated,
         [parameter(parameterSetName = 'Deligated')]
-        [string]$Scopes,
+        [string]$Scope,
         [parameter(parameterSetName = 'Deligated')]
         [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
         [string]$AuthType = 'Private',
@@ -1946,7 +2219,7 @@ function GetGraphAccessToken()
     Write-Verbose "[$functionName] Cache Type: $CacheType"
     Write-Verbose "[$functionName] Domain: $domain"
     Write-Verbose "[$functionName] Deligated: $Deligated"
-    Write-Verbose "[$functionName] Scopes: $Scopes"
+    Write-Verbose "[$functionName] Scopes: $Scope"
     Write-Verbose "[$functionName] Config has refresh token: $($null -ne $configRefreshToken)"
     #endregion Log parameters
     
@@ -1959,7 +2232,7 @@ function GetGraphAccessToken()
     if (-not $ForceNewToken)
     {
         $accessToken = Get-TokenFromCache -cacheType $CacheType -domain $domain -renewalLeadTime $renewalLeadTime `
-            -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scopes `
+            -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scope `
             -deligated $Deligated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile `
             -secureString $SecureString -configFilePath $configFile -configRefreshToken $configRefreshToken
         if ($accessToken)
@@ -1980,7 +2253,7 @@ function GetGraphAccessToken()
         $params = @{
             tenantId           = $tenantId 
             clientId           = $clientId 
-            scopes             = $Scopes 
+            scopes             = $Scope
             domain             = $domain 
             cacheType          = $CacheType
             AuthType           = $AuthType
@@ -2033,87 +2306,6 @@ function GetGraphAccessToken()
         }
     }
     #endregion Authentication flow
-}
-
-function ProcessFilterCondition()
-{
-    [CmdletBinding()]
-    param(
-        [string]$condition
-    )
-
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Processing filter condition: $condition"
-    # Check if this is a function-based filter (contains, startswith, endswith)
-    Write-Verbose "[$functionName] Checking for function-based filter..."
-    if ($condition -match '(startswith|contains|endswith)\s*\(([^,]+),\s*([^)]+)\)')
-    {
-        Write-Verbose "[$functionName] Found function-based filter: $($Matches[1])"
-        $filterOperator = $Matches[1]
-        Write-Verbose "[$functionName] Filter Operator: $filterOperator"
-        $filterKey = $Matches[2].Trim()
-        Write-Verbose "[$functionName] Filter Key: $filterKey"
-        $filterValue = $Matches[3].Trim()
-        Write-Verbose "[$functionName] Filter Value: $filterValue"
-        # Remove quotes if present in the value
-        Write-Verbose "[$functionName] Removing quotes from filter value..."
-        $filterValue = $filterValue -replace "^'|'$", ""
-        Write-Verbose "[$functionName] Filter Value after removing double quotes: $filterValue"
-        $filterValue = $filterValue -replace '^"|"$', ""
-        Write-Verbose "[$functionName] Filter Value after removing single quotes: $filterValue"
-        Write-Verbose "[$functionName] Filter Key after removing quotes: $FilterKey"
-        Write-Verbose "[$functionName] Filter Value: $FilterValue"
-        Write-Verbose "[$functionName] Filter Operator: $FilterOperator"
-        $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
-        Write-Verbose "[$functionName] Encoded Filter Value: $encodedFilterValue"
-        # Rebuild the function call with encoded value
-        $returnFilter = "$filterOperator($filterKey,'$encodedFilterValue')"
-        Write-Verbose "[$functionName] Returning filter: $returnFilter"
-        return $returnFilter
-    }
-    # Check for standard comparison operators
-    elseif ($condition -match '([^\s]+)\s+(eq|ne|gt|lt|ge|le)\s+(.+)')
-    {
-        Write-Verbose "[$functionName] Not a function based filter. Checking for standard comparison operators..."
-        $filterKey = $Matches[1].Trim()
-        $filterOperator = $Matches[2].Trim()
-        $filterValue = $Matches[3].Trim()
-        Write-Verbose "[$functionName] Filter Key: $FilterKey"
-        Write-Verbose "[$functionName] Filter Operator: $FilterOperator"
-        Write-Verbose "[$functionName] Filter Value: $FilterValue"
-        # Special handling for null and empty string
-        Write-Verbose "[$functionName] Checking for null or empty string..."
-        if ($filterValue -eq "null" -or $filterValue -eq "''" -or $filterValue -eq '""')
-        {
-            Write-Verbose "[$functionName] Filter value is null or empty string."
-            Write-Verbose "[$functionName] Returning filter without encoding: $filterKey $filterOperator $filterValue"
-            # Don't encode null or empty string values
-            return "$filterKey $filterOperator $filterValue"
-        }
-        else
-        {
-            # Remove quotes if present
-            Write-Verbose "[$functionName] Checking for quotes and removing from value if present..."
-            Write-Verbose "[$functionName] Value before processing: $filterValue"
-            $filterValue = $filterValue -replace "^'|'$", ""
-            Write-Verbose "[$functionName] Value after removing double quotes: $filterValue"
-            $filterValue = $filterValue -replace '^"|"$', ""
-            Write-Verbose "[$functionName] Value after removing single quotes: $filterValue"
-            Write-Verbose "[$functionName] Filter Key: $FilterKey"
-            Write-Verbose "[$functionName] Filter Value: $FilterValue"
-            $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
-            Write-Verbose "[$functionName] Encoded Filter Value: $encodedFilterValue"
-            # Add quotes back for the encoded value
-            $returnFilter = "$filterKey $filterOperator '$encodedFilterValue'"
-            Write-Verbose "[$functionName] Returning filter: $returnFilter"
-            return $returnFilter
-        }
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Unrecognized filter condition format: $condition"
-        return $condition
-    }
 }
 
 function CallGraphAPI()

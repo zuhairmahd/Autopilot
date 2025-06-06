@@ -634,42 +634,180 @@ function MergeSettings()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        $settings,
+        $localSettings,
         [Parameter(Mandatory = $true)]
-        $globalSettings
+        $globalSettings,
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Local', 'Global')]
+        [string]$ConflictResolution = 'Global'
     )
+    $functionName = $MyInvocation.MyCommand.Name
     $merged = @{}
-
-    # Add all keys from $settings
-    foreach ($property in $settings.PSObject.Properties)
+    
+    # Helper function to flatten a nested object into a flat hashtable
+    function ConvertTo-FlatHashtable($object, $prefix = '')
     {
-        $merged[$property.Name] = $property.Value
-    }
-
-    # Add/merge all keys from $globalSettings
-    foreach ($property in $globalSettings.PSObject.Properties)
-    {
-        if ($merged.ContainsKey($property.Name))
+        $flatHash = @{}
+        $functionName = $MyInvocation.MyCommand.Name
+        if ($object -is [hashtable] -or $object -is [System.Collections.IDictionary])
         {
-            # If both are arrays, merge arrays
-            if ($merged[$property.Name] -is [System.Collections.IEnumerable] -and
-                $property.Value -is [System.Collections.IEnumerable] -and
-                ($merged[$property.Name] -isnot [string]) -and
-                ($property.Value -isnot [string]))
+            Write-Verbose "[$functionName] Flattening hashtable/dictionary with $($object.Keys.Count) keys"
+            foreach ($key in $object.Keys)
             {
-                $merged[$property.Name] = @($merged[$property.Name] + $property.Value)
+                $fullKey = if ($prefix)
+                {
+                    "$prefix.$key" 
+                }
+                else
+                {
+                    $key 
+                }
+                $value = $object[$key]
+                
+                if (($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
+                    ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0))
+                {
+                    Write-Verbose "[$functionName] Found nested object at key: $fullKey"
+                    $nestedFlat = ConvertTo-FlatHashtable $value $fullKey
+                    foreach ($nestedKey in $nestedFlat.Keys)
+                    {
+                        $flatHash[$nestedKey] = $nestedFlat[$nestedKey]
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Adding flat key: $fullKey"
+                    $flatHash[$fullKey] = $value
+                }
             }
-            else
+        }
+        elseif ($object -is [PSCustomObject])
+        {
+            Write-Verbose "[$functionName] Flattening PSCustomObject with $($object.PSObject.Properties.Count) properties"
+            foreach ($property in $object.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' })
             {
-                # Otherwise, overwrite
-                $merged[$property.Name] = $property.Value
+                $fullKey = if ($prefix)
+                {
+                    "$prefix.$($property.Name)" 
+                }
+                else
+                {
+                    $property.Name 
+                }
+                $value = $property.Value
+                
+                if (($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
+                    ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0))
+                {
+                    Write-Verbose "[$functionName] Found nested object at property: $fullKey"
+                    $nestedFlat = ConvertTo-FlatHashtable $value $fullKey
+                    foreach ($nestedKey in $nestedFlat.Keys)
+                    {
+                        $flatHash[$nestedKey] = $nestedFlat[$nestedKey]
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Adding flat property: $fullKey"
+                    $flatHash[$fullKey] = $value
+                }
             }
         }
         else
         {
-            $merged[$property.Name] = $property.Value
+            # If it's a simple value, just return it with the prefix as key
+            if ($prefix)
+            {
+                $flatHash[$prefix] = $object
+            }
+        }
+        
+        return $flatHash
+    }    Write-Verbose "[$functionName] Merging settings with conflict resolution: $ConflictResolution"
+    
+    # Flatten local settings
+    Write-Verbose "[$functionName] Flattening local settings"
+    $flatLocalSettings = ConvertTo-FlatHashtable $localSettings
+    Write-Verbose "[$functionName] Local settings flattened to $($flatLocalSettings.Count) properties"
+    
+    # Flatten global settings
+    Write-Verbose "[$functionName] Flattening global settings"
+    $flatGlobalSettings = ConvertTo-FlatHashtable $globalSettings
+    Write-Verbose "[$functionName] Global settings flattened to $($flatGlobalSettings.Count) properties"
+    
+    # Normalize all keys to simple format (remove any prefixes)
+    function Get-SimpleKey($key)
+    {
+        if ($key.Contains('.'))
+        {
+            return $key.Split('.')[-1]  # Get the last part after the last dot
+        }
+        return $key
+    }
+    
+    # Create normalized hashtables with simple keys
+    $normalizedLocal = @{}
+    foreach ($key in $flatLocalSettings.Keys)
+    {
+        $simpleKey = Get-SimpleKey $key
+        $normalizedLocal[$simpleKey] = $flatLocalSettings[$key]
+        Write-Verbose "[$functionName] Normalized local key: $key -> $simpleKey"
+    }
+    
+    $normalizedGlobal = @{}
+    foreach ($key in $flatGlobalSettings.Keys)
+    {
+        $simpleKey = Get-SimpleKey $key
+        $normalizedGlobal[$simpleKey] = $flatGlobalSettings[$key]
+        Write-Verbose "[$functionName] Normalized global key: $key -> $simpleKey"
+    }
+    
+    # Start with local settings
+    foreach ($key in $normalizedLocal.Keys)
+    {
+        $merged[$key] = $normalizedLocal[$key]
+        Write-Verbose "[$functionName] Added local setting: $key"
+    }
+    
+    # Merge global settings
+    foreach ($key in $normalizedGlobal.Keys)
+    {
+        if ($merged.ContainsKey($key))
+        {
+            Write-Verbose "[$functionName] Conflict detected for property: $key"
+            
+            # If both are arrays, merge arrays
+            if ($merged[$key] -is [System.Collections.IEnumerable] -and
+                $normalizedGlobal[$key] -is [System.Collections.IEnumerable] -and
+                ($merged[$key] -isnot [string]) -and
+                ($normalizedGlobal[$key] -isnot [string]))
+            {
+                Write-Verbose "[$functionName] Both values are arrays, merging arrays for: $key"
+                $merged[$key] = @($merged[$key] + $normalizedGlobal[$key])
+            }
+            else
+            {
+                # Handle conflict based on ConflictResolution parameter
+                if ($ConflictResolution -eq 'Global')
+                {
+                    Write-Verbose "[$functionName] Resolving conflict by using global value for: $key"
+                    $merged[$key] = $normalizedGlobal[$key]
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Resolving conflict by keeping local value for: $key"
+                    # Keep the existing local value (do nothing)
+                }
+            }
+        }
+        else
+        {
+            $merged[$key] = $normalizedGlobal[$key]
+            Write-Verbose "[$functionName] Added global setting: $key"
         }
     }
+    
+    Write-Verbose "[$functionName] Final merged settings count: $($merged.Count)"
     return $merged
 }
 

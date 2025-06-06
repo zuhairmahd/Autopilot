@@ -1,33 +1,16 @@
 {
   "description": "This is the configuration file for the Intune helpdesk script. It contains the settings for the script to run correctly.",
   "version": "1.0",
-  "auth": {
-    "Deligated": false,
-    "authType": "PublicAuthFlow",
-    "NoSaveRefreshToken": false,
-    "scopes": [
-      "offline_access",
-      "openid",
-      "Device.ReadWrite.All",
-      "DeviceManagementApps.Read.All",
-      "DeviceManagementConfiguration.ReadWrite.All",
-      "DeviceManagementManagedDevices.PrivilegedOperations.All",
-      "DeviceManagementManagedDevices.ReadWrite.All",
-      "DeviceManagementServiceConfig.ReadWrite.All"
-    ]
-  },
   "globalSettings": {
     "operatingSystem": "Windows",
-    "testMode": false
-  },
-  "vars": {
+    "testMode": false,
     "configFile": ".\\\\.secrets\\\\config.json",
     "maxWaitTime": "30",
     "timeInSeconds": "60",
     "Release": "2.5",
     "Repo": "Github",
     "appMode": "full",
-    "GroupTag": "MSB01"
+    "GroupTag": "ENTRA"
   },
   "domains": {
     "gao.gov": {
@@ -45,8 +28,11 @@
         "MaxUserNameLength": 50,
         "MaxSerialNumberLength": 100,
         "MinSerialNumberLength": 7,
+        "preferredBrowser": "Chrome",
+        "privateSession": true,
         "MinimumDevicePhysicalMemoryInGB": 16,
         "MinUsernameLength": 3,
+        "GroupTag": "MSB01",
         "DesiredAutopilotProfiles": [
           "msb"
         ]

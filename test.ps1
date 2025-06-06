@@ -25,13 +25,13 @@ else
 #endregion
 
 #region variables
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+# $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
-$userUri = "users"
-$managedAppUri = "deviceAppManagement/mobileApps"
-$appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
+# $userUri = "users"
+# $managedAppUri = "deviceAppManagement/mobileApps"
+# $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
 # $importedAutopilotDeviceExtraParameters = "select=serialNumber,importId,groupTag,state"
 # $unmanagedDeviceUri = "devices"
@@ -46,7 +46,7 @@ $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -AuthType 'PublicAuthFlow' -NoSaveRefreshToken
-$accessToken = GetGraphAccessToken -configFile $configFile
+# $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
@@ -57,8 +57,3 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
-
-
-$extraParameters = "select=accountEnabled,givenName,surname,displayName,mail,userPrincipalName&top=999"
-
-$global:users = CallGraphApi -ResourcePath $userUri -accessToken $accessToken -extraParameters $extraParameters
