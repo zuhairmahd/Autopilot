@@ -5,7 +5,7 @@ param(
     [string]$outputFile = '',
     [string]$Version = '',
     [string]$CompanyName = 'Zuhair Mahmoud',
-    [switch]$MergeOnly,
+    [switch]$CreateModule,
     [switch]$Overwrite
 )
 
@@ -172,7 +172,7 @@ function MergeFunctions()
 
     $functionName = $MyInvocation.MyCommand.Name
     $success = $false
-    $AddComments = $true # Set default to true for backward compatibility with PS 5.1
+    # $AddComments = $true # Set default to true for backward compatibility with PS 5.1
     Write-Verbose "[$functionName] Starting to merge functions from $(($FilesToMerge | Measure-Object).Count) files."
     $mergedContent = New-Object System.Text.StringBuilder
     # Add header to the merged content
@@ -235,7 +235,17 @@ function MergeFunctions()
     try
     {
         # Ensure the destination directory exists
-        $destinationDir = Split-Path -Parent $DestinationFile
+        if ($DestinationFile -contains '\')
+        {
+            Write-Verbose "[$functionName] Destination file contains a path: $DestinationFile"
+            $destinationDir = Split-Path -Parent $DestinationFile    
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Destination file does not contain a path, using current directory: $pwd"
+            $destinationDir = $pwd
+        }
+        
         if (-not (Test-Path -Path $destinationDir))
         {
             Write-Verbose "[$functionName] Creating destination directory: $destinationDir"
@@ -353,21 +363,45 @@ $successMessage = "$OutputFile written"
 $scriptName = $MyInvocation.MyCommand.Name
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 Write-Host "Starting build script on $todaysDate"
-if ($outputFile -eq '')
+if (-not $createModule) 
 {
-    Write-Verbose "[$scriptName] No output file specified. Using default output file name."
-    $leafName = Split-Path -Leaf $InputFile
-    Write-Verbose "[$scriptName] Leaf name is: $leafName"
-    $exeName = $leafName.Replace('.ps1', '.exe')
-    Write-Verbose "[$scriptName] Executable name is: $exeName"
-    $outputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
-    Write-Verbose "[$scriptName] Output file set to: $outputFile"
-    Write-Host "No output file specified. Output file set to: $outputFile"
+    if ($outputFile -eq '')
+    {
+        Write-Verbose "[$scriptName] No output file specified. Using default output file name."
+        $leafName = Split-Path -Leaf $InputFile
+        Write-Verbose "[$scriptName] Leaf name is: $leafName"
+        $exeName = $leafName.Replace('.ps1', '.exe')
+        Write-Verbose "[$scriptName] Executable name is: $exeName"
+        $outputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
+        Write-Verbose "[$scriptName] Output file set to: $outputFile"
+        Write-Host "No output file specified. Output file set to: $outputFile"
+    }
+    $parentFolder = Split-Path -Parent $outputFile
 }
-$parentFolder = Split-Path -Parent $outputFile
+else 
+{
+    Write-Host "Creating module functions."
+    $outputFile = $inputFile -Replace 'ps1', 'psm1'
+}
 #endregion
 
 #region initial checks
+if ($CreateModule)
+{
+    Write-Host "Creating module functions in $outputFile."
+    $mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $outputFile
+    if ($mergeResult -eq $true)
+    {
+        Write-Host "Module created successfully: $outputFile."
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to create module: $outputFile."
+        exit 1
+    }
+}
+
 #Check if the initialization file exists.  If not, create it.
 if (-not (Test-Path -Path $initFile))
 {

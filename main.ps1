@@ -107,22 +107,43 @@ else
 }
 #endregion Load parameters from the configuration file if it exists
 
-#region import functions.
-$functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder)
+#Check if 'main.psm1' exists in the current folder and if it was created today, if so, import it.
+$mainModulePath = "$PWD\main.psm1" 
+$moduleObject = Get-Item -Path $mainModulePath -ErrorAction SilentlyContinue
+if ((Test-Path -Path $mainModulePath) -and ($moduleObject.CreationTime -ge (Get-Date).Date))
 {
-    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-    foreach ($function in $functions)
+    Write-Verbose "[$scriptName] Importing main module from $mainModulePath"
+    Import-Module -Name $mainModulePath -Force -ErrorAction Stop
+}
+else
+{
+    Write-Verbose "[$scriptName] Main module $mainModulePath not found or not created today. Skipping import."
+}
+
+#region import functions.
+if (-not (Get-Module -Name 'main' -ErrorAction SilentlyContinue))
+{
+    Write-Host "Main module not found. Attempting to import functions."
+    $functionsFolder = "$PWD\functions"
+    if (Test-Path $functionsFolder)
     {
-        Write-Verbose "[$scriptName] Importing function $function"
-        . $function.FullName
+        Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+        foreach ($function in $functions)
+        {
+            Write-Verbose "[$scriptName] Importing function $function"
+            . $function.FullName
+        }
+    }
+    else
+    {
+        Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+        exit 1
     }
 }
 else
 {
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
-    exit 1
+    Write-Verbose "[$scriptName] Main module already loaded. Skipping function import."
 }
 #endregion import functions.
 
