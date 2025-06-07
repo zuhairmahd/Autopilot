@@ -107,23 +107,36 @@ else
 }
 #endregion Load parameters from the configuration file if it exists
 
-#Check if 'main.psm1' exists in the current folder and if it was created today, if so, import it.
-$mainModulePath = "$PWD\main.psm1" 
-$moduleObject = Get-Item -Path $mainModulePath -ErrorAction SilentlyContinue
-if ((Test-Path -Path $mainModulePath) -and ($moduleObject.CreationTime -ge (Get-Date).Date))
+#Attempt to import module if found.
+$moduleFileName = 'HelperModule.psm1'
+$moduleObject = Get-Item -Path $moduleFileName -Force
+$moduleName = $moduleObject.BaseName
+if ($moduleObject -and $moduleObject.PSIsContainer -eq $false)
 {
-    Write-Verbose "[$scriptName] Importing main module from $mainModulePath"
-    Import-Module -Name $mainModulePath -Force -ErrorAction Stop
+    Write-Verbose "[$scriptName] Importing module $moduleFileName"
+    try
+    {
+        Import-Module -Name $moduleObject -Force -ErrorAction SilentlyContinue
+        Write-Verbose "[$scriptName] Module $moduleFileName imported successfully."
+    }
+    catch
+    {
+        Write-Verbose "[$scriptName] Failed to import module $moduleFileName. Error: $_"
+    }
 }
 else
 {
-    Write-Verbose "[$scriptName] Main module $mainModulePath not found or not created today. Skipping import."
+    Write-Verbose "[$scriptName] Module $moduleFileName not found in the current directory. Skipping import."
 }
 
 #region import functions.
-if (-not (Get-Module -Name 'main' -ErrorAction SilentlyContinue))
+if (Get-Module -Name $moduleName -ErrorAction SilentlyContinue)
 {
-    Write-Host "Main module not found. Attempting to import functions."
+    Write-Verbose "[$scriptName] Module $moduleName is already imported."
+}
+else
+{
+    Write-Host "Module $moduleName not found. Attempting to import functions."
     $functionsFolder = "$PWD\functions"
     if (Test-Path $functionsFolder)
     {
@@ -140,10 +153,6 @@ if (-not (Get-Module -Name 'main' -ErrorAction SilentlyContinue))
         Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
         exit 1
     }
-}
-else
-{
-    Write-Verbose "[$scriptName] Main module already loaded. Skipping function import."
 }
 #endregion import functions.
 

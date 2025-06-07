@@ -1,15 +1,3 @@
-#region Inlined Functions
-# This section contains inlined functions from multiple files
-# Generated on: 2025-06-06 22:56:22
-# Source files:
-#   - C:\Users\zuhai\code\Autopilot\functions\DeviceAndUserLookupFunctions.ps1
-#   - C:\Users\zuhai\code\Autopilot\functions\DeviceFunctions.ps1
-#   - C:\Users\zuhai\code\Autopilot\functions\DeviceReportingFunctions.ps1
-#   - C:\Users\zuhai\code\Autopilot\functions\GraphAPIFunctions.ps1
-#   - C:\Users\zuhai\code\Autopilot\functions\MenuFunctions.ps1
-#   - C:\Users\zuhai\code\Autopilot\functions\MiscFunctions.ps1
-#   - C:\Users\zuhai\code\Autopilot\functions\ScriptUpdateFunctions.ps1
-
 function VerifyGroupMembership()
 {
     [CmdletBinding()]
@@ -8078,6 +8066,4 @@ function GetUpdates()
     #endregion
 }
 
-
-#endregion Inlined Functions
 
