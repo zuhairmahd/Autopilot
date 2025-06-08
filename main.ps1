@@ -134,14 +134,15 @@ else
     Write-Verbose "[$scriptName] Module $moduleFileName not found in the current directory. Skipping import."
 }
 
-
 if (Get-Module -Name $moduleName -ErrorAction SilentlyContinue)
 {
     Write-Verbose "[$scriptName] Module $moduleName is already imported."
 }
 else
 {
-    Write-Host "Module $moduleName not found. Attempting to import functions."
+    Write-Verbose "[$scriptName] Module $moduleName not found. Attempting to import functions."
+    #beep
+    [console]::beep(200, 100)
     $functionsFolder = "$PWD\functions"
     if (Test-Path $functionsFolder)
     {
@@ -454,6 +455,17 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
 }
 $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Use this device's serial number." -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -NoHash
     Write-Verbose "[$scriptName] Device object: $($deviceObject)"
     if ($deviceObject)
@@ -479,6 +491,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
     {
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
     }
     $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken
@@ -495,6 +508,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
     {
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
     }
     $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
@@ -502,6 +516,36 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
     {
         Write-Verbose "[$scriptName] Custom import aborted. Returning $backoutText."
         return $backoutText
+    }
+}
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Getting device object."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    if ($deviceObject)
+    {
+        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+        $outputFile = "\device_$($deviceObject.serialNumber).csv"
+        if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
+        {
+            Write-Host 'Device hash created successfully.' -ForegroundColor Green
+            Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
+            Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
+            Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host 'Failed to create device hash.' -ForegroundColor Red
+        }
     }
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
@@ -515,6 +559,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
     {
         Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
     }
     Write-Host 'Downloading and installing the latest Windows updates...'
     $updateResult = ApplyWindowsUpdates
@@ -545,35 +590,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Getting device object."
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-    }
-    if ($deviceObject)
-    {
-        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-        $outputFile = "\device_$($deviceObject.serialNumber).csv"
-        if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
-        {
-            Write-Host 'Device hash created successfully.' -ForegroundColor Green
-            Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
-            Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
-            Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host 'Failed to create device hash.' -ForegroundColor Red
-        }
-    }
-}
+
 #endregion Autopilot menu
 
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
