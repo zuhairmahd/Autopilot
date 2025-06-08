@@ -107,10 +107,15 @@ else
 }
 #endregion Load parameters from the configuration file if it exists
 
+#region import functions.
 #Attempt to import module if found.
+$moduleName = 'HelperModule'
 $moduleFileName = 'HelperModule.psm1'
-$moduleObject = Get-Item -Path $moduleFileName -Force
-$moduleName = $moduleObject.BaseName
+$moduleObject = Get-Item -Path $moduleFileName -Force -ErrorAction SilentlyContinue
+if ($null -ne $moduleObject)
+{
+    $moduleName = $moduleObject.BaseName
+}
 if ($moduleObject -and $moduleObject.PSIsContainer -eq $false)
 {
     Write-Verbose "[$scriptName] Importing module $moduleFileName"
@@ -129,7 +134,7 @@ else
     Write-Verbose "[$scriptName] Module $moduleFileName not found in the current directory. Skipping import."
 }
 
-#region import functions.
+
 if (Get-Module -Name $moduleName -ErrorAction SilentlyContinue)
 {
     Write-Verbose "[$scriptName] Module $moduleName is already imported."
@@ -237,6 +242,11 @@ $returnValues = [ordered] @{
     UpdateFailedMessage     = 'Could not download update.'
     UpdateSuccessMessage    = 'The script was updated successfully.'
     UpdateNotNeededMessage  = 'The script is already up to date.'
+    999                     = 'No updates were found'
+    1000                    = 'All updates were installed'
+    1001                    = 'Some updates were installed'
+    10002                   = 'Some updates were installed'
+    1003                    = 'Updates failed to install'
 }
 if (Test-Path -Path $versionFile)
 {
@@ -460,12 +470,32 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+    }
     $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+    }
     $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
     if ($result -eq $backoutText)
@@ -473,6 +503,22 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         Write-Verbose "[$scriptName] Custom import aborted. Returning $backoutText."
         return $backoutText
     }
+}
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
+    Write-Verbose "[$scriptName] Download and install latest Windows updates."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+    }
+    Write-Host 'Downloading and installing the latest Windows updates...'
+    $updateResult = ApplyWindowsUpdates
+    Write-Host $returnValues.$updateResult
 }
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $serialNumberMenu
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
