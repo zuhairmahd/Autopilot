@@ -874,8 +874,8 @@ function AssessDeviceState()
                 if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
                 {
                     Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of RAM, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
-                    $readinessState = 'Ready'
-                    $action = 'None'
+                    $readinessState = $deviceStates.ready 
+                    $action = $deviceActions.none
                     $device = $enrollmentState.managedDevice.device.id
                 }
                 else
@@ -886,67 +886,67 @@ function AssessDeviceState()
                     if ($autopilotReadiness.CorrectProfile -eq $false)
                     {
                         Write-Host "The device is not assigned to the correct autopilot profile."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($autopilotReadiness.ProfileAssigned -eq $false)
                     {
                         Write-Host "The device is not assigned to an autopilot profile."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($autopilotReadiness.RemediationStateGood -eq $false)
                     {
                         Write-Host "The device has a remediation state that is not valid."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($autopilotReadiness.EnrollmentStateGood -eq $false)
                     {
                         Write-Host "The device has an enrollment state that is not valid."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($managedDeviceReadiness.OrphanDevice -eq $true)
                     {
                         Write-Host "The device is an orphan device."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($managedDeviceReadiness.CorrectRam -eq $false)
                     {
                         Write-Host "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
                         Write-Host "Contact Hardware and Logistics."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($managedDeviceReadiness.HasUser)
                     {
                         Write-Host "The managed device is associated with a user."
                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                        $readinessState = 'NotReady'
-                        $action = 'WipeOrClean'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.WipeOrClean
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     elseif ($managedDeviceReadiness.ValidUser -eq $false)
                     {
                         Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                        $readinessState = 'NotReady'
-                        $action = 'WipeOrClean'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.WipeOrClean
                         $device = $enrollmentState.managedDevice.device.id
                     }
                     else
                     {
                         Write-Host "The device is not ready for the next user."
-                        $readinessState = 'NotReady'
-                        $action = 'ContactAdmin'
+                        $readinessState = $deviceStates.notReady
+                        $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
                 }
@@ -955,8 +955,8 @@ function AssessDeviceState()
             {
                 Write-Host "The device is not registered in Autopilot."
                 Write-Host "You may want to contact an Intune admin."
-                $readinessState = 'NotReady'
-                $action = 'ContactAdmin'
+                $readinessState = $deviceStates.notReady
+                $action = $deviceActions.contactAdmin
                 $device = $enrollmentState.managedDevice.device.id
             }
         }

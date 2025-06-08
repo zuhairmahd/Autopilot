@@ -250,6 +250,16 @@ $returnValues = [ordered] @{
     10002                   = 'Some updates were installed'
     1003                    = 'Updates failed to install'
 }
+$deviceStates = [ordered] @{
+    Ready    = 'The device is ready for the next user'
+    NotReady = 'The device is not ready for the next user'
+}
+$deviceActions = [ordered] @{
+    none            = 'No action'
+    contactAdmin    = 'Contact an Intune administrator'
+    contactHelpdesk = 'Contact the helpdesk'
+    WipeOrClean     = 'Wipe or clean the device'
+}
 if (Test-Path -Path $versionFile)
 {
     Write-Verbose "[$scriptName] Version file $versionFile found. Reading version."

@@ -1062,12 +1062,16 @@ function ProcessSerialNumber()
         if ($enrollmentState.inAutopilot)
         {
             Write-Host "This device is enrolled in Autopilot."
+            #capture the device information since this is the first place we can get it.
             if (-not $enrollmentState.managed)
             {
                 Write-Host "Model: $($enrollmentState.autopilot.device.model)"
                 Write-Host "Manufacturer: $($enrollmentState.autopilot.device.manufacturer)"
                 Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
                 Write-Host "=============================`n" -ForegroundColor Green
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
             if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
