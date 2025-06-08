@@ -74,4 +74,4 @@ else
 # }
 $fileName = ".\.secrets\config.json"
 $password = "abcdefg"
-Invoke-JsonFileEncryption -filePath $fileName -Key $password 
+Invoke-JsonFileEncryption -filePath $fileName -Key $password -decrypt
