@@ -57,3 +57,21 @@ else
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
+
+
+# $fileName = Read-Host -Prompt "Enter the path to the JSON file you want to encrypt (default: $configFile)"
+# $password = Read-Host -Prompt "Enter your password" -AsSecureString
+# $choice = Read-Host "Press 1 to encrypt, 2 to decrypt, or any other key to exit"
+# if ($choice -eq '2')
+# {
+# Invoke-JsonFileEncryption -filePath $fileName -Key $password
+# exit
+# }
+# elseif ($choice -ne '1')
+# {
+# Write-Host "Exiting script." -ForegroundColor Yellow
+# exit
+# }
+$fileName = ".\.secrets\config.json"
+$password = "abcdefg"
+Invoke-JsonFileEncryption -filePath $fileName -Key $password 
