@@ -39,10 +39,11 @@ function DisplayNumericMenu()
         Write-Verbose "[$functionName] Using ReadLine for input (requires Enter key)..."
         Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
         $selection = $host.UI.ReadLine()
+        Write-Verbose "[$functionName] User input received: '$selection'"
         Start-Sleep -Milliseconds 600
         # Clean input
         $selection = $selection.Trim()
-        Write-Verbose "[$functionName] Raw user input received: '$selection'"
+        Write-Verbose "[$functionName] Raw user input received after cleanup: '$selection'"
     }
     else
     {
@@ -59,12 +60,14 @@ function DisplayNumericMenu()
             {
                 $keyInfo = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
                 $selection = $keyInfo.Character.ToString()
+                Write-Verbose "[$functionName] Key pressed: '$selection' (Character code: $([int]$keyInfo.Character))"
                 $keyCode = [int]$keyInfo.VirtualKeyCode
-                Write-Verbose "[$functionName] Key pressed: '$selection' (Character code: $([int]$keyInfo.Character), VK: $keyCode)"
+                Write-Verbose "[$functionName] Key pressed virtual code: '$selection' (Character code: $([int]$keyInfo.Character), VK: $keyCode)"
                 # Handle special case for numpad keys which might have different character codes
                 if ($keyCode -ge 96 -and $keyCode -le 105)
                 {
                     # Convert numpad key codes (96-105) to numbers (0-9)
+                    Write-Verbose "[$functionName] Detected numpad key press."
                     $selection = ($keyCode - 96).ToString()
                     Write-Verbose "[$functionName] Converted numpad key to: $selection"
                 }
@@ -185,6 +188,63 @@ function AddMenuItem()
     return $Menu
 }
 
+function GoBack()
+{
+    [CmdletBinding()]
+    param(    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Going back to previous menu."
+    if ($History.Count -gt 0 -and $MenuHistory.Count -gt 0)
+    {
+        Write-Verbose "[$functionName] Removing last item from history since count is $($History.Count)"
+        $History.RemoveAt($History.Count - 1)
+        # Get previous menu from MenuHistory
+        Write-Verbose "[$functionName] Getting previous menu from MenuHistory since count is $($MenuHistory.Count)"
+        if ($MenuHistory.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] Finding previous menu by removing last item from MenuHistory."
+            $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
+            Write-Verbose "[$functionName] Previous menu found: $($previousMenu.Title)"
+            Write-Verbose "[$functionName] Removing last menu from MenuHistory since count is $($MenuHistory.Count)"
+            $MenuHistory.RemoveAt($MenuHistory.Count - 1)
+            Write-Verbose "[$functionName] Decreasing depth since we are going back."
+            $Depth = ($Depth - 1) 
+            Write-Verbose "[]$functionName] Current depth after going back: $Depth"
+            Write-Verbose "[$functionName] Returning to previous menu: $($previousMenu.Title)"
+            return ShowMenu -Menu $previousMenu 
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Cannot go back - no previous menu available"
+        return ShowMenu -Menu $Menu 
+    }
+}
+
+function GoToMainMenu()
+{
+    [CmdletBinding()]
+    param ()
+    Write-Verbose "[$functionName] Going to main menu."
+    # Go to main menu
+    if ($MenuHistory.Count -gt 0)
+    {
+        $mainMenu = $MenuHistory[0]
+        Write-Verbose "[$functionName] Clearing history and menu history since we are going to main menu."
+        $History.Clear()
+        $MenuHistory.Clear()
+        [void]$MenuHistory.Add($mainMenu)
+        Write-Verbose "[$functionName] Setting depth to 0 since we are going to main menu."
+        $Depth = 0
+        return ShowMenu -Menu $mainMenu
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Cannot go to main menu - no main menu available"
+        return ShowMenu -Menu $Menu 
+    }
+}
+
 function ShowMenu()
 {
     [CmdletBinding()]
@@ -214,7 +274,7 @@ function ShowMenu()
     # Clear-Host
     Write-Verbose "[$functionName] Clearing the screen for better readability." 
     
-    #display choices    
+    #region display choices and add navigation options
     $choices = @()
     $menuItems = @()
     Write-Verbose "[$functionName] Initializing choices and menu items."
@@ -226,7 +286,7 @@ function ShowMenu()
         Write-Verbose "[$functionName] Adding menu $($item.Name) to menu items."
         $menuItems += $item
     }
-    
+
     # Add navigation options - use ASCII friendly characters instead of Unicode arrows
     if ($Depth -gt 0)
     {
@@ -238,8 +298,9 @@ function ShowMenu()
         Write-Verbose "[$functionName] Adding main menu since the depth is $depth."
         $choices += "Main Menu"
     }
-    
-    # Create banner text
+    #endregion
+
+    #region Create banner text and breadcrumb
     Write-Verbose "[$functionName] Creating banner text."
     $banner = $Menu.Title
     if (-not [string]::IsNullOrEmpty($Menu.Description))
@@ -288,7 +349,8 @@ function ShowMenu()
     {
         $banner += "`n[$($Menu.Title)]"
     }
-    
+    #endregion
+
     # Display menu and get selection
     $selectedOption = DisplayNumericMenu -choices $choices -banner $banner -Prompt "Please select an option" -RequireEnter
     Write-Verbose "[$functionName] option received $selectedOption"
@@ -296,53 +358,11 @@ function ShowMenu()
     # Handle navigation options - check for both string and integer types
     if ($selectedOption -eq "Back" -or $selectedOption -eq "back")
     {
-        Write-Verbose "[$functionName] Going back to previous menu."
-        if ($History.Count -gt 0 -and $MenuHistory.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] Removing last item from history since count is $($History.Count)"
-            $History.RemoveAt($History.Count - 1)
-            # Get previous menu from MenuHistory
-            Write-Verbose "[$functionName] Getting previous menu from MenuHistory since count is $($MenuHistory.Count)"
-            if ($MenuHistory.Count -gt 0)
-            {
-                Write-Verbose "[$functionName] Finding previous menu by removing last item from MenuHistory."
-                $previousMenu = $MenuHistory[$MenuHistory.Count - 1]
-                Write-Verbose "[$functionName] Previous menu found: $($previousMenu.Title)"
-                Write-Verbose "[$functionName] Removing last menu from MenuHistory since count is $($MenuHistory.Count)"
-                $MenuHistory.RemoveAt($MenuHistory.Count - 1)
-                Write-Verbose "[$functionName] Decreasing depth since we are going back."
-                $Depth = ($Depth - 1) 
-                Write-Verbose "[]$functionName] Current depth after going back: $Depth"
-                Write-Verbose "[$functionName] Returning to previous menu: $($previousMenu.Title)"
-                return ShowMenu -Menu $previousMenu 
-            }
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Cannot go back - no previous menu available"
-            return ShowMenu -Menu $Menu 
-        }
+        GoBack
     }
     elseif ($selectedOption -eq "Main Menu" -or $selectedOption -eq "main menu")
     {
-        Write-Verbose "[$functionName] Going to main menu."
-        # Go to main menu
-        if ($MenuHistory.Count -gt 0)
-        {
-            $mainMenu = $MenuHistory[0]
-            Write-Verbose "[$functionName] Clearing history and menu history since we are going to main menu."
-            $History.Clear()
-            $MenuHistory.Clear()
-            [void]$MenuHistory.Add($mainMenu)
-            Write-Verbose "[$functionName] Setting depth to 0 since we are going to main menu."
-            $Depth = 0
-            return ShowMenu -Menu $mainMenu
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Cannot go to main menu - no main menu available"
-            return ShowMenu -Menu $Menu 
-        }
+        GoToMainMenu
     }
     elseif ($selectedOption -eq 0 -or $selectedOption -eq "0")
     {
@@ -353,7 +373,6 @@ function ShowMenu()
     {
         # Find the selected item - check if it's a navigation option first
         Write-Verbose "[$functionName] Finding selected item. Selected option: '$selectedOption'"
-        
         # Try to find the selected option in choices array
         $selectedIndex = -1
         for ($i = 0; $i -lt $choices.Count; $i++)

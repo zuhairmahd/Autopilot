@@ -822,7 +822,7 @@ function ProcessDevice()
     $model = $deviceObject.model
     Write-Verbose "[$functionName] The model is $model"
     #endregion check and initialize variables
-
+    
     switch ($action)
     {
         'import'
@@ -881,11 +881,9 @@ function ProcessDevice()
         {
             Write-Host "Checking device with serial number $serialNumber..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            
             if ($deviceAssignment)
             {
                 $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment -functionName $functionName
-                
                 if ($isAssigned)
                 {
                     # Handle enrollment state for assigned devices
@@ -905,18 +903,20 @@ function ProcessDevice()
                             return $returnValues.PendingMessage
                         }
                     }
-                    
                     # Show options for problem devices
                     Write-Host "What would you like to do?"
                     $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
                     $choice = DisplayNumericMenu -Choices $choices 
-                    
                     switch ($choice)
                     {
                         'Restart the device'
                         {
-                            Write-Host 'Restarting the device...'
-                            RestartDevice
+                            Write-Verbose "[$functionName] User chose to restart the device."
+                            if (-not (RestartDevice))
+                            {
+                                Write-Verbose "[$functionName] RestartDevice function returned false."
+                                return $returnValues.noRestartMessage 
+                            }
                         }
                         'Continue to wait for profile assignment'
                         {
@@ -929,34 +929,46 @@ function ProcessDevice()
                             if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
                             {
                                 Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                                return $returnValues.DeleteSuccessMessage
                             }
                             else
                             {
                                 Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                                return $null
+                                return $returnValues.DeleteFailedMessage
                             }
                         }
                     }
-                    return $true
                 }
             }
             else
             {
-                Write-Host 'The device is not in Intune.'
+                Write-Host 'The device is not in Autopilot.'
+                return $returnValues.notInIntuneMessage
             }
         }
         'delete'
         {
-            Write-Host "Deleting device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
-            if (DeleteAutopilotDevice -DeviceIdentifyer $serialNumber -IdentifyerType 'serialNumber')
+            Write-Host "Checking whether the device is in Autopilot..."
+            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            if ($deviceAssignment)
             {
-                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                return $returnValues.DeleteSuccessMessage
+                Write-Host "Deleting device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
+                if (DeleteAutopilotDevice -DeviceIdentifyer $serialNumber -IdentifyerType 'serialNumber')
+                {
+                    Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                    return $returnValues.DeleteSuccessMessage
+                }
+                else
+                {
+                    Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                    return $returnValues.DeleteFailedMessage
+                }
             }
             else
             {
-                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                return $returnValues.DeleteFailedMessage
+                Write-Host "The device with serial number $serialNumber is not in Autopilot." -ForegroundColor Yellow
+                Write-Host "No action taken." -ForegroundColor Yellow
+                return $returnValues.notInIntuneMessage 
             }
         }
         default
