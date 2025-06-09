@@ -28,9 +28,21 @@ Consistent with security best practices, the app uses a rotating encrypted secre
 4. Problems
 If you have any problems, please contact the author.
 
+
 5. Running Tests
 To execute the automated tests run:
 
 ```
 pwsh -File tests/run-tests.ps1
 ```
+
+5. Installing PowerShell
+If PowerShell is not available, you can install it using the helper script:
+
+```bash
+sudo ./scripts/install-powershell.sh
+```
+
+The script downloads the latest release, extracts it to `/usr/local/share/powershell`,
+creates a symlink at `/usr/local/bin/pwsh` and prints the installed version.
+
