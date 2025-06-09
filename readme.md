@@ -27,3 +27,11 @@ Consistent with security best practices, the app uses a rotating encrypted secre
 
 4. Problems
 If you have any problems, please contact the author.
+
+## Running Tests
+To execute the Pester tests, run:
+
+```powershell
+cd tests
+./run-tests.ps1
+```
