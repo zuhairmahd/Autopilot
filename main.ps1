@@ -774,7 +774,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
             $hasCorrectGroups = $true
         }
-        else
+        elseif ($selectedItem.Submenu)
         {
             Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group membershipss and $($groups.ForbiddenGroups.Count) forbidden group membershipss."
             Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
