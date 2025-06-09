@@ -108,21 +108,57 @@ else
 #endregion Load parameters from the configuration file if it exists
 
 #region import functions.
-$functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder)
+#Attempt to import module if found.
+$moduleName = 'HelperModule'
+$moduleFileName = 'HelperModule.psm1'
+$moduleObject = Get-Item -Path $moduleFileName -Force -ErrorAction SilentlyContinue
+if ($null -ne $moduleObject)
 {
-    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-    foreach ($function in $functions)
+    $moduleName = $moduleObject.BaseName
+}
+if ($moduleObject -and $moduleObject.PSIsContainer -eq $false)
+{
+    Write-Verbose "[$scriptName] Importing module $moduleFileName"
+    try
     {
-        Write-Verbose "[$scriptName] Importing function $function"
-        . $function.FullName
+        Import-Module -Name $moduleObject -Force -ErrorAction SilentlyContinue
+        Write-Verbose "[$scriptName] Module $moduleFileName imported successfully."
+    }
+    catch
+    {
+        Write-Verbose "[$scriptName] Failed to import module $moduleFileName. Error: $_"
     }
 }
 else
 {
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
-    exit 1
+    Write-Verbose "[$scriptName] Module $moduleFileName not found in the current directory. Skipping import."
+}
+
+if (Get-Module -Name $moduleName -ErrorAction SilentlyContinue)
+{
+    Write-Verbose "[$scriptName] Module $moduleName is already imported."
+}
+else
+{
+    Write-Verbose "[$scriptName] Module $moduleName not found. Attempting to import functions."
+    #beep
+    [console]::beep(200, 100)
+    $functionsFolder = "$PWD\functions"
+    if (Test-Path $functionsFolder)
+    {
+        Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+        foreach ($function in $functions)
+        {
+            Write-Verbose "[$scriptName] Importing function $function"
+            . $function.FullName
+        }
+    }
+    else
+    {
+        Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+        exit 1
+    }
 }
 #endregion import functions.
 
@@ -193,6 +229,7 @@ Write-Verbose "[$scriptName] Version file: $versionFile"
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $returnValues = [ordered] @{
+    noRestartMessage        = 'Device not restarted.'
     EnrolledMessage         = 'The device is enrolled.'
     notContactedMessage     = 'The device has not contacted the enrollment service.'
     PendingResetMessage     = 'The device is pending a reset.'
@@ -207,6 +244,11 @@ $returnValues = [ordered] @{
     UpdateFailedMessage     = 'Could not download update.'
     UpdateSuccessMessage    = 'The script was updated successfully.'
     UpdateNotNeededMessage  = 'The script is already up to date.'
+    999                     = 'No updates were found'
+    1000                    = 'All updates were installed'
+    1001                    = 'Some updates were installed'
+    10002                   = 'Some updates were installed'
+    1003                    = 'Updates failed to install'
 }
 if (Test-Path -Path $versionFile)
 {
@@ -239,7 +281,7 @@ $script:History = New-Object System.Collections.ArrayList
 $script:MenuHistory = New-Object System.Collections.ArrayList
 $script:previousMenu = New-Object System.Collections.Hashtable
 $script:depth = 0
-# Device enrollment state cache (serialNumber -> enrollmentState)
+# Device enrollment state cache content
 $script:DeviceEnrollmentCache = @{}
 #endregion Define variables
 
@@ -395,12 +437,12 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
 $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Enter a serial number." -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
-    $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number'
+    $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber'
     # Check if user entered 'back'
     if ($null -eq $serialNumber)
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-        return $backoutText
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $backoutText."
+        GoBack
     } 
     else # Process only if a serial number was entered
     {
@@ -410,10 +452,37 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
         $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
         Write-Verbose "[$scriptName] Result returned: $result"
+        # Handle navigation responses  
+        if ($result -eq "Back" -or $result -eq "back")
+        {
+            Write-Verbose "[$scriptName] Received Back from ProcessDevice function, returning to previous menu"
+            return $backoutText
+        }
+        elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] Received MainMenu from ProcessDevice function, returning to main menu"
+            GoToMainMenu
+        }
+        elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
+        {
+            Write-Verbose "[$scriptName] User requested application exit."
+            return "EXIT_APPLICATION"
+        }
+        elseif ($result -eq $true -or $result -in $returnValues.Values)
+        {
+            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
+            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            GoBack
+        }
+        else
+        {
+            Write-Host "Failed to fetch information for device with serial number: $($deviceObject.serialNumber)" -ForegroundColor Red  
+        }
     }
-}
+} -returnsValue
 $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Use this device's serial number." -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
+    
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -NoHash
     Write-Verbose "[$scriptName] Device object: $($deviceObject)"
     if ($deviceObject)
@@ -421,21 +490,69 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
         Write-Host "Checking device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
         $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'check'
-        Write-Verbose "[$scriptName] Result returned: $result"
+        Write-Host "[$scriptName] Result returned: $result"
+        # Handle navigation responses  
+        if ($result -eq "Back" -or $result -eq "back")
+        {
+            Write-Verbose "[$scriptName] Received Back from ProcessDevice function, returning to previous menu"
+            return $backoutText
+        }
+        elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] Received MainMenu from ProcessDevice function, returning to main menu"
+            GoToMainMenu
+        }
+        elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
+        {
+            Write-Verbose "[$scriptName] User requested application exit."
+            return "EXIT_APPLICATION"
+        }
+        elseif ($result -eq $true -or $result -in $returnValues.Values)
+        {
+            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
+            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            GoBack
+        }
+        else
+        {
+            Write-Host "Failed to fetch information for device with serial number: $($deviceObject.serialNumber)" -ForegroundColor Red  
+        }
     }
     else
     {
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
     }
-}
+} -returnsValue
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
     $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
     $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
     if ($result -eq $backoutText)
@@ -444,7 +561,54 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         return $backoutText
     }
 }
-$autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $serialNumberMenu
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Getting device object."
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    if ($deviceObject)
+    {
+        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+        $outputFile = "\device_$($deviceObject.serialNumber).csv"
+        if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
+        {
+            Write-Host 'Device hash created successfully.' -ForegroundColor Green
+            Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
+            Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
+            Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host 'Failed to create device hash.' -ForegroundColor Red
+        }
+    }
+}
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
+    Write-Verbose "[$scriptName] Download and install latest Windows updates."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    Write-Host 'Downloading and installing the latest Windows updates...'
+    $updateResult = ApplyWindowsUpdates
+    Write-Host $returnValues.$updateResult
+}
+$autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $autopilotSerialNumberMenu
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
     Write-Host 'Deleting the device from Autopilot...'
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
@@ -469,35 +633,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Getting device object."
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-    }
-    if ($deviceObject)
-    {
-        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-        $outputFile = "\device_$($deviceObject.serialNumber).csv"
-        if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
-        {
-            Write-Host 'Device hash created successfully.' -ForegroundColor Green
-            Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
-            Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
-            Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host 'Failed to create device hash.' -ForegroundColor Red
-        }
-    }
-}
+
 #endregion Autopilot menu
 
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
@@ -748,12 +884,14 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceE
 # Add the main menu title to the title history (for breadcrumb display) and menu object to menu history (for navigation)
 try
 {
+    Write-Verbose "[$scriptName] Adding main menu to history using newer powershell functions."
     # [void]$script:History.Add("Main Menu")
     [void]$script:MenuHistory.Add($mainMenu)
 }
 catch
 {
     # Fallback for older PowerShell versions
+    Write-Verbose "[$scriptName] Adding main menu to history using older powershell functions."
     $script:MainMenuHistory += "Main Menu"
     $script:MainMenuHistory_Menu += $mainMenu
 }

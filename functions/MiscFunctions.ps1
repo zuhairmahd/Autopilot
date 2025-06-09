@@ -991,21 +991,22 @@ function GetUserInput()
 
     while ($true) # Loop indefinitely until valid input or Enter is pressed
     {
+        Write-Verbose "[$functionName] Entering validation loop"
         $inputItem = Read-Host $Prompt
         Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
-
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
             Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
             return $null # Return null to signal going back
         }
-
         # Validate the input if it's not empty
+        Write-Verbose "[$functionName] Validating input $inputItem as $InputType"
         $validationResult = validateInput -UserInput $inputItem -type $InputType -settings $settings
+        Write-Verbose "[$functionName] Validation result: $($validationResult.valid)"
+        Write-Verbose "[$functionName] Validation value: $($validationResult.value)"
         $inputResultValid = $validationResult.valid
         $inputResult = $validationResult.value
-
         if ($inputResultValid)
         {
             Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
@@ -1021,6 +1022,7 @@ function GetUserInput()
             # The loop will continue, prompting the user again
         }
     }
+    Write-Verbose "[$functionName] Exiting GetUserInput function"
 }
 
 function ProcessSerialNumber()
@@ -1077,7 +1079,6 @@ function ProcessSerialNumber()
             {
                 Write-Host "This device is not assigned to a deployment profile." -ForegroundColor Yellow
             }
-            
         }
         else
         {

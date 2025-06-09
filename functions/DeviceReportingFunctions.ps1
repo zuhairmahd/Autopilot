@@ -1197,6 +1197,7 @@ function ShowDeviceReport()
         Write-Host "$readableKey`: $formattedValue"
     }
     Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report
+    #endregion Display report
     
     #region Handle export decision
     $HTMLAction = {
