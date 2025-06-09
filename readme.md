@@ -27,3 +27,10 @@ Consistent with security best practices, the app uses a rotating encrypted secre
 
 4. Problems
 If you have any problems, please contact the author.
+
+5. Running Tests
+To execute the automated tests run:
+
+```
+pwsh -File tests/run-tests.ps1
+```
