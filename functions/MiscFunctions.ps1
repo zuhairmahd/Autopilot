@@ -1181,6 +1181,23 @@ function ProcessSerialNumber()
                 }
                 return $backoutText
             }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
+                Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
+                {
+                    Write-Host $deviceStates.ready
+                    Write-Host $DeviceAssessmentState.action
+                }
+                elseif ($DeviceAssessmentState.ReadinessState -eq $deviceStates.notReady)
+                {
+                    Write-Host $deviceStates.notReady
+                    Write-Host $DeviceAssessmentState.action
+                }
+            }
+            
+            
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             $result = ShowMenu -Menu $deviceActionsMenu
