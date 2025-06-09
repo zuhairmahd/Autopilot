@@ -25,8 +25,7 @@ else
 #endregion
 
 #region variables
-# $CSVObject = [System.Collections.ArrayList]@()
-# $scopes = "offline_access Device.ReadWrite.All DeviceLocalCredential.Read.All DeviceManagementApps.Read.All DeviceManagementApps.ReadWrite.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All Directory.ReadWrite.All Domain.ReadWrite.All Group.Read.All GroupMember.ReadWrite.All Organization.ReadWrite.All"
+# $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
@@ -46,17 +45,34 @@ else
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -Interactive
-$accessToken = GetGraphAccessToken -configFile $configFile
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -AuthType 'PublicAuthFlow' -NoSaveRefreshToken
+# $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
-$global:enrollments = [ordered] @{
-    # "autopilot" = $autopilotDevices
-    "managed" = $managedDevices
-    # "imported"  = $importedDevices
-    # "unmanaged" = $unmanagedDevices
-}
+# $global:enrollments = [ordered] @{
+# "autopilot" = $autopilotDevices
+# "managed" = $managedDevices
+# "imported"  = $importedDevices
+# "unmanaged" = $unmanagedDevices
+# }
 #endregion variables
 
-ExportDeviceMemory -AccessToken $accessToken -OutputFile $outputFile -IncludeStorageInfo 
+
+# $fileName = Read-Host -Prompt "Enter the path to the JSON file you want to encrypt (default: $configFile)"
+# $password = Read-Host -Prompt "Enter your password" -AsSecureString
+# $choice = Read-Host "Press 1 to encrypt, 2 to decrypt, or any other key to exit"
+# if ($choice -eq '2')
+# {
+# Invoke-JsonFileEncryption -filePath $fileName -Key $password
+# exit
+# }
+# elseif ($choice -ne '1')
+# {
+# Write-Host "Exiting script." -ForegroundColor Yellow
+# exit
+# }
+
+
+# GetInstalledWindowsUpdates
+ApplyWindowsUpdates

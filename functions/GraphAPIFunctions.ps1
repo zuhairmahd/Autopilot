@@ -1,4 +1,3 @@
-#region Helper functions
 function FormatScopes()
 {
     [CmdletBinding()]
@@ -113,7 +112,7 @@ function FormatScopes()
     return $scopesFormatted
 }    
 
-function Get-TokenFromResponse
+function Get-TokenFromResponse()
 {
     param($tokenResponse, $domain, $refreshToken)
     $functionName = $MyInvocation.MyCommand.Name
@@ -141,7 +140,7 @@ function Get-TokenFromResponse
     return $cachedToken
 }
 
-function Start-HttpListener
+function Start-HttpListener()
 {
     param (
         [string]$redirectUri
@@ -319,7 +318,7 @@ function Start-HttpListener
     return $result
 }
 
-function Save-TokenToCache
+function Save-TokenToCache()
 {
     param($cachedToken, $cacheType, $cacheTokenFile, $cacheFolder)
     $functionName = $MyInvocation.MyCommand.Name
@@ -342,7 +341,7 @@ function Save-TokenToCache
     }
 }
 
-function Save-RefreshTokenToConfig
+function Save-RefreshTokenToConfig()
 {
     param($refreshToken, $configFilePath)
     $functionName = $MyInvocation.MyCommand.Name
@@ -362,7 +361,7 @@ function Save-RefreshTokenToConfig
         if (isEncrypted -data $config)
         {
             Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-            $decryptedConfig = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name', 'scope')
+            $decryptedConfig = DecryptObject -encryptedObject $config
             if ($decryptedConfig.deligatedCredentials)
             {
                 Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
@@ -388,7 +387,7 @@ function Save-RefreshTokenToConfig
             }
             # Re-encrypt the config
             Write-Verbose "[$functionName] Re-encrypting config with refresh token"
-            $Config = EncryptObject -DecryptedObject $decryptedConfig -excludeFields @('domain', 'name', 'scope')
+            $Config = EncryptObject -DecryptedObject $decryptedConfig 
         }
         else
         {
@@ -409,7 +408,7 @@ function Save-RefreshTokenToConfig
     }
 }
 
-function Format-TokenOutput
+function Format-TokenOutput()
 {
     param($token, $secureString)
     $functionName = $MyInvocation.MyCommand.Name
@@ -427,7 +426,7 @@ function Format-TokenOutput
     }
 }
 
-function Test-RefreshTokenValidity
+function Test-RefreshTokenValidity()
 {
     param(
         $refreshToken,
@@ -435,7 +434,8 @@ function Test-RefreshTokenValidity
         $clientSecret,
         $tenantId,
         $scopes,
-        $domain
+        $domain,
+        $AuthType
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Testing refresh token validity..."
@@ -462,10 +462,13 @@ function Test-RefreshTokenValidity
         }
         $refreshTokenRequestBody = @{
             client_id     = $clientId
-            client_secret = $clientSecret
             refresh_token = $refreshToken
             grant_type    = 'refresh_token'
             scope         = $scopesFormatted
+        }
+        if ($AuthType -eq 'PublicAuthFlow')
+        {
+            $refreshTokenRequestBody.Add('client_secret', $clientSecret)
         }
         $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
         Write-Verbose "[$functionName] Attempting to validate refresh token by getting a new access token..."
@@ -481,7 +484,7 @@ function Test-RefreshTokenValidity
     }
 }
 
-function Get-RefreshToken
+function Get-RefreshToken()
 {
     param(
         $accessTokenObject,
@@ -531,7 +534,7 @@ function Get-RefreshToken
     }
 }
 
-function Get-TokenFromCache
+function Get-TokenFromCache()
 {
     param(
         $cacheType,
@@ -725,15 +728,116 @@ function Get-TokenFromCache
     return $null
 }
 
-function Get-DelegatedToken
+function LaunchBrowser()
 {
-    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken)
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)]
+        [ValidateNotNullOrEmpty()]
+        [string]$url,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Chrome", "Edge", "Firefox")]
+        [string]$browser
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    #print log of incoming parameters.
+    Write-Verbose "[$functionName] Launching browser with URL: $url"
+    Write-Verbose "[$functionName] Browser preference: $browser"
+    Write-Verbose "[$functionName] Launching browser with URL: $url"
+    Write-Verbose "[$functionName] Browser preference: $browser"
+    switch ($Browser)
+    {
+        'Edge'
+        {
+            Write-Verbose "[$functionName] Opening Edge browser for authentication"
+            if ($settings.privateSession)
+            {
+                Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                $urlParams = @{
+                    FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+                    ArgumentList = "--inprivate", $authUrl
+                }
+            }
+            else
+            {
+                $urlParams = @{
+                    FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+                    ArgumentList = $authUrl
+                }
+            }
+        }
+        'Chrome'
+        {
+            Write-Verbose "[$functionName] Opening Chrome browser for authentication"
+            if ($settings.privateSession)
+            {
+                Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+                    ArgumentList = "--incognito", $authUrl
+                }
+            }
+            else
+            {
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+                    ArgumentList = $authUrl
+                }
+            }
+        }
+        'Firefox'
+        {
+            Write-Verbose "[$functionName] Opening Firefox browser for authentication"
+            if ($settings.privateSession)
+            {
+                Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
+                    ArgumentList = "-private-window", $authUrl
+                }
+            }
+            else
+            {
+                $urlParams = @{
+                    FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
+                    ArgumentList = $authUrl
+                }
+            }
+        }
+        default
+        {
+            Write-Verbose "[$functionName] Opening default browser for authentication"
+            $urlParams = @{
+                FilePath     = "start"
+                ArgumentList = $authUrl
+            }
+        }
+    }
+    Write-Verbose "[$functionName] Launching $browser with URL: $url"
+    try
+    {
+        # Start the browser with the specified URL
+        Start-Process @urlParams 
+        Write-Verbose "[$functionName] Browser launched successfully."
+    }
+    catch
+    {
+        Write-Error "Failed to launch browser: $_"
+        return $false
+    }
+    return $true
+}
+
+function Get-DelegatedToken()
+{
+    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $settings = $settings)
     $functionName = $MyInvocation.MyCommand.Name
     # First check if we have a valid refresh token in config
     if ($configRefreshToken)
     {
         Write-Verbose "[$functionName] Found refresh token in config. Testing its validity before requesting new authorization..."
-        $isValid, $tokenResponse = Test-RefreshTokenValidity -refreshToken $configRefreshToken -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain
+        $isValid, $tokenResponse = Test-RefreshTokenValidity -refreshToken $configRefreshToken -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -AuthType $AuthType
         if ($isValid)
         {
             Write-Host "Existing refresh token is valid. Using it without requesting a new authorization."
@@ -752,58 +856,208 @@ function Get-DelegatedToken
     # Generate a random state string
     Write-Verbose "[$functionName] Generating random state string."
     $state = [System.Guid]::NewGuid().ToString()
-    if ($interactive)
-    {
-        $redirectUri = "http://localhost:8080/"
-    }
-    else 
-    {
-        $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
-    }
     $scopesFormatted = FormatScopes -scopes $scopes
-    # Encode parameters
     $encodedScopes = [uri]::EscapeDataString($scopesFormatted)
-    $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
-    # Attempt to fetch token using HTTP listener first
+    
     $automaticFlowSuccess = $false
-    $code = $null
-    if (-not $Interactive)        
+    switch ($AuthType)
     {
-        Write-Verbose "[$functionName] Using non-interactive mode (manual code input)"
-        $automaticFlowSuccess = $false
-    }
-    else
-    {
-        # Try the automatic HTTP listener flow first
-        try
+        PublicAuthFlow
         {
-            Write-Verbose "[$functionName] Attempting automatic HTTP listener flow"
-            $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
-            Write-Verbose "[$functionName] Authorization URL: $authUrl"
-            Write-Host "Opening browser for user authentication and consent..."
-            Start-Process $authUrl
-            $listenerResult = Start-HttpListener -redirectUri $redirectUri
-            if ($listenerResult.Success)
-            {
-                Write-Verbose "[$functionName] HTTP listener successfully captured the authorization code"
-                $code = $listenerResult.Code
-                $automaticFlowSuccess = $true
+            Write-Verbose "[$functionName] Using device auth flow."
+            $deviceCodeRequestUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/devicecode"
+            Write-Verbose "[$functionName] Device code request URL: $deviceCodeRequestUrl"
+            $deviceCodeRequestBody = @{
+                client_id = $clientId
+                scope     = $scopesFormatted
             }
-            else
+            Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)"
+            try
             {
-                Write-Warning "HTTP listener failed to capture the authorization code: $($listenerResult.ErrorMessage)"
+                $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri $deviceCodeRequestUrl -Body $deviceCodeRequestBody
+                Write-Verbose "[$functionName] Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth 3)"
+            }
+            catch
+            {
+                Write-Error "Error requesting device code: $($_.Exception.Message)"
+                Write-Error "Response: $($_.Exception.Response.GetResponseStream() | ForEach-Object { New-Object System.IO.StreamReader($_) } | ForEach-Object { $_.ReadToEnd() })"
+                return $null
+            }
+            Write-Host ""
+            Write-Host $deviceCodeResponse.message
+            Write-Host "Waiting for authentication..."
+            Write-Host ""
+            # --- Poll for Access Token ---
+            Write-Verbose "[$functionName] Polling for access token using device code."
+            $tokenRequestUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
+            $tokenRequestBody = @{
+                grant_type  = "urn:ietf:params:oauth:grant-type:device_code"
+                client_id   = $clientId
+                device_code = $deviceCodeResponse.device_code
+            }
+            $accessToken = $null
+            $timeoutSeconds = $deviceCodeResponse.expires_in # Typically 15 minutes
+            Write-Verbose "[$functionName] Token request URL: $tokenRequestUrl"
+            Write-Verbose "[$functionName] Token request body: $($tokenRequestBody | ConvertTo-Json -Depth 3)"
+            Write-Verbose "Timeout for polling: $timeoutSeconds seconds"
+            $intervalSeconds = $deviceCodeResponse.interval # Typically 5 seconds
+            Write-Verbose "Polling interval: $intervalSeconds seconds"
+            $startTime = Get-Date
+            Write-Verbose "[$functionName] Start time for polling: $startTime"
+            while ((Get-Date -UFormat %s) -lt ($startTime.AddSeconds($timeoutSeconds) | Get-Date -UFormat %s))
+            {
+                Write-Verbose "[$functionName] Polling for access token..."
+                Start-Sleep -Seconds $intervalSeconds 
+                try
+                {
+                    $tokenResponse = Invoke-RestMethod -Method POST -Uri $tokenRequestUrl -Body $tokenRequestBody -ErrorAction SilentlyContinue
+                    Write-Verbose "[$functionName] Polling attempt successful."
+                    Write-Verbose "[$functionName] Token response: $($tokenResponse | ConvertTo-Json -Depth 3)"
+                    if ($tokenResponse.access_token)
+                    {
+                        $accessToken = $tokenResponse.access_token
+                        Write-Host "Authentication successful. Access token acquired."
+                        $automaticFlowSuccess = $true
+                        break
+                    }
+                    elseif ($tokenResponse.error -ne "authorization_pending")
+                    {
+                        Write-Error "Error polling for token: $($tokenResponse.error_description)"
+                        return $null
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] Authorization still pending, continuing to poll..."
+                    }
+                }
+                catch
+                {
+                    # Check if this is the expected "authorization_pending" error (400 Bad Request)
+                    $isAuthPending = $false
+                    
+                    # Check the HTTP status code first
+                    if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 400)
+                    {
+                        Write-Verbose "[$functionName] Received 400 Bad Request during polling - checking if authorization is pending..."
+                        
+                        # Multiple ways to detect authorization_pending:
+                        # 1. Check the exception message for common patterns
+                        $exceptionMessage = $_.Exception.Message
+                        if ($exceptionMessage -like "*authorization_pending*" -or 
+                            $exceptionMessage -like "*Bad Request*" -or
+                            $exceptionMessage -like "*400*")
+                        {
+                            $isAuthPending = $true
+                            Write-Verbose "[$functionName] Detected authorization_pending from exception message pattern"
+                        }
+                        
+                        # 2. Try to parse the response body if available
+                        if (-not $isAuthPending)
+                        {
+                            try
+                            {
+                                $errorResponse = $_.Exception.Response.GetResponseStream()
+                                if ($errorResponse -and $errorResponse.CanRead)
+                                {
+                                    $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                                    $errorMessage = $streamReader.ReadToEnd()
+                                    $streamReader.Close()
+                                    
+                                    if ($errorMessage)
+                                    {
+                                        $errorJson = $errorMessage | ConvertFrom-Json
+                                        if ($errorJson.error -eq "authorization_pending")
+                                        {
+                                            $isAuthPending = $true
+                                            Write-Verbose "[$functionName] Confirmed authorization_pending from response body"
+                                        }
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                Write-Verbose "[$functionName] Could not parse error response, but assuming authorization_pending for 400 status"
+                                # For 400 errors during OAuth device flow polling, assume it's authorization_pending
+                                $isAuthPending = $true
+                            }
+                        }
+                        
+                        if ($isAuthPending)
+                        {
+                            Write-Verbose "[$functionName] Authorization still pending (from catch block), continuing to poll..."
+                        }
+                    }
+                    
+                    # Only show warning for unexpected errors, not for authorization_pending
+                    if (-not $isAuthPending)
+                    {
+                        Write-Warning "Polling attempt failed: $($_.Exception.Message)"
+                        Write-Verbose "[$functionName] Unexpected error during polling: $($_.Exception | Out-String)"
+                    }
+                }
+                Write-Host -NoNewline "."
+            }
+            if (-not $accessToken)
+            {
+                Write-Error "Authentication timed out or failed."
+                return $null
+            }
+        }
+        'interactive'
+        {
+            Write-Verbose "[$functionName] Using interactive authentication flow."
+            $redirectUri = "http://localhost:8080/"
+            Write-Verbose "[$functionName] Redirect URI: $redirectUri"
+            $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
+            Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+            Write-Verbose "[$functionName] Attempting automatic HTTP listener flow"
+            try
+            {
+                Write-Verbose "[$functionName] Starting HTTP listener at $redirectUri"
+                $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
+                Write-Verbose "[$functionName] Authorization URL: $authUrl"
+                Write-Host "Opening browser for user authentication and consent..."
+                if (-not (LaunchBrowser -url $authUrl -browser $settings.preferredBrowser))
+                {
+                    Write-Error "Failed to launch browser. Please open the URL manually: $authUrl"
+                    return $null
+                }
+                $listenerResult = Start-HttpListener -redirectUri $redirectUri
+                if ($listenerResult.Success)
+                {
+                    Write-Verbose "[$functionName] HTTP listener successfully captured the authorization code"
+                    $code = $listenerResult.Code
+                    $automaticFlowSuccess = $true
+                }
+                else
+                {
+                    Write-Warning "HTTP listener failed to capture the authorization code: $($listenerResult.ErrorMessage)"
+                    Write-Verbose "[$functionName] Will fall back to manual code input"
+                    $automaticFlowSuccess = $false
+                }
+            }
+            catch
+            {
+                Write-Warning "Error in automatic HTTP listener flow: $_"
                 Write-Verbose "[$functionName] Will fall back to manual code input"
                 $automaticFlowSuccess = $false
             }
         }
-        catch
+        'Private'
         {
-            Write-Warning "Error in automatic HTTP listener flow: $_"
-            Write-Verbose "[$functionName] Will fall back to manual code input"
-            $automaticFlowSuccess = $false
+            Write-Verbose "[$functionName] Using non-interactive mode (manual code input)"
+            $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
+            Write-Verbose "[$functionName] Redirect URI: $redirectUri"
+            $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
+            Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+        }
+        default
+        {
+            Write-Error "Invalid AuthType specified. Use 'interactive' or 'device'."
+            return $null
         }
     }
-        
+    
     # Fall back to manual code input if automatic flow failed
     if (-not $automaticFlowSuccess)
     {
@@ -811,7 +1065,11 @@ function Get-DelegatedToken
         $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
         Write-Verbose "[$functionName] Authorization URL: $authUrl"
         Write-Host "Opening browser for user authentication and consent..."
-        Start-Process $authUrl
+        if (-not (LaunchBrowser -url $authUrl -browser $settings.preferredBrowser))
+        {
+            Write-Error "Failed to launch browser. Please open the URL manually: $authUrl"
+            return $null
+        }        
         Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
         $code = Read-Host "Enter the authorization code"
         Write-Verbose "[$functionName] Received authorization code input from user"
@@ -828,7 +1086,7 @@ function Get-DelegatedToken
         }
     }           
     # Regardless of how we got the code, exchange it for a token
-    if ($code)
+    if ($code -and $AuthType -ne 'PublicAuthFlow')
     {
         Write-Verbose "[$functionName] Exchanging authorization code for access token"
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
@@ -846,40 +1104,12 @@ function Get-DelegatedToken
         Write-Verbose "[$functionName]   Redirect URI: $redirectUri"
         Write-Verbose "[$functionName]   Grant Type: authorization_code"
         Write-Verbose "[$functionName]   Scopes: $scopesFormatted"
-        
         try
         {
             Write-Verbose "[$functionName] Sending token request to $tokenEndpoint"
             $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody -ErrorVariable tokenError
             Write-Verbose "[$functionName] Access token received successfully"
-            
-            # Log the token response properties (without exposing the actual token)
-            Write-Verbose "[$functionName] Token response contains the following properties:"
-            foreach ($prop in $tokenResponse.PSObject.Properties.Name)
-            {
-                if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
-                {
-                    $tokenLength = $tokenResponse.$prop.Length
-                    Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
-                }
-                else
-                {
-                    Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
-                }
-            }
-            
-            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            # Cache the access token based on cache type
-            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            
-            # Save the refresh token to config file regardless of cache type
-            if ($tokenResponse.refresh_token)
-            {
-                Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
-            }
-            
-            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
-        }
+        }            
         catch
         {
             Write-Error "Failed to get delegated access token: $_"
@@ -902,11 +1132,9 @@ function Get-DelegatedToken
                     }
                 }
             }
-            
             if ($_.Exception.Response)
             {
                 Write-Verbose "[$functionName] Status code: $($_.Exception.Response.StatusCode)"
-                
                 # Try to get more information from the response
                 try
                 {
@@ -914,7 +1142,6 @@ function Get-DelegatedToken
                     $responseBody = $reader.ReadToEnd()
                     $reader.Close()
                     Write-Verbose "[$functionName] Response body: $responseBody"
-                    
                     try
                     {
                         $responseJson = $responseBody | ConvertFrom-Json
@@ -934,29 +1161,58 @@ function Get-DelegatedToken
             return $null
         }
     }
-    else
+    
+    # Log the token response properties (without exposing the actual token)
+    if ($tokenResponse)
     {
-        Write-Error "Failed to obtain authorization code. Cannot proceed with token request."
+        Write-Verbose "[$functionName] Token response contains the following properties:"
+        foreach ($prop in $tokenResponse.PSObject.Properties.Name)
+        {
+            if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
+            {
+                {
+                    $tokenLength = $tokenResponse.$prop.Length
+                    Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
+                }
+            }
+            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+            # Cache the access token based on cache type
+            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            # Save the refresh token to config file regardless of cache type
+            if ($tokenResponse.refresh_token)
+            {
+                if (-not $NoSaveRefreshToken)
+                {
+                    Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
+                }
+            }
+            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        }
+    }
+    else 
+    {
+        Write-Verbose "[$functionName] Token response is null. Authorization code exchange failed."
         return $null
     }
-}   
-    
-function Get-ClientCredentialsToken
+}
+
+function Get-ClientCredentialsToken()
 {
     param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Using non-delegated access..."
     Write-Verbose "[$functionName] Requesting new access token with client credentials flow"
-        
     $body = @{
         client_id     = $clientId
         scope         = 'https://graph.microsoft.com/.default'
         client_secret = $clientSecret
         grant_type    = 'client_credentials'
     }
-        
     Write-Verbose "[$functionName] Token request body: client_id=$clientId, scope=https://graph.microsoft.com/.default, grant_type=client_credentials"
-        
     try
     {
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
@@ -990,7 +1246,7 @@ function Get-ClientCredentialsToken
             $errorMessage = $streamReader.ReadToEnd()
             $streamReader.Close()
             Write-Error "Server Response: $errorMessage"
-                
+            
             try
             {
                 $errorJson = $errorMessage | ConvertFrom-Json
@@ -1005,790 +1261,91 @@ function Get-ClientCredentialsToken
         return $null
     }
 }
-#endregion Helper functions
 
-$excludeFields = @('domain', 'name', 'scopes')
-function TestIsBase64String
-{
-    param (
-        [string]$Value
-    )
-
-    if ([string]::IsNullOrEmpty($Value))
-    {
-        return $false
-    }
-    # A common check: length must be a multiple of 4.
-    # And it should not contain characters outside the Base64 character set.
-    # This is a basic check; more robust validation might be needed for edge cases.
-    if (($Value.Length % 4 -ne 0) -or ($Value -notmatch "^[a-zA-Z0-9+/]*=*$"))
-    {
-        return $false
-    }
-
-    try
-    {
-        $null = [Convert]::FromBase64String($Value)
-        return $true
-    }
-    catch
-    {
-        return $false
-    }
-}
-
-function isEncrypted
-{
-    [CmdletBinding()]
-    param (
-        [psObject]$data
-    )
-    
-    function CountEncryptionStatus
-    {
-        param (
-            [Parameter(ValueFromPipeline)]
-            [object]$InputObject
-        )
-        
-        $result = [PSCustomObject]@{
-            EncryptedCount   = 0
-            UnencryptedCount = 0
-        }
-        
-        if ($null -eq $InputObject)
-        {
-            return $result
-        }
-        
-        if ($InputObject -is [array])
-        {
-            foreach ($item in $InputObject)
-            {
-                $itemStatus = CountEncryptionStatus -InputObject $item
-                $result.EncryptedCount += $itemStatus.EncryptedCount
-                $result.UnencryptedCount += $itemStatus.UnencryptedCount
-            }
-        }
-        elseif ($InputObject -is [PSCustomObject] -or $InputObject -is [hashtable])
-        {
-            foreach ($prop in $InputObject.PSObject.Properties)
-            {
-                if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                {
-                    $nestedStatus = CountEncryptionStatus -InputObject $prop.Value
-                    $result.EncryptedCount += $nestedStatus.EncryptedCount
-                    $result.UnencryptedCount += $nestedStatus.UnencryptedCount
-                }
-                elseif ($prop.Value -is [string] -and $prop.Value.Length -gt 0)
-                {
-                    Write-Verbose "Checking if the value of $($prop.Name) is encrypted."
-                    if (TestIsBase64String -Value $prop.Value)
-                    {
-                        Write-Verbose "The value of $($prop.Name) is encrypted."
-                        $result.EncryptedCount++
-                    }
-                    else
-                    {
-                        Write-Verbose "The value of $($prop.Name) is not encrypted."
-                        $result.UnencryptedCount++
-                    }
-                }
-                else
-                {
-                    Write-Verbose "The value of $($prop.Name) is not a string, skipping."
-                    $result.UnencryptedCount++
-                }
-            }
-        }
-        else
-        {
-            if ($InputObject -is [string] -and $InputObject.Length -gt 0)
-            {
-                if (TestIsBase64String -Value $InputObject)
-                {
-                    $result.EncryptedCount++
-                }
-                else
-                {
-                    $result.UnencryptedCount++
-                }
-            }
-            else
-            {
-                $result.UnencryptedCount++
-            }
-        }
-        
-        return $result
-    }
-    
-    $isEncrypted = $false
-    Write-Verbose 'Checking if the data is encrypted.'
-    
-    $encryptionStatus = CountEncryptionStatus -InputObject $data
-    $encryptedCount = $encryptionStatus.EncryptedCount
-    $unencryptedCount = $encryptionStatus.UnencryptedCount
-    
-    Write-Verbose "The number of encrypted values is $encryptedCount"
-    Write-Verbose "The number of unencrypted values is $unencryptedCount"
-    
-    # If the number of encrypted values is greater than the number of unencrypted values, the data is encrypted.
-    if ($encryptedCount -gt $unencryptedCount -and $encryptedCount -gt 0)
-    {
-        $isEncrypted = $true
-    }
-    
-    Write-Verbose "The data is encrypted: $isEncrypted"
-    return $isEncrypted
-}
-
-function DecryptObject
-{
-    [CmdletBinding()]
-    param (
-        [object]$encryptedObject,
-        [string[]]$excludeFields
-    )
-    
-    function Invoke-RecursiveDecryption
-    {
-        param (
-            [Parameter(ValueFromPipeline)]
-            [object]$InputObject,
-            [string[]]$ExcludeFields,
-            [string]$ParentPath = "",
-            [bool]$ParentIsExcluded = $false # New parameter
-        )
-
-        if ($null -eq $InputObject)
-        {
-            return $null 
-        }
-        Write-Verbose "[DECRYPT] Path: '$ParentPath', ParentIsExcluded: $ParentIsExcluded, Type: $($InputObject.GetType().FullName)"
-
-        if ($InputObject -is [array])
-        {
-            Write-Verbose "[DECRYPT] Processing array at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $resultArray = @()
-            for ($i = 0; $i -lt $InputObject.Count; $i++)
-            {
-                $element = $InputObject[$i]
-                $currentElementPath = if ($ParentPath)
-                {
-                    "$ParentPath[$i]" 
-                }
-                else
-                {
-                    "[$i]" 
-                }
-                # Pass ParentIsExcluded status to array elements
-                $resultArray += Invoke-RecursiveDecryption -InputObject $element -ExcludeFields $ExcludeFields -ParentPath $currentElementPath -ParentIsExcluded $ParentIsExcluded
-            }
-            return $resultArray
-        }
-        elseif ($InputObject -is [hashtable])
-        {
-            Write-Verbose "[DECRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-            
-            # Process hashtable by enumerating through the key-value pairs directly
-            foreach ($entry in $InputObject.GetEnumerator())
-            {
-                $key = $entry.Key
-                $value = $entry.Value
-                
-                Write-Verbose "[DECRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[DECRYPT] Value type: $($value.GetType().FullName)"
-                
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$key" 
-                }
-                else
-                {
-                    $key 
-                }
-                
-                $isPropertyItselfExcluded = $ExcludeFields -contains $key
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
-                Write-Verbose "[DECRYPT] Hashtable key: '$key' at path '$currentPropertyPath'. KeyItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
-                if ($value -is [PSCustomObject] -or $value -is [hashtable] -or $value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$key] = Invoke-RecursiveDecryption -InputObject $value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[DECRYPT] Hashtable key '$key' is effectively excluded. Assigning original value."
-                    $result[$key] = $value
-                }
-                else # Not effectively excluded, attempt to decrypt if it's a string
-                {
-                    if ($value -is [string] -and (TestIsBase64String -Value $value))
-                    {
-                        Write-Verbose ("[DECRYPT] Attempting to decrypt string value for {0}" -f $currentPropertyPath)
-                        try
-                        {
-                            $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($value))
-                            $result[$key] = $decodedValue
-                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPropertyPath, $decodedValue)
-                        }
-                        catch
-                        {
-                            Write-Warning "[DECRYPT] Failed to decode Base64 string for key '$key' at path '$currentPropertyPath'. Value: '$value'. Assigning original value."
-                            $result[$key] = $value # Keep original if not valid Base64 or UTF8
-                        }
-                    }
-                    else
-                    {
-                        # Not a string, not Base64, or some other primitive type that wasn't encrypted
-                        Write-Verbose "[DECRYPT] Hashtable key '$key' is not a decodable string. Assigning original value."
-                        $result[$key] = $value
-                    }
-                }
-            }
-            
-            return $result
-        }
-        elseif ($InputObject -is [PSCustomObject])
-        {
-            Write-Verbose "[DECRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-            foreach ($prop in $InputObject.PSObject.Properties)
-            {
-                Write-Verbose "[DECRYPT] Processing property '$($prop.Name)' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[decrypt] Property type: $($prop.Value.GetType().FullName)"
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$($prop.Name)" 
-                }
-                else
-                {
-                    $prop.Name 
-                }
-                $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
-                Write-Verbose "[DECRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
-                if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$prop.Name] = Invoke-RecursiveDecryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[DECRYPT] Property '$($prop.Name)' is effectively excluded. Assigning original value."
-                    $result[$prop.Name] = $prop.Value
-                }
-                else # Not effectively excluded, attempt to decrypt if it's a string
-                {
-                    if ($prop.Value -is [string] -and (TestIsBase64String -Value $prop.Value))
-                    {
-                        Write-Verbose ("[DECRYPT] Attempting to decrypt string value for {0}" -f $currentPropertyPath)
-                        try
-                        {
-                            $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($prop.Value))
-                            $result[$prop.Name] = $decodedValue
-                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPropertyPath, $decodedValue)
-                        }
-                        catch
-                        {
-                            Write-Warning "[DECRYPT] Failed to decode Base64 string for property '$($prop.Name)' at path '$currentPropertyPath'. Value: '$($prop.Value)'. Assigning original value."
-                            $result[$prop.Name] = $prop.Value # Keep original if not valid Base64 or UTF8
-                        }
-                    }
-                    else
-                    {
-                        # Not a string, not Base64, or some other primitive type that wasn't encrypted
-                        Write-Verbose "[DECRYPT] Property '$($prop.Name)' is not a decodable string. Assigning original value."
-                        $result[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            return [PSCustomObject]$result
-        }
-        # Handle standalone primitive types (e.g., a string element directly in an array)
-        elseif ($InputObject -is [string])
-        {
-            if ($ParentIsExcluded) # If the parent (e.g. an array holding this string) was excluded
-            {
-                Write-Verbose "[DECRYPT] Primitive string at path '$ParentPath' is part of an excluded parent. Returning as-is."
-                return $InputObject
-            }
-            elseif (TestIsBase64String -Value $InputObject)
-            {
-                Write-Verbose ("[DECRYPT] Attempting to decrypt primitive string value at path '{0}'" -f $ParentPath)
-                try
-                {
-                    $decodedValuePrim = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($InputObject))
-                    Write-Verbose ("[DECRYPT] Decrypted primitive value at path '{0}': {1}" -f $ParentPath, $decodedValuePrim)
-                    return $decodedValuePrim
-                }
-                catch
-                {
-                    Write-Warning "[DECRYPT] Failed to decode Base64 string for primitive at path '$ParentPath'. Value: '$InputObject'. Returning original value."
-                    return $InputObject # Keep original if not valid Base64 or UTF8
-                }
-            }
-            else
-            {
-                # Not Base64, return as is
-                Write-Verbose "[DECRYPT] Primitive string at path '$ParentPath' is not Base64. Returning as-is."
-                return $InputObject
-            }
-        }
-        else # Other primitive types (int, bool, etc.) or other object types, return as is
-        {
-            Write-Verbose "[DECRYPT] Value type '$($InputObject.GetType().FullName)' at path '$ParentPath' not a string or already handled. Returning as-is."
-            return $InputObject
-        }
-    }
-    
-    $result = Invoke-RecursiveDecryption -InputObject $encryptedObject -ExcludeFields $excludeFields
-    
-    if ($null -eq $result)
-    {
-        Write-Error 'No values were decrypted.'
-        return $null
-    }
-    
-    Write-Verbose "Decryption complete"
-    return $result
-}
-
-function EncryptObject
-{
-    [CmdletBinding()]
-    param (
-        [object]$decryptedObject,
-        [string[]]$excludeFields
-    )
-    
-    
-    function Invoke-RecursiveEncryption
-    {
-        param (
-            [Parameter(ValueFromPipeline)]
-            [object]$InputObject,
-            [string[]]$ExcludeFields,
-            [string]$ParentPath = "",
-            [bool]$ParentIsExcluded = $false # New parameter
-        )
-
-        if ($null -eq $InputObject)
-        {
-            Write-Verbose "[ENCRYPT] InputObject is null at path '$ParentPath'. Returning null."; return $null 
-        }
-        Write-Verbose "[ENCRYPT] Path: '$ParentPath', ParentIsExcluded: $ParentIsExcluded, Type: $($InputObject.GetType().FullName)"
-
-        if ($InputObject -is [array])
-        {
-            Write-Verbose "[ENCRYPT] Processing array at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $resultArray = @()
-            for ($i = 0; $i -lt $InputObject.Count; $i++)
-            {
-                $element = $InputObject[$i]
-                $currentElementPath = if ($ParentPath)
-                {
-                    "$ParentPath[$i]" 
-                }
-                else
-                {
-                    "[$i]" 
-                }
-                # Pass ParentIsExcluded status to array elements
-                $resultArray += Invoke-RecursiveEncryption -InputObject $element -ExcludeFields $ExcludeFields -ParentPath $currentElementPath -ParentIsExcluded $ParentIsExcluded
-            }
-            return $resultArray
-        }
-        elseif ($InputObject -is [hashtable])
-        {
-            Write-Verbose "[ENCRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-            
-            # Process hashtable by enumerating through the key-value pairs directly
-            foreach ($entry in $InputObject.GetEnumerator())
-            {
-                $key = $entry.Key
-                $value = $entry.Value
-                
-                Write-Verbose "[ENCRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[ENCRYPT] Value type: $($value.GetType().FullName)"
-                Write-Verbose "[ENCRYPT] Value: $value"
-                
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$key" 
-                }
-                else
-                {
-                    $key 
-                }
-                
-                $isPropertyItselfExcluded = $ExcludeFields -contains $key
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
-                Write-Verbose "[ENCRYPT] Hashtable key: '$key' at path '$currentPropertyPath'. KeyItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
-                if ($null -eq $value)
-                {
-                    Write-Verbose "[ENCRYPT] Hashtable key '$key' has null value. Assigning null."
-                    $result[$key] = $null
-                }
-                elseif ($value -is [PSCustomObject] -or $value -is [hashtable] -or $value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$key] = Invoke-RecursiveEncryption -InputObject $value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[ENCRYPT] Hashtable key '$key' is effectively excluded. Assigning original value."
-                    $result[$key] = $value
-                }
-                else # Not effectively excluded, encrypt appropriate types
-                {
-                    # Encrypt strings, numbers, booleans. Other complex types not directly handled here will be returned as-is by the final 'else'.
-                    if ($value -is [string] -or $value -is [int] -or $value -is [bool] -or $value -is [double])
-                    {
-                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}" -f $currentPropertyPath)
-                        $stringValue = $value.ToString() # Convert boolean/numbers to string before encoding
-                        $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
-                        $result[$key] = $encodedValue
-                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, $encodedValue)
-                    }
-                    else
-                    {
-                        Write-Verbose "[ENCRYPT] Hashtable key '$key' value type '$($value.GetType().FullName)' not directly encrypted. Assigning original value."
-                        $result[$key] = $value
-                    }
-                }
-            }
-            
-            return $result
-        }
-        elseif ($InputObject -is [PSCustomObject])
-        {
-            Write-Verbose "[ENCRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-            foreach ($prop in $InputObject.PSObject.Properties)
-            {
-                Write-Verbose "[ENCRYPT] Processing property '$($prop.Name)' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[ENCRYPT] Property type: $($prop.Value.GetType().FullName)"
-                if ($prop.Name -in $excludeFields)
-                {
-                    Write-Verbose "[ENCRYPT] Property value: $($prop.Value)"    
-                }
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$($prop.Name)" 
-                }
-                else
-                {
-                    $prop.Name 
-                }
-                $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-                Write-Verbose "[ENCRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-                if ($null -eq $prop.Value)
-                {
-                    Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is null. Assigning null."
-                    $result[$prop.Name] = $null
-                }
-                elseif ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$prop.Name] = Invoke-RecursiveEncryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is effectively excluded. Assigning original value."
-                    $result[$prop.Name] = $prop.Value
-                }
-                else # Not effectively excluded, encrypt appropriate types
-                {
-                    # Encrypt strings, numbers, booleans. Other complex types not directly handled here will be returned as-is by the final 'else'.
-                    if ($prop.Value -is [string] -or $prop.Value -is [int] -or $prop.Value -is [bool] -or $prop.Value -is [double])
-                    {
-                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}" -f $currentPropertyPath)
-                        $stringValue = $prop.Value.ToString() # Convert boolean/numbers to string before encoding
-                        $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
-                        $result[$prop.Name] = $encodedValue
-                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, 'redacted')
-                    }
-                    else
-                    {
-                        Write-Verbose "[ENCRYPT] Property '$($prop.Name)' type '$($prop.Value.GetType().FullName)' not directly encrypted. Assigning original value."
-                        $result[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            return [PSCustomObject]$result
-        }
-        # Handle standalone primitive types (e.g., a string/number/bool element directly in an array)
-        elseif (($InputObject -is [string] -or $InputObject -is [int] -or $InputObject -is [bool] -or $InputObject -is [double]))
-        {
-            if ($ParentIsExcluded) # If the parent (e.g. an array holding this primitive) was excluded
-            {
-                Write-Verbose "[ENCRYPT] Primitive value at path '$ParentPath' is part of an excluded parent. Returning as-is."
-                return $InputObject
-            }
-            else
-            {
-                Write-Verbose ("[ENCRYPT] Encrypting primitive value at path '{0}'" -f $ParentPath)
-                $stringValuePrim = $InputObject.ToString()
-                $encodedValuePrim = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValuePrim))
-                Write-Verbose ("[ENCRYPT] Encrypted primitive value at path '{0}': {1}" -f $ParentPath, $encodedValuePrim)
-                return $encodedValuePrim
-            }
-        }
-        else # Other types not explicitly handled (e.g. custom objects not PSCustomObject/hashtable, or other primitive types if any), return as is.
-        {
-            Write-Verbose "[ENCRYPT] Value type '$($InputObject.GetType().FullName)' at path '$ParentPath' not processed for encryption. Returning as-is."
-            return $InputObject
-        }
-    }
-
-    $result = Invoke-RecursiveEncryption -InputObject $decryptedObject -ExcludeFields $excludeFields
-    
-    if ($null -eq $result)
-    {
-        Write-Error 'No values were encrypted.'
-        return $null
-    }
-    
-    Write-Verbose "Encryption complete"
-    return $result
-}
-
-function DecryptAndEncrypt()
-{
-    param (
-        $data,
-        [string[]]$excludeFields = $excludeFields,
-        [string]$operation
-    )
-    
-    # ### Main script ###
-    if ($operation -eq 'encrypt')
-    {
-        if (isEncrypted -data $data)
-        {
-            Write-Host 'The data is already encrypted.'
-            Write-Host 'Nothing to do.'
-            exit
-        }
-        $encodedData = EncryptObject -decryptedObject $data -excludeFields $excludeFields
-    }
-    elseif ($operation -eq 'decrypt')
-    {
-        if (!(isEncrypted -data $data))
-        {
-            Write-Host 'The data is already decrypted.'
-            Write-Host 'Nothing to do.'
-            exit
-        }
-        $encodedData = DecryptObject -encryptedObject $data -excludeFields $excludeFields
-    }
-    elseif ($operation -eq 'check')
-    {
-        if (isEncrypted -data $data)
-        {
-            Write-Host 'The data is encrypted.'
-        }
-        else
-        {
-            Write-Host "The data in $inputFile is not encrypted."
-        }
-        exit
-    }
-    else
-    {
-        Write-Error 'No operation was specified.'
-        exit
-    }
-
-
-    #make sure the output file exists.  If so, prompt to overwrite., otherwise create, unless the Force switch is set.
-    if (Test-Path $outputFile)
-    {
-        if ($Force)
-        {
-            Clear-Content -Path $OutputFile
-        }
-        else
-        {
-            $overwrite = Read-Host -Prompt "The file $outputFile already exists.  Do you want to overwrite it? (Y/N)"
-            if ($overwrite -eq 'Y')
-            {
-                Clear-Content -Path $OutputFile
-            }
-            else
-            {
-                Write-Host "The file $outputFile was not overwritten.  Exiting."
-                exit
-            }
-        }
-    }
-    else
-    {
-        New-Item -Path $OutputFile -ItemType File -Force | Out-Null
-    }
-
-
-    #write the encoded data to the output file if it is not null.
-    if ($encodedData)
-    {
-        Write-Host "Processing data in $inputFile"
-        Write-Host "Writing data to $outputFile"
-        Write-Verbose "The encoded data is: $($encodedData | ConvertTo-Json)"
-        $encodedData | ConvertTo-Json | Set-Content -Path $outputFile -ErrorAction Stop
-        Write-Host 'Data processed successfully.'
-    }
-    else
-    {
-        Write-Host 'No data was processed.'
-        exit
-    }
-}
-function GetGraphAccessToken()
+function BuildAuthSplatTable()
 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$configFile,
-        [int]$renewalLeadTime = 5,
-        [switch]$SecureString,
-        [parameter(parameterSetName = 'Deligated')]
-        [switch]$Deligated,
-        [parameter(parameterSetName = 'Deligated')]
-        [string]$Scopes,
-        [parameter(parameterSetName = 'Deligated')]
-        [switch]$Interactive,
-        [switch]$ForceNewToken,
-        [ValidateSet('file', 'memory')]
-        [string]$CacheType = 'Memory'
+        $auth
     )
-    #region Main function logic
-    $functionName = $MyInvocation.MyCommand.Name
-    # Read and process configuration file
-    if (-not $configFile)
-    {
-        Write-Error "Config file not found. Please provide a valid config file."
-        return $null
+    
+    # Dynamic splatting approach - iterate over all auth properties
+    # Create clean splatting hashtable starting with required parameter
+    $getTokenParams = @{
+        configFile = $configFile
     }
     
-    Write-Verbose "[$functionName] Reading config file $configFile"
-    try
+    # Define valid parameters for GetGraphAccessToken function
+    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'CacheType', 'configFile')
+    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
+    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType')    # Iterate over all properties in the auth object
+    foreach ($property in $auth.PSObject.Properties)
     {
-        $config = Get-Content -Raw -Path $configFile | ConvertFrom-Json
-        Write-Verbose "[$functionName] Config file loaded successfully"
-        Write-Verbose "[$functionName] Decrypting values from $configFile"
-        $configRefreshToken = $null
-        if (isEncrypted -data $config)
+        $paramName = $property.Name
+        $paramValue = $property.Value
+        # Skip if not a valid parameter for the function
+        if ($paramName -notin $validParams)
         {
-            Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-            $config = DecryptObject -encryptedObject $config -excludeFields @('domain', 'name')
-            # Extract the refresh token if it exists
-            if ($config.deligatedCredentials.refresh_token)
+            Write-Verbose "Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
+            continue
+        }
+        # Skip if value is null, empty, or false for switch parameters
+        if ($null -eq $paramValue -or $paramValue -eq '' -or $paramValue -eq $false)
+        {
+            Write-Verbose "Skipping parameter '$paramName' due to null/empty/false value"
+            continue
+        }
+        # Check if this is a delegated-only parameter
+        if ($paramName -in $deligatedOnlyParams)
+        {
+            # Only add if Deligated is true in the auth object
+            if ($auth.PSObject.Properties.Name -contains 'Deligated' -and $auth.Deligated)
             {
-                $configRefreshToken = $config.deligatedCredentials.refresh_token
-                Write-Verbose "[$functionName] Found refresh token in encrypted config."
+                Write-Verbose "Adding delegated parameter '$paramName' with value: $paramValue"
+                #Check if the parameter is an array, and if so convert it to a space seperated string
+                if ($paramValue -is [array])
+                {
+                    $paramValue = $paramValue -join ' '
+                    Write-Verbose "Converted array parameter '$paramName' to space-separated string: $paramValue"
+                }
+                $getTokenParams[$paramName] = $paramValue
+            }
+            else
+            {
+                Write-Verbose "Skipping delegated parameter '$paramName' because Deligated is not true"
             }
         }
         else
         {
-            Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
-            # Extract the refresh token if it exists
-            if ($config.deligatedCredentials.refresh_token)
-            {
-                $configRefreshToken = $config.deligatedCredentials.refresh_token
-                Write-Verbose "[$functionName] Found refresh token in config."
-            }
-        }
-        
-        $tenantId = $config.tenantId
-        $clientId = $config.appId
-        $clientSecret = $config.appSecret
-        $domain = $config.domain
-        
-        Write-Verbose "[$functionName] Config file values:"
-        Write-Verbose "[$functionName]   Domain: $domain"
-        Write-Verbose "[$functionName]   Tenant ID: $tenantId"
-        Write-Verbose "[$functionName]   Client ID: $clientId" 
-        Write-Verbose "[$functionName]   Client Secret: [REDACTED]"
-        Write-Verbose "[$functionName]   Has refresh token: $($null -ne $configRefreshToken)"
-    }
-    catch
-    {
-        Write-Error "Failed to read or process config file: $_"
-        return $null
-    }
-    
-    #region Log parameters
-    Write-Verbose "[$functionName] Received parameters:"
-    Write-Verbose "[$functionName] Configuration File: $configFile"
-    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime"
-    Write-Verbose "[$functionName] Secure String: $SecureString"
-    Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
-    Write-Verbose "[$functionName] Cache Type: $CacheType"
-    Write-Verbose "[$functionName] Domain: $domain"
-    Write-Verbose "[$functionName] Deligated: $Deligated"
-    Write-Verbose "[$functionName] Scopes: $Scopes"
-    Write-Verbose "[$functionName] Config has refresh token: $($null -ne $configRefreshToken)"
-    #endregion Log parameters
-    
-    # Set up cache paths
-    $cacheFolder = Split-Path $configFile
-    $cacheTokenFile = Join-Path $cacheFolder "accessToken.json"
-    
-    # Try to get token from cache if not forcing new token
-    $accessToken = $null
-    if (-not $ForceNewToken)
-    {
-        $accessToken = Get-TokenFromCache -cacheType $CacheType -domain $domain -renewalLeadTime $renewalLeadTime `
-            -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scopes `
-            -deligated $Deligated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile `
-            -secureString $SecureString -configFilePath $configFile -configRefreshToken $configRefreshToken
-        if ($accessToken)
-        {
-            return $accessToken
+            # Add general parameters (not restricted to delegated mode)
+            Write-Verbose "Adding parameter '$paramName' with value: $paramValue"
+            $getTokenParams[$paramName] = $paramValue
         }
     }
-    else
+
+    # Log the final splatting parameters for verification
+    Write-Verbose "Final splatting parameters:"
+    foreach ($param in $getTokenParams.GetEnumerator())
     {
-        Write-Host "Force new token requested. Ignoring cache."
-    }
-    
-    # Get new token if we don't have a valid cached token
-    if ($tenantId -and $clientId -and $clientSecret)
-    {
-        if ($Deligated)
+        if ($param.Key -eq 'configFile')
         {
-            return Get-DelegatedToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -scopes $Scopes -domain $domain -cacheType $CacheType `
-                -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFile `
-                -configRefreshToken $configRefreshToken
+            Write-Verbose "  $($param.Key): $($param.Value)"
+        }
+        elseif ($param.Value -is [bool])
+        {
+            Write-Verbose "  $($param.Key): $($param.Value)"
         }
         else
         {
-            return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+            Write-Verbose "  $($param.Key): '$($param.Value)'"
         }
     }
-    else
-    {
-        Write-Error "Missing required authentication parameters (tenantId, clientId, or clientSecret)"
-        return $null
-    }
-    #endregion Main function logic
+    # Return the splatting hashtable
+    return $getTokenParams
 }
 
-
-function ProcessFilterCondition
+function ProcessFilterCondition()
 {
     [CmdletBinding()]
     param(
@@ -1867,6 +1424,206 @@ function ProcessFilterCondition
         Write-Verbose "[$functionName] Unrecognized filter condition format: $condition"
         return $condition
     }
+}
+
+function GetGraphAccessToken()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$configFile,
+        [int]$renewalLeadTime = 5,
+        [switch]$SecureString,
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$NoSaveRefreshToken,
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$Deligated,
+        [parameter(parameterSetName = 'Deligated')]
+        [string]$Scope,
+        [parameter(parameterSetName = 'Deligated')]
+        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
+        [string]$AuthType = 'Private',
+        [switch]$ForceNewToken,
+        [ValidateSet('file', 'memory')]
+        [string]$CacheType = 'Memory'
+    )
+    
+    #region Process config files
+    $functionName = $MyInvocation.MyCommand.Name
+    # Read and process configuration file
+    if (-not $configFile)
+    {
+        Write-Error "Config file not found. Please provide a valid config file."
+        return $null
+    }
+    Write-Verbose "[$functionName] Reading config file $configFile"
+    try
+    {
+        $config = Get-Content -Raw -Path $configFile -Force | ConvertFrom-Json
+        Write-Verbose "[$functionName] Config file loaded successfully"
+    }
+    catch
+    {
+        Write-Error "Failed to read or process config file: $_"
+        return $null
+    }
+    Write-Verbose "[$functionName] Decrypting values from $configFile"
+    $configRefreshToken = $null
+    if (isEncrypted -data $config)
+    {
+        Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
+        $config = DecryptObject -encryptedObject $config
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
+    }
+    # Extract the refresh token if it exists
+    if ($config.deligatedCredentials.refresh_token)
+    {
+        $configRefreshToken = $config.deligatedCredentials.refresh_token
+        Write-Verbose "[$functionName] Found refresh token in encrypted config."
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No refresh token found in config."
+    }
+    if ($config.tenantId)
+    {
+        $tenantId = $config.tenantId
+        Write-Verbose "[$functionName] Tenant ID found in config: $tenantId"
+    }
+    else
+    {
+        Write-Error "Tenant ID not found in config file."
+        return $null
+    }
+    if ($config.appId)
+    {
+        $clientId = $config.appId
+        Write-Verbose "[$functionName] Client ID found in config: $clientId"
+    }
+    else
+    {
+        Write-Error "Client ID not found in config file."
+        return $null
+    }
+    if ($config.AppSecret)
+    {
+        $clientSecret = $config.AppSecret
+        Write-Verbose "[$functionName] Client Secret found in config."
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Client Secret not found in config file."
+        Write-Verbose "Checking whether the authtype is public flow which does not require client secret."
+        if ($AuthType -ne 'PublicAuthFlow')
+        {
+            Write-Error "Client Secret is required for the selected authentication type."
+            return $null
+        }
+        Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+    }
+    #endregion Process config files
+    
+    #region Log parameters
+    Write-Verbose "[$functionName] Received parameters:"
+    Write-Verbose "[$functionName] Configuration File: $configFile"
+    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime"
+    Write-Verbose "[$functionName] Secure String: $SecureString"
+    Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
+    Write-Verbose "[$functionName] Use Public Auth Flow: $UsePublicAuthFlow"
+    Write-Verbose "[$functionName] Interactive: $Interactive"
+    Write-Verbose "[$functionName] Cache Type: $CacheType"
+    Write-Verbose "[$functionName] Domain: $domain"
+    Write-Verbose "[$functionName] Deligated: $Deligated"
+    Write-Verbose "[$functionName] Scopes: $Scope"
+    Write-Verbose "[$functionName] Config has refresh token: $($null -ne $configRefreshToken)"
+    #endregion Log parameters
+    
+    # Set up cache paths
+    $cacheFolder = Split-Path $configFile
+    $cacheTokenFile = Join-Path $cacheFolder "accessToken.json"
+    
+    #region Try to get token from cache if not forcing new token
+    $accessToken = $null
+    if (-not $ForceNewToken)
+    {
+        $accessToken = Get-TokenFromCache -cacheType $CacheType -domain $domain -renewalLeadTime $renewalLeadTime `
+            -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scope `
+            -deligated $Deligated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile `
+            -secureString $SecureString -configFilePath $configFile -configRefreshToken $configRefreshToken
+        if ($accessToken)
+        {
+            return $accessToken
+        }
+    }
+    else
+    {
+        Write-Host "Force new token requested. Ignoring cache."
+    }
+    #endregion Try to get token from cache if not forcing new token
+    
+    #region Authentication flow
+    if ($deligated)
+    {
+        Write-Verbose "[$functionName] Deligated authentication flow selected."
+        $params = @{
+            tenantId           = $tenantId 
+            clientId           = $clientId 
+            scopes             = $Scope
+            domain             = $domain 
+            cacheType          = $CacheType
+            AuthType           = $AuthType
+            cacheTokenFile     = $cacheTokenFile
+            cacheFolder        = $cacheFolder 
+            configFilePath     = $configFile
+            configRefreshToken = $configRefreshToken
+        }
+        switch ($AuthType)
+        {
+            PublicAuthFlow
+            {
+                Write-Verbose "[$functionName] Using public authentication flow for delegated token."
+            }
+            Interactive
+            {
+                Write-Verbose "[$functionName] Using interactive authentication flow for delegated token."
+                $params += @{
+                    clientSecret = $clientSecret
+                }
+            }
+            Private
+            {
+                Write-Verbose "[$functionName] Using private authentication flow for delegated token."
+                $params += @{
+                    clientSecret = $clientSecret
+                }
+            }
+        }
+        if ($NoSaveRefreshToken)
+        {
+            Write-Verbose "[$functionName] No save refresh token option selected. Not saving refresh token."
+            $params += @{
+                NoSaveRefreshToken = $NoSaveRefreshToken
+            }
+        }
+        return Get-DelegatedToken @params
+    }
+    else
+    {
+        if ($tenantId -and $clientId -and $clientSecret)
+        {
+            return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
+                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+        }
+        else
+        {
+            Write-Error "Missing required authentication parameters (tenantId, clientId, or clientSecret)"
+            return $null
+        }
+    }
+    #endregion Authentication flow
 }
 
 function CallGraphAPI()
@@ -2048,6 +1805,7 @@ function CallGraphAPI()
 
     #region prepare the call
     # Create parameter hashtable for splatting
+    Write-Verbose "[$functionName] Preparing parameters for Invoke-RestMethod call."
     $restParams = @{
         Method          = $method
         Uri             = $encodedUri
@@ -2057,11 +1815,14 @@ function CallGraphAPI()
     # Only add Body parameter if it exists
     if ($body)
     {
+        Write-Verbose "[$functionName] Body parameter provided. Adding to the request."
         $restParams['Body'] = $body
     }
     #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
     {
+        Write-Verbose "[$functionName] PowerShell version is $($PSVersionTable.PSVersion.Major ). Adding StatusCodeVariable to the request."
+        Write-Verbose "[$functionName] Added StatusCodeVariable."
         $restParams['StatusCodeVariable'] = 'statusCode'
     }
     Write-Verbose "[$functionName] Making the following call to Microsoft Graph:" 
@@ -2071,14 +1832,33 @@ function CallGraphAPI()
     try
     {
         $response = Invoke-RestMethod @restParams
-        $response | ForEach-Object {
-            if ($_.'@odata.nextLink')
+        Write-Verbose "[$functionName] NextLink: $($response.'@odata.nextLink')"
+        Write-Verbose "[$functionName] Response count: $($response.value.count)"
+        if ($response.'@odata.nextLink')
+        {
+            Write-Verbose "[$functionName] NextLink found. Fetching additional pages."
+            # Initialize an array to hold all items
+            $allItems = @()
+            $allItems += $response.value
+            $nextLink = $response.'@odata.nextLink'
+            while ($nextLink)
             {
-                $nextLink = $_.'@odata.nextLink'
-                # $nextGroups = CallGraphAPI -accessToken $accessToken -ResourcePath $nextLink -Method GET
-                $nextGroups = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing 
-                $response.value += $nextGroups.value
+                $nextGroup = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing
+                Write-Verbose "[$functionName] Fetched next page with $($nextGroup.value.Count) items."
+                if ($nextGroup.value)
+                {
+                    Write-Verbose "[$functionName] Adding items from next page to the collection."
+                    $allItems += $nextGroup.value
+                }
+                $nextLink = $nextGroup.'@odata.nextLink'
             }
+            # Optionally, reconstruct a response object if needed
+            $response.value = $allItems
+            Write-Verbose "[$functionName] All items collected. Total count: $($Response.value.Count)"
+        }
+        else 
+        {
+            Write-Verbose "[$functionName] No nextLink found. Single page response received."
         }
         Write-Verbose "[$functionName] The call was successful."
         if ($response.count)

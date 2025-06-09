@@ -16,16 +16,8 @@ TestReports/
 TestResults/
 .claude/
 
-TestResults/
-TestReports/
-
 
 # PowerShell-specific files
-
-# PowerShell data files
-*.psd1
-*.psm1
-*claud*.*
 
 # PowerShell script logs
 *.log
@@ -44,9 +36,9 @@ TestReports/
 *.nupkg
 *.snupkg
 
-# Local PowerShell modules
-Modules/
-pwsh/
+# Misc. files.
 *.bat
 *.csv
 *.exe
+*.cmd
+*.txt
