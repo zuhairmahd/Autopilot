@@ -82,29 +82,50 @@ function Write-Log()
                 Move-Item -Path $LogFile -Destination $archiveFile -Force
                 Write-Verbose "Log file rotated to: $archiveFile"
             }
-            
             # Prepare log entries
             $logEntries = @()
             
             if ($CMTraceFormat)
             {
-                # For CMTrace format - separator line without standard components
-                $logEntries += $separatorLine
-                
-                # For CMTrace format - start/finish message with full logging components
+                # For CMTrace format - prepare message with full logging components
                 $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
                 $cmDate = Get-Date -Format "MM-dd-yyyy"
                 $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-                $logEntries += "<![LOG[$startFinishMessage]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
+                $messageEntry = "<![LOG[$startFinishMessage]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
+                
+                # Order entries based on start vs finish logging
+                if ($StartLogging)
+                {
+                    # For start: separator first, then message
+                    $logEntries += $separatorLine
+                    $logEntries += $messageEntry
+                }
+                else
+                {
+                    # For finish: message first, then separator
+                    $logEntries += $messageEntry
+                    $logEntries += $separatorLine
+                }
             }
             else
             {
-                # For standard format - separator line without standard components
-                $logEntries += $separatorLine
-                
-                # For standard format - start/finish message with full logging components
+                # For standard format - prepare message with full logging components
                 $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-                $logEntries += "$timestamp [$LogLevel] [$Module] [Thread:$thread] $startFinishMessage"
+                $messageEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] $startFinishMessage"
+                
+                # Order entries based on start vs finish logging
+                if ($StartLogging)
+                {
+                    # For start: separator first, then message
+                    $logEntries += $separatorLine
+                    $logEntries += $messageEntry
+                }
+                else
+                {
+                    # For finish: message first, then separator
+                    $logEntries += $messageEntry
+                    $logEntries += $separatorLine
+                }
             }
             
             # Use mutex for thread safety
@@ -124,10 +145,19 @@ function Write-Log()
                 $mutex.ReleaseMutex()
                 $mutex.Dispose()
             }
-            
-            # Write to console
-            Write-Host $separatorLine
-            Write-Host $startFinishMessage
+            # Write to console with same ordering as log file
+            if ($StartLogging)
+            {
+                # For start: separator first, then message
+                Write-Host $separatorLine
+                Write-Host $startFinishMessage
+            }
+            else
+            {
+                # For finish: message first, then separator
+                Write-Host $startFinishMessage
+                Write-Host $separatorLine
+            }
             
             return
         }        

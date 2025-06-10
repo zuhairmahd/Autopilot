@@ -75,6 +75,6 @@ $logfile = "mylog.log"
 # }
 
 Write-Host "Calling log function with $logfile"
-write-log -StartLogging -LogFile $logfile -verbose 
+write-log -StartLogging -LogFile $logfile
 Write-Log -Message "This is a test log" -Module "test" -LogFile $logfile 
 write-log -FinishLogging -LogFile $logfile
