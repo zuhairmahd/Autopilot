@@ -245,9 +245,10 @@ function GoToMainMenu()
 
 function Get-CallingContext()
 {
+    [CmdletBinding()]
+    param()
     
     $functionName = $MyInvocation.MyCommand.Name
-    
     # Examine the call stack to determine context
     Write-Verbose "[$functionName] Analyzing call stack to determine context"
     $callStack = Get-PSCallStack
@@ -331,66 +332,66 @@ function Pop-MenuFromStack()
     $functionName = $MyInvocation.MyCommand
     if ($Global:History.Count -gt 0 -and $Global:MenuHistory.Count -gt 0)
     {
-        Write-Host "[$functionName] Starting pop operation"
+        Write-Verbose "[$functionName] Starting pop operation"
         Write-Verbose "[$functionName] Popping menu from stack"
         try
         {
-            Write-Host "[$functionName] Current History Count: $($Global:History.Count)"
-            Write-Host "[$functionName] Current History : $($Global:History -join ', ')"
+            Write-Verbose "[$functionName] Current History Count: $($Global:History.Count)"
+            Write-Verbose "[$functionName] Current History : $($Global:History -join ', ')"
             $Global:History.RemoveAt($Global:History.Count - 1)
-            Write-Host "[$functionName] New History Count: $($Global:History.Count)"
-            Write-Host "[$functionName] New history: $($Global:History -join ', ')"
-            Write-Host "[$functionName] Current MenuHistory Count: $($Global:MenuHistory.Count)"
-            # Write-Host "[$functionName] Current MenuHistory: $($Global:MenuHistory | ForEach-Object { $_.Title } -join ', ')"
+            Write-Verbose "[$functionName] New History Count: $($Global:History.Count)"
+            Write-Verbose "[$functionName] New history: $($Global:History -join ', ')"
+            Write-Verbose "[$functionName] Current MenuHistory Count: $($Global:MenuHistory.Count)"
+            # Write-Verbose "[$functionName] Current MenuHistory: $($Global:MenuHistory | ForEach-Object { $_.Title } -join ', ')"
             
             # Get the menu that was just removed for logging
             $poppedMenu = $Global:MenuHistory[$Global:MenuHistory.Count - 1]
-            Write-Host "[$functionName] Removing menu: $($poppedMenu.Title)"
+            Write-Verbose "[$functionName] Removing menu: $($poppedMenu.Title)"
             # Remove the current menu from the stack
             $Global:MenuHistory.RemoveAt($Global:MenuHistory.Count - 1)
-            Write-Host "[$functionName] New MenuHistory Count after pop: $($Global:MenuHistory.Count)"
+            Write-Verbose "[$functionName] New MenuHistory Count after pop: $($Global:MenuHistory.Count)"
             # Create a simple array of titles for display
             $menuTitles = $Global:MenuHistory | ForEach-Object { $_.Title }
             $menuTitlesString = $menuTitles -join ', '
-            Write-Host "[$functionName] New MenuHistory: $menuTitlesString"
+            Write-Verbose "[$functionName] New MenuHistory: $menuTitlesString"
             # Return the menu that is now at the top of the stack (the previous menu)
             if ($Global:MenuHistory.Count -gt 0)
             {
-                Write-Host "[$functionName] Latest MenuHistory Count: $($Global:MenuHistory.Count)"
-                Write-Host "[$functionName] Stack is not empty, returning to previous menu"
+                Write-Verbose "[$functionName] Latest MenuHistory Count: $($Global:MenuHistory.Count)"
+                Write-Verbose "[$functionName] Stack is not empty, returning to previous menu"
                 try
                 {
                     $targetMenu = $Global:MenuHistory[$Global:MenuHistory.Count - 1]
                     if ($targetMenu -and $targetMenu.Title)
                     {
-                        Write-Host "[$functionName] Previous menu: $($targetMenu.Title)"
-                        Write-Host "[$functionName] Returning to previous menu: $($targetMenu.Title)"
+                        Write-Verbose "[$functionName] Previous menu: $($targetMenu.Title)"
+                        Write-Verbose "[$functionName] Returning to previous menu: $($targetMenu.Title)"
                         return $targetMenu
                     }
                     else
                     {
-                        Write-Host "[$functionName] Error: Target menu is null or missing Title property"
+                        Write-Verbose "[$functionName] Error: Target menu is null or missing Title property"
                         return $null
                     }
                 }
                 catch
                 {
-                    Write-Host "[$functionName] Error accessing target menu: $_"
+                    Write-Verbose "[$functionName] Error accessing target menu: $_"
                     return $null
                 }
             }
             else
             {
-                Write-Host "[$functionName] Latest MenuHistory Count: $($Global:MenuHistory.Count)"
-                Write-Host "[$functionName] Stack is now empty, cannot return to previous menu"
+                Write-Verbose "[$functionName] Latest MenuHistory Count: $($Global:MenuHistory.Count)"
+                Write-Verbose "[$functionName] Stack is now empty, cannot return to previous menu"
                 return $null
             }        
         }
         catch
         {
-            Write-Host "[$functionName] Error popping from stack: $_"
-            Write-Host "[$functionName] Error details: $($_.Exception.Message)"
-            Write-Host "[$functionName] Stack trace: $($_.ScriptStackTrace)"
+            Write-Verbose "[$functionName] Error popping from stack: $_"
+            Write-Verbose "[$functionName] Error details: $($_.Exception.Message)"
+            Write-Verbose "[$functionName] Stack trace: $($_.ScriptStackTrace)"
             return $null
         }
     }
@@ -670,18 +671,28 @@ function ShowMenu()
     $functionName = $MyInvocation.MyCommand.Name
     # region Initialize global variables if they don't exist and display debug
     Write-Verbose "[$functionName] Initializing global variables if not already set"
-    Write-Verbose "Menu history count: $($Global:MenuHistory.Count)"
-    Write-Verbose "History count: $($Global:History.Count)"
+    Write-Verbose "Count of Menu history: $($Global:MenuHistory.Count)"
+    Write-Verbose "Count of history: $($Global:History.Count)"
 
     if (-not $Global:MenuHistory)
     {
         Write-Verbose "[$functionName] Initializing MenuHistory"
         $Global:MenuHistory = [System.Collections.ArrayList]::new() 
     }
+    else
+    {
+        Write-Verbose "[$functionName] MenuHistory is already initialized"
+        Write-Verbose "Menu history count: $($Global:MenuHistory.Count)"
+    }
     if (-not $Global:History)
     {
         Write-Verbose "[$functionName] Initializing History"
         $Global:History = [System.Collections.ArrayList]::new() 
+    }
+    else
+    {
+        Write-Verbose "[$functionName] History is already initialized"
+        Write-Verbose "History count: $($Global:History.Count)"
     }
     Write-Verbose "[$functionName] ===== MENU NAVIGATION DEBUG ====="
     Write-Verbose "[$functionName] Entering ShowMenu for: $($Menu.Title)"
