@@ -1952,8 +1952,8 @@ function CallGraphAPI()
                 Write-Verbose "[$functionName] Server Response: $errorMessage"
             }   
         }
-        # return $statusCode
-        return $null
+        return $statusCode
+        # return $null
     }
     Write-Verbose "[$functionName] Response: $($response)"
     Write-Verbose "[$functionName] Response value: $($response.value)"
