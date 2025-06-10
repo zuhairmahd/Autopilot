@@ -25,6 +25,7 @@ else
 #endregion
 
 #region variables
+$logfile = "mylog.log"
 # $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
@@ -73,6 +74,7 @@ else
 # exit
 # }
 
-
-# GetInstalledWindowsUpdates
-ApplyWindowsUpdates
+Write-Host "Calling log function with $logfile"
+write-log -StartLogging -LogFile $logfile -verbose 
+Write-Log -Message "This is a test log" -Module "test" -LogFile $logfile 
+write-log -FinishLogging -LogFile $logfile

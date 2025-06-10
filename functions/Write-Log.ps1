@@ -6,9 +6,17 @@ function Write-Log()
         [string]$Message,
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
         [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
-        [ValidateScript({
+        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]        [ValidateScript({
+                # Handle relative paths with no backslashes (current directory files)
+                if (-not ($_ -match '[\\\/]'))
+                {
+                    # File is in current directory, no parent directory validation needed
+                    Write-Verbose "Log file is in current directory: $_"
+                    return $true
+                }
+                
                 $parentDir = Split-Path $_ -Parent
+                Write-Verbose "Checking if log directory exists: $parentDir"
                 if (-not (Test-Path $parentDir))
                 {
                     try
@@ -43,6 +51,10 @@ function Write-Log()
         [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
         [switch]$FinishLogging
     )
+    
+    #write verbodse log of received parameters.
+    Write-Verbose "Parameters received: Message='$Message', LogFile='$LogFile', Module='$Module', LogLevel='$LogLevel', CMTraceFormat=$CMTraceFormat, MaxLogSizeMB=$MaxLogSizeMB, PassThru=$PassThru, StartLogging=$StartLogging, FinishLogging=$FinishLogging"
+    # Validate that either StartLogging or FinishLogging is specified
     try
     {
         # Handle StartLogging and FinishLogging switches
@@ -51,15 +63,16 @@ function Write-Log()
             # Set default values when using StartLogging or FinishLogging
             $Module = $MyInvocation.MyCommand.Name
             $LogLevel = "Information"
-            
-            # Create separator line
+            # Create separator line and start/finish message
             $separatorLine = "=" * 80
-            
-            # Ensure log directory exists
-            $logDir = Split-Path $LogFile -Parent
-            if (-not (Test-Path $logDir))
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+            $startFinishMessage = if ($StartLogging)
             {
-                New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+                "Script started at $timestamp" 
+            }
+            else
+            {
+                "Script completed at $timestamp" 
             }
             
             # Check for log rotation if file exists and is too large
@@ -70,18 +83,28 @@ function Write-Log()
                 Write-Verbose "Log file rotated to: $archiveFile"
             }
             
+            # Prepare log entries
+            $logEntries = @()
+            
             if ($CMTraceFormat)
             {
-                # For CMTrace format, still use the separator but in CMTrace format
+                # For CMTrace format - separator line without standard components
+                $logEntries += $separatorLine
+                
+                # For CMTrace format - start/finish message with full logging components
                 $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
                 $cmDate = Get-Date -Format "MM-dd-yyyy"
                 $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-                $logEntry = "<![LOG[$separatorLine]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
+                $logEntries += "<![LOG[$startFinishMessage]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
             }
             else
             {
-                # For standard format, just use the separator line without timestamp
-                $logEntry = $separatorLine
+                # For standard format - separator line without standard components
+                $logEntries += $separatorLine
+                
+                # For standard format - start/finish message with full logging components
+                $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
+                $logEntries += "$timestamp [$LogLevel] [$Module] [Thread:$thread] $startFinishMessage"
             }
             
             # Use mutex for thread safety
@@ -91,7 +114,10 @@ function Write-Log()
             try
             {
                 $mutex.WaitOne() | Out-Null
-                Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+                foreach ($entry in $logEntries)
+                {
+                    Add-Content -Path $LogFile -Value $entry -Encoding UTF8 -Force
+                }
             }
             finally
             {
@@ -101,17 +127,10 @@ function Write-Log()
             
             # Write to console
             Write-Host $separatorLine
+            Write-Host $startFinishMessage
             
             return
-        }
-        
-        # Ensure log directory exists
-        $logDir = Split-Path $LogFile -Parent
-        if (-not (Test-Path $logDir))
-        {
-            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-        }
-        
+        }        
         # Check for log rotation if file exists and is too large
         if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
         {
