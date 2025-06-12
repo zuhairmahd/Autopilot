@@ -347,7 +347,7 @@ function GetDeviceByUser()
             Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
             Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
             Write-Verbose "[$functionName] Current menu title: $($deviceMenu.Title)"
-            $selectedSerialNumber = ShowMenu -Menu $deviceMenu 
+            $selectedSerialNumber = ShowMenu -Menu $deviceMenu -CalledBy 'Action'
             if ($null -ne $selectedSerialNumber -and $selectedSerialNumber -is [string])
             {
                 Write-Verbose "[$functionName] Selected serial number: $selectedSerialNumber"

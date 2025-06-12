@@ -668,12 +668,13 @@ function ShowMenu()
         [ValidateSet('Unknown', 'Direct', 'Action', 'Submenu', 'Navigation')]
         [string]$CalledBy = 'Unknown'
     )
-    $functionName = $MyInvocation.MyCommand.Name
+
+    
     # region Initialize global variables if they don't exist and display debug
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Initializing global variables if not already set"
     Write-Verbose "Count of Menu history: $($Global:MenuHistory.Count)"
     Write-Verbose "Count of history: $($Global:History.Count)"
-
     if (-not $Global:MenuHistory)
     {
         Write-Verbose "[$functionName] Initializing MenuHistory"
@@ -786,12 +787,12 @@ function ShowMenu()
     }
 
     # Add navigation options based on current depth
-    if ($Global:MenuHistory.Count -gt 0)
+    if ($Global:MenuHistory.Count -gt 1)
     {
         Write-Verbose "[$functionName] Adding 'Back' option since depth is $($Global:MenuHistory.Count)"
         $choices += "Back"
     }
-    if ($Global:MenuHistory.Count -gt 1)
+    if ($Global:MenuHistory.Count -gt 2)
     {
         Write-Verbose "[$functionName] Adding 'Main Menu' option since depth is $($Global:MenuHistory.Count)"
         $choices += "Main Menu"

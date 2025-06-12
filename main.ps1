@@ -534,7 +534,7 @@ $autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name 
     {
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
     }
-} -returnsValue
+}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -707,7 +707,6 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         Write-Verbose "[$scriptName] Got user name: $userName"
         $accessToken = GetGraphAccessToken @getTokenParams
         #Check if the user exists first.
-
         $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken
         if ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)  
         {

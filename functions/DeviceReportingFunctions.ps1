@@ -1230,7 +1230,8 @@ function ShowDeviceReport()
     $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
     $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
-    $selection = ShowMenu -Menu $exportMenu
+    $selection = ShowMenu -Menu $exportMenu -CalledBy 'Action'
+
     if ($null -ne $selection )
     {
         Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
