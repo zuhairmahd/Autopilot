@@ -1062,12 +1062,16 @@ function ProcessSerialNumber()
         if ($enrollmentState.inAutopilot)
         {
             Write-Host "This device is enrolled in Autopilot."
+            #capture the device information since this is the first place we can get it.
             if (-not $enrollmentState.managed)
             {
                 Write-Host "Model: $($enrollmentState.autopilot.device.model)"
                 Write-Host "Manufacturer: $($enrollmentState.autopilot.device.manufacturer)"
                 Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
                 Write-Host "=============================`n" -ForegroundColor Green
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
             if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
@@ -1138,7 +1142,7 @@ function ProcessSerialNumber()
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
                 Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' -MonitorAction
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
@@ -1177,9 +1181,26 @@ function ProcessSerialNumber()
                 }
                 return $backoutText
             }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
+                Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
+                {
+                    Write-Host $deviceStates.ready
+                    Write-Host $DeviceAssessmentState.action
+                }
+                elseif ($DeviceAssessmentState.ReadinessState -eq $deviceStates.notReady)
+                {
+                    Write-Host $deviceStates.notReady
+                    Write-Host $DeviceAssessmentState.action
+                }
+            }
+            
+            
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-            $result = ShowMenu -Menu $deviceActionsMenu
+            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             Write-Verbose "Returning from device actions menu with result: $result"
             return $result
         }
