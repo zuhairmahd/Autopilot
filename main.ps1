@@ -859,8 +859,8 @@ catch
 {
     # Fallback for older PowerShell versions
     Write-Verbose "[$scriptName] Adding main menu to both history arrays using older powershell functions."
-    $script:MainMenuHistory += "Main Menu"
-    $script:MainMenuHistory_Menu += $mainMenu
+    $global:MainMenuHistory += "Main Menu"
+    $global:MainMenuHistory_Menu += $mainMenu
 }
 
 # Only show menu if not in test mode
