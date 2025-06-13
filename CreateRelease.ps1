@@ -172,7 +172,6 @@ function MergeFunctions()
 
     $functionName = $MyInvocation.MyCommand.Name
     $success = $false
-    # $AddComments = $true # Set default to true for backward compatibility with PS 5.1
     $mergedContent = New-Object System.Text.StringBuilder
     Write-Verbose "[$functionName] Starting to merge functions from $(($FilesToMerge | Measure-Object).Count) files."
     # Add header to the merged content
