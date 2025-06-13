@@ -231,6 +231,40 @@ function GetTotalRegisteredDevicesByUser()
     }
 }
 
+function GetEntraUser()    
+{
+    [CmdletBinding()]
+    param (
+        [string]$accessToken,
+        [string]$UserName
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    $userUri = "users/$UserName"
+    $userExtraParameters = "select=displayName,userPrincipalName,mail,id"
+    Write-Verbose "[$functionName] Starting function to get user from Entra ID"
+    if (-not $accessToken)
+    {
+        Write-Verbose "[$functionName] AccessToken is null or empty. Cannot proceed."
+        return $returnValues.noAccessTokenMessage
+    }
+    Write-Verbose "[$functionName] Checking if user $UserName exists in Entra ID"
+    $userInfo = CallGraphAPI -accessToken $AccessToken -ResourcePath $userUri -extraParameters $userExtraParameters
+    Write-Verbose "[$functionName] User Info: $($userInfo | Out-String)"
+    if ($userInfo -notin 400, 401, 403, 404)
+    {
+        Write-Verbose "[$functionName] User $UserName found in Entra ID."
+    }
+    else
+    {
+        Write-Verbose "[$functionName] User $UserName not found in Entra ID (Error code: $userInfo)"
+        Write-Verbose "[$functionName] The user $UserName was not found in Entra ID." 
+        return $returnValues.noUserFoundInDirectoryMessage
+    }
+    Write-Verbose "[$functionName] User found: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
+    return $userInfo
+}
+
 function GetDeviceByUser()
 {
     [CmdletBinding()]
@@ -265,7 +299,7 @@ function GetDeviceByUser()
     $managedDeviceUri = "deviceManagement/managedDevices"
     Write-Verbose "[$functionName] Managed device URI: $managedDeviceUri"
     #endregion
-    
+
     $deviceInfo = CallGraphAPI -accessToken $accessToken -ResourcePath $managedDeviceUri -Filter $filter -extraParameters $extraparameters
     Write-Verbose "[$functionName] Device value count: $($deviceInfo.value.Count)"
     Write-Verbose "[$functionName] Device Info: $($deviceInfo | Out-String)"
@@ -274,7 +308,7 @@ function GetDeviceByUser()
         if ($deviceInfo.value.Count -eq 0)
         {
             Write-Verbose "[$functionName] No devices found for user: $UserName"
-            return $null
+            return $returnValues.noUserDeviceFoundMessage 
         }
         elseif ($deviceInfo.value.Count -eq 1)
         {
@@ -312,7 +346,7 @@ function GetDeviceByUser()
             Write-Verbose "[$functionName] Showing device selection menu with $($deviceMenu.Items.Count) items"
             Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
             Write-Verbose "[$functionName] Current menu title: $($deviceMenu.Title)"
-            $selectedSerialNumber = ShowMenu -Menu $deviceMenu 
+            $selectedSerialNumber = ShowMenu -Menu $deviceMenu -CalledBy 'Action'
             if ($null -ne $selectedSerialNumber -and $selectedSerialNumber -is [string])
             {
                 Write-Verbose "[$functionName] Selected serial number: $selectedSerialNumber"

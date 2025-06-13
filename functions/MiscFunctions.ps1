@@ -991,21 +991,22 @@ function GetUserInput()
 
     while ($true) # Loop indefinitely until valid input or Enter is pressed
     {
+        Write-Verbose "[$functionName] Entering validation loop"
         $inputItem = Read-Host $Prompt
         Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
-
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
             Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
             return $null # Return null to signal going back
         }
-
         # Validate the input if it's not empty
+        Write-Verbose "[$functionName] Validating input $inputItem as $InputType"
         $validationResult = validateInput -UserInput $inputItem -type $InputType -settings $settings
+        Write-Verbose "[$functionName] Validation result: $($validationResult.valid)"
+        Write-Verbose "[$functionName] Validation value: $($validationResult.value)"
         $inputResultValid = $validationResult.valid
         $inputResult = $validationResult.value
-
         if ($inputResultValid)
         {
             Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
@@ -1021,6 +1022,7 @@ function GetUserInput()
             # The loop will continue, prompting the user again
         }
     }
+    Write-Verbose "[$functionName] Exiting GetUserInput function"
 }
 
 function ProcessSerialNumber()
@@ -1060,12 +1062,16 @@ function ProcessSerialNumber()
         if ($enrollmentState.inAutopilot)
         {
             Write-Host "This device is enrolled in Autopilot."
+            #capture the device information since this is the first place we can get it.
             if (-not $enrollmentState.managed)
             {
                 Write-Host "Model: $($enrollmentState.autopilot.device.model)"
                 Write-Host "Manufacturer: $($enrollmentState.autopilot.device.manufacturer)"
                 Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
                 Write-Host "=============================`n" -ForegroundColor Green
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
             if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
@@ -1077,7 +1083,6 @@ function ProcessSerialNumber()
             {
                 Write-Host "This device is not assigned to a deployment profile." -ForegroundColor Yellow
             }
-            
         }
         else
         {
@@ -1137,7 +1142,7 @@ function ProcessSerialNumber()
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
                 Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync' -MonitorAction
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
@@ -1176,9 +1181,26 @@ function ProcessSerialNumber()
                 }
                 return $backoutText
             }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
+                Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
+                {
+                    Write-Host $deviceStates.ready
+                    Write-Host $DeviceAssessmentState.action
+                }
+                elseif ($DeviceAssessmentState.ReadinessState -eq $deviceStates.notReady)
+                {
+                    Write-Host $deviceStates.notReady
+                    Write-Host $DeviceAssessmentState.action
+                }
+            }
+            
+            
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-            $result = ShowMenu -Menu $deviceActionsMenu
+            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             Write-Verbose "Returning from device actions menu with result: $result"
             return $result
         }

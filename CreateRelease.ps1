@@ -5,7 +5,7 @@ param(
     [string]$outputFile = '',
     [string]$Version = '',
     [string]$CompanyName = 'Zuhair Mahmoud',
-    [switch]$MergeOnly,
+    [switch]$CreateModule,
     [switch]$Overwrite
 )
 
@@ -172,20 +172,29 @@ function MergeFunctions()
 
     $functionName = $MyInvocation.MyCommand.Name
     $success = $false
-    $AddComments = $true # Set default to true for backward compatibility with PS 5.1
-    Write-Verbose "[$functionName] Starting to merge functions from $(($FilesToMerge | Measure-Object).Count) files."
+    # $AddComments = $true # Set default to true for backward compatibility with PS 5.1
     $mergedContent = New-Object System.Text.StringBuilder
+    Write-Verbose "[$functionName] Starting to merge functions from $(($FilesToMerge | Measure-Object).Count) files."
     # Add header to the merged content
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    [void]$mergedContent.AppendLine("#region Inlined Functions")
-    [void]$mergedContent.AppendLine("# This section contains inlined functions from multiple files")
-    [void]$mergedContent.AppendLine("# Generated on: $timestamp")
-    [void]$mergedContent.AppendLine("# Source files:")
-    foreach ($file in $FilesToMerge)
+    if ($AddComments )
     {
-        [void]$mergedContent.AppendLine("#   - $file")
+        Write-Verbose "[$functionName] Comments will be added to the merged content."
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        [void]$mergedContent.AppendLine("#region Inlined Functions")
+        [void]$mergedContent.AppendLine("# This section contains inlined functions from multiple files")
+        [void]$mergedContent.AppendLine("# Generated on: $timestamp")
+        [void]$mergedContent.AppendLine("# Source files:")
+        foreach ($file in $FilesToMerge)
+        {
+            [void]$mergedContent.AppendLine("#   - $file")
+        }
+        [void]$mergedContent.AppendLine("")
     }
-    [void]$mergedContent.AppendLine("")
+    else
+    {
+        Write-Verbose "[$functionName] No comments will be added to the merged content."
+    }
+    
     # Process each file
     foreach ($filePath in $FilesToMerge)
     {
@@ -229,23 +238,42 @@ function MergeFunctions()
         }
     }
     # Add footer to the merged content
-    [void]$mergedContent.AppendLine("")
-    [void]$mergedContent.AppendLine("#endregion Inlined Functions")
+    if ($AddComments )
+    {
+        Write-Verbose "[$functionName] Adding footer comments to the merged content."
+        [void]$mergedContent.AppendLine("")
+        [void]$mergedContent.AppendLine("#endregion Inlined Functions")
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No footer comments will be added to the merged content."
+    }
+    
+    #Check if we are given a destination file with a path
+    if ($DestinationFile -contains '\')
+    {
+        Write-Verbose "[$functionName] Destination file contains a path: $DestinationFile"
+        $destinationDir = Split-Path -Parent $DestinationFile    
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Destination file does not contain a path, using current directory: $pwd"
+        $destinationDir = $pwd
+    }
+    
+    # Ensure the destination directory exists
+    if (-not (Test-Path -Path $destinationDir))
+    {
+        Write-Verbose "[$functionName] Creating destination directory: $destinationDir"
+        New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
+    }
     
     try
     {
-        # Ensure the destination directory exists
-        $destinationDir = Split-Path -Parent $DestinationFile
-        if (-not (Test-Path -Path $destinationDir))
-        {
-            Write-Verbose "[$functionName] Creating destination directory: $destinationDir"
-            New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
-        }
-        
         # Save the merged content to the destination file
         Write-Verbose "[$functionName] Saving content to: $DestinationFile"
         $mergedContent.ToString() | Set-Content -Path $DestinationFile -Force
-        Write-Host "Merged functions saved to: $DestinationFile"
+        Write-Verbose "Merged functions saved to: $DestinationFile"
         $success = $true
     }
     catch
@@ -265,15 +293,55 @@ function CopySecrets()
         [Parameter(Mandatory = $true)]
         [string]$SourceFolder,
         [Parameter(Mandatory = $true)]
-        [string]$DestinationFolder
+        [string]$DestinationFolder,
+        [switch]$Overwrite
     )
-    
+
+    #region Print logs
     Write-Verbose 'Received the following parameters:'
     Write-Verbose "SourceFolder: $SourceFolder"
     Write-Verbose "DestinationFolder: $DestinationFolder"
+    Write-Verbose "Overwrite: $Overwrite"
+    #endregion
+    
+    if (Test-Path -Path "$DestinationFolder\.secrets")
+    {
+        Write-Host "the folder $DestinationFolder\.secrets already exists."
+        if ($Overwrite)
+        {
+            Write-Host 'Removing .secrets folder...'
+            Remove-Item -Path "$DestinationFolder\.secrets" -Force | Out-Null
+        }
+        else 
+        {
+            $response = Read-Host 'Overwrite? (Y/N)'
+            Write-Verbose "User response: $response"
+            while ($response -notin 'Y', 'N')
+            {
+                $response = Read-Host 'Invalid input. Please enter Y or N: '
+                Write-Verbose "User response: $response"
+                [console]::beep(500, 300)
+            }
+            if ($response -eq 'Y')
+            {
+                Write-Host 'Removing .secrets folder...'
+                Remove-Item -Path "$DestinationFolder\.secrets" -Force | Out-Null
+            }
+            else
+            {
+                Write-Host 'Exiting without copying secrets.'
+                return $false
+            }   
+        }
+    }
+    else
+    {
+        Write-Host "Creating .secrets folder in: $DestinationFolder"
+        New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
+    }
     
     Write-Host 'Looking for secrets...'
-    $secrets = Get-ChildItem -Path $SourceFolder -Filter config*.json -Recurse
+    $secrets = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse
     if ($secrets.Count -eq 0)
     {
         Write-Host 'No secrets found.'
@@ -289,6 +357,8 @@ function CopySecrets()
             $domain = $data.domain
             $name = $data.name
             $encrypted = (isEncrypted -data $data)
+            $deligated = $data.auth.deligated
+            $index = $i + 1
             if ($encrypted)
             {
                 $encryption = 'Encrypted'
@@ -305,30 +375,36 @@ function CopySecrets()
             {
                 $name = 'Unknown'
             }
-            Write-Host "$i. $($name): $domain ($encryption)"
+            if ($deligated)
+            {
+                $deligatedStatus = 'Delegated'
+            }
+            else
+            {
+                $deligatedStatus = 'Client'
+            }
+            Write-Host "$index. $($name): $domain ($encryption, $deligatedStatus)"
         }
-        $index = Read-Host 'Enter the number of the secret you would like to copy. (99 to quit)'
-        $secret = $secrets[$index]
-        while (($index -lt 0 -or $index -ge $secrets.Count) -and $index -ne 99)
+        $choice = Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)'
+        Write-Verbose "User selected: $choice"
+        while ($choice -lt 0 -or $choice -ge $secrets.Count)
         {
             Write-Host 'Invalid choice.'
             #beep
             [console]::beep(500, 300)
-            Write-Host "Please choose a number between 1 and $($secrets.Count)"
-            $index = Read-Host 'Enter the number of the secret you would like to copy.'
+            Write-Host "Please choose a number between 1 and $($secrets.Count), or 0 to exit."
+            $choice = Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)'
+            Write-Verbose "User selected: $choice"
         }
-        if (-not $secret)
+        if ($choice -eq 0)
         {
-            Write-Verbose 'No secrets selected.'
+            Write-Host 'Exiting...'
             return $false
         }
+        $secret = $secrets[$choice - 1]        
     }
-    Write-Verbose "Copying $($secret.FullName) to $DestinationFolder"
-    if (-not (Test-Path -Path "$DestinationFolder\.secrets"))
-    {
-        Write-Host 'Creating .secrets folder...'
-        New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
-    }
+    
+    Write-Host "Copying $($secret.FullName) to $DestinationFolder"
     try
     {
         Copy-Item -Path $secret.FullName -Destination "$DestinationFolder\.secrets\config.json" -Force
@@ -352,6 +428,7 @@ $filesToCopy = @('settings.json', 'version.txt', 'init.json')
 $successMessage = "$OutputFile written"
 $scriptName = $MyInvocation.MyCommand.Name
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
+$helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
 if ($outputFile -eq '')
 {
@@ -368,6 +445,21 @@ $parentFolder = Split-Path -Parent $outputFile
 #endregion
 
 #region initial checks
+if ($CreateModule)
+{
+    Write-Host "Creating module $helperModuleName."
+    $mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $helperModuleName
+    if ($mergeResult -eq $true)
+    {
+        Write-Host "Module $helperModuleName. created successfully."
+    }
+    else
+    {
+        Write-Host "Failed to create module: $helperModuleName."
+        exit 1
+    }
+}
+
 #Check if the initialization file exists.  If not, create it.
 if (-not (Test-Path -Path $initFile))
 {
@@ -476,25 +568,10 @@ if (-not $Overwrite)
                 Remove-Item -Path $parentFolder -Recurse -Force | Out-Null
                 Write-Host "Creating folder $parentFolder"
                 New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
-                Write-Verbose 'Creating functions folder'
-                New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
-                Write-Host 'Creating secrets folder.'
-                New-Item -Path "$parentFolder\.secrets" -ItemType Directory -Force | Out-Null
             }
             C
             {
                 Write-Host 'Continuing with the existing folder.'
-                #Check to make sure all subfolders exist.
-                if (-not (Test-Path -Path "$parentFolder\functions"))
-                {
-                    Write-Host 'Creating functions folder'
-                    New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
-                }
-                if (-not (Test-Path -Path "$parentFolder\.secrets"))
-                {
-                    Write-Host 'Creating secrets folder'
-                    New-Item -Path "$parentFolder\.secrets" -ItemType Directory -Force | Out-Null
-                }
             }
             E
             {
@@ -507,10 +584,6 @@ if (-not $Overwrite)
     {
         Write-Host "Creating folder $parentFolder"
         New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
-        Write-Verbose 'Creating functions folder'
-        New-Item -Path "$parentFolder\functions" -ItemType Directory -Force | Out-Null
-        Write-Verbose 'Creating secrets folder'
-        New-Item -Path "$parentFolder\.secrets" -ItemType Directory -Force | Out-Null
     }
 }
 else
@@ -530,75 +603,84 @@ else
 #endregion
 
 #region Merge functions
-$mergeOutputFile = Join-Path -Path "$pwd\build" -ChildPath 'merged.ps1'
-$mergeParentFolder = Split-Path -Parent $mergeOutputFile
-# Ensure destination directory exists
-if (-not (Test-Path -Path $mergeParentFolder))
+if (-not $CreateModule)
 {
-    Write-Verbose "[$scriptName] Creating parent folder: $mergeParentFolder"
-    New-Item -ItemType Directory -Path $mergeParentFolder -Force | Out-Null
-}
-if ($InputFile -ne $outputFile)
-{
-    Write-Verbose "[$scriptName] Copying input file to parent folder: $mergeParentFolder"
-    $newscriptFile = "$mergeParentFolder\$($InputFile.Split('\')[-1])"
-    Write-Verbose "[$scriptName] New script file path: $newscriptFile"
-    Copy-Item -Path $InputFile -Destination $mergeParentFolder -Force
-}
-Write-Verbose "[$scriptName] Calling MergeFunctions with destination: $mergeOutputFile"
-Write-Host "Merging sourced functions in $inputFile to $mergeOutputFile"
-$mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $mergeOutputFile
-Write-Verbose "[$scriptName] MergeFunctions returned: $mergeResult"
-if ($mergeResult -eq $true)
-{
-    Write-Host "Functions merged successfully to $mergeOutputFile"
-    Write-Host "Creating master script at $newscriptFile"
-    #read the newscript into a variable.
-    Write-Verbose "[$scriptName] Reading new script content into variable."
-    $newscriptContent = Get-Content -Path $newscriptFile -Raw
-    Write-Verbose "[$scriptName] New script content read successfully."        #read the merged script into a variable.
-    Write-Verbose "[$scriptName] Reading merged script content into variable."
-    $mergedContent = Get-Content -Path $mergeOutputFile -Raw
-    Write-Verbose "[$scriptName] Merged script content read from: $mergeOutputFile"
-    # Find the positions of the region markers
-    Write-Verbose "[$scriptName] Finding region markers in the script."
-    $startMarker = "#region import functions."
-    $endMarker = "#endregion import functions."
-    $startPosition = $newscriptContent.IndexOf($startMarker)
-    $endPosition = $newscriptContent.IndexOf($endMarker, $startPosition)
-    if ($startPosition -ge 0 -and $endPosition -gt $startPosition)
+    $mergeOutputFile = Join-Path -Path "$pwd\build" -ChildPath 'merged.ps1'
+    $mergeParentFolder = Split-Path -Parent $mergeOutputFile
+    # Ensure destination directory exists
+    if (-not (Test-Path -Path $mergeParentFolder))
     {
-        Write-Verbose "[$scriptName] Found start marker at position $startPosition and end marker at position $endPosition."
-        # Extract portions before, between, and after markers
-        $beforeRegion = $newscriptContent.Substring(0, $startPosition + $startMarker.Length)
-        $afterRegion = $newscriptContent.Substring($endPosition)
-        # Construct the new content by concatenating the parts with the merged content
-        $newscriptContent = $beforeRegion + "`r`n" + $mergedContent + "`r`n" + $afterRegion
-        Write-Verbose "[$scriptName] Replaced content between import functions markers."
+        Write-Verbose "[$scriptName] Creating parent folder: $mergeParentFolder"
+        New-Item -ItemType Directory -Path $mergeParentFolder -Force | Out-Null
+    }
+    if ($InputFile -ne $outputFile)
+    {
+        Write-Verbose "[$scriptName] Copying input file to parent folder: $mergeParentFolder"
+        $newscriptFile = "$mergeParentFolder\$($InputFile.Split('\')[-1])"
+        Write-Verbose "[$scriptName] New script file path: $newscriptFile"
+        Copy-Item -Path $InputFile -Destination $mergeParentFolder -Force
+    }
+    Write-Verbose "[$scriptName] Calling MergeFunctions with destination: $mergeOutputFile"
+    Write-Host "Merging sourced functions in $inputFile to $mergeOutputFile"
+    $mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $mergeOutputFile
+    Write-Verbose "[$scriptName] MergeFunctions returned: $mergeResult"
+    if ($mergeResult -eq $true)
+    {
+        Write-Host "Functions merged successfully to $mergeOutputFile"
+        Write-Host "Creating master script at $newscriptFile"
+        #read the newscript into a variable.
+        Write-Verbose "[$scriptName] Reading new script content into variable."
+        $newscriptContent = Get-Content -Path $newscriptFile -Raw
+        Write-Verbose "[$scriptName] New script content read successfully."        #read the merged script into a variable.
+        Write-Verbose "[$scriptName] Reading merged script content into variable."
+        $mergedContent = Get-Content -Path $mergeOutputFile -Raw
+        Write-Verbose "[$scriptName] Merged script content read from: $mergeOutputFile"
+        # Find the positions of the region markers
+        Write-Verbose "[$scriptName] Finding region markers in the script."
+        $startMarker = "#region import functions."
+        $endMarker = "#endregion import functions."
+        $startPosition = $newscriptContent.IndexOf($startMarker)
+        $endPosition = $newscriptContent.IndexOf($endMarker, $startPosition)
+        if ($startPosition -ge 0 -and $endPosition -gt $startPosition)
+        {
+            Write-Verbose "[$scriptName] Found start marker at position $startPosition and end marker at position $endPosition."
+            # Extract portions before, between, and after markers
+            $beforeRegion = $newscriptContent.Substring(0, $startPosition + $startMarker.Length)
+            $afterRegion = $newscriptContent.Substring($endPosition)
+            # Construct the new content by concatenating the parts with the merged content
+            $newscriptContent = $beforeRegion + "`r`n" + $mergedContent + "`r`n" + $afterRegion
+            Write-Verbose "[$scriptName] Replaced content between import functions markers."
+        }
+        else
+        {
+            Write-Warning "[$scriptName] Could not find region markers in the script. Script will not be modified."
+        }
+        #write the newscriptContent to the newscriptFile
+        Write-Verbose "[$scriptName] Writing new script content to: $newscriptFile"
+        try
+        {
+            $newscriptContent | Set-Content -Path $newscriptFile -Force
+            Write-Verbose "[$scriptName] New script content written successfully."
+            Write-Host "New script content written to $newscriptFile"
+        }
+        catch
+        {
+            Write-Host "Failed to write new script content to $newscriptFile"
+            Write-Error $_
+            exit 1
+        }
     }
     else
     {
-        Write-Warning "[$scriptName] Could not find region markers in the script. Script will not be modified."
-    }
-    #write the newscriptContent to the newscriptFile
-    Write-Verbose "[$scriptName] Writing new script content to: $newscriptFile"
-    try
-    {
-        $newscriptContent | Set-Content -Path $newscriptFile -Force
-        Write-Verbose "[$scriptName] New script content written successfully."
-        Write-Host "New script content written to $newscriptFile"
-    }
-    catch
-    {
-        Write-Host "Failed to write new script content to $newscriptFile"
-        Write-Error $_
+        Write-Host "Failed to merge functions to $OutputFile"
         exit 1
     }
 }
 else
 {
-    Write-Host "Failed to merge functions to $OutputFile"
-    exit 1
+    Write-Verbose "No merge operation was performed."
+    $newscriptFile = $InputFile
+    Write-Verbose "Using input file as new script file: $newscriptFile"
 }
 #endregion
 
@@ -656,62 +738,50 @@ else
     exit 1
 }
 
-Write-Verbose 'Checking if the secrets folder exists.'
-if (Test-Path -Path "parentFolder\.secrets\config.json")
+if ($Overwrite)
 {
-    Write-Host 'Secrets already exist in the destination folder.'
-    $response = Read-Host 'Would you like to overwrite them? (Y/N)'
-    while ($response -notin 'Y', 'N')
+    $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder -Overwrite
+}
+else
+{
+    $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder
+}
+if ($secretsCopied)
+{
+    Write-Host "Secrets copied successfully to $parentFolder\.secrets"
+}
+else
+{
+    Write-Host "No secrets were copied."
+}
+
+Write-Host "Cleaning up..."
+if ($null -ne $mergeOutputFile)
+{
+    Write-Verbose "[$scriptName] Cleaning up merge output file: $mergeOutputFile"
+    if (Test-Path -Path $mergeOutputFile)
     {
-        $response = Read-Host 'Invalid input. Please enter Y or N: '
-        [console]::beep(500, 300)
+        Write-Host "Removing $mergeOutputFile"
+        Remove-Item -Path $mergeOutputFile -Force | Out-Null
     }
-    switch ($response)
+    else
     {
-        Y
-        { 
-            Write-Host 'Overwriting secrets...' 
-            if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder)
-            {
-                Write-Host 'Secrets copied successfully.'
-            }
-            else
-            {
-                Write-Host 'Failed to copy secrets.'
-                Write-Host 'Run the script with the -Verbose switch for more information.'
-            }
-        }
-        N
-        {
-            Write-Host 'No secrets will be copied.'
-        }
+        Write-Host "No merge operation was performed so no merge files to clean."
+    }
+    Write-Verbose "[$scriptName] Cleaning up new script file: $newscriptFile"
+    if (Test-Path -Path $newscriptFile)
+    {
+        Write-Host "Removing $newscriptFile"
+        Remove-Item -Path $newscriptFile -Force | Out-Null
+    }
+    else
+    {
+        Write-Host "No new script file was created so no new script files to clean."
     }
 }
 else
 {
-    Write-Host 'Secrets do not exist in the destination folder.'
-    if (CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder)
-    {
-        Write-Host 'Secrets copied successfully.'
-    }
-    else
-    {
-        Write-Host 'Failed to copy secrets.'
-        Write-Host 'Run the script with the -Verbose switch for more information.'
-    }
+    Write-Host "No merge output file to clean up."
 }
-
-Write-Host "Cleaning up..."
-if (Test-Path -Path $mergeOutputFile)
-{
-    Write-Host "Removing $mergeOutputFile"
-    Remove-Item -Path $mergeOutputFile -Force | Out-Null
-}
-if (Test-Path -Path $newscriptFile)
-{
-    Write-Host "Removing $newscriptFile"
-    Remove-Item -Path $newscriptFile -Force | Out-Null
-}
-
 Write-Host "Build process completed successfully."
 Write-Host "Executable and files are located in $parentFolder"

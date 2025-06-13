@@ -25,6 +25,7 @@ else
 #endregion
 
 #region variables
+$logfile = "mylog.log"
 # $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
@@ -57,3 +58,23 @@ else
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
+
+
+# $fileName = Read-Host -Prompt "Enter the path to the JSON file you want to encrypt (default: $configFile)"
+# $password = Read-Host -Prompt "Enter your password" -AsSecureString
+# $choice = Read-Host "Press 1 to encrypt, 2 to decrypt, or any other key to exit"
+# if ($choice -eq '2')
+# {
+# Invoke-JsonFileEncryption -filePath $fileName -Key $password
+# exit
+# }
+# elseif ($choice -ne '1')
+# {
+# Write-Host "Exiting script." -ForegroundColor Yellow
+# exit
+# }
+
+Write-Host "Calling log function with $logfile"
+write-log -StartLogging -LogFile $logfile
+Write-Log -Message "This is a test log" -Module "test" -LogFile $logfile 
+write-log -FinishLogging -LogFile $logfile
