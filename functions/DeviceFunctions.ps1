@@ -50,6 +50,7 @@ function SendDeviceCommand ()
         [switch]$MonitorAction,
         [switch]$NoConfirmation
     )
+    
     #region variables and logs
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Device ID:     $ManagedDeviceId"
@@ -81,7 +82,6 @@ function SendDeviceCommand ()
 
     Write-Host "Sending $Command command to device with identifier $ManagedDeviceId" -ForegroundColor Cyan
     $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
-    $success = $false
     $actionType = ""
     $response = ""
     
@@ -139,7 +139,7 @@ function SendDeviceCommand ()
         # Only send additional sync for non-sync operations to avoid redundancy
         if ($Command -ne "sync")
         {
-            Write-Verbose "[$functionName] Performing automatic device sync after $Command operation."
+            Write-Host "Performing automatic device sync after $Command operation."
             $syncUri = "$deviceManagementUri/syncDevice"
             $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
             Write-Verbose "[$functionName] Sync Response: $syncResponse"
@@ -158,15 +158,13 @@ function SendDeviceCommand ()
                 $retryCount++
                 Write-Host "Checking $Command status, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
                 Write-Verbose "[$functionName] Checking action results (Attempt $retryCount of $MaxRetries)"
-  
                 # Wait before checking
+                Write-Verbose "[$functionName] Waiting for $RetryDelaySeconds seconds before checking action status."
                 Start-Sleep -Seconds $RetryDelaySeconds
-  
                 # Check action results
                 $deviceDetails = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
                 Write-Verbose "[$functionName] Device action results: $($deviceDetails | ConvertTo-Json -Depth 5)"
                 Write-Host "Action results: $($deviceDetails.deviceActionResults)"
-  
                 if ($deviceDetails -and $deviceDetails.deviceActionResults)
                 {
                     # Find the relevant action result based on action type
@@ -275,7 +273,6 @@ function SendDeviceCommand ()
         else
         {
             Write-Verbose "[$functionName] Monitoring not enabled, skipping action status checks."
-            $success = $true
         }
     }
     else
@@ -283,7 +280,6 @@ function SendDeviceCommand ()
         Write-Host "Failed to send $Command command to device." -ForegroundColor Red
         Write-Verbose "[$functionName] Failed to send command. Response: $response"
     }
-    return $success
 }
 
 function GetDeviceIdFromSerial()

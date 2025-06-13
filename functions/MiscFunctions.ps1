@@ -1200,8 +1200,8 @@ function ProcessSerialNumber()
             
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
-            Write-Verbose "Returning from device actions menu with result: $result"
+            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action' -Verbose 
+            Write-Host "Returning from device actions menu with result: $result"
             return $result
         }
         else

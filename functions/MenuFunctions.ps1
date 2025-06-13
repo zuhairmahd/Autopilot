@@ -857,13 +857,13 @@ function Handle-ActionExecution()
     # Handle special signals
     if ($result -eq "EXIT_APPLICATION")
     {
-        Write-Verbose "[$functionName] Action requested application exit"
+        Write-Verbose "[$functionName] Action requested application exit because result is $result"
         return $null
     }
     
     if ($result -eq $backoutText)
     {
-        Write-Verbose "[$functionName] Action returned backout text"
+        Write-Verbose "[$functionName] Action returned backout text beaaus result is $result"
         return ShowMenu -Menu $CurrentMenu -CalledBy 'Action' -StackOperation 'None'
     }
     
