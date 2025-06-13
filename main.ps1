@@ -320,7 +320,6 @@ $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How w
 $deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
-$autopilotSerialNumberMenu = newMenu -Title "Check device registration" -Description "How would you like to enter the serial number?."
 
 #region export menu
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
@@ -391,22 +390,42 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers.'
     $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-    if ($null -eq $serialNumber)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-        return $backoutText
-    }
-    else
+    if ($null -ne $serialNumber)
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
+        Write-Host "Looking up device with serial number: $serialNumber"
         $accessToken = GetGraphAccessToken @getTokenParams
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        $callingContext = Get-CallingContext -IncludeNavigationPath
+        switch ($callingContext)
+        {
+            Action-ViaCheckMenu
+            {
+                Write-Verbose "[$scriptName] Action called via $callingContext"
+                Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                Write-Verbose "[$scriptName] Result returned: $result"
+            }
+            Action-ViaAutopilotMenu
+            {
+                Write-Verbose "[$scriptName] Action called via $callingContext"
+                Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
+                Write-Host "Checking device with serial number $($SerialNumber)..."
+                $deviceObject = @{SerialNumber = $serialNumber}
+                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
+                Write-Verbose "[$scriptName] Result returned: $result"
+            }
+        }
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
         {
             Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
             return "EXIT_APPLICATION"
         }
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
+        return $backoutText
     }
 }
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
@@ -420,17 +439,32 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $model = $deviceObject.model
         Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
         $accessToken = GetGraphAccessToken @getTokenParams
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Verbose "Result returned: $result"
+        $context = Get-CallingContext -IncludeNavigationPath
+        switch ($context)
+        {
+            Action-ViaCheckMenu
+            {
+                Write-Verbose "[$scriptName] Action called via $context"
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                Write-Verbose "[$scriptName] Result returned: $result"
+            }
+            Action-ViaAutopilotMenu
+            {
+                Write-Verbose "[$scriptName] Action called via $context"
+                Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
+                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
+                Write-Verbose "[$scriptName] Result returned: $result"
+            }
+        }
         # Check if ProcessSerialNumber returned an exit signal
         if ($null -eq $result)
         {
             Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
             return "EXIT_APPLICATION"
         }
-        elseif ($result -eq $true)
+        elseif ($result -eq $true -or $result -in $returnValues.Values)
         {
-            Write-Host "Device information for device with serial number: $serialNumber was retrieved successfully." -ForegroundColor Green
+            Write-Host $result
         }
         else
         {
@@ -446,95 +480,6 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
 #endregion serial number menu
 
 #region Autopilot menu   
-$autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Enter a serial number." -Action {
-    Write-Host 'Please enter the serial number of the device.'
-    Write-Host 'The serial number is typically a combination of letters and numbers and is no more than 10 digits long.'
-    $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber'
-    # Check if user entered 'back'
-    if ($null -eq $serialNumber)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $backoutText."
-        GoBack
-    } 
-    else # Process only if a serial number was entered
-    {
-        Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
-        Write-Host "Checking device with serial number $($SerialNumber)..."
-        $deviceObject = @{SerialNumber = $serialNumber}
-        $accessToken = GetGraphAccessToken @getTokenParams
-        $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
-        Write-Verbose "[$scriptName] Result returned: $result"
-        # Handle navigation responses  
-        if ($result -eq "Back" -or $result -eq "back")
-        {
-            Write-Verbose "[$scriptName] Received Back from ProcessDevice function, returning to previous menu"
-            return $backoutText
-        }
-        elseif ($result -eq "Main Menu" -or $result -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] Received MainMenu from ProcessDevice function, returning to main menu"
-            GoToMainMenu
-        }
-        elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
-        {
-            Write-Verbose "[$scriptName] User requested application exit."
-            return "EXIT_APPLICATION"
-        }
-        elseif ($result -eq $true -or $result -in $returnValues.Values)
-        {
-            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            GoBack
-        }
-        else
-        {
-            Write-Host "Failed to fetch information for device with serial number: $($deviceObject.serialNumber)" -ForegroundColor Red  
-        }
-    }
-} -returnsValue
-$autopilotSerialNumberMenu = AddMenuItem -Menu $autopilotSerialNumberMenu -Name "Use this device's serial number." -Action {
-    Write-Verbose "[$scriptName] Getting the serial number for this device..."
-    
-    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -NoHash
-    Write-Verbose "[$scriptName] Device object: $($deviceObject)"
-    if ($deviceObject)
-    {
-        Write-Host "Checking device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-        $accessToken = GetGraphAccessToken @getTokenParams
-        $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'check'
-        Write-Host "[$scriptName] Result returned: $result"
-        # Handle navigation responses  
-        if ($result -eq "Back" -or $result -eq "back")
-        {
-            Write-Verbose "[$scriptName] Received Back from ProcessDevice function, returning to previous menu"
-            return $backoutText
-        }
-        elseif ($result -eq "Main Menu" -or $result -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] Received MainMenu from ProcessDevice function, returning to main menu"
-            GoToMainMenu
-        }
-        elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
-        {
-            Write-Verbose "[$scriptName] User requested application exit."
-            return "EXIT_APPLICATION"
-        }
-        elseif ($result -eq $true -or $result -in $returnValues.Values)
-        {
-            Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            GoBack
-        }
-        else
-        {
-            Write-Host "Failed to fetch information for device with serial number: $($deviceObject.serialNumber)" -ForegroundColor Red  
-        }
-    }
-    else
-    {
-        Write-Host "Could not obtain the serial number." -ForegroundColor Red
-    }
-}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -620,7 +565,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
     $updateResult = ApplyWindowsUpdates
     Write-Host $returnValues.$updateResult
 }
-$autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $autopilotSerialNumberMenu
+$autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
     Write-Host 'Deleting the device from Autopilot...'
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash

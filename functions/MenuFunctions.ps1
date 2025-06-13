@@ -246,19 +246,69 @@ function GoToMainMenu()
 function Get-CallingContext()
 {
     [CmdletBinding()]
-    param()
+    param(
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Menu = $null,
+        [Parameter(Mandatory = $false)]
+        [string]$PreferredContext = $null,
+        [Parameter(Mandatory = $false)]
+        [switch]$IncludeNavigationPath
+    )
     
     $functionName = $MyInvocation.MyCommand.Name
-    # Examine the call stack to determine context
     Write-Verbose "[$functionName] Analyzing call stack to determine context"
+    Write-Verbose "[$functionName] PreferredContext: $PreferredContext"
+    Write-Verbose "[$functionName] Menu provided: $($null -ne $Menu)"
+    Write-Verbose "[$functionName] IncludeNavigationPath: $IncludeNavigationPath"
+    
     $callStack = Get-PSCallStack
     Write-Verbose "[$functionName] Call stack depth: $($callStack.Count)"
     
-    # Look at the calling function (skip current function)
-    if ($callStack.Count -gt 1)
+    # If PreferredContext is provided and valid, use it (but still apply navigation path if requested)
+    if ($PreferredContext -and $PreferredContext -in @('Direct', 'Action', 'Submenu', 'Navigation'))
     {
-        Write-Verbose "[$functionName] Call stack has more than one entry, analyzing caller"
-        $caller = $callStack[1]
+        Write-Verbose "[$functionName] Using preferred context: $PreferredContext"
+        $baseContext = $PreferredContext
+    }
+    else
+    {
+        # Determine base context using original logic
+        $baseContext = Get-BaseCallingContext -CallStack $callStack -Menu $Menu
+    }
+    
+    # If navigation path is requested and available, enhance the context
+    if ($IncludeNavigationPath -and $Global:MenuHistory -and $Global:MenuHistory.Count -gt 0)
+    {
+        $navigationContext = Get-NavigationPathContext
+        if ($navigationContext -ne 'Unknown')
+        {
+            $enhancedContext = "$baseContext-$navigationContext"
+            Write-Verbose "[$functionName] Enhanced context with navigation path: $enhancedContext"
+            return $enhancedContext
+        }
+    }
+    
+    Write-Verbose "[$functionName] Returning base context: $baseContext"
+    return $baseContext
+}
+
+function Get-BaseCallingContext()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$CallStack,
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Menu = $null
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Look at the calling function (skip current function and Get-CallingContext)
+    if ($CallStack.Count -gt 2)
+    {
+        Write-Verbose "[$functionName] Call stack has sufficient depth, analyzing caller"
+        $caller = $CallStack[2]  # Skip Get-CallingContext and Get-BaseCallingContext
         Write-Verbose "[$functionName] Called from: $($caller.FunctionName) at line $($caller.ScriptLineNumber)"
         
         # If called from ShowMenu itself, it's likely navigation
@@ -271,12 +321,202 @@ function Get-CallingContext()
         # Check if called from known navigation functions
         if ($caller.FunctionName -in @('Handle-BackNavigation', 'Handle-MainMenuNavigation', 'GoBack', 'GoToMainMenu'))
         {
+            Write-Verbose "[$functionName] Called from known navigation function: $($caller.FunctionName)"
             return 'Navigation'
+        }
+        
+        # Check if called from menu item action execution functions
+        if ($caller.FunctionName -in @('Handle-ActionExecution', 'Handle-MenuItemSelection'))
+        {
+            Write-Verbose "[$functionName] Called from action execution function: $($caller.FunctionName)"
+            return 'Action'
+        }
+        
+        # Check if called from submenu navigation functions
+        if ($caller.FunctionName -in @('Handle-SubmenuNavigation'))
+        {
+            Write-Verbose "[$functionName] Called from submenu navigation function: $($caller.FunctionName)"
+            return 'Submenu'
+        }
+        
+        # Generate unique context based on calling function properties
+        $callerContext = Get-UniqueCallerContext -CallStack $CallStack -Menu $Menu
+        if ($callerContext -ne 'Unknown')
+        {
+            Write-Verbose "[$functionName] Generated unique caller context: $callerContext"
+            return $callerContext
         }
     }
     
     # If we can't determine from call stack, assume direct call
+    Write-Verbose "[$functionName] Unable to determine specific context, defaulting to 'Direct'"
     return 'Direct'
+}
+
+function Get-NavigationPathContext()
+{
+    [CmdletBinding()]
+    param()
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Analyzing navigation path from MenuHistory"
+    
+    if (-not $Global:MenuHistory -or $Global:MenuHistory.Count -eq 0)
+    {
+        Write-Verbose "[$functionName] No menu history available"
+        return 'Unknown'
+    }
+    
+    # Create navigation path signature from menu titles
+    $menuTitles = @()
+    foreach ($menu in $Global:MenuHistory)
+    {
+        if ($menu -and $menu.Title)
+        {
+            # Normalize menu titles for consistent context generation
+            $normalizedTitle = $menu.Title -replace '\s+', '' -replace '[^a-zA-Z0-9]', ''
+            $menuTitles += $normalizedTitle
+            Write-Verbose "[$functionName] Added normalized menu title: $normalizedTitle"
+        }
+    }
+    
+    if ($menuTitles.Count -eq 0)
+    {
+        Write-Verbose "[$functionName] No valid menu titles found in history"
+        return 'Unknown'
+    }
+    
+    # Generate context based on navigation path patterns
+    $pathSignature = $menuTitles -join '-'
+    Write-Verbose "[$functionName] Generated path signature: $pathSignature"
+    
+    # Check for specific known navigation patterns
+    switch -Regex ($pathSignature)
+    {
+        'MainMenu-CheckDeviceStatus-LookupbySerialNumber'
+        {
+            Write-Verbose "[$functionName] Detected CheckMenu -> SerialNumber navigation path"
+            return 'ViaCheckMenu'
+        }
+        'MainMenu-AutopilotMenu-CheckdeviceAutopilotstatus'
+        {
+            Write-Verbose "[$functionName] Detected AutopilotMenu -> SerialNumber navigation path"
+            return 'ViaAutopilotMenu'
+        }
+        'MainMenu-AutopilotMenu.*SerialNumber'
+        {
+            Write-Verbose "[$functionName] Detected general AutopilotMenu -> SerialNumber navigation path"
+            return 'ViaAutopilotMenu'
+        }
+        'MainMenu-CheckDeviceStatus.*SerialNumber'
+        {
+            Write-Verbose "[$functionName] Detected general CheckMenu -> SerialNumber navigation path"
+            return 'ViaCheckMenu'
+        }
+        default
+        {
+            # For unknown patterns, create a generic path-based context
+            if ($menuTitles.Count -gt 1)
+            {
+                $parentMenu = $menuTitles[-2]  # Second to last menu (parent of current)
+                Write-Verbose "[$functionName] Creating context based on parent menu: $parentMenu"
+                return "Via$parentMenu"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Single menu in path, using direct context"
+                return 'Direct'
+            }
+        }
+    }
+}
+
+function Get-UniqueCallerContext()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [array]$CallStack,
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Menu = $null
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Generating unique context from call stack"
+    
+    if ($CallStack.Count -lt 2) 
+    {
+        Write-Verbose "[$functionName] Insufficient call stack depth"
+        return 'Unknown'
+    }
+    
+    # Skip Get-CallingContext (index 0) and look at actual caller (index 1)
+    $caller = $CallStack[1]
+    $callerFunction = $caller.FunctionName
+    $callerLine = $caller.ScriptLineNumber
+    $callerFile = Split-Path -Leaf $caller.ScriptName
+    
+    Write-Verbose "[$functionName] Analyzing caller: $callerFunction in $callerFile at line $callerLine"
+    
+    # Create context based on function name patterns
+    switch -Regex ($callerFunction)
+    {
+        '^Get-.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be a Get function"
+            return "Getter_$($callerFunction)"
+        }
+        '^Set-.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be a Set function"
+            return "Setter_$($callerFunction)"
+        }
+        '^New-.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be a New/Create function"
+            return "Creator_$($callerFunction)"
+        }
+        '^Remove-.*|^Delete-.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be a Remove/Delete function"
+            return "Remover_$($callerFunction)"
+        }
+        '^Test-.*|^Validate-.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be a Test/Validate function"
+            return "Validator_$($callerFunction)"
+        }
+        '^Connect-.*|^Disconnect-.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be a Connection function"
+            return "Connection_$($callerFunction)"
+        }
+        '.*Menu.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be menu-related"
+            return "MenuFunction_$($callerFunction)"
+        }
+        '.*Action.*|.*Execute.*'
+        {
+            Write-Verbose "[$functionName] Caller appears to be action/execution related"
+            return "ActionFunction_$($callerFunction)"
+        }
+        default
+        {
+            # If no pattern matches, create context based on file and function combination
+            if ($callerFile -and $callerFunction)
+            {
+                $fileBaseName = [System.IO.Path]::GetFileNameWithoutExtension($callerFile)
+                Write-Verbose "[$functionName] Creating context from file and function: $fileBaseName/$callerFunction"
+                return "Custom_$($fileBaseName)_$($callerFunction)"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Unable to create unique context, caller function: $callerFunction"
+                return 'Unknown'
+            }
+        }
+    }
 }
 
 function Push-MenuToStack()
@@ -292,7 +532,7 @@ function Push-MenuToStack()
     try
     {
         # Only add if it's not already the current menu to prevent duplicates
-        if ($Global:MenuHistory.Count -eq 0 -or $Global:MenuHistory[-1].Title -ne $Menu.Title)
+        if ($Global:MenuHistory.Count -eq 0 -or $Global:MenuHistory[$Global:MenuHistory.Count - 1].Title -ne $Menu.Title)
         {
             Write-Verbose "[$functionName] Pushing menu '$($Menu.Title)' to stack"
             Write-Verbose "[$functionName] Current History Count: $($Global:History.Count)"
@@ -664,9 +904,7 @@ function ShowMenu()
         [Parameter(Mandatory = $false)]
         [ValidateSet('Auto', 'Push', 'Pop', 'None')]
         [string]$StackOperation = 'Auto',
-        [Parameter(Mandatory = $false)]
-        [ValidateSet('Unknown', 'Direct', 'Action', 'Submenu', 'Navigation')]
-        [string]$CalledBy = 'Unknown'
+        [Parameter(Mandatory = $false)]        [string]$CalledBy = 'Unknown'
     )
 
     
@@ -702,13 +940,11 @@ function ShowMenu()
     Write-Verbose "[$functionName] Current Depth: $($Global:MenuHistory.Count)"
     Write-Verbose "[$functionName] History Count: $($Global:History.Count)"
     Write-Verbose "[$functionName] MenuHistory Count: $($Global:MenuHistory.Count)"
-    #endregion
-
-    # Determine calling context if not explicitly provided
+    #endregion    # Determine calling context if not explicitly provided
     if ($CalledBy -eq 'Unknown')
     {
         Write-Verbose "[$functionName] CalledBy is 'Unknown', determining calling context"
-        $CalledBy = Get-CallingContext
+        $CalledBy = Get-CallingContext -Menu $Menu
         Write-Verbose "[$functionName] Determined CalledBy: $CalledBy"
     }
     
@@ -717,7 +953,7 @@ function ShowMenu()
     {
         'Auto'
         {
-            Write-Verbose "[$functionName] Auto stack operation based on CalledBy context"
+            Write-Verbose "[$functionName] Auto stack operation based on CalledBy context" 
             switch ($CalledBy)
             {
                 'Submenu'
@@ -734,7 +970,8 @@ function ShowMenu()
                 {
                     Write-Verbose "[$functionName] No stack operation for navigation"
                     # Navigation (Back/Main Menu) handles its own stack management
-                }                'Direct'
+                }
+                'Direct'
                 {
                     Write-Verbose "[$functionName] Direct call - checking if this is initial menu"
                     # Check if this is the initial main menu call (already in stack from main.ps1)
@@ -751,6 +988,45 @@ function ShowMenu()
                     {
                         Write-Verbose "[$functionName] Direct call with existing stack - pushing menu"
                         Push-MenuToStack -Menu $Menu
+                    }
+                }
+                default
+                {
+                    # Handle new dynamic context types
+                    Write-Verbose "[$functionName] Handling dynamic context: $CalledBy"
+                    
+                    # Determine behavior based on context pattern
+                    switch -Regex ($CalledBy)
+                    {
+                        '^(Getter|Setter|Creator|Remover|Validator|Connection)_.*'
+                        {
+                            Write-Verbose "[$functionName] Context suggests data operation - pushing to stack"
+                            Push-MenuToStack -Menu $Menu
+                        }
+                        '^(MenuFunction|ActionFunction)_.*'
+                        {
+                            Write-Verbose "[$functionName] Context suggests menu/action function - pushing to stack"
+                            Push-MenuToStack -Menu $Menu
+                        }
+                        '^Custom_.*'
+                        {
+                            Write-Verbose "[$functionName] Custom context - pushing to stack"
+                            Push-MenuToStack -Menu $Menu
+                        }
+                        default
+                        {
+                            Write-Verbose "[$functionName] Unknown context pattern: $CalledBy - treating as direct call"
+                            if ($Global:MenuHistory.Count -eq 0)
+                            {
+                                Write-Verbose "[$functionName] Empty stack - adding menu"
+                                Push-MenuToStack -Menu $Menu
+                            }
+                            else
+                            {
+                                Write-Verbose "[$functionName] Existing stack - pushing menu"
+                                Push-MenuToStack -Menu $Menu
+                            }
+                        }
                     }
                 }
             }

@@ -50,7 +50,6 @@ function SendDeviceCommand ()
         [switch]$MonitorAction,
         [switch]$NoConfirmation
     )
-  
     #region variables and logs
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Device ID:     $ManagedDeviceId"
@@ -85,7 +84,7 @@ function SendDeviceCommand ()
     $success = $false
     $actionType = ""
     $response = ""
-  
+    
     switch ($Command)
     {
         "clean"
@@ -132,28 +131,27 @@ function SendDeviceCommand ()
             return $false
         }
     }  
-    # Monitor action status for all operations
-    if ($MonitorAction)
-    {
-        if ($response -eq '')
-        {
-            Write-Host "Command sent successfully. Performing automatic device sync..." -ForegroundColor Green
-        
-            # Only send additional sync for non-sync operations to avoid redundancy
-            if ($Command -ne "sync")
-            {
-                $syncUri = "$deviceManagementUri/syncDevice"
-                $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
-                Write-Verbose "[$functionName] Sync Response: $syncResponse"
-            }
 
-            # Begin monitoring the action status
+    # Report on action status for all operations
+    if ($response -eq '')
+    {
+        Write-Host "Command sent successfully. Performing automatic device sync..." -ForegroundColor Green
+        # Only send additional sync for non-sync operations to avoid redundancy
+        if ($Command -ne "sync")
+        {
+            Write-Verbose "[$functionName] Performing automatic device sync after $Command operation."
+            $syncUri = "$deviceManagementUri/syncDevice"
+            $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
+            Write-Verbose "[$functionName] Sync Response: $syncResponse"
+        }
+        # Begin monitoring the action status
+        if ($MonitorAction)            
+        {
             Write-Host "Starting to monitor $Command action status..." -ForegroundColor Yellow
             $retryCount = 0
             $actionCompleted = $false
             $actionFailed = $false
             $actionState = "unknown"
-
             # Loop until action completes, fails, or max retries reached
             while (-not $actionCompleted -and -not $actionFailed -and $retryCount -lt $MaxRetries)
             {
@@ -258,7 +256,6 @@ function SendDeviceCommand ()
                     }
                 }
             }
-
             # Final status report
             if ($actionCompleted)
             {
@@ -277,9 +274,14 @@ function SendDeviceCommand ()
         }
         else
         {
-            Write-Host "Failed to send $Command command to device." -ForegroundColor Red
-            Write-Verbose "[$functionName] Failed to send command. Response: $response"
+            Write-Verbose "[$functionName] Monitoring not enabled, skipping action status checks."
+            $success = $true
         }
+    }
+    else
+    {
+        Write-Host "Failed to send $Command command to device." -ForegroundColor Red
+        Write-Verbose "[$functionName] Failed to send command. Response: $response"
     }
     return $success
 }
