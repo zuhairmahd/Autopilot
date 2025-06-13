@@ -254,7 +254,6 @@ function GetEntraUser()
     if ($userInfo -notin 400, 401, 403, 404)
     {
         Write-Verbose "[$functionName] User $UserName found in Entra ID."
-        Write-Verbose "[$functionName] User $UserName found in Entra ID."
     }
     else
     {
