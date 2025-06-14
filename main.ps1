@@ -228,41 +228,199 @@ $versionFile = 'version.txt'
 Write-Verbose "[$scriptName] Version file: $versionFile"
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
-$returnValues = [ordered] @{
-    noRestartMessage              = 'Device not restarted.'
-    EnrolledMessage               = 'The device is enrolled.'
-    notContactedMessage           = 'The device has not contacted the enrollment service.'
-    PendingResetMessage           = 'The device is pending a reset.'
-    EnrollmentFailedMessage       = 'The device enrollment failed.'
-    UnassignedMessage             = 'The device is not assigned to a deployment profile.'
-    PendingMessage                = 'The device is pending assignment to a deployment profile.'
-    notInIntuneMessage            = 'The device is not in Intune.'
-    noUserDeviceFoundMessage      = 'No user or device found.'
-    noUserFoundInDirectoryMessage = 'This user does not exist'
-    ImportSuccessMessage          = 'The device was imported successfully.'
-    ImportFailedMessage           = 'The device import failed.'
-    DeleteSuccessMessage          = 'The device was deleted successfully.'
-    DeleteFailedMessage           = 'The device deletion failed.'
-    UpdateFailedMessage           = 'Could not download update.'
-    noAccessTokenMessage          = 'Could not obtain an access token. Please check your credentials.'
-    UpdateSuccessMessage          = 'The script was updated successfully.'
-    UpdateNotNeededMessage        = 'The script is already up to date.'
-    999                           = 'No updates were found'
-    1000                          = 'All updates were installed'
-    1001                          = 'Some updates were installed'
-    10002                         = 'Some updates were installed'
-    1003                          = 'Updates failed to install'
+#region Load strings from JSON file with fallback
+function Get-StringsFromJson
+{
+    [CmdletBinding()]
+    param(
+        [string]$StringsFile = "$PWD\strings.json"
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Attempting to load strings from: $StringsFile"
+    
+    # Default fallback values
+    $defaultReturnValues = [ordered] @{
+        noRestartMessage              = 'Device not restarted.'
+        EnrolledMessage               = 'The device is enrolled.'
+        notContactedMessage           = 'The device has not contacted the enrollment service.'
+        PendingResetMessage           = 'The device is pending a reset.'
+        EnrollmentFailedMessage       = 'The device enrollment failed.'
+        UnassignedMessage             = 'The device is not assigned to a deployment profile.'
+        PendingMessage                = 'The device is pending assignment to a deployment profile.'
+        notInIntuneMessage            = 'The device is not in Intune.'
+        noUserDeviceFoundMessage      = 'No user or device found.'
+        noUserFoundInDirectoryMessage = 'This user does not exist'
+        ImportSuccessMessage          = 'The device was imported successfully.'
+        ImportFailedMessage           = 'The device import failed.'
+        DeleteSuccessMessage          = 'The device was deleted successfully.'
+        DeleteFailedMessage           = 'The device deletion failed.'
+        UpdateFailedMessage           = 'Could not download update.'
+        noAccessTokenMessage          = 'Could not obtain an access token. Please check your credentials.'
+        UpdateSuccessMessage          = 'The script was updated successfully.'
+        UpdateNotNeededMessage        = 'The script is already up to date.'
+        999                           = 'No updates were found'
+        1000                          = 'All updates were installed'
+        1001                          = 'Some updates were installed'
+        10002                         = 'Some updates were installed'
+        1003                          = 'Updates failed to install'
+    }
+    
+    $defaultDeviceStates = [ordered] @{
+        Ready    = 'The device is ready for the next user'
+        NotReady = 'The device is not ready for the next user'
+    }
+    
+    $defaultDeviceActions = [ordered] @{
+        none            = 'No action'
+        contactAdmin    = 'Contact an Intune administrator'
+        contactHelpdesk = 'Contact the helpdesk'
+        WipeOrClean     = 'Wipe or clean the device'
+    }
+    
+    try
+    {
+        if (Test-Path -Path $StringsFile)
+        {
+            Write-Verbose "[$functionName] Loading strings from JSON file: $StringsFile"
+            $stringsContent = Get-Content -Path $StringsFile -Raw -Force -ErrorAction Stop
+            $stringsData = $stringsContent | ConvertFrom-Json -ErrorAction Stop
+            
+            # Create ordered hashtables from JSON data, preserving original structure
+            $returnValues = [ordered] @{}
+            $deviceStates = [ordered] @{}
+            $deviceActions = [ordered] @{}
+            
+            # Load returnValues with fallback for missing keys
+            if ($stringsData.returnValues)
+            {
+                Write-Verbose "[$functionName] Loading returnValues from JSON"
+                foreach ($key in $defaultReturnValues.Keys)
+                {
+                    if ($stringsData.returnValues.PSObject.Properties.Name -contains $key)
+                    {
+                        $returnValues[$key] = $stringsData.returnValues.$key
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] Key '$key' not found in JSON, using default value"
+                        $returnValues[$key] = $defaultReturnValues[$key]
+                    }
+                }
+                # Add any additional keys from JSON that aren't in defaults
+                foreach ($property in $stringsData.returnValues.PSObject.Properties)
+                {
+                    if (-not $returnValues.ContainsKey($property.Name))
+                    {
+                        Write-Verbose "[$functionName] Adding additional key '$($property.Name)' from JSON"
+                        $returnValues[$property.Name] = $property.Value
+                    }
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No returnValues section found in JSON, using defaults"
+                $returnValues = $defaultReturnValues
+            }
+            
+            # Load deviceStates with fallback
+            if ($stringsData.deviceStates)
+            {
+                Write-Verbose "[$functionName] Loading deviceStates from JSON"
+                foreach ($key in $defaultDeviceStates.Keys)
+                {
+                    if ($stringsData.deviceStates.PSObject.Properties.Name -contains $key)
+                    {
+                        $deviceStates[$key] = $stringsData.deviceStates.$key
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] Key '$key' not found in JSON deviceStates, using default value"
+                        $deviceStates[$key] = $defaultDeviceStates[$key]
+                    }
+                }
+                # Add any additional keys from JSON
+                foreach ($property in $stringsData.deviceStates.PSObject.Properties)
+                {
+                    if (-not $deviceStates.ContainsKey($property.Name))
+                    {
+                        Write-Verbose "[$functionName] Adding additional deviceStates key '$($property.Name)' from JSON"
+                        $deviceStates[$property.Name] = $property.Value
+                    }
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No deviceStates section found in JSON, using defaults"
+                $deviceStates = $defaultDeviceStates
+            }
+            
+            # Load deviceActions with fallback
+            if ($stringsData.deviceActions)
+            {
+                Write-Verbose "[$functionName] Loading deviceActions from JSON"
+                foreach ($key in $defaultDeviceActions.Keys)
+                {
+                    if ($stringsData.deviceActions.PSObject.Properties.Name -contains $key)
+                    {
+                        $deviceActions[$key] = $stringsData.deviceActions.$key
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] Key '$key' not found in JSON deviceActions, using default value"
+                        $deviceActions[$key] = $defaultDeviceActions[$key]
+                    }
+                }
+                # Add any additional keys from JSON
+                foreach ($property in $stringsData.deviceActions.PSObject.Properties)
+                {
+                    if (-not $deviceActions.ContainsKey($property.Name))
+                    {
+                        Write-Verbose "[$functionName] Adding additional deviceActions key '$($property.Name)' from JSON"
+                        $deviceActions[$property.Name] = $property.Value
+                    }
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No deviceActions section found in JSON, using defaults"
+                $deviceActions = $defaultDeviceActions
+            }
+            
+            Write-Verbose "[$functionName] Successfully loaded strings from JSON file"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Strings file not found: $StringsFile, using default values"
+            $returnValues = $defaultReturnValues
+            $deviceStates = $defaultDeviceStates
+            $deviceActions = $defaultDeviceActions
+        }
+    }
+    catch
+    {
+        Write-Verbose "[$functionName] Error loading strings from JSON file: $($_.Exception.Message)"
+        Write-Verbose "[$functionName] Falling back to default values"
+        $returnValues = $defaultReturnValues
+        $deviceStates = $defaultDeviceStates
+        $deviceActions = $defaultDeviceActions
+    }
+    
+    return @{
+        returnValues  = $returnValues
+        deviceStates  = $deviceStates
+        deviceActions = $deviceActions
+    }
 }
-$deviceStates = [ordered] @{
-    Ready    = 'The device is ready for the next user'
-    NotReady = 'The device is not ready for the next user'
-}
-$deviceActions = [ordered] @{
-    none            = 'No action'
-    contactAdmin    = 'Contact an Intune administrator'
-    contactHelpdesk = 'Contact the helpdesk'
-    WipeOrClean     = 'Wipe or clean the device'
-}
+# Load strings from JSON file with fallback to defaults
+$stringsFile = "$PWD\strings.json"
+Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
+$loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
+$returnValues = $loadedStrings.returnValues
+$deviceStates = $loadedStrings.deviceStates
+$deviceActions = $loadedStrings.deviceActions
+Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
+#endregion Load strings from JSON file with fallback
 if (Test-Path -Path $versionFile)
 {
     Write-Verbose "[$scriptName] Version file $versionFile found. Reading version."

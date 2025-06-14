@@ -1,0 +1,37 @@
+{
+    "returnValues": {
+        "noRestartMessage": "Device not restarted.",
+        "EnrolledMessage": "The device is enrolled.",
+        "notContactedMessage": "The device has not contacted the enrollment service.",
+        "PendingResetMessage": "The device is pending a reset.",
+        "EnrollmentFailedMessage": "The device enrollment failed.",
+        "UnassignedMessage": "The device is not assigned to a deployment profile.",
+        "PendingMessage": "The device is pending assignment to a deployment profile.",
+        "notInIntuneMessage": "The device is not in Intune.",
+        "noUserDeviceFoundMessage": "No user or device found.",
+        "noUserFoundInDirectoryMessage": "This user does not exist",
+        "ImportSuccessMessage": "The device was imported successfully.",
+        "ImportFailedMessage": "The device import failed.",
+        "DeleteSuccessMessage": "The device was deleted successfully.",
+        "DeleteFailedMessage": "The device deletion failed.",
+        "UpdateFailedMessage": "Could not download update.",
+        "noAccessTokenMessage": "Could not obtain an access token. Please check your credentials.",
+        "UpdateSuccessMessage": "The script was updated successfully.",
+        "UpdateNotNeededMessage": "The script is already up to date.",
+        "999": "No updates were found",
+        "1000": "All updates were installed",
+        "1001": "Some updates were installed",
+        "10002": "Some updates were installed",
+        "1003": "Updates failed to install"
+    },
+    "deviceStates": {
+        "Ready": "The device is ready for the next user",
+        "NotReady": "The device is not ready for the next user"
+    },
+    "deviceActions": {
+        "none": "No action",
+        "contactAdmin": "Contact an Intune administrator",
+        "contactHelpdesk": "Contact the helpdesk",
+        "WipeOrClean": "Wipe or clean the device"
+    }
+}
