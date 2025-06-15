@@ -351,25 +351,10 @@ function ProcessDevice()
                 return $backoutText
             }
             $importResult = ProcessImportResult -device $device -functionName $functionName -returnValues $returnValues
-            if ($importResult -ne $true)
+            if ($importResult -ne $returnValues.deviceImportSuccessMessage)
             {
                 return $importResult
             }
-            
-            #region Handle CustomImport settings if needed
-            # if ($CustomImport)
-            # {
-            #   $maxWaitTimeRef = [ref]$maxWaitTime
-            #   $timeInSecondsRef = [ref]$timeInSeconds
-            #   $customResult = HandleCustomImportSettings -functionName $functionName -maxWaitTimeRef $maxWaitTimeRef -timeInSecondsRef $timeInSecondsRef -returnValues $returnValues
-            #   if ($customResult)
-            #   {
-            #     return $customResult
-            #   }
-            #   $maxWaitTime = $maxWaitTimeRef.Value
-            #   $timeInSeconds = $timeInSecondsRef.Value
-            # }
-            #endregion Handle CustomImport settings if needed
             
             Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
             Start-Sleep -Seconds $timeInSeconds
@@ -397,54 +382,65 @@ function ProcessDevice()
                     {
                         'unassigned'
                         {
-                            return $returnValues.UnassignedMessage
+                            return $returnValues.deviceNotAssignedMessage
                         }
                         'pending'
                         {
-                            return $returnValues.PendingMessage
+                            return $returnValues.deviceAssignmentPendingMessage
                         }
                     }
                     # Show options for problem devices
                     Write-Host "What would you like to do?"
-                    $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
-                    $choice = DisplayNumericMenu -Choices $choices 
-                    switch ($choice)
+                    $deviceWaitMenu = NewMenu -Title "Options for Device With Serial Number $serialNumber" -Description "Choose what you would like to do with this device:"
+                    $deviceWaitMenu = AddMenu Item -Menu $deviceWaitMenu -Name "Restart the device" -Action {
+                        Write-Host "Restarting the device..."
+                        Write-Verbose "[$functionName] User chose to restart the device."
+                        if (-not (RestartDevice))
+                        {
+                            Write-Verbose "[$functionName] RestartDevice function returned false."
+                            return $returnValues.noRestartMessage 
+                        }
+                    }
+                    $deviceWaitMenu = AddMenu Item -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
+                        Write-Host "Continuing to wait for profile assignment..."
+                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+                        return $deviceAssignment
+                    }
+                    $deviceWaitMenu = AddMenu Item -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {
+                        Write-Host "Deleting the device from Autopilot..."
+                        if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+                        {
+                            Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                            return $returnValues.deviceDeleteSuccessMessage
+                        }
+                        else
+                        {
+                            Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                            return $returnValues.deviceDeleteFailedMessage
+                        }
+                    }
+                    $result = ShowMenu -Menu $deviceWaitMenu -CalledBy 'Action'
+                    Write-Verbose "[$functionName] Result from device wait menu: $result"
+                    if ($result -eq $backoutText)
                     {
-                        'Restart the device'
-                        {
-                            Write-Verbose "[$functionName] User chose to restart the device."
-                            if (-not (RestartDevice))
-                            {
-                                Write-Verbose "[$functionName] RestartDevice function returned false."
-                                return $returnValues.noRestartMessage 
-                            }
-                        }
-                        'Continue to wait for profile assignment'
-                        {
-                            Write-Host 'Continuing to wait for profile assignment...'
-                            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-                        }
-                        'Delete from Autopilot'
-                        {
-                            Write-Host 'Deleting the device from Autopilot...'
-                            if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
-                            {
-                                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                                return $returnValues.DeleteSuccessMessage
-                            }
-                            else
-                            {
-                                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                                return $returnValues.DeleteFailedMessage
-                            }
-                        }
+                        Write-Verbose "[$functionName] User selected Back from device wait menu."
+                        return $backoutText
+                    }
+                    elseif ($result -eq "EXIT_APPLICATION")
+                    {
+                        Write-Verbose "[$functionName] User selected to exit the application."
+                        return "EXIT_APPLICATION"
+                    }
+                    else 
+                    {
+                        return $result
                     }
                 }
             }
             else
             {
                 Write-Host 'The device is not in Autopilot.'
-                return $returnValues.notInIntuneMessage
+                return $returnValues.deviceNotInIntuneMessage
             }
         }
         'delete'
@@ -457,25 +453,25 @@ function ProcessDevice()
                 if (DeleteAutopilotDevice -DeviceIdentifyer $serialNumber -IdentifyerType 'serialNumber')
                 {
                     Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                    return $returnValues.DeleteSuccessMessage
+                    return $returnValues.deviceDeleteSuccessMessage
                 }
                 else
                 {
                     Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                    return $returnValues.DeleteFailedMessage
+                    return $returnValues.deviceDeleteFailedMessage
                 }
             }
             else
             {
                 Write-Host "The device with serial number $serialNumber is not in Autopilot." -ForegroundColor Yellow
                 Write-Host "No action taken." -ForegroundColor Yellow
-                return $returnValues.notInIntuneMessage 
+                return $returnValues.deviceNotInIntuneMessage 
             }
         }
         default
         {
             Write-Verbose "[$functionName] Invalid action: $action"
-            return $false
+            return $returnValues.unknownErrorMessage
         }
     }
 }

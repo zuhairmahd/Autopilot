@@ -45,29 +45,41 @@ function Get-StringsFromJson
     # Default fallback values organized by sections - PowerShell 5.1 compatible
     $defaultStringValues = @{
         returnValues  = @{
-            noRestartMessage              = 'Device not restarted.'
-            EnrolledMessage               = 'The device is enrolled.'
-            notContactedMessage           = 'The device has not contacted the enrollment service.'
-            PendingResetMessage           = 'The device is pending a reset.'
-            EnrollmentFailedMessage       = 'The device enrollment failed.'
-            UnassignedMessage             = 'The device is not assigned to a deployment profile.'
-            PendingMessage                = 'The device is pending assignment to a deployment profile.'
-            notInIntuneMessage            = 'The device is not in Intune.'
-            noUserDeviceFoundMessage      = 'No user or device found.'
-            noUserFoundInDirectoryMessage = 'This user does not exist'
-            ImportSuccessMessage          = 'The device was imported successfully.'
-            ImportFailedMessage           = 'The device import failed.'
-            DeleteSuccessMessage          = 'The device was deleted successfully.'
-            DeleteFailedMessage           = 'The device deletion failed.'
-            UpdateFailedMessage           = 'Could not download update.'
-            noAccessTokenMessage          = 'Could not obtain an access token. Please check your credentials.'
-            UpdateSuccessMessage          = 'The script was updated successfully.'
-            UpdateNotNeededMessage        = 'The script is already up to date.'
-            999                           = 'No updates were found'
-            1000                          = 'All updates were installed'
-            1001                          = 'Some updates were installed'
-            10002                         = 'Some updates were installed'
-            1003                          = 'Updates failed to install'
+            unknownErrorMessage            = 'An unknown error occurred'
+            noRestartMessage               = 'Device not restarted.'
+            EnrolledMessage                = 'The device is enrolled.'
+            notContactedMessage            = 'The device has not contacted the enrollment service.'
+            PendingResetMessage            = 'The device is pending a reset.'
+            EnrollmentFailedMessage        = 'The device enrollment failed.'
+            deviceNotAssignedMessage       = 'The device is not assigned to a deployment profile.'
+            deviceAssignmentPendingMessage = 'The device is pending assignment to a deployment profile.'
+            deviceNotInIntuneMessage       = 'The device is not in Intune.'
+            noUserDeviceFoundMessage       = 'No user or device found.'
+            noUserFoundInDirectoryMessage  = 'This user does not exist'
+            deviceUnknownActionMessage     = 'The action may still be in progress. You can check the device status in the Intune portal'
+            deviceImportSuccessMessage     = 'The device was imported successfully.'
+            deviceImportFailedMessage      = 'The device import failed.'
+            deviceDeleteSuccessMessage     = 'The device was deleted successfully.'
+            deviceDeleteFailedMessage      = 'The device deletion failed.'
+            deviceWipeSuccessMessage       = 'The device was wiped successfully'
+            deviceWipeFailedMessage        = 'The device wipe failed'
+            deviceSyncSuccessMessage       = 'The device sync was successful'
+            deviceSyncFailedMessage        = 'The device sync failed'
+            deviceCleanSuccessMessage      = 'The device was cleaned successfully'
+            deviceCleanFailedMessage       = 'The device clean failed'
+            deviceRestartSuccessMessage    = 'The device was restarted successfully.'
+            deviceRestartFailedMessage     = 'The device restart failed'
+            serialNumberNotFoundMessage    = 'Serial number was not found'
+            UpdateFailedMessage            = 'Could not download update.'
+            noAccessTokenMessage           = 'Could not obtain an access token. Please check your credentials.'
+            UpdateSuccessMessage           = 'The script was updated successfully.'
+            UpdateNotNeededMessage         = 'The script is already up to date.'
+            userCanceledMessage            = 'Operation canceled by user'
+            999                            = 'No updates were found'
+            1000                           = 'All updates were installed'
+            1001                           = 'Some updates were installed'
+            10002                          = 'Some updates were installed'
+            1003                           = 'Updates failed to install'
         }
         deviceStates  = @{
             Ready    = 'The device is ready for the next user'
@@ -95,9 +107,6 @@ function Get-StringsFromJson
         return $defaultStringValues
     }
 }
-
-
-
 
 <#
 .SYNOPSIS
@@ -342,7 +351,7 @@ function Get-JsonConfiguration
     - Handles missing files gracefully by returning default values
     - Includes comprehensive logging for troubleshooting
 #>
-function Get-InitConfiguration
+function Get-InitConfiguration()
 {
     [CmdletBinding()]
     param(

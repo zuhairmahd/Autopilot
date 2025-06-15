@@ -318,7 +318,7 @@ function HandleCustomImportSettings()
     if ($customMaxWaitTime -eq '0')
     {
         Write-Host "Skipping the wait for profile assignment."
-        return $returnValues.ImportSuccessMessage
+        return $returnValues.deviceImportSuccessMessage
     }
     elseif ($customMaxWaitTime -as [int] -and [int]$customMaxWaitTime -ge 0 -and [int]$customMaxWaitTime -le 60)
     {
@@ -342,7 +342,7 @@ function HandleCustomImportSettings()
     if ($customTimeInSeconds -eq '0')
     {
         Write-Host "Skipping the wait for profile assignment."
-        return $returnValues.ImportSuccessMessage
+        return $returnValues.deviceImportSuccessMessage
     }
     elseif ($customTimeInSeconds -as [int] -and [int]$customTimeInSeconds -ge 0 -and [int]$customTimeInSeconds -le 60)
     {
@@ -379,19 +379,19 @@ function ProcessImportResult()
     {
         $serialNumber = $device.SerialNumber
         Write-Host "The import of device with serial number $serialNumber completed successfully." -ForegroundColor Green
-        return $true
+        return $returnValues.deviceImportSuccessMessage
     }
     elseif ($device.state.deviceImportStatus -eq 'error')
     {
         Write-Host 'The device import failed with the following error:' -ForegroundColor Red
         Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
-        return $returnValues.ImportFailedMessage
+        return $returnValues.deviceImportFailedMessage
     }
     else
     {
         Write-Host 'The device import failed with the following error:' -ForegroundColor Red
         Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
-        return $returnValues.ImportFailedMessage
+        return $returnValues.deviceImportFailedMessage
     }
 }
 
@@ -445,7 +445,7 @@ function ProcessAssignmentResult()
         
         if (-not (RestartDevice))
         {
-            return $returnValues.ImportSuccessMessage
+            return $returnValues.deviceImportSuccessMessage
         }
     }
     else
@@ -455,9 +455,10 @@ function ProcessAssignmentResult()
         Write-Host "The device current assignment status is $($assignment.deploymentProfileAssignmentStatus)."
         Write-Host "The device assignment profile name is $($assignment.deploymentProfile.displayName)."
         Write-Host "The device profile assignment date is $($assignment.deploymentProfileAssignmentDateTime)."
-        return $returnValues.ImportFailedMessage
+        return $returnValues.deviceImportFailedMessage
     }
 }
+
 function ImportAutopilotDevice() 
 {
     [CmdletBinding()]
@@ -703,7 +704,7 @@ function CheckDeviceAssignment()
         else
         {
             Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
-            return $null
+            return $returnValues.notInIntuneMessage
         }
     }
     else
@@ -755,21 +756,22 @@ function CheckDeviceAssignment()
                 Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
                 Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
                 Write-Verbose "[$functionName] The device is ready for enrollment."
+                return $returnValues.deviceAssignedMessage
             }
             else
             {
                 Write-Host "The device is not assigned to a deployment profile."
                 Write-Host "Please check the Intune portal or contact an Intune administrator."
                 Write-Verbose "[$functionName] The device is not ready for enrollment."
+                return $returnValues.deviceNotAssignedMessage
             }
         }
     }
     else
     {
         Write-Verbose "[$functionName] The device is not found in Intune."
+        return $returnValues.deviceNotInIntuneMessage
     }
-    Write-Verbose "[$functionName] Returning $assignment."
-    return $assignment
 }
 
 function GetDeviceHash()
