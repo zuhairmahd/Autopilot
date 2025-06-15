@@ -228,105 +228,6 @@ $versionFile = 'version.txt'
 Write-Verbose "[$scriptName] Version file: $versionFile"
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
-#region Load strings from JSON file with fallback
-<#
-.SYNOPSIS
-    Loads localized strings and messages from strings.json with comprehensive fallback support.
-
-.DESCRIPTION
-    This function loads localized strings, return values, device states, and device actions from
-    the strings.json file. It uses the consolidated Get-JsonConfiguration function to provide
-    robust JSON handling, validation, and fallback to default values when the file is missing
-    or contains invalid data.
-
-.PARAMETER StringsFile
-    The path to the strings.json file. Defaults to "$PWD\strings.json".
-
-.OUTPUTS
-    System.Collections.Hashtable
-    Returns a hashtable with three main sections:
-    - returnValues: Messages for various operation results
-    - deviceStates: Device state descriptions  
-    - deviceActions: Available device actions
-
-.EXAMPLE
-    # Load strings from default location
-    $strings = Get-StringsFromJson
-
-.EXAMPLE  
-    # Load strings from custom location
-    $strings = Get-StringsFromJson -StringsFile "C:\Config\custom-strings.json"
-
-.NOTES
-    - Uses the consolidated Get-JsonConfiguration function for consistency
-    - Provides comprehensive default values for all string categories
-    - Handles missing files and invalid JSON gracefully
-    - Maintains backward compatibility with existing code
-    - Includes detailed logging for troubleshooting
-#>
-function Get-StringsFromJson
-{
-    [CmdletBinding()]
-    param(
-        [string]$StringsFile = "$PWD\strings.json"
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Attempting to load strings from: $StringsFile"
-      # Default fallback values organized by sections - PowerShell 5.1 compatible
-    $defaultStringValues = @{
-        returnValues = @{
-            noRestartMessage              = 'Device not restarted.'
-            EnrolledMessage               = 'The device is enrolled.'
-            notContactedMessage           = 'The device has not contacted the enrollment service.'
-            PendingResetMessage           = 'The device is pending a reset.'
-            EnrollmentFailedMessage       = 'The device enrollment failed.'
-            UnassignedMessage             = 'The device is not assigned to a deployment profile.'
-            PendingMessage                = 'The device is pending assignment to a deployment profile.'
-            notInIntuneMessage            = 'The device is not in Intune.'
-            noUserDeviceFoundMessage      = 'No user or device found.'
-            noUserFoundInDirectoryMessage = 'This user does not exist'
-            ImportSuccessMessage          = 'The device was imported successfully.'
-            ImportFailedMessage           = 'The device import failed.'
-            DeleteSuccessMessage          = 'The device was deleted successfully.'
-            DeleteFailedMessage           = 'The device deletion failed.'
-            UpdateFailedMessage           = 'Could not download update.'
-            noAccessTokenMessage          = 'Could not obtain an access token. Please check your credentials.'
-            UpdateSuccessMessage          = 'The script was updated successfully.'
-            UpdateNotNeededMessage        = 'The script is already up to date.'
-            999                           = 'No updates were found'
-            1000                          = 'All updates were installed'
-            1001                          = 'Some updates were installed'
-            10002                         = 'Some updates were installed'
-            1003                          = 'Updates failed to install'
-        }
-        deviceStates = @{
-            Ready    = 'The device is ready for the next user'
-            NotReady = 'The device is not ready for the next user'
-        }
-        deviceActions = @{
-            none            = 'No action'
-            contactAdmin    = 'Contact an Intune administrator'
-            contactHelpdesk = 'Contact the helpdesk'
-            WipeOrClean     = 'Wipe or clean the device'
-        }
-    }
-    
-    try
-    {
-        # Use the consolidated configuration loader
-        $stringsConfig = Get-JsonConfiguration -JsonFile $StringsFile -DefaultValues $defaultStringValues
-        Write-Verbose "[$functionName] Successfully loaded strings configuration"
-        return $stringsConfig
-    }
-    catch
-    {
-        Write-Warning "[$functionName] Failed to load strings configuration: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Returning default values"
-        return $defaultStringValues
-    }
-}
-# Load strings from JSON file with fallback to defaults
 $stringsFile = "$PWD\strings.json"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
 $loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
@@ -334,7 +235,6 @@ $returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
 Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
-#endregion Load strings from JSON file with fallback
 if (Test-Path -Path $versionFile)
 {
     Write-Verbose "[$scriptName] Version file $versionFile found. Reading version."
