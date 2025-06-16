@@ -226,7 +226,7 @@ $version = '3.0.0'
 Write-Verbose "[$scriptName] Version: $version"
 $versionFile = 'version.txt'
 Write-Verbose "[$scriptName] Version file: $versionFile"
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/$versionFile"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $stringsFile = "$PWD\strings.json"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -235,32 +235,6 @@ $returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
 Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
-if (Test-Path -Path $versionFile)
-{
-    Write-Verbose "[$scriptName] Version file $versionFile found. Reading version."
-    $localVersion = Get-Content -Path $versionFile -Raw -ErrorAction Stop
-    Write-Verbose "[$scriptName] Local version: $localVersion"
-    $localVersionObject = [System.Version]::Parse($LocalVersion)
-    Write-Verbose "[$scriptName] Local version object: $localVersionObject"
-    $versionVariableObject = [System.Version]::Parse($version)
-    Write-Verbose "[$scriptName] Version object: $versionVariableObject"
-    if ($versionVariableObject -le $localVersionObject)
-    {
-        Write-Verbose "[$scriptName] Version file $versionFile is up to date."
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Version file $versionFile is not up to date. Updating version file."
-        Set-Content -Path $versionFile -Value $version -Force
-        $localVersion = $version
-    }
-}
-else
-{
-    Write-Verbose "[$scriptName] Version file $versionFile not found. Creating version file."
-    Set-Content -Path $versionFile -Value $version -Force
-    $localVersion = $version
-}
 # Initialize navigation context variables
 $Global:History = [System.Collections.ArrayList]::new() 
 $Global:MenuHistory = [System.Collections.ArrayList]::new() 
@@ -969,6 +943,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 
 #endregion Autopilot menu
 
+#region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
     Write-Host 'Reconfiguring the script...'
     if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
@@ -1015,6 +990,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action
         Write-Host 'Failed to restore script defaults..' -ForegroundColor Red
     }
 }
+#endregion Settings menu
+
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -1197,7 +1174,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+# $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
