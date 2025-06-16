@@ -296,6 +296,7 @@ function normalizeADUserDisplayName()
     $processedUser.Add('Nickname', $nickname)
     return $processedUser
 }
+
 function GetCachedDeviceEnrollmentState()
 {
     [CmdletBinding()]
@@ -425,22 +426,20 @@ function validateInput()
                 Write-Host "The username cannot start with a digit." -ForegroundColor Red
                 return $returnValue
             }
+            $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
+            
+            # Basic email format check
+            if ($normalizedUserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+            {
+                Write-Verbose "[$functionName] Username validation passed"
+                $returnValue.valid = $true
+                $returnValue.value = $normalizedUserInput
+            }
             else
             {
-                $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
-                # Basic email format check
-                if ($normalizedUserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-                {
-                    Write-Verbose "[$functionName] Username validation passed"
-                    $returnValue.valid = $true
-                    $returnValue.value = $normalizedUserInput
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Username validation failed - must be a valid email format (e.g., user@$domain)"
-                    Write-Host "Invalid user name format. Please enter a valid email address (e.g., user@$domain)." -ForegroundColor Red
-                    return $returnValue
-                }
+                Write-Verbose "[$functionName] Username validation failed - must be a valid email format (e.g., user@$domain)"
+                Write-Host "Invalid user name format. Please enter a valid email address (e.g., user@$domain)." -ForegroundColor Red
+                return $returnValue
             }
         }
         default

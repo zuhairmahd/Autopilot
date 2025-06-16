@@ -500,7 +500,8 @@ function ProcessSerialNumber()
         [parameter(Mandatory = $true)]
         [string]$SerialNumber,
         $AccessToken,
-        $Settings = $settings
+        $Settings = $settings,
+        [switch]$CheckUserReadiness
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -511,7 +512,6 @@ function ProcessSerialNumber()
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
         return $null # Return null to signal no valid serial number
     }
-    
     $success = $false
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
@@ -527,6 +527,10 @@ function ProcessSerialNumber()
         Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
         Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
         Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
+        if ($CheckUserReadiness)
+        {
+            return GetNextUserReadinessReport -enrollmentState $enrollmentState
+        }
         if ($enrollmentState.inAutopilot)
         {
             Write-Host "This device is enrolled in Autopilot."
@@ -650,26 +654,12 @@ function ProcessSerialNumber()
                 return $backoutText
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
-                Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
-                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
-                if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
-                {
-                    Write-Host $deviceStates.ready
-                    Write-Host $DeviceAssessmentState.action
-                }
-                elseif ($DeviceAssessmentState.ReadinessState -eq $deviceStates.notReady)
-                {
-                    Write-Host $deviceStates.notReady
-                    Write-Host $DeviceAssessmentState.action
-                }
+                return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
             }
-            
-            
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
-            Write-Host "Returning from device actions menu with result: $result"
+            Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
             return $result
         }
         else
@@ -1047,6 +1037,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         else
         {
             Write-Host "Found user: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
+            $userName = $userInfo.userPrincipalName
         }
         #Print the current navigation context prior too calling GetDeviceByUser
         Write-Verbose "[$scriptName] Current navigation context:"
@@ -1120,6 +1111,18 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Host "Checking group membership for user $userName."
         Write-Verbose "[$scriptName] Getting access token..."
         $accessToken = GetGraphAccessToken @getTokenParams
+        #Check if the user exists first.
+        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken
+        if ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)  
+        {
+            Write-Verbose "[$scriptName] User $userName not found in directory."
+            return $userInfo
+        }
+        else
+        {
+            Write-Host "Found user: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
+            $userName = $userInfo.userPrincipalName
+        }
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
         if ($groups.success -eq $true)
         {
@@ -1177,8 +1180,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             else # Process only if a serial number was entered
             {
-                # Pass navigation context to ProcessSerialNumber
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
                 # Check if ProcessSerialNumber returned an exit signal
                 if ($null -eq $result)
                 {

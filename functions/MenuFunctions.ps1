@@ -716,6 +716,8 @@ function Create-MenuBanner()
 
 function Handle-BackNavigation()
 {
+    [CmdletBinding()]
+    param()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Handling back navigation"
     
@@ -737,6 +739,8 @@ function Handle-BackNavigation()
 
 function Handle-MainMenuNavigation()
 {
+    [CmdletBinding()]
+    param()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Handling main menu navigation"
     
@@ -906,7 +910,6 @@ function ShowMenu()
         [string]$StackOperation = 'Auto',
         [Parameter(Mandatory = $false)]        [string]$CalledBy = 'Unknown'
     )
-
     
     # region Initialize global variables if they don't exist and display debug
     $functionName = $MyInvocation.MyCommand.Name
@@ -941,6 +944,7 @@ function ShowMenu()
     Write-Verbose "[$functionName] History Count: $($Global:History.Count)"
     Write-Verbose "[$functionName] MenuHistory Count: $($Global:MenuHistory.Count)"
     #endregion    # Determine calling context if not explicitly provided
+    
     if ($CalledBy -eq 'Unknown')
     {
         Write-Verbose "[$functionName] CalledBy is 'Unknown', determining calling context"
