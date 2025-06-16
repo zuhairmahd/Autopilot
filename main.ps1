@@ -328,14 +328,17 @@ function ProcessDevice()
     {
         'import'
         {
+            Write-Verbose "[$functionName] Importing device with serial number $serialNumber."
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            Write-Verbose "[$functionName] Device assignment check returned: $deviceAssignment"
             if ($deviceAssignment)
             {
-                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment -functionName $functionName
-                if (-not $isAssigned)
+                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                Write-Verbose "[$functionName] Device assignment status: $isAssigned"
+                if ($isAssigned)
                 {
-                    return $returnValues.UnassignedMessage
+                    return $returnValues.deviceAssignedMessage
                 }
             }
             else
@@ -343,6 +346,20 @@ function ProcessDevice()
                 Write-Host "The device is not in Intune." 
             }
             #region Add the device to Intune
+            Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) into Autopilot."
+            $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
+            while ($choice -notin @('yes', 'no'))
+            {
+                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                #beep
+                [console]::beep(1000, 500)
+                $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
+            }
+            if ($choice -eq 'no')
+            {
+                Write-Host "Exiting..."
+                return $backoutText
+            }
             $importStart = Get-Date
             $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
             if ($device -eq $backoutText)
@@ -350,7 +367,7 @@ function ProcessDevice()
                 Write-Verbose "[$functionName] The import function returned $device."
                 return $backoutText
             }
-            $importResult = ProcessImportResult -device $device -functionName $functionName -returnValues $returnValues
+            $importResult = ProcessImportResult -device $device -returnValues $returnValues
             if ($importResult -ne $returnValues.deviceImportSuccessMessage)
             {
                 return $importResult
@@ -360,7 +377,7 @@ function ProcessDevice()
             Start-Sleep -Seconds $timeInSeconds
             
             $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-            return ProcessAssignmentResult -assignment $assignment -functionName $functionName -importStart $importStart -returnValues $returnValues
+            return ProcessAssignmentResult -assignment $assignment -importStart $importStart -returnValues $returnValues
             #endregion Add the device to Intune.
         }
         'check'
@@ -369,11 +386,11 @@ function ProcessDevice()
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             if ($deviceAssignment)
             {
-                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment -functionName $functionName
+                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
                 if ($isAssigned)
                 {
                     # Handle enrollment state for assigned devices
-                    return HandleDeviceEnrollmentState -deviceAssignment $deviceAssignment -serialNumber $serialNumber -accessToken $accessToken -functionName $functionName -returnValues $returnValues -domain $domain
+                    return HandleDeviceEnrollmentState -deviceAssignment $deviceAssignment -serialNumber $serialNumber -accessToken $accessToken -returnValues $returnValues -domain $domain
                 }
                 else
                 {
@@ -392,7 +409,7 @@ function ProcessDevice()
                     # Show options for problem devices
                     Write-Host "What would you like to do?"
                     $deviceWaitMenu = NewMenu -Title "Options for Device With Serial Number $serialNumber" -Description "Choose what you would like to do with this device:"
-                    $deviceWaitMenu = AddMenu Item -Menu $deviceWaitMenu -Name "Restart the device" -Action {
+                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
                         Write-Host "Restarting the device..."
                         Write-Verbose "[$functionName] User chose to restart the device."
                         if (-not (RestartDevice))
@@ -401,12 +418,12 @@ function ProcessDevice()
                             return $returnValues.noRestartMessage 
                         }
                     }
-                    $deviceWaitMenu = AddMenu Item -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
+                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
                         Write-Host "Continuing to wait for profile assignment..."
                         $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
                         return $deviceAssignment
                     }
-                    $deviceWaitMenu = AddMenu Item -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {
+                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {
                         Write-Host "Deleting the device from Autopilot..."
                         if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
                         {
@@ -651,7 +668,7 @@ function ProcessSerialNumber()
             
             # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
-            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action' -Verbose 
+            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             Write-Host "Returning from device actions menu with result: $result"
             return $result
         }
@@ -822,7 +839,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
             {
                 Write-Verbose "[$scriptName] Action called via $context"
                 Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
-                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
+                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check' 
                 Write-Verbose "[$scriptName] Result returned: $result"
             }
         }
@@ -855,7 +872,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
         Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Checking for Windows updates."
     }
     else
     {

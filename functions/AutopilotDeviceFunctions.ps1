@@ -1,5 +1,3 @@
-
-#region Autopilot functions
 function validateInput()
 {
     [CmdletBinding()]
@@ -128,21 +126,7 @@ function PrepareImportDevice()
         }
         else 
         {
-            Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) to Intune."
-            Write-Verbose "[$functionName] Importing device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-            $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
-            while ($choice -notin @('yes', 'no'))
-            {
-                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-                #beep
-                [console]::beep(1000, 500)
-                $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
-            }
-            if ($choice -eq 'no')
-            {
-                Write-Host "Exiting..."
-                return $backoutText
-            }
+            Write-Verbose "[$functionName] The device with serial number $($deviceObject.serialNumber) is ready for import."
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import'
         }
     }
@@ -157,18 +141,16 @@ function DisplayDeviceAssignmentStatus()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        $deviceAssignment,
-        [Parameter(Mandatory = $true)]
-        [string]$functionName
+        $deviceAssignment
     )
 
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
-    
     if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
     {
         Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
         Write-Verbose "[$functionName] The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
-        $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
+        $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | FormatDateWithTimeZone) 
         Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
         Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
         return $true
@@ -204,13 +186,12 @@ function HandleDeviceEnrollmentState()
         [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
-        [string]$functionName,
-        [Parameter(Mandatory = $true)]
         $returnValues,
         [Parameter(Mandatory = $false)]
         [string]$domain
     )
 
+    $functionName = $MyInvocation.MyCommand.Name
     $enrollmentState = $deviceAssignment.enrollmentState
     Write-Verbose "[$functionName] Processing enrollment state: $enrollmentState"
     
@@ -369,8 +350,6 @@ function ProcessImportResult()
         [Parameter(Mandatory = $true)]
         $device,
         [Parameter(Mandatory = $true)]
-        [string]$functionName,
-        [Parameter(Mandatory = $true)]
         $returnValues
     )
     
@@ -402,13 +381,12 @@ function ProcessAssignmentResult()
         [Parameter(Mandatory = $true)]
         $assignment,
         [Parameter(Mandatory = $true)]
-        [string]$functionName,
-        [Parameter(Mandatory = $true)]
         [datetime]$importStart,
         [Parameter(Mandatory = $true)]
         $returnValues
     )
-    
+
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing assignment result"
     Write-Verbose "[$functionName] The assignment details are: $($assignment | ConvertTo-Json)"
     
@@ -754,16 +732,15 @@ function CheckDeviceAssignment()
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
                 Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
-                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
+                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
                 Write-Verbose "[$functionName] The device is ready for enrollment."
-                return $returnValues.deviceAssignedMessage
+                Write-Verbose "[$functionName] Returning $($returnValues.deviceAssignedMessage)"
             }
             else
             {
                 Write-Host "The device is not assigned to a deployment profile."
                 Write-Host "Please check the Intune portal or contact an Intune administrator."
                 Write-Verbose "[$functionName] The device is not ready for enrollment."
-                return $returnValues.deviceNotAssignedMessage
             }
         }
     }
@@ -772,6 +749,7 @@ function CheckDeviceAssignment()
         Write-Verbose "[$functionName] The device is not found in Intune."
         return $returnValues.deviceNotInIntuneMessage
     }
+    return $assignment
 }
 
 function GetDeviceHash()
@@ -1064,4 +1042,3 @@ function RestartDevice()
         return $false
     }
 }
-#endregion 

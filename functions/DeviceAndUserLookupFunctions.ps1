@@ -145,7 +145,7 @@ function SendDeviceCommand ()
     # Report on action status for all operations
     if ($response -eq '')
     {
-        Write-Host "Command sent successfully. Performing automatic device sync..." -ForegroundColor Green
+        Write-Host "Command sent successfully." -ForegroundColor Green
         # Only send additional sync for non-sync operations to avoid redundancy
         if ($Command -ne "sync")
         {
