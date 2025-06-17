@@ -28,10 +28,6 @@ param(
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
-if ($null -eq $scriptName)
-{
-    $scriptName = 'main.ps1'
-}
 
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -48,10 +44,10 @@ else
     {
         Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
         $ScriptPath = "."
+        $scriptName = 'main.ps1'
     }
 }
 
-exit 0
 #region Load parameters from the configuration file if it exists
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 Write-Verbose "[$scriptName] Domain: $domain"
