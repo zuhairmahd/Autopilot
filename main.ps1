@@ -26,9 +26,28 @@ param(
     [ValidateSet('full', 'helpDesk', 'registration')]
     [string]$appMode
 )
+$scriptName = $MyInvocation.MyCommand.Name
+
+# if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+# {
+#     Write-Verbose "[$scriptName] Running as an external script."
+#     $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+#     Write-Verbose "[$scriptName] Script path: $ScriptPath"
+# }
+# else
+# {
+#     Write-Verbose "[$scriptName] Running as a script block."
+#     $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+#     Write-Verbose "[$scriptName] Script path: $ScriptPath"
+#     if (!$ScriptPath)
+#     {
+#         Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
+#         $ScriptPath = "."
+#     }
+# }
 
 #region Load parameters from the configuration file if it exists
-$scriptName = $MyInvocation.MyCommand.Name
+
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 Write-Verbose "[$scriptName] Domain: $domain"
 if (Test-Path -Path $InitFile)
@@ -108,57 +127,21 @@ else
 #endregion Load parameters from the configuration file if it exists
 
 #region import functions.
-#Attempt to import module if found.
-$moduleName = 'HelperModule'
-$moduleFileName = 'HelperModule.psm1'
-$moduleObject = Get-Item -Path $moduleFileName -Force -ErrorAction SilentlyContinue
-if ($null -ne $moduleObject)
+$functionsFolder = "$PWD\functions"
+if (Test-Path $functionsFolder)
 {
-    $moduleName = $moduleObject.BaseName
-}
-if ($moduleObject -and $moduleObject.PSIsContainer -eq $false)
-{
-    Write-Verbose "[$scriptName] Importing module $moduleFileName"
-    try
+    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    foreach ($function in $functions)
     {
-        Import-Module -Name $moduleObject -Force -ErrorAction SilentlyContinue
-        Write-Verbose "[$scriptName] Module $moduleFileName imported successfully."
-    }
-    catch
-    {
-        Write-Verbose "[$scriptName] Failed to import module $moduleFileName. Error: $_"
+        Write-Verbose "[$scriptName] Importing function $function"
+        . $function.FullName
     }
 }
 else
 {
-    Write-Verbose "[$scriptName] Module $moduleFileName not found in the current directory. Skipping import."
-}
-
-if (Get-Module -Name $moduleName -ErrorAction SilentlyContinue)
-{
-    Write-Verbose "[$scriptName] Module $moduleName is already imported."
-}
-else
-{
-    Write-Verbose "[$scriptName] Module $moduleName not found. Attempting to import functions."
-    #beep
-    [console]::beep(200, 100)
-    $functionsFolder = "$PWD\functions"
-    if (Test-Path $functionsFolder)
-    {
-        Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-        foreach ($function in $functions)
-        {
-            Write-Verbose "[$scriptName] Importing function $function"
-            . $function.FullName
-        }
-    }
-    else
-    {
-        Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
-        exit 1
-    }
+    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    exit 1
 }
 #endregion import functions.
 
@@ -1177,7 +1160,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopil
 # $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
+    $updateResult = GetUpdates -RootFolder $pwd -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
     Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
     {

@@ -39,6 +39,5 @@ TestResults/
 # Misc. files.
 *.bat
 *.csv
-*.exe
 *.cmd
 *.txt
