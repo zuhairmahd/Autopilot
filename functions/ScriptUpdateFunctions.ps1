@@ -122,7 +122,7 @@ function GetUpdates()
         Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
         Write-Host "An update is available to version $remoteVersion. Downloading update from $updateURL."
         #make a backup of the executable
-        $backupFile = Join-Path -Path $RootFolder -ChildPath "$executableFileName.bak"
+        $backupFile = Join-Path -Path $env:TEMP -ChildPath "$executableFileName.bak"
         if (Test-Path $backupFile)
         {
             Write-Host "Backup file already exists. Deleting old backup file."
@@ -132,6 +132,8 @@ function GetUpdates()
         Copy-Item -Path "$RootFolder\$executableFileName" -Destination $backupFile -Force
         #download the update file.
         $updateFile = Join-Path -Path $RootFolder -ChildPath $executableFileName
+        $updateURL = "$updateURL/$executableFileName"
+        Write-Verbose "Downloading the update file $updateFile from $updateURL"
         $response = Invoke-WebRequest -Uri $updateURL -OutFile $updateFile -Method Get -ErrorAction Stop -PassThru
         #check the return code.
         if ($response.StatusCode -ne 200)

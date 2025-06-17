@@ -26,7 +26,7 @@ else
 
 #region variables
 # $logfile = "mylog.log"
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+# $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
@@ -46,7 +46,7 @@ $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertF
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scopes -AuthType 'PublicAuthFlow' 
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scopes -AuthType 'PublicAuthFlow' 
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -59,6 +59,24 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $sc
 # }
 #endregion variables
 
-$username = Read-Host -Prompt "Enter the username (UPN) to search for"
-$global:users = GetEntraUser -UserName $username -accessToken $accessToken -verbose 
-Write-Host "Found $($global:users.count) users."
+$global:invocation = $MyInvocation
+Write-Host "$($MyInvocation.MyCommand.Name) started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
+Write-Host "Command type: $($MyInvocation.MyCommand.CommandType)"
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Host "Running as an external script."
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Host "Script path: $ScriptPath"
+}
+else
+{
+    Write-Host "Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Host "Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        Write-Host "Script path is not set. Defaulting to current directory."
+        $ScriptPath = "."
+    }
+}
+

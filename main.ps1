@@ -26,7 +26,12 @@ param(
     [ValidateSet('full', 'helpDesk', 'registration')]
     [string]$appMode
 )
+
 $scriptName = $MyInvocation.MyCommand.Name
+if ($null -eq $scriptName)
+{
+    $scriptName = 'main.ps1'
+}
 
 # if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 # {
@@ -46,8 +51,8 @@ $scriptName = $MyInvocation.MyCommand.Name
 #     }
 # }
 
-#region Load parameters from the configuration file if it exists
 
+#region Load parameters from the configuration file if it exists
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 Write-Verbose "[$scriptName] Domain: $domain"
 if (Test-Path -Path $InitFile)
