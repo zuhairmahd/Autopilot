@@ -33,25 +33,25 @@ if ($null -eq $scriptName)
     $scriptName = 'main.ps1'
 }
 
-# if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
-# {
-#     Write-Verbose "[$scriptName] Running as an external script."
-#     $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-#     Write-Verbose "[$scriptName] Script path: $ScriptPath"
-# }
-# else
-# {
-#     Write-Verbose "[$scriptName] Running as a script block."
-#     $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-#     Write-Verbose "[$scriptName] Script path: $ScriptPath"
-#     if (!$ScriptPath)
-#     {
-#         Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
-#         $ScriptPath = "."
-#     }
-# }
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Verbose "[$scriptName] Running as an external script."
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
+        $ScriptPath = "."
+    }
+}
 
-
+exit 0
 #region Load parameters from the configuration file if it exists
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 Write-Verbose "[$scriptName] Domain: $domain"

@@ -59,13 +59,24 @@ else
 # }
 #endregion variables
 
-$global:invocation = $MyInvocation
-Write-Host "$($MyInvocation.MyCommand.Name) started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
-Write-Host "Command type: $($MyInvocation.MyCommand.CommandType)"
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+$invocation = $MyInvocation
+#print all the content of $myinvocation.
+Write-Host "Script name: $($invocation.MyCommand.Name)"
+Write-Host "Script path: $($invocation.MyCommand.Path)"
+Write-Host "Script line number: $($invocation.ScriptLineNumber)"
+Write-Host "Script command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Script arguments: $($invocation.MyCommand.Parameters | Out-String)"
+Write-Host "$($invocation.MyCommand.Name) started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
+Write-Host "Command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Command name: $($invocation.MyCommand.Name)"
+Write-Host "Command path: $($invocation.MyCommand.Path)"
+Write-Host "Command line number: $($invocation.ScriptLineNumber)"
+Write-Host "Command arguments: $($invocation.MyCommand.Parameters | Out-String)"    
+
+if ($invocation.MyCommand.CommandType -eq "ExternalScript")
 {
     Write-Host "Running as an external script."
-    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    $ScriptPath = Split-Path -Parent -Path $invocation.MyCommand.Definition
     Write-Host "Script path: $ScriptPath"
 }
 else
@@ -79,4 +90,16 @@ else
         $ScriptPath = "."
     }
 }
+
+Write-Host "Script name: $($invocation.MyCommand.Name)"
+Write-Host "Script path: $($invocation.MyCommand.Path)"
+Write-Host "Script line number: $($invocation.ScriptLineNumber)"
+Write-Host "Script command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Script arguments: $($invocation.MyCommand.Parameters | Out-String)"
+Write-Host "$($invocation.MyCommand.Name) started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
+Write-Host "Command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Command name: $($invocation.MyCommand.Name)"
+Write-Host "Command path: $($invocation.MyCommand.Path)"
+Write-Host "Command line number: $($invocation.ScriptLineNumber)"
+Write-Host "Command arguments: $($invocation.MyCommand.Parameters | Out-String)"    
 
