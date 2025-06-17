@@ -1,0 +1,50 @@
+{
+    "returnValues": {
+        "unknownErrorMessage": "An unknown error occurred.",
+        "noRestartMessage": "Device not restarted.",
+        "EnrolledMessage": "The device is enrolled.",
+        "notContactedMessage": "The device has not contacted the enrollment service.",
+        "PendingResetMessage": "The device is pending a reset.",
+        "EnrollmentFailedMessage": "The device enrollment failed.",
+        "deviceNotAssignedMessage": "The device is not assigned to a deployment profile.",
+        "deviceAssignmentPendingMessage": "The device is pending assignment to a deployment profile.",
+        "deviceNotInIntuneMessage": "The device is not in Intune.",
+        "noUserDeviceFoundMessage": "No user or device found.",
+        "noUserFoundInDirectoryMessage": "This user does not exist",
+        "deviceAssignedMessage": "The device is assigned to a deployment profile.",
+        "deviceUnknownActionMessage": "The action may still be in progress. You can check the device status in the Intune portal.",
+        "deviceImportSuccessMessage": "The device was imported successfully.",
+        "deviceImportFailedMessage": "The device import failed.",
+        "deviceDeleteSuccessMessage": "The device was deleted successfully.",
+        "deviceDeleteFailedMessage": "The device deletion failed.",
+        "deviceWipeSuccessMessage": "The device was wiped successfully.",
+        "deviceWipeFailedMessage": "The device wipe failed.",
+        "deviceSyncSuccessMessage": "The device sync was successful.",
+        "deviceSyncFailedMessage": "The device sync failed.",
+        "deviceRestartSuccessMessage": "The device was restarted successfully.",
+        "deviceRestartFailedMessage": "The device restart failed.",
+        "deviceCleanSuccessMessage": "The device was cleaned successfully.",
+        "deviceCleanFailedMessage": "The device clean failed.",
+        "serialNumberNotFoundMessage": "The serial number was not found.",
+        "UpdateFailedMessage": "Could not download update.",
+        "noAccessTokenMessage": "Could not obtain an access token. Please check your credentials.",
+        "UpdateSuccessMessage": "The script was updated successfully.",
+        "UpdateNotNeededMessage": "The script is already up to date.",
+        "userCanceledMessage": "Operation canceled by user",
+        "999": "No updates were found",
+        "1000": "All updates were installed",
+        "1001": "Some updates were installed",
+        "10002": "Some updates were installed",
+        "1003": "Updates failed to install"
+    },
+    "deviceStates": {
+        "Ready": "The device is ready for the next user",
+        "NotReady": "The device is not ready for the next user"
+    },
+    "deviceActions": {
+        "none": "No action",
+        "contactAdmin": "Contact an Intune administrator",
+        "contactHelpdesk": "Contact the helpdesk",
+        "WipeOrClean": "Wipe or clean the device"
+    }
+}

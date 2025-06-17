@@ -188,61 +188,6 @@ function AddMenuItem()
     return $Menu
 }
 
-function GoBack()
-{
-    [CmdletBinding()]
-    param(    )
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Going back to previous menu."
-    if ($Global:History.Count -gt 0 -and $Global:MenuHistory.Count -gt 0)
-    {
-        Write-Verbose "[$functionName] Removing last item from history since count is $($Global:History.Count)"
-        $Global:History.RemoveAt($Global:History.Count - 1)
-        # Get previous menu from MenuHistory
-        Write-Verbose "[$functionName] Getting previous menu from MenuHistory since count is $($Global:MenuHistory.Count)"
-        if ($Global:MenuHistory.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] Finding previous menu by removing last item from MenuHistory."
-            $previousMenu = $Global:MenuHistory[$Global:MenuHistory.Count - 1]
-            Write-Verbose "[$functionName] Previous menu found: $($previousMenu.Title)"
-            Write-Verbose "[$functionName] Removing last menu from MenuHistory since count is $($Global:MenuHistory.Count)"
-            $Global:MenuHistory.RemoveAt($Global:MenuHistory.Count - 1)
-            Write-Verbose "[$functionName] Current depth after going back: $($Global:MenuHistory.Count)"
-            Write-Verbose "[$functionName] Returning to previous menu: $($previousMenu.Title)"
-            return ShowMenu -Menu $previousMenu 
-        }
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Cannot go back - no previous menu available"
-        return ShowMenu -Menu $Menu 
-    }
-}
-
-function GoToMainMenu()
-{
-    [CmdletBinding()]
-    param ()
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Going to main menu."
-    # Go to main menu
-    if ($Global:MenuHistory.Count -gt 0)
-    {
-        $mainMenu = $Global:MenuHistory[0]
-        Write-Verbose "[$functionName] Clearing history and menu history since we are going to main menu."
-        $Global:History.Clear()
-        $Global:MenuHistory.Clear()
-        [void]$Global:MenuHistory.Add($mainMenu)
-        Write-Verbose "[$functionName] Reset to main menu. Current depth: $($Global:MenuHistory.Count)"
-        return ShowMenu -Menu $mainMenu
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Cannot go to main menu - no main menu available"
-        return ShowMenu -Menu $Menu 
-    }
-}
-
 function Get-CallingContext()
 {
     [CmdletBinding()]
@@ -716,6 +661,8 @@ function Create-MenuBanner()
 
 function Handle-BackNavigation()
 {
+    [CmdletBinding()]
+    param()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Handling back navigation"
     
@@ -737,6 +684,8 @@ function Handle-BackNavigation()
 
 function Handle-MainMenuNavigation()
 {
+    [CmdletBinding()]
+    param()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Handling main menu navigation"
     
@@ -857,13 +806,13 @@ function Handle-ActionExecution()
     # Handle special signals
     if ($result -eq "EXIT_APPLICATION")
     {
-        Write-Verbose "[$functionName] Action requested application exit"
+        Write-Verbose "[$functionName] Action requested application exit because result is $result"
         return $null
     }
     
     if ($result -eq $backoutText)
     {
-        Write-Verbose "[$functionName] Action returned backout text"
+        Write-Verbose "[$functionName] Action returned backout text beaaus result is $result"
         return ShowMenu -Menu $CurrentMenu -CalledBy 'Action' -StackOperation 'None'
     }
     
@@ -906,7 +855,6 @@ function ShowMenu()
         [string]$StackOperation = 'Auto',
         [Parameter(Mandatory = $false)]        [string]$CalledBy = 'Unknown'
     )
-
     
     # region Initialize global variables if they don't exist and display debug
     $functionName = $MyInvocation.MyCommand.Name
@@ -941,6 +889,7 @@ function ShowMenu()
     Write-Verbose "[$functionName] History Count: $($Global:History.Count)"
     Write-Verbose "[$functionName] MenuHistory Count: $($Global:MenuHistory.Count)"
     #endregion    # Determine calling context if not explicitly provided
+    
     if ($CalledBy -eq 'Unknown')
     {
         Write-Verbose "[$functionName] CalledBy is 'Unknown', determining calling context"

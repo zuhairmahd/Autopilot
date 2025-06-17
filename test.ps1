@@ -25,7 +25,7 @@ else
 #endregion
 
 #region variables
-$logfile = "mylog.log"
+# $logfile = "mylog.log"
 # $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
@@ -46,7 +46,7 @@ $logfile = "mylog.log"
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scopes $scopes -AuthType 'PublicAuthFlow' -NoSaveRefreshToken
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scopes -AuthType 'PublicAuthFlow' 
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -59,22 +59,47 @@ $logfile = "mylog.log"
 # }
 #endregion variables
 
+$invocation = $MyInvocation
+#print all the content of $myinvocation.
+Write-Host "Script name: $($invocation.MyCommand.Name)"
+Write-Host "Script path: $($invocation.MyCommand.Path)"
+Write-Host "Script line number: $($invocation.ScriptLineNumber)"
+Write-Host "Script command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Script arguments: $($invocation.MyCommand.Parameters | Out-String)"
+Write-Host "$($invocation.MyCommand.Name) started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
+Write-Host "Command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Command name: $($invocation.MyCommand.Name)"
+Write-Host "Command path: $($invocation.MyCommand.Path)"
+Write-Host "Command line number: $($invocation.ScriptLineNumber)"
+Write-Host "Command arguments: $($invocation.MyCommand.Parameters | Out-String)"    
 
-# $fileName = Read-Host -Prompt "Enter the path to the JSON file you want to encrypt (default: $configFile)"
-# $password = Read-Host -Prompt "Enter your password" -AsSecureString
-# $choice = Read-Host "Press 1 to encrypt, 2 to decrypt, or any other key to exit"
-# if ($choice -eq '2')
-# {
-# Invoke-JsonFileEncryption -filePath $fileName -Key $password
-# exit
-# }
-# elseif ($choice -ne '1')
-# {
-# Write-Host "Exiting script." -ForegroundColor Yellow
-# exit
-# }
+if ($invocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Host "Running as an external script."
+    $ScriptPath = Split-Path -Parent -Path $invocation.MyCommand.Definition
+    Write-Host "Script path: $ScriptPath"
+}
+else
+{
+    Write-Host "Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Host "Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        Write-Host "Script path is not set. Defaulting to current directory."
+        $ScriptPath = "."
+    }
+}
 
-Write-Host "Calling log function with $logfile"
-write-log -StartLogging -LogFile $logfile
-Write-Log -Message "This is a test log" -Module "test" -LogFile $logfile 
-write-log -FinishLogging -LogFile $logfile
+Write-Host "Script name: $($invocation.MyCommand.Name)"
+Write-Host "Script path: $($invocation.MyCommand.Path)"
+Write-Host "Script line number: $($invocation.ScriptLineNumber)"
+Write-Host "Script command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Script arguments: $($invocation.MyCommand.Parameters | Out-String)"
+Write-Host "$($invocation.MyCommand.Name) started at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Green
+Write-Host "Command type: $($invocation.MyCommand.CommandType)"
+Write-Host "Command name: $($invocation.MyCommand.Name)"
+Write-Host "Command path: $($invocation.MyCommand.Path)"
+Write-Host "Command line number: $($invocation.ScriptLineNumber)"
+Write-Host "Command arguments: $($invocation.MyCommand.Parameters | Out-String)"    
+

@@ -1,333 +1,3 @@
-function GetVMAutopilotDeviceIdBySerialNumber() 
-{
-    [CmdletBinding()]
-    param (
-        [string]$serialNumber,
-        [string]$accessToken
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    #write a verbose log  of receved parameters
-    Write-Verbose "[$functionName] Received serial number: $serialNumber"
-    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-    $autopilotDevices = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI).value
-    Write-Verbose "[$functionName] Received $($autopilotDevices.Count) devices from Autopilot."
-    for ($i = 0; $i -lt $autopilotDevices.Count; $i++)
-    {
-        $device = $autopilotDevices[$i]
-        Write-Verbose "[$functionName] Processing device with serial number $($device.serialNumber)"
-        $filteredDeviceSerialNumber = $device.serialNumber -replace '\s', ''
-        Write-Verbose "[$functionName] Filtered device serial number: $filteredDeviceSerialNumber"
-        if ($serialNumber -match '\s')
-        {
-            Write-Verbose "[$functionName] Also filtering input serial number $serialNumber since it contains spaces."
-            $serialNumber = $serialNumber -replace '\s', ''
-            Write-Verbose "[$functionName] Filtered input serial number: $serialNumber"
-        }
-        if ($filteredDeviceSerialNumber -eq $serialNumber)
-        {
-            Write-Verbose "[$functionName] Found a match for serial number $serialNumber in Autopilot."
-            return $device.id
-        }
-        else
-        {
-            Write-Verbose "[$functionName] No match for serial number $serialNumber in Autopilot."
-        }
-    }
-    Write-Verbose "[$functionName] Filtered device serial number: $filteredDeviceSerialNumber"
-    return $null
-}
-
-function SendDeviceCommand ()
-{
-    [CmdletBinding()]
-    param (
-        [string]$ManagedDeviceId,
-        [string]$accessToken,
-        [ValidateSet("clean", "wipe", "sync", "restart")]
-        [string]$Command = "clean",
-        [int]$MaxRetries = 20,
-        [int]$RetryDelaySeconds = 15,
-        [switch]$MonitorAction,
-        [switch]$NoConfirmation
-    )
-    #region variables and logs
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Device ID:     $ManagedDeviceId"
-    Write-Verbose "[$functionName] Command: $Command"
-    Write-Verbose "[$functionName] MaxRetries: $MaxRetries"
-    Write-Verbose "[$functionName] RetryDelaySeconds: $RetryDelaySeconds"
-    if ($accessToken)
-    {
-        Write-Verbose "[$functionName] AccessToken provided."
-    }
-    else
-    {
-        Write-Verbose "[$functionName] No AccessToken provided."
-        return $false
-    }
-    #endregion
-
-    # Confirmation for destructive operations only
-    if (-not $NoConfirmation -and ($Command -eq "clean" -or $Command -eq "wipe" -or $Command -eq "restart"))
-    {
-        Write-Host "Are you sure you want to $Command the device?" -ForegroundColor Yellow
-        $confirmation = Read-Host "Type 'yes' to confirm, or 'no' to cancel"
-        if ($confirmation -ne 'yes')
-        {
-            Write-Host "Operation cancelled." -ForegroundColor Gray
-            return $false
-        }
-    }
-
-    Write-Host "Sending $Command command to device with identifier $ManagedDeviceId" -ForegroundColor Cyan
-    $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
-    $success = $false
-    $actionType = ""
-    $response = ""
-    
-    switch ($Command)
-    {
-        "clean"
-        {
-            Write-Host 'Cleaning the device...' -ForegroundColor Yellow
-            $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
-            $body = @{ 'keepUserData' = $false } | ConvertTo-Json
-            $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' 
-            Write-Verbose "[$functionName] Response: $response"
-            $actionType = "cleanWindows"
-        }
-        "wipe"
-        {
-            Write-Host 'Wiping the device...' -ForegroundColor Yellow
-            $wipeURI = "$deviceManagementUri/wipe"
-            $body = @{
-                'keepEnrollmentData'   = $false
-                'keepUserData'         = $false
-                'obliterationBehavior' = "doNotObliterate"
-            } | ConvertTo-Json
-            $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] Response: $response"
-            $actionType = "wipe"
-        }
-        "sync"
-        {
-            Write-Host 'Syncing the device...' -ForegroundColor Yellow
-            $syncUri = "$deviceManagementUri/syncDevice"
-            $response = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] Response: $response"
-            $actionType = "syncDevice"
-        }
-        "restart"
-        {
-            Write-Host 'Restarting the device...' -ForegroundColor Yellow
-            $restartUri = "$deviceManagementUri/rebootNow"
-            $response = callGraphApi -AccessToken $accessToken -Method 'POST' -ResourcePath $restartUri -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] Response: $response"
-            $actionType = "rebootNow"
-        }
-        default
-        {
-            Write-Host "Invalid command. Please use 'clean', 'wipe', 'sync', or 'restart'." -ForegroundColor Red
-            return $false
-        }
-    }  
-
-    # Report on action status for all operations
-    if ($response -eq '')
-    {
-        Write-Host "Command sent successfully. Performing automatic device sync..." -ForegroundColor Green
-        # Only send additional sync for non-sync operations to avoid redundancy
-        if ($Command -ne "sync")
-        {
-            Write-Verbose "[$functionName] Performing automatic device sync after $Command operation."
-            $syncUri = "$deviceManagementUri/syncDevice"
-            $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
-            Write-Verbose "[$functionName] Sync Response: $syncResponse"
-        }
-        # Begin monitoring the action status
-        if ($MonitorAction)            
-        {
-            Write-Host "Starting to monitor $Command action status..." -ForegroundColor Yellow
-            $retryCount = 0
-            $actionCompleted = $false
-            $actionFailed = $false
-            $actionState = "unknown"
-            # Loop until action completes, fails, or max retries reached
-            while (-not $actionCompleted -and -not $actionFailed -and $retryCount -lt $MaxRetries)
-            {
-                $retryCount++
-                Write-Host "Checking $Command status, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
-                Write-Verbose "[$functionName] Checking action results (Attempt $retryCount of $MaxRetries)"
-  
-                # Wait before checking
-                Start-Sleep -Seconds $RetryDelaySeconds
-  
-                # Check action results
-                $deviceDetails = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
-                Write-Verbose "[$functionName] Device action results: $($deviceDetails | ConvertTo-Json -Depth 5)"
-                Write-Host "Action results: $($deviceDetails.deviceActionResults)"
-  
-                if ($deviceDetails -and $deviceDetails.deviceActionResults)
-                {
-                    # Find the relevant action result based on action type
-                    $actionResult = $null
-                    foreach ($result in $deviceDetails.deviceActionResults)
-                    {
-                        if ($result.actionName -eq $actionType)
-                        {
-                            $actionResult = $result
-                            break
-                        }
-                    }
-                    if ($actionResult)
-                    {
-                        $actionState = $actionResult.status
-                        Write-Host "Current $Command status: $actionState" -ForegroundColor Cyan
-                        Write-Verbose "[$functionName] Action start time: $($actionResult.startDateTime)"
-                        Write-Verbose "[$functionName] Action last updated: $($actionResult.lastUpdatedDateTime)"
-                        # Check if action completed or failed
-                        switch ($actionState)
-                        {
-                            "succeeded"
-                            {
-                                Write-Host "$Command action completed successfully!" -ForegroundColor Green
-                                $actionCompleted = $true
-                                $success = $true
-                            }
-                            "failed"
-                            {
-                                Write-Host "$Command action failed with error: $($actionResult.errorCode)" -ForegroundColor Red
-                                if ($actionResult.errorDescription)
-                                {
-                                    Write-Host "Error description: $($actionResult.errorDescription)" -ForegroundColor Red
-                                }
-                                $actionFailed = $true
-                                $success = $false
-                            }
-                            "timeout"
-                            {
-                                Write-Host "$Command action timed out." -ForegroundColor Red
-                                $actionFailed = $true
-                                $success = $false
-                            }
-                            "canceled"
-                            {
-                                Write-Host "$Command action was canceled." -ForegroundColor Red
-                                $actionFailed = $true
-                                $success = $false
-                            }
-                            "notFound"
-                            {
-                                Write-Verbose "[$functionName] Action not found yet or device may no longer be available."
-                                if ($retryCount -gt 3)
-                                {
-                                    Write-Verbose "[$functionName] Action not found after multiple attempts, assuming device is no longer available."
-                                    $actionFailed = $false
-                                    $success = $true
-                                }
-                            }
-                            default
-                            {
-                                Write-Verbose "[$functionName] Action status is '$actionState', continuing to monitor."
-                                # Continue monitoring for non-terminal states
-                            }
-                        }
-                    }
-                    else
-                    {
-                        Write-Verbose "[$functionName] No action of type '$actionType' found yet."
-                    }
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] No device action results available or device might be offline/no longer accessible."
-                    # If we can no longer get device details, check if device still exists
-                    $deviceCheck = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0'
-                    if (-not $deviceCheck)
-                    {
-                        Write-Host "Device is no longer accessible. This could be expected for wipe operations." -ForegroundColor Yellow
-                        # For wipe operations, this might be expected behavior as device is reset
-                        if ($Command -eq 'wipe')
-                        {
-                            Write-Host "Wipe command appears to have succeeded as device is no longer accessible." -ForegroundColor Green
-                            $actionCompleted = $true
-                            $success = $true
-                        }
-                    }
-                }
-            }
-            # Final status report
-            if ($actionCompleted)
-            {
-                Write-Host "$Command action has completed successfully." -ForegroundColor Green
-            }
-            elseif ($actionFailed)
-            {
-                Write-Host "$Command action has failed with status: $actionState" -ForegroundColor Red
-            }
-            else
-            {
-                Write-Host "$Command action monitoring timed out after $MaxRetries attempts." -ForegroundColor Yellow
-                Write-Host "Last known status: $actionState" -ForegroundColor Yellow
-                Write-Warning "The action may still be in progress. You can check the device status in the Intune portal."
-            }
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Monitoring not enabled, skipping action status checks."
-            $success = $true
-        }
-    }
-    else
-    {
-        Write-Host "Failed to send $Command command to device." -ForegroundColor Red
-        Write-Verbose "[$functionName] Failed to send command. Response: $response"
-    }
-    return $success
-}
-
-function GetDeviceIdFromSerial()
-{
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$SerialNumber,
-        [Parameter(Mandatory = $true)]
-        [string]$AccessToken
-    )
-
-    #region Variables and verbose logs    
-    $functionName = $MyInvocation.MyCommand.Name
-    $managedDeviceUri = "deviceManagement/managedDevices"
-    $filter = "serialNumber eq '$SerialNumber'"
-    $extraParameters = "select=Id"
-    $device = $null
-    Write-Verbose "[$functionName] Serial Number: $SerialNumber"
-    if ($AccessToken)
-    {
-        Write-Verbose "[$functionName] AccessToken provided."
-    }
-    else
-    {
-        Write-Verbose "[$functionName] No AccessToken provided."
-        return $false
-    }
-    #endregion    # Query the device enrollment status using Microsoft Graph API
-    # Fetch the device details using the serial number
-    $response = CallGraphApi -AccessToken $AccessToken -ResourcePath $managedDeviceUri -filter $filter -ExtraParameters $extraParameters -Method GET
-    if ($response)
-    {
-        $device = $response.value.Id
-        Write-Verbose "[$functionName] Device found with ID: $($device)"
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Device with serial number $SerialNumber not found."
-    }
-    return $device
-}
-
-#region Autopilot functions
 function validateInput()
 {
     [CmdletBinding()]
@@ -456,21 +126,7 @@ function PrepareImportDevice()
         }
         else 
         {
-            Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) to Intune."
-            Write-Verbose "[$functionName] Importing device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-            $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
-            while ($choice -notin @('yes', 'no'))
-            {
-                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-                #beep
-                [console]::beep(1000, 500)
-                $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
-            }
-            if ($choice -eq 'no')
-            {
-                Write-Host "Exiting..."
-                return $backoutText
-            }
+            Write-Verbose "[$functionName] The device with serial number $($deviceObject.serialNumber) is ready for import."
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import'
         }
     }
@@ -485,18 +141,16 @@ function DisplayDeviceAssignmentStatus()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        $deviceAssignment,
-        [Parameter(Mandatory = $true)]
-        [string]$functionName
+        $deviceAssignment
     )
 
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
-    
     if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
     {
         Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
         Write-Verbose "[$functionName] The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
-        $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | Get-Date -Format "dddd, MMMM d, yyyy h:mm:ss tt K") 
+        $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | FormatDateWithTimeZone) 
         Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
         Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
         return $true
@@ -532,13 +186,12 @@ function HandleDeviceEnrollmentState()
         [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
-        [string]$functionName,
-        [Parameter(Mandatory = $true)]
         $returnValues,
         [Parameter(Mandatory = $false)]
         [string]$domain
     )
 
+    $functionName = $MyInvocation.MyCommand.Name
     $enrollmentState = $deviceAssignment.enrollmentState
     Write-Verbose "[$functionName] Processing enrollment state: $enrollmentState"
     
@@ -646,7 +299,7 @@ function HandleCustomImportSettings()
     if ($customMaxWaitTime -eq '0')
     {
         Write-Host "Skipping the wait for profile assignment."
-        return $returnValues.ImportSuccessMessage
+        return $returnValues.deviceImportSuccessMessage
     }
     elseif ($customMaxWaitTime -as [int] -and [int]$customMaxWaitTime -ge 0 -and [int]$customMaxWaitTime -le 60)
     {
@@ -670,7 +323,7 @@ function HandleCustomImportSettings()
     if ($customTimeInSeconds -eq '0')
     {
         Write-Host "Skipping the wait for profile assignment."
-        return $returnValues.ImportSuccessMessage
+        return $returnValues.deviceImportSuccessMessage
     }
     elseif ($customTimeInSeconds -as [int] -and [int]$customTimeInSeconds -ge 0 -and [int]$customTimeInSeconds -le 60)
     {
@@ -697,8 +350,6 @@ function ProcessImportResult()
         [Parameter(Mandatory = $true)]
         $device,
         [Parameter(Mandatory = $true)]
-        [string]$functionName,
-        [Parameter(Mandatory = $true)]
         $returnValues
     )
     
@@ -707,19 +358,19 @@ function ProcessImportResult()
     {
         $serialNumber = $device.SerialNumber
         Write-Host "The import of device with serial number $serialNumber completed successfully." -ForegroundColor Green
-        return $true
+        return $returnValues.deviceImportSuccessMessage
     }
     elseif ($device.state.deviceImportStatus -eq 'error')
     {
         Write-Host 'The device import failed with the following error:' -ForegroundColor Red
         Write-Host "$($device.state.deviceErrorName)" -ForegroundColor red
-        return $returnValues.ImportFailedMessage
+        return $returnValues.deviceImportFailedMessage
     }
     else
     {
         Write-Host 'The device import failed with the following error:' -ForegroundColor Red
         Write-Host "$($device.state.deviceImportStatus)" -ForegroundColor Red
-        return $returnValues.ImportFailedMessage
+        return $returnValues.deviceImportFailedMessage
     }
 }
 
@@ -730,13 +381,12 @@ function ProcessAssignmentResult()
         [Parameter(Mandatory = $true)]
         $assignment,
         [Parameter(Mandatory = $true)]
-        [string]$functionName,
-        [Parameter(Mandatory = $true)]
         [datetime]$importStart,
         [Parameter(Mandatory = $true)]
         $returnValues
     )
-    
+
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing assignment result"
     Write-Verbose "[$functionName] The assignment details are: $($assignment | ConvertTo-Json)"
     
@@ -773,7 +423,7 @@ function ProcessAssignmentResult()
         
         if (-not (RestartDevice))
         {
-            return $returnValues.ImportSuccessMessage
+            return $returnValues.deviceImportSuccessMessage
         }
     }
     else
@@ -783,201 +433,7 @@ function ProcessAssignmentResult()
         Write-Host "The device current assignment status is $($assignment.deploymentProfileAssignmentStatus)."
         Write-Host "The device assignment profile name is $($assignment.deploymentProfile.displayName)."
         Write-Host "The device profile assignment date is $($assignment.deploymentProfileAssignmentDateTime)."
-        return $returnValues.ImportFailedMessage
-    }
-}
-
-function ProcessDevice()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$accessToken,
-        [Parameter(Mandatory = $true)]
-        $DeviceObject,
-        $returnValues = $returnValues,
-        [Parameter(Mandatory = $true)]
-        [ValidateSet('import', 'check', 'delete')]
-        [string]$action,
-        [switch]$CustomImport
-    )
-    
-    #region check and initialize variables
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Checking access token..."
-    if ($accessToken)
-    {
-        Write-Verbose "[$functionName] Access token provided."
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Access token not provided. Returning Null."
-        return $null
-    }
-    Write-Verbose "[$functionName] Processing serial number: $($deviceObject.SerialNumber)."
-    Write-Verbose "[$functionName] Action: $action"
-    Write-Verbose "[$functionName] Custom import: $CustomImport"
-    $serialNumber = $deviceObject.serialNumber
-    Write-Verbose "[$functionName] The serial number is $serialNumber."
-    $make = $deviceObject.manufacturer
-    Write-Verbose "[$functionName] The manufacturer is $make"
-    $model = $deviceObject.model
-    Write-Verbose "[$functionName] The model is $model"
-    #endregion check and initialize variables
-    
-    switch ($action)
-    {
-        'import'
-        {
-            Write-Host "Checking to make sure the device hash is not already in Intune..."
-            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            if ($deviceAssignment)
-            {
-                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment -functionName $functionName
-                if (-not $isAssigned)
-                {
-                    return $returnValues.UnassignedMessage
-                }
-            }
-            else
-            {
-                Write-Host "The device is not in Intune." 
-            }
-            #region Add the device to Intune
-            $importStart = Get-Date
-            $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
-            if ($device -eq $backoutText)
-            {
-                Write-Verbose "[$functionName] The import function returned $device."
-                return $backoutText
-            }
-            $importResult = ProcessImportResult -device $device -functionName $functionName -returnValues $returnValues
-            if ($importResult -ne $true)
-            {
-                return $importResult
-            }
-            
-            #region Handle CustomImport settings if needed
-            # if ($CustomImport)
-            # {
-            #   $maxWaitTimeRef = [ref]$maxWaitTime
-            #   $timeInSecondsRef = [ref]$timeInSeconds
-            #   $customResult = HandleCustomImportSettings -functionName $functionName -maxWaitTimeRef $maxWaitTimeRef -timeInSecondsRef $timeInSecondsRef -returnValues $returnValues
-            #   if ($customResult)
-            #   {
-            #     return $customResult
-            #   }
-            #   $maxWaitTime = $maxWaitTimeRef.Value
-            #   $timeInSeconds = $timeInSecondsRef.Value
-            # }
-            #endregion Handle CustomImport settings if needed
-            
-            Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
-            Start-Sleep -Seconds $timeInSeconds
-            
-            $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-            return ProcessAssignmentResult -assignment $assignment -functionName $functionName -importStart $importStart -returnValues $returnValues
-            #endregion Add the device to Intune.
-        }
-        'check'
-        {
-            Write-Host "Checking device with serial number $serialNumber..."
-            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            if ($deviceAssignment)
-            {
-                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment -functionName $functionName
-                if ($isAssigned)
-                {
-                    # Handle enrollment state for assigned devices
-                    return HandleDeviceEnrollmentState -deviceAssignment $deviceAssignment -serialNumber $serialNumber -accessToken $accessToken -functionName $functionName -returnValues $returnValues -domain $domain
-                }
-                else
-                {
-                    # Handle unassigned devices
-                    switch ($deviceAssignment.deploymentProfileAssignmentStatus)
-                    {
-                        'unassigned'
-                        {
-                            return $returnValues.UnassignedMessage
-                        }
-                        'pending'
-                        {
-                            return $returnValues.PendingMessage
-                        }
-                    }
-                    # Show options for problem devices
-                    Write-Host "What would you like to do?"
-                    $choices = @('Restart the device', 'Continue to wait for profile assignment', 'Delete from Autopilot')
-                    $choice = DisplayNumericMenu -Choices $choices 
-                    switch ($choice)
-                    {
-                        'Restart the device'
-                        {
-                            Write-Verbose "[$functionName] User chose to restart the device."
-                            if (-not (RestartDevice))
-                            {
-                                Write-Verbose "[$functionName] RestartDevice function returned false."
-                                return $returnValues.noRestartMessage 
-                            }
-                        }
-                        'Continue to wait for profile assignment'
-                        {
-                            Write-Host 'Continuing to wait for profile assignment...'
-                            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
-                        }
-                        'Delete from Autopilot'
-                        {
-                            Write-Host 'Deleting the device from Autopilot...'
-                            if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
-                            {
-                                Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                                return $returnValues.DeleteSuccessMessage
-                            }
-                            else
-                            {
-                                Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                                return $returnValues.DeleteFailedMessage
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                Write-Host 'The device is not in Autopilot.'
-                return $returnValues.notInIntuneMessage
-            }
-        }
-        'delete'
-        {
-            Write-Host "Checking whether the device is in Autopilot..."
-            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            if ($deviceAssignment)
-            {
-                Write-Host "Deleting device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
-                if (DeleteAutopilotDevice -DeviceIdentifyer $serialNumber -IdentifyerType 'serialNumber')
-                {
-                    Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
-                    return $returnValues.DeleteSuccessMessage
-                }
-                else
-                {
-                    Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
-                    return $returnValues.DeleteFailedMessage
-                }
-            }
-            else
-            {
-                Write-Host "The device with serial number $serialNumber is not in Autopilot." -ForegroundColor Yellow
-                Write-Host "No action taken." -ForegroundColor Yellow
-                return $returnValues.notInIntuneMessage 
-            }
-        }
-        default
-        {
-            Write-Verbose "[$functionName] Invalid action: $action"
-            return $false
-        }
+        return $returnValues.deviceImportFailedMessage
     }
 }
 
@@ -1226,7 +682,7 @@ function CheckDeviceAssignment()
         else
         {
             Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
-            return $null
+            return $returnValues.notInIntuneMessage
         }
     }
     else
@@ -1276,8 +732,9 @@ function CheckDeviceAssignment()
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
                 Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
-                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($autopilotDevice.deploymentProfileAssignedDateTime)."
+                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
                 Write-Verbose "[$functionName] The device is ready for enrollment."
+                Write-Verbose "[$functionName] Returning $($returnValues.deviceAssignedMessage)"
             }
             else
             {
@@ -1290,8 +747,8 @@ function CheckDeviceAssignment()
     else
     {
         Write-Verbose "[$functionName] The device is not found in Intune."
+        return $returnValues.deviceNotInIntuneMessage
     }
-    Write-Verbose "[$functionName] Returning $assignment."
     return $assignment
 }
 
@@ -1585,4 +1042,3 @@ function RestartDevice()
         return $false
     }
 }
-#endregion 

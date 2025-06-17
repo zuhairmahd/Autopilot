@@ -869,8 +869,8 @@ function AssessDeviceState()
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
                 $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
-                Write-Host "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
-                Write-Host "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
+                Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
+                Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
                 {
                     Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of RAM, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
@@ -1250,4 +1250,50 @@ function ShowDeviceReport()
     #endregion Handle export decision
     Write-Verbose "[$functionName] Device report generation completed"
     return $true
+}
+
+function GetNextUserReadinessReport()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $enrollmentState
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+    $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+    Write-Verbose "[$functionName] Device assessment state: $DeviceAssessmentState"
+    if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
+    {
+        Write-Host $DeviceAssessmentState.ready
+        Write-Host $DeviceAssessmentState.action
+        return $DeviceAssessmentState
+    }
+    elseif ($DeviceAssessmentState.ReadinessState -eq $deviceStates.notReady)
+    {
+        Write-Host $deviceStates.notReady
+        Write-Host $DeviceAssessmentState.action
+        switch ($DeviceAssessmentState.Action)
+        {
+            $deviceActions.contactAdmin
+            {
+                Write-Host "Please contact your Intune administrator for assistance." -ForegroundColor Red
+            }
+            $deviceActions.WipeOrClean
+            {
+                Write-Host "You may need to wipe or clean the device before it can be used by the next user." -ForegroundColor Red
+            }
+            $deviceActions.none
+            {
+                Write-Host "No action required at this time." -ForegroundColor Green
+            }
+        }
+        return $DeviceAssessmentState
+    }
+    else
+    {
+        Write-Host "An unexpected readiness state was encountered: $($DeviceAssessmentState.ReadinessState)" -ForegroundColor Red
+        return $null
+    }
 }

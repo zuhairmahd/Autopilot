@@ -2,8 +2,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$InputFile,
+    [Parameter(Mandatory = $false)]
+    [string]$Version,
     [string]$outputFile = '',
-    [string]$Version = '',
     [string]$CompanyName = 'Zuhair Mahmoud',
     [switch]$CreateModule,
     [switch]$Overwrite
@@ -423,7 +424,7 @@ function CopySecrets()
 $initFile = "init.json"
 $versionFile = 'version.txt'
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.json', 'version.txt', 'init.json') 
+$filesToCopy = @('settings.json', 'strings.json', 'init.json') 
 $successMessage = "$OutputFile written"
 $scriptName = $MyInvocation.MyCommand.Name
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
@@ -479,75 +480,6 @@ else
     Write-Host "Found initialization file $($initFile)..."
 }
 
-#Define the version variable.
-if ($Version -eq '')
-{
-    Write-Host 'No version specified. Attempting to read version from input file.'
-    $versionString = Select-String -Path $InputFile -Pattern '.VERSION\s*(\d+\.\d+\.\d)'
-    if ($versionString -match '(\d+\.\d+\.\d+)')
-    {
-        $Version = $matches[1]
-        Write-Host "Found version $($Version) in input file."
-    }
-    else
-    {
-        Write-Host "No version found in input file. Checking for version file $versionFile."
-        if (Test-Path -Path $versionFile)
-        {
-            $Version = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
-            Write-Host "Found version $($Version) in version file."
-            $versionFileFound = $true
-            Write-Host "Using version $($Version) from version file."
-        }
-        else
-        {
-            Write-Host "No version specified and no version file found. Using default version 1.0.0."
-            $Version = '1.0.0'
-            $versionFileFound = $false
-        }
-    }
-}
-else
-{
-    Write-Host "Using version $($Version)"
-}
-
-#Check if the version file exists.  If not, create it.
-if (-not $versionFileFound)
-{
-    if (-not (Test-Path -Path $versionFile))
-    {
-        Write-Verbose "[$scriptName] Cannot find the version file $($versionFile). Creating..."
-        Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
-        Write-Host 'Version file created successfully.'
-    }
-    else
-    {
-        Write-Host "Found version file $($versionFile)..."
-        $VersionFileContent = Get-Content -Path $versionFile -ErrorAction SilentlyContinue
-        $VersionFileContentObject = [System.Version]::Parse($VersionFileContent)
-        Write-Verbose "[$scriptName] Local version object: $VersionFileContentObject"
-        $versionObject = [System.Version]::Parse($Version)
-        Write-Verbose "[$scriptName] Version object: $versionObject"
-        if ($VersionFileContentObject -lt $versionObject)
-        {
-            Write-Host "Version file content is less than the specified version. Updating file..."
-            Set-Content -Path $versionFile -Value $Version -Force -ErrorAction SilentlyContinue
-            Write-Host 'Version file updated successfully.'
-        }
-        elseif ($VersionFileContentObject -gt $versionObject)
-        {
-            Write-Host "Version file content is greater than the specified version. Updating the local variable."
-            $Version = $VersionFileContentObject.ToString()
-            Write-Verbose "[$scriptName] Version updated to: $Version"
-        }
-        else
-        {
-            Write-Host "Version file content matches the specified version."
-        }
-    }
-}
-
 if (-not $Overwrite)
 {
     if (Test-Path -Path $parentFolder)
@@ -591,7 +523,7 @@ else
     if (Test-Path -Path $parentFolder)
     {
         Write-Host "Removing $parentFolder"
-        Remove-Item -Path $parentFolder -Recurse -Force | Out-Null
+        Remove-Item -Path $parentFolder -Recurse -Force -ErrorAction Stop | Out-Null
     }
     else
     {

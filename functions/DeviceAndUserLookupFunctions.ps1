@@ -1,3 +1,337 @@
+function GetVMAutopilotDeviceIdBySerialNumber() 
+{
+    [CmdletBinding()]
+    param (
+        [string]$serialNumber,
+        [string]$accessToken
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #write a verbose log  of receved parameters
+    Write-Verbose "[$functionName] Received serial number: $serialNumber"
+    $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
+    $autopilotDevices = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI).value
+    Write-Verbose "[$functionName] Received $($autopilotDevices.Count) devices from Autopilot."
+    for ($i = 0; $i -lt $autopilotDevices.Count; $i++)
+    {
+        $device = $autopilotDevices[$i]
+        Write-Verbose "[$functionName] Processing device with serial number $($device.serialNumber)"
+        $filteredDeviceSerialNumber = $device.serialNumber -replace '\s', ''
+        Write-Verbose "[$functionName] Filtered device serial number: $filteredDeviceSerialNumber"
+        if ($serialNumber -match '\s')
+        {
+            Write-Verbose "[$functionName] Also filtering input serial number $serialNumber since it contains spaces."
+            $serialNumber = $serialNumber -replace '\s', ''
+            Write-Verbose "[$functionName] Filtered input serial number: $serialNumber"
+        }
+        if ($filteredDeviceSerialNumber -eq $serialNumber)
+        {
+            Write-Verbose "[$functionName] Found a match for serial number $serialNumber in Autopilot."
+            return $device.id
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No match for serial number $serialNumber in Autopilot."
+        }
+    }
+    Write-Verbose "[$functionName] Filtered device serial number: $filteredDeviceSerialNumber"
+    return $null
+}
+
+function SendDeviceCommand ()
+{
+    [CmdletBinding()]
+    param (
+        [string]$ManagedDeviceId,
+        [string]$accessToken,
+        [ValidateSet("clean", "wipe", "sync", "restart")]
+        [string]$Command = "clean",
+        [int]$MaxRetries = 20,
+        [int]$RetryDelaySeconds = 15,
+        [switch]$MonitorAction,
+        [switch]$NoConfirmation
+    )
+    
+    #region variables and logs
+    $functionName = $MyInvocation.MyCommand.Name
+    $returnSuccessMessage = ''
+    $returnFailureMessage = ''
+    Write-Verbose "[$functionName] Device ID:     $ManagedDeviceId"
+    Write-Verbose "[$functionName] Command: $Command"
+    Write-Verbose "[$functionName] MaxRetries: $MaxRetries"
+    Write-Verbose "[$functionName] RetryDelaySeconds: $RetryDelaySeconds"
+    if ($accessToken)
+    {
+        Write-Verbose "[$functionName] AccessToken provided."
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No AccessToken provided."
+        return $false
+    }
+    #endregion
+
+    # Confirmation for destructive operations only
+    if (-not $NoConfirmation -and ($Command -eq "clean" -or $Command -eq "wipe" -or $Command -eq "restart"))
+    {
+        Write-Host "Are you sure you want to $Command the device?" -ForegroundColor Yellow
+        $confirmation = Read-Host "Type 'yes' to confirm, or 'no' to cancel"
+        if ($confirmation -ne 'yes')
+        {
+            Write-Host "Operation cancelled." -ForegroundColor Gray
+            return $returnedValues.userCanceledMessage
+        }
+    }
+
+    Write-Host "Sending $Command command to device with identifier $ManagedDeviceId" -ForegroundColor Cyan
+    $deviceManagementUri = "deviceManagement/managedDevices/$ManagedDeviceId"
+    $actionType = ""
+    $response = ""
+    
+    switch ($Command)
+    {
+        "clean"
+        {
+            Write-Host 'Cleaning the device...' -ForegroundColor Yellow
+            $cleanURI = "$deviceManagementUri/cleanWindowsDevice"
+            $body = @{ 'keepUserData' = $false } | ConvertTo-Json
+            $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $cleanURI -body $body -apiVersion 'v1.0' 
+            Write-Verbose "[$functionName] Response: $response"
+            $actionType = "cleanWindows"
+            $returnSuccessMessage = $returnValues.deviceCleanSuccessMessage
+            $returnFailureMessage = $returnValues.deviceCleanFailedMessage
+        }
+        "wipe"
+        {
+            Write-Host 'Wiping the device...' -ForegroundColor Yellow
+            $wipeURI = "$deviceManagementUri/wipe"
+            $body = @{
+                'keepEnrollmentData'   = $false
+                'keepUserData'         = $false
+                'obliterationBehavior' = "doNotObliterate"
+            } | ConvertTo-Json
+            $response = callGraphApi -AccessToken $accessToken -Method 'post' -ResourcePath $wipeURI -body $body -apiVersion 'v1.0'
+            Write-Verbose "[$functionName] Response: $response"
+            $actionType = "wipe"
+            $returnSuccessMessage = $returnValues.deviceWipeSuccessMessage
+            $returnFailureMessage = $returnValues.deviceWipeFailedMessage
+        }
+        "sync"
+        {
+            Write-Host 'Syncing the device...' -ForegroundColor Yellow
+            $syncUri = "$deviceManagementUri/syncDevice"
+            $response = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
+            Write-Verbose "[$functionName] Response: $response"
+            $actionType = "syncDevice"
+            $returnSuccessMessage = $returnValues.deviceSyncSuccessMessage
+            $returnFailureMessage = $returnValues.deviceSyncFailedMessage
+        }
+        "restart"
+        {
+            Write-Host 'Restarting the device...' -ForegroundColor Yellow
+            $restartUri = "$deviceManagementUri/rebootNow"
+            $response = callGraphApi -AccessToken $accessToken -Method 'POST' -ResourcePath $restartUri -apiVersion 'v1.0'
+            Write-Verbose "[$functionName] Response: $response"
+            $actionType = "rebootNow"
+            $returnSuccessMessage = $returnValues.deviceRestartSuccessMessage
+            $returnFailureMessage = $returnValues.deviceRestartFailedMessage
+        }
+        default
+        {
+            Write-Host "Invalid command. Please use 'clean', 'wipe', 'sync', or 'restart'." -ForegroundColor Red
+            return $returnValues.unknownErrorMessage
+        }
+    }  
+
+    # Report on action status for all operations
+    if ($response -eq '')
+    {
+        Write-Host "Command sent successfully." -ForegroundColor Green
+        # Only send additional sync for non-sync operations to avoid redundancy
+        if ($Command -ne "sync")
+        {
+            Write-Host "Performing automatic device sync after $Command operation."
+            $syncUri = "$deviceManagementUri/syncDevice"
+            $syncResponse = callGraphApi -AccessToken $accessToken -ResourcePath $syncUri -Method POST -apiVersion 'v1.0'
+            Write-Verbose "[$functionName] Sync Response: $syncResponse"
+        }
+        # Begin monitoring the action status
+        if ($MonitorAction)            
+        {
+            Write-Host "Starting to monitor $Command action status..." -ForegroundColor Yellow
+            $retryCount = 0
+            $actionCompleted = $false
+            $actionFailed = $false
+            $actionState = "unknown"
+            # Loop until action completes, fails, or max retries reached
+            while (-not $actionCompleted -and -not $actionFailed -and $retryCount -lt $MaxRetries)
+            {
+                $retryCount++
+                Write-Host "Checking $Command status, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
+                Write-Verbose "[$functionName] Checking action results (Attempt $retryCount of $MaxRetries)"
+                # Wait before checking
+                Write-Verbose "[$functionName] Waiting for $RetryDelaySeconds seconds before checking action status."
+                Start-Sleep -Seconds $RetryDelaySeconds
+                # Check action results
+                $deviceDetails = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0' -ExtraParameters "select=deviceActionResults"
+                Write-Verbose "[$functionName] Device action results: $($deviceDetails | ConvertTo-Json -Depth 5)"
+                Write-Host "Action results: $($deviceDetails.deviceActionResults)"
+                if ($deviceDetails -and $deviceDetails.deviceActionResults)
+                {
+                    # Find the relevant action result based on action type
+                    $actionResult = $null
+                    foreach ($result in $deviceDetails.deviceActionResults)
+                    {
+                        if ($result.actionName -eq $actionType)
+                        {
+                            $actionResult = $result
+                            break
+                        }
+                    }
+                    if ($actionResult)
+                    {
+                        $actionState = $actionResult.status
+                        Write-Host "Current $Command status: $actionState" -ForegroundColor Cyan
+                        Write-Verbose "[$functionName] Action start time: $($actionResult.startDateTime)"
+                        Write-Verbose "[$functionName] Action last updated: $($actionResult.lastUpdatedDateTime)"
+                        # Check if action completed or failed
+                        switch ($actionState)
+                        {
+                            "succeeded"
+                            {
+                                Write-Host "$Command action completed successfully!" -ForegroundColor Green
+                                $actionCompleted = $true
+                            }
+                            "failed"
+                            {
+                                Write-Host "$Command action failed with error: $($actionResult.errorCode)" -ForegroundColor Red
+                                if ($actionResult.errorDescription)
+                                {
+                                    Write-Host "Error description: $($actionResult.errorDescription)" -ForegroundColor Red
+                                }
+                                $actionFailed = $true
+                            }
+                            "timeout"
+                            {
+                                Write-Host "$Command action timed out." -ForegroundColor Red
+                                $actionFailed = $true
+                            }
+                            "canceled"
+                            {
+                                Write-Host "$Command action was canceled." -ForegroundColor Red
+                                $actionFailed = $true
+                            }
+                            "notFound"
+                            {
+                                Write-Verbose "[$functionName] Action not found yet or device may no longer be available."
+                                if ($retryCount -gt 3)
+                                {
+                                    Write-Verbose "[$functionName] Action not found after multiple attempts, assuming device is no longer available."
+                                    $actionFailed = $false
+                                }
+                            }
+                            default
+                            {
+                                Write-Verbose "[$functionName] Action status is '$actionState', continuing to monitor."
+                                # Continue monitoring for non-terminal states
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] No action of type '$actionType' found yet."
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No device action results available or device might be offline/no longer accessible."
+                    # If we can no longer get device details, check if device still exists
+                    $deviceCheck = callGraphApi -AccessToken $accessToken -ResourcePath $deviceManagementUri -apiVersion 'v1.0'
+                    if (-not $deviceCheck)
+                    {
+                        Write-Host "Device is no longer accessible. This could be expected for wipe operations." -ForegroundColor Yellow
+                        # For wipe operations, this might be expected behavior as device is reset
+                        if ($Command -eq 'wipe')
+                        {
+                            Write-Host "Wipe command appears to have succeeded as device is no longer accessible." -ForegroundColor Green
+                            $actionCompleted = $true
+                        }
+                    }
+                }
+            }
+            # Final status report
+            if ($actionCompleted)
+            {
+                Write-Host "$Command action has completed successfully." -ForegroundColor Green
+                return $returnSuccessMessage
+            }
+            elseif ($actionFailed)
+            {
+                Write-Host "$Command action has failed with status: $actionState" -ForegroundColor Red
+                return $returnFailureMessage
+            }
+            else
+            {
+                Write-Host "$Command action monitoring timed out after $MaxRetries attempts." -ForegroundColor Yellow
+                Write-Host "Last known status: $actionState" -ForegroundColor Yellow
+                Write-Warning "The action may still be in progress. You can check the device status in the Intune portal."
+                return $returnValues.deviceUnknownActionMessage
+            }
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Monitoring not enabled, skipping action status checks."
+            return $returnSuccessMessage
+        }
+    }
+    else
+    {
+        Write-Host "Failed to send $Command command to device." -ForegroundColor Red
+        Write-Verbose "[$functionName] Failed to send command. Response: $response"
+        return $returnFailureMessage
+    }
+}
+
+function GetDeviceIdFromSerial()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$SerialNumber,
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken
+    )
+
+    #region Variables and verbose logs    
+    $functionName = $MyInvocation.MyCommand.Name
+    $managedDeviceUri = "deviceManagement/managedDevices"
+    $filter = "serialNumber eq '$SerialNumber'"
+    $extraParameters = "select=Id"
+    $device = $null
+    Write-Verbose "[$functionName] Serial Number: $SerialNumber"
+    if ($AccessToken)
+    {
+        Write-Verbose "[$functionName] AccessToken provided."
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No AccessToken provided."
+        return $false
+    }
+    #endregion    # Query the device enrollment status using Microsoft Graph API
+    # Fetch the device details using the serial number
+    $response = CallGraphApi -AccessToken $AccessToken -ResourcePath $managedDeviceUri -filter $filter -ExtraParameters $extraParameters -Method GET
+    if ($response)
+    {
+        $device = $response.value.Id
+        Write-Verbose "[$functionName] Device found with ID: $($device)"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Device with serial number $SerialNumber not found."
+    }
+    return $device
+}
+
 function VerifyGroupMembership()
 {
     [CmdletBinding()]
@@ -13,8 +347,9 @@ function VerifyGroupMembership()
     )
 
     #region Initialize result object and logging
-    Write-Verbose "[$($MyInvocation.MyCommand)] Starting VerifyGroupMembership function"
-    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Starting VerifyGroupMembership function"
+
     # Create a consistent return object structure that will always be returned
     $result = [PSCustomObject]@{
         Success         = $false
@@ -27,65 +362,65 @@ function VerifyGroupMembership()
 
     if (-not $accessToken)
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Access token is empty or null"
+        Write-Verbose "[$functionName] Access token is empty or null"
         Write-Host "Access token is required." -ForegroundColor Red
         $result.Error = "Access token is required."
         return $result
     }
 
-    Write-Verbose "[$($MyInvocation.MyCommand)] User name: $userName"
-    Write-Verbose "[$($MyInvocation.MyCommand)] Groups to include count: $(if ($groupsToInclude) { $groupsToInclude.Count } else { 0 })"
-    Write-Verbose "[$($MyInvocation.MyCommand)] Groups to exclude count: $(if ($groupsToExclude) { $groupsToExclude.Count } else { 0 })"
+    Write-Verbose "[$functionName] User name: $userName"
+    Write-Verbose "[$functionName] Groups to include count: $(if ($groupsToInclude) { $groupsToInclude.Count } else { 0 })"
+    Write-Verbose "[$functionName] Groups to exclude count: $(if ($groupsToExclude) { $groupsToExclude.Count } else { 0 })"
     
     if ($groupsToInclude)
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Groups to include: $($groupsToInclude -join ', ')"
+        Write-Verbose "[$functionName] Groups to include: $($groupsToInclude -join ', ')"
     }
     
     if ($groupsToExclude)
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Groups to exclude: $($groupsToExclude -join ', ')"
+        Write-Verbose "[$functionName] Groups to exclude: $($groupsToExclude -join ', ')"
     }
     #endregion
-
+    
     #region Get user information
     try
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Getting user information for $userName"
+        Write-Verbose "[$functionName] Getting user information for $userName"
         $userUri = "users/$($userName)" 
         $user = CallGraphApi -accessToken $accessToken -ResourcePath $userUri -extraparameters "select=displayName,mail,userPrincipalName,id"
         # Check if user was found
         if ($user -is [string] -and $user -match '^\d+$')
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName not found in Azure AD (Error code: $user)"
+            Write-Verbose "[$functionName] User $userName not found in Azure AD (Error code: $user)"
             Write-Host "The user $userName was not found in Azure AD." -ForegroundColor Red
             Write-Host "Please check the user name and try again." -ForegroundColor Red
             $result.Error = "User not found in Azure AD (Error code: $user)"
             return $result
         }
         $result.UserInfo = $user
-        Write-Verbose "[$($MyInvocation.MyCommand)] Successfully retrieved user information for $userName (Display Name: $($user.DisplayName), ID: $($user.id))"
+        Write-Verbose "[$functionName] Successfully retrieved user information for $userName (Display Name: $($user.DisplayName), ID: $($user.id))"
     }
     catch
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Error getting user information: $_"
+        Write-Verbose "[$functionName] Error getting user information: $_"
         Write-Host "Error getting user information: $_" -ForegroundColor Red
         $result.Error = "Error getting user information: $_"
         return $result
     }
     #endregion
-
+    
     #region Get group membership
     try
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Getting group membership for user $userName"
+        Write-Verbose "[$functionName] Getting group membership for user $userName"
         Write-Host "Getting group membership for user $userName ($($user.displayName))."
         $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
         $groupSelection = "select=displayName&top=999&orderby=displayName"
         $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters $groupSelection
         if ($response -is [string] -and $response -match '^\d+$')
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] Failed to get group membership (Error code: $response)"
+            Write-Verbose "[$functionName] Failed to get group membership (Error code: $response)"
             Write-Host "The group membership for $userName could not be determined." -ForegroundColor Red
             Write-Host "Please try again or contact an Intune administrator." -ForegroundColor Red
             $result.Error = "Failed to get group membership (Error code: $response)"
@@ -93,13 +428,13 @@ function VerifyGroupMembership()
         }
         $groups = $response.value | Select-Object -ExpandProperty displayName | Sort-Object
         $result.UserGroups = $groups
-        Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of $($groups.Count) groups"
+        Write-Verbose "[$functionName] User $userName is a member of $($groups.Count) groups"
         Write-Host "User $userName is a member of $($groups.Count) groups."
-        Write-Verbose "[$($MyInvocation.MyCommand)] Groups: $($groups -join ', ')"
+        Write-Verbose "[$functionName] Groups: $($groups -join ', ')"
     }
     catch
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Error getting group membership: $_"
+        Write-Verbose "[$functionName] Error getting group membership: $_"
         Write-Host "Error getting group membership: $_" -ForegroundColor Red
         $result.Error = "Error getting group membership: $_"
         return $result
@@ -110,32 +445,32 @@ function VerifyGroupMembership()
     $missingGroups = @()
     if ($null -eq $groupsToInclude -or $groupsToInclude.Count -eq 0)
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] No groups to include were specified. Skipping this check."
+        Write-Verbose "[$functionName] No groups to include were specified. Skipping this check."
     }
     else
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Checking memberships for user $userName in $($groupsToInclude.Count) required groups"
+        Write-Verbose "[$functionName] Checking memberships for user $userName in $($groupsToInclude.Count) required groups"
         foreach ($group in $groupsToInclude)
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] Checking membership in required group: $group"
+            Write-Verbose "[$functionName] Checking membership in required group: $group"
             if ($groups -notcontains $group)
             {
-                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is NOT a member of the required group: $group"
+                Write-Verbose "[$functionName] User $userName is NOT a member of the required group: $group"
                 $missingGroups += $group
             }
             else
             {
-                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of the required group: $group"
+                Write-Verbose "[$functionName] User $userName is a member of the required group: $group"
             }
         }
         $result.MissingGroups = $missingGroups
         if ($missingGroups.Count -gt 0)
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is missing membership in $($missingGroups.Count) required groups: $($missingGroups -join ', ')"
+            Write-Verbose "[$functionName] User $userName is missing membership in $($missingGroups.Count) required groups: $($missingGroups -join ', ')"
         }
         else
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of all required groups"
+            Write-Verbose "[$functionName] User $userName is a member of all required groups"
         }
     }
     #endregion
@@ -144,32 +479,32 @@ function VerifyGroupMembership()
     $forbiddenGroups = @()
     if ($null -eq $groupsToExclude -or $groupsToExclude.Count -eq 0)
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] No groups to exclude were specified. Skipping this check."
+        Write-Verbose "[$functionName] No groups to exclude were specified. Skipping this check."
     }
     else
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
+        Write-Verbose "[$functionName] Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
         foreach ($group in $groupsToExclude)
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] Checking membership in excluded group: $group"
+            Write-Verbose "[$functionName] Checking membership in excluded group: $group"
             if ($groups -contains $group)
             {
-                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of the excluded group: $group (should not be)"
+                Write-Verbose "[$functionName] User $userName is a member of the excluded group: $group (should not be)"
                 $forbiddenGroups += $group
             }
             else
             {
-                Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is not a member of the excluded group: $group (correct)"
+                Write-Verbose "[$functionName] User $userName is not a member of the excluded group: $group (correct)"
             }
         }
         $result.ForbiddenGroups = $forbiddenGroups
         if ($forbiddenGroups.Count -gt 0)
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is a member of $($forbiddenGroups.Count) excluded groups: $($forbiddenGroups -join ', ')"
+            Write-Verbose "[$functionName] User $userName is a member of $($forbiddenGroups.Count) excluded groups: $($forbiddenGroups -join ', ')"
         }
         else
         {
-            Write-Verbose "[$($MyInvocation.MyCommand)] User $userName is not a member of any excluded groups"
+            Write-Verbose "[$functionName] User $userName is not a member of any excluded groups"
         }
     }
     #endregion
@@ -177,12 +512,12 @@ function VerifyGroupMembership()
     #region Determine result and return
     if ($missingGroups.Count -eq 0 -and $forbiddenGroups.Count -eq 0)
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] User $userName has correct group memberships"
+        Write-Verbose "[$functionName] User $userName has correct group memberships"
         $result.Success = $true
     }
     else
     {
-        Write-Verbose "[$($MyInvocation.MyCommand)] User $userName does not have correct group memberships"
+        Write-Verbose "[$functionName] User $userName does not have correct group memberships"
         $result.Success = $false
         if ($missingGroups.Count -gt 0)
         {
@@ -193,7 +528,7 @@ function VerifyGroupMembership()
             Write-Host "User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')" -ForegroundColor Yellow
         }
     }
-    Write-Verbose "[$($MyInvocation.MyCommand)] Completed VerifyGroupMembership function with Success=$($result.Success)"
+    Write-Verbose "[$functionName] Completed VerifyGroupMembership function with Success=$($result.Success)"
     return $result
     #endregion
 }
@@ -236,33 +571,116 @@ function GetEntraUser()
     [CmdletBinding()]
     param (
         [string]$accessToken,
-        [string]$UserName
+        [string]$UserName,
+        [switch]$FindSimilar
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    $userUri = "users/$UserName"
-    $userExtraParameters = "select=displayName,userPrincipalName,mail,id"
     Write-Verbose "[$functionName] Starting function to get user from Entra ID"
+    
+    # Validate access token
     if (-not $accessToken)
     {
         Write-Verbose "[$functionName] AccessToken is null or empty. Cannot proceed."
         return $returnValues.noAccessTokenMessage
     }
-    Write-Verbose "[$functionName] Checking if user $UserName exists in Entra ID"
+    Write-Verbose "[$functionName] Attempting exact match for userPrincipalName: $UserName"
+    $userUri = "users/$UserName"
+    $userExtraParameters = "select=givenName,surName,displayName,userPrincipalName,mail,id"
     $userInfo = CallGraphAPI -accessToken $AccessToken -ResourcePath $userUri -extraParameters $userExtraParameters
-    Write-Verbose "[$functionName] User Info: $($userInfo | Out-String)"
+    Write-Verbose "[$functionName] Exact match API response: $($userInfo | Out-String)"
+    
     if ($userInfo -notin 400, 401, 403, 404)
     {
-        Write-Verbose "[$functionName] User $UserName found in Entra ID."
+        Write-Verbose "[$functionName] Exact match found for userPrincipalName: $UserName"
+        Write-Verbose "[$functionName] User found: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
+        # Return the exact match - this is a single user object
+        return $userInfo
+    }
+
+    # Step 2: If no exact match found, perform substring search using $search parameter if the $findSimilar switch is set
+    if ($FindSimilar)
+    {
+        Write-Verbose "[$functionName] No exact match found (Error code: $userInfo). Performing substring search using Graph API search."
+    
+        # Remove the @ portion from the username if it exists for better search results
+        $searchTerm = $UserName -replace '@.*$', ''
+        Write-Verbose "[$functionName] Cleaned search term: $searchTerm"
+    
+        $searchUri = "users"
+        Write-Verbose "[$functionName] Searching for substring matches in user properties for: $searchTerm"    # Use Graph API $search parameter which supports fuzzy search across user properties
+        # $search parameter is better for substring matching than $filter for user properties
+        # The search will look across displayName, givenName, surname, mail, and userPrincipalName
+        # Note: CallGraphAPI will handle proper URL encoding of the search term
+        $extraParameters = "search=$searchTerm&select=givenName,surname,displayName,userPrincipalName,mail,id&top=50"
+        Write-Verbose "[$functionName] Executing substring search with search term: $searchTerm"
+        # Note: Using consistencyLevel switch is required when using $search parameter
+        $searchResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -extraParameters $extraParameters -consistencyLevel
+        Write-Verbose "[$functionName] Substring search API response: $($searchResults | Out-String)"
+    
+        # Check if substring search was successful
+        if ($searchResults -in 400, 401, 403, 404)
+        {
+            Write-Verbose "[$functionName] Substring search failed (Error code: $searchResults)"
+            return $returnValues.noUserFoundInDirectoryMessage
+        }
+    
+        # Process search results
+        if ($searchResults.value -and $searchResults.value.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] Found $($searchResults.value.Count) potential matches through substring search"
+            # Create a list of matches with additional metadata for the calling function
+            $matchList = @()
+            foreach ($user in $searchResults.value)
+            {
+                # Determine which fields matched the search term by checking if the search term appears in each field
+                $matchedFields = @()
+                if ($user.givenName -and $user.givenName.ToLower().Contains($searchTerm.ToLower()))
+                {
+                    $matchedFields += "givenName"
+                }
+                if ($user.surName -and $user.surName.ToLower().Contains($searchTerm.ToLower()))
+                {
+                    $matchedFields += "surName"
+                }
+                if ($user.displayName -and $user.displayName.ToLower().Contains($searchTerm.ToLower()))
+                {
+                    $matchedFields += "displayName"
+                }
+                if ($user.mail -and $user.mail.ToLower().Contains($searchTerm.ToLower()))
+                {
+                    $matchedFields += "mail"
+                }            if ($user.userPrincipalName -and $user.userPrincipalName.ToLower().Contains($searchTerm.ToLower()))
+                {
+                    $matchedFields += "userPrincipalName"
+                }
+            
+                # Create match object with metadata
+                $matchObject = [PSCustomObject]@{
+                    User          = $user
+                    MatchedFields = $matchedFields
+                    MatchType     = "SubstringMatch"
+                }
+            
+                $matchList += $matchObject
+                Write-Verbose "[$functionName] Added match: $($user.displayName) ($($user.userPrincipalName)) - Matched fields: $($matchedFields -join ', ')"
+            }
+        
+            Write-Verbose "[$functionName] Returning $($matchList.Count) substring matches"
+            # Return the list of matches - this is an array of match objects
+            return $matchList
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No substring matches found for: $searchTerm"
+            return $returnValues.noUserFoundInDirectoryMessage
+        }
     }
     else
     {
-        Write-Verbose "[$functionName] User $UserName not found in Entra ID (Error code: $userInfo)"
-        Write-Verbose "[$functionName] The user $UserName was not found in Entra ID." 
+        Write-Verbose "[$functionName] No matches found for userPrincipalName: $UserName"
         return $returnValues.noUserFoundInDirectoryMessage
     }
-    Write-Verbose "[$functionName] User found: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
-    return $userInfo
 }
 
 function GetDeviceByUser()

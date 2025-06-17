@@ -69,7 +69,7 @@ function GetUpdates()
         [Parameter(Mandatory = $false)]
         [string]$RootFolder,
         [Parameter(Mandatory = $false)]
-        [string]$LocalVersion = $null,
+        [string]$executableFileName = 'main.exe',
         [Parameter(Mandatory = $true)]
         [string]$remoteVersionURL,
         [Parameter(Mandatory = $true)]
@@ -78,18 +78,13 @@ function GetUpdates()
     $functionName = $MyInvocation.MyCommand.Name
     #region write a verbose log of received parameters.
     Write-Verbose "[$functionName] RootFolder: $RootFolder"
-    Write-Verbose "[$functionName] LocalVersion: $LocalVersion"
     Write-Verbose "[$functionName] remoteVersionURL: $remoteVersionURL"
     Write-Verbose "[$functionName] updateURL: $updateURL"
     #endregion
 
     #region get local version
-    Write-Verbose "[$functionName] Checking if we received a local version."
-    if ($null -eq $LocalVersion -or $LocalVersion -eq '')
-    {
-        Write-Verbose "[$functionName] LocalVersion is null or empty. Returning to calling function."
-        return $null
-    }
+    Write-Verbose "[$functionName] Getting the local version."
+    $LocalVersion = (Get-Item "$RootFolder\$executableFileName").VersionInfo.ProductVersion
     Write-Host "LocalVersion: $LocalVersion"
     $localVersion = [System.Version]::Parse($LocalVersion)
     #endregion
@@ -126,17 +121,19 @@ function GetUpdates()
     {
         Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
         Write-Host "An update is available to version $remoteVersion. Downloading update from $updateURL."
-        #make a backup of register.exe.
-        $backupFile = Join-Path -Path $RootFolder -ChildPath "register.exe.bak"
+        #make a backup of the executable
+        $backupFile = Join-Path -Path $env:TEMP -ChildPath "$executableFileName.bak"
         if (Test-Path $backupFile)
         {
             Write-Host "Backup file already exists. Deleting old backup file."
             Remove-Item -Path $backupFile -Force
         }
-        Write-Host "Backing up current register.exe to $backupFile."
-        Copy-Item -Path "$RootFolder\register.exe" -Destination $backupFile -Force
+        Write-Host "Backing up current $executableFileName to $backupFile."
+        Copy-Item -Path "$RootFolder\$executableFileName" -Destination $backupFile -Force
         #download the update file.
-        $updateFile = Join-Path -Path $RootFolder -ChildPath "register.exe"
+        $updateFile = Join-Path -Path $RootFolder -ChildPath $executableFileName
+        $updateURL = "$updateURL/$executableFileName"
+        Write-Verbose "Downloading the update file $updateFile from $updateURL"
         $response = Invoke-WebRequest -Uri $updateURL -OutFile $updateFile -Method Get -ErrorAction Stop -PassThru
         #check the return code.
         if ($response.StatusCode -ne 200)

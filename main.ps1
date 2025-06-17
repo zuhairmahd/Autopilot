@@ -27,8 +27,28 @@ param(
     [string]$appMode
 )
 
-#region Load parameters from the configuration file if it exists
 $scriptName = $MyInvocation.MyCommand.Name
+
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Verbose "[$scriptName] Running as an external script."
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
+        $ScriptPath = "."
+        $scriptName = 'main.ps1'
+    }
+}
+
+#region Load parameters from the configuration file if it exists
 $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
 Write-Verbose "[$scriptName] Domain: $domain"
 if (Test-Path -Path $InitFile)
@@ -108,57 +128,21 @@ else
 #endregion Load parameters from the configuration file if it exists
 
 #region import functions.
-#Attempt to import module if found.
-$moduleName = 'HelperModule'
-$moduleFileName = 'HelperModule.psm1'
-$moduleObject = Get-Item -Path $moduleFileName -Force -ErrorAction SilentlyContinue
-if ($null -ne $moduleObject)
+$functionsFolder = "$PWD\functions"
+if (Test-Path $functionsFolder)
 {
-    $moduleName = $moduleObject.BaseName
-}
-if ($moduleObject -and $moduleObject.PSIsContainer -eq $false)
-{
-    Write-Verbose "[$scriptName] Importing module $moduleFileName"
-    try
+    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    foreach ($function in $functions)
     {
-        Import-Module -Name $moduleObject -Force -ErrorAction SilentlyContinue
-        Write-Verbose "[$scriptName] Module $moduleFileName imported successfully."
-    }
-    catch
-    {
-        Write-Verbose "[$scriptName] Failed to import module $moduleFileName. Error: $_"
+        Write-Verbose "[$scriptName] Importing function $function"
+        . $function.FullName
     }
 }
 else
 {
-    Write-Verbose "[$scriptName] Module $moduleFileName not found in the current directory. Skipping import."
-}
-
-if (Get-Module -Name $moduleName -ErrorAction SilentlyContinue)
-{
-    Write-Verbose "[$scriptName] Module $moduleName is already imported."
-}
-else
-{
-    Write-Verbose "[$scriptName] Module $moduleName not found. Attempting to import functions."
-    #beep
-    [console]::beep(200, 100)
-    $functionsFolder = "$PWD\functions"
-    if (Test-Path $functionsFolder)
-    {
-        Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-        foreach ($function in $functions)
-        {
-            Write-Verbose "[$scriptName] Importing function $function"
-            . $function.FullName
-        }
-    }
-    else
-    {
-        Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
-        exit 1
-    }
+    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    exit 1
 }
 #endregion import functions.
 
@@ -226,69 +210,15 @@ $version = '3.0.0'
 Write-Verbose "[$scriptName] Version: $version"
 $versionFile = 'version.txt'
 Write-Verbose "[$scriptName] Version file: $versionFile"
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/version.txt"
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/$versionFile"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
-$returnValues = [ordered] @{
-    noRestartMessage              = 'Device not restarted.'
-    EnrolledMessage               = 'The device is enrolled.'
-    notContactedMessage           = 'The device has not contacted the enrollment service.'
-    PendingResetMessage           = 'The device is pending a reset.'
-    EnrollmentFailedMessage       = 'The device enrollment failed.'
-    UnassignedMessage             = 'The device is not assigned to a deployment profile.'
-    PendingMessage                = 'The device is pending assignment to a deployment profile.'
-    notInIntuneMessage            = 'The device is not in Intune.'
-    noUserDeviceFoundMessage      = 'No user or device found.'
-    noUserFoundInDirectoryMessage = 'This user does not exist'
-    ImportSuccessMessage          = 'The device was imported successfully.'
-    ImportFailedMessage           = 'The device import failed.'
-    DeleteSuccessMessage          = 'The device was deleted successfully.'
-    DeleteFailedMessage           = 'The device deletion failed.'
-    UpdateFailedMessage           = 'Could not download update.'
-    noAccessTokenMessage          = 'Could not obtain an access token. Please check your credentials.'
-    UpdateSuccessMessage          = 'The script was updated successfully.'
-    UpdateNotNeededMessage        = 'The script is already up to date.'
-    999                           = 'No updates were found'
-    1000                          = 'All updates were installed'
-    1001                          = 'Some updates were installed'
-    10002                         = 'Some updates were installed'
-    1003                          = 'Updates failed to install'
-}
-$deviceStates = [ordered] @{
-    Ready    = 'The device is ready for the next user'
-    NotReady = 'The device is not ready for the next user'
-}
-$deviceActions = [ordered] @{
-    none            = 'No action'
-    contactAdmin    = 'Contact an Intune administrator'
-    contactHelpdesk = 'Contact the helpdesk'
-    WipeOrClean     = 'Wipe or clean the device'
-}
-if (Test-Path -Path $versionFile)
-{
-    Write-Verbose "[$scriptName] Version file $versionFile found. Reading version."
-    $localVersion = Get-Content -Path $versionFile -Raw -ErrorAction Stop
-    Write-Verbose "[$scriptName] Local version: $localVersion"
-    $localVersionObject = [System.Version]::Parse($LocalVersion)
-    Write-Verbose "[$scriptName] Local version object: $localVersionObject"
-    $versionVariableObject = [System.Version]::Parse($version)
-    Write-Verbose "[$scriptName] Version object: $versionVariableObject"
-    if ($versionVariableObject -le $localVersionObject)
-    {
-        Write-Verbose "[$scriptName] Version file $versionFile is up to date."
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Version file $versionFile is not up to date. Updating version file."
-        Set-Content -Path $versionFile -Value $version -Force
-        $localVersion = $version
-    }
-}
-else
-{
-    Write-Verbose "[$scriptName] Version file $versionFile not found. Creating version file."
-    Set-Content -Path $versionFile -Value $version -Force
-    $localVersion = $version
-}
+$stringsFile = "$PWD\strings.json"
+Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
+$loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
+$returnValues = $loadedStrings.returnValues
+$deviceStates = $loadedStrings.deviceStates
+$deviceActions = $loadedStrings.deviceActions
+Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
 # Initialize navigation context variables
 $Global:History = [System.Collections.ArrayList]::new() 
 $Global:MenuHistory = [System.Collections.ArrayList]::new() 
@@ -312,6 +242,411 @@ Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 Write-Verbose "[$scriptName] Backout text: $backoutText"
 #endregion logging
+
+#region helper functions
+function ProcessDevice()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$accessToken,
+        [Parameter(Mandatory = $true)]
+        $DeviceObject,
+        $returnValues = $returnValues,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('import', 'check', 'delete')]
+        [string]$action,
+        [switch]$CustomImport
+    )
+    
+    #region check and initialize variables
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Checking access token..."
+    if ($accessToken)
+    {
+        Write-Verbose "[$functionName] Access token provided."
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Access token not provided. Returning Null."
+        return $null
+    }
+    Write-Verbose "[$functionName] Processing serial number: $($deviceObject.SerialNumber)."
+    Write-Verbose "[$functionName] Action: $action"
+    Write-Verbose "[$functionName] Custom import: $CustomImport"
+    $serialNumber = $deviceObject.serialNumber
+    Write-Verbose "[$functionName] The serial number is $serialNumber."
+    $make = $deviceObject.manufacturer
+    Write-Verbose "[$functionName] The manufacturer is $make"
+    $model = $deviceObject.model
+    Write-Verbose "[$functionName] The model is $model"
+    #endregion check and initialize variables
+    
+    switch ($action)
+    {
+        'import'
+        {
+            Write-Verbose "[$functionName] Importing device with serial number $serialNumber."
+            Write-Host "Checking to make sure the device hash is not already in Intune..."
+            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            Write-Verbose "[$functionName] Device assignment check returned: $deviceAssignment"
+            if ($deviceAssignment)
+            {
+                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                Write-Verbose "[$functionName] Device assignment status: $isAssigned"
+                if ($isAssigned)
+                {
+                    return $returnValues.deviceAssignedMessage
+                }
+            }
+            else
+            {
+                Write-Host "The device is not in Intune." 
+            }
+            #region Add the device to Intune
+            Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) into Autopilot."
+            $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
+            while ($choice -notin @('yes', 'no'))
+            {
+                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                #beep
+                [console]::beep(1000, 500)
+                $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
+            }
+            if ($choice -eq 'no')
+            {
+                Write-Host "Exiting..."
+                return $backoutText
+            }
+            $importStart = Get-Date
+            $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
+            if ($device -eq $backoutText)
+            {
+                Write-Verbose "[$functionName] The import function returned $device."
+                return $backoutText
+            }
+            $importResult = ProcessImportResult -device $device -returnValues $returnValues
+            if ($importResult -ne $returnValues.deviceImportSuccessMessage)
+            {
+                return $importResult
+            }
+            
+            Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
+            Start-Sleep -Seconds $timeInSeconds
+            
+            $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+            return ProcessAssignmentResult -assignment $assignment -importStart $importStart -returnValues $returnValues
+            #endregion Add the device to Intune.
+        }
+        'check'
+        {
+            Write-Host "Checking device with serial number $serialNumber..."
+            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            if ($deviceAssignment)
+            {
+                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                if ($isAssigned)
+                {
+                    # Handle enrollment state for assigned devices
+                    return HandleDeviceEnrollmentState -deviceAssignment $deviceAssignment -serialNumber $serialNumber -accessToken $accessToken -returnValues $returnValues -domain $domain
+                }
+                else
+                {
+                    # Handle unassigned devices
+                    switch ($deviceAssignment.deploymentProfileAssignmentStatus)
+                    {
+                        'unassigned'
+                        {
+                            return $returnValues.deviceNotAssignedMessage
+                        }
+                        'pending'
+                        {
+                            return $returnValues.deviceAssignmentPendingMessage
+                        }
+                    }
+                    # Show options for problem devices
+                    Write-Host "What would you like to do?"
+                    $deviceWaitMenu = NewMenu -Title "Options for Device With Serial Number $serialNumber" -Description "Choose what you would like to do with this device:"
+                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
+                        Write-Host "Restarting the device..."
+                        Write-Verbose "[$functionName] User chose to restart the device."
+                        if (-not (RestartDevice))
+                        {
+                            Write-Verbose "[$functionName] RestartDevice function returned false."
+                            return $returnValues.noRestartMessage 
+                        }
+                    }
+                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
+                        Write-Host "Continuing to wait for profile assignment..."
+                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+                        return $deviceAssignment
+                    }
+                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {
+                        Write-Host "Deleting the device from Autopilot..."
+                        if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
+                        {
+                            Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                            return $returnValues.deviceDeleteSuccessMessage
+                        }
+                        else
+                        {
+                            Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                            return $returnValues.deviceDeleteFailedMessage
+                        }
+                    }
+                    $result = ShowMenu -Menu $deviceWaitMenu -CalledBy 'Action'
+                    Write-Verbose "[$functionName] Result from device wait menu: $result"
+                    if ($result -eq $backoutText)
+                    {
+                        Write-Verbose "[$functionName] User selected Back from device wait menu."
+                        return $backoutText
+                    }
+                    elseif ($result -eq "EXIT_APPLICATION")
+                    {
+                        Write-Verbose "[$functionName] User selected to exit the application."
+                        return "EXIT_APPLICATION"
+                    }
+                    else 
+                    {
+                        return $result
+                    }
+                }
+            }
+            else
+            {
+                Write-Host 'The device is not in Autopilot.'
+                return $returnValues.deviceNotInIntuneMessage
+            }
+        }
+        'delete'
+        {
+            Write-Host "Checking whether the device is in Autopilot..."
+            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
+            if ($deviceAssignment)
+            {
+                Write-Host "Deleting device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
+                if (DeleteAutopilotDevice -DeviceIdentifyer $serialNumber -IdentifyerType 'serialNumber')
+                {
+                    Write-Host 'The device was deleted from Autopilot.' -ForegroundColor Green
+                    return $returnValues.deviceDeleteSuccessMessage
+                }
+                else
+                {
+                    Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
+                    return $returnValues.deviceDeleteFailedMessage
+                }
+            }
+            else
+            {
+                Write-Host "The device with serial number $serialNumber is not in Autopilot." -ForegroundColor Yellow
+                Write-Host "No action taken." -ForegroundColor Yellow
+                return $returnValues.deviceNotInIntuneMessage 
+            }
+        }
+        default
+        {
+            Write-Verbose "[$functionName] Invalid action: $action"
+            return $returnValues.unknownErrorMessage
+        }
+    }
+}
+
+function ProcessSerialNumber()
+{
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $true)]
+        [string]$SerialNumber,
+        $AccessToken,
+        $Settings = $settings,
+        [switch]$CheckUserReadiness
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
+    Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
+    if ([string]::IsNullOrWhiteSpace($SerialNumber))
+    {
+        Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
+        return $null # Return null to signal no valid serial number
+    }
+    $success = $false
+    $SerialNumber = $SerialNumber.Trim()
+    Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
+    $enrollmentState = GetCachedDeviceEnrollmentState -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
+    if ($enrollmentState)
+    {
+        $success = $true
+        Write-Verbose "[$functionName] Device lookup successful"
+        # Display basic device information
+        Write-Host "`n=== Device Information ===" -ForegroundColor Green
+        Write-Host "Serial Number: $SerialNumber"
+        Write-Verbose "[$scriptName] Device is managed: $($enrollmentState.managed)"
+        Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
+        Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
+        Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
+        if ($CheckUserReadiness)
+        {
+            return GetNextUserReadinessReport -enrollmentState $enrollmentState
+        }
+        if ($enrollmentState.inAutopilot)
+        {
+            Write-Host "This device is enrolled in Autopilot."
+            #capture the device information since this is the first place we can get it.
+            if (-not $enrollmentState.managed)
+            {
+                Write-Host "Model: $($enrollmentState.autopilot.device.model)"
+                Write-Host "Manufacturer: $($enrollmentState.autopilot.device.manufacturer)"
+                Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
+                Write-Host "=============================`n" -ForegroundColor Green
+                $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
+            }
+            Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
+            if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
+            {
+                Write-Host "Deployment profile: $($enrollmentState.autopilot.device.deploymentProfile.displayName)"
+                Write-Host "Deployment Profile Assignment Date: $($enrollmentState.autopilot.device.deploymentProfileAssignedDateTime | FormatDateWithTimeZone)"
+            }
+            else
+            {
+                Write-Host "This device is not assigned to a deployment profile." -ForegroundColor Yellow
+            }
+        }
+        else
+        {
+            Write-Host "This device is not enrolled in Autopilot." -ForegroundColor Yellow
+            Write-Host "=============================`n" -ForegroundColor Yellow
+        }
+        if ($enrollmentState.Imported)
+        {
+            Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
+            Write-Verbose "[$scriptName] Imported count: $($enrollmentState.ImportedAutopilotDevice.Count)"
+            if ($enrollmentState.ImportedAutopilotDevice.Count -gt 1)
+            {
+                Write-Host "This device was imported into Autopilot $($enrollmentState.ImportedAutopilotDevice.Count) times." -ForegroundColor Green
+                $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice[$enrollmentState.ImportedAutopilotDevice.Count - 1]
+            }
+            else
+            {
+                Write-Host "This device was recently imported into Autopilot." -ForegroundColor Green
+                $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice
+            }
+            if (-not $enrollmentState.managed)
+            {
+                Write-Host "However, this device is not currently managed in Intune."
+            }
+            Write-Host "Here is the latest known import information:"
+            Write-Host "Imported Device ID: $($importedDeviceInfo.id)"
+            Write-Host "Last import registration id: $($importedDeviceInfo.state.deviceRegistrationId)"
+            Write-Host "Last import status: $($importedDeviceInfo.state.deviceImportStatus)"
+            Write-Host "Last import error: $($importedDeviceInfo.state.deviceErrorName)"
+            Write-Host "Last import error code: $($importedDeviceInfo.state.deviceErrorCode)"
+        }
+        else
+        {
+            Write-Verbose "This device was not recently imported into Autopilot."
+        }
+        if ($enrollmentState.managed)
+        {
+            $deviceName = $enrollmentState.managedDevice.device.deviceName
+            $model = $enrollmentState.managedDevice.device.model
+            $manufacturer = $enrollmentState.managedDevice.device.manufacturer
+            $managedDeviceId = $enrollmentState.managedDevice.device.id
+            Write-Host "Device Name: $deviceName"
+            Write-Host "Model: $model"
+            Write-Host "Manufacturer: $manufacturer"
+            Write-Host "Status: Managed by Intune" -ForegroundColor Green
+            Write-Host "=============================`n" -ForegroundColor Green
+            # Create and show device actions menu using main.ps1 menu structure
+            $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
+            # Add menu items for each device action
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
+                Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
+                Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
+                Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
+                Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
+                $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
+                Write-Verbose "[$functionName] Device report: $deviceReport"
+                # Handle navigation responses from ShowReport
+                if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
+                {
+                    Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+                    return $backoutText
+                }
+                elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
+                {
+                    Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+                    return "EXIT_APPLICATION"
+                }
+                elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
+                {
+                    Write-Verbose "[$scriptName] User requested application exit from device selection."
+                    return "EXIT_APPLICATION"
+                }        
+                elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
+                {
+                    if ($deviceReport -eq $true -or $deviceReport -in ("Export to HTML", "Export to CSV"))
+                    {
+                        Write-Host "`nDevice health status displayed successfully." -ForegroundColor Green
+                    }
+                    else
+                    {
+                        Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
+                    }
+                    Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
+                }
+                return $backoutText
+            }
+            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
+                return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
+            }
+            # Show the device actions menu with navigation context
+            Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
+            $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
+            Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
+            return $result
+        }
+        else
+        {
+            Write-Host "This device is not managed in Intune." -ForegroundColor Yellow
+        }
+        if ($enrollmentState.hasDeviceObject)
+        {
+            Write-Host "`nDevice object found in Intune." -ForegroundColor Green
+            Write-Host "Device ID: $($enrollmentState.managedDevice.device.id)"
+            Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
+            Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
+        }
+        else
+        {
+            Write-Host "This device does not have an associated object in Intune." -ForegroundColor Red
+        }
+    }
+    else
+    {
+        # Explicitly return $null if no enrollmentState
+        Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
+        return $null
+    }
+    
+    # Return success status for calling functions
+    return $success
+}
+#endregion helper functions
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
@@ -452,7 +787,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
             {
                 Write-Verbose "[$scriptName] Action called via $context"
                 Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
-                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
+                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check' 
                 Write-Verbose "[$scriptName] Result returned: $result"
             }
         }
@@ -485,7 +820,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
         Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Checking for Windows updates."
     }
     else
     {
@@ -593,6 +927,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 
 #endregion Autopilot menu
 
+#region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
     Write-Host 'Reconfiguring the script...'
     if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
@@ -639,6 +974,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action
         Write-Host 'Failed to restore script defaults..' -ForegroundColor Red
     }
 }
+#endregion Settings menu
+
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
@@ -661,6 +998,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         else
         {
             Write-Host "Found user: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
+            $userName = $userInfo.userPrincipalName
         }
         #Print the current navigation context prior too calling GetDeviceByUser
         Write-Verbose "[$scriptName] Current navigation context:"
@@ -734,6 +1072,18 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Host "Checking group membership for user $userName."
         Write-Verbose "[$scriptName] Getting access token..."
         $accessToken = GetGraphAccessToken @getTokenParams
+        #Check if the user exists first.
+        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken
+        if ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)  
+        {
+            Write-Verbose "[$scriptName] User $userName not found in directory."
+            return $userInfo
+        }
+        else
+        {
+            Write-Host "Found user: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
+            $userName = $userInfo.userPrincipalName
+        }
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
         if ($groups.success -eq $true)
         {
@@ -791,8 +1141,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             else # Process only if a serial number was entered
             {
-                # Pass navigation context to ProcessSerialNumber
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
                 # Check if ProcessSerialNumber returned an exit signal
                 if ($null -eq $result)
                 {
@@ -809,10 +1158,10 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+# $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -RootFolder $pwd -LocalVersion $localVersion -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
+    $updateResult = GetUpdates -RootFolder $pwd -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
     Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
     {
