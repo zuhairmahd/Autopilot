@@ -707,6 +707,7 @@ function GetManagedDeviceRelevantProperties()
             else
             {
                 Write-Verbose "[$functionName] The managed device is not associated with a user."
+                Write-Host "The device is not associated with a user."
                 $hasUser = $false
             }
         }
@@ -873,7 +874,7 @@ function AssessDeviceState()
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
                 {
-                    Write-Host "The device has $($enrollmentState.managedDevice.memory)GB of RAM, which meets the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                    Write-Host "The device is ready for the next user."
                     $readinessState = $deviceStates.ready 
                     $action = $deviceActions.none
                     $device = $enrollmentState.managedDevice.device.id

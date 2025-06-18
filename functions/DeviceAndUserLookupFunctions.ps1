@@ -1258,7 +1258,7 @@ function GetDeviceLAPSCredentials()
     else
     {
         Write-Verbose "[$functionName] No LAPS credentials found for device: $DeviceId"
-        Write-Host "No LAPS credentials found for device: $DeviceId" -ForegroundColor Red
+        if (-not $quiet) {Write-Host "No LAPS credentials found for device: $DeviceId" -ForegroundColor Red}
         return $returnValues.noLAPSFoundMessage
     }
 }
