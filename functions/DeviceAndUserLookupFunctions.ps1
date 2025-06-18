@@ -723,7 +723,7 @@ function GetDeviceByUser()
     Write-Verbose "[$functionName] Trimmed user name: $UserName"
     $extraparameters = "select=deviceName,serialNumber,userDisplayName,model,manufacturer,complianceState"
     Write-Verbose "[$functionName] Extra parameters for API call: $extraparameters"
-    $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
+    $filter = "contains(userPrincipalName, '$UserName') and operatingSystem eq '$OperatingSystem'"
     Write-Verbose "[$functionName] Filter for API call: $filter"
     $managedDeviceUri = "deviceManagement/managedDevices"
     Write-Verbose "[$functionName] Managed device URI: $managedDeviceUri"
@@ -821,7 +821,7 @@ function GetDeviceByUser()
     else
     {
         Write-Host "An error occured looking up device for user: $UserName" -ForegroundColor Red
-        return $null
+        return $returnValues.noDeviceFound
     }
 }
 

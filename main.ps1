@@ -987,7 +987,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     $accessToken = GetGraphAccessToken @getTokenParams
     
     #region Check if the user exists first.
-    $global:userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+    $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
     Write-Verbose "[$scriptName] Substring search: $($userInfo)"
     Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
     Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth 10)"
@@ -1001,7 +1001,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     {
         Write-Host "Could not find an exact match for user $($userName)."
         Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
-        if ($($userInfo[0].value.count) -gt $settings.maxUserMatchDisplay)
+        if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
         {
             Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
         }
@@ -1009,7 +1009,8 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         {
             Write-Host "Displaying all $($userInfo[0].value.count) matches:"
         }
-        $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay -userName $userName
+        $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay 
+        Write-Verbose "[$scriptName] User name selected: $userName"
         # Handle navigation options returned from DisplayUserList
         if ($null -eq $userName)
         {
@@ -1127,7 +1128,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         {
             Write-Host "Could not find an exact match for user $($userName)."
             Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
-            if ($($userInfo[0].value.count) -gt $settings.maxUserMatchDisplay)
+            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
             {
                 Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
             }
@@ -1135,7 +1136,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             {
                 Write-Host "Displaying all $($userInfo[0].value.count) matches:"
             }
-            $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay -userName $userName
+            $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay 
             Write-Verbose "[$scriptName] User name after DisplayUserList: $userName"
             # Handle navigation options returned from DisplayUserList
             if ($null -eq $userName)
