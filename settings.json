@@ -6,6 +6,7 @@
     "testMode": false,
     "configFile": ".\\\\.secrets\\\\config.json",
     "maxWaitTime": "30",
+    "maxUserMatchDisplay": "10",
     "timeInSeconds": "60",
     "Release": "2.5",
     "Repo": "Github",
@@ -33,6 +34,9 @@
         "MinimumDevicePhysicalMemoryInGB": 16,
         "MinUsernameLength": 3,
         "GroupTag": "MSB01",
+        "userPatternsToExclude": [
+          "-cma"
+        ],
         "DesiredAutopilotProfiles": [
           "msb"
         ]
