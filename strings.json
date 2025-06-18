@@ -2,6 +2,7 @@
     "returnValues": {
         "unknownErrorMessage": "An unknown error occurred.",
         "noRestartMessage": "Device not restarted.",
+        "noLAPSFoundMessage": "No LAPS password found for this device.",
         "EnrolledMessage": "The device is enrolled.",
         "notContactedMessage": "The device has not contacted the enrollment service.",
         "PendingResetMessage": "The device is pending a reset.",

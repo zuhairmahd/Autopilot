@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param
 (
-    [Parameter(Mandatory = $true, Position = 0)]
     $userName,
     $repo = 'Github', # Options: Github, gitlab
     $release = 'auto',
@@ -144,18 +143,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $sc
 # }
 #endregion variables
 
-
-
-$global:users = GetEntraUser -accessToken $accessToken -UserName $userName -FindSimilar
-Write-Host "Found $($global:users[0].value.Count) users matching '$userName'"
-if ($global:users[1] -eq $true)
-{
-    $userNameSelection = DisplayUserList -UserList $global:users[0].value -userName $userName
-    Write-Host "Selected user: $userNameSelection"
-}
-else 
-{
-    Write-Host "Found $($global:users[0].value.Count) users matching '$userName'"
-}
+$managedDeviceId = "16d8604d-d11d-4191-98dc-69180ec06b2d"
+$deviceId = "17156ac7-e2ae-4204-ab08-4eb7115b6ae9"
+$global:laps = GetDeviceLAPSCredentials -DeviceId $deviceId -accessToken $accessToken
 
 

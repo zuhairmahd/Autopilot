@@ -723,7 +723,7 @@ function GetDeviceByUser()
     Write-Verbose "[$functionName] Trimmed user name: $UserName"
     $extraparameters = "select=deviceName,serialNumber,userDisplayName,model,manufacturer,complianceState"
     Write-Verbose "[$functionName] Extra parameters for API call: $extraparameters"
-    $filter = "contains(userPrincipalName, '$UserName') and operatingSystem eq '$OperatingSystem'"
+    $filter = "startswith(userPrincipalName,'$UserName') and operatingSystem eq '$OperatingSystem'"
     Write-Verbose "[$functionName] Filter for API call: $filter"
     $managedDeviceUri = "deviceManagement/managedDevices"
     Write-Verbose "[$functionName] Managed device URI: $managedDeviceUri"
@@ -737,7 +737,7 @@ function GetDeviceByUser()
         if ($deviceInfo.value.Count -eq 0)
         {
             Write-Verbose "[$functionName] No devices found for user: $UserName"
-            return $returnValues.noUserDeviceFoundMessage 
+            return $returnValues.noDeviceFound
         }
         elseif ($deviceInfo.value.Count -eq 1)
         {
@@ -1091,6 +1091,15 @@ function GetDeviceEnrollmentStatus()
         {
             Write-Verbose "[$functionName] No logged on users found for device in Intune"
         }
+        $laps = GetDeviceLAPSCredentials -DeviceId $managedDevice.azureADDeviceId -accessToken $accessToken -quiet
+        if ($null -ne $laps -and $laps -ne $returnValues.noLAPSFoundMessage)
+        {
+            Write-Verbose "[$functionName] LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
+        }
     }
     else
     {
@@ -1180,6 +1189,7 @@ function GetDeviceEnrollmentStatus()
         Device = $returnedManagedDevice
         Memory = $deviceMemory
         Users  = $loggedOnUsers
+        LAPS   = $laps
     }
     $deviceState.add('managedDevice', $managedDeviceData)
     $deviceState.add('imported', $imported)
@@ -1189,4 +1199,66 @@ function GetDeviceEnrollmentStatus()
     #endregion
     $global:enrollment = $deviceState
     return $deviceState
+}
+
+function GetDeviceLAPSCredentials()
+{
+    [CmdletBinding()]
+    param (
+        [string]$DeviceId,
+        [string]$accessToken,
+        [switch]$quiet
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting LAPS credentials for device with ID: $DeviceId"
+    if (-not $accessToken)
+    {
+        Write-Verbose "[$functionName] AccessToken is null or empty. Cannot proceed."
+        return $returnValues.noAccessTokenMessage
+    }
+    $returnObject = @{}
+    $lapsUri = "directory/deviceLocalCredentials/$DeviceId"
+    Write-Verbose "[$functionName] LAPS URI: $lapsUri"
+    $extraParameters = "select=credentials" 
+    $lapsCredentials = CallGraphAPI -accessToken $AccessToken -ResourcePath $lapsUri -extraParameters $extraParameters
+    Write-Verbose "[$functionName] LAPS credentials response: $($lapsCredentials | Out-String)"
+    if ($lapsCredentials)
+    {
+        if (-not $quiet) {Write-Host "LAPS credentials found for device: $DeviceId" -ForegroundColor Green}
+        Write-Verbose "Found $($lapsCredentials.credentials.count ) LAPS credentials for device: $DeviceId"
+        #If there is more than $lapsCredentials.credentials.count, return the latest (by date) $lapsCredential.accountName, backupDateTime and a clear text password derived from passwordBase64
+        if ($lapsCredentials.credentials.count -gt 1)
+        {
+            Write-Verbose "[$functionName] More than one LAPS credential found. Sorting by backupDateTime and getting the latest credential."
+            $latestCredential = $lapsCredentials.credentials | Sort-Object backupDateTime -Descending | Select-Object -First 1
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Only one LAPS credential found. Using that credential."
+            $latestCredential = $lapsCredentials.credentials
+        }
+        $clearTextPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($latestCredential.passwordBase64))
+        $returnObject = @{
+            AccountName       = $latestCredential.accountName
+            BackupDateTime    = $latestCredential.backupDateTime
+            ClearTextPassword = $clearTextPassword
+        }
+        #display the LAPS credentials
+        if (-not $quiet)
+        {
+            Write-Host "LAPS Credentials for device: $DeviceId" -ForegroundColor Cyan
+            Write-Host "Account Name: $($returnObject.AccountName)" -ForegroundColor Cyan
+            Write-Host "Backup DateTime: $($returnObject.BackupDateTime | FormatDateWithTimeZone)" -ForegroundColor Cyan
+            Write-Host "Clear Text Password: $($returnObject.ClearTextPassword)" -ForegroundColor Cyan
+            return "`n"
+        }
+        return $lapsCredentials 
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No LAPS credentials found for device: $DeviceId"
+        Write-Host "No LAPS credentials found for device: $DeviceId" -ForegroundColor Red
+        return $returnValues.noLAPSFoundMessage
+    }
 }

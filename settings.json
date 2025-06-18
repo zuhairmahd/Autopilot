@@ -35,7 +35,10 @@
         "MinUsernameLength": 3,
         "GroupTag": "MSB01",
         "userPatternsToExclude": [
-          "-cma"
+          "-cma",
+          "-test",
+          "onmicrosoft.com",
+          "-a"
         ],
         "DesiredAutopilotProfiles": [
           "msb"
