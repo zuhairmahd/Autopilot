@@ -109,6 +109,8 @@ else
 #endregion
 
 #region variables
+$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+$scope = $auth.scope
 # $logfile = "mylog.log"
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # $serialNumber = '0F3CFP724223KV'
@@ -130,7 +132,7 @@ $settings = MergeSettings -localSettings $localSettings -globalSettings $globalS
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scopes -AuthType 'PublicAuthFlow' 
+$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow' 
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -143,8 +145,50 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $sc
 # }
 #endregion variables
 
-$managedDeviceId = "16d8604d-d11d-4191-98dc-69180ec06b2d"
 $deviceId = "17156ac7-e2ae-4204-ab08-4eb7115b6ae9"
-$global:laps = GetDeviceLAPSCredentials -DeviceId $deviceId -accessToken $accessToken
+$URI = "informationProtection/bitlocker/recoveryKeys"
+$filter = "deviceId eq '$deviceId'"
+# First, get the list of recovery keys (without the actual key values)
+$extraParameters = "select=id,createdDateTime,volumeType,deviceId" 
+Write-Verbose "[$scriptName] Getting BitLocker recovery keys for device: $deviceId"
+$global:bitlockerKeys = CallGraphApi -accessToken $accessToken -ResourcePath $URI -filter $filter -extraParameters $extraParameters 
 
-
+if ($bitlockerKeys.value.count -gt 0)
+{
+    Write-Host "Found $($bitlockerKeys.value.count) BitLocker recovery keys" -ForegroundColor Green
+    
+    # Get the most recently created key
+    $latestKeyInfo = $bitlockerKeys.value | Sort-Object -Property createdDateTime -Descending | Select-Object -First 1
+    Write-Verbose "[$scriptName] Latest key ID: $($latestKeyInfo.id)"
+    
+    # Now make a separate call to get the actual recovery key value
+    $keyRetrievalURI = "informationProtection/bitlocker/recoveryKeys/$($latestKeyInfo.id)"
+    $keyRetrievalParameters = "select=key"
+    Write-Verbose "[$scriptName] Retrieving actual BitLocker recovery key..."
+    
+    try
+    {
+        $global:recoveryKeyDetails = CallGraphApi -accessToken $accessToken -ResourcePath $keyRetrievalURI -extraParameters $keyRetrievalParameters
+        
+        # Display the recovery key information
+        Write-Host "Latest BitLocker recovery key:" -ForegroundColor Cyan
+        Write-Host "Key: $($global:recoveryKeyDetails.key)" -ForegroundColor Yellow
+        Write-Host "Created: $($latestKeyInfo.createdDateTime)" -ForegroundColor Yellow
+        Write-Host "Volume Type: $($latestKeyInfo.volumeType)" -ForegroundColor Yellow
+        Write-Host "Device ID: $($latestKeyInfo.deviceId)" -ForegroundColor Yellow
+        Write-Host "Key ID: $($latestKeyInfo.id)" -ForegroundColor Yellow
+    }
+    catch
+    {
+        Write-Error "[$scriptName] Failed to retrieve BitLocker recovery key: $($_.Exception.Message)"
+        Write-Host "Key metadata available:" -ForegroundColor Yellow
+        Write-Host "Created: $($latestKeyInfo.createdDateTime)" -ForegroundColor Yellow
+        Write-Host "Volume Type: $($latestKeyInfo.volumeType)" -ForegroundColor Yellow
+        Write-Host "Device ID: $($latestKeyInfo.deviceId)" -ForegroundColor Yellow
+        Write-Host "Key ID: $($latestKeyInfo.id)" -ForegroundColor Yellow
+    }
+}
+else
+{
+    Write-Host "No BitLocker recovery keys found for device: $deviceId" -ForegroundColor Red
+}

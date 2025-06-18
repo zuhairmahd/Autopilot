@@ -2,16 +2,18 @@ function FormatScopes()
 {
     [CmdletBinding()]
     param(
-        [string]$scopes,
+        [string[]]$scopes,
         [switch]$AsIs,
         [switch]$Reverse
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] [FormatScopes] Called with AsIs=$AsIs, Reverse=$Reverse"
+    Write-Verbose "[$functionName] [FormatScopes] Input scopes: '$scopes'"
     #Check for null or empty scopes.
-    if (-not $scopes)
+    if (-not $scopes -or $scopes.Trim() -eq "")
     {
         Write-Verbose "[$functionName] [FormatScopes] No scopes provided. Returning empty string."
+        Write-Warning "[$functionName] [FormatScopes] WARNING: Scopes parameter is null or empty!"
         return ""
     }
     #region Format scopes properly if necessary
@@ -831,8 +833,27 @@ function LaunchBrowser()
 
 function Get-DelegatedToken()
 {
-    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $settings = $settings)
+    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $ForcedRenewal, $settings = $settings)
     $functionName = $MyInvocation.MyCommand.Name
+    
+    # Handle null or empty scopes by providing a sensible default
+    if (-not $scopes -or $scopes -eq "")
+    {
+        Write-Verbose "[$functionName] Scopes parameter is null or empty. Using default Graph API scopes."
+        $scopes = "offline_access openid Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
+        Write-Host "Using default scopes as none were provided: $scopes" -ForegroundColor Yellow
+    }
+    
+    Write-Verbose "[$functionName] Starting with scopes: '$scopes'"
+    
+    # Debug the incoming scopes parameter
+    Write-Verbose "[$functionName] Received scopes parameter: '$scopes'"
+    Write-Verbose "[$functionName] Scopes parameter type: $($scopes.GetType().Name)"
+    if ([string]::IsNullOrEmpty($scopes))
+    {
+        Write-Warning "[$functionName] WARNING: Received null or empty scopes parameter!"
+    }
+    
     # First check if we have a valid refresh token in config
     if ($configRefreshToken)
     {
@@ -851,6 +872,17 @@ function Get-DelegatedToken()
         else
         {
             Write-Verbose "[$functionName] Existing refresh token is invalid. Will proceed with new authorization."
+            if ($ForcedRenewal)
+            {
+                Write-Host "Forcing new refresh token - proceeding with new authentication flow." -ForegroundColor Yellow
+            }
+        }
+    }
+    else
+    {
+        if ($ForcedRenewal)
+        {
+            Write-Host "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow." -ForegroundColor Yellow
         }
     }
     # Generate a random state string
@@ -871,6 +903,8 @@ function Get-DelegatedToken()
                 client_id = $clientId
                 scope     = $scopesFormatted
             }
+            Write-Verbose "[$functionName] Original scopes parameter: '$scopes'"
+            Write-Verbose "[$functionName] Formatted scopes: '$scopesFormatted'"
             Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)"
             try
             {
@@ -1161,7 +1195,6 @@ function Get-DelegatedToken()
             return $null
         }
     }
-    
     # Log the token response properties (without exposing the actual token)
     if ($tokenResponse)
     {
@@ -1170,28 +1203,39 @@ function Get-DelegatedToken()
         {
             if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
             {
-                {
-                    $tokenLength = $tokenResponse.$prop.Length
-                    Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
-                }
-                else
-                {
-                    Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
-                }
+                $tokenLength = $tokenResponse.$prop.Length
+                Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
             }
-            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            # Cache the access token based on cache type
-            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            # Save the refresh token to config file regardless of cache type
-            if ($tokenResponse.refresh_token)
+            else
             {
-                if (-not $NoSaveRefreshToken)
+                Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
+            }
+        }
+        
+        $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+        # Cache the access token based on cache type
+        Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder        # Save the refresh token to config file regardless of cache type
+        if ($tokenResponse.refresh_token)
+        {
+            if (-not $NoSaveRefreshToken)
+            {
+                Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
+                if ($ForcedRenewal)
                 {
-                    Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
+                    Write-Host "New refresh token has been successfully obtained and saved to configuration." -ForegroundColor Green
+                    Write-Verbose "[$functionName] Forced refresh token renewal completed successfully."
                 }
             }
-            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+            else
+            {
+                if ($ForcedRenewal)
+                {
+                    Write-Host "New refresh token has been obtained but was not saved due to NoSaveRefreshToken setting." -ForegroundColor Yellow
+                    Write-Verbose "[$functionName] Forced refresh token renewal completed but not saved per NoSaveRefreshToken setting."
+                }
+            }
         }
+        return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
     }
     else 
     {
@@ -1270,34 +1314,59 @@ function BuildAuthSplatTable()
         $auth
     )
     
-    # Dynamic splatting approach - iterate over all auth properties
-    # Create clean splatting hashtable starting with required parameter
+    # Dynamic splatting approach - iterate over all auth properties    # Create clean splatting hashtable starting with required parameter
     $getTokenParams = @{
         configFile = $configFile
+    }    # Define valid parameters for GetGraphAccessToken function (case-insensitive comparison)
+    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'ForceNewRefreshToken', 'CacheType', 'configFile')
+    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
+    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewRefreshToken')
+    
+    Write-Verbose "Debugging BuildAuthSplatTable - Auth object properties:"
+    foreach ($prop in $auth.PSObject.Properties)
+    {
+        Write-Verbose "  Property: '$($prop.Name)' = '$($prop.Value)' (Type: $($prop.Value.GetType().Name))"
     }
     
-    # Define valid parameters for GetGraphAccessToken function
-    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'CacheType', 'configFile')
-    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
-    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType')    # Iterate over all properties in the auth object
+    # Iterate over all properties in the auth object
     foreach ($property in $auth.PSObject.Properties)
     {
         $paramName = $property.Name
         $paramValue = $property.Value
+        Write-Verbose "Processing property '$paramName' with value '$paramValue'"
+        
+        # Special debugging for scope parameter
+        if ($paramName -ieq 'scope')
+        {
+            Write-Verbose "SCOPE DEBUG: Found scope parameter with value: '$paramValue'"
+            Write-Verbose "SCOPE DEBUG: Value type: $($paramValue.GetType().Name)"
+            if ($paramValue -is [array])
+            {
+                Write-Verbose "SCOPE DEBUG: Scope is array with $($paramValue.Count) elements: $($paramValue -join ', ')"
+            }
+        }
+        
+        # Find the correct parameter name (case-insensitive match)
+        $correctParamName = $validParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
+        
+        Write-Verbose "Case-insensitive match for '$paramName': '$correctParamName'"
+        
         # Skip if not a valid parameter for the function
-        if ($paramName -notin $validParams)
+        if (-not $correctParamName)
         {
             Write-Verbose "Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
             continue
         }
+        
         # Skip if value is null, empty, or false for switch parameters
         if ($null -eq $paramValue -or $paramValue -eq '' -or $paramValue -eq $false)
         {
             Write-Verbose "Skipping parameter '$paramName' due to null/empty/false value"
             continue
         }
-        # Check if this is a delegated-only parameter
-        if ($paramName -in $deligatedOnlyParams)
+        # Check if this is a delegated-only parameter (case-insensitive)
+        $isDelegatedOnlyParam = $deligatedOnlyParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
+        if ($isDelegatedOnlyParam)
         {
             # Only add if Deligated is true in the auth object
             if ($auth.PSObject.Properties.Name -contains 'Deligated' -and $auth.Deligated)
@@ -1307,9 +1376,16 @@ function BuildAuthSplatTable()
                 if ($paramValue -is [array])
                 {
                     $paramValue = $paramValue -join ' '
-                    Write-Verbose "Converted array parameter '$paramName' to space-separated string: $paramValue"
+                    Write-Verbose "Converted array parameter '$paramName' to space-separated string: $paramValue"                
                 }
-                $getTokenParams[$paramName] = $paramValue
+                # Use the correct parameter name (properly capitalized) for the hashtable
+                $getTokenParams[$correctParamName] = $paramValue
+                
+                # Special debugging for scope parameter
+                if ($correctParamName -ieq 'Scope')
+                {
+                    Write-Verbose "SCOPE DEBUG: Added scope to hashtable with key '$correctParamName' and value '$paramValue'"
+                }
             }
             else
             {
@@ -1320,11 +1396,10 @@ function BuildAuthSplatTable()
         {
             # Add general parameters (not restricted to delegated mode)
             Write-Verbose "Adding parameter '$paramName' with value: $paramValue"
-            $getTokenParams[$paramName] = $paramValue
+            # Use the correct parameter name (properly capitalized) for the hashtable
+            $getTokenParams[$correctParamName] = $paramValue
         }
-    }
-
-    # Log the final splatting parameters for verification
+    }    # Log the final splatting parameters for verification
     Write-Verbose "Final splatting parameters:"
     foreach ($param in $getTokenParams.GetEnumerator())
     {
@@ -1341,6 +1416,18 @@ function BuildAuthSplatTable()
             Write-Verbose "  $($param.Key): '$($param.Value)'"
         }
     }
+    
+    # Special debug for Scope parameter
+    if ($getTokenParams.ContainsKey('Scope'))
+    {
+        Write-Verbose "[$functionName] DEBUG: Scope parameter found in hashtable: '$($getTokenParams.Scope)'" 
+    }
+    else
+    {
+        Write-Verbose "[$functionName] DEBUG: Scope parameter NOT found in hashtable!"
+        Write-Verbose "[$functionName] DEBUG: Available keys: $($getTokenParams.Keys -join ', ')"
+    }
+    
     # Return the splatting hashtable
     return $getTokenParams
 }
@@ -1439,11 +1526,12 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'Deligated')]
         [switch]$Deligated,
         [parameter(parameterSetName = 'Deligated')]
-        [string]$Scope,
+        [string[]]$Scope,
         [parameter(parameterSetName = 'Deligated')]
         [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
-        [string]$AuthType = 'Private',
-        [switch]$ForceNewToken,
+        [string]$AuthType = 'Private', [switch]$ForceNewToken,
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$ForceNewRefreshToken,
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
     )
@@ -1477,8 +1565,7 @@ function GetGraphAccessToken()
     else
     {
         Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
-    }
-    # Extract the refresh token if it exists
+    }    # Extract the refresh token if it exists
     if ($config.deligatedCredentials.refresh_token)
     {
         $configRefreshToken = $config.deligatedCredentials.refresh_token
@@ -1487,6 +1574,16 @@ function GetGraphAccessToken()
     else
     {
         Write-Verbose "[$functionName] No refresh token found in config."
+    }
+    # Handle ForceNewRefreshToken parameter
+    if ($ForceNewRefreshToken -and $Deligated)
+    {
+        Write-Host "Force new refresh token requested. Invalidating existing refresh token." -ForegroundColor Yellow
+        Write-Verbose "[$functionName] ForceNewRefreshToken requested. Clearing existing refresh token from memory."
+        
+        # Clear the configRefreshToken variable so a new one will be obtained
+        $configRefreshToken = $null
+        Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
     }
     if ($config.tenantId)
     {
@@ -1529,9 +1626,10 @@ function GetGraphAccessToken()
     #region Log parameters
     Write-Verbose "[$functionName] Received parameters:"
     Write-Verbose "[$functionName] Configuration File: $configFile"
-    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime"
+    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime" 
     Write-Verbose "[$functionName] Secure String: $SecureString"
     Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
+    Write-Verbose "[$functionName] Force New Refresh Token: $ForceNewRefreshToken"
     Write-Verbose "[$functionName] Use Public Auth Flow: $UsePublicAuthFlow"
     Write-Verbose "[$functionName] Interactive: $Interactive"
     Write-Verbose "[$functionName] Cache Type: $CacheType"
@@ -1567,7 +1665,7 @@ function GetGraphAccessToken()
     #region Authentication flow
     if ($deligated)
     {
-        Write-Verbose "[$functionName] Deligated authentication flow selected."
+        Write-Verbose "[$functionName] Deligated authentication flow selected." 
         $params = @{
             tenantId           = $tenantId 
             clientId           = $clientId 
@@ -1579,6 +1677,14 @@ function GetGraphAccessToken()
             cacheFolder        = $cacheFolder 
             configFilePath     = $configFile
             configRefreshToken = $configRefreshToken
+        }
+        
+        # Debug the scopes parameter being passed
+        Write-Verbose "[$functionName] Scope parameter value: '$Scope'"
+        Write-Verbose "[$functionName] Scope parameter type: $($Scope.GetType().Name)"
+        if ([string]::IsNullOrEmpty($Scope))
+        {
+            Write-Warning "[$functionName] WARNING: Scope parameter is null or empty!"
         }
         switch ($AuthType)
         {
@@ -1599,13 +1705,21 @@ function GetGraphAccessToken()
                 $params += @{
                     clientSecret = $clientSecret
                 }
-            }
+            }        
         }
         if ($NoSaveRefreshToken)
         {
             Write-Verbose "[$functionName] No save refresh token option selected. Not saving refresh token."
             $params += @{
                 NoSaveRefreshToken = $NoSaveRefreshToken
+            }
+        }
+        if ($ForceNewRefreshToken)
+        {
+            Write-Verbose "[$functionName] Force new refresh token requested. This will force a new authentication flow."
+            # Add a marker to indicate this was a forced refresh token renewal
+            $params += @{
+                ForcedRenewal = $true
             }
         }
         return Get-DelegatedToken @params

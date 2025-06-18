@@ -196,10 +196,6 @@ foreach ($key in $settings.Keys)
 }
 $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
-foreach ($key in $auth.Keys)
-{
-    Write-Verbose "[$scriptName] Auth key: $($key) = $($auth[$key])"
-}   
 $getTokenParams = BuildAuthSplatTable -auth $auth
 $backoutText = 'Returning to previous menu'
 Write-Verbose "[$scriptName] Backout Text: $backoutText"
@@ -553,7 +549,6 @@ function ProcessSerialNumber()
             $model = $enrollmentState.managedDevice.device.model
             $manufacturer = $enrollmentState.managedDevice.device.manufacturer
             $managedDeviceId = $enrollmentState.managedDevice.device.id
-            $azureADDeviceId = $enrollmentState.managedDevice.device.azureADDeviceId
             Write-Host "Device Name: $deviceName"
             Write-Host "Model: $model"
             Write-Host "Manufacturer: $manufacturer"
@@ -574,8 +569,22 @@ function ProcessSerialNumber()
                 Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
-                GetDeviceLAPSCredentials -DeviceId $azureADDeviceId -accessToken $accessToken
+            Write-Verbose "[$functionName] Checking if device has LAPS credentials."
+            Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
+            if ($enrollmentState.managedDevice.laps.credentials.count -gt 0)
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
+                    GetDeviceLAPSCredentials -enrollmentState $enrollmentState
+                }
+            }            
+            Write-Verbose "Checking if we have bitlocker keys for this device."
+            Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
+            if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
+                    Write-Host "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
+                    GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken -verbose 
+                }
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
