@@ -508,3 +508,74 @@ function GetUserInput()
     }
     Write-Verbose "[$functionName] Exiting GetUserInput function"
 }
+
+function DisplayUserList()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [array]$UserList,
+        [Parameter(Mandatory = $false)]
+        [int]$maxDisplay = 10
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Displaying user list"
+
+    if ($UserList.Count -eq 0)
+    {
+        Write-Host "No users found." -ForegroundColor Yellow
+        return $returnValues.noUserFoundInDirectoryMessage
+    }
+    if ($userList.count -gt $maxDisplay)
+    {
+        Write-Verbose "[$functionName] User list has more than $maxDisplay users, truncating to $maxDisplay."
+        $UserList = $UserList | Select-Object -First $maxDisplay
+    }
+    # Create user selection menu
+    $userMenu = NewMenu -Title "Select a user" -Description "Did you mean:"
+    # Store devices in an array to reference later
+    $users = $UserList
+    Write-Verbose "[$functionName] Creating user menu with $($userList.Count) users."
+    # Add each device as a menu item
+    foreach ($user in $users)
+    {
+        # Create a display name for the menu
+        $menuItemName = "User: $($user.displayName) ($($user.userPrincipalName))"
+        Write-Verbose "[$functionName] Adding menu item: $menuItemName"
+        # Create a scriptblock action that returns This specific user id when selected.
+        $UPN = $user.userPrincipalName
+        Write-Verbose "[$functionName] Creating action for user: $user"
+        $action = {
+            Write-Verbose "[$functionName] Returning user name: $($UPN)"
+            return $UPN
+        }.GetNewClosure()
+        # Add the menu item with the action
+        $userMenu = AddMenuItem -Menu $userMenu -Name $menuItemName -Action $action -ReturnsValue
+    }
+    Write-Verbose "[$functionName] Showing user selection menu with $($userMenu.Items.Count) items"
+    Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
+    Write-Verbose "[$functionName] Current menu title: $($userMenu.Title)"
+    $selectedUser = ShowMenu -Menu $userMenu -CalledBy 'Action'
+    if ($null -ne $selectedUser -and $selectedUser -is [string])
+    {
+        Write-Verbose "[$functionName] Selected user: $selectedUser"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Selected user is null or not a string"
+    }
+    # Validate that we got a proper user name, not a navigation option
+    if ($selectedUser -eq "Back" -or $selectedUser -eq "Main Menu" -or $selectedUser -eq 0 -or $selectedUser -eq "0")
+    {
+        Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selectedUser', treating as navigation"
+        return $selectedUser
+    }
+    else
+    {
+        Write-Host "An error occured looking up device for user: $UserName" -ForegroundColor Red
+        return $null
+    }
+}
+
+

@@ -28,7 +28,6 @@ param(
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
-
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
     Write-Verbose "[$scriptName] Running as an external script."
@@ -984,76 +983,118 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
         return $backoutText
     }
+    Write-Verbose "[$scriptName] Got user name: $userName"
+    $accessToken = GetGraphAccessToken @getTokenParams
+    
+    #region Check if the user exists first.
+    $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+    Write-Verbose "[$scriptName] Substring search: $($userInfo)"
+    Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
+    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth 10)"
+    if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+    {
+        Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
+        $userName = $userInfo[0].value.userPrincipalName
+        Write-Verbose "[$scriptName] User name set to: $userName"
+    }
+    elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+    {
+        Write-Host "Could not find an exact match for user $($userName)."
+        Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+        if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+        {
+            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+        }
+        else
+        {
+            Write-Host "Displaying all $($userInfo[0].value.count) matches:"
+        }
+        $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay 
+        Write-Verbose "[$scriptName] User name selected: $userName"
+        # Handle navigation options returned from DisplayUserList
+        if ($null -eq $userName)
+        {
+            Write-Verbose "[$scriptName] DisplayUserList returned null (exit signal)."
+            return "EXIT_APPLICATION"
+        }
+        elseif ($userName -eq "Back" -or $userName -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected 'Back'. Returning $backoutText."
+            return $backoutText
+        }
+        elseif ($userName -eq "Main Menu" -or $userName -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+            return "Main Menu"
+        }
+        elseif ($userName -eq 0 -or $userName -eq "0")
+        {
+            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+            return "EXIT_APPLICATION"
+        }
+    }
+    elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
+    {
+        return $userInfo
+    }
     else
     {
-        Write-Verbose "[$scriptName] Got user name: $userName"
-        $accessToken = GetGraphAccessToken @getTokenParams
-        #Check if the user exists first.
-        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken
-        if ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)  
-        {
-            Write-Verbose "[$scriptName] User $userName not found in directory."
-            return $userInfo
-        }
-        else
-        {
-            Write-Host "Found user: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
-            $userName = $userInfo.userPrincipalName
-        }
-        #Print the current navigation context prior too calling GetDeviceByUser
-        Write-Verbose "[$scriptName] Current navigation context:"
-        Write-Verbose "[$scriptName] Action History: $($actionHistory -join ' > ')"
-        Write-Verbose "[$scriptName] Menu History: $($actionMenuHistory -join ' > ')"
-        # Call GetDeviceByUser to find devices for the specified user
-        Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
-        $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
-        Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
-        
-        # Handle navigation responses from GetDeviceByUser
-        if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-            return $backoutText
-        }
-        elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected Main Menu from device selection"
-            return "EXIT_APPLICATION"
-        }
-        elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
-        {
-            Write-Verbose "[$scriptName] User requested application exit from device selection."
-            return "EXIT_APPLICATION"
-        }        
-        elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu" -and $serialNumber -ne $returnValues.noUserDeviceFoundMessage)
-        {
-            Write-Host "Found device for user $userName with serial number: $serialNumber"
-            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        return $returnValues.noUserFoundInDirectoryMessage
+    }
+    #endregion Check if the user exists first.
+    
+    #Print the current navigation context prior too calling GetDeviceByUser
+    Write-Verbose "[$scriptName] Current navigation context:"
+    Write-Verbose "[$scriptName] Action History: $($actionHistory -join ' > ')"
+    Write-Verbose "[$scriptName] Menu History: $($actionMenuHistory -join ' > ')"
+    # Call GetDeviceByUser to find devices for the specified user
+    Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
+    $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
+    Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
+    # Handle navigation responses from GetDeviceByUser
+    if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+        return $backoutText
+    }
+    elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from device selection."
+        return "EXIT_APPLICATION"
+    }        
+    elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu" -and $serialNumber -ne $returnValues.noUserDeviceFoundMessage)
+    {
+        Write-Host "Found device for user $userName with serial number: $serialNumber"
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
             
-            Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-            if ($null -eq $result)
-            {
-                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                return "EXIT_APPLICATION"
-            }
-            elseif ($result -eq $true)
-            {
-                Write-Host "Device information for device with serial number: $serialNumber was retrieved successfully." -ForegroundColor Green
-            }
-            else
-            {
-                Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
-            }
-        }
-        elseif ($serialNumber -eq '0')
+        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
+        if ($null -eq $result)
         {
-            Write-Verbose "[$scriptName] User selected Exit option (0). Returning $BackoutText."
-            return $backoutText
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+            return "EXIT_APPLICATION"
+        }
+        elseif ($result -eq $true)
+        {
+            Write-Host "Device information for device with serial number: $serialNumber was retrieved successfully." -ForegroundColor Green
         }
         else
         {
-            Write-Host $returnValues.noUserDeviceFoundMessage -ForegroundColor Red
+            Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
         }
+    }
+    elseif ($serialNumber -eq '0')
+    {
+        Write-Verbose "[$scriptName] User selected Exit option (0). Returning $BackoutText."
+        return $backoutText
+    }
+    else
+    {
+        Write-Host $returnValues.noUserDeviceFoundMessage -ForegroundColor Red
     }
 }
 
@@ -1072,18 +1113,58 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Host "Checking group membership for user $userName."
         Write-Verbose "[$scriptName] Getting access token..."
         $accessToken = GetGraphAccessToken @getTokenParams
-        #Check if the user exists first.
-        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken
-        if ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)  
+        #region Check if the user exists first.
+        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+        Write-Verbose "[$scriptName] Substring search: $($userInfo)"
+        Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
+        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth 10)"
+        if ($null -ne $userInfo -and $userInfo[1] -eq $false)
         {
-            Write-Verbose "[$scriptName] User $userName not found in directory."
+            Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
+            $userName = $userInfo[0].value.userPrincipalName
+            Write-Verbose "[$scriptName] User name set to: $userName"
+        }
+        elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+        {
+            Write-Host "Could not find an exact match for user $($userName)."
+            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+            {
+                Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+            }
+            else
+            {
+                Write-Host "Displaying all $($userInfo[0].value.count) matches:"
+            }
+            $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay 
+            Write-Verbose "[$scriptName] User name after DisplayUserList: $userName"
+            # Handle navigation options returned from DisplayUserList
+            if ($null -eq $userName)
+            {
+                Write-Verbose "[$scriptName] DisplayUserList returned null (exit signal)."
+                return "EXIT_APPLICATION"
+            }
+            elseif ($userName -eq "Back" -or $userName -eq "back")
+            {
+                Write-Verbose "[$scriptName] User selected 'Back'. Returning $backoutText."
+                return $backoutText
+            }
+            elseif ($userName -eq "Main Menu" -or $userName -eq "main menu")
+            {
+                Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+                return "Main Menu"
+            }
+            elseif ($userName -eq 0 -or $userName -eq "0")
+            {
+                Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                return "EXIT_APPLICATION"
+            }
+        }
+        else 
+        {
             return $userInfo
         }
-        else
-        {
-            Write-Host "Found user: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
-            $userName = $userInfo.userPrincipalName
-        }
+        #endregion Check if the user exists first.
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
         if ($groups.success -eq $true)
         {

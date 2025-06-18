@@ -576,8 +576,8 @@ function GetEntraUser()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $substringSearch = $false
     Write-Verbose "[$functionName] Starting function to get user from Entra ID"
-    
     # Validate access token
     if (-not $accessToken)
     {
@@ -586,7 +586,7 @@ function GetEntraUser()
     }
     Write-Verbose "[$functionName] Attempting exact match for userPrincipalName: $UserName"
     $userUri = "users/$UserName"
-    $userExtraParameters = "select=givenName,surName,displayName,userPrincipalName,mail,id"
+    $userExtraParameters = "select=givenName,surName,displayName,userPrincipalName,mail,id"    
     $userInfo = CallGraphAPI -accessToken $AccessToken -ResourcePath $userUri -extraParameters $userExtraParameters
     Write-Verbose "[$functionName] Exact match API response: $($userInfo | Out-String)"
     
@@ -594,85 +594,96 @@ function GetEntraUser()
     {
         Write-Verbose "[$functionName] Exact match found for userPrincipalName: $UserName"
         Write-Verbose "[$functionName] User found: $($userInfo.displayName) ($($userInfo.userPrincipalName))"
-        # Return the exact match - this is a single user object
-        return $userInfo
+        
+        # Create a response object in the same format as Graph API for consistency
+        $exactMatchResponse = [PSCustomObject]@{
+            '@odata.context' = $null
+            value            = @($userInfo)  # Force array creation even for single item
+        }
+        
+        return $exactMatchResponse, $substringSearch
     }
-
+    
+    # Handle error cases - show error message only if FindSimilar is not enabled
+    if ($userInfo -in 400, 401, 403, 404 -and -not $FindSimilar)
+    {
+        Write-Verbose "[$functionName] Exact match failed with error code: $userInfo"
+        
+        # Display appropriate error message to user based on error code
+        switch ($userInfo)
+        {
+            400 { Write-Host "Bad request. Please check the username format." -ForegroundColor Red }
+            401 { Write-Host "Unauthorized. Please check your access token." -ForegroundColor Red }
+            403 { Write-Host "Forbidden. You do not have permission to access this user." -ForegroundColor Red }
+            404 { Write-Host "User '$UserName' not found in Entra ID." -ForegroundColor Red }
+        }
+        
+        return $returnValues.noUserFoundInDirectoryMessage
+    }
+    
     # Step 2: If no exact match found, perform substring search using $search parameter if the $findSimilar switch is set
     if ($FindSimilar)
     {
         Write-Verbose "[$functionName] No exact match found (Error code: $userInfo). Performing substring search using Graph API search."
-    
         # Remove the @ portion from the username if it exists for better search results
         $searchTerm = $UserName -replace '@.*$', ''
         Write-Verbose "[$functionName] Cleaned search term: $searchTerm"
-    
         $searchUri = "users"
-        Write-Verbose "[$functionName] Searching for substring matches in user properties for: $searchTerm"    # Use Graph API $search parameter which supports fuzzy search across user properties
-        # $search parameter is better for substring matching than $filter for user properties
-        # The search will look across displayName, givenName, surname, mail, and userPrincipalName
-        # Note: CallGraphAPI will handle proper URL encoding of the search term
-        $extraParameters = "search=$searchTerm&select=givenName,surname,displayName,userPrincipalName,mail,id&top=50"
-        Write-Verbose "[$functionName] Executing substring search with search term: $searchTerm"
-        # Note: Using consistencyLevel switch is required when using $search parameter
-        $searchResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -extraParameters $extraParameters -consistencyLevel
-        Write-Verbose "[$functionName] Substring search API response: $($searchResults | Out-String)"
-    
-        # Check if substring search was successful
-        if ($searchResults -in 400, 401, 403, 404)
+        $filterExpression = "startswith(givenName, '$searchTerm') or startsWith(surname, '$searchTerm')"
+        Write-Verbose "[$functionName] Searching for substring matches in user properties for: $searchTerm"
+        Write-Verbose "[$functionName] Trying filter: $filterExpression" 
+        $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $filterExpression -extraParameters $userExtraParameters
+        if ($fallbackResults -notin 400, 401, 403, 404 -and $fallbackResults.value -and $fallbackResults.value.Count -gt 0)
         {
-            Write-Verbose "[$functionName] Substring search failed (Error code: $searchResults)"
-            return $returnValues.noUserFoundInDirectoryMessage
-        }
-    
-        # Process search results
-        if ($searchResults.value -and $searchResults.value.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] Found $($searchResults.value.Count) potential matches through substring search"
-            # Create a list of matches with additional metadata for the calling function
-            $matchList = @()
-            foreach ($user in $searchResults.value)
+            $substringSearch = $true
+            Write-Verbose "[$functionName] Filter approach succeeded with $($fallbackResults.value.Count) results"
+            # Initialize filtered results array
+            $filteredUsers = @()
+            # Filter out excluded users
+            foreach ($user in $fallbackResults.value)
             {
-                # Determine which fields matched the search term by checking if the search term appears in each field
-                $matchedFields = @()
-                if ($user.givenName -and $user.givenName.ToLower().Contains($searchTerm.ToLower()))
+                #Check if the user is a duplicate record of a previous record
+                Write-Verbose "[$functionName] Processing user: $($user.displayName) ($($user.userPrincipalName))"
+                if ($filteredUsers -contains $user.userPrincipalName)
                 {
-                    $matchedFields += "givenName"
+                    Write-Verbose "[$functionName] User $($user.userPrincipalName) is a duplicate, skipping."
+                    continue
                 }
-                if ($user.surName -and $user.surName.ToLower().Contains($searchTerm.ToLower()))
+                $excludeUser = $false
+                # Check if any of the exclusion patterns match this user
+                Write-Verbose "Checking against $($settings.userPatternsToExclude.Count) patterns to exclude."
+                if ($settings.userPatternsToExclude -and $settings.userPatternsToExclude.Count -gt 0)
                 {
-                    $matchedFields += "surName"
+                    foreach ($pattern in $settings.userPatternsToExclude)
+                    {
+                        Write-Verbose "[$functionName] Checking user: $($user.displayName) ($($user.userPrincipalName)) against exclusion pattern: $pattern"
+                        if ($user.userPrincipalName.Contains($pattern) -or $user.displayName -match $pattern)
+                        {
+                            # If the user matches any exclusion pattern, mark them for exclusion
+                            Write-Verbose "[$functionName] User matches exclusion pattern: $pattern"
+                            Write-Verbose "[$functionName] Excluding user: $($user.displayName) ($($user.userPrincipalName)) - Matched exclusion pattern: $pattern"
+                            $excludeUser = $true
+                            break
+                        }
+                    }
                 }
-                if ($user.displayName -and $user.displayName.ToLower().Contains($searchTerm.ToLower()))
+                # Add user to filtered results if not excluded
+                if (-not $excludeUser)
                 {
-                    $matchedFields += "displayName"
+                    Write-Verbose "[$functionName] Including user: $($user.displayName) ($($user.userPrincipalName))"
+                    $filteredUsers += $user
                 }
-                if ($user.mail -and $user.mail.ToLower().Contains($searchTerm.ToLower()))
-                {
-                    $matchedFields += "mail"
-                }            if ($user.userPrincipalName -and $user.userPrincipalName.ToLower().Contains($searchTerm.ToLower()))
-                {
-                    $matchedFields += "userPrincipalName"
-                }
-            
-                # Create match object with metadata
-                $matchObject = [PSCustomObject]@{
-                    User          = $user
-                    MatchedFields = $matchedFields
-                    MatchType     = "SubstringMatch"
-                }
-            
-                $matchList += $matchObject
-                Write-Verbose "[$functionName] Added match: $($user.displayName) ($($user.userPrincipalName)) - Matched fields: $($matchedFields -join ', ')"
+            }            # Create a response object in the same format as the original Graph API response
+            $filteredResponse = [PSCustomObject]@{
+                '@odata.context' = $fallbackResults.'@odata.context'
+                value            = @($filteredUsers | Sort-Object -Property userPrincipalName -Unique)  # Force array creation
             }
-        
-            Write-Verbose "[$functionName] Returning $($matchList.Count) substring matches"
-            # Return the list of matches - this is an array of match objects
-            return $matchList
+            Write-Verbose "[$functionName] Filtered results to $($filteredResponse.value.Count) unique users after exclusions"
+            return $filteredResponse, $substringSearch
         }
-        else
+        else        
         {
-            Write-Verbose "[$functionName] No substring matches found for: $searchTerm"
+            Write-Verbose "[$functionName] Search approach failed (Error code: $fallbackResults)"
             return $returnValues.noUserFoundInDirectoryMessage
         }
     }
@@ -712,7 +723,7 @@ function GetDeviceByUser()
     Write-Verbose "[$functionName] Trimmed user name: $UserName"
     $extraparameters = "select=deviceName,serialNumber,userDisplayName,model,manufacturer,complianceState"
     Write-Verbose "[$functionName] Extra parameters for API call: $extraparameters"
-    $filter = "userPrincipalName ne null and userPrincipalName ne '' and contains(userPrincipalName, '$username') and operatingSystem eq '$OperatingSystem'"
+    $filter = "contains(userPrincipalName, '$UserName') and operatingSystem eq '$OperatingSystem'"
     Write-Verbose "[$functionName] Filter for API call: $filter"
     $managedDeviceUri = "deviceManagement/managedDevices"
     Write-Verbose "[$functionName] Managed device URI: $managedDeviceUri"
@@ -780,6 +791,7 @@ function GetDeviceByUser()
                 Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selectedSerialNumber', treating as navigation"
                 return $selectedSerialNumber
             }
+            
             Write-Verbose "[$functionName] Returning valid selected serial number: $selectedSerialNumber"
             return $selectedSerialNumber
             # #region Additional validation: check if the returned value is actually a serial number from one of our devices
@@ -809,7 +821,7 @@ function GetDeviceByUser()
     else
     {
         Write-Host "An error occured looking up device for user: $UserName" -ForegroundColor Red
-        return $null
+        return $returnValues.noDeviceFound
     }
 }
 
