@@ -233,7 +233,7 @@ foreach ($key in $settings.Keys)
     Write-Verbose "[$scriptName] $($key): $($settings[$key])"
     if ($showSettings)
     {
-        Write-Host "Setting $key: $($settings[$key])"
+        Write-Host "Setting $($key): $($settings[$key])"
     }
 }
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
