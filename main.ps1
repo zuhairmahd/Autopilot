@@ -8,10 +8,14 @@ param(
     [switch]$Reconfigure,
     [switch]$ReInitialize,
     [switch]$Update,
+    [switch]$showAuth,
+    [switch]$showSettings,
     [switch]$SecureString,
     [switch]$ForceNewToken,
     [parameter(parameterSetName = 'Deligated')]
     [switch]$Deligated,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$ForceNewRefreshToken,
     [parameter(parameterSetName = 'Deligated')]
     [switch]$NoSaveRefreshToken,
     [parameter(parameterSetName = 'Deligated')]
@@ -48,11 +52,44 @@ else
 }
 
 #region Load parameters from the configuration file if it exists
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-Write-Verbose "[$scriptName] Domain: $domain"
+Write-Verbose "[$scriptName] Checking configuration file: $configFile"
+if (Test-Path $configFile)
+{
+    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+    $authConfiguration = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+    $auth = @{}
+    Write-Verbose "[$scriptName] Domain: $domain"
+    Write-Verbose "[$scriptName] Loading Auth configuration from $configFile"
+    foreach ($key in $authConfiguration.PSObject.Properties.Name)
+    {
+        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
+        {
+            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($authConfiguration.$key)"
+            Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
+            if ($authConfiguration.$key -in ('true', 'false'))
+            {
+                Write-Verbose "[$scriptName] Converting $key to boolean."
+                $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
+                $auth.add($key, $keyBooleanValue)
+                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($authConfiguration.$key))."
+                $auth.add($key, $authConfiguration.$key)
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
+            $auth.add($key, $PSBoundParameters[$key])
+        }
+    }
+}
 if (Test-Path -Path $InitFile)
 {
-    Write-Host " Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
+    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
     $global:globalSettings = @{}
     $global:localSettings = @{}
     $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
@@ -119,6 +156,7 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    
 }
 else
 {
@@ -193,10 +231,22 @@ Write-Verbose "[$scriptName] Settings are as follows:"
 foreach ($key in $settings.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($settings[$key])"
+    if ($showSettings)
+    {
+        Write-Host "Setting $key: $($settings[$key])"
+    }
 }
-$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
 $getTokenParams = BuildAuthSplatTable -auth $auth
+foreach ($key in $getTokenParams.Keys)
+{
+    Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
+    if ($showAuth)
+    {
+        Write-Host "$($key): $($getTokenParams[$key])"
+    }
+}
+Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
 $backoutText = 'Returning to previous menu'
 Write-Verbose "[$scriptName] Backout Text: $backoutText"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
@@ -233,6 +283,17 @@ Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
 Write-Verbose "[$scriptName] Repository: $Repo"
 Write-Verbose "[$scriptName] Release: $Release"
 Write-Verbose "[$scriptName] Domain: $domain"
+Write-Verbose "[$scriptName] Max wait time: $maxWaitTime seconds"
+Write-Verbose "[$scriptName] Time in seconds: $timeInSeconds"
+Write-Verbose "[$scriptName] Auth type: $AuthType"
+Write-Verbose "[$scriptName] Cache type: $CacheType"
+Write-Verbose "[$scriptName] Force new token: $ForceNewToken"
+Write-Verbose "[$scriptName] Force new refresh token: $ForceNewRefreshToken"
+Write-Verbose "[$scriptName] No save refresh token: $NoSaveRefreshToken"
+Write-Verbose "[$scriptName] Deligated: $Deligated"
+Write-Verbose "[$scriptName] Scope: $Scope"
+Write-Verbose "[$scriptName] Secure string: $SecureString"
+Write-Verbose "[$scriptName] App mode: $appMode"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 Write-Verbose "[$scriptName] Backout text: $backoutText"
@@ -658,8 +719,25 @@ function ProcessSerialNumber()
     # Return success status for calling functions
     return $success
 }
-#endregion helper functions
 
+if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
+{
+    Write-Host "Forcing new token retrieval due to parameters." -ForegroundColor Yellow
+    $accessToken = GetGraphAccessToken @getTokenParams
+    if ($accessToken)
+    {
+        Write-Host "Access token retrieved successfully." -ForegroundColor Green
+        Write-Host "The script will now exit."
+        Write-Host "You can now run the script again to use the new access token." -ForegroundColor Green
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to retrieve access token." -ForegroundColor Red
+        exit 1
+    }
+}
+#endregion helper functions
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"

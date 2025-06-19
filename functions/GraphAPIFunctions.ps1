@@ -3,12 +3,12 @@ function FormatScopes()
     [CmdletBinding()]
     param(
         [string[]]$scopes,
-        [switch]$AsIs,
         [switch]$Reverse
     )
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] [FormatScopes] Called with AsIs=$AsIs, Reverse=$Reverse"
+    Write-Verbose "[$functionName] [FormatScopes] Called with Reverse=$Reverse"
     Write-Verbose "[$functionName] [FormatScopes] Input scopes: '$scopes'"
+    
     #Check for null or empty scopes.
     if (-not $scopes -or $scopes.Trim() -eq "")
     {
@@ -16,100 +16,115 @@ function FormatScopes()
         Write-Warning "[$functionName] [FormatScopes] WARNING: Scopes parameter is null or empty!"
         return ""
     }
+    
     #region Format scopes properly if necessary
     $scopesFormatted = $scopes
     Write-Verbose "[$functionName] [FormatScopes] Received a scope string of length $($scopes.Length) characters"
-    if (!$AsIs -and $scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
+    
+    if ($Reverse)
     {
-        Write-Verbose "[$functionName] [FormatScopes] Formatting scopes to include Graph API prefix"
-        $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
-        $formattedScopesArray = @()
-        Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
-        foreach ($scope in $scopesArray)
+        # Reverse mode: Remove Graph API prefixes and don't add default scopes
+        Write-Verbose "[$functionName] [FormatScopes] Reverse mode: Removing Graph API prefixes"
+        
+        if ($scopes -and $scopes.Contains("https://graph.microsoft.com/"))
         {
-            Write-Verbose "[$functionName] Processing scope: $scope"
-            if ($scope -eq "offline_access")
+            Write-Verbose "[$functionName] [FormatScopes] Converting scopes to array for processing"
+            $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+            $formattedScopesArray = @()
+            
+            Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
+            foreach ($scope in $scopesArray)
             {
-                $formattedScopesArray += $scope
-                Write-Verbose "[$functionName] [FormatScopes] Added as is: $scope"
-            }
-            else
-            {
-                # Check if the scope already has the Graph prefix
-                if (-not $scope.StartsWith("https://graph.microsoft.com/"))
+                Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
+                if ($scope.StartsWith("https://graph.microsoft.com/"))
                 {
-                    $formattedScopesArray += "https://graph.microsoft.com/$scope"
-                    Write-Verbose "[$functionName] [FormatScopes] Added prefix: https://graph.microsoft.com/$scope"
+                    Write-Verbose "[$functionName] [FormatScopes] Removing prefix from scope: $scope"
+                    $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
+                    $formattedScopesArray += $formattedScope
+                    Write-Verbose "[$functionName] [FormatScopes] Scope is now: $formattedScope"
                 }
                 else
                 {
                     $formattedScopesArray += $scope
-                    Write-Verbose "[$functionName] [FormatScopes] Added as is (already has prefix): $scope"
+                    Write-Verbose "[$functionName] [FormatScopes] Added as is (no prefix): $scope"
                 }
             }
+            
+            Write-Verbose "[$functionName] [FormatScopes] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
+            $scopesFormatted = $formattedScopesArray
         }
-        Write-Verbose "[$functionName] [FormatScopes] Count of Scopes formatted to include Graph API prefix: $($formattedScopesArray.count)"
-        Write-Verbose "[$functionName] [FormatScopes] Converting from array back to string."
-        $scopesFormatted = $formattedScopesArray -join ' '
-    }
-    elseif ($AsIs -and $scopes -and $scopes.Contains("https://graph.microsoft.com/"))
-    {
-        Write-Verbose "[$functionName] [FormatScopes] Reversing scopes already formatted with Graph API prefix"
-        Write-Verbose "[$functionName] [FormatScopes] The type of scopes received is: $($scopes.GetType())"
-        Write-Verbose "[$functionName] [FormatScopes] Converting into an array."
-        $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
-        $FormattedScopesArray = @()
-        Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
-        foreach ($scope in $scopesArray)
+        else
         {
-            Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
-            if ($scope.StartsWith("https://graph.microsoft.com/"))
-            {
-                Write-Verbose "[$functionName] [FormatScopes] Removing prefix from scope: $scope"
-                $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
-                $formattedScopesArray += $formattedScope
-                Write-Verbose "[$functionName] [FormatScopes] Scope is now $formattedScope"
-            }
-            else
-            {
-                $formattedScopesArray += $scope
-                Write-Verbose "[$functionName] [FormatScopes] Added as is (no prefix): $scope"
-            }
+            Write-Verbose "[$functionName] [FormatScopes] No Graph API prefixes found, returning scopes as-is"
         }
-        $scopesFormatted = $FormattedScopesArray
     }
     else
     {
-        Write-Verbose "[$functionName] [FormatScopes] Scopes already properly formatted or empty"
-    }
-    Write-Verbose "[$functionName] [FormatScopes] Using scopes: $($scopesFormatted.count)"
-    if (!$AsIs -and !$Reverse)
-    {
-        Write-Verbose "[$functionName] [FormatScopes] Checking for openid."
+        # Normal mode: Add Graph API prefixes and default scopes
+        if ($scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
+        {
+            Write-Verbose "[$functionName] [FormatScopes] Normal mode: Adding Graph API prefixes"
+            $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+            $formattedScopesArray = @()
+            
+            Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
+            foreach ($scope in $scopesArray)
+            {
+                Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
+                if ($scope -eq "offline_access" -or $scope -eq "openid")
+                {
+                    $formattedScopesArray += $scope
+                    Write-Verbose "[$functionName] [FormatScopes] Added default scope as-is: $scope"
+                }
+                else
+                {
+                    # Check if the scope already has the Graph prefix
+                    if (-not $scope.StartsWith("https://graph.microsoft.com/"))
+                    {
+                        $formattedScopesArray += "https://graph.microsoft.com/$scope"
+                        Write-Verbose "[$functionName] [FormatScopes] Added prefix: https://graph.microsoft.com/$scope"
+                    }
+                    else
+                    {
+                        $formattedScopesArray += $scope
+                        Write-Verbose "[$functionName] [FormatScopes] Added as-is (already has prefix): $scope"
+                    }
+                }
+            }
+            
+            Write-Verbose "[$functionName] [FormatScopes] Count of scopes with prefixes added: $($formattedScopesArray.count)"
+            $scopesFormatted = $formattedScopesArray -join ' '
+        }
+        else
+        {
+            Write-Verbose "[$functionName] [FormatScopes] Scopes already have Graph API prefixes or are empty"
+        }
+        
+        # Add default scopes for normal mode
+        Write-Verbose "[$functionName] [FormatScopes] Adding default scopes (openid and offline_access)"
+        
         if (-not $scopesFormatted.Contains("openid"))
         {
             $scopesFormatted = "openid $scopesFormatted"
-            Write-Verbose "[$functionName] [FormatScopes] Added openid to scopes: $scopesFormatted"
+            Write-Verbose "[$functionName] [FormatScopes] Added openid to scopes"
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] openid already present in scopes."
+            Write-Verbose "[$functionName] [FormatScopes] openid already present in scopes"
         }
-        Write-Verbose "[$functionName] [FormatScopes] Checking for offline_access."
+        
         if (-not $scopesFormatted.Contains("offline_access"))
         {
             $scopesFormatted = "offline_access $scopesFormatted"
-            Write-Verbose "[$functionName] [FormatScopes] Added offline_access to scopes: $scopesFormatted"
+            Write-Verbose "[$functionName] [FormatScopes] Added offline_access to scopes"
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] offline_access already present in scopes."
+            Write-Verbose "[$functionName] [FormatScopes] offline_access already present in scopes"
         }
     }
-    else
-    {
-        Write-Verbose "[$functionName] [FormatScopes] Skipping openid and offline_access addition."
-    }
+    
+    Write-Verbose "[$functionName] [FormatScopes] Final formatted scopes: $scopesFormatted"
     #endregion Format scopes
     return $scopesFormatted
 }    
@@ -371,8 +386,17 @@ function Save-RefreshTokenToConfig()
                 if ($refreshToken.scope)
                 {
                     Write-Verbose "[$functionName] Updating existing scope in deligatedCredentials"
-                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -AsIs -Reverse
-                    $decryptedConfig.deligatedCredentials.scope = $formattedScopes 
+                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
+                    Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
+                    #If it is not an array, make it int an array
+                    if (-not ($formattedScopes -is [array]))
+                    {
+                        Write-Verbose "[$functionName] Scopes is not an array, converting to array"
+                        $formattedScopes = @($formattedScopes)
+                    }
+                    $decryptedConfig.deligatedCredentials.scope = $formattedScopes
+
+
                 }
             }
             else
@@ -383,7 +407,7 @@ function Save-RefreshTokenToConfig()
                 if ($refreshToken.scope)
                 {
                     Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
-                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -AsIs -Reverse
+                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
                     $decryptedConfig.deligatedCredentials.scope = $formattedScopes
                 }
             }
@@ -1314,6 +1338,8 @@ function BuildAuthSplatTable()
         $auth
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Received object of type $($auth.GetType().Name)"
     # Dynamic splatting approach - iterate over all auth properties    # Create clean splatting hashtable starting with required parameter
     $getTokenParams = @{
         configFile = $configFile
@@ -1321,99 +1347,122 @@ function BuildAuthSplatTable()
     $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'ForceNewRefreshToken', 'CacheType', 'configFile')
     # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
     $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewRefreshToken')
-    
-    Write-Verbose "Debugging BuildAuthSplatTable - Auth object properties:"
-    foreach ($prop in $auth.PSObject.Properties)
+
+    Write-Verbose "[$functionName] Debugging BuildAuthSplatTable - Auth object properties:"
+    foreach ($key in $auth.Keys)
     {
-        Write-Verbose "  Property: '$($prop.Name)' = '$($prop.Value)' (Type: $($prop.Value.GetType().Name))"
+        $value = $auth[$key]
+        Write-Verbose "[$functionName]  Property: '$key' = '$value' (Type: $($value.GetType().Name))"
     }
     
     # Iterate over all properties in the auth object
-    foreach ($property in $auth.PSObject.Properties)
+    foreach ($property in $auth.Keys)
     {
-        $paramName = $property.Name
-        $paramValue = $property.Value
-        Write-Verbose "Processing property '$paramName' with value '$paramValue'"
-        
+        $paramName = $property
+        $paramValue = $auth[$property]
+        Write-Verbose "[$functionName] Processing property '$paramName' with value '$paramValue'"
+
         # Special debugging for scope parameter
         if ($paramName -ieq 'scope')
         {
-            Write-Verbose "SCOPE DEBUG: Found scope parameter with value: '$paramValue'"
-            Write-Verbose "SCOPE DEBUG: Value type: $($paramValue.GetType().Name)"
+            Write-Verbose "[$functionName] SCOPE DEBUG: Found scope parameter with value: '$paramValue'"
+            Write-Verbose "[$functionName] SCOPE DEBUG: Value type: $($paramValue.GetType().Name)"
             if ($paramValue -is [array])
             {
-                Write-Verbose "SCOPE DEBUG: Scope is array with $($paramValue.Count) elements: $($paramValue -join ', ')"
+                Write-Verbose "[$functionName] SCOPE DEBUG: Scope is array with $($paramValue.Count) elements: $($paramValue -join ', ')"
             }
         }
         
         # Find the correct parameter name (case-insensitive match)
         $correctParamName = $validParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
-        
-        Write-Verbose "Case-insensitive match for '$paramName': '$correctParamName'"
-        
+
+        Write-Verbose "[$functionName] Case-insensitive match for '$paramName': '$correctParamName'"
         # Skip if not a valid parameter for the function
         if (-not $correctParamName)
         {
-            Write-Verbose "Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
+            Write-Verbose "[$functionName] Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
             continue
         }
         
         # Skip if value is null, empty, or false for switch parameters
         if ($null -eq $paramValue -or $paramValue -eq '' -or $paramValue -eq $false)
         {
-            Write-Verbose "Skipping parameter '$paramName' due to null/empty/false value"
+            Write-Verbose "[$functionName] Skipping parameter '$paramName' due to null/empty/false value"
             continue
-        }
-        # Check if this is a delegated-only parameter (case-insensitive)
+        }        # Check if this is a delegated-only parameter (case-insensitive)
         $isDelegatedOnlyParam = $deligatedOnlyParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
         if ($isDelegatedOnlyParam)
         {
             # Only add if Deligated is true in the auth object
-            if ($auth.PSObject.Properties.Name -contains 'Deligated' -and $auth.Deligated)
+            # Handle both hashtable and PSObject cases
+            $hasDelegatedProperty = $false
+            $delegatedValue = $false
+            
+            if ($auth -is [hashtable])
             {
-                Write-Verbose "Adding delegated parameter '$paramName' with value: $paramValue"
-                #Check if the parameter is an array, and if so convert it to a space seperated string
-                if ($paramValue -is [array])
+                $hasDelegatedProperty = $auth.ContainsKey('Deligated')
+                if ($hasDelegatedProperty)
                 {
-                    $paramValue = $paramValue -join ' '
-                    Write-Verbose "Converted array parameter '$paramName' to space-separated string: $paramValue"                
-                }
-                # Use the correct parameter name (properly capitalized) for the hashtable
-                $getTokenParams[$correctParamName] = $paramValue
-                
-                # Special debugging for scope parameter
-                if ($correctParamName -ieq 'Scope')
-                {
-                    Write-Verbose "SCOPE DEBUG: Added scope to hashtable with key '$correctParamName' and value '$paramValue'"
+                    $delegatedValue = $auth.Deligated
                 }
             }
             else
             {
-                Write-Verbose "Skipping delegated parameter '$paramName' because Deligated is not true"
+                $hasDelegatedProperty = $auth.PSObject.Properties.Name -contains 'Deligated'
+                if ($hasDelegatedProperty)
+                {
+                    $delegatedValue = $auth.Deligated
+                }
+            }
+            
+            Write-Verbose "[$functionName] Delegated check: HasProperty=$hasDelegatedProperty, Value=$delegatedValue, ValueType=$($delegatedValue.GetType().Name)"
+            
+            if ($hasDelegatedProperty -and $delegatedValue)
+            {
+                Write-Verbose "[$functionName] Adding delegated parameter '$paramName' with value: $paramValue"
+                #Check if the parameter is an array, and if so convert it to a space seperated string
+                if ($paramValue -is [array])
+                {
+                    $paramValue = $paramValue -join ' '
+                    Write-Verbose "[$functionName] Converted array parameter '$paramName' to space-separated string: $paramValue"
+                }
+                # Use the correct parameter name (properly capitalized) for the hashtable
+                $getTokenParams[$correctParamName] = $paramValue
+                Write-Verbose "[$functionName] Added delegated parameter '$correctParamName' with value: $paramValue"
+                
+                # Special debugging for scope parameter
+                if ($correctParamName -ieq 'Scope')
+                {
+                    Write-Verbose "[$functionName] SCOPE DEBUG: Added scope to hashtable with key '$correctParamName' and value '$paramValue'"
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Skipping delegated parameter '$paramName' because Deligated is not true (HasProperty=$hasDelegatedProperty, Value=$delegatedValue)"
             }
         }
         else
         {
             # Add general parameters (not restricted to delegated mode)
-            Write-Verbose "Adding parameter '$paramName' with value: $paramValue"
+            Write-Verbose "[$functionName] Adding parameter '$paramName' with value: $paramValue"
             # Use the correct parameter name (properly capitalized) for the hashtable
             $getTokenParams[$correctParamName] = $paramValue
         }
     }    # Log the final splatting parameters for verification
-    Write-Verbose "Final splatting parameters:"
+    Write-Verbose "[$functionName] Final splatting parameters:"
     foreach ($param in $getTokenParams.GetEnumerator())
     {
         if ($param.Key -eq 'configFile')
         {
-            Write-Verbose "  $($param.Key): $($param.Value)"
+            Write-Verbose "[$functionName]   $($param.Key): $($param.Value)"
         }
         elseif ($param.Value -is [bool])
         {
-            Write-Verbose "  $($param.Key): $($param.Value)"
+            Write-Verbose "[$functionName]  $($param.Key): $($param.Value)"
         }
         else
         {
-            Write-Verbose "  $($param.Key): '$($param.Value)'"
+            Write-Verbose "[$functionName]  $($param.Key): '$($param.Value)'"
         }
     }
     
@@ -1429,6 +1478,7 @@ function BuildAuthSplatTable()
     }
     
     # Return the splatting hashtable
+    Write-Verbose "[$functionName] Returning splatting hashtable with parameters for GetGraphAccessToken"
     return $getTokenParams
 }
 
@@ -1529,7 +1579,9 @@ function GetGraphAccessToken()
         [string[]]$Scope,
         [parameter(parameterSetName = 'Deligated')]
         [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
-        [string]$AuthType = 'Private', [switch]$ForceNewToken,
+        [string]$AuthType = 'Private', 
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$ForceNewToken,
         [parameter(parameterSetName = 'Deligated')]
         [switch]$ForceNewRefreshToken,
         [ValidateSet('file', 'memory')]

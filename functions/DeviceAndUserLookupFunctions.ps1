@@ -1126,7 +1126,7 @@ function GetDeviceEnrollmentStatus()
         }
         else
         {
-            Write-Verbose "[$functionName] No BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)" -ForegroundColor Yellow
+            Write-Verbose "[$functionName] No BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)" 
             $bitlockerKeys = $returnValues.noBitLockerKeysFoundMessage
             $latestBitlockerKey = $null
         }
