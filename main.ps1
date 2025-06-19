@@ -738,6 +738,7 @@ if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshTo
     }
 }
 #endregion helper functions
+
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"

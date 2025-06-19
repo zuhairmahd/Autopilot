@@ -338,11 +338,16 @@ function Start-HttpListener()
 function Save-TokenToCache()
 {
     param($cachedToken, $cacheType, $cacheTokenFile, $cacheFolder)
-    $functionName = $MyInvocation.MyCommand.Name
-    # Save access token according to cache type
+    $functionName = $MyInvocation.MyCommand.Name    # Save access token according to cache type
     if ($cacheType -eq 'memory')
     {
         Write-Verbose "[$functionName] Saving access token to memory cache."
+        # Initialize global memory cache if it doesn't exist
+        if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
+        {
+            Write-Verbose "[$functionName] Initializing global memory cache."
+            New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
+        }
         $Global:MemoryCache['accessToken'] = $cachedToken
     }
     else
@@ -1270,7 +1275,7 @@ function Get-DelegatedToken()
 
 function Get-ClientCredentialsToken()
 {
-    param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
+    param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $secureString)
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Using non-delegated access..."
     Write-Verbose "[$functionName] Requesting new access token with client credentials flow"
@@ -1286,16 +1291,12 @@ function Get-ClientCredentialsToken()
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
         Write-Verbose "[$functionName] Sending request to token endpoint: $tokenEndpoint"
         $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType 'application/x-www-form-urlencoded' -Body $body -ErrorVariable restError
-            
-        Write-Verbose "[$functionName] Access token received successfully"
+        Write-Verbose "[$functionName] Access token received successfully" 
         Write-Verbose "[$functionName] Token expires in: $($tokenResponse.expires_in) seconds"
-            
         $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            
         # Cache the token
         Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            
-        return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        return Format-TokenOutput -token $tokenResponse.access_token -secureString $secureString
     }
     catch
     {
@@ -1636,7 +1637,7 @@ function GetGraphAccessToken()
         # Clear the configRefreshToken variable so a new one will be obtained
         $configRefreshToken = $null
         Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
-    }
+    }    
     if ($config.tenantId)
     {
         $tenantId = $config.tenantId
@@ -1645,6 +1646,16 @@ function GetGraphAccessToken()
     else
     {
         Write-Error "Tenant ID not found in config file."
+        return $null
+    }
+    if ($config.domain)
+    {
+        $domain = $config.domain
+        Write-Verbose "[$functionName] Domain found in config: $domain"
+    }
+    else
+    {
+        Write-Error "Domain not found in config file."
         return $null
     }
     if ($config.appId)
@@ -1781,7 +1792,7 @@ function GetGraphAccessToken()
         if ($tenantId -and $clientId -and $clientSecret)
         {
             return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -secureString $SecureString
         }
         else
         {
