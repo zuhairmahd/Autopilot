@@ -397,9 +397,22 @@ function Get-UniqueCallerContext()
     
     # Skip Get-CallingContext (index 0) and look at actual caller (index 1)
     $caller = $CallStack[1]
+    Write-Verbose "[$functionName] Caller: $caller"
     $callerFunction = $caller.FunctionName
+    Write-Verbose "[$functionName] Caller function name: $callerFunction"
     $callerLine = $caller.ScriptLineNumber
-    $callerFile = Split-Path -Leaf $caller.ScriptName
+    Write-Verbose "[$functionName] Caller line number: $callerLine"
+    if ($null -ne $caller.ScriptName)
+    {
+        $callerFile = Split-Path -Leaf $caller.ScriptName    
+        Write-Verbose "[$functionName] Caller script name: $callerFile"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Caller script name is null"
+        $callerFile = 'main.exe'
+    }
+    
     
     Write-Verbose "[$functionName] Analyzing caller: $callerFunction in $callerFile at line $callerLine"
     
