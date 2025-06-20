@@ -1,12 +1,12 @@
 [CmdletBinding()]
 param
 (
-    [Parameter(Mandatory = $true, Position = 0)]
     $userName,
     $repo = 'Github', # Options: Github, gitlab
     $release = 'auto',
     $configFile = "$pwd\.secrets\config.json",
-    $outputFile = "$pwd\deviceMemory-export.csv"
+    $outputFile = "$pwd\deviceMemory-export.csv",
+    [switch]$forceNewToken
 )
 
 #region Load parameters from the configuration file if it exists
@@ -110,8 +110,10 @@ else
 #endregion
 
 #region variables
+# $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+# $scope = $auth.scope
 # $logfile = "mylog.log"
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+# $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
@@ -131,7 +133,7 @@ $settings = MergeSettings -localSettings $localSettings -globalSettings $globalS
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scopes -AuthType 'PublicAuthFlow' 
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow' 
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -144,18 +146,23 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $sc
 # }
 #endregion variables
 
-
-
-$global:users = GetEntraUser -accessToken $accessToken -UserName $userName -FindSimilar
-Write-Host "Found $($global:users[0].value.Count) users matching '$userName'"
-if ($global:users[1] -eq $true)
+if (Test-Path $configFile)
 {
-    $userNameSelection = DisplayUserList -UserList $global:users[0].value -userName $userName
-    Write-Host "Selected user: $userNameSelection"
+    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+    $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+    Write-Verbose "[$scriptName] Domain: $domain"
+    foreach ($key in $auth.PSObject.Properties.Name)
+    {
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $auth.$key)
+        {
+            Write-Host "[$scriptName] Setting $key to $($auth.$key)"
+            Set-Variable -Name $key -Value $auth.$key
+        }
+        else
+        {
+            Write-Host "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
+            Set-Variable -Name $key -Value $PSBoundParameters[$key]
+        }
+    }
 }
-else 
-{
-    Write-Host "Found $($global:users[0].value.Count) users matching '$userName'"
-}
-
 
