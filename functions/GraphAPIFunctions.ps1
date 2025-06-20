@@ -2,60 +2,58 @@ function FormatScopes()
 {
     [CmdletBinding()]
     param(
-        [string[]]$scopes,
+        [string]$scopes,
         [switch]$Reverse
     )
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] [FormatScopes] Called with Reverse=$Reverse"
-    Write-Verbose "[$functionName] [FormatScopes] Input scopes: '$scopes'"
-    
+    Write-Verbose "[$functionName] Called with Reverse=$Reverse"
+    Write-Verbose "[$functionName] Input scopes: '$scopes'"
+    Write-Verbose "Passed parameter type: $($scopes.GetType().Name)"
     #Check for null or empty scopes.
     if (-not $scopes -or $scopes.Trim() -eq "")
     {
-        Write-Verbose "[$functionName] [FormatScopes] No scopes provided. Returning empty string."
-        Write-Warning "[$functionName] [FormatScopes] WARNING: Scopes parameter is null or empty!"
+        Write-Verbose "[$functionName] No scopes provided. Returning empty string."
+        Write-Warning "[$functionName] WARNING: Scopes parameter is null or empty!"
         return ""
     }
     
     #region Format scopes properly if necessary
     $scopesFormatted = $scopes
-    Write-Verbose "[$functionName] [FormatScopes] Received a scope string of length $($scopes.Length) characters"
-    
+    Write-Verbose "[$functionName] Received a scope string of length $($scopes.Length) characters"
     if ($Reverse)
     {
         # Reverse mode: Remove Graph API prefixes and don't add default scopes
-        Write-Verbose "[$functionName] [FormatScopes] Reverse mode: Removing Graph API prefixes"
-        
-        if ($scopes -and $scopes.Contains("https://graph.microsoft.com/"))
+        Write-Verbose "[$functionName] Reverse mode: Removing Graph API prefixes"
+        if ($scopes.Contains("https://graph.microsoft.com/"))
         {
-            Write-Verbose "[$functionName] [FormatScopes] Converting scopes to array for processing"
+            Write-Verbose "[$functionName] Converting scopes to array for processing"
             $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
             $formattedScopesArray = @()
             
-            Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
+            Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
             foreach ($scope in $scopesArray)
             {
-                Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
+                Write-Verbose "[$functionName] Processing scope: $scope"
                 if ($scope.StartsWith("https://graph.microsoft.com/"))
                 {
-                    Write-Verbose "[$functionName] [FormatScopes] Removing prefix from scope: $scope"
+                    Write-Verbose "[$functionName] Removing prefix from scope: $scope"
                     $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
                     $formattedScopesArray += $formattedScope
-                    Write-Verbose "[$functionName] [FormatScopes] Scope is now: $formattedScope"
+                    Write-Verbose "[$functionName] Scope is now: $formattedScope"
                 }
                 else
                 {
                     $formattedScopesArray += $scope
-                    Write-Verbose "[$functionName] [FormatScopes] Added as is (no prefix): $scope"
+                    Write-Verbose "[$functionName] Added as is (no prefix): $scope"
                 }
             }
-            
-            Write-Verbose "[$functionName] [FormatScopes] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
+
+            Write-Verbose "[$functionName] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
             $scopesFormatted = $formattedScopesArray
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] No Graph API prefixes found, returning scopes as-is"
+            Write-Verbose "[$functionName] No Graph API prefixes found, returning scopes as-is"
         }
     }
     else
@@ -63,18 +61,17 @@ function FormatScopes()
         # Normal mode: Add Graph API prefixes and default scopes
         if ($scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
         {
-            Write-Verbose "[$functionName] [FormatScopes] Normal mode: Adding Graph API prefixes"
+            Write-Verbose "[$functionName] Normal mode: Adding Graph API prefixes"
             $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
             $formattedScopesArray = @()
-            
-            Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
+            Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
             foreach ($scope in $scopesArray)
             {
-                Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
+                Write-Verbose "[$functionName] Processing scope: $scope"
                 if ($scope -eq "offline_access" -or $scope -eq "openid")
                 {
                     $formattedScopesArray += $scope
-                    Write-Verbose "[$functionName] [FormatScopes] Added default scope as-is: $scope"
+                    Write-Verbose "[$functionName] Added default scope as-is: $scope"
                 }
                 else
                 {
@@ -82,49 +79,48 @@ function FormatScopes()
                     if (-not $scope.StartsWith("https://graph.microsoft.com/"))
                     {
                         $formattedScopesArray += "https://graph.microsoft.com/$scope"
-                        Write-Verbose "[$functionName] [FormatScopes] Added prefix: https://graph.microsoft.com/$scope"
+                        Write-Verbose "[$functionName] Added prefix: https://graph.microsoft.com/$scope"
                     }
                     else
                     {
                         $formattedScopesArray += $scope
-                        Write-Verbose "[$functionName] [FormatScopes] Added as-is (already has prefix): $scope"
+                        Write-Verbose "[$functionName] Added as-is (already has prefix): $scope"
                     }
                 }
             }
-            
-            Write-Verbose "[$functionName] [FormatScopes] Count of scopes with prefixes added: $($formattedScopesArray.count)"
+
+            Write-Verbose "[$functionName] Count of scopes with prefixes added: $($formattedScopesArray.count)"
             $scopesFormatted = $formattedScopesArray -join ' '
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] Scopes already have Graph API prefixes or are empty"
+            Write-Verbose "[$functionName] Scopes already have Graph API prefixes or are empty"
         }
         
         # Add default scopes for normal mode
-        Write-Verbose "[$functionName] [FormatScopes] Adding default scopes (openid and offline_access)"
-        
+        Write-Verbose "[$functionName] Adding default scopes (openid and offline_access)"
         if (-not $scopesFormatted.Contains("openid"))
         {
             $scopesFormatted = "openid $scopesFormatted"
-            Write-Verbose "[$functionName] [FormatScopes] Added openid to scopes"
+            Write-Verbose "[$functionName] Added openid to scopes"
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] openid already present in scopes"
+            Write-Verbose "[$functionName] openid already present in scopes"
         }
         
         if (-not $scopesFormatted.Contains("offline_access"))
         {
             $scopesFormatted = "offline_access $scopesFormatted"
-            Write-Verbose "[$functionName] [FormatScopes] Added offline_access to scopes"
+            Write-Verbose "[$functionName] Added offline_access to scopes"
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] offline_access already present in scopes"
+            Write-Verbose "[$functionName] offline_access already present in scopes"
         }
     }
-    
-    Write-Verbose "[$functionName] [FormatScopes] Final formatted scopes: $scopesFormatted"
+
+    Write-Verbose "[$functionName] Final formatted scopes: $scopesFormatted"
     #endregion Format scopes
     return $scopesFormatted
 }    
@@ -367,7 +363,7 @@ function Save-RefreshTokenToConfig()
 {
     param($refreshToken, $configFilePath)
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] [Save-RefreshTokenToConfig] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
+    Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
     if (-not $refreshToken)
     {
         Write-Verbose "[$functionName] No refresh token to save"
@@ -392,16 +388,27 @@ function Save-RefreshTokenToConfig()
                 {
                     Write-Verbose "[$functionName] Updating existing scope in deligatedCredentials"
                     $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
-                    Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
+                    Write-Verbose "[$functionName] Formatted scope object type: $($formattedScopes.GetType().Name)"
                     #If it is not an array, make it int an array
                     if (-not ($formattedScopes -is [array]))
                     {
                         Write-Verbose "[$functionName] Scopes is not an array, converting to array"
                         $formattedScopes = @($formattedScopes)
                     }
-                    $decryptedConfig.deligatedCredentials.scope = $formattedScopes
-
-
+                    else 
+                    {
+                        Write-Verbose "[$functionName] Scopes is already an array"
+                    }
+                    if ($decryptedConfig.deligatedCredentials.scope)
+                    {
+                        Write-Verbose "[$functionName] Existing scope found in deligatedCredentials, updating it"
+                        $decryptedConfig.deligatedCredentials.scope = $formattedScopes
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] No existing scope found in deligatedCredentials, adding it"
+                        $decryptedConfig.deligatedCredentials | Add-Member -MemberType NoteProperty -Name 'scope' -Value $formattedScopes
+                    }       
                 }
             }
             else
@@ -413,6 +420,13 @@ function Save-RefreshTokenToConfig()
                 {
                     Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
                     $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
+                    Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
+                    #If it is not an array, make it int an array
+                    if (-not ($formattedScopes -is [array]))
+                    {
+                        Write-Verbose "[$functionName] Scopes is not an array, converting to array"
+                        $formattedScopes = @($formattedScopes)
+                    }
                     $decryptedConfig.deligatedCredentials.scope = $formattedScopes
                 }
             }
