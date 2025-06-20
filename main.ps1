@@ -644,7 +644,7 @@ function ProcessSerialNumber()
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
                     Write-Host "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
-                    GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken -verbose 
+                    GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                 }
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
@@ -719,7 +719,9 @@ function ProcessSerialNumber()
     # Return success status for calling functions
     return $success
 }
-
+Write-Verbose "Force new token: $($auth.ForceNewToken )"
+Write-Verbose "Force new refresh token: $($auth.ForceNewRefreshToken )"
+Write-Verbose "No save refresh token: $($auth.NoSaveRefreshToken )"
 if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
 {
     Write-Host "Forcing new token retrieval due to parameters." -ForegroundColor Yellow
