@@ -2,6 +2,7 @@
     "returnValues": {
         "unknownErrorMessage": "An unknown error occurred.",
         "noRestartMessage": "Device not restarted.",
+        "noLAPSFoundMessage": "No LAPS password found for this device.",
         "EnrolledMessage": "The device is enrolled.",
         "notContactedMessage": "The device has not contacted the enrollment service.",
         "PendingResetMessage": "The device is pending a reset.",
@@ -11,6 +12,7 @@
         "deviceNotInIntuneMessage": "The device is not in Intune.",
         "noUserDeviceFoundMessage": "No user or device found.",
         "noUserFoundInDirectoryMessage": "This user does not exist",
+        "noBitLockerKeysFoundMessage": "No BitLocker keys found for this device.",
         "noDeviceFound": "No device found",
         "deviceAssignedMessage": "The device is assigned to a deployment profile.",
         "deviceUnknownActionMessage": "The action may still be in progress. You can check the device status in the Intune portal.",

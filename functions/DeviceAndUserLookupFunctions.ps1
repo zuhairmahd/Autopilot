@@ -723,7 +723,7 @@ function GetDeviceByUser()
     Write-Verbose "[$functionName] Trimmed user name: $UserName"
     $extraparameters = "select=deviceName,serialNumber,userDisplayName,model,manufacturer,complianceState"
     Write-Verbose "[$functionName] Extra parameters for API call: $extraparameters"
-    $filter = "contains(userPrincipalName, '$UserName') and operatingSystem eq '$OperatingSystem'"
+    $filter = "startswith(userPrincipalName,'$UserName') and operatingSystem eq '$OperatingSystem'"
     Write-Verbose "[$functionName] Filter for API call: $filter"
     $managedDeviceUri = "deviceManagement/managedDevices"
     Write-Verbose "[$functionName] Managed device URI: $managedDeviceUri"
@@ -737,7 +737,7 @@ function GetDeviceByUser()
         if ($deviceInfo.value.Count -eq 0)
         {
             Write-Verbose "[$functionName] No devices found for user: $UserName"
-            return $returnValues.noUserDeviceFoundMessage 
+            return $returnValues.noDeviceFound
         }
         elseif ($deviceInfo.value.Count -eq 1)
         {
@@ -993,6 +993,8 @@ function GetDeviceEnrollmentStatus()
         Write-Verbose "[$functionName] Device found in Intune with serial number $($managedDevice.serialNumber)"
         $inManagedDevices = $true
         $returnedManagedDevice = $managedDevice
+        
+        #region Check device memory
         Write-Verbose "[$functionName] Checking device memory information."
         $hardwareResourcePath = "$deviceManagementUri/$($autopilotDevice.managedDeviceId)" 
         Write-Verbose "[$functionName] Calling graph using the path $hardwareResourcePath with the extra parameters         $deviceHardwareExtraparameters"
@@ -1010,6 +1012,9 @@ function GetDeviceEnrollmentStatus()
             $deviceMemory = $null
         }
         Write-Verbose "[$functionName] Got device memory: $deviceMemory"
+        #endregion
+
+        #region check device users
         Write-Verbose "[$functionName] Checking for logged on users for device with serial number $($managedDevice.serialNumber)"
         Write-Verbose "[$functionName] managedDevice.usersLoggedOn: $($managedDevice.usersLoggedOn)"
         Write-Verbose "[$functionName] managedDevice.userPrincipalName: $($managedDevice.userPrincipalName)"
@@ -1091,6 +1096,40 @@ function GetDeviceEnrollmentStatus()
         {
             Write-Verbose "[$functionName] No logged on users found for device in Intune"
         }
+        #endregion
+
+        #region Check for LAPS credentials
+        $lapsUri = "directory/deviceLocalCredentials/$($managedDevice.azureADDeviceId)"
+        $lapsExtraParameters = "select=credentials" 
+        $laps = CallGraphAPI -accessToken $AccessToken -ResourcePath $lapsUri -extraParameters $lapsExtraParameters 
+        if ($null -ne $laps -and $laps -ne $returnValues.noLAPSFoundMessage)
+        {
+            Write-Verbose "[$functionName] LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
+        }
+        #endregion
+
+        #region Get bitlocker recovery objects.
+        $bitlockerURI = "informationProtection/bitlocker/recoveryKeys"
+        $bitlockerFilter = "deviceId eq '$($managedDevice.azureADDeviceId)'"
+        $bitlockerExtraParameters = "select=id,createdDateTime,volumeType,deviceId" 
+        Write-Verbose "[$scriptName] Getting BitLocker recovery keys for device: $($managedDevice.azureADDeviceId)"
+        $bitlockerKeys = CallGraphApi -accessToken $accessToken -ResourcePath $bitlockerURI -filter $bitlockerFilter -extraParameters $bitlockerExtraParameters 
+        if ($bitlockerKeys.value.count -gt 0)
+        {
+            Write-Verbose "[$functionName] $($bitlockerKeys.value.count) BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)"
+            #get the latest BitLocker recovery key
+            $latestBitlockerKey = $bitlockerKeys.value | Sort-Object createdDateTime -Descending | Select-Object -First 1
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)" 
+            $bitlockerKeys = $returnValues.noBitLockerKeysFoundMessage
+            $latestBitlockerKey = $null
+        }
     }
     else
     {
@@ -1166,6 +1205,45 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "[$functionName] Device not found in Intune"
     }
+    if ($hasUserObject)
+    {
+        Write-Verbose "[$functionName] Device has user object: $hasUserObject"
+        Write-Verbose "[$functionName] Device has user: $hasUser"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Device does not have user object: $hasUserObject"
+        Write-Verbose "[$functionName] Device does not have user: $hasUser"
+    }
+    if ($loggedOnUsers)
+    {
+        Write-Verbose "[$functionName] Logged on users: $($loggedOnUsers.Count)"
+        Write-Verbose "[$functionName] Logged on user display name: $($loggedOnUsers.userDisplayName)"
+        Write-Verbose "[$functionName] Logged on user principal name: $($loggedOnUsers.userPrincipalName)"
+        Write-Verbose "[$functionName] Logged on user email address: $($loggedOnUsers.emailAddress)"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No logged on users found for device in Intune"
+    }
+    if ($laps)
+    {
+        Write-Verbose "[$functionName] LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
+        Write-Verbose "[$functionName] LAPS credentials count: $($laps.credentials.count)"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
+    }
+    if ($bitlockerKeys -and $bitlockerKeys.value.count -gt 0)
+    {
+        Write-Verbose "[$functionName] BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)"
+        Write-Verbose "[$functionName] BitLocker recovery keys count: $($bitlockerKeys.value.count)"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)"
+    }
     #endregion
 
     #region return values
@@ -1177,9 +1255,12 @@ function GetDeviceEnrollmentStatus()
     $deviceState.add('autopilot', $autopilotData)
     $deviceState.add('Managed', $inManagedDevices)
     $managedDeviceData = [ordered] @{
-        Device = $returnedManagedDevice
-        Memory = $deviceMemory
-        Users  = $loggedOnUsers
+        Device             = $returnedManagedDevice
+        Memory             = $deviceMemory
+        Users              = $loggedOnUsers
+        LAPS               = $laps
+        BitLocker          = $bitlockerKeys
+        LatestBitLockerKey = $latestBitlockerKey
     }
     $deviceState.add('managedDevice', $managedDeviceData)
     $deviceState.add('imported', $imported)
@@ -1189,4 +1270,97 @@ function GetDeviceEnrollmentStatus()
     #endregion
     $global:enrollment = $deviceState
     return $deviceState
+}
+
+function GetDeviceLAPSCredentials()
+{
+    [CmdletBinding()]
+    param (
+        $enrollmentState
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting LAPS credentials for device with Azure ID: $($enrollmentState.managedDevice.Device.azureADDeviceId)."
+
+    if ($enrollmentState.managedDevice.laps -notin $returnValues.values)
+    {
+        Write-Host "LAPS credentials found for device with serial number $($enrollmentState.managedDevice.Device.serialNumber)" -ForegroundColor Green
+        Write-Verbose "Found $($enrollmentState.managedDevice.laps.credentials.count ) LAPS credentials for device with Azure ID: $DeviceId"
+        #If there is more than $lapsCredentials.credentials.count, return the latest (by date) $lapsCredential.accountName, backupDateTime and a clear text password derived from passwordBase64
+        if ($enrollmentState.managedDevice.laps.credentials.count -gt 1)
+        {
+            Write-Verbose "[$functionName] More than one LAPS credential found. Sorting by backupDateTime and getting the latest credential."
+            $latestCredential = $enrollmentState.managedDevice.laps.credentials | Sort-Object backupDateTime -Descending | Select-Object -First 1
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Only one LAPS credential found. Using that credential."
+            $latestCredential = $enrollmentState.managedDevice.laps.credentials
+        }
+        $clearTextPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($latestCredential.passwordBase64))
+        $returnObject = @{
+            AccountName       = $latestCredential.accountName
+            BackupDateTime    = $latestCredential.backupDateTime
+            ClearTextPassword = $clearTextPassword
+        }
+        #display the LAPS credentials
+        Write-Host "LAPS Credentials for device: $DeviceId" -ForegroundColor Cyan
+        Write-Host "Account Name: $($returnObject.AccountName)" -ForegroundColor Cyan
+        Write-Host "Backup DateTime: $($returnObject.BackupDateTime | FormatDateWithTimeZone)" -ForegroundColor Cyan
+        Write-Host "Clear Text Password: $($returnObject.ClearTextPassword)" -ForegroundColor Cyan
+        return "`n"
+        # return $lapsCredentials 
+        return "`n"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No LAPS credentials found for device: $DeviceId"
+        Write-Host "No LAPS credentials found for device: $DeviceId" -ForegroundColor Red
+        return $returnValues.noLAPSFoundMessage
+    }
+}
+
+function GetBitLockerRecoveryKey()
+{
+    [CmdletBinding()]
+    param (
+        [parameter(Mandatory = $true)]
+        $key,
+        [parameter(Mandatory = $true)]
+        [string]$accessToken
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Retrieving BitLocker recovery key for key ID: $($key.id)"
+    if ($accessToken)
+    {
+        Write-Verbose "[$functionName] Access Token provided."
+    }
+    
+    # Define the resource path for BitLocker recovery keys
+    $bitLockerUri = "informationProtection/bitlocker/recoveryKeys/$($key.id)"
+    $bitlockerExtraParameters = "select=key"
+    Write-Verbose "[$functionName] Retrieving actual BitLocker recovery key..."
+    Write-Verbose "[$functionName] BitLocker URI: $bitLockerUri"
+    Write-Verbose "[$functionName] Extra parameters for BitLocker API call: $bitlockerExtraParameters"
+    # Call the Graph API to get BitLocker recovery keys
+    try
+    {
+        $recoveryKeyDetails = CallGraphApi -accessToken $accessToken -ResourcePath $bitLockerUri -extraParameters $bitlockerExtraParameters
+        # Display the recovery key information
+        Write-Host "Latest BitLocker recovery key:" -ForegroundColor Cyan
+        Write-Host "Key: $($recoveryKeyDetails.key)" -ForegroundColor Yellow
+        Write-Host "Created: $($key.createdDateTime)" -ForegroundColor Yellow
+        Write-Host "Volume Type: $($key.volumeType)" -ForegroundColor Yellow
+    }
+    catch
+    {
+        Write-Error "[$scriptName] Failed to retrieve BitLocker recovery key: $($_.Exception.Message)"
+        Write-Host "Key metadata available:" -ForegroundColor Yellow
+        Write-Host "Created: $($latestKeyInfo.createdDateTime)" -ForegroundColor Yellow
+        Write-Host "Volume Type: $($latestKeyInfo.volumeType)" -ForegroundColor Yellow
+        Write-Host "Device ID: $($latestKeyInfo.deviceId)" -ForegroundColor Yellow
+        Write-Host "Key ID: $($latestKeyInfo.id)" -ForegroundColor Yellow
+    }
+    return "`n"
 }

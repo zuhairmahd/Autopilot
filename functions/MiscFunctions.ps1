@@ -537,11 +537,11 @@ function DisplayUserList()
     # Store devices in an array to reference later
     $users = $UserList
     Write-Verbose "[$functionName] Creating user menu with $($userList.Count) users."
-    # Add each device as a menu item
+    # Add each user as a menu item
     foreach ($user in $users)
     {
         # Create a display name for the menu
-        $menuItemName = "User: $($user.displayName) ($($user.userPrincipalName))"
+        $menuItemName = "$($user.displayName): ($($user.userPrincipalName))"
         Write-Verbose "[$functionName] Adding menu item: $menuItemName"
         # Create a scriptblock action that returns This specific user id when selected.
         $UPN = $user.userPrincipalName
@@ -565,17 +565,7 @@ function DisplayUserList()
     {
         Write-Verbose "[$functionName] Selected user is null or not a string"
     }
-    # Validate that we got a proper user name, not a navigation option
-    if ($selectedUser -eq "Back" -or $selectedUser -eq "Main Menu" -or $selectedUser -eq 0 -or $selectedUser -eq "0")
-    {
-        Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selectedUser', treating as navigation"
-        return $selectedUser
-    }
-    else
-    {
-        Write-Host "An error occured looking up device for user: $UserName" -ForegroundColor Red
-        return $null
-    }
+    return $selectedUser
 }
 
 

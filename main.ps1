@@ -8,10 +8,14 @@ param(
     [switch]$Reconfigure,
     [switch]$ReInitialize,
     [switch]$Update,
+    [switch]$showAuth,
+    [switch]$showSettings,
     [switch]$SecureString,
     [switch]$ForceNewToken,
     [parameter(parameterSetName = 'Deligated')]
     [switch]$Deligated,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$ForceNewRefreshToken,
     [parameter(parameterSetName = 'Deligated')]
     [switch]$NoSaveRefreshToken,
     [parameter(parameterSetName = 'Deligated')]
@@ -48,11 +52,44 @@ else
 }
 
 #region Load parameters from the configuration file if it exists
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-Write-Verbose "[$scriptName] Domain: $domain"
+Write-Verbose "[$scriptName] Checking configuration file: $configFile"
+if (Test-Path $configFile)
+{
+    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+    $authConfiguration = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+    $auth = @{}
+    Write-Verbose "[$scriptName] Domain: $domain"
+    Write-Verbose "[$scriptName] Loading Auth configuration from $configFile"
+    foreach ($key in $authConfiguration.PSObject.Properties.Name)
+    {
+        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
+        {
+            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($authConfiguration.$key)"
+            Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
+            if ($authConfiguration.$key -in ('true', 'false'))
+            {
+                Write-Verbose "[$scriptName] Converting $key to boolean."
+                $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
+                $auth.add($key, $keyBooleanValue)
+                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($authConfiguration.$key))."
+                $auth.add($key, $authConfiguration.$key)
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
+            $auth.add($key, $PSBoundParameters[$key])
+        }
+    }
+}
 if (Test-Path -Path $InitFile)
 {
-    Write-Host " Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
+    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
     $global:globalSettings = @{}
     $global:localSettings = @{}
     $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
@@ -119,6 +156,7 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    
 }
 else
 {
@@ -193,14 +231,22 @@ Write-Verbose "[$scriptName] Settings are as follows:"
 foreach ($key in $settings.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($settings[$key])"
+    if ($showSettings)
+    {
+        Write-Host "Setting $($key): $($settings[$key])"
+    }
 }
-$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
-foreach ($key in $auth.Keys)
-{
-    Write-Verbose "[$scriptName] Auth key: $($key) = $($auth[$key])"
-}   
 $getTokenParams = BuildAuthSplatTable -auth $auth
+foreach ($key in $getTokenParams.Keys)
+{
+    Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
+    if ($showAuth)
+    {
+        Write-Host "$($key): $($getTokenParams[$key])"
+    }
+}
+Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
 $backoutText = 'Returning to previous menu'
 Write-Verbose "[$scriptName] Backout Text: $backoutText"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
@@ -237,6 +283,17 @@ Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
 Write-Verbose "[$scriptName] Repository: $Repo"
 Write-Verbose "[$scriptName] Release: $Release"
 Write-Verbose "[$scriptName] Domain: $domain"
+Write-Verbose "[$scriptName] Max wait time: $maxWaitTime seconds"
+Write-Verbose "[$scriptName] Time in seconds: $timeInSeconds"
+Write-Verbose "[$scriptName] Auth type: $AuthType"
+Write-Verbose "[$scriptName] Cache type: $CacheType"
+Write-Verbose "[$scriptName] Force new token: $ForceNewToken"
+Write-Verbose "[$scriptName] Force new refresh token: $ForceNewRefreshToken"
+Write-Verbose "[$scriptName] No save refresh token: $NoSaveRefreshToken"
+Write-Verbose "[$scriptName] Deligated: $Deligated"
+Write-Verbose "[$scriptName] Scope: $Scope"
+Write-Verbose "[$scriptName] Secure string: $SecureString"
+Write-Verbose "[$scriptName] App mode: $appMode"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 Write-Verbose "[$scriptName] Backout text: $backoutText"
@@ -521,10 +578,10 @@ function ProcessSerialNumber()
         if ($enrollmentState.Imported)
         {
             Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
-            Write-Verbose "[$scriptName] Imported count: $($enrollmentState.ImportedAutopilotDevice.Count)"
-            if ($enrollmentState.ImportedAutopilotDevice.Count -gt 1)
+            Write-Verbose "[$scriptName] Imported count: $($enrollmentState.Imported)"
+            if ($enrollmentState.Imported -gt 1)
             {
-                Write-Host "This device was imported into Autopilot $($enrollmentState.ImportedAutopilotDevice.Count) times." -ForegroundColor Green
+                Write-Host "This device was imported into Autopilot $($enrollmentState.Imported) times." -ForegroundColor Green
                 $importedDeviceInfo = $enrollmentState.ImportedAutopilotDevice[$enrollmentState.ImportedAutopilotDevice.Count - 1]
             }
             else
@@ -572,6 +629,23 @@ function ProcessSerialNumber()
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
                 Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
+            }
+            Write-Verbose "[$functionName] Checking if device has LAPS credentials."
+            Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
+            if ($enrollmentState.managedDevice.laps.credentials.count -gt 0)
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
+                    GetDeviceLAPSCredentials -enrollmentState $enrollmentState
+                }
+            }            
+            Write-Verbose "Checking if we have bitlocker keys for this device."
+            Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
+            if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
+                    Write-Host "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
+                    GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken -verbose 
+                }
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
@@ -644,6 +718,24 @@ function ProcessSerialNumber()
     
     # Return success status for calling functions
     return $success
+}
+
+if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
+{
+    Write-Host "Forcing new token retrieval due to parameters." -ForegroundColor Yellow
+    $accessToken = GetGraphAccessToken @getTokenParams
+    if ($accessToken)
+    {
+        Write-Host "Access token retrieved successfully." -ForegroundColor Green
+        Write-Host "The script will now exit."
+        Write-Host "You can now run the script again to use the new access token." -ForegroundColor Green
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to retrieve access token." -ForegroundColor Red
+        exit 1
+    }
 }
 #endregion helper functions
 
@@ -1000,37 +1092,53 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
     {
         Write-Host "Could not find an exact match for user $($userName)."
-        Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+        if ($userInfo[0].value.count -eq 1)
+        {
+            Write-Host "Found a user with a similar name."
+        }
+        else
+        {
+            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+        }
         if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
         {
             Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+        }
+        elseif ($($userInfo[0].value.count) -eq 1)
+        {
+            Write-Host "Is this the correct user?"
         }
         else
         {
             Write-Host "Displaying all $($userInfo[0].value.count) matches:"
         }
-        $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay 
-        Write-Verbose "[$scriptName] User name selected: $userName"
+        $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
+        Write-Verbose "[$scriptName] User name selected: $possibleUserName"
         # Handle navigation options returned from DisplayUserList
-        if ($null -eq $userName)
+        if ($null -eq $possibleUserName)
         {
             Write-Verbose "[$scriptName] DisplayUserList returned null (exit signal)."
             return "EXIT_APPLICATION"
         }
-        elseif ($userName -eq "Back" -or $userName -eq "back")
+        elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
         {
             Write-Verbose "[$scriptName] User selected 'Back'. Returning $backoutText."
             return $backoutText
         }
-        elseif ($userName -eq "Main Menu" -or $userName -eq "main menu")
+        elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
         {
             Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
             return "Main Menu"
         }
-        elseif ($userName -eq 0 -or $userName -eq "0")
+        elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
         {
             Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
             return "EXIT_APPLICATION"
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] User selected: $possibleUserName"
+            $userName = $possibleUserName
         }
     }
     elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
@@ -1067,11 +1175,10 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         Write-Verbose "[$scriptName] User requested application exit from device selection."
         return "EXIT_APPLICATION"
     }        
-    elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu" -and $serialNumber -ne $returnValues.noUserDeviceFoundMessage)
+    elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu" -and $serialNumber -notin $returnValues.Values)
     {
         Write-Host "Found device for user $userName with serial number: $serialNumber"
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-            
         Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
         if ($null -eq $result)
         {
@@ -1094,7 +1201,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
     else
     {
-        Write-Host $returnValues.noUserDeviceFoundMessage -ForegroundColor Red
+        Write-Host $serialNumber -ForegroundColor Red
     }
 }
 
@@ -1110,9 +1217,10 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     {
         $hasCorrectGroups = $false
         $hasCorrectNumberOfDevices = $false
-        Write-Host "Checking group membership for user $userName."
+        
         Write-Verbose "[$scriptName] Getting access token..."
         $accessToken = GetGraphAccessToken @getTokenParams
+        
         #region Check if the user exists first.
         $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
@@ -1127,44 +1235,65 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
         {
             Write-Host "Could not find an exact match for user $($userName)."
-            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+            if ($userInfo[0].value.count -eq 1)
+            {
+                Write-Host "Found a user with a similar name."
+            }
+            else
+            {
+                Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+            }
             if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
             {
                 Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+            }
+            elseif ($($userInfo[0].value.count) -eq 1)
+            {
+                Write-Host "Is this the correct user?"
             }
             else
             {
                 Write-Host "Displaying all $($userInfo[0].value.count) matches:"
             }
-            $userName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay 
-            Write-Verbose "[$scriptName] User name after DisplayUserList: $userName"
+            $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
+            Write-Verbose "[$scriptName] User name selected: $possibleUserName"
             # Handle navigation options returned from DisplayUserList
-            if ($null -eq $userName)
+            if ($null -eq $possibleUserName)
             {
                 Write-Verbose "[$scriptName] DisplayUserList returned null (exit signal)."
                 return "EXIT_APPLICATION"
             }
-            elseif ($userName -eq "Back" -or $userName -eq "back")
+            elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
             {
                 Write-Verbose "[$scriptName] User selected 'Back'. Returning $backoutText."
                 return $backoutText
             }
-            elseif ($userName -eq "Main Menu" -or $userName -eq "main menu")
+            elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
             {
                 Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
                 return "Main Menu"
             }
-            elseif ($userName -eq 0 -or $userName -eq "0")
+            elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
             {
                 Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
                 return "EXIT_APPLICATION"
             }
+            else
+            {
+                Write-Verbose "[$scriptName] User selected: $possibleUserName"
+                $userName = $possibleUserName
+            }
         }
-        else 
+        elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
         {
             return $userInfo
         }
+        else
+        {
+            return $returnValues.noUserFoundInDirectoryMessage
+        }
         #endregion Check if the user exists first.
+        Write-Host "Checking group membership for user $userName."
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
         if ($groups.success -eq $true)
         {

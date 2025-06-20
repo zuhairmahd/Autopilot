@@ -2,112 +2,129 @@ function FormatScopes()
 {
     [CmdletBinding()]
     param(
-        [string]$scopes,
-        [switch]$AsIs,
+        [string[]]$scopes,
         [switch]$Reverse
     )
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] [FormatScopes] Called with AsIs=$AsIs, Reverse=$Reverse"
+    Write-Verbose "[$functionName] [FormatScopes] Called with Reverse=$Reverse"
+    Write-Verbose "[$functionName] [FormatScopes] Input scopes: '$scopes'"
+    
     #Check for null or empty scopes.
-    if (-not $scopes)
+    if (-not $scopes -or $scopes.Trim() -eq "")
     {
         Write-Verbose "[$functionName] [FormatScopes] No scopes provided. Returning empty string."
+        Write-Warning "[$functionName] [FormatScopes] WARNING: Scopes parameter is null or empty!"
         return ""
     }
+    
     #region Format scopes properly if necessary
     $scopesFormatted = $scopes
     Write-Verbose "[$functionName] [FormatScopes] Received a scope string of length $($scopes.Length) characters"
-    if (!$AsIs -and $scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
+    
+    if ($Reverse)
     {
-        Write-Verbose "[$functionName] [FormatScopes] Formatting scopes to include Graph API prefix"
-        $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
-        $formattedScopesArray = @()
-        Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
-        foreach ($scope in $scopesArray)
+        # Reverse mode: Remove Graph API prefixes and don't add default scopes
+        Write-Verbose "[$functionName] [FormatScopes] Reverse mode: Removing Graph API prefixes"
+        
+        if ($scopes -and $scopes.Contains("https://graph.microsoft.com/"))
         {
-            Write-Verbose "[$functionName] Processing scope: $scope"
-            if ($scope -eq "offline_access")
+            Write-Verbose "[$functionName] [FormatScopes] Converting scopes to array for processing"
+            $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+            $formattedScopesArray = @()
+            
+            Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
+            foreach ($scope in $scopesArray)
             {
-                $formattedScopesArray += $scope
-                Write-Verbose "[$functionName] [FormatScopes] Added as is: $scope"
-            }
-            else
-            {
-                # Check if the scope already has the Graph prefix
-                if (-not $scope.StartsWith("https://graph.microsoft.com/"))
+                Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
+                if ($scope.StartsWith("https://graph.microsoft.com/"))
                 {
-                    $formattedScopesArray += "https://graph.microsoft.com/$scope"
-                    Write-Verbose "[$functionName] [FormatScopes] Added prefix: https://graph.microsoft.com/$scope"
+                    Write-Verbose "[$functionName] [FormatScopes] Removing prefix from scope: $scope"
+                    $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
+                    $formattedScopesArray += $formattedScope
+                    Write-Verbose "[$functionName] [FormatScopes] Scope is now: $formattedScope"
                 }
                 else
                 {
                     $formattedScopesArray += $scope
-                    Write-Verbose "[$functionName] [FormatScopes] Added as is (already has prefix): $scope"
+                    Write-Verbose "[$functionName] [FormatScopes] Added as is (no prefix): $scope"
                 }
             }
+            
+            Write-Verbose "[$functionName] [FormatScopes] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
+            $scopesFormatted = $formattedScopesArray
         }
-        Write-Verbose "[$functionName] [FormatScopes] Count of Scopes formatted to include Graph API prefix: $($formattedScopesArray.count)"
-        Write-Verbose "[$functionName] [FormatScopes] Converting from array back to string."
-        $scopesFormatted = $formattedScopesArray -join ' '
-    }
-    elseif ($AsIs -and $scopes -and $scopes.Contains("https://graph.microsoft.com/"))
-    {
-        Write-Verbose "[$functionName] [FormatScopes] Reversing scopes already formatted with Graph API prefix"
-        Write-Verbose "[$functionName] [FormatScopes] The type of scopes received is: $($scopes.GetType())"
-        Write-Verbose "[$functionName] [FormatScopes] Converting into an array."
-        $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
-        $FormattedScopesArray = @()
-        Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
-        foreach ($scope in $scopesArray)
+        else
         {
-            Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
-            if ($scope.StartsWith("https://graph.microsoft.com/"))
-            {
-                Write-Verbose "[$functionName] [FormatScopes] Removing prefix from scope: $scope"
-                $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
-                $formattedScopesArray += $formattedScope
-                Write-Verbose "[$functionName] [FormatScopes] Scope is now $formattedScope"
-            }
-            else
-            {
-                $formattedScopesArray += $scope
-                Write-Verbose "[$functionName] [FormatScopes] Added as is (no prefix): $scope"
-            }
+            Write-Verbose "[$functionName] [FormatScopes] No Graph API prefixes found, returning scopes as-is"
         }
-        $scopesFormatted = $FormattedScopesArray
     }
     else
     {
-        Write-Verbose "[$functionName] [FormatScopes] Scopes already properly formatted or empty"
-    }
-    Write-Verbose "[$functionName] [FormatScopes] Using scopes: $($scopesFormatted.count)"
-    if (!$AsIs -and !$Reverse)
-    {
-        Write-Verbose "[$functionName] [FormatScopes] Checking for openid."
+        # Normal mode: Add Graph API prefixes and default scopes
+        if ($scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
+        {
+            Write-Verbose "[$functionName] [FormatScopes] Normal mode: Adding Graph API prefixes"
+            $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+            $formattedScopesArray = @()
+            
+            Write-Verbose "[$functionName] [FormatScopes] Processing scope array with $($scopesArray.Count) items"
+            foreach ($scope in $scopesArray)
+            {
+                Write-Verbose "[$functionName] [FormatScopes] Processing scope: $scope"
+                if ($scope -eq "offline_access" -or $scope -eq "openid")
+                {
+                    $formattedScopesArray += $scope
+                    Write-Verbose "[$functionName] [FormatScopes] Added default scope as-is: $scope"
+                }
+                else
+                {
+                    # Check if the scope already has the Graph prefix
+                    if (-not $scope.StartsWith("https://graph.microsoft.com/"))
+                    {
+                        $formattedScopesArray += "https://graph.microsoft.com/$scope"
+                        Write-Verbose "[$functionName] [FormatScopes] Added prefix: https://graph.microsoft.com/$scope"
+                    }
+                    else
+                    {
+                        $formattedScopesArray += $scope
+                        Write-Verbose "[$functionName] [FormatScopes] Added as-is (already has prefix): $scope"
+                    }
+                }
+            }
+            
+            Write-Verbose "[$functionName] [FormatScopes] Count of scopes with prefixes added: $($formattedScopesArray.count)"
+            $scopesFormatted = $formattedScopesArray -join ' '
+        }
+        else
+        {
+            Write-Verbose "[$functionName] [FormatScopes] Scopes already have Graph API prefixes or are empty"
+        }
+        
+        # Add default scopes for normal mode
+        Write-Verbose "[$functionName] [FormatScopes] Adding default scopes (openid and offline_access)"
+        
         if (-not $scopesFormatted.Contains("openid"))
         {
             $scopesFormatted = "openid $scopesFormatted"
-            Write-Verbose "[$functionName] [FormatScopes] Added openid to scopes: $scopesFormatted"
+            Write-Verbose "[$functionName] [FormatScopes] Added openid to scopes"
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] openid already present in scopes."
+            Write-Verbose "[$functionName] [FormatScopes] openid already present in scopes"
         }
-        Write-Verbose "[$functionName] [FormatScopes] Checking for offline_access."
+        
         if (-not $scopesFormatted.Contains("offline_access"))
         {
             $scopesFormatted = "offline_access $scopesFormatted"
-            Write-Verbose "[$functionName] [FormatScopes] Added offline_access to scopes: $scopesFormatted"
+            Write-Verbose "[$functionName] [FormatScopes] Added offline_access to scopes"
         }
         else
         {
-            Write-Verbose "[$functionName] [FormatScopes] offline_access already present in scopes."
+            Write-Verbose "[$functionName] [FormatScopes] offline_access already present in scopes"
         }
     }
-    else
-    {
-        Write-Verbose "[$functionName] [FormatScopes] Skipping openid and offline_access addition."
-    }
+    
+    Write-Verbose "[$functionName] [FormatScopes] Final formatted scopes: $scopesFormatted"
     #endregion Format scopes
     return $scopesFormatted
 }    
@@ -321,11 +338,16 @@ function Start-HttpListener()
 function Save-TokenToCache()
 {
     param($cachedToken, $cacheType, $cacheTokenFile, $cacheFolder)
-    $functionName = $MyInvocation.MyCommand.Name
-    # Save access token according to cache type
+    $functionName = $MyInvocation.MyCommand.Name    # Save access token according to cache type
     if ($cacheType -eq 'memory')
     {
         Write-Verbose "[$functionName] Saving access token to memory cache."
+        # Initialize global memory cache if it doesn't exist
+        if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
+        {
+            Write-Verbose "[$functionName] Initializing global memory cache."
+            New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
+        }
         $Global:MemoryCache['accessToken'] = $cachedToken
     }
     else
@@ -369,8 +391,17 @@ function Save-RefreshTokenToConfig()
                 if ($refreshToken.scope)
                 {
                     Write-Verbose "[$functionName] Updating existing scope in deligatedCredentials"
-                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -AsIs -Reverse
-                    $decryptedConfig.deligatedCredentials.scope = $formattedScopes 
+                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
+                    Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
+                    #If it is not an array, make it int an array
+                    if (-not ($formattedScopes -is [array]))
+                    {
+                        Write-Verbose "[$functionName] Scopes is not an array, converting to array"
+                        $formattedScopes = @($formattedScopes)
+                    }
+                    $decryptedConfig.deligatedCredentials.scope = $formattedScopes
+
+
                 }
             }
             else
@@ -381,7 +412,7 @@ function Save-RefreshTokenToConfig()
                 if ($refreshToken.scope)
                 {
                     Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
-                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -AsIs -Reverse
+                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
                     $decryptedConfig.deligatedCredentials.scope = $formattedScopes
                 }
             }
@@ -831,8 +862,27 @@ function LaunchBrowser()
 
 function Get-DelegatedToken()
 {
-    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $settings = $settings)
+    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $ForcedRenewal, $settings = $settings)
     $functionName = $MyInvocation.MyCommand.Name
+    
+    # Handle null or empty scopes by providing a sensible default
+    if (-not $scopes -or $scopes -eq "")
+    {
+        Write-Verbose "[$functionName] Scopes parameter is null or empty. Using default Graph API scopes."
+        $scopes = "offline_access openid Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
+        Write-Host "Using default scopes as none were provided: $scopes" -ForegroundColor Yellow
+    }
+    
+    Write-Verbose "[$functionName] Starting with scopes: '$scopes'"
+    
+    # Debug the incoming scopes parameter
+    Write-Verbose "[$functionName] Received scopes parameter: '$scopes'"
+    Write-Verbose "[$functionName] Scopes parameter type: $($scopes.GetType().Name)"
+    if ([string]::IsNullOrEmpty($scopes))
+    {
+        Write-Warning "[$functionName] WARNING: Received null or empty scopes parameter!"
+    }
+    
     # First check if we have a valid refresh token in config
     if ($configRefreshToken)
     {
@@ -851,6 +901,17 @@ function Get-DelegatedToken()
         else
         {
             Write-Verbose "[$functionName] Existing refresh token is invalid. Will proceed with new authorization."
+            if ($ForcedRenewal)
+            {
+                Write-Host "Forcing new refresh token - proceeding with new authentication flow." -ForegroundColor Yellow
+            }
+        }
+    }
+    else
+    {
+        if ($ForcedRenewal)
+        {
+            Write-Host "No existing refresh token found or refresh token was cleared - proceeding with new authentication flow." -ForegroundColor Yellow
         }
     }
     # Generate a random state string
@@ -871,6 +932,8 @@ function Get-DelegatedToken()
                 client_id = $clientId
                 scope     = $scopesFormatted
             }
+            Write-Verbose "[$functionName] Original scopes parameter: '$scopes'"
+            Write-Verbose "[$functionName] Formatted scopes: '$scopesFormatted'"
             Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)"
             try
             {
@@ -1161,7 +1224,6 @@ function Get-DelegatedToken()
             return $null
         }
     }
-    
     # Log the token response properties (without exposing the actual token)
     if ($tokenResponse)
     {
@@ -1170,28 +1232,39 @@ function Get-DelegatedToken()
         {
             if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
             {
-                {
-                    $tokenLength = $tokenResponse.$prop.Length
-                    Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
-                }
-                else
-                {
-                    Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
-                }
+                $tokenLength = $tokenResponse.$prop.Length
+                Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
             }
-            $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            # Cache the access token based on cache type
-            Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            # Save the refresh token to config file regardless of cache type
-            if ($tokenResponse.refresh_token)
+            else
             {
-                if (-not $NoSaveRefreshToken)
+                Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
+            }
+        }
+        
+        $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
+        # Cache the access token based on cache type
+        Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder        # Save the refresh token to config file regardless of cache type
+        if ($tokenResponse.refresh_token)
+        {
+            if (-not $NoSaveRefreshToken)
+            {
+                Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
+                if ($ForcedRenewal)
                 {
-                    Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
+                    Write-Host "New refresh token has been successfully obtained and saved to configuration." -ForegroundColor Green
+                    Write-Verbose "[$functionName] Forced refresh token renewal completed successfully."
                 }
             }
-            return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+            else
+            {
+                if ($ForcedRenewal)
+                {
+                    Write-Host "New refresh token has been obtained but was not saved due to NoSaveRefreshToken setting." -ForegroundColor Yellow
+                    Write-Verbose "[$functionName] Forced refresh token renewal completed but not saved per NoSaveRefreshToken setting."
+                }
+            }
         }
+        return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
     }
     else 
     {
@@ -1202,7 +1275,7 @@ function Get-DelegatedToken()
 
 function Get-ClientCredentialsToken()
 {
-    param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder)
+    param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $secureString)
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Using non-delegated access..."
     Write-Verbose "[$functionName] Requesting new access token with client credentials flow"
@@ -1218,16 +1291,12 @@ function Get-ClientCredentialsToken()
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
         Write-Verbose "[$functionName] Sending request to token endpoint: $tokenEndpoint"
         $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType 'application/x-www-form-urlencoded' -Body $body -ErrorVariable restError
-            
-        Write-Verbose "[$functionName] Access token received successfully"
+        Write-Verbose "[$functionName] Access token received successfully" 
         Write-Verbose "[$functionName] Token expires in: $($tokenResponse.expires_in) seconds"
-            
         $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
-            
         # Cache the token
         Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
-            
-        return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
+        return Format-TokenOutput -token $tokenResponse.access_token -secureString $secureString
     }
     catch
     {
@@ -1270,78 +1339,147 @@ function BuildAuthSplatTable()
         $auth
     )
     
-    # Dynamic splatting approach - iterate over all auth properties
-    # Create clean splatting hashtable starting with required parameter
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Received object of type $($auth.GetType().Name)"
+    # Dynamic splatting approach - iterate over all auth properties    # Create clean splatting hashtable starting with required parameter
     $getTokenParams = @{
         configFile = $configFile
+    }    # Define valid parameters for GetGraphAccessToken function (case-insensitive comparison)
+    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'ForceNewRefreshToken', 'CacheType', 'configFile')
+    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
+    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewRefreshToken')
+
+    Write-Verbose "[$functionName] Debugging BuildAuthSplatTable - Auth object properties:"
+    foreach ($key in $auth.Keys)
+    {
+        $value = $auth[$key]
+        Write-Verbose "[$functionName]  Property: '$key' = '$value' (Type: $($value.GetType().Name))"
     }
     
-    # Define valid parameters for GetGraphAccessToken function
-    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'CacheType', 'configFile')
-    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
-    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType')    # Iterate over all properties in the auth object
-    foreach ($property in $auth.PSObject.Properties)
+    # Iterate over all properties in the auth object
+    foreach ($property in $auth.Keys)
     {
-        $paramName = $property.Name
-        $paramValue = $property.Value
-        # Skip if not a valid parameter for the function
-        if ($paramName -notin $validParams)
+        $paramName = $property
+        $paramValue = $auth[$property]
+        Write-Verbose "[$functionName] Processing property '$paramName' with value '$paramValue'"
+
+        # Special debugging for scope parameter
+        if ($paramName -ieq 'scope')
         {
-            Write-Verbose "Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
+            Write-Verbose "[$functionName] SCOPE DEBUG: Found scope parameter with value: '$paramValue'"
+            Write-Verbose "[$functionName] SCOPE DEBUG: Value type: $($paramValue.GetType().Name)"
+            if ($paramValue -is [array])
+            {
+                Write-Verbose "[$functionName] SCOPE DEBUG: Scope is array with $($paramValue.Count) elements: $($paramValue -join ', ')"
+            }
+        }
+        
+        # Find the correct parameter name (case-insensitive match)
+        $correctParamName = $validParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
+
+        Write-Verbose "[$functionName] Case-insensitive match for '$paramName': '$correctParamName'"
+        # Skip if not a valid parameter for the function
+        if (-not $correctParamName)
+        {
+            Write-Verbose "[$functionName] Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
             continue
         }
+        
         # Skip if value is null, empty, or false for switch parameters
         if ($null -eq $paramValue -or $paramValue -eq '' -or $paramValue -eq $false)
         {
-            Write-Verbose "Skipping parameter '$paramName' due to null/empty/false value"
+            Write-Verbose "[$functionName] Skipping parameter '$paramName' due to null/empty/false value"
             continue
-        }
-        # Check if this is a delegated-only parameter
-        if ($paramName -in $deligatedOnlyParams)
+        }        # Check if this is a delegated-only parameter (case-insensitive)
+        $isDelegatedOnlyParam = $deligatedOnlyParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
+        if ($isDelegatedOnlyParam)
         {
             # Only add if Deligated is true in the auth object
-            if ($auth.PSObject.Properties.Name -contains 'Deligated' -and $auth.Deligated)
+            # Handle both hashtable and PSObject cases
+            $hasDelegatedProperty = $false
+            $delegatedValue = $false
+            
+            if ($auth -is [hashtable])
             {
-                Write-Verbose "Adding delegated parameter '$paramName' with value: $paramValue"
+                $hasDelegatedProperty = $auth.ContainsKey('Deligated')
+                if ($hasDelegatedProperty)
+                {
+                    $delegatedValue = $auth.Deligated
+                }
+            }
+            else
+            {
+                $hasDelegatedProperty = $auth.PSObject.Properties.Name -contains 'Deligated'
+                if ($hasDelegatedProperty)
+                {
+                    $delegatedValue = $auth.Deligated
+                }
+            }
+            
+            Write-Verbose "[$functionName] Delegated check: HasProperty=$hasDelegatedProperty, Value=$delegatedValue, ValueType=$($delegatedValue.GetType().Name)"
+            
+            if ($hasDelegatedProperty -and $delegatedValue)
+            {
+                Write-Verbose "[$functionName] Adding delegated parameter '$paramName' with value: $paramValue"
                 #Check if the parameter is an array, and if so convert it to a space seperated string
                 if ($paramValue -is [array])
                 {
                     $paramValue = $paramValue -join ' '
-                    Write-Verbose "Converted array parameter '$paramName' to space-separated string: $paramValue"
+                    Write-Verbose "[$functionName] Converted array parameter '$paramName' to space-separated string: $paramValue"
                 }
-                $getTokenParams[$paramName] = $paramValue
+                # Use the correct parameter name (properly capitalized) for the hashtable
+                $getTokenParams[$correctParamName] = $paramValue
+                Write-Verbose "[$functionName] Added delegated parameter '$correctParamName' with value: $paramValue"
+                
+                # Special debugging for scope parameter
+                if ($correctParamName -ieq 'Scope')
+                {
+                    Write-Verbose "[$functionName] SCOPE DEBUG: Added scope to hashtable with key '$correctParamName' and value '$paramValue'"
+                }
             }
             else
             {
-                Write-Verbose "Skipping delegated parameter '$paramName' because Deligated is not true"
+                Write-Verbose "[$functionName] Skipping delegated parameter '$paramName' because Deligated is not true (HasProperty=$hasDelegatedProperty, Value=$delegatedValue)"
             }
         }
         else
         {
             # Add general parameters (not restricted to delegated mode)
-            Write-Verbose "Adding parameter '$paramName' with value: $paramValue"
-            $getTokenParams[$paramName] = $paramValue
+            Write-Verbose "[$functionName] Adding parameter '$paramName' with value: $paramValue"
+            # Use the correct parameter name (properly capitalized) for the hashtable
+            $getTokenParams[$correctParamName] = $paramValue
         }
-    }
-
-    # Log the final splatting parameters for verification
-    Write-Verbose "Final splatting parameters:"
+    }    # Log the final splatting parameters for verification
+    Write-Verbose "[$functionName] Final splatting parameters:"
     foreach ($param in $getTokenParams.GetEnumerator())
     {
         if ($param.Key -eq 'configFile')
         {
-            Write-Verbose "  $($param.Key): $($param.Value)"
+            Write-Verbose "[$functionName]   $($param.Key): $($param.Value)"
         }
         elseif ($param.Value -is [bool])
         {
-            Write-Verbose "  $($param.Key): $($param.Value)"
+            Write-Verbose "[$functionName]  $($param.Key): $($param.Value)"
         }
         else
         {
-            Write-Verbose "  $($param.Key): '$($param.Value)'"
+            Write-Verbose "[$functionName]  $($param.Key): '$($param.Value)'"
         }
     }
+    
+    # Special debug for Scope parameter
+    if ($getTokenParams.ContainsKey('Scope'))
+    {
+        Write-Verbose "[$functionName] DEBUG: Scope parameter found in hashtable: '$($getTokenParams.Scope)'" 
+    }
+    else
+    {
+        Write-Verbose "[$functionName] DEBUG: Scope parameter NOT found in hashtable!"
+        Write-Verbose "[$functionName] DEBUG: Available keys: $($getTokenParams.Keys -join ', ')"
+    }
+    
     # Return the splatting hashtable
+    Write-Verbose "[$functionName] Returning splatting hashtable with parameters for GetGraphAccessToken"
     return $getTokenParams
 }
 
@@ -1439,11 +1577,14 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'Deligated')]
         [switch]$Deligated,
         [parameter(parameterSetName = 'Deligated')]
-        [string]$Scope,
+        [string[]]$Scope,
         [parameter(parameterSetName = 'Deligated')]
         [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
-        [string]$AuthType = 'Private',
+        [string]$AuthType = 'Private', 
+        [parameter(parameterSetName = 'Deligated')]
         [switch]$ForceNewToken,
+        [parameter(parameterSetName = 'Deligated')]
+        [switch]$ForceNewRefreshToken,
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory'
     )
@@ -1477,8 +1618,7 @@ function GetGraphAccessToken()
     else
     {
         Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
-    }
-    # Extract the refresh token if it exists
+    }    # Extract the refresh token if it exists
     if ($config.deligatedCredentials.refresh_token)
     {
         $configRefreshToken = $config.deligatedCredentials.refresh_token
@@ -1488,6 +1628,16 @@ function GetGraphAccessToken()
     {
         Write-Verbose "[$functionName] No refresh token found in config."
     }
+    # Handle ForceNewRefreshToken parameter
+    if ($ForceNewRefreshToken -and $Deligated)
+    {
+        Write-Host "Force new refresh token requested. Invalidating existing refresh token." -ForegroundColor Yellow
+        Write-Verbose "[$functionName] ForceNewRefreshToken requested. Clearing existing refresh token from memory."
+        
+        # Clear the configRefreshToken variable so a new one will be obtained
+        $configRefreshToken = $null
+        Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
+    }    
     if ($config.tenantId)
     {
         $tenantId = $config.tenantId
@@ -1496,6 +1646,16 @@ function GetGraphAccessToken()
     else
     {
         Write-Error "Tenant ID not found in config file."
+        return $null
+    }
+    if ($config.domain)
+    {
+        $domain = $config.domain
+        Write-Verbose "[$functionName] Domain found in config: $domain"
+    }
+    else
+    {
+        Write-Error "Domain not found in config file."
         return $null
     }
     if ($config.appId)
@@ -1529,9 +1689,10 @@ function GetGraphAccessToken()
     #region Log parameters
     Write-Verbose "[$functionName] Received parameters:"
     Write-Verbose "[$functionName] Configuration File: $configFile"
-    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime"
+    Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime" 
     Write-Verbose "[$functionName] Secure String: $SecureString"
     Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
+    Write-Verbose "[$functionName] Force New Refresh Token: $ForceNewRefreshToken"
     Write-Verbose "[$functionName] Use Public Auth Flow: $UsePublicAuthFlow"
     Write-Verbose "[$functionName] Interactive: $Interactive"
     Write-Verbose "[$functionName] Cache Type: $CacheType"
@@ -1567,7 +1728,7 @@ function GetGraphAccessToken()
     #region Authentication flow
     if ($deligated)
     {
-        Write-Verbose "[$functionName] Deligated authentication flow selected."
+        Write-Verbose "[$functionName] Deligated authentication flow selected." 
         $params = @{
             tenantId           = $tenantId 
             clientId           = $clientId 
@@ -1579,6 +1740,14 @@ function GetGraphAccessToken()
             cacheFolder        = $cacheFolder 
             configFilePath     = $configFile
             configRefreshToken = $configRefreshToken
+        }
+        
+        # Debug the scopes parameter being passed
+        Write-Verbose "[$functionName] Scope parameter value: '$Scope'"
+        Write-Verbose "[$functionName] Scope parameter type: $($Scope.GetType().Name)"
+        if ([string]::IsNullOrEmpty($Scope))
+        {
+            Write-Warning "[$functionName] WARNING: Scope parameter is null or empty!"
         }
         switch ($AuthType)
         {
@@ -1599,13 +1768,21 @@ function GetGraphAccessToken()
                 $params += @{
                     clientSecret = $clientSecret
                 }
-            }
+            }        
         }
         if ($NoSaveRefreshToken)
         {
             Write-Verbose "[$functionName] No save refresh token option selected. Not saving refresh token."
             $params += @{
                 NoSaveRefreshToken = $NoSaveRefreshToken
+            }
+        }
+        if ($ForceNewRefreshToken)
+        {
+            Write-Verbose "[$functionName] Force new refresh token requested. This will force a new authentication flow."
+            # Add a marker to indicate this was a forced refresh token renewal
+            $params += @{
+                ForcedRenewal = $true
             }
         }
         return Get-DelegatedToken @params
@@ -1615,7 +1792,7 @@ function GetGraphAccessToken()
         if ($tenantId -and $clientId -and $clientSecret)
         {
             return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
+                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -secureString $SecureString
         }
         else
         {
