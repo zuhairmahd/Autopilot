@@ -801,7 +801,37 @@ function GetAutopilotDeviceRelevantProperties()
     if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -in @('enrolled', 'notContacted'))
     {
         Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
-        $enrollmentStateGood = $true
+        #Check the last enrollment status.
+        if ($enrollmentState.autopilot.events.count -gt 0)
+        {
+            $lastEnrollmentEvent = $enrollmentState.autopilot.events[-1]
+            Write-Host "Checking the last autopilot event..."
+            if ($lastEnrollmentEvent.deploymentState -ne 'success' -or $lastEnrollmentEvent.deviceSetupStatus -ne 'success')
+            {
+                Write-Host "There are issues with the device's enrollment:"
+                Write-Host "Deployment start date: $($lastEnrollmentEvent.deploymentStartDateTime | FormatDateWithTimeZone)"
+                Write-Host "Deployment end date: $($lastEnrollmentEvent.deploymentEndDateTime | FormatDateWithTimeZone)"
+                Write-Host "Deployment state: $($lastEnrollmentEvent.deploymentState)"
+                Write-Host "Device setup status: $($lastEnrollmentEvent.deviceSetupStatus)"
+                Write-Host "Enrollment failure details: $($lastEnrollmentEvent.enrollmentFailureDetails)"
+                $enrollmentStateGood = $false
+            }
+            else
+            {
+                Write-Host "The device enrollment state is good."
+                Write-Host "Deployment start date: $($lastEnrollmentEvent.deploymentStartDateTime | FormatDateWithTimeZone)"
+                Write-Host "Deployment end date: $($lastEnrollmentEvent.deploymentEndDateTime | FormatDateWithTimeZone)"
+                Write-Host "Deployment state: $($lastEnrollmentEvent.deploymentState)"
+                Write-Host "Device setup status: $($lastEnrollmentEvent.deviceSetupStatus)"
+                $enrollmentStateGood = $true
+            }
+        }
+        else
+        {
+            Write-Host "No enrollment events found for this device."
+            Write-Host "The device enrollment state is good."
+            $enrollmentStateGood = $true
+        }
     }
     else
     {
@@ -869,12 +899,23 @@ function AssessDeviceState()
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
-                $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                if (-not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
+                {   
+                    Write-Verbose "[$functionName] Getting managed device properties."
+                    $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                    $memoryMessage = "`n"
+                }
+                else 
+                {
+                    Write-Verbose "[$functionName] Device enrollment state is 'notContacted', skipping managed device readiness check."
+                    $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
+                }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
-                if ($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser)
+                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false))
                 {
                     Write-Host "The device is ready for the next user."
+                    Write-Host $memoryMessage
                     $readinessState = $deviceStates.ready 
                     $action = $deviceActions.none
                     $device = $enrollmentState.managedDevice.device.id
@@ -907,7 +948,7 @@ function AssessDeviceState()
                     }
                     elseif ($autopilotReadiness.EnrollmentStateGood -eq $false)
                     {
-                        Write-Host "The device has an enrollment state that is not valid."
+                        Write-Host "The device failed enrollment."
                         $readinessState = $deviceStates.notReady
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
