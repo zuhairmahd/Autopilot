@@ -752,7 +752,6 @@ function Get-TokenFromCache()
     $functionName = $MyInvocation.MyCommand.Name
     $accessTokenObject = $null
     $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-        
     # Get token from memory cache
     if ($cacheType -eq 'memory')
     {
@@ -762,16 +761,13 @@ function Get-TokenFromCache()
             Write-Verbose "[$functionName] Initializing memory cache."
             New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
         }
-            
         if ($Global:MemoryCache.ContainsKey('accessToken'))
         {
             $accessTokenObject = $Global:MemoryCache['accessToken']
-                
             if ($accessTokenObject.domain -eq $domain)
             {
                 Write-Verbose "[$functionName] Domain matches. Using cached token."
                 Write-Verbose "[$functionName] Token for $domain found in memory cache."
-                    
                 # Check if token is still valid
                 if ($accessTokenObject.access_token -and 
                     $accessTokenObject.AbsoluteExpiryTime -and 
@@ -833,12 +829,10 @@ function Get-TokenFromCache()
             try
             {
                 $accessTokenObject = Get-Content -Path $cacheTokenFile -Raw -Force | ConvertFrom-Json
-                    
                 if ($accessTokenObject.domain -eq $domain)
                 {
                     Write-Verbose "[$functionName] Domain matches. Using cached token."
                     $accessToken = $accessTokenObject.access_token
-                        
                     # Handle time formats
                     if ($accessTokenObject.AbsoluteExpiryTime -is [string])
                     {
@@ -853,10 +847,8 @@ function Get-TokenFromCache()
                     {
                         $absoluteExpiryTime = $accessTokenObject.AbsoluteExpiryTime
                     }
-                        
                     Write-Verbose "[$functionName] Absolute Expiry Time: $absoluteExpiryTime"
                     Write-Verbose "[$functionName] We will renew the token $($renewalLeadTime) minutes before it expires."
-                        
                     # Check if token is still valid
                     if ($accessToken -and $absoluteExpiryTime -gt $timeBuffer)
                     {
@@ -922,7 +914,6 @@ function Get-TokenFromCache()
         Write-Error "Invalid cache type. Use 'file' or 'memory'."
         return $null
     }
-        
     return $null
 }
 
