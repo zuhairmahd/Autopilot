@@ -134,7 +134,7 @@ else
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow' 
-# $accessToken = GetGraphAccessToken -configFile $configFile
+$accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
@@ -145,24 +145,4 @@ else
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
-
-if (Test-Path $configFile)
-{
-    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-    $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
-    Write-Verbose "[$scriptName] Domain: $domain"
-    foreach ($key in $auth.PSObject.Properties.Name)
-    {
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $auth.$key)
-        {
-            Write-Host "[$scriptName] Setting $key to $($auth.$key)"
-            Set-Variable -Name $key -Value $auth.$key
-        }
-        else
-        {
-            Write-Host "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            Set-Variable -Name $key -Value $PSBoundParameters[$key]
-        }
-    }
-}
 

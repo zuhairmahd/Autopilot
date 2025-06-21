@@ -2,6 +2,7 @@
     "returnValues": {
         "unknownErrorMessage": "An unknown error occurred.",
         "noRestartMessage": "Device not restarted.",
+        "invalidJWTTokenMessage": "Invalid JWT token format. Expected at least 2 parts.",
         "noLAPSFoundMessage": "No LAPS password found for this device.",
         "EnrolledMessage": "The device is enrolled.",
         "notContactedMessage": "The device has not contacted the enrollment service.",
