@@ -134,7 +134,7 @@ else
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow' 
-$accessToken = GetGraphAccessToken -configFile $configFile
+# $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
