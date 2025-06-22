@@ -250,7 +250,7 @@ function SendDeviceCommand ()
                     {
                         Write-Host "Device is no longer accessible. This could be expected for wipe operations." -ForegroundColor Yellow
                         # For wipe operations, this might be expected behavior as device is reset
-                        if ($Command -eq 'wipe')
+                        if ($Command -eq 'wipe' -or $Command -eq 'clean')
                         {
                             Write-Host "Wipe command appears to have succeeded as device is no longer accessible." -ForegroundColor Green
                             $actionCompleted = $true
