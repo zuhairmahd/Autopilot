@@ -110,8 +110,8 @@ else
 #endregion
 
 #region variables
-# $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
-# $scope = $auth.scope
+$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+$scope = $auth.scope
 # $logfile = "mylog.log"
 # $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # $serialNumber = '0F3CFP724223KV'
@@ -133,7 +133,7 @@ else
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow' 
+$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow' 
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -146,3 +146,22 @@ else
 # }
 #endregion variables
 
+
+# Debug: Display the cached token scope
+Write-Host "Checking cached token scope..." -ForegroundColor Yellow
+if ($Global:MemoryCache -and $Global:MemoryCache['accessToken'])
+{
+    Write-Host "Access Token exists in cache: $($Global:MemoryCache['accessToken'].access_token.Length) characters" -ForegroundColor Green
+    if ($Global:MemoryCache['accessToken'].scope)
+    {
+        Write-Host "Token Scope: $($Global:MemoryCache['accessToken'].scope -join ', ')" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "No scope found in cached token" -ForegroundColor Red
+    }
+}
+else
+{
+    Write-Host "No access token found in memory cache" -ForegroundColor Red
+}

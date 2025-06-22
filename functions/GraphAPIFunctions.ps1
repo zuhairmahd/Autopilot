@@ -486,29 +486,83 @@ function Start-HttpListener()
 
 function Save-TokenToCache()
 {
-    param($cachedToken, $cacheType, $cacheTokenFile, $cacheFolder)
-    $functionName = $MyInvocation.MyCommand.Name    # Save access token according to cache type
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$cachedToken,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('file', 'memory')]
+        [string]$cacheType,
+        [string]$cacheTokenFile,
+        [string]$cacheFolder
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Starting token cache save operation"
+    Write-Verbose "[$functionName] Cache type: $cacheType"
+    # Extract token scope from JWT token roles
+    Write-Verbose "[$functionName] Decoding JWT token to extract roles/scope"
+    $tokenScope = (DecodeJwtToken -Token $cachedToken.access_token -raw).roles 
+    Write-Verbose "[$functionName] Successfully extracted token scope: $($tokenScope -join ', ')"
+    # Add scope to cached token object
+    if ($cachedToken -is [hashtable])
+    {
+        Write-Host "[$functionName] Cached token is a hashtable, adding scope property"
+        $cachedToken['scope'] = $tokenScope
+    }
+    else
+    {
+        Write-Host "[$functionName] Cached token is not a hashtable, adding scope property using Add-Member"
+        $cachedToken | Add-Member -MemberType NoteProperty -Name 'scope' -Value $tokenScope -Force
+    }
+    Write-Verbose "[$functionName] Added scope property to cached token object"
+    
+    # Save access token according to cache type
     if ($cacheType -eq 'memory')
     {
-        Write-Verbose "[$functionName] Saving access token to memory cache."
+        Write-Verbose "[$functionName] Saving access token to memory cache"
+        
         # Initialize global memory cache if it doesn't exist
         if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
         {
-            Write-Verbose "[$functionName] Initializing global memory cache."
+            Write-Verbose "[$functionName] Initializing global memory cache"
             New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
         }
+        
+        # Save to memory cache
         $Global:MemoryCache['accessToken'] = $cachedToken
+        Write-Verbose "[$functionName] Token successfully saved to memory cache"
+        
+        # Debug: Log what was actually saved
+        if ($Global:MemoryCache['accessToken'].scope)
+        {
+            Write-Verbose "[$functionName] Verified scope is accessible: $($Global:MemoryCache['accessToken'].scope -join ', ')"
+        }
+        else
+        {
+            Write-Warning "[$functionName] Scope property not found in saved token"
+        }
     }
     else
     {
         Write-Verbose "[$functionName] Saving access token to cache file: $cacheTokenFile"
+        
         if (-not (Test-Path -Path $cacheFolder))
         {
             Write-Verbose "[$functionName] Creating cache folder: $cacheFolder"
             New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
         }
-        $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
-        Write-Verbose "[$functionName] Access token saved to $cacheTokenFile"
+        
+        try
+        {
+            $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+            Write-Verbose "[$functionName] Access token successfully saved to $cacheTokenFile"
+        }
+        catch
+        {
+            Write-Error "[$functionName] Failed to save token to cache file: $_"
+            throw
+        }
     }
 }
 
@@ -684,17 +738,23 @@ function Test-RefreshTokenValidity()
 
 function Get-RefreshToken()
 {
+    [CmdletBinding()]
     param(
-        $accessTokenObject,
-        $clientId,
-        $clientSecret,
-        $tenantId,
-        $scopes,
-        $domain,
-        $cacheType,
-        $cacheTokenFile,
-        $cacheFolder,
-        $configFilePath
+        [Parameter(Mandatory = $true)]
+        [object]$accessTokenObject,
+        [Parameter(Mandatory = $true)]
+        [string]$clientId,
+        [string]$clientSecret,
+        [Parameter(Mandatory = $true)]
+        [string]$tenantId,
+        [string[]]$scopes,
+        [Parameter(Mandatory = $true)]
+        [string]$domain,
+        [ValidateSet('file', 'memory')]
+        [string]$cacheType,
+        [string]$cacheTokenFile,
+        [string]$cacheFolder,
+        [string]$configFilePath
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Host "Using refresh token to get a new access token..."
@@ -734,186 +794,261 @@ function Get-RefreshToken()
 
 function Get-TokenFromCache()
 {
+    [CmdletBinding()]
     param(
-        $cacheType,
-        $domain,
-        $renewalLeadTime,
-        $clientId,
-        $clientSecret,
-        $tenantId,
-        $scopes,
-        $deligated,
-        $cacheFolder,
-        $cacheTokenFile,
-        $secureString,
-        $configFilePath,
-        $configRefreshToken
+        [ValidateSet('file', 'memory')]
+        [string]$cacheType,
+        [string]$domain,
+        [int]$renewalLeadTime,
+        [string]$clientId,
+        [string]$clientSecret,
+        [string]$tenantId,
+        [string[]]$scopes,
+        [bool]$deligated,
+        [string]$cacheFolder,
+        [string]$cacheTokenFile,
+        [bool]$secureString,
+        [string]$configFilePath,
+        [string]$configRefreshToken
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Starting token cache retrieval for domain: $domain"
+    Write-Verbose "[$functionName] Cache type: $cacheType, Delegated: $deligated"
+    
+    # Calculate time buffer for token renewal
+    $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
+    Write-Verbose "[$functionName] Token renewal buffer time: $timeBuffer"
+    
+    # Get cached token object based on cache type
+    $accessTokenObject = Get-CachedTokenObject -cacheType $cacheType -cacheTokenFile $cacheTokenFile -domain $domain 
+    
+    # If we have a cached token, validate and return it
+    if ($accessTokenObject)
+    {
+        $validToken = Test-CachedTokenValidity -accessTokenObject $accessTokenObject -timeBuffer $timeBuffer -domain $domain -cacheType $cacheType
+        if ($validToken)
+        {
+            return $validToken
+        }
+        
+        # Token is expired, try to refresh it
+        $refreshedToken = Invoke-TokenRefresh -accessTokenObject $accessTokenObject -deligated $deligated -configRefreshToken $configRefreshToken -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath 
+        if ($refreshedToken)
+        {
+            return $refreshedToken
+        }
+    }
+    
+    # No cached token found, try config refresh token as fallback
+    if ($deligated -and $configRefreshToken)
+    {
+        Write-Verbose "[$functionName] No valid cached token found, attempting to use config refresh token"
+        $refreshTokenObject = @{ refresh_token = $configRefreshToken }
+        return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
+    }
+    
+    Write-Verbose "[$functionName] No valid token found in cache or config"
+    return $null
+}
+
+# Helper function to get cached token object
+function Get-CachedTokenObject()
+{
+    [CmdletBinding()]
+    param(
+        [string]$cacheType,
+        [string]$cacheTokenFile,
+        [string]$domain
     )
     $functionName = $MyInvocation.MyCommand.Name
-    $accessTokenObject = $null
-    $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
-    # Get token from memory cache
-    if ($cacheType -eq 'memory')
+    switch ($cacheType)
     {
-        Write-Verbose "[$functionName] Using memory cache for access token."
-        if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
+        'memory'
         {
-            Write-Verbose "[$functionName] Initializing memory cache."
-            New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
-        }
-        if ($Global:MemoryCache.ContainsKey('accessToken'))
-        {
-            $accessTokenObject = $Global:MemoryCache['accessToken']
-            if ($accessTokenObject.domain -eq $domain)
+            Write-Verbose "[$functionName] Checking memory cache for access token"
+            
+            # Initialize memory cache if it doesn't exist
+            if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
             {
-                Write-Verbose "[$functionName] Domain matches. Using cached token."
-                Write-Verbose "[$functionName] Token for $domain found in memory cache."
-                # Check if token is still valid
-                if ($accessTokenObject.access_token -and 
-                    $accessTokenObject.AbsoluteExpiryTime -and 
-                    $accessTokenObject.AbsoluteExpiryTime -gt $timeBuffer)
+                Write-Verbose "[$functionName] Initializing memory cache"
+                New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
+            }
+            
+            if ($Global:MemoryCache.ContainsKey('accessToken'))
+            {
+                $tokenObject = $Global:MemoryCache['accessToken']
+                if ($tokenObject.domain -eq $domain)
                 {
-                    Write-Host "Access token is valid until $($accessTokenObject.AbsoluteExpiryTime)."
-                    Write-Host "Using cached access token for $($accessTokenObject.domain) from memory."
-                    return $accessTokenObject.access_token
+                    Write-Verbose "[$functionName] Found matching token in memory cache for domain: $domain"
+                    return $tokenObject
                 }
                 else
                 {
-                    Write-Host "Access token in memory is expired or invalid."
-                    # Try to use refresh token if available
-                    if ($Deligated)
-                    {
-                        # First check if the object has a refresh token
-                        if ($accessTokenObject.refresh_token)
-                        {
-                            return Get-RefreshToken -accessTokenObject $accessTokenObject -clientId $clientId -clientSecret $clientSecret `
-                                -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
-                                -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
-                        }
-                        # If not, check if we have one in the config
-                        elseif ($configRefreshToken)
-                        {
-                            $refreshTokenObject = @{ refresh_token = $configRefreshToken }
-                            return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret `
-                                -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
-                                -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
-                        }
-                    }
+                    Write-Verbose "[$functionName] Memory cache token domain ($($tokenObject.domain)) doesn't match requested domain ($domain)"
                 }
             }
             else
             {
-                Write-Host "Domain does not match. Requesting a new token from $domain."
+                Write-Verbose "[$functionName] No token found in memory cache"
             }
+            return $null
         }
-        else
+        
+        'file'
         {
-            Write-Verbose "[$functionName] No token found in memory cache."
-            # Check if we have a refresh token in config even if there's no memory cache
-            if ($Deligated -and $configRefreshToken)
+            Write-Verbose "[$functionName] Checking file cache for access token: $cacheTokenFile"
+            
+            if (-not (Test-Path -Path $cacheTokenFile))
             {
-                Write-Verbose "[$functionName] No access token in memory, but found refresh token in config."
-                $refreshTokenObject = @{ refresh_token = $configRefreshToken }
-                return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret `
-                    -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
-                    -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
+                Write-Verbose "[$functionName] Cache file not found: $cacheTokenFile"
+                return $null
             }
-        }
-    }
-    # Get token from file cache
-    elseif ($cacheType -eq 'file')
-    {
-        if (Test-Path -Path $cacheTokenFile)
-        {
-            Write-Verbose "[$functionName] Cache file exists: $cacheTokenFile"
+            
             try
             {
-                $accessTokenObject = Get-Content -Path $cacheTokenFile -Raw -Force | ConvertFrom-Json
-                if ($accessTokenObject.domain -eq $domain)
+                $tokenObject = Get-Content -Path $cacheTokenFile -Raw -Force | ConvertFrom-Json
+                if ($tokenObject.domain -eq $domain)
                 {
-                    Write-Verbose "[$functionName] Domain matches. Using cached token."
-                    $accessToken = $accessTokenObject.access_token
-                    # Handle time formats
-                    if ($accessTokenObject.AbsoluteExpiryTime -is [string])
-                    {
-                        $absoluteExpiryTime = [datetime]::Parse($accessTokenObject.absoluteExpiryTime).ToLocalTime()
-                        if ($absoluteExpiryTime -lt $accessTokenObject.AbsoluteExpiryTime)
-                        {
-                            Write-Verbose "[$functionName] Resolving time differences between UTC and local time."
-                            $absoluteExpiryTime = $accessTokenObject.AbsoluteExpiryTime
-                        }
-                    }
-                    else
-                    {
-                        $absoluteExpiryTime = $accessTokenObject.AbsoluteExpiryTime
-                    }
-                    Write-Verbose "[$functionName] Absolute Expiry Time: $absoluteExpiryTime"
-                    Write-Verbose "[$functionName] We will renew the token $($renewalLeadTime) minutes before it expires."
-                    # Check if token is still valid
-                    if ($accessToken -and $absoluteExpiryTime -gt $timeBuffer)
-                    {
-                        Write-Host "Access token for $($accessTokenObject.domain) is valid until $absoluteExpiryTime."
-                        Write-Host "Using cached access token from disk."
-                        return $accessToken
-                    }
-                    else
-                    {
-                        Write-Host "Access token is expired or invalid."
-                        # Try to use refresh token if available
-                        if ($Deligated)
-                        {
-                            # First check if the cache file has a refresh token
-                            if ($accessTokenObject.refresh_token)
-                            {
-                                return Get-RefreshToken -accessTokenObject $accessTokenObject -clientId $clientId -clientSecret $clientSecret `
-                                    -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
-                                    -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
-                            }
-                            # If not, check if we have one in the config
-                            elseif ($configRefreshToken)
-                            {
-                                $refreshTokenObject = @{ refresh_token = $configRefreshToken }
-                                return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret `
-                                    -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
-                                    -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
-                            }
-                            else
-                            {
-                                Write-Host "Requesting a new token for $domain."
-                            }
-                        }
-                    }
+                    Write-Verbose "[$functionName] Found matching token in file cache for domain: $domain"
+                    return $tokenObject
                 }
                 else
                 {
-                    Write-Verbose "[$functionName] Domain $domain does not match cached token domain $($accessTokenObject.domain)."
+                    Write-Verbose "[$functionName] File cache token domain ($($tokenObject.domain)) doesn't match requested domain ($domain)"
                 }
             }
             catch
             {
-                Write-Host "Failed to read cache file: $_"
-                Write-Host "Cache file may be corrupted or invalid. Requesting a new token."
+                Write-Warning "[$functionName] Failed to read cache file: $_"
+                Write-Verbose "[$functionName] Cache file may be corrupted or invalid"
             }
+            return $null
         }
-        else
+        default
         {
-            Write-Host "No cache file found."
-            # Check if we have a refresh token in config even if there's no cache file
-            if ($Deligated -and $configRefreshToken)
-            {
-                Write-Verbose "[$functionName] No access token in file cache, but found refresh token in config."
-                $refreshTokenObject = @{ refresh_token = $configRefreshToken }
-                return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret `
-                    -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType `
-                    -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
-            }
+            Write-Error "[$functionName] Invalid cache type: $cacheType. Use 'file' or 'memory'."
+            return $null
         }
+    }
+}
+
+# Helper function to test cached token validity
+function Test-CachedTokenValidity()
+{
+    [CmdletBinding()]
+    param(
+        [object]$accessTokenObject,
+        [datetime]$timeBuffer,
+        [string]$domain,
+        [string]$cacheType
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    if (-not $accessTokenObject.access_token)
+    {
+        Write-Verbose "[$functionName] No access token in cached object"
+        return $null
+    }
+    
+    # Handle different time formats for expiry time
+    $absoluteExpiryTime = Get-NormalizedExpiryTime -accessTokenObject $accessTokenObject
+    
+    if ($absoluteExpiryTime -gt $timeBuffer)
+    {
+        Write-Host "Access token for $domain is valid until $absoluteExpiryTime"
+        Write-Host "Using cached access token from $cacheType cache"
+        return $accessTokenObject.access_token
     }
     else
     {
-        Write-Error "Invalid cache type. Use 'file' or 'memory'."
+        Write-Host "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)"
         return $null
     }
+}
+
+# Helper function to normalize expiry time formats
+function Get-NormalizedExpiryTime()
+{
+    [CmdletBinding()]
+    param(
+        [object]$accessTokenObject
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    if (-not $accessTokenObject.AbsoluteExpiryTime)
+    {
+        Write-Verbose "[$functionName] No AbsoluteExpiryTime found in token object"
+        return [datetime]::MinValue
+    }
+    
+    try
+    {
+        if ($accessTokenObject.AbsoluteExpiryTime -is [string])
+        {
+            Write-Verbose "[$functionName] Converting string expiry time to datetime"
+            $parsedTime = [datetime]::Parse($accessTokenObject.AbsoluteExpiryTime).ToLocalTime()
+            
+            # Handle timezone differences
+            if ($parsedTime -lt $accessTokenObject.AbsoluteExpiryTime)
+            {
+                Write-Verbose "[$functionName] Using original expiry time to resolve timezone differences"
+                return $accessTokenObject.AbsoluteExpiryTime
+            }
+            return $parsedTime
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Using datetime expiry time as-is"
+            return $accessTokenObject.AbsoluteExpiryTime
+        }
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Failed to parse expiry time: $_"
+        return [datetime]::MinValue
+    }
+}
+
+# Helper function to handle token refresh logic
+function Invoke-TokenRefresh()
+{
+    [CmdletBinding()]
+    param(
+        [object]$accessTokenObject,
+        [bool]$deligated,
+        [string]$configRefreshToken,
+        [string]$clientId,
+        [string]$clientSecret,
+        [string]$tenantId,
+        [string[]]$scopes,
+        [string]$domain,
+        [string]$cacheType,
+        [string]$cacheTokenFile,
+        [string]$cacheFolder,
+        [string]$configFilePath
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    if (-not $deligated)
+    {
+        Write-Verbose "[$functionName] Not using delegated authentication, skipping refresh token logic"
+        return $null
+    }
+    
+    # Try cached refresh token first
+    if ($accessTokenObject.refresh_token)
+    {
+        Write-Verbose "[$functionName] Attempting to refresh token using cached refresh token"
+        return Get-RefreshToken -accessTokenObject $accessTokenObject -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
+    }
+    
+    # Try config refresh token as fallback
+    if ($configRefreshToken)
+    {
+        Write-Verbose "[$functionName] Attempting to refresh token using config refresh token"
+        $refreshTokenObject = @{ refresh_token = $configRefreshToken }
+        return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
+    }
+    
+    Write-Verbose "[$functionName] No refresh token available for token refresh"
     return $null
 }
 
@@ -1749,12 +1884,14 @@ function GetGraphAccessToken()
     
     #region Process config files
     $functionName = $MyInvocation.MyCommand.Name
+    
     # Read and process configuration file
     if (-not $configFile)
     {
         Write-Error "Config file not found. Please provide a valid config file."
         return $null
     }
+
     Write-Verbose "[$functionName] Reading config file $configFile"
     try
     {
@@ -1776,7 +1913,8 @@ function GetGraphAccessToken()
     else
     {
         Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
-    }    # Extract the refresh token if it exists
+    }    
+    # Extract the refresh token if it exists
     if ($config.deligatedCredentials.refresh_token)
     {
         $configRefreshToken = $config.deligatedCredentials.refresh_token
