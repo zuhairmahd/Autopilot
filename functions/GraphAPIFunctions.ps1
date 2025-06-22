@@ -155,15 +155,16 @@ function FormatScopes()
 {
     [CmdletBinding()]
     param(
-        [string]$scopes,
+        [string[]]$scopes,
         [switch]$Reverse
     )
     $functionName = $MyInvocation.MyCommand.Name
+    $openIdScopes = @('offline_access', 'openid')
     Write-Verbose "[$functionName] Called with Reverse=$Reverse"
-    Write-Verbose "[$functionName] Input scopes: '$scopes'"
+    # Write-Verbose "[$functionName] Input scopes: '$scopes'"
     Write-Verbose "Passed parameter type: $($scopes.GetType().Name)"
     #Check for null or empty scopes.
-    if (-not $scopes -or $scopes.Trim() -eq "")
+    if (-not $scopes -or $scopes -eq "")
     {
         Write-Verbose "[$functionName] No scopes provided. Returning empty string."
         Write-Warning "[$functionName] WARNING: Scopes parameter is null or empty!"
@@ -172,107 +173,84 @@ function FormatScopes()
     
     #region Format scopes properly if necessary
     $scopesFormatted = $scopes
-    Write-Verbose "[$functionName] Received a scope string of length $($scopes.Length) characters"
+    Write-Verbose "[$functionName] Received $($scopes.count) scopes"
     if ($Reverse)
     {
         # Reverse mode: Remove Graph API prefixes and don't add default scopes
         Write-Verbose "[$functionName] Reverse mode: Removing Graph API prefixes"
-        if ($scopes.Contains("https://graph.microsoft.com/"))
+        Write-Verbose "[$functionName] Converting scopes to array for processing"
+        $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+        $formattedScopesArray = @()
+        Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
+        foreach ($scope in $scopesArray)
         {
-            Write-Verbose "[$functionName] Converting scopes to array for processing"
-            $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
-            $formattedScopesArray = @()
-            
-            Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
-            foreach ($scope in $scopesArray)
+            Write-Verbose "[$functionName] Processing scope: $scope"
+            if ($scope.StartsWith("https://graph.microsoft.com/"))
             {
-                Write-Verbose "[$functionName] Processing scope: $scope"
-                if ($scope.StartsWith("https://graph.microsoft.com/"))
-                {
-                    Write-Verbose "[$functionName] Removing prefix from scope: $scope"
-                    $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
-                    $formattedScopesArray += $formattedScope
-                    Write-Verbose "[$functionName] Scope is now: $formattedScope"
-                }
-                else
-                {
-                    $formattedScopesArray += $scope
-                    Write-Verbose "[$functionName] Added as is (no prefix): $scope"
-                }
+                Write-Verbose "[$functionName] Removing prefix from scope: $scope"
+                $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
+                $formattedScopesArray += $formattedScope
+                Write-Verbose "[$functionName] Scope is now: $formattedScope"
             }
-
-            Write-Verbose "[$functionName] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
-            $scopesFormatted = $formattedScopesArray
+            else
+            {
+                $formattedScopesArray += $scope
+                Write-Verbose "[$functionName] Added as is (no prefix): $scope"
+            }
         }
-        else
-        {
-            Write-Verbose "[$functionName] No Graph API prefixes found, returning scopes as-is"
-        }
+        Write-Verbose "[$functionName] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
+        $scopesFormatted = $formattedScopesArray
     }
     else
     {
+        Write-Verbose "[$functionName] Formatting scopes for normal mode"
         # Normal mode: Add Graph API prefixes and default scopes
-        if ($scopes -and -not $scopes.Contains("https://graph.microsoft.com/"))
+        Write-Verbose "[$functionName] Normal mode: Adding Graph API prefixes"
+        $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
+        $formattedScopesArray = @()
+        Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
+        foreach ($scope in $scopesArray)
         {
-            Write-Verbose "[$functionName] Normal mode: Adding Graph API prefixes"
-            $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
-            $formattedScopesArray = @()
-            Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
-            foreach ($scope in $scopesArray)
+            Write-Verbose "[$functionName] Processing scope: $scope"
+            if ($scope -in $openIdScopes)
             {
-                Write-Verbose "[$functionName] Processing scope: $scope"
-                if ($scope -eq "offline_access" -or $scope -eq "openid")
+                $formattedScopesArray += $scope
+                Write-Verbose "[$functionName] Added default scope as-is: $scope"
+            }
+            else
+            {
+                # Check if the scope already has the Graph prefix
+                if (-not $scope.StartsWith("https://graph.microsoft.com/"))
                 {
-                    $formattedScopesArray += $scope
-                    Write-Verbose "[$functionName] Added default scope as-is: $scope"
+                    $formattedScopesArray += "https://graph.microsoft.com/$scope"
+                    Write-Verbose "[$functionName] Added prefix: https://graph.microsoft.com/$scope"
                 }
                 else
                 {
-                    # Check if the scope already has the Graph prefix
-                    if (-not $scope.StartsWith("https://graph.microsoft.com/"))
-                    {
-                        $formattedScopesArray += "https://graph.microsoft.com/$scope"
-                        Write-Verbose "[$functionName] Added prefix: https://graph.microsoft.com/$scope"
-                    }
-                    else
-                    {
-                        $formattedScopesArray += $scope
-                        Write-Verbose "[$functionName] Added as-is (already has prefix): $scope"
-                    }
+                    $formattedScopesArray += $scope
+                    Write-Verbose "[$functionName] Added as-is (already has prefix): $scope"
                 }
             }
-
-            Write-Verbose "[$functionName] Count of scopes with prefixes added: $($formattedScopesArray.count)"
-            $scopesFormatted = $formattedScopesArray -join ' '
         }
-        else
-        {
-            Write-Verbose "[$functionName] Scopes already have Graph API prefixes or are empty"
-        }
-        
-        # Add default scopes for normal mode
+        Write-Verbose "[$functionName] Count of scopes with prefixes added: $($formattedScopesArray.count)"
         Write-Verbose "[$functionName] Adding default scopes (openid and offline_access)"
-        if (-not $scopesFormatted.Contains("openid"))
+        #If the $scopesFormatted  does not contain a scope in the $openIdScopes, add the missing scope.
+        foreach ($defaultScope in $openIdScopes)
         {
-            $scopesFormatted = "openid $scopesFormatted"
-            Write-Verbose "[$functionName] Added openid to scopes"
+            if (-not $scopesFormatted.Contains($defaultScope))
+            {
+                Write-Verbose "[$functionName] Adding default scope: $defaultScope"
+                $scopesFormatted += " $defaultScope"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Default scope already present: $defaultScope"
+            }
         }
-        else
-        {
-            Write-Verbose "[$functionName] openid already present in scopes"
-        }
-        
-        if (-not $scopesFormatted.Contains("offline_access"))
-        {
-            $scopesFormatted = "offline_access $scopesFormatted"
-            Write-Verbose "[$functionName] Added offline_access to scopes"
-        }
-        else
-        {
-            Write-Verbose "[$functionName] offline_access already present in scopes"
-        }
+        $scopesFormatted = $formattedScopesArray -join ' '
+        # Remove any extra spaces
+        $scopesFormatted = $scopesFormatted.Trim()
     }
-
     Write-Verbose "[$functionName] Final formatted scopes: $scopesFormatted"
     #endregion Format scopes
     return $scopesFormatted
@@ -502,20 +480,20 @@ function Save-TokenToCache()
     Write-Verbose "[$functionName] Cache type: $cacheType"
     # Extract token scope from JWT token roles
     Write-Verbose "[$functionName] Decoding JWT token to extract roles/scope"
-    $tokenScope = (DecodeJwtToken -Token $cachedToken.access_token -raw).roles 
+    
     Write-Verbose "[$functionName] Successfully extracted token scope: $($tokenScope -join ', ')"
     # Add scope to cached token object
-    if ($cachedToken -is [hashtable])
+    Write-Verbose "[$functionName] Adding scope property to cached token object"
+    if (-not $cachedToken.scope)
     {
-        Write-Host "[$functionName] Cached token is a hashtable, adding scope property"
-        $cachedToken['scope'] = $tokenScope
+        Write-Verbose "[$functionName] Scope property not found in cached token, adding it"
+        $cachedToken.add('scope', (DecodeJwtToken -Token $cachedToken.access_token -raw).roles)
     }
     else
     {
-        Write-Host "[$functionName] Cached token is not a hashtable, adding scope property using Add-Member"
-        $cachedToken | Add-Member -MemberType NoteProperty -Name 'scope' -Value $tokenScope -Force
+        Write-Verbose "[$functionName] Scope property already exists in cached token. Applying proper formatting."
+        $cachedToken.scope = FormatScopes -scopes $cachedToken.scope -Reverse
     }
-    Write-Verbose "[$functionName] Added scope property to cached token object"
     
     # Save access token according to cache type
     if ($cacheType -eq 'memory')
@@ -569,95 +547,71 @@ function Save-TokenToCache()
 function Save-RefreshTokenToConfig()
 {
     param($refreshToken, $configFilePath)
+
     $functionName = $MyInvocation.MyCommand.Name
+    $DeligatedCredentials = @{}
     Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
     if (-not $refreshToken)
     {
         Write-Verbose "[$functionName] No refresh token to save"
         return
     }
+    # Read the current config and check if it is encrypted
+    $config = Get-Content -Raw -Path $configFilePath | ConvertFrom-Json
+    if (isEncrypted -data $config)
+    {
+        Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
+        $config = DecryptObject -encryptedObject $config
+        $encrypted = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Config file is not encrypted. No decryption needed."
+        $encrypted = $false
+    }
+    
+    if ($refreshToken.scope)
+    {
+        Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
+        $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
+        Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
+        #If it is not an array, make it int an array
+        if (-not ($formattedScopes -is [array]))
+        {
+            Write-Verbose "[$functionName] Scopes is not an array, converting to array"
+            $formattedScopes = @($formattedScopes)
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No scopes provided in refresh token, using empty array"
+        $formattedScopes = @()
+    }
 
-    $DeligatedCredentials = @{}
-    try
+    if ($config.deligatedCredentials)
     {
-        Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
-        # Read the current config
-        $config = Get-Content -Raw -Path $configFilePath | ConvertFrom-Json
-        if (isEncrypted -data $config)
-        {
-            Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-            $decryptedConfig = DecryptObject -encryptedObject $config
-            if ($decryptedConfig.deligatedCredentials)
-            {
-                Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
-                $decryptedConfig.deligatedCredentials.refresh_token = $refreshToken.refresh_token
-                if ($refreshToken.scope)
-                {
-                    Write-Verbose "[$functionName] Updating existing scope in deligatedCredentials"
-                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
-                    Write-Verbose "[$functionName] Formatted scope object type: $($formattedScopes.GetType().Name)"
-                    #If it is not an array, make it int an array
-                    if (-not ($formattedScopes -is [array]))
-                    {
-                        Write-Verbose "[$functionName] Scopes is not an array, converting to array"
-                        $formattedScopes = @($formattedScopes)
-                    }
-                    else 
-                    {
-                        Write-Verbose "[$functionName] Scopes is already an array"
-                    }
-                    if ($decryptedConfig.deligatedCredentials.scope)
-                    {
-                        Write-Verbose "[$functionName] Existing scope found in deligatedCredentials, updating it"
-                        $decryptedConfig.deligatedCredentials.scope = $formattedScopes
-                    }
-                    else
-                    {
-                        Write-Verbose "[$functionName] No existing scope found in deligatedCredentials, adding it"
-                        $decryptedConfig.deligatedCredentials | Add-Member -MemberType NoteProperty -Name 'scope' -Value $formattedScopes
-                    }       
-                }
-            }
-            else
-            {
-                Write-Verbose "[$functionName] Creating new deligatedCredentials property"
-                $decryptedConfig | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $DeligatedCredentials
-                $decryptedConfig.deligatedCredentials.refresh_token = $refreshToken.refresh_token
-                if ($refreshToken.scope)
-                {
-                    Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
-                    $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
-                    Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
-                    #If it is not an array, make it int an array
-                    if (-not ($formattedScopes -is [array]))
-                    {
-                        Write-Verbose "[$functionName] Scopes is not an array, converting to array"
-                        $formattedScopes = @($formattedScopes)
-                    }
-                    $decryptedConfig.deligatedCredentials.scope = $formattedScopes
-                }
-            }
-            # Re-encrypt the config
-            Write-Verbose "[$functionName] Re-encrypting config with refresh token"
-            $Config = EncryptObject -DecryptedObject $decryptedConfig 
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Config is not encrypted, updating directly"
-            if (-not $config.deligatedCredentials)
-            {
-                Write-Verbose "[$functionName] Creating new deligatedCredentials property"
-                $config | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $emptyDeligatedCredentials
-            }
-        }
-        # Save the updated config
-        $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
-        Write-Verbose "[$functionName] Refresh token saved to config file"
+        Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
+        $config.deligatedCredentials.refresh_token = $refreshToken.refresh_token
+        $config.deligatedCredentials.scope = $formattedScopes
     }
-    catch
+    else
     {
-        Write-Error "Failed to save refresh token to config: $_"
+        Write-Verbose "[$functionName] Creating new deligatedCredentials property"
+        $deligatedCredentials.refresh_token = $refreshToken.refresh_token
+        $deligatedCredentials.scope = $formattedScopes
+        $config | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $DeligatedCredentials
     }
+
+    # Re-encrypt the config if it was encrypted before
+    if ($encrypted)
+    {
+        Write-Verbose "[$functionName] Re-encrypting config with refresh token"
+        $Config = EncryptObject -DecryptedObject $config 
+    }   
+    # Save the updated config
+    Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
+    $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
+    Write-Verbose "[$functionName] Refresh token saved to config file"
 }
 
 function Format-TokenOutput()
@@ -1155,7 +1109,7 @@ function LaunchBrowser()
 
 function Get-DelegatedToken()
 {
-    param($tenantId, $clientId, $clientSecret, $scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $ForcedRenewal, $settings = $settings)
+    param($tenantId, $clientId, $clientSecret, [string[]]$scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $ForcedRenewal, $settings = $settings)
     $functionName = $MyInvocation.MyCommand.Name
     
     # Handle null or empty scopes by providing a sensible default
