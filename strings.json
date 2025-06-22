@@ -1,6 +1,7 @@
 {
     "returnValues": {
         "unknownErrorMessage": "An unknown error occurred.",
+        "backoutText": "Returning to previous menu",
         "noRestartMessage": "Device not restarted.",
         "invalidJWTTokenMessage": "Invalid JWT token format. Expected at least 2 parts.",
         "noLAPSFoundMessage": "No LAPS password found for this device.",

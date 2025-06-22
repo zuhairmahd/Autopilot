@@ -247,8 +247,6 @@ foreach ($key in $getTokenParams.Keys)
     }
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
-$backoutText = 'Returning to previous menu'
-Write-Verbose "[$scriptName] Backout Text: $backoutText"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 $version = '3.0.0'
@@ -296,7 +294,6 @@ Write-Verbose "[$scriptName] Secure string: $SecureString"
 Write-Verbose "[$scriptName] App mode: $appMode"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
-Write-Verbose "[$scriptName] Backout text: $backoutText"
 #endregion logging
 
 #region helper functions
@@ -372,14 +369,14 @@ function ProcessDevice()
             if ($choice -eq 'no')
             {
                 Write-Host "Exiting..."
-                return $backoutText
+                return $returnValues.backoutText
             }
             $importStart = Get-Date
             $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
-            if ($device -eq $backoutText)
+            if ($device -eq $returnValues.backoutText)
             {
                 Write-Verbose "[$functionName] The import function returned $device."
-                return $backoutText
+                return $returnValues.backoutText
             }
             $importResult = ProcessImportResult -device $device -returnValues $returnValues
             if ($importResult -ne $returnValues.deviceImportSuccessMessage)
@@ -452,10 +449,10 @@ function ProcessDevice()
                     }
                     $result = ShowMenu -Menu $deviceWaitMenu -CalledBy 'Action'
                     Write-Verbose "[$functionName] Result from device wait menu: $result"
-                    if ($result -eq $backoutText)
+                    if ($result -eq $returnValues.backoutText)
                     {
                         Write-Verbose "[$functionName] User selected Back from device wait menu."
-                        return $backoutText
+                        return $returnValues.backoutText
                     }
                     elseif ($result -eq "EXIT_APPLICATION")
                     {
@@ -658,7 +655,7 @@ function ProcessSerialNumber()
                 if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
                 {
                     Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-                    return $backoutText
+                    return $returnValues.backoutText
                 }
                 elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
                 {
@@ -682,7 +679,7 @@ function ProcessSerialNumber()
                     }
                     Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
                 }
-                return $backoutText
+                return $returnValues.backoutText
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
                 return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
@@ -719,27 +716,33 @@ function ProcessSerialNumber()
     # Return success status for calling functions
     return $success
 }
-Write-Verbose "Force new token: $($auth.ForceNewToken )"
-Write-Verbose "Force new refresh token: $($auth.ForceNewRefreshToken )"
-Write-Verbose "No save refresh token: $($auth.NoSaveRefreshToken )"
-if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
+#endregion helper functions
+
+#region initialization block
+Write-Verbose "[$scriptName] Initialization block started."
+Write-Verbose "[$scriptName] Force new token: $($auth.ForceNewToken )"
+Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshToken )"
+Write-Verbose "[$scriptName] No save refresh token: $($auth.NoSaveRefreshToken )"
+Write-Verbose "[$scriptName] Getting access token..."
+$accessToken = GetGraphAccessToken @getTokenParams
+if ($accessToken)
 {
-    Write-Host "Forcing new token retrieval due to parameters." -ForegroundColor Yellow
-    $accessToken = GetGraphAccessToken @getTokenParams
-    if ($accessToken)
+    Write-Verbose "[$scriptName] Access token retrieved successfully."
+    if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
     {
-        Write-Host "Access token retrieved successfully." -ForegroundColor Green
+        Write-Host "Forced new token retrieval due to parameters." 
         Write-Host "The script will now exit."
-        Write-Host "You can now run the script again to use the new access token." -ForegroundColor Green
-        exit 0
-    }
-    else
-    {
-        Write-Host "Failed to retrieve access token." -ForegroundColor Red
-        exit 1
+        Write-Host "You can run the script again without these parameters to use the new token." 
+        exit 0    
     }
 }
-#endregion helper functions
+else
+{
+    Write-Host "Failed to retrieve access token." -ForegroundColor Red
+    Write-Host "Please check your authentication parameters and try again." 
+    exit 1
+}
+#endregion initialization block
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
@@ -751,7 +754,6 @@ $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device i
 
 #region export menu
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
-    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'autopilot'
     if ($exported)
     {
@@ -763,7 +765,6 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot 
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported Autopilot Devices" -Action {
-    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'imported'
     if ($exported)
     {
@@ -775,7 +776,6 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported A
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Windows Devices" -Action {
-    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'managed'
     if ($exported)
     {
@@ -787,7 +787,6 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Wi
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Windows Devices" -Action {
-    $accessToken = GetGraphAccessToken @getTokenParams
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'unmanaged'
     if ($exported)
     {
@@ -801,7 +800,6 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged 
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
-    $accessToken = GetGraphAccessToken @getTokenParams
     if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
     {
         Write-Host "Exported device storage report to $($storageOutputFileName)." -ForegroundColor Green
@@ -822,7 +820,6 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     {
         Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
         Write-Host "Looking up device with serial number: $serialNumber"
-        $accessToken = GetGraphAccessToken @getTokenParams
         $callingContext = Get-CallingContext -IncludeNavigationPath
         switch ($callingContext)
         {
@@ -852,8 +849,8 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
     }
     else
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-        return $backoutText
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        return $returnValues.backoutText
     }
 }
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
@@ -866,7 +863,6 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         $make = $deviceObject.manufacturer
         $model = $deviceObject.model
         Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
-        $accessToken = GetGraphAccessToken @getTokenParams
         $context = Get-CallingContext -IncludeNavigationPath
         switch ($context)
         {
@@ -920,7 +916,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
     }
-    $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
@@ -937,12 +932,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
     }
-    $accessToken = GetGraphAccessToken @getTokenParams
     $result = PrepareImportDevice -accessToken $accessToken -CustomImport
-    if ($result -eq $backoutText)
+    if ($result -eq $returnValues.backoutText)
     {
-        Write-Verbose "[$scriptName] Custom import aborted. Returning $backoutText."
-        return $backoutText
+        Write-Verbose "[$scriptName] Custom import aborted. Returning $($returnValues.backoutText)."
+        return $returnValues.backoutText
     }
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
@@ -1010,9 +1004,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         if ($choice -eq 'no')
         {
             Write-Host "Exiting..."
-            return $backoutText
+            return $returnValues.backoutText
         }
-        $accessToken = GetGraphAccessToken @getTokenParams
         $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
@@ -1074,11 +1067,10 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     if ($null -eq $userName)
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-        return $backoutText
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        return $returnValues.backoutText
     }
     Write-Verbose "[$scriptName] Got user name: $userName"
-    $accessToken = GetGraphAccessToken @getTokenParams
     
     #region Check if the user exists first.
     $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
@@ -1124,8 +1116,8 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         }
         elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
         {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $backoutText."
-            return $backoutText
+            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText
         }
         elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
         {
@@ -1165,7 +1157,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
     {
         Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-        return $backoutText
+        return $returnValues.backoutText
     }
     elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
     {
@@ -1198,8 +1190,8 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
     elseif ($serialNumber -eq '0')
     {
-        Write-Verbose "[$scriptName] User selected Exit option (0). Returning $BackoutText."
-        return $backoutText
+        Write-Verbose "[$scriptName] User selected Exit option (0). Returning $($returnValues.backoutText)."
+        return $returnValues.backoutText
     }
     else
     {
@@ -1212,16 +1204,13 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     # Check if user entered 'back'
     if ($null -eq $username)
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-        return $backoutText # Return to the previous menu
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+        return $returnValues.backoutText # Return to the previous menu
     } 
     else # Continue only if a username was entered
     {
         $hasCorrectGroups = $false
         $hasCorrectNumberOfDevices = $false
-        
-        Write-Verbose "[$scriptName] Getting access token..."
-        $accessToken = GetGraphAccessToken @getTokenParams
         
         #region Check if the user exists first.
         $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
@@ -1267,8 +1256,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
             {
-                Write-Verbose "[$scriptName] User selected 'Back'. Returning $backoutText."
-                return $backoutText
+                Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+                return $returnValues.backoutText
             }
             elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
             {
@@ -1348,8 +1337,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             # Check if user entered 'back'
             if ($null -eq $serialNumber)
             {
-                Write-Verbose "[$scriptName] User pressed Enter. Returning $BackoutText."
-                return $backoutText # Return to the previous menu
+                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+                return $returnValues.backoutText # Return to the previous menu
             }
             else # Process only if a serial number was entered
             {
@@ -1402,7 +1391,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     if (-not (RestartDevice))
     {
         Write-Verbose "[$scriptName] RestartDevice function failed."
-        return $backoutText
+        return $returnValues.backoutText
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceExportMenu

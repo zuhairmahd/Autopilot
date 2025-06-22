@@ -823,9 +823,9 @@ function Handle-ActionExecution()
         return $null
     }
     
-    if ($result -eq $backoutText)
+    if ($result -eq $returnValues.backoutText)
     {
-        Write-Verbose "[$functionName] Action returned backout text beaaus result is $result"
+        Write-Verbose "[$functionName] Action returned backout text because result is $result"
         return ShowMenu -Menu $CurrentMenu -CalledBy 'Action' -StackOperation 'None'
     }
     
@@ -861,8 +861,6 @@ function ShowMenu()
     param (
         [Parameter(Mandatory = $true)]
         [hashtable]$Menu,
-        [Parameter(Mandatory = $false)]
-        [string]$BackoutText = $backoutText,
         [Parameter(Mandatory = $false)]
         [ValidateSet('Auto', 'Push', 'Pop', 'None')]
         [string]$StackOperation = 'Auto',
@@ -1065,3 +1063,5 @@ function ShowMenu()
         return Handle-MenuItemSelection -SelectedOption $selectedOption -Choices $choices -MenuItems $menuItems -CurrentMenu $Menu
     }
 }
+
+

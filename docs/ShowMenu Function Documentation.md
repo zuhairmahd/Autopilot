@@ -12,12 +12,9 @@ function ShowMenu()
         [Parameter(Mandatory = $true)]
         [hashtable]$Menu,
         [Parameter(Mandatory = $false)]
-        [string]$BackoutText = $backoutText,
-        [Parameter(Mandatory = $false)]
         [ValidateSet('Auto', 'Push', 'Pop', 'None')]
         [string]$StackOperation = 'Auto',
         [Parameter(Mandatory = $false)]
-        [ValidateSet('Unknown', 'Direct', 'Action', 'Submenu', 'Navigation')]
         [string]$CalledBy = 'Unknown'
     )
 }
@@ -37,18 +34,7 @@ $myMenu = NewMenu -Title "Main Menu" -Description "Select an option"
 ShowMenu -Menu $myMenu
 ```
 
-### 2. `$BackoutText` (Optional)
-- **Type:** `[string]`
-- **Default:** `$backoutText` (global variable)
-- **Purpose:** Text that signals a "back out" action from menu items
-- **Usage:** When you have menu actions that might return a specific text value to indicate the user wants to go back
-
-**Example:**
-```powershell
-ShowMenu -Menu $myMenu -BackoutText "Cancel Operation"
-```
-
-### 3. `$StackOperation` (Optional)
+### 2. `$StackOperation` (Optional)
 - **Type:** `ValidateSet('Auto', 'Push', 'Pop', 'None')`
 - **Default:** `'Auto'`
 - **Purpose:** Controls how the menu manages the navigation stack
@@ -84,7 +70,7 @@ ShowMenu -Menu $previousMenu -StackOperation 'Pop'
 ShowMenu -Menu $currentMenu -StackOperation 'None'
 ```
 
-### 4. `$CalledBy` (Optional)
+### 3. `$CalledBy` (Optional)
 - **Type:** `ValidateSet('Unknown', 'Direct', 'Action', 'Submenu', 'Navigation')`
 - **Default:** `'Unknown'`
 - **Purpose:** Indicates the context from which ShowMenu was called
@@ -234,7 +220,7 @@ if ($null -eq $result) {
 The function requires these global variables:
 - `$Global:MenuHistory` - Automatically initialized if not present
 - `$Global:History` - Automatically initialized if not present  
-- `$backoutText` - Should be defined in your application
+- `$returnValues` - Should contain backoutText and other return values
 
 ## Related Functions
 - `DisplayNumericMenu` - Handles user input and menu display

@@ -172,7 +172,7 @@ function ExportDeviceStorage()
         
         if ($null -eq $deviceListResponse -or $null -eq $deviceListResponse.value -or $deviceListResponse.value.count -eq 0)
         {
-            Write-Host "[$functionName] - No devices found. Exiting script." -ForegroundColor Red
+            Write-Host "No devices found." -ForegroundColor Red
             return $false
         }
         
@@ -320,20 +320,20 @@ function ExportDeviceStorage()
         {
             Write-Verbose "[$functionName] - Exporting data for $($CSVObject.Count) devices to file $OutputFile"
             $CSVObject | Export-Csv -Path $OutputFile -NoTypeInformation -Force
-            Write-Host "[$functionName] - Successfully exported device information to $OutputFile" -ForegroundColor Green
-            Write-Host "[$functionName] - Exported $($CSVObject.Count) devices with memory and storage information" -ForegroundColor Green
+            Write-Host "Successfully exported device information to $OutputFile" -ForegroundColor Green
+            Write-Host "Exported $($CSVObject.Count) devices with memory and storage information" -ForegroundColor Green
             $success = $true
         }
         else
         {
-            Write-Host "[$functionName] - No device information was collected to export" -ForegroundColor Yellow
+            Write-Host "No device information was collected to export" -ForegroundColor Yellow
             $success = $false
         }
     }
     catch
     {
-        Write-Host "[$functionName] - Error processing device information: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Verbose "[$functionName] - Exception detail: $($_.Exception | Format-List -Force | Out-String)"
+        Write-Host "Error processing device information: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Verbose "Exception detail: $($_.Exception | Format-List -Force | Out-String)"
         $success = $false
     }
     return $success

@@ -1934,6 +1934,34 @@ function GetGraphAccessToken()
         }
         Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
     }
+    if ($deligated )
+    {
+        Write-Verbose "[$functionName] Delegated access selected. Checking for scope."
+        if ($null -eq $scope -or $scope -eq '')
+        {
+            Write-Verbose "[$functionName] No scope provided in parameters. Checking config file for scope."
+            if ($config.auth.scope)
+            {
+                Write-Verbose "[$functionName] Found scope in config file."
+                $Scope = $config.auth.scope
+                Write-Verbose "[$functionName] Using scope from config file: $Scope"
+            }
+            else
+            {
+                Write-Error "No scope provided."
+                return $null
+            }
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Scope provided in parameters: $Scope"
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Non-delegated access selected. No scope required."
+        Write-Verbose "[$functionName] Using default scope: $Scope"
+    }
     #endregion Process config files
     
     #region Log parameters

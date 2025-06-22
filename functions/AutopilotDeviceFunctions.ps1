@@ -63,7 +63,7 @@ function GetUserInput()
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
-            Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
+            Write-Verbose "[$functionName] User pressed Enter. Returning $($returnValues.backoutText)."
             return $null # Return null to signal going back
         }
         # Validate the input if it's not empty
@@ -118,10 +118,10 @@ function PrepareImportDevice()
         {
             Write-Verbose "[$functionName] Custom import is enabled."
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import' -CustomImport
-            if ($result -eq $backoutText)
+            if ($result -eq $returnValues.backoutText)
             {
-                Write-Verbose "[$functionName] Custom import aborted. Returning $backoutText."
-                return $backoutText
+                Write-Verbose "[$functionName] Custom import aborted. Returning $($returnValues.backoutText)."
+                return $returnValues.backoutText
             }
         }
         else 
@@ -562,8 +562,8 @@ function ImportAutopilotDevice()
             else
             {
                 $ProceedWithImport = $false
-                Write-Verbose "[$functionName] Returning to the previous menu."
-                return $backoutText
+                Write-Host "Exiting..."
+                return $returnValues.backoutText
             }
         } while ($ProceedWithImport -eq $false)
     }

@@ -481,7 +481,7 @@ function GetUserInput()
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
-            Write-Verbose "[$functionName] User pressed Enter. Returning $BackoutText."
+            Write-Verbose "[$functionName] User pressed Enter. Returning $($returnValues.backoutText)."
             return $null # Return null to signal going back
         }
         # Validate the input if it's not empty
