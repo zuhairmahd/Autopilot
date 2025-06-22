@@ -147,23 +147,30 @@ $scope = $auth.scope
 #endregion variables
 
 $uris = @()
-$queryString = 'uri ='
+# Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http
+$queryPattern = '\$\w*uri\s*=\s*(?!\$|(?i:http))'
 $filesToSearch = Get-ChildItem "$pwd\*.ps1" -Recurse 
 Write-Host "Found $($filesToSearch.count) files."
-#Search each file for the $queryString and print each line the string is found in.
+#Search each file for variables ending with 'uri' and extract their assigned values
 foreach ($file in $filesToSearch)
 {
     Write-Host "Searching in $($file.Name)"
-    $lines = Select-String -Path $file.FullName -Pattern $queryString -SimpleMatch
+    $lines = Select-String -Path $file.FullName -Pattern $queryPattern -AllMatches
     if ($lines)
     {
-        Write-Host "Found $($lines.count) lines in $($file.Name)"
+        Write-Host "Found $($lines.count) lines in $($file.Name)" 
         foreach ($line in $lines)
         {
-            $match = $line.Line -match 'uri\s*=\s*([\'']?)([^\'']+)\1'
+            # Extract the value after the = sign, handling quoted and unquoted strings
+            $match = $line.Line -match '\$\w*uri\s*=\s*([\x27\x22]?)([^\x27\x22#\r\n]+)\1'
             if ($match)
             {
-                $uris += $matches[2]
+                $extractedUri = $matches[2].Trim()
+                if ($extractedUri -and $extractedUri -notmatch '^(\$|(?i:http))')
+                {
+                    $uris += $extractedUri
+                    Write-Verbose "Found URI: $extractedUri in $($file.Name) at line $($line.LineNumber)"
+                }
             }
         }
     }
