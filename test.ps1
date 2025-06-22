@@ -134,7 +134,7 @@ $scope = $auth.scope
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow'
-$accessToken = GetGraphAccessToken -configFile $configFile
+# $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
 # $unmanagedDevices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken
@@ -146,6 +146,47 @@ $accessToken = GetGraphAccessToken -configFile $configFile
 # }
 #endregion variables
 
-# $scope = 'openid profile email https://graph.microsoft.com/BitlockerKey.Read.All https://graph.microsoft.com/Device.ReadWrite.All https://graph.microsoft.com/DeviceLocalCredential.Read.All https://graph.microsoft.com/DeviceManagementApps.Read.All https://graph.microsoft.com/DeviceManagementConfiguration.ReadWrite.All https://graph.microsoft.com/DeviceManagementManagedDevices.PrivilegedOperations.All https://graph.microsoft.com/DeviceManagementManagedDevices.Read.All https://graph.microsoft.com/DeviceManagementManagedDevices.ReadWrite.All https://graph.microsoft.com/DeviceManagementServiceConfig.ReadWrite.All https://graph.microsoft.com/Directory.ReadWrite.All https://graph.microsoft.com/User.Read'
+$uris = @()
+$queryString = 'uri ='
+$filesToSearch = Get-ChildItem "$pwd\*.ps1" -Recurse 
+Write-Host "Found $($filesToSearch.count) files."
+#Search each file for the $queryString and print each line the string is found in.
+foreach ($file in $filesToSearch)
+{
+    Write-Host "Searching in $($file.Name)"
+    $lines = Select-String -Path $file.FullName -Pattern $queryString -SimpleMatch
+    if ($lines)
+    {
+        Write-Host "Found $($lines.count) lines in $($file.Name)"
+        foreach ($line in $lines)
+        {
+            $match = $line.Line -match 'uri\s*=\s*([\'']?)([^\'']+)\1'
+            if ($match)
+            {
+                $uris += $matches[2]
+            }
+        }
+    }
+    else
+    {
+        Write-Host "No matches found in $($file.Name)"
+    }
+}
+#sort uris and remove dupicates
+Write-Host "Found $($uris.count) URIs."
+if ($uris.count -eq 0)
+{
+    Write-Host "No URIs found. Exiting script." -ForegroundColor Red
+    exit 1
+}
+else
+{
+    Write-Host "Found $($uris.count) unique URIs."
+}
+# Remove duplicates and sort the URIs
+Write-Host "Sorting and removing duplicates from URIs..."
+$uris = $uris | Sort-Object -Unique
+Write-Host "Found $($uris.count) unique URIs after sorting."
+Set-Content -Path 'uris.txt' -Value $uris -Force
 
 
