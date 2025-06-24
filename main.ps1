@@ -612,6 +612,22 @@ function ProcessSerialNumber()
             Write-Host "Manufacturer: $manufacturer"
             Write-Host "Status: Managed by Intune" -ForegroundColor Green
             Write-Host "=============================`n" -ForegroundColor Green
+            $pendingActions = getDevicePendingActions -enrollmentState $enrollmentState
+            Write-Verbose "[$functionName] Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)"
+            if ($pendingActions.isPendingAction)
+            {
+                Write-Host "This device has pending actions:"
+                foreach ($action in $pendingActions.pendingActions)
+                {
+                    Write-Host "- Action name: $($action.actionName)" -ForegroundColor Yellow
+                    Write-Host "- Action status: $($action.status)" -ForegroundColor Yellow
+                }
+                return $returnValues.deviceActionPendingMessage
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No pending actions for this device."
+            }
             # Create and show device actions menu using main.ps1 menu structure
             Write-Verbose "[$functionName] Starting device actions menu loop"
             $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
@@ -689,9 +705,7 @@ function ProcessSerialNumber()
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             #endregion Process devices
-            Write-Host "[$functionName] Device actions menu returned result: $result"
-            
-
+            Write-Verbose "[$functionName] Device actions menu returned result: $result"
             Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
             return $result
         }
@@ -1159,10 +1173,10 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     do
     {
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Host "[$scriptName] Result: $result"
+        Write-Verbose "[$scriptName] Result: $result"
         Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
         $serialNumber = $result        
-    } until ($result -eq $returnValues.backoutText -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))    
+    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))    
 
     #region Handle navigation responses from GetDeviceByUser
     if ($serialNumber -eq "Back" -or $serialNumber -eq "back")

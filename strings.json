@@ -1,6 +1,7 @@
 {
     "returnValues": {
         "unknownErrorMessage": "An unknown error occurred.",
+        "deviceActionPendingMessage": "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed.",
         "backoutText": "Returning to previous menu",
         "noRestartMessage": "Device not restarted.",
         "invalidJWTTokenMessage": "Invalid JWT token format. Expected at least 2 parts.",

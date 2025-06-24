@@ -1339,3 +1339,67 @@ function GetNextUserReadinessReport()
         return $null
     }
 }
+
+function getDevicePendingActions()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $enrollmentState
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $returnObject = @{}
+    $deviceActions = @('wipePending')
+    $pendingActions = [PSCustomObject]@{}
+    $isPendingAction = $false
+    Write-Verbose "[$functionName] Checking for pending actions on the device..."
+    Write-Verbose "[$functionName] Device management state: $($enrollmentState.managedDevice.device.managementState)"
+    if ($enrollmentState.managedDevice.device.managementState -in $deviceActions)
+    {
+        Write-Verbose "[$functionName] The device has pending actions."
+        $isPendingAction = $true
+        Write-Verbose "Action name $($enrollmentState.managedDevice.device.managementState)"
+        Write-Verbose "Action status $($enrollmentState.managedDevice.device.managementState)"
+        $pendingActions = [PSCustomObject]@{
+            ActionName   = $enrollmentState.managedDevice.device.managementState
+            ActionStatus = $enrollmentState.managedDevice.device.managementState
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] The device has no pending actions."
+        Write-Verbose "[$functionName] Device management state: $($enrollmentState.managedDevice.device.managementState)"
+        $isPendingAction = $false
+    }
+
+    if ($enrollmentState.managedDevice.device.deviceActionResults -and $enrollmentState.managedDevice.device.deviceActionResults.Count -gt 0)
+    {
+        Write-Host "$($enrollmentState.managedDevice.device.deviceActionResults.Count ) Pending actions found for the device:"
+        foreach ($action in $enrollmentState.managedDevice.device.deviceActionResults)
+        {
+            Write-Host "- $($action.actionName): $($action.status)"
+            $isPendingAction = $true
+            $pendingActions += [PSCustomObject]@{
+                ActionName   = $action.actionName
+                ActionStatus = $action.status
+            }
+        }
+    }        
+    Write-Verbose "[$functionName] Is pending action: $isPendingAction"
+    if ($isPendingAction -eq $true)
+    {
+        Write-Verbose "[$functionName] There are pending actions for the device."
+        $returnObject.Add('PendingActions', $pendingActions)
+        $returnObject.Add('IsPendingAction', $isPendingAction)
+        return $returnObject
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No pending actions found for the device."
+        $returnObject.Add('PendingActions', $null)
+        $returnObject.Add('IsPendingAction', $isPendingAction)
+        return $returnObject
+    }
+}
+
