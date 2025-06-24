@@ -1216,7 +1216,12 @@ function GetBitLockerRecoveryKey()
     {
         Write-Verbose "[$functionName] Access Token provided."
     }
-    
+    $volumeTypes = @{
+        "0" = "Unknown"
+        "1" = "OperatingSystem"
+        "2" = "FixedData"
+        "3" = "RemovableData"
+    }
     # Define the resource path for BitLocker recovery keys
     $bitLockerUri = "informationProtection/bitlocker/recoveryKeys/$($key.id)"
     $bitlockerExtraParameters = "select=key"
@@ -1230,16 +1235,16 @@ function GetBitLockerRecoveryKey()
         # Display the recovery key information
         Write-Host "Latest BitLocker recovery key:" -ForegroundColor Cyan
         Write-Host "Key: $($recoveryKeyDetails.key)" -ForegroundColor Yellow
-        Write-Host "Created: $($key.createdDateTime)" -ForegroundColor Yellow
-        Write-Host "Volume Type: $($key.volumeType)" -ForegroundColor Yellow
+        Write-Host "Created: $($key.createdDateTime |FormatDateWithTimeZone)" -ForegroundColor Yellow
+        Write-Host "Volume Type: $($volumeTypes[$key.volumeType])" -ForegroundColor Yellow
     }
     catch
     {
         Write-Error "[$scriptName] Failed to retrieve BitLocker recovery key: $($_.Exception.Message)"
         Write-Host "Key metadata available:" -ForegroundColor Yellow
-        Write-Host "Created: $($latestKeyInfo.createdDateTime)" -ForegroundColor Yellow
-        Write-Host "Volume Type: $($latestKeyInfo.volumeType)" -ForegroundColor Yellow
-        Write-Host "Device ID: $($latestKeyInfo.deviceId)" -ForegroundColor Yellow
+        Write-Host "Created: $($latestKeyInfo.createdDateTime |FormatDateWithTimeZone)" 
+        Write-Host "Volume Type: $($volumeTypes[$latestKeyInfo.volumeType])" 
+        Write-Host "Device ID: $($latestKeyInfo.deviceId)" 
         Write-Host "Key ID: $($latestKeyInfo.id)" -ForegroundColor Yellow
     }
     return "`n"
