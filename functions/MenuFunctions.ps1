@@ -869,9 +869,7 @@ function ShowMenu()
     
     # region Initialize global variables if they don't exist and display debug
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Initializing global variables if not already set"
-    Write-Verbose "Count of Menu history: $($Global:MenuHistory.Count)"
-    Write-Verbose "Count of history: $($Global:History.Count)"
+    Write-Verbose "[$functionName] Checking global variables."
     if (-not $Global:MenuHistory)
     {
         Write-Verbose "[$functionName] Initializing MenuHistory"
@@ -879,8 +877,7 @@ function ShowMenu()
     }
     else
     {
-        Write-Verbose "[$functionName] MenuHistory is already initialized"
-        Write-Verbose "Menu history count: $($Global:MenuHistory.Count)"
+        Write-Verbose "[$functionName] MenuHistory is already initialized with $($Global:MenuHistory.Count) items."
     }
     if (-not $Global:History)
     {
@@ -889,8 +886,7 @@ function ShowMenu()
     }
     else
     {
-        Write-Verbose "[$functionName] History is already initialized"
-        Write-Verbose "History count: $($Global:History.Count)"
+        Write-Verbose "[$functionName] History is already initialized with $($Global:History.Count) items."
     }
     Write-Verbose "[$functionName] ===== MENU NAVIGATION DEBUG ====="
     Write-Verbose "[$functionName] Entering ShowMenu for: $($Menu.Title)"
@@ -899,6 +895,9 @@ function ShowMenu()
     Write-Verbose "[$functionName] Current Depth: $($Global:MenuHistory.Count)"
     Write-Verbose "[$functionName] History Count: $($Global:History.Count)"
     Write-Verbose "[$functionName] MenuHistory Count: $($Global:MenuHistory.Count)"
+    Write-Verbose "[$functionName] Current Menu: $($Menu.Title)"
+    Write-Verbose "[$functionName] Previous menu (if available): $($Global:MenuHistory[-1].Title)"
+    Write-Verbose "[$functionName] =================================="
     #endregion    # Determine calling context if not explicitly provided
     
     if ($CalledBy -eq 'Unknown')

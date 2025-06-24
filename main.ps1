@@ -613,7 +613,9 @@ function ProcessSerialNumber()
             Write-Host "Status: Managed by Intune" -ForegroundColor Green
             Write-Host "=============================`n" -ForegroundColor Green
             # Create and show device actions menu using main.ps1 menu structure
+            Write-Verbose "[$functionName] Starting device actions menu loop"
             $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
+            #region Process devices
             # Add menu items for each device action
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
                 Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
@@ -683,10 +685,13 @@ function ProcessSerialNumber()
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
                 return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
-            }
-            # Show the device actions menu with navigation context
+            }            # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
+            #endregion Process devices
+            Write-Host "[$functionName] Device actions menu returned result: $result"
+            
+
             Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
             return $result
         }
@@ -1145,15 +1150,21 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
     #endregion Check if the user exists first.
     
-    #Print the current navigation context prior too calling GetDeviceByUser
-    Write-Verbose "[$scriptName] Current navigation context:"
-    Write-Verbose "[$scriptName] Action History: $($actionHistory -join ' > ')"
-    Write-Verbose "[$scriptName] Menu History: $($actionMenuHistory -join ' > ')"
     # Call GetDeviceByUser to find devices for the specified user
     Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
     $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
     Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
-    # Handle navigation responses from GetDeviceByUser
+    Write-Host "Found device for user $userName with serial number: $serialNumber"
+    
+    do
+    {
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        Write-Host "[$scriptName] Result: $result"
+        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
+        $serialNumber = $result        
+    } until ($result -eq $returnValues.backoutText -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))    
+
+    #region Handle navigation responses from GetDeviceByUser
     if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
     {
         Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
@@ -1169,35 +1180,12 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         Write-Verbose "[$scriptName] User requested application exit from device selection."
         return "EXIT_APPLICATION"
     }        
-    elseif ($serialNumber -ne '0' -and $null -ne $serialNumber -and $serialNumber -ne "Back" -and $serialNumber -ne "Main Menu" -and $serialNumber -notin $returnValues.Values)
+    else 
     {
-        Write-Host "Found device for user $userName with serial number: $serialNumber"
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        if ($null -eq $result)
-        {
-            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-            return "EXIT_APPLICATION"
-        }
-        elseif ($result -eq $true)
-        {
-            Write-Host "Device information for device with serial number: $serialNumber was retrieved successfully." -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
-        }
-    }
-    elseif ($serialNumber -eq '0')
-    {
-        Write-Verbose "[$scriptName] User selected Exit option (0). Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText
-    }
-    else
-    {
-        Write-Host $serialNumber -ForegroundColor Red
+        return $result
     }
 }
+
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
