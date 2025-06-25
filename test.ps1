@@ -110,8 +110,8 @@ else
 #endregion
 
 #region variables
-$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
-$scope = $auth.scope
+# $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+# $scope = $auth.scope
 # $logfile = "mylog.log"
 # $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # $serialNumber = '0F3CFP724223KV'
@@ -145,6 +145,24 @@ $scope = $auth.scope
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
+
+$message = "To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code AER883WH4 to authenticate."
+$regex = "(?<=enter the code )([A-Z0-9]+)"
+#extract the code
+if ($deviceCodeResponse.message -match $regex)
+{
+    $code = $matches[1]
+    Write-Host "The extracted code is: $code"
+    #now copy the code to the clipboard.
+    Set-Clipboard -Value $code
+    Write-Host "The code has been copied to the clipboard."
+}
+else
+{
+    Write-Host "No code found in the message."
+}
+
+exit 0
 
 $uris = @()
 # Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http

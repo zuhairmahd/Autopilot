@@ -249,8 +249,6 @@ foreach ($key in $getTokenParams.Keys)
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
-$version = '3.0.0'
-Write-Verbose "[$scriptName] Version: $version"
 $versionFile = 'version.txt'
 Write-Verbose "[$scriptName] Version file: $versionFile"
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/$versionFile"
@@ -274,24 +272,25 @@ $script:DeviceEnrollmentCache = @{}
 Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
 Write-Verbose "[$scriptName] The current parameter set is $($PSCmdlet.ParameterSetName)"
 Write-Verbose "[$scriptName] Configuration file: $configFile"
+Write-Verbose "[$scriptName] App mode is $($settings.appMode)."
 Write-Verbose "[$scriptName] Computer name: $Name"
-Write-Verbose "[$scriptName] Group tag: $GroupTag"
+Write-Verbose "[$scriptName] Group tag: $settings.GroupTag"
 Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
 Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
-Write-Verbose "[$scriptName] Repository: $Repo"
-Write-Verbose "[$scriptName] Release: $Release"
-Write-Verbose "[$scriptName] Domain: $domain"
-Write-Verbose "[$scriptName] Max wait time: $maxWaitTime seconds"
-Write-Verbose "[$scriptName] Time in seconds: $timeInSeconds"
-Write-Verbose "[$scriptName] Auth type: $AuthType"
-Write-Verbose "[$scriptName] Cache type: $CacheType"
-Write-Verbose "[$scriptName] Force new token: $ForceNewToken"
-Write-Verbose "[$scriptName] Force new refresh token: $ForceNewRefreshToken"
-Write-Verbose "[$scriptName] No save refresh token: $NoSaveRefreshToken"
-Write-Verbose "[$scriptName] Deligated: $Deligated"
-Write-Verbose "[$scriptName] Scope: $Scope"
-Write-Verbose "[$scriptName] Secure string: $SecureString"
-Write-Verbose "[$scriptName] App mode: $appMode"
+Write-Verbose "[$scriptName] Repository: $settings.Repo"
+Write-Verbose "[$scriptName] Release: $settings.Release"
+Write-Verbose "[$scriptName]    Domain: $domain"
+Write-Verbose "[$scriptName] Max wait time: $settings.maxWaitTime"
+Write-Verbose "[$scriptName] Time in seconds: $settings.timeInSeconds"
+Write-Verbose "[$scriptName] Auth type: $auth.AuthType"
+Write-Verbose "[$scriptName] Cache type: $auth.CacheType"
+Write-Verbose "[$scriptName] Force new token: $auth.ForceNewToken"
+Write-Verbose "[$scriptName] Force new refresh token: $auth.ForceNewRefreshToken"
+Write-Verbose "[$scriptName] No save refresh token: $auth.NoSaveRefreshToken"
+Write-Verbose "[$scriptName] Deligated: $auth.Deligated"
+Write-Verbose "[$scriptName] Scope: $auth.Scope"
+Write-Verbose "[$scriptName] Secure string: $auth.SecureString"
+Write-Verbose "[$scriptName] App mode: $settings.appMode"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 #endregion logging
@@ -1361,32 +1360,50 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-# $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
-    Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -RootFolder $pwd -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
-    Write-Verbose "[$scriptName] Update result: $updateResult"
-    switch ($updateResult)
-    {
-        $returnValues.UpdateSuccessMessage
+
+if ($settings.appMode -ne 'test')
+{
+    Write-Verbose "[$scriptName] App mode is not test. Adding settings menu to main menu."
+    # Add the settings menu to the main menu
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+}
+else
+{
+    Write-Verbose "[$scriptName] App mode is test. Skipping Settings menu."
+}
+if ($settings.appMode -ne 'test')
+{
+    Write-Verbose "[$scriptName] App mode is not test. Adding script update check to main menu."
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+        Write-Host "Checking for script updates..."
+        $updateResult = GetUpdates -RootFolder $pwd -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
+        Write-Verbose "[$scriptName] Update result: $updateResult"
+        switch ($updateResult)
         {
-            Write-Host 'The script has been updated.' -ForegroundColor Green
-            Write-Host 'Please restart the script.' -ForegroundColor Green
-            exit 0
-        }
-        $returnValues.UpdateFailedMessage
-        {
-            Write-Host 'The script update failed.' -ForegroundColor Red
-        }
-        $returnValues.UpdateNotNeededMessage
-        {
-            Write-Host 'The script is up to date.' -ForegroundColor Green
-        }
-        default
-        {
-            Write-Host 'An unknown error occurred while checking for updates.' -ForegroundColor Red
+            $returnValues.UpdateSuccessMessage
+            {
+                Write-Host 'The script has been updated.' -ForegroundColor Green
+                Write-Host 'Please restart the script.' -ForegroundColor Green
+                exit 0
+            }
+            $returnValues.UpdateFailedMessage
+            {
+                Write-Host 'The script update failed.' -ForegroundColor Red
+            }
+            $returnValues.UpdateNotNeededMessage
+            {
+                Write-Host 'The script is up to date.' -ForegroundColor Green
+            }
+            default
+            {
+                Write-Host 'An unknown error occurred while checking for updates.' -ForegroundColor Red
+            }
         }
     }
+}
+else 
+{
+    Write-Verbose "[$scriptName] App mode is test. Skipping script update check."
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'

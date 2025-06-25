@@ -10,8 +10,7 @@
     "timeInSeconds": "60",
     "Release": "2.5",
     "Repo": "Github",
-    "appMode": "full",
-    "GroupTag": "ENTRA"
+    "appMode": "full"
   },
   "domains": {
     "gao.gov": {
@@ -24,6 +23,7 @@
       "groupsToExclude": [],
       "settings": {
         "domain": "gao.gov",
+        "appMode": "test",
         "deviceNamePrefix": "w11-",
         "maxNumberOfDevicesAllowed": 20,
         "MaxUserNameLength": 50,
@@ -57,6 +57,9 @@
         "MaxSerialNumberLength": 100,
         "MinSerialNumberLength": 7,
         "MinimumDevicePhysicalMemoryInGB": 8,
+        "preferredBrowser": "Chrome",
+        "privateSession": true,
+        "GroupTag": "ENTRA",
         "maxNumberOfDevicesAllowed": 15,
         "DesiredAutopilotProfiles": [
           "windowsCloudConfig Autopilot profile",

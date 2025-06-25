@@ -1013,8 +1013,7 @@ function LaunchBrowser()
         [Parameter(Mandatory = $true, Position = 0)]
         [ValidateNotNullOrEmpty()]
         [string]$url,
-        [Parameter(Mandatory = $true)]
-        [ValidateSet("Chrome", "Edge", "Firefox")]
+        [ValidateSet("Chrome", "Edge", "Firefox", "Default")]
         [string]$browser
     )
     
@@ -1022,8 +1021,22 @@ function LaunchBrowser()
     #print log of incoming parameters.
     Write-Verbose "[$functionName] Launching browser with URL: $url"
     Write-Verbose "[$functionName] Browser preference: $browser"
-    Write-Verbose "[$functionName] Launching browser with URL: $url"
-    Write-Verbose "[$functionName] Browser preference: $browser"
+    Write-Verbose "[$functionName] Private session: $private"
+    if ($null -eq $browser -or $browser -eq '')
+    {
+        Write-Verbose "[$functionName] No browser specified, attempting to read value from settings"
+        if ($null -ne $settings.preferredBrowser -and $settings.preferredBrowser -ne '')
+        {
+            Write-Verbose "[$functionName] Using preferred browser from settings: $($settings.preferredBrowser)"
+            $browser = $settings.preferredBrowser
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No preferred browser set in settings, defaulting to Edge"
+            $browser = 'Default'
+        }
+    }
+    
     switch ($Browser)
     {
         'Edge'
@@ -1195,6 +1208,70 @@ function Get-DelegatedToken()
             }
             Write-Host ""
             Write-Host $deviceCodeResponse.message
+            #extract the code and copy it to the clipboard.
+            $regex = "(?<=enter the code )([A-Z0-9]+)"
+            if ($deviceCodeResponse.message -match $regex)
+            {
+                $code = $matches[1]
+                Write-Verbose "[$functionName] Extracted code from device code response: $code"
+                #now copy the code to the clipboard.
+                try
+                {
+                    Set-Clipboard -Value $code
+                    Write-Host "The code has been copied to the clipboard for you to paste."
+                }
+                catch
+                {
+                    Write-Warning "Failed to copy code to clipboard. Please copy it manually: $code"
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] No code found in device code response message."
+            }
+            if ($settings.preferredBrowser -eq '' -or $null -eq $settings.preferredBrowser)
+            {
+                Write-Verbose "[$functionName] No preferred browser set in settings, using default browser."
+                $preferredBrowser = 'Default'
+                $displayMessage = "If you choose 'Yes', your default browser will be used for authentication."
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Using preferred browser from settings: $($settings.preferredBrowser)"
+                $preferredBrowser = $settings.preferredBrowser
+                $displayMessage = "If you choose 'Yes', $preferredBrowser will be used for authentication."
+                if ($settings.privateSession)
+                {
+                    $displayMessage += " A private session (incognito) will be used."
+                }
+            }
+            Write-Verbose "[$functionName] Preferred browser for authentication: $preferredBrowser"
+            $authUrl = "https://microsoft.com/devicelogin"
+            Write-Verbose "[$functionName] Authentication URL: $authUrl"
+            Write-Host "Would you like to open a browser to the authentication page?"
+            Write-Host "`n$displayMessage"
+            $userChoice = Read-Host "Type 'Yes' to open the browser, or 'No' to continue without opening a browser `n (you will need to manually open your browser to $authUrl)"
+            while ($userChoice -notin @('Yes', 'No'))
+            {
+                Write-Host "Invalid choice. Please type 'Yes' or 'No'."
+                #beep
+                [console]::beep(1000, 500)
+                $userChoice = Read-Host "Type 'Yes' to open the browser, or 'No' to continue without opening a browser"
+            }
+            if ($userChoice -eq 'Yes')
+            {
+                Write-Verbose "[$functionName] User chose to open browser for authentication."
+                $browserOpened = LaunchBrowser -url $authUrl -browser $preferredBrowser
+                if (-not $browserOpened)
+                {
+                    Write-Error "Failed to open browser for authentication. Please open it manually."
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] User chose not to open browser, will continue with manual authentication."
+                Write-Host "Please open your browser to $authUrl and paste the code: $code to sign-in"
+            }
             Write-Host "Waiting for authentication..."
             Write-Host ""
             # --- Poll for Access Token ---
