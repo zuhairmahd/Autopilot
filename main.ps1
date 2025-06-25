@@ -342,7 +342,7 @@ function ProcessDevice()
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             Write-Verbose "[$functionName] Device assignment check returned: $deviceAssignment"
-            if ($deviceAssignment)
+            if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
                 $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
                 Write-Verbose "[$functionName] Device assignment status: $isAssigned"
@@ -394,7 +394,7 @@ function ProcessDevice()
         {
             Write-Host "Checking device with serial number $serialNumber..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
-            if ($deviceAssignment)
+            if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
                 $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
                 if ($isAssigned)
@@ -467,7 +467,7 @@ function ProcessDevice()
             else
             {
                 Write-Host 'The device is not in Autopilot.'
-                return $returnValues.deviceNotInIntuneMessage
+                return $deviceAssignment
             }
         }
         'delete'
@@ -1198,8 +1198,6 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
-
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1360,7 +1358,6 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-
 if ($settings.appMode -ne 'test')
 {
     Write-Verbose "[$scriptName] App mode is not test. Adding settings menu to main menu."

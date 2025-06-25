@@ -836,7 +836,7 @@ function Handle-ActionExecution()
     }
     
     Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyUp")
     
     return ShowMenu -Menu $CurrentMenu -CalledBy 'Action' -StackOperation 'None'
 }
