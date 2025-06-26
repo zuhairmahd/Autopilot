@@ -146,24 +146,157 @@ else
 # }
 #endregion variables
 
-$message = "To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code AER883WH4 to authenticate."
-$regex = "(?<=enter the code )([A-Z0-9]+)"
-#extract the code
-if ($deviceCodeResponse.message -match $regex)
-{
-    $code = $matches[1]
-    Write-Host "The extracted code is: $code"
-    #now copy the code to the clipboard.
-    Set-Clipboard -Value $code
-    Write-Host "The code has been copied to the clipboard."
-}
-else
-{
-    Write-Host "No code found in the message."
-}
 
+# Define required permissions with reasons
+$requiredPermissions = @(
+    @{
+        Permission = "User.Read.All"
+        Reason     = "Required to read user profile information and check group memberships"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+        Reason     = "Needed to perform privileged operations on managed devices, such as wiping or retiring devices and reading LAPS passwords"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.ReadWrite.All"
+        Reason     = "Required to read and write managed device information, including compliance policies and device configurations"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.ReadWrite.All"
+        Reason     = "Needed to read and write Intune device configuration policies and their assignments"
+    },
+    @{
+        Permission = "DeviceManagementServiceConfig.ReadWrite.All"
+        Reason     = "Needed to read and write Intune service configuration settings"
+    },
+    @{
+        Permission = "offline_access"
+        Reason     = "Needed to maintain access to resources when the user is not actively using the application"
+    },
+    @{ 
+        Permission = "openid"
+        Reason     = "Needed for OpenID Connect authentication to verify user identity"
+    },
+    @{
+        Permission = "Device.ReadWrite.All"
+        Reason     = "Needed to import devices into Autopilot"
+    },    
+    @{
+        Permission = "Group.Read.All"
+        Reason     = "Needed to read group information and memberships"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.Read.All"
+        Reason     = "Allows reading Intune device configuration policies and their assignments"
+    },
+    @{
+        Permission = "DeviceManagementApps.Read.All"
+        Reason     = "Necessary to read mobile app management policies and app configurations"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.Read.All"
+        Reason     = "Required to read managed device information and compliance policies"
+    },
+    @{
+        Permission = "Device.Read.All"
+        Reason     = "Needed to read device information from Entra ID"
+    }
+)
+
+# Required permissions based on specific API endpoint access, following the principle of least privilege.
+
+$requiredPermissions = @(
+    @{
+        Permission = "User.Read.All"
+        Reason     = "Required to read user profiles, group memberships, and registered devices. (Covers: /users, /users/{id}, /users/{id}/memberOf, /users/{id}/registeredDevices)"
+    },
+    @{
+        Permission = "Device.Read.All"
+        Reason     = "Required to read Microsoft Entra ID device objects. (Covers: /devices)"
+    },
+    @{
+        Permission = "DeviceManagementApps.ReadWrite.All"
+        Reason     = "Required to read application information and manage app assignments. (Covers: /deviceAppManagement/mobileApps and .../assignments)"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.Read.All"
+        Reason     = "Required to read Intune device configuration policies. (Covers: /deviceManagement/deviceConfigurations)"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.Read.All"
+        Reason     = "Required to read Intune managed device properties. (Covers: /deviceManagement/managedDevices and /deviceManagement/managedDevices/{id})"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+        Reason     = "Required for highly privileged operations, specifically to read local admin (LAPS) passwords. (Covers: /directory/deviceLocalCredentials)"
+    },
+    @{
+        Permission = "DeviceManagementServiceConfig.ReadWrite.All"
+        Reason     = "Required to read Autopilot events and to read and manage Autopilot device identities. (Covers: /deviceManagement/autopilotEvents, .../importedWindowsAutopilotDeviceIdentities, .../windowsAutopilotDeviceIdentities)"
+    },
+    @{
+        Permission = "BitlockerKey.Read.All"
+        Reason     = "Required to read BitLocker recovery keys for all devices. (Covers: /informationProtection/bitlocker/recoveryKeys)"
+    },
+    @{
+        Permission = "openid"
+        Reason     = "Standard scope required for user sign-in with OpenID Connect."
+    },
+    @{
+        Permission = "profile"
+        Reason     = "Standard scope to get basic user profile information during sign-in."
+    },
+    @{
+        Permission = "offline_access"
+        Reason     = "Standard scope that provides refresh tokens to maintain access when the user is not active."
+    }
+)
+
+# You can now use this array to construct your authentication request.
+# For example, with MSAL.PS:
+# $scopes = $requiredPermissions.Permission
+# Get-MsalToken -ClientId "your-client-id" -TenantId "your-tenant-id" -Scope $scopes
+
+# Define revised required permissions with reasons
+$requiredPermissions = @(
+    @{
+        Permission = "User.Read.All"
+        Reason     = "Required to read user profile information and check group memberships"
+    },
+    @{
+        Permission = "Group.Read.All"
+        Reason     = "Needed to read group information and memberships"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+        Reason     = "Needed to perform privileged operations on managed devices, such as wiping or retiring devices and reading LAPS passwords"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.ReadWrite.All"
+        Reason     = "Required to read and write managed device information and compliance policies"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.ReadWrite.All"
+        Reason     = "Needed to read and write Intune device configuration policies and their assignments"
+    },
+    @{
+        Permission = "DeviceManagementApps.Read.All"
+        Reason     = "Necessary to read mobile app management policies and app configurations"
+    },
+    @{
+        Permission = "DeviceManagementServiceConfig.ReadWrite.All"
+        Reason     = "Needed to read/write Intune service configuration settings and to import devices into Autopilot"
+    },
+    @{
+        Permission = "openid"
+        Reason     = "Needed for OpenID Connect authentication to verify user identity"
+    },
+    @{
+        Permission = "offline_access"
+        Reason     = "Needed to maintain access to resources when the user is not actively using the application"
+    }
+)
 exit 0
-
 $uris = @()
 # Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http
 $queryPattern = '\$\w*uri\s*=\s*(?!\$|(?i:http))'
