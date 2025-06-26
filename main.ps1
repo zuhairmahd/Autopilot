@@ -28,8 +28,64 @@ param(
     [string]$Repo = 'github',
     [string]$Release = 'main',
     [ValidateSet('full', 'helpDesk', 'registration')]
-    [string]$appMode
+    [string]$appMode,
+    [string]$LogFile = "$pwd\Logs\Autopilot.log"
 )
+
+# Initialize logging if verbose is enabled
+if ($VerbosePreference -eq 'Continue' -or $PSBoundParameters.ContainsKey('Verbose')) {
+    # First call to create the log directory if it doesn't exist
+    $logDir = Split-Path $LogFile -Parent
+    if (-not (Test-Path $logDir)) {
+        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+    }
+    
+    # Add a start marker to the log file
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+    $startMarker = "=" * 80
+    $startMessage = "$startMarker`n$timestamp [Information] [main.ps1] Script started with verbose logging enabled`n$startMarker"
+    Add-Content -Path $LogFile -Value $startMessage -Encoding UTF8 -Force
+}
+
+# Override Write-Verbose to also log to file when verbose is enabled
+function Write-Verbose {
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, ValueFromPipeline=$true)]
+        [string]$Message
+    )
+    
+    # Call the original Write-Verbose
+    Microsoft.PowerShell.Utility\Write-Verbose $Message
+    
+    # Also write to log file if verbose is enabled and LogFile is defined
+    if (($VerbosePreference -eq 'Continue' -or $PSBoundParameters.ContainsKey('Verbose')) -and $LogFile) {
+        # Extract module name from message if it follows the pattern [module] message
+        if ($Message -match '^\[(.*?)\]\s*(.*)$') {
+            $moduleName = $matches[1]
+            $cleanMessage = $matches[2]
+        } else {
+            $moduleName = 'main.ps1'
+            $cleanMessage = $Message
+        }
+        
+        # Write to log file with timestamp
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+        $logEntry = "$timestamp [Verbose] [$moduleName] $cleanMessage"
+        
+        # Use mutex for thread safety in concurrent scenarios
+        $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
+        $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+        
+        try {
+            $mutex.WaitOne() | Out-Null
+            Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+        } finally {
+            $mutex.ReleaseMutex()
+            $mutex.Dispose()
+        }
+    }
+}
 
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
@@ -1445,3 +1501,22 @@ else
     Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion Show Menu
+
+# Add end logging marker if verbose was enabled
+if ($VerbosePreference -eq 'Continue' -or $PSBoundParameters.ContainsKey('Verbose')) {
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+    $endMarker = "=" * 80
+    $endMessage = "$endMarker`n$timestamp [Information] [main.ps1] Script completed`n$endMarker"
+    
+    # Use mutex for thread safety
+    $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
+    $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+    
+    try {
+        $mutex.WaitOne() | Out-Null
+        Add-Content -Path $LogFile -Value $endMessage -Encoding UTF8 -Force
+    } finally {
+        $mutex.ReleaseMutex()
+        $mutex.Dispose()
+    }
+}
