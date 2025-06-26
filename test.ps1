@@ -6,17 +6,50 @@ param
     $release = 'auto',
     $configFile = "$pwd\.secrets\config.json",
     $outputFile = "$pwd\deviceMemory-export.csv",
+    [string]$InitFile = "$pwd\settings.json",
     [switch]$forceNewToken
 )
 
 #region Load parameters from the configuration file if it exists
-$scriptName = $MyInvocation.MyCommand.Name
-$initFile = "$pwd\settings.json"
-$domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-Write-Verbose "[$scriptName] Domain: $domain"
+Write-Host "Loading configuration file: $configFile"
+if (Test-Path $configFile)
+{
+    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
+    $authConfiguration = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+    $auth = @{}
+    Write-Verbose "[$scriptName] Domain: $domain"
+    Write-Verbose "[$scriptName] Loading Auth configuration from $configFile"
+    foreach ($key in $authConfiguration.PSObject.Properties.Name)
+    {
+        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
+        {
+            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($authConfiguration.$key)"
+            Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
+            if ($authConfiguration.$key -in ('true', 'false'))
+            {
+                Write-Verbose "[$scriptName] Converting $key to boolean."
+                $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
+                $auth.add($key, $keyBooleanValue)
+                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($authConfiguration.$key))."
+                $auth.add($key, $authConfiguration.$key)
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
+            $auth.add($key, $PSBoundParameters[$key])
+        }
+    }
+}
+Write-Host "Loading settings file: $initFile"
 if (Test-Path -Path $InitFile)
 {
-    Write-Host " Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
+    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
     $global:globalSettings = @{}
     $global:localSettings = @{}
     $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
@@ -83,12 +116,15 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    
 }
 else
 {
     Write-Host "Configuration file $initFile not found. Using default values."
 }
 #endregion Load parameters from the configuration file if it exists
+
+
 
 #region import functions.
 $functionsFolder = "$PWD\functions"
@@ -110,10 +146,11 @@ else
 #endregion
 
 #region variables
-# $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$requiredScopes = $settings.requiredScopes
 # $scope = $auth.scope
 # $logfile = "mylog.log"
-# $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
@@ -146,7 +183,28 @@ else
 # }
 #endregion variables
 
+foreach ($scope in $requiredScopes)
+{
+    Write-Verbose "Checking if the scope $scope is granted."
+    Write-Host "Checking if the scope $($scope.scope) is granted."
+    Write-Host "Scope reason: $($scope.reason)"
+    Write-Host "Covered endpoints:"
+    $scope.Endpoints | ForEach-Object {
+        Write-Host " - $_"
+    }
+    if ($requiredScopes.scope -in $auth.scope)
+    {
+        Write-Host "The scope $scope is not granted. Exiting script." -ForegroundColor Red
+        exit 1
+    }
+    else
+    {
+        Write-Host "The scope $($scope.scope) is granted."
+    }
+}
 
+
+exit 0
 # Define required permissions with reasons
 $requiredPermissions = @(
     @{
@@ -251,11 +309,6 @@ $requiredPermissions = @(
     }
 )
 
-# You can now use this array to construct your authentication request.
-# For example, with MSAL.PS:
-# $scopes = $requiredPermissions.Permission
-# Get-MsalToken -ClientId "your-client-id" -TenantId "your-tenant-id" -Scope $scopes
-
 # Define revised required permissions with reasons
 $requiredPermissions = @(
     @{
@@ -295,7 +348,6 @@ $requiredPermissions = @(
         Reason     = "Needed to maintain access to resources when the user is not actively using the application"
     }
 )
-exit 0
 $uris = @()
 # Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http
 $queryPattern = '\$\w*uri\s*=\s*(?!\$|(?i:http))'
