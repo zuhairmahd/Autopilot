@@ -204,7 +204,6 @@ $requiredPermissions = @(
 )
 
 # Required permissions based on specific API endpoint access, following the principle of least privilege.
-
 $requiredPermissions = @(
     @{
         Permission = "User.Read.All"
