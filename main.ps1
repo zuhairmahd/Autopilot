@@ -32,61 +32,6 @@ param(
     [string]$LogFile = "$pwd\Logs\Autopilot.log"
 )
 
-# Initialize logging if verbose is enabled
-if ($VerbosePreference -eq 'Continue' -or $PSBoundParameters.ContainsKey('Verbose')) {
-    # First call to create the log directory if it doesn't exist
-    $logDir = Split-Path $LogFile -Parent
-    if (-not (Test-Path $logDir)) {
-        New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-    }
-    
-    # Add a start marker to the log file
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-    $startMarker = "=" * 80
-    $startMessage = "$startMarker`n$timestamp [Information] [main.ps1] Script started with verbose logging enabled`n$startMarker"
-    Add-Content -Path $LogFile -Value $startMessage -Encoding UTF8 -Force
-}
-
-# Override Write-Verbose to also log to file when verbose is enabled
-function Write-Verbose {
-    [CmdletBinding()]
-    param(
-        [Parameter(Position=0, ValueFromPipeline=$true)]
-        [string]$Message
-    )
-    
-    # Call the original Write-Verbose
-    Microsoft.PowerShell.Utility\Write-Verbose $Message
-    
-    # Also write to log file if verbose is enabled and LogFile is defined
-    if (($VerbosePreference -eq 'Continue' -or $PSBoundParameters.ContainsKey('Verbose')) -and $LogFile) {
-        # Extract module name from message if it follows the pattern [module] message
-        if ($Message -match '^\[(.*?)\]\s*(.*)$') {
-            $moduleName = $matches[1]
-            $cleanMessage = $matches[2]
-        } else {
-            $moduleName = 'main.ps1'
-            $cleanMessage = $Message
-        }
-        
-        # Write to log file with timestamp
-        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-        $logEntry = "$timestamp [Verbose] [$moduleName] $cleanMessage"
-        
-        # Use mutex for thread safety in concurrent scenarios
-        $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
-        $mutex = New-Object System.Threading.Mutex($false, $mutexName)
-        
-        try {
-            $mutex.WaitOne() | Out-Null
-            Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
-        } finally {
-            $mutex.ReleaseMutex()
-            $mutex.Dispose()
-        }
-    }
-}
-
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -109,12 +54,14 @@ else
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Checking configuration file: $configFile" -LogLevel "Information"
 if (Test-Path $configFile)
 {
     $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
     $authConfiguration = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
     $auth = @{}
     Write-Verbose "[$scriptName] Domain: $domain"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Domain: $domain" -LogLevel "Information"
     Write-Verbose "[$scriptName] Loading Auth configuration from $configFile"
     foreach ($key in $authConfiguration.PSObject.Properties.Name)
     {
@@ -225,19 +172,27 @@ $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Importing functions from $functionsFolder" -LogLevel "Information"
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
     foreach ($function in $functions)
     {
         Write-Verbose "[$scriptName] Importing function $function"
         . $function.FullName
     }
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Successfully imported $($functions.Count) functions" -LogLevel "Information"
 }
 else
 {
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "FATAL: Cannot find the functions folder. Exiting script." -LogLevel "Error"
     exit 1
 }
 #endregion import functions.
+
+# Initialize logging
+Write-Log -LogFile $LogFile -StartLogging
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Running as $(if ($MyInvocation.MyCommand.CommandType -eq 'ExternalScript') {'external script'} else {'script block'})" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Script path: $ScriptPath" -LogLevel "Information"
 
 #region Define variables
 if ($repo -eq 'github')
@@ -1500,23 +1455,8 @@ else
     Write-Host "Test mode: $($settings.testMode). No menu will be shown." -ForegroundColor Yellow
     Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
-#endregion Show Menu
 
-# Add end logging marker if verbose was enabled
-if ($VerbosePreference -eq 'Continue' -or $PSBoundParameters.ContainsKey('Verbose')) {
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-    $endMarker = "=" * 80
-    $endMessage = "$endMarker`n$timestamp [Information] [main.ps1] Script completed`n$endMarker"
-    
-    # Use mutex for thread safety
-    $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
-    $mutex = New-Object System.Threading.Mutex($false, $mutexName)
-    
-    try {
-        $mutex.WaitOne() | Out-Null
-        Add-Content -Path $LogFile -Value $endMessage -Encoding UTF8 -Force
-    } finally {
-        $mutex.ReleaseMutex()
-        $mutex.Dispose()
-    }
-}
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+
+#endregion Show Menu
