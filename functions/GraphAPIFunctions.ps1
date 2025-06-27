@@ -26,50 +26,64 @@ function DecodeJwtToken
     }
     $parts = $Token -split '\.'
     Write-Verbose "[$functionName] Token parts: $($parts.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token parts: $($parts.Length)" -LogLevel "Information"
     if ($parts.Length -lt 2)
     {
         Write-Verbose "[$functionName] Invalid JWT token format. Expected at least 2 parts."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid JWT token format. Expected at least 2 parts." -LogLevel "Error"
         return $returnValues.invalidJWTTokenMessage
     }
     $payload = $parts[1].Replace('-', '+').Replace('_', '/')
     Write-Verbose "[$functionName] Payload part: $($payload.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Payload part: $($payload.Length)" -LogLevel "Information"
     switch ($payload.Length % 4)
     {
         2 { Write-Verbose "[$functionName] Adjusting payload length by adding two padding characters."; $payload += '==' }
         3 { Write-Verbose "[$functionName] Adjusting payload length by adding one padding character."; $payload += '=' }
     }
     Write-Verbose "[$functionName] Adjusted payload for Base64 decoding: $($payload.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adjusted payload for Base64 decoding: $($payload.Length)" -LogLevel "Verbose"
     $bytes = [System.Convert]::FromBase64String($payload)
     Write-Verbose "[$functionName] Decoded bytes length: $($bytes.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Decoded bytes length: $($bytes.Length)" -LogLevel "Information"
     if ($bytes.Length -eq 0)
     {
         Write-Verbose "[$functionName] Decoded bytes are empty. Invalid JWT payload."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Decoded bytes are empty. Invalid JWT payload." -LogLevel "Error"
         return $returnValues.invalidJWTPayloadMessage
     }
     Write-Verbose "[$functionName] Decoding payload to JSON string."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Decoding payload to JSON string." -LogLevel "Verbose"
     $json = [System.Text.Encoding]::UTF8.GetString($bytes)
     $claims = $json | ConvertFrom-Json
     if (-not $raw)
     {
         # Convert all claims to human readable if possible
         Write-Verbose "[$functionName] Converting JWT claims to human readable format."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting JWT claims to human readable format." -LogLevel "Verbose"
         $humanClaims = [ordered]@{}
         foreach ($key in $claims.PSObject.Properties.Name)
         {
             Write-Verbose "[$functionName] Processing claim: $key"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing claim: $key" -LogLevel "Verbose"
             $value = $claims.$key
             Write-Verbose "[$functionName] Claim value: $value"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim value: $value" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Claim value type: $($value.GetType().Name)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim value type: $($value.GetType().Name)" -LogLevel "Verbose"
             # Check if the key is a known identifier and convert it to human readable format
             Write-Verbose "[$functionName] Checking if claim key $key is a known identifier."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if claim key $key is a known identifier." -LogLevel "Verbose"
             if ($HRIdentifyers.ContainsKey($key))
             {
                 Write-Verbose "[$functionName] Claim key $key is a known identifier, converting to human readable format."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim key $key is a known identifier, converting to human readable format." -LogLevel "Verbose"
                 $key = $HRIdentifyers[$key]
             }
             else
             {
                 Write-Verbose "[$functionName] Claim key $key is not a known identifier, Skipping."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim key $key is not a known identifier, Skipping." -LogLevel "Verbose"
                 continue
             }
             # Try to convert unix time fields
@@ -77,9 +91,11 @@ function DecodeJwtToken
             {
                 # Heuristic: treat as unix time if key is a known time claim or value is in a reasonable unix time range
                 Write-Verbose "[$functionName] Claim is a number, checking if it is a unix time."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim is a number, checking if it is a unix time." -LogLevel "Verbose"
                 if ($value -gt 1000000000 -and $value -lt 3000000000)
                 {
                     Write-Verbose "[$functionName] Claim $key is a unix time, converting to human readable format."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim $key is a unix time, converting to human readable format." -LogLevel "Verbose"
                     $dt = [DateTimeOffset]::FromUnixTimeSeconds([long]$value).UtcDateTime
                     $humanClaims[$key] = FormatDateWithTimeZone -DateTime $dt
                     continue
@@ -87,15 +103,18 @@ function DecodeJwtToken
             }
             # Try to convert arrays to comma-separated string
             Write-Verbose "[$functionName] Checking if claim value is an array."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if claim value is an array." -LogLevel "Verbose"
             if ($value -is [array])
             {
                 Write-Verbose "[$functionName] Claim value is an array, converting to comma-separated string."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim value is an array, converting to comma-separated string." -LogLevel "Verbose"
                 $humanClaims[$key] = $value -join ', '
                 continue
             }
             else
             {
                 Write-Verbose "[$functionName] Claim value is not an array."    
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Claim value is not an array."    " -LogLevel "Verbose"
             }
             if ($key -eq 'AuthenticationMechanism')
             {
@@ -105,21 +124,25 @@ function DecodeJwtToken
                     { 
                         $value = 'Public'
                         Write-Verbose "[$functionName] AuthenticationMechanism is 0, setting value to $value"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AuthenticationMechanism is 0, setting value to $value" -LogLevel "Information"
                     }
                     1 
                     { 
                         $value = 'App Secret'
                         Write-Verbose "[$functionName] AuthenticationMechanism is 1, setting value to $value"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AuthenticationMechanism is 1, setting value to $value" -LogLevel "Information"
                     }
                     2 
                     { 
                         $value = 'Certificate'
                         Write-Verbose "[$functionName] AuthenticationMechanism is 2, setting value to $value"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AuthenticationMechanism is 2, setting value to $value" -LogLevel "Information"
                     }
                     default 
                     { 
                         $value = $value
                         Write-Verbose "[$functionName] AuthenticationMechanism is unknown, keeping value as $value"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AuthenticationMechanism is unknown, keeping value as $value" -LogLevel "Information"
                     }
                 }
                 $humanClaims[$key] = $value
@@ -131,22 +154,26 @@ function DecodeJwtToken
         if ($RawJSON)
         {
             Write-Verbose "[$functionName] Returning all decoded JWT claims as raw JSON."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning all decoded JWT claims as raw JSON." -LogLevel "Information"
             return $humanClaims | ConvertTo-Json -Depth 5
         }
         else
         {
             Write-Verbose "[$functionName] Returning all decoded JWT claims as object."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning all decoded JWT claims as object." -LogLevel "Information"
             return $humanClaims
         }
     }
     if ($RawJSON)
     {
         Write-Verbose "[$functionName] Returning raw decoded JWT payload as raw JSON."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning raw decoded JWT payload as raw JSON." -LogLevel "Information"
         return $json 
     }
     else
     {
         Write-Verbose "[$functionName] Returning raw decoded JWT payload."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning raw decoded JWT payload." -LogLevel "Information"
         return $json | ConvertFrom-Json
     }
 }
@@ -161,12 +188,14 @@ function FormatScopes()
     $functionName = $MyInvocation.MyCommand.Name
     $openIdScopes = @('offline_access', 'openid')
     Write-Verbose "[$functionName] Called with Reverse=$Reverse"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Called with Reverse=$Reverse" -LogLevel "Information"
     # Write-Verbose "[$functionName] Input scopes: '$scopes'"
     Write-Verbose "Passed parameter type: $($scopes.GetType().Name)"
     #Check for null or empty scopes.
     if (-not $scopes -or $scopes -eq "")
     {
         Write-Verbose "[$functionName] No scopes provided. Returning empty string."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scopes provided. Returning empty string." -LogLevel "Information"
         Write-Warning "[$functionName] WARNING: Scopes parameter is null or empty!"
         return ""
     }
@@ -174,48 +203,62 @@ function FormatScopes()
     #region Format scopes properly if necessary
     $scopesFormatted = $scopes
     Write-Verbose "[$functionName] Received $($scopes.count) scopes"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received $($scopes.count) scopes" -LogLevel "Information"
     if ($Reverse)
     {
         # Reverse mode: Remove Graph API prefixes and don't add default scopes
         Write-Verbose "[$functionName] Reverse mode: Removing Graph API prefixes"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Reverse mode: Removing Graph API prefixes" -LogLevel "Information"
         Write-Verbose "[$functionName] Converting scopes to array for processing"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting scopes to array for processing" -LogLevel "Verbose"
         $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
         $formattedScopesArray = @()
         Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing scope array with $($scopesArray.Count) items" -LogLevel "Verbose"
         foreach ($scope in $scopesArray)
         {
             Write-Verbose "[$functionName] Processing scope: $scope"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing scope: $scope" -LogLevel "Verbose"
             if ($scope.StartsWith("https://graph.microsoft.com/"))
             {
                 Write-Verbose "[$functionName] Removing prefix from scope: $scope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing prefix from scope: $scope" -LogLevel "Information"
                 $formattedScope = $scope -replace "https://graph.microsoft.com/", ""
                 $formattedScopesArray += $formattedScope
                 Write-Verbose "[$functionName] Scope is now: $formattedScope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scope is now: $formattedScope" -LogLevel "Information"
             }
             else
             {
                 $formattedScopesArray += $scope
                 Write-Verbose "[$functionName] Added as is (no prefix): $scope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added as is (no prefix): $scope" -LogLevel "Information"
             }
         }
         Write-Verbose "[$functionName] Count of scopes with prefixes removed: $($formattedScopesArray.count)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Count of scopes with prefixes removed: $($formattedScopesArray.count)" -LogLevel "Information"
         $scopesFormatted = $formattedScopesArray
     }
     else
     {
         Write-Verbose "[$functionName] Formatting scopes for normal mode"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatting scopes for normal mode" -LogLevel "Information"
         # Normal mode: Add Graph API prefixes and default scopes
         Write-Verbose "[$functionName] Normal mode: Adding Graph API prefixes"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Normal mode: Adding Graph API prefixes" -LogLevel "Information"
         $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
         $formattedScopesArray = @()
         Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing scope array with $($scopesArray.Count) items" -LogLevel "Verbose"
         foreach ($scope in $scopesArray)
         {
             Write-Verbose "[$functionName] Processing scope: $scope"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing scope: $scope" -LogLevel "Verbose"
             if ($scope -in $openIdScopes)
             {
                 $formattedScopesArray += $scope
                 Write-Verbose "[$functionName] Added default scope as-is: $scope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added default scope as-is: $scope" -LogLevel "Information"
             }
             else
             {
@@ -224,27 +267,33 @@ function FormatScopes()
                 {
                     $formattedScopesArray += "https://graph.microsoft.com/$scope"
                     Write-Verbose "[$functionName] Added prefix: https://graph.microsoft.com/$scope"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added prefix: https://graph.microsoft.com/$scope" -LogLevel "Information"
                 }
                 else
                 {
                     $formattedScopesArray += $scope
                     Write-Verbose "[$functionName] Added as-is (already has prefix): $scope"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added as-is (already has prefix): $scope" -LogLevel "Information"
                 }
             }
         }
         Write-Verbose "[$functionName] Count of scopes with prefixes added: $($formattedScopesArray.count)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Count of scopes with prefixes added: $($formattedScopesArray.count)" -LogLevel "Information"
         Write-Verbose "[$functionName] Adding default scopes (openid and offline_access)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding default scopes (openid and offline_access)" -LogLevel "Information"
         #If the $scopesFormatted  does not contain a scope in the $openIdScopes, add the missing scope.
         foreach ($defaultScope in $openIdScopes)
         {
             if (-not $scopesFormatted.Contains($defaultScope))
             {
                 Write-Verbose "[$functionName] Adding default scope: $defaultScope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding default scope: $defaultScope" -LogLevel "Information"
                 $scopesFormatted += " $defaultScope"
             }
             else
             {
                 Write-Verbose "[$functionName] Default scope already present: $defaultScope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Default scope already present: $defaultScope" -LogLevel "Information"
             }
         }
         $scopesFormatted = $formattedScopesArray -join ' '
@@ -252,6 +301,7 @@ function FormatScopes()
         $scopesFormatted = $scopesFormatted.Trim()
     }
     Write-Verbose "[$functionName] Final formatted scopes: $scopesFormatted"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Final formatted scopes: $scopesFormatted" -LogLevel "Information"
     #endregion Format scopes
     return $scopesFormatted
 }    
@@ -262,6 +312,7 @@ function Get-TokenFromResponse()
     $functionName = $MyInvocation.MyCommand.Name
     $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)
     Write-Verbose "[$functionName] Token absolute expiry time: $($tokenExpiryTime)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token absolute expiry time: $($tokenExpiryTime)" -LogLevel "Information"
     $cachedToken = [ordered] @{
         'domain'           = $domain
         access_token       = $tokenResponse.access_token
@@ -291,6 +342,7 @@ function Start-HttpListener()
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting HTTP listener function with redirectUri: $redirectUri"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting HTTP listener function with redirectUri: $redirectUri" -LogLevel "Information"
     # Result object to return
     $result = @{
         Success      = $false
@@ -304,21 +356,26 @@ function Start-HttpListener()
         {
             $localIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlias -notlike "*Loopback*" -and $_.InterfaceAlias -notlike "*Virtual*"}).IPAddress
             Write-Verbose "[$functionName] Local IP addresses: $($localIp -join ', ')"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Local IP addresses: $($localIp -join ', ')" -LogLevel "Information"
         }
         catch
         {
             Write-Verbose "[$functionName] Could not get local IP address: $_"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not get local IP address: $_" -LogLevel "Information"
         }
         # Create HTTP listener
         $listener = New-Object System.Net.HttpListener
         # Make sure redirect URI ends with a slash for matching
         $redirectUri = $redirectUri.TrimEnd('/') + '/'
         Write-Verbose "[$functionName] Using redirect URI: $redirectUri"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using redirect URI: $redirectUri" -LogLevel "Information"
         # Add prefix
         $listener.Prefixes.Add($redirectUri)
         Write-Verbose "[$functionName] Added listener prefix: $redirectUri"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added listener prefix: $redirectUri" -LogLevel "Information"
         # Start listener
         Write-Verbose "[$functionName] Starting HTTP listener..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting HTTP listener..." -LogLevel "Information"
         $listener.Start()
         Write-Host "Waiting for authorization response. Please complete the sign in within your browser..."
         # Set timeout for listener
@@ -341,19 +398,24 @@ function Start-HttpListener()
                     {
                         $context = $task.GetAwaiter().GetResult()
                         Write-Verbose "[$functionName] Received HTTP request"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received HTTP request" -LogLevel "Information"
                         # Get request details for diagnostics
                         $request = $context.Request
                         Write-Verbose "[$functionName] Request URL: $($request.Url)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Request URL: $($request.Url)" -LogLevel "Information"
                         Write-Verbose "[$functionName] Request headers: $($request.Headers)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Request headers: $($request.Headers)" -LogLevel "Information"
                         # Check if QueryString exists and has keys
                         if ($null -ne $request.QueryString -and $request.QueryString.Count -gt 0)
                         {
                             Write-Verbose "[$functionName] Query string keys: $($request.QueryString.AllKeys -join ', ')"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Query string keys: $($request.QueryString.AllKeys -join ', ')" -LogLevel "Information"
                             # Check for code
                             $code = $request.QueryString.Get("code")
                             if ($null -ne $code)
                             {
                                 Write-Verbose "[$functionName] Successfully retrieved authorization code"
+                                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully retrieved authorization code" -LogLevel "Information"
                                 $result.Success = $true
                                 $result.Code = $code
                             }
@@ -365,11 +427,13 @@ function Start-HttpListener()
                                 if ($authError)
                                 {
                                     Write-Verbose "[$functionName] Error in response: $authError - $errorDescription"
+                                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error in response: $authError - $errorDescription" -LogLevel "Error"
                                     $result.ErrorMessage = "Authentication error: $authError - $errorDescription"
                                 }
                                 else
                                 {
                                     Write-Verbose "[$functionName] No code or error found in query string"
+                                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No code or error found in query string" -LogLevel "Error"
                                     $result.ErrorMessage = "Authorization code not found in the response"
                                 }
                             }
@@ -377,6 +441,7 @@ function Start-HttpListener()
                         else
                         {
                             Write-Verbose "[$functionName] Query string is empty or null"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Query string is empty or null" -LogLevel "Information"
                             $result.ErrorMessage = "Empty query string in redirect response"
                         }
                         # Send response to browser
@@ -423,13 +488,16 @@ function Start-HttpListener()
                 catch
                 {
                     Write-Verbose "[$functionName] Error while waiting for request: $_"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error while waiting for request: $_" -LogLevel "Error"
                     Write-Verbose "[$functionName] Exception details: $($_.Exception.ToString())"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exception details: $($_.Exception.ToString())" -LogLevel "Error"
                     $result.ErrorMessage = "HTTP listener error: $($_.Exception.Message)"
                 }
             }
             else
             {
                 Write-Verbose "[$functionName] Listener is no longer listening"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Listener is no longer listening" -LogLevel "Information"
                 $result.ErrorMessage = "HTTP listener stopped unexpectedly"
                 break
             }
@@ -440,13 +508,16 @@ function Start-HttpListener()
         if ($stopwatch.Elapsed -ge $timeout)
         {
             Write-Verbose "[$functionName] Timeout waiting for authentication response"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Timeout waiting for authentication response" -LogLevel "Information"
             $result.ErrorMessage = "Timed out waiting for authentication response"
         }
     }
     catch
     {
         Write-Verbose "[$functionName] Error in HTTP listener: $_"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error in HTTP listener: $_" -LogLevel "Error"
         Write-Verbose "[$functionName] Exception details: $($_.Exception.ToString())"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exception details: $($_.Exception.ToString())" -LogLevel "Error"
         $result.ErrorMessage = "Failed to start HTTP listener: $($_.Exception.Message)"
     }
     finally
@@ -457,6 +528,7 @@ function Start-HttpListener()
             $listener.Stop()
             $listener.Close()
             Write-Verbose "[$functionName] HTTP listener stopped"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "HTTP listener stopped" -LogLevel "Information"
         }
     }
     return $result
@@ -477,21 +549,28 @@ function Save-TokenToCache()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting token cache save operation"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting token cache save operation" -LogLevel "Information"
     Write-Verbose "[$functionName] Cache type: $cacheType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cache type: $cacheType" -LogLevel "Information"
     # Extract token scope from JWT token roles
     Write-Verbose "[$functionName] Decoding JWT token to extract roles/scope"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Decoding JWT token to extract roles/scope" -LogLevel "Verbose"
     
     Write-Verbose "[$functionName] Successfully extracted token scope: $($tokenScope -join ', ')"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully extracted token scope: $($tokenScope -join ', ')" -LogLevel "Information"
     # Add scope to cached token object
     Write-Verbose "[$functionName] Adding scope property to cached token object"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding scope property to cached token object" -LogLevel "Information"
     if (-not $cachedToken.scope)
     {
         Write-Verbose "[$functionName] Scope property not found in cached token, adding it"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scope property not found in cached token, adding it" -LogLevel "Information"
         $cachedToken.add('scope', (DecodeJwtToken -Token $cachedToken.access_token -raw).roles)
     }
     else
     {
         Write-Verbose "[$functionName] Scope property already exists in cached token. Applying proper formatting."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scope property already exists in cached token. Applying proper formatting." -LogLevel "Information"
         $cachedToken.scope = FormatScopes -scopes $cachedToken.scope -Reverse
     }
     
@@ -499,22 +578,26 @@ function Save-TokenToCache()
     if ($cacheType -eq 'memory')
     {
         Write-Verbose "[$functionName] Saving access token to memory cache"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Saving access token to memory cache" -LogLevel "Information"
         
         # Initialize global memory cache if it doesn't exist
         if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
         {
             Write-Verbose "[$functionName] Initializing global memory cache"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initializing global memory cache" -LogLevel "Information"
             New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
         }
         
         # Save to memory cache
         $Global:MemoryCache['accessToken'] = $cachedToken
         Write-Verbose "[$functionName] Token successfully saved to memory cache"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token successfully saved to memory cache" -LogLevel "Information"
         
         # Debug: Log what was actually saved
         if ($Global:MemoryCache['accessToken'].scope)
         {
             Write-Verbose "[$functionName] Verified scope is accessible: $($Global:MemoryCache['accessToken'].scope -join ', ')"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Verified scope is accessible: $($Global:MemoryCache['accessToken'].scope -join ', ')" -LogLevel "Information"
         }
         else
         {
@@ -524,10 +607,12 @@ function Save-TokenToCache()
     else
     {
         Write-Verbose "[$functionName] Saving access token to cache file: $cacheTokenFile"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Saving access token to cache file: $cacheTokenFile" -LogLevel "Information"
         
         if (-not (Test-Path -Path $cacheFolder))
         {
             Write-Verbose "[$functionName] Creating cache folder: $cacheFolder"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating cache folder: $cacheFolder" -LogLevel "Information"
             New-Item -Path $cacheFolder -ItemType Directory -Force | Out-Null
         }
         
@@ -535,6 +620,7 @@ function Save-TokenToCache()
         {
             $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
             Write-Verbose "[$functionName] Access token successfully saved to $cacheTokenFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token successfully saved to $cacheTokenFile" -LogLevel "Information"
         }
         catch
         {
@@ -551,9 +637,11 @@ function Save-RefreshTokenToConfig()
     $functionName = $MyInvocation.MyCommand.Name
     $DeligatedCredentials = @{}
     Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)" -LogLevel "Information"
     if (-not $refreshToken)
     {
         Write-Verbose "[$functionName] No refresh token to save"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No refresh token to save" -LogLevel "Information"
         return
     }
     # Read the current config and check if it is encrypted
@@ -561,42 +649,50 @@ function Save-RefreshTokenToConfig()
     if (isEncrypted -data $config)
     {
         Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config file is encrypted. Decrypting." -LogLevel "Information"
         $config = DecryptObject -encryptedObject $config
         $encrypted = $true
     }
     else
     {
         Write-Verbose "[$functionName] Config file is not encrypted. No decryption needed."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config file is not encrypted. No decryption needed." -LogLevel "Information"
         $encrypted = $false
     }
     
     if ($refreshToken.scope)
     {
         Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding scope to new deligatedCredentials" -LogLevel "Information"
         $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
         Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted scopes object type: $($formattedScopes.GetType().Name)" -LogLevel "Information"
         #If it is not an array, make it int an array
         if (-not ($formattedScopes -is [array]))
         {
             Write-Verbose "[$functionName] Scopes is not an array, converting to array"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scopes is not an array, converting to array" -LogLevel "Verbose"
             $formattedScopes = @($formattedScopes)
         }
     }
     else
     {
         Write-Verbose "[$functionName] No scopes provided in refresh token, using empty array"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scopes provided in refresh token, using empty array" -LogLevel "Information"
         $formattedScopes = @()
     }
 
     if ($config.deligatedCredentials)
     {
         Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Updating existing deligatedCredentials property" -LogLevel "Information"
         $config.deligatedCredentials.refresh_token = $refreshToken.refresh_token
         $config.deligatedCredentials.scope = $formattedScopes
     }
     else
     {
         Write-Verbose "[$functionName] Creating new deligatedCredentials property"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new deligatedCredentials property" -LogLevel "Information"
         $deligatedCredentials.refresh_token = $refreshToken.refresh_token
         $deligatedCredentials.scope = $formattedScopes
         $config | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $DeligatedCredentials
@@ -606,12 +702,15 @@ function Save-RefreshTokenToConfig()
     if ($encrypted)
     {
         Write-Verbose "[$functionName] Re-encrypting config with refresh token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Re-encrypting config with refresh token" -LogLevel "Information"
         $Config = EncryptObject -DecryptedObject $config 
     }   
     # Save the updated config
     Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Saving refresh token to config file: $configFilePath" -LogLevel "Information"
     $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
     Write-Verbose "[$functionName] Refresh token saved to config file"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Refresh token saved to config file" -LogLevel "Information"
 }
 
 function Format-TokenOutput()
@@ -621,13 +720,16 @@ function Format-TokenOutput()
     if ($secureString)
     {
         Write-Verbose "[$functionName] Converting access token to secure string"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting access token to secure string" -LogLevel "Verbose"
         $secureAccessToken = ConvertTo-SecureString -String $token -AsPlainText -Force
         Write-Verbose "[$functionName] Returning secure token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning secure token" -LogLevel "Information"
         return $secureAccessToken
     }
     else
     {
         Write-Verbose "[$functionName] Returning plain text access token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning plain text access token" -LogLevel "Information"
         return $token
     }
 }
@@ -645,6 +747,7 @@ function Test-RefreshTokenValidity()
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Testing refresh token validity..."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Testing refresh token validity..." -LogLevel "Information"
     try
     {
         # Ensure scopes are properly formatted for the token refresh
@@ -678,14 +781,18 @@ function Test-RefreshTokenValidity()
         }
         $refreshTokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
         Write-Verbose "[$functionName] Attempting to validate refresh token by getting a new access token..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to validate refresh token by getting a new access token..." -LogLevel "Information"
         $tokenResponse = Invoke-RestMethod -Method Post -Uri $refreshTokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $refreshTokenRequestBody
         Write-Verbose "[$functionName] Refresh token is valid. Successfully obtained a new access token."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Refresh token is valid. Successfully obtained a new access token." -LogLevel "Information"
         return $true, $tokenResponse
     }
     catch
     {
         Write-Verbose "[$functionName] Refresh token validation failed: $_"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Refresh token validation failed: $_" -LogLevel "Error"
         Write-Verbose "[$functionName] Refresh token appears to be invalid or expired."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Refresh token appears to be invalid or expired." -LogLevel "Error"
         return $false, $null
     }
 }
@@ -727,14 +834,17 @@ function Get-RefreshToken()
         Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
         # Only save the refresh token if it's different from the one we already have
         Write-Verbose "[$functionName] Checking whether to save the refresh token..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether to save the refresh token..." -LogLevel "Verbose"
         if ($tokenResponse.refresh_token -and $tokenResponse.refresh_token -ne $accessTokenObject.refresh_token)
         {
             Write-Verbose "[$functionName] Saving new refresh token as it differs from the existing one."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Saving new refresh token as it differs from the existing one." -LogLevel "Information"
             Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
         }
         else
         {
             Write-Verbose "[$functionName] No need to save refresh token as it hasn't changed."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No need to save refresh token as it hasn't changed." -LogLevel "Information"
         }
         return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
     }
@@ -768,11 +878,14 @@ function Get-TokenFromCache()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting token cache retrieval for domain: $domain"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting token cache retrieval for domain: $domain" -LogLevel "Information"
     Write-Verbose "[$functionName] Cache type: $cacheType, Delegated: $deligated"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cache type: $cacheType, Delegated: $deligated" -LogLevel "Information"
     
     # Calculate time buffer for token renewal
     $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
     Write-Verbose "[$functionName] Token renewal buffer time: $timeBuffer"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token renewal buffer time: $timeBuffer" -LogLevel "Information"
     
     # Get cached token object based on cache type
     $accessTokenObject = Get-CachedTokenObject -cacheType $cacheType -cacheTokenFile $cacheTokenFile -domain $domain 
@@ -798,11 +911,13 @@ function Get-TokenFromCache()
     if ($deligated -and $configRefreshToken)
     {
         Write-Verbose "[$functionName] No valid cached token found, attempting to use config refresh token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No valid cached token found, attempting to use config refresh token" -LogLevel "Information"
         $refreshTokenObject = @{ refresh_token = $configRefreshToken }
         return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
     }
     
     Write-Verbose "[$functionName] No valid token found in cache or config"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No valid token found in cache or config" -LogLevel "Information"
     return $null
 }
 
@@ -821,11 +936,13 @@ function Get-CachedTokenObject()
         'memory'
         {
             Write-Verbose "[$functionName] Checking memory cache for access token"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking memory cache for access token" -LogLevel "Verbose"
             
             # Initialize memory cache if it doesn't exist
             if (-not (Get-Variable -Name 'MemoryCache' -Scope Global -ErrorAction SilentlyContinue))
             {
                 Write-Verbose "[$functionName] Initializing memory cache"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initializing memory cache" -LogLevel "Information"
                 New-Variable -Name 'MemoryCache' -Scope Global -Value @{} -Force
             }
             
@@ -835,16 +952,19 @@ function Get-CachedTokenObject()
                 if ($tokenObject.domain -eq $domain)
                 {
                     Write-Verbose "[$functionName] Found matching token in memory cache for domain: $domain"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found matching token in memory cache for domain: $domain" -LogLevel "Information"
                     return $tokenObject
                 }
                 else
                 {
                     Write-Verbose "[$functionName] Memory cache token domain ($($tokenObject.domain)) doesn't match requested domain ($domain)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Memory cache token domain ($($tokenObject.domain)) doesn't match requested domain ($domain)" -LogLevel "Information"
                 }
             }
             else
             {
                 Write-Verbose "[$functionName] No token found in memory cache"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No token found in memory cache" -LogLevel "Information"
             }
             return $null
         }
@@ -852,10 +972,12 @@ function Get-CachedTokenObject()
         'file'
         {
             Write-Verbose "[$functionName] Checking file cache for access token: $cacheTokenFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking file cache for access token: $cacheTokenFile" -LogLevel "Verbose"
             
             if (-not (Test-Path -Path $cacheTokenFile))
             {
                 Write-Verbose "[$functionName] Cache file not found: $cacheTokenFile"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cache file not found: $cacheTokenFile" -LogLevel "Information"
                 return $null
             }
             
@@ -865,17 +987,20 @@ function Get-CachedTokenObject()
                 if ($tokenObject.domain -eq $domain)
                 {
                     Write-Verbose "[$functionName] Found matching token in file cache for domain: $domain"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found matching token in file cache for domain: $domain" -LogLevel "Information"
                     return $tokenObject
                 }
                 else
                 {
                     Write-Verbose "[$functionName] File cache token domain ($($tokenObject.domain)) doesn't match requested domain ($domain)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "File cache token domain ($($tokenObject.domain)) doesn't match requested domain ($domain)" -LogLevel "Information"
                 }
             }
             catch
             {
                 Write-Warning "[$functionName] Failed to read cache file: $_"
                 Write-Verbose "[$functionName] Cache file may be corrupted or invalid"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cache file may be corrupted or invalid" -LogLevel "Error"
             }
             return $null
         }
@@ -901,6 +1026,7 @@ function Test-CachedTokenValidity()
     if (-not $accessTokenObject.access_token)
     {
         Write-Verbose "[$functionName] No access token in cached object"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No access token in cached object" -LogLevel "Information"
         return $null
     }
     
@@ -931,6 +1057,7 @@ function Get-NormalizedExpiryTime()
     if (-not $accessTokenObject.AbsoluteExpiryTime)
     {
         Write-Verbose "[$functionName] No AbsoluteExpiryTime found in token object"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No AbsoluteExpiryTime found in token object" -LogLevel "Information"
         return [datetime]::MinValue
     }
     
@@ -939,12 +1066,14 @@ function Get-NormalizedExpiryTime()
         if ($accessTokenObject.AbsoluteExpiryTime -is [string])
         {
             Write-Verbose "[$functionName] Converting string expiry time to datetime"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting string expiry time to datetime" -LogLevel "Verbose"
             $parsedTime = [datetime]::Parse($accessTokenObject.AbsoluteExpiryTime).ToLocalTime()
             
             # Handle timezone differences
             if ($parsedTime -lt $accessTokenObject.AbsoluteExpiryTime)
             {
                 Write-Verbose "[$functionName] Using original expiry time to resolve timezone differences"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using original expiry time to resolve timezone differences" -LogLevel "Information"
                 return $accessTokenObject.AbsoluteExpiryTime
             }
             return $parsedTime
@@ -952,6 +1081,7 @@ function Get-NormalizedExpiryTime()
         else
         {
             Write-Verbose "[$functionName] Using datetime expiry time as-is"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using datetime expiry time as-is" -LogLevel "Information"
             return $accessTokenObject.AbsoluteExpiryTime
         }
     }
@@ -984,6 +1114,7 @@ function Invoke-TokenRefresh()
     if (-not $deligated)
     {
         Write-Verbose "[$functionName] Not using delegated authentication, skipping refresh token logic"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Not using delegated authentication, skipping refresh token logic" -LogLevel "Information"
         return $null
     }
     
@@ -991,6 +1122,7 @@ function Invoke-TokenRefresh()
     if ($accessTokenObject.refresh_token)
     {
         Write-Verbose "[$functionName] Attempting to refresh token using cached refresh token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to refresh token using cached refresh token" -LogLevel "Information"
         return Get-RefreshToken -accessTokenObject $accessTokenObject -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
     }
     
@@ -998,11 +1130,13 @@ function Invoke-TokenRefresh()
     if ($configRefreshToken)
     {
         Write-Verbose "[$functionName] Attempting to refresh token using config refresh token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to refresh token using config refresh token" -LogLevel "Information"
         $refreshTokenObject = @{ refresh_token = $configRefreshToken }
         return Get-RefreshToken -accessTokenObject $refreshTokenObject -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath
     }
     
     Write-Verbose "[$functionName] No refresh token available for token refresh"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No refresh token available for token refresh" -LogLevel "Information"
     return $null
 }
 
@@ -1020,19 +1154,25 @@ function LaunchBrowser()
     $functionName = $MyInvocation.MyCommand.Name
     #print log of incoming parameters.
     Write-Verbose "[$functionName] Launching browser with URL: $url"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Launching browser with URL: $url" -LogLevel "Information"
     Write-Verbose "[$functionName] Browser preference: $browser"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Browser preference: $browser" -LogLevel "Information"
     Write-Verbose "[$functionName] Private session: $private"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Private session: $private" -LogLevel "Information"
     if ($null -eq $browser -or $browser -eq '')
     {
         Write-Verbose "[$functionName] No browser specified, attempting to read value from settings"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No browser specified, attempting to read value from settings" -LogLevel "Information"
         if ($null -ne $settings.preferredBrowser -and $settings.preferredBrowser -ne '')
         {
             Write-Verbose "[$functionName] Using preferred browser from settings: $($settings.preferredBrowser)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using preferred browser from settings: $($settings.preferredBrowser)" -LogLevel "Information"
             $browser = $settings.preferredBrowser
         }
         else
         {
             Write-Verbose "[$functionName] No preferred browser set in settings, defaulting to Edge"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No preferred browser set in settings, defaulting to Edge" -LogLevel "Information"
             $browser = 'Default'
         }
     }
@@ -1042,9 +1182,11 @@ function LaunchBrowser()
         'Edge'
         {
             Write-Verbose "[$functionName] Opening Edge browser for authentication"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Opening Edge browser for authentication" -LogLevel "Information"
             if ($settings.privateSession)
             {
                 Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Private session detected.  Opening $($settings.preferredBrowser) in private mode" -LogLevel "Verbose"
                 $urlParams = @{
                     FilePath     = "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
                     ArgumentList = "--inprivate", $authUrl
@@ -1061,9 +1203,11 @@ function LaunchBrowser()
         'Chrome'
         {
             Write-Verbose "[$functionName] Opening Chrome browser for authentication"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Opening Chrome browser for authentication" -LogLevel "Information"
             if ($settings.privateSession)
             {
                 Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Private session detected.  Opening $($settings.preferredBrowser) in private mode" -LogLevel "Verbose"
                 $urlParams = @{
                     FilePath     = "C:\Program Files\Google\Chrome\Application\chrome.exe"
                     ArgumentList = "--incognito", $authUrl
@@ -1080,9 +1224,11 @@ function LaunchBrowser()
         'Firefox'
         {
             Write-Verbose "[$functionName] Opening Firefox browser for authentication"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Opening Firefox browser for authentication" -LogLevel "Information"
             if ($settings.privateSession)
             {
                 Write-Verbose "[$functionName] Private session detected.  Opening $($settings.preferredBrowser) in private mode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Private session detected.  Opening $($settings.preferredBrowser) in private mode" -LogLevel "Verbose"
                 $urlParams = @{
                     FilePath     = "C:\Program Files\Mozilla Firefox\firefox.exe"
                     ArgumentList = "-private-window", $authUrl
@@ -1099,6 +1245,7 @@ function LaunchBrowser()
         default
         {
             Write-Verbose "[$functionName] Opening default browser for authentication"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Opening default browser for authentication" -LogLevel "Information"
             $urlParams = @{
                 FilePath     = "start"
                 ArgumentList = $authUrl
@@ -1106,11 +1253,13 @@ function LaunchBrowser()
         }
     }
     Write-Verbose "[$functionName] Launching $browser with URL: $url"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Launching $browser with URL: $url" -LogLevel "Information"
     try
     {
         # Start the browser with the specified URL
         Start-Process @urlParams 
         Write-Verbose "[$functionName] Browser launched successfully."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Browser launched successfully." -LogLevel "Information"
     }
     catch
     {
@@ -1129,15 +1278,19 @@ function Get-DelegatedToken()
     if (-not $scopes -or $scopes -eq "")
     {
         Write-Verbose "[$functionName] Scopes parameter is null or empty. Using default Graph API scopes."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scopes parameter is null or empty. Using default Graph API scopes." -LogLevel "Information"
         $scopes = "offline_access openid Device.ReadWrite.All DeviceManagementApps.Read.All DeviceManagementConfiguration.ReadWrite.All DeviceManagementManagedDevices.PrivilegedOperations.All DeviceManagementManagedDevices.ReadWrite.All DeviceManagementServiceConfig.ReadWrite.All"
         Write-Host "Using default scopes as none were provided: $scopes" -ForegroundColor Yellow
     }
     
     Write-Verbose "[$functionName] Starting with scopes: '$scopes'"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting with scopes: '$scopes'" -LogLevel "Information"
     
     # Debug the incoming scopes parameter
     Write-Verbose "[$functionName] Received scopes parameter: '$scopes'"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received scopes parameter: '$scopes'" -LogLevel "Information"
     Write-Verbose "[$functionName] Scopes parameter type: $($scopes.GetType().Name)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scopes parameter type: $($scopes.GetType().Name)" -LogLevel "Information"
     if ([string]::IsNullOrEmpty($scopes))
     {
         Write-Warning "[$functionName] WARNING: Received null or empty scopes parameter!"
@@ -1147,6 +1300,7 @@ function Get-DelegatedToken()
     if ($configRefreshToken)
     {
         Write-Verbose "[$functionName] Found refresh token in config. Testing its validity before requesting new authorization..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found refresh token in config. Testing its validity before requesting new authorization..." -LogLevel "Information"
         $isValid, $tokenResponse = Test-RefreshTokenValidity -refreshToken $configRefreshToken -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -AuthType $AuthType
         if ($isValid)
         {
@@ -1156,11 +1310,13 @@ function Get-DelegatedToken()
             Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
             # We don't need to save the refresh token again since it's the same one
             Write-Verbose "[$functionName] Using existing refresh token that is still valid."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using existing refresh token that is still valid." -LogLevel "Information"
             return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
         }
         else
         {
             Write-Verbose "[$functionName] Existing refresh token is invalid. Will proceed with new authorization."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Existing refresh token is invalid. Will proceed with new authorization." -LogLevel "Error"
             if ($ForcedRenewal)
             {
                 Write-Host "Forcing new refresh token - proceeding with new authentication flow." -ForegroundColor Yellow
@@ -1176,6 +1332,7 @@ function Get-DelegatedToken()
     }
     # Generate a random state string
     Write-Verbose "[$functionName] Generating random state string."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Generating random state string." -LogLevel "Information"
     $state = [System.Guid]::NewGuid().ToString()
     $scopesFormatted = FormatScopes -scopes $scopes
     $encodedScopes = [uri]::EscapeDataString($scopesFormatted)
@@ -1186,19 +1343,25 @@ function Get-DelegatedToken()
         PublicAuthFlow
         {
             Write-Verbose "[$functionName] Using device auth flow."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using device auth flow." -LogLevel "Information"
             $deviceCodeRequestUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/devicecode"
             Write-Verbose "[$functionName] Device code request URL: $deviceCodeRequestUrl"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device code request URL: $deviceCodeRequestUrl" -LogLevel "Information"
             $deviceCodeRequestBody = @{
                 client_id = $clientId
                 scope     = $scopesFormatted
             }
             Write-Verbose "[$functionName] Original scopes parameter: '$scopes'"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Original scopes parameter: '$scopes'" -LogLevel "Information"
             Write-Verbose "[$functionName] Formatted scopes: '$scopesFormatted'"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted scopes: '$scopesFormatted'" -LogLevel "Information"
             Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)" -LogLevel "Information"
             try
             {
                 $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri $deviceCodeRequestUrl -Body $deviceCodeRequestBody
                 Write-Verbose "[$functionName] Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth 3)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth 3)" -LogLevel "Information"
             }
             catch
             {
@@ -1214,6 +1377,7 @@ function Get-DelegatedToken()
             {
                 $code = $matches[1]
                 Write-Verbose "[$functionName] Extracted code from device code response: $code"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted code from device code response: $code" -LogLevel "Information"
                 #now copy the code to the clipboard.
                 try
                 {
@@ -1228,16 +1392,19 @@ function Get-DelegatedToken()
             else
             {
                 Write-Verbose "[$functionName] No code found in device code response message."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No code found in device code response message." -LogLevel "Information"
             }
             if ($settings.preferredBrowser -eq '' -or $null -eq $settings.preferredBrowser)
             {
                 Write-Verbose "[$functionName] No preferred browser set in settings, using default browser."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No preferred browser set in settings, using default browser." -LogLevel "Information"
                 $preferredBrowser = 'Default'
                 $displayMessage = "If you choose 'Yes', your default browser will be used for authentication."
             }
             else
             {
                 Write-Verbose "[$functionName] Using preferred browser from settings: $($settings.preferredBrowser)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using preferred browser from settings: $($settings.preferredBrowser)" -LogLevel "Information"
                 $preferredBrowser = $settings.preferredBrowser
                 $displayMessage = "If you choose 'Yes', $preferredBrowser will be used for authentication."
                 if ($settings.privateSession)
@@ -1246,8 +1413,10 @@ function Get-DelegatedToken()
                 }
             }
             Write-Verbose "[$functionName] Preferred browser for authentication: $preferredBrowser"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preferred browser for authentication: $preferredBrowser" -LogLevel "Information"
             $authUrl = "https://microsoft.com/devicelogin"
             Write-Verbose "[$functionName] Authentication URL: $authUrl"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Authentication URL: $authUrl" -LogLevel "Information"
             Write-Host "Would you like to open a browser to the authentication page?"
             Write-Host "`n$displayMessage"
             $userChoice = Read-Host "Type 'Yes' to open the browser, or 'No' to continue without opening a browser `n (you will need to manually open your browser to $authUrl)"
@@ -1261,6 +1430,7 @@ function Get-DelegatedToken()
             if ($userChoice -eq 'Yes')
             {
                 Write-Verbose "[$functionName] User chose to open browser for authentication."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "User chose to open browser for authentication." -LogLevel "Information"
                 $browserOpened = LaunchBrowser -url $authUrl -browser $preferredBrowser
                 if (-not $browserOpened)
                 {
@@ -1270,12 +1440,14 @@ function Get-DelegatedToken()
             else
             {
                 Write-Verbose "[$functionName] User chose not to open browser, will continue with manual authentication."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "User chose not to open browser, will continue with manual authentication." -LogLevel "Information"
                 Write-Host "Please open your browser to $authUrl and paste the code: $code to sign-in"
             }
             Write-Host "Waiting for authentication..."
             Write-Host ""
             # --- Poll for Access Token ---
             Write-Verbose "[$functionName] Polling for access token using device code."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Polling for access token using device code." -LogLevel "Information"
             $tokenRequestUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
             $tokenRequestBody = @{
                 grant_type  = "urn:ietf:params:oauth:grant-type:device_code"
@@ -1285,21 +1457,27 @@ function Get-DelegatedToken()
             $accessToken = $null
             $timeoutSeconds = $deviceCodeResponse.expires_in # Typically 15 minutes
             Write-Verbose "[$functionName] Token request URL: $tokenRequestUrl"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token request URL: $tokenRequestUrl" -LogLevel "Information"
             Write-Verbose "[$functionName] Token request body: $($tokenRequestBody | ConvertTo-Json -Depth 3)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token request body: $($tokenRequestBody | ConvertTo-Json -Depth 3)" -LogLevel "Information"
             Write-Verbose "Timeout for polling: $timeoutSeconds seconds"
             $intervalSeconds = $deviceCodeResponse.interval # Typically 5 seconds
             Write-Verbose "Polling interval: $intervalSeconds seconds"
             $startTime = Get-Date
             Write-Verbose "[$functionName] Start time for polling: $startTime"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Start time for polling: $startTime" -LogLevel "Information"
             while ((Get-Date -UFormat %s) -lt ($startTime.AddSeconds($timeoutSeconds) | Get-Date -UFormat %s))
             {
                 Write-Verbose "[$functionName] Polling for access token..."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Polling for access token..." -LogLevel "Information"
                 Start-Sleep -Seconds $intervalSeconds 
                 try
                 {
                     $tokenResponse = Invoke-RestMethod -Method POST -Uri $tokenRequestUrl -Body $tokenRequestBody -ErrorAction SilentlyContinue
                     Write-Verbose "[$functionName] Polling attempt successful."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Polling attempt successful." -LogLevel "Information"
                     Write-Verbose "[$functionName] Token response: $($tokenResponse | ConvertTo-Json -Depth 3)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token response: $($tokenResponse | ConvertTo-Json -Depth 3)" -LogLevel "Information"
                     if ($tokenResponse.access_token)
                     {
                         $accessToken = $tokenResponse.access_token
@@ -1315,6 +1493,7 @@ function Get-DelegatedToken()
                     else
                     {
                         Write-Verbose "[$functionName] Authorization still pending, continuing to poll..."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Authorization still pending, continuing to poll..." -LogLevel "Information"
                     }
                 }
                 catch
@@ -1326,6 +1505,7 @@ function Get-DelegatedToken()
                     if ($_.Exception.Response -and $_.Exception.Response.StatusCode -eq 400)
                     {
                         Write-Verbose "[$functionName] Received 400 Bad Request during polling - checking if authorization is pending..."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received 400 Bad Request during polling - checking if authorization is pending..." -LogLevel "Verbose"
                         
                         # Multiple ways to detect authorization_pending:
                         # 1. Check the exception message for common patterns
@@ -1336,6 +1516,7 @@ function Get-DelegatedToken()
                         {
                             $isAuthPending = $true
                             Write-Verbose "[$functionName] Detected authorization_pending from exception message pattern"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Detected authorization_pending from exception message pattern" -LogLevel "Error"
                         }
                         
                         # 2. Try to parse the response body if available
@@ -1357,6 +1538,7 @@ function Get-DelegatedToken()
                                         {
                                             $isAuthPending = $true
                                             Write-Verbose "[$functionName] Confirmed authorization_pending from response body"
+                                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Confirmed authorization_pending from response body" -LogLevel "Information"
                                         }
                                     }
                                 }
@@ -1364,6 +1546,7 @@ function Get-DelegatedToken()
                             catch
                             {
                                 Write-Verbose "[$functionName] Could not parse error response, but assuming authorization_pending for 400 status"
+                                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not parse error response, but assuming authorization_pending for 400 status" -LogLevel "Error"
                                 # For 400 errors during OAuth device flow polling, assume it's authorization_pending
                                 $isAuthPending = $true
                             }
@@ -1372,6 +1555,7 @@ function Get-DelegatedToken()
                         if ($isAuthPending)
                         {
                             Write-Verbose "[$functionName] Authorization still pending (from catch block), continuing to poll..."
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Authorization still pending (from catch block), continuing to poll..." -LogLevel "Information"
                         }
                     }
                     
@@ -1380,6 +1564,7 @@ function Get-DelegatedToken()
                     {
                         Write-Warning "Polling attempt failed: $($_.Exception.Message)"
                         Write-Verbose "[$functionName] Unexpected error during polling: $($_.Exception | Out-String)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Unexpected error during polling: $($_.Exception | Out-String)" -LogLevel "Error"
                     }
                 }
                 Write-Host -NoNewline "."
@@ -1393,16 +1578,22 @@ function Get-DelegatedToken()
         'interactive'
         {
             Write-Verbose "[$functionName] Using interactive authentication flow."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using interactive authentication flow." -LogLevel "Information"
             $redirectUri = "http://localhost:8080/"
             Write-Verbose "[$functionName] Redirect URI: $redirectUri"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Redirect URI: $redirectUri" -LogLevel "Information"
             $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
             Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Encoded Redirect URI: $encodedRedirectUri" -LogLevel "Information"
             Write-Verbose "[$functionName] Attempting automatic HTTP listener flow"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting automatic HTTP listener flow" -LogLevel "Information"
             try
             {
                 Write-Verbose "[$functionName] Starting HTTP listener at $redirectUri"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting HTTP listener at $redirectUri" -LogLevel "Information"
                 $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
                 Write-Verbose "[$functionName] Authorization URL: $authUrl"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Authorization URL: $authUrl" -LogLevel "Information"
                 Write-Host "Opening browser for user authentication and consent..."
                 if (-not (LaunchBrowser -url $authUrl -browser $settings.preferredBrowser))
                 {
@@ -1413,6 +1604,7 @@ function Get-DelegatedToken()
                 if ($listenerResult.Success)
                 {
                     Write-Verbose "[$functionName] HTTP listener successfully captured the authorization code"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "HTTP listener successfully captured the authorization code" -LogLevel "Information"
                     $code = $listenerResult.Code
                     $automaticFlowSuccess = $true
                 }
@@ -1420,6 +1612,7 @@ function Get-DelegatedToken()
                 {
                     Write-Warning "HTTP listener failed to capture the authorization code: $($listenerResult.ErrorMessage)"
                     Write-Verbose "[$functionName] Will fall back to manual code input"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Will fall back to manual code input" -LogLevel "Information"
                     $automaticFlowSuccess = $false
                 }
             }
@@ -1427,16 +1620,20 @@ function Get-DelegatedToken()
             {
                 Write-Warning "Error in automatic HTTP listener flow: $_"
                 Write-Verbose "[$functionName] Will fall back to manual code input"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Will fall back to manual code input" -LogLevel "Information"
                 $automaticFlowSuccess = $false
             }
         }
         'Private'
         {
             Write-Verbose "[$functionName] Using non-interactive mode (manual code input)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using non-interactive mode (manual code input)" -LogLevel "Information"
             $redirectUri = "https://login.microsoftonline.com/common/oauth2/nativeclient"
             Write-Verbose "[$functionName] Redirect URI: $redirectUri"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Redirect URI: $redirectUri" -LogLevel "Information"
             $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
             Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Encoded Redirect URI: $encodedRedirectUri" -LogLevel "Information"
         }
         default
         {
@@ -1451,6 +1648,7 @@ function Get-DelegatedToken()
         # Step 1: Open the authorization URL
         $authUrl = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/authorize?client_id=$clientId&response_type=code&redirect_uri=$encodedRedirectUri&response_mode=query&scope=$encodedScopes&state=$state"
         Write-Verbose "[$functionName] Authorization URL: $authUrl"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Authorization URL: $authUrl" -LogLevel "Information"
         Write-Host "Opening browser for user authentication and consent..."
         if (-not (LaunchBrowser -url $authUrl -browser $settings.preferredBrowser))
         {
@@ -1460,22 +1658,26 @@ function Get-DelegatedToken()
         Write-Host "After granting consent, copy the 'code' parameter from the redirected URL and paste it below."
         $code = Read-Host "Enter the authorization code"
         Write-Verbose "[$functionName] Received authorization code input from user"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received authorization code input from user" -LogLevel "Information"
         #The $code string above contains the intire URL. Extract the code from the URL.
         if ($code -match '.*code=([^&]+).*')
         {
             $code = $Matches[1]
             Write-Verbose "[$functionName] Extracted code from URL: $($code.Substring(0, [Math]::Min(10, $code.Length)))..."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted code from URL: $($code.Substring(0, [Math]::Min(10, $code.Length)))..." -LogLevel "Information"
         }
         else
         {
             Write-Warning "Could not extract code parameter from the provided URL"
             Write-Verbose "[$functionName] Input received: $($code.Substring(0, [Math]::Min(30, $code.Length)))..."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Input received: $($code.Substring(0, [Math]::Min(30, $code.Length)))..." -LogLevel "Information"
         }
     }           
     # Regardless of how we got the code, exchange it for a token
     if ($code -and $AuthType -ne 'PublicAuthFlow')
     {
         Write-Verbose "[$functionName] Exchanging authorization code for access token"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exchanging authorization code for access token" -LogLevel "Information"
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
         $tokenRequestBody = @{
             client_id     = $clientId
@@ -1486,16 +1688,24 @@ function Get-DelegatedToken()
             scope         = $scopesFormatted
         }
         Write-Verbose "[$functionName] Token request parameters:"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token request parameters:" -LogLevel "Information"
         Write-Verbose "[$functionName]   Endpoint: $tokenEndpoint"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Endpoint: $tokenEndpoint" -LogLevel "Information"
         Write-Verbose "[$functionName]   Client ID: $clientId"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Client ID: $clientId" -LogLevel "Information"
         Write-Verbose "[$functionName]   Redirect URI: $redirectUri"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Redirect URI: $redirectUri" -LogLevel "Information"
         Write-Verbose "[$functionName]   Grant Type: authorization_code"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Grant Type: authorization_code" -LogLevel "Information"
         Write-Verbose "[$functionName]   Scopes: $scopesFormatted"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scopes: $scopesFormatted" -LogLevel "Information"
         try
         {
             Write-Verbose "[$functionName] Sending token request to $tokenEndpoint"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Sending token request to $tokenEndpoint" -LogLevel "Information"
             $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType "application/x-www-form-urlencoded" -Body $tokenRequestBody -ErrorVariable tokenError
             Write-Verbose "[$functionName] Access token received successfully"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token received successfully" -LogLevel "Information"
         }            
         catch
         {
@@ -1503,25 +1713,32 @@ function Get-DelegatedToken()
             if ($tokenError)
             {
                 Write-Verbose "[$functionName] Error details: $($tokenError | Out-String)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error details: $($tokenError | Out-String)" -LogLevel "Error"
                 if ($_.ErrorDetails.Message)
                 {
                     Write-Verbose "[$functionName] Error message details: $($_.ErrorDetails.Message)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error message details: $($_.ErrorDetails.Message)" -LogLevel "Error"
                     try
                     {
                         $errorJson = $_.ErrorDetails.Message | ConvertFrom-Json
                         Write-Verbose "[$functionName] Error JSON: $($errorJson | ConvertTo-Json -Depth 3)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error JSON: $($errorJson | ConvertTo-Json -Depth 3)" -LogLevel "Error"
                         Write-Verbose "[$functionName] Error code: $($errorJson.error)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error code: $($errorJson.error)" -LogLevel "Error"
                         Write-Verbose "[$functionName] Error description: $($errorJson.error_description)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error description: $($errorJson.error_description)" -LogLevel "Error"
                     }
                     catch
                     {
                         Write-Verbose "[$functionName] Could not convert error details to JSON: $_"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not convert error details to JSON: $_" -LogLevel "Error"
                     }
                 }
             }
             if ($_.Exception.Response)
             {
                 Write-Verbose "[$functionName] Status code: $($_.Exception.Response.StatusCode)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $($_.Exception.Response.StatusCode)" -LogLevel "Error"
                 # Try to get more information from the response
                 try
                 {
@@ -1529,20 +1746,25 @@ function Get-DelegatedToken()
                     $responseBody = $reader.ReadToEnd()
                     $reader.Close()
                     Write-Verbose "[$functionName] Response body: $responseBody"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response body: $responseBody" -LogLevel "Information"
                     try
                     {
                         $responseJson = $responseBody | ConvertFrom-Json
                         Write-Verbose "[$functionName] Error code: $($responseJson.error)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error code: $($responseJson.error)" -LogLevel "Error"
                         Write-Verbose "[$functionName] Error description: $($responseJson.error_description)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error description: $($responseJson.error_description)" -LogLevel "Error"
                     }
                     catch
                     {
                         Write-Verbose "[$functionName] Could not parse response body as JSON"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not parse response body as JSON" -LogLevel "Information"
                     }
                 }
                 catch
                 {
                     Write-Verbose "[$functionName] Could not read response stream: $_"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not read response stream: $_" -LogLevel "Information"
                 }
             }
             return $null
@@ -1552,16 +1774,19 @@ function Get-DelegatedToken()
     if ($tokenResponse)
     {
         Write-Verbose "[$functionName] Token response contains the following properties:"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token response contains the following properties:" -LogLevel "Information"
         foreach ($prop in $tokenResponse.PSObject.Properties.Name)
         {
             if ($prop -eq "access_token" -or $prop -eq "refresh_token" -or $prop -eq "id_token")
             {
                 $tokenLength = $tokenResponse.$prop.Length
                 Write-Verbose "[$functionName]   $($prop): [Token of length $tokenLength]"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "$($prop): [Token of length $tokenLength]" -LogLevel "Information"
             }
             else
             {
                 Write-Verbose "[$functionName]   $($prop): $($tokenResponse.$prop)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "$($prop): $($tokenResponse.$prop)" -LogLevel "Information"
             }
         }
         
@@ -1577,6 +1802,7 @@ function Get-DelegatedToken()
                 {
                     Write-Host "New refresh token has been successfully obtained and saved to configuration." -ForegroundColor Green
                     Write-Verbose "[$functionName] Forced refresh token renewal completed successfully."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Forced refresh token renewal completed successfully." -LogLevel "Information"
                 }
             }
             else
@@ -1585,6 +1811,7 @@ function Get-DelegatedToken()
                 {
                     Write-Host "New refresh token has been obtained but was not saved due to NoSaveRefreshToken setting." -ForegroundColor Yellow
                     Write-Verbose "[$functionName] Forced refresh token renewal completed but not saved per NoSaveRefreshToken setting."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Forced refresh token renewal completed but not saved per NoSaveRefreshToken setting." -LogLevel "Information"
                 }
             }
         }
@@ -1593,6 +1820,7 @@ function Get-DelegatedToken()
     else 
     {
         Write-Verbose "[$functionName] Token response is null. Authorization code exchange failed."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token response is null. Authorization code exchange failed." -LogLevel "Error"
         return $null
     }
 }
@@ -1602,7 +1830,9 @@ function Get-ClientCredentialsToken()
     param($tenantId, $clientId, $clientSecret, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $secureString)
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Using non-delegated access..."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using non-delegated access..." -LogLevel "Information"
     Write-Verbose "[$functionName] Requesting new access token with client credentials flow"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Requesting new access token with client credentials flow" -LogLevel "Information"
     $body = @{
         client_id     = $clientId
         scope         = 'https://graph.microsoft.com/.default'
@@ -1610,13 +1840,17 @@ function Get-ClientCredentialsToken()
         grant_type    = 'client_credentials'
     }
     Write-Verbose "[$functionName] Token request body: client_id=$clientId, scope=https://graph.microsoft.com/.default, grant_type=client_credentials"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token request body: client_id=$clientId, scope=https://graph.microsoft.com/.default, grant_type=client_credentials" -LogLevel "Information"
     try
     {
         $tokenEndpoint = "https://login.microsoftonline.com/$tenantId/oauth2/v2.0/token"
         Write-Verbose "[$functionName] Sending request to token endpoint: $tokenEndpoint"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Sending request to token endpoint: $tokenEndpoint" -LogLevel "Information"
         $tokenResponse = Invoke-RestMethod -Method Post -Uri $tokenEndpoint -ContentType 'application/x-www-form-urlencoded' -Body $body -ErrorVariable restError
         Write-Verbose "[$functionName] Access token received successfully" 
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token received successfully" " -LogLevel "Information"
         Write-Verbose "[$functionName] Token expires in: $($tokenResponse.expires_in) seconds"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Token expires in: $($tokenResponse.expires_in) seconds" -LogLevel "Information"
         $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain
         # Cache the token
         Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
@@ -1629,11 +1863,13 @@ function Get-ClientCredentialsToken()
         if ($restError)
         {
             Write-Verbose "[$functionName] Error details: $($restError | Out-String)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error details: $($restError | Out-String)" -LogLevel "Error"
         }
             
         if ($_.Exception.Response)
         {
             Write-Verbose "[$functionName] Status code: $($_.Exception.Response.StatusCode)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $($_.Exception.Response.StatusCode)" -LogLevel "Error"
             $errorResponse = $_.Exception.Response.GetResponseStream()
             $streamReader = New-Object System.IO.StreamReader($errorResponse)
             $errorMessage = $streamReader.ReadToEnd()
@@ -1644,11 +1880,14 @@ function Get-ClientCredentialsToken()
             {
                 $errorJson = $errorMessage | ConvertFrom-Json
                 Write-Verbose "[$functionName] Error code: $($errorJson.error)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error code: $($errorJson.error)" -LogLevel "Error"
                 Write-Verbose "[$functionName] Error description: $($errorJson.error_description)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error description: $($errorJson.error_description)" -LogLevel "Error"
             }
             catch
             {
                 Write-Verbose "[$functionName] Could not parse error message as JSON: $_"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not parse error message as JSON: $_" -LogLevel "Error"
             }
         }
         return $null
@@ -1665,6 +1904,7 @@ function BuildAuthSplatTable()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Received object of type $($auth.GetType().Name)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received object of type $($auth.GetType().Name)" -LogLevel "Information"
     # Dynamic splatting approach - iterate over all auth properties    # Create clean splatting hashtable starting with required parameter
     $getTokenParams = @{
         configFile = $configFile
@@ -1674,10 +1914,12 @@ function BuildAuthSplatTable()
     $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewRefreshToken')
 
     Write-Verbose "[$functionName] Debugging BuildAuthSplatTable - Auth object properties:"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Debugging BuildAuthSplatTable - Auth object properties:" -LogLevel "Information"
     foreach ($key in $auth.Keys)
     {
         $value = $auth[$key]
         Write-Verbose "[$functionName]  Property: '$key' = '$value' (Type: $($value.GetType().Name))"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Property: '$key' = '$value' (Type: $($value.GetType().Name))" -LogLevel "Information"
     }
     
     # Iterate over all properties in the auth object
@@ -1686,15 +1928,19 @@ function BuildAuthSplatTable()
         $paramName = $property
         $paramValue = $auth[$property]
         Write-Verbose "[$functionName] Processing property '$paramName' with value '$paramValue'"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing property '$paramName' with value '$paramValue'" -LogLevel "Verbose"
 
         # Special debugging for scope parameter
         if ($paramName -ieq 'scope')
         {
             Write-Verbose "[$functionName] SCOPE DEBUG: Found scope parameter with value: '$paramValue'"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "SCOPE DEBUG: Found scope parameter with value: '$paramValue'" -LogLevel "Information"
             Write-Verbose "[$functionName] SCOPE DEBUG: Value type: $($paramValue.GetType().Name)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "SCOPE DEBUG: Value type: $($paramValue.GetType().Name)" -LogLevel "Information"
             if ($paramValue -is [array])
             {
                 Write-Verbose "[$functionName] SCOPE DEBUG: Scope is array with $($paramValue.Count) elements: $($paramValue -join ', ')"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "SCOPE DEBUG: Scope is array with $($paramValue.Count) elements: $($paramValue -join ', ')" -LogLevel "Information"
             }
         }
         
@@ -1702,10 +1948,12 @@ function BuildAuthSplatTable()
         $correctParamName = $validParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
 
         Write-Verbose "[$functionName] Case-insensitive match for '$paramName': '$correctParamName'"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Case-insensitive match for '$paramName': '$correctParamName'" -LogLevel "Information"
         # Skip if not a valid parameter for the function
         if (-not $correctParamName)
         {
             Write-Verbose "[$functionName] Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping parameter '$paramName' as it's not valid for GetGraphAccessToken" -LogLevel "Information"
             continue
         }
         
@@ -1713,6 +1961,7 @@ function BuildAuthSplatTable()
         if ($null -eq $paramValue -or $paramValue -eq '' -or $paramValue -eq $false)
         {
             Write-Verbose "[$functionName] Skipping parameter '$paramName' due to null/empty/false value"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping parameter '$paramName' due to null/empty/false value" -LogLevel "Information"
             continue
         }        # Check if this is a delegated-only parameter (case-insensitive)
         $isDelegatedOnlyParam = $deligatedOnlyParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
@@ -1741,53 +1990,64 @@ function BuildAuthSplatTable()
             }
             
             Write-Verbose "[$functionName] Delegated check: HasProperty=$hasDelegatedProperty, Value=$delegatedValue, ValueType=$($delegatedValue.GetType().Name)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delegated check: HasProperty=$hasDelegatedProperty, Value=$delegatedValue, ValueType=$($delegatedValue.GetType().Name)" -LogLevel "Information"
             
             if ($hasDelegatedProperty -and $delegatedValue)
             {
                 Write-Verbose "[$functionName] Adding delegated parameter '$paramName' with value: $paramValue"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding delegated parameter '$paramName' with value: $paramValue" -LogLevel "Information"
                 #Check if the parameter is an array, and if so convert it to a space seperated string
                 if ($paramValue -is [array])
                 {
                     $paramValue = $paramValue -join ' '
                     Write-Verbose "[$functionName] Converted array parameter '$paramName' to space-separated string: $paramValue"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converted array parameter '$paramName' to space-separated string: $paramValue" -LogLevel "Information"
                 }
                 # Use the correct parameter name (properly capitalized) for the hashtable
                 $getTokenParams[$correctParamName] = $paramValue
                 Write-Verbose "[$functionName] Added delegated parameter '$correctParamName' with value: $paramValue"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added delegated parameter '$correctParamName' with value: $paramValue" -LogLevel "Information"
                 
                 # Special debugging for scope parameter
                 if ($correctParamName -ieq 'Scope')
                 {
                     Write-Verbose "[$functionName] SCOPE DEBUG: Added scope to hashtable with key '$correctParamName' and value '$paramValue'"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "SCOPE DEBUG: Added scope to hashtable with key '$correctParamName' and value '$paramValue'" -LogLevel "Information"
                 }
             }
             else
             {
                 Write-Verbose "[$functionName] Skipping delegated parameter '$paramName' because Deligated is not true (HasProperty=$hasDelegatedProperty, Value=$delegatedValue)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping delegated parameter '$paramName' because Deligated is not true (HasProperty=$hasDelegatedProperty, Value=$delegatedValue)" -LogLevel "Information"
             }
         }
         else
         {
             # Add general parameters (not restricted to delegated mode)
             Write-Verbose "[$functionName] Adding parameter '$paramName' with value: $paramValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding parameter '$paramName' with value: $paramValue" -LogLevel "Information"
             # Use the correct parameter name (properly capitalized) for the hashtable
             $getTokenParams[$correctParamName] = $paramValue
         }
     }    # Log the final splatting parameters for verification
     Write-Verbose "[$functionName] Final splatting parameters:"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Final splatting parameters:" -LogLevel "Information"
     foreach ($param in $getTokenParams.GetEnumerator())
     {
         if ($param.Key -eq 'configFile')
         {
             Write-Verbose "[$functionName]   $($param.Key): $($param.Value)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "$($param.Key): $($param.Value)" -LogLevel "Information"
         }
         elseif ($param.Value -is [bool])
         {
             Write-Verbose "[$functionName]  $($param.Key): $($param.Value)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "$($param.Key): $($param.Value)" -LogLevel "Information"
         }
         else
         {
             Write-Verbose "[$functionName]  $($param.Key): '$($param.Value)'"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "$($param.Key): '$($param.Value)'" -LogLevel "Information"
         }
     }
     
@@ -1795,15 +2055,19 @@ function BuildAuthSplatTable()
     if ($getTokenParams.ContainsKey('Scope'))
     {
         Write-Verbose "[$functionName] DEBUG: Scope parameter found in hashtable: '$($getTokenParams.Scope)'" 
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "DEBUG: Scope parameter found in hashtable: '$($getTokenParams.Scope)'" " -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] DEBUG: Scope parameter NOT found in hashtable!"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "DEBUG: Scope parameter NOT found in hashtable!" -LogLevel "Information"
         Write-Verbose "[$functionName] DEBUG: Available keys: $($getTokenParams.Keys -join ', ')"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "DEBUG: Available keys: $($getTokenParams.Keys -join ', ')" -LogLevel "Information"
     }
     
     # Return the splatting hashtable
     Write-Verbose "[$functionName] Returning splatting hashtable with parameters for GetGraphAccessToken"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning splatting hashtable with parameters for GetGraphAccessToken" -LogLevel "Information"
     return $getTokenParams
 }
 
@@ -1816,49 +2080,70 @@ function ProcessFilterCondition()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing filter condition: $condition"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing filter condition: $condition" -LogLevel "Verbose"
     # Check if this is a function-based filter (contains, startswith, endswith)
     Write-Verbose "[$functionName] Checking for function-based filter..."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking for function-based filter..." -LogLevel "Verbose"
     if ($condition -match '(startswith|contains|endswith)\s*\(([^,]+),\s*([^)]+)\)')
     {
         Write-Verbose "[$functionName] Found function-based filter: $($Matches[1])"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found function-based filter: $($Matches[1])" -LogLevel "Information"
         $filterOperator = $Matches[1]
         Write-Verbose "[$functionName] Filter Operator: $filterOperator"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Operator: $filterOperator" -LogLevel "Information"
         $filterKey = $Matches[2].Trim()
         Write-Verbose "[$functionName] Filter Key: $filterKey"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Key: $filterKey" -LogLevel "Information"
         $filterValue = $Matches[3].Trim()
         Write-Verbose "[$functionName] Filter Value: $filterValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Value: $filterValue" -LogLevel "Information"
         # Remove quotes if present in the value
         Write-Verbose "[$functionName] Removing quotes from filter value..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing quotes from filter value..." -LogLevel "Information"
         $filterValue = $filterValue -replace "^'|'$", ""
         Write-Verbose "[$functionName] Filter Value after removing double quotes: $filterValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Value after removing double quotes: $filterValue" -LogLevel "Information"
         $filterValue = $filterValue -replace '^"|"$', ""
         Write-Verbose "[$functionName] Filter Value after removing single quotes: $filterValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Value after removing single quotes: $filterValue" -LogLevel "Information"
         Write-Verbose "[$functionName] Filter Key after removing quotes: $FilterKey"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Key after removing quotes: $FilterKey" -LogLevel "Information"
         Write-Verbose "[$functionName] Filter Value: $FilterValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Value: $FilterValue" -LogLevel "Information"
         Write-Verbose "[$functionName] Filter Operator: $FilterOperator"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Operator: $FilterOperator" -LogLevel "Information"
         $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
         Write-Verbose "[$functionName] Encoded Filter Value: $encodedFilterValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Encoded Filter Value: $encodedFilterValue" -LogLevel "Information"
         # Rebuild the function call with encoded value
         $returnFilter = "$filterOperator($filterKey,'$encodedFilterValue')"
         Write-Verbose "[$functionName] Returning filter: $returnFilter"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning filter: $returnFilter" -LogLevel "Information"
         return $returnFilter
     }
     # Check for standard comparison operators
     elseif ($condition -match '([^\s]+)\s+(eq|ne|gt|lt|ge|le)\s+(.+)')
     {
         Write-Verbose "[$functionName] Not a function based filter. Checking for standard comparison operators..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Not a function based filter. Checking for standard comparison operators..." -LogLevel "Verbose"
         $filterKey = $Matches[1].Trim()
         $filterOperator = $Matches[2].Trim()
         $filterValue = $Matches[3].Trim()
         Write-Verbose "[$functionName] Filter Key: $FilterKey"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Key: $FilterKey" -LogLevel "Information"
         Write-Verbose "[$functionName] Filter Operator: $FilterOperator"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Operator: $FilterOperator" -LogLevel "Information"
         Write-Verbose "[$functionName] Filter Value: $FilterValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Value: $FilterValue" -LogLevel "Information"
         # Special handling for null and empty string
         Write-Verbose "[$functionName] Checking for null or empty string..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking for null or empty string..." -LogLevel "Verbose"
         if ($filterValue -eq "null" -or $filterValue -eq "''" -or $filterValue -eq '""')
         {
             Write-Verbose "[$functionName] Filter value is null or empty string."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter value is null or empty string." -LogLevel "Information"
             Write-Verbose "[$functionName] Returning filter without encoding: $filterKey $filterOperator $filterValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning filter without encoding: $filterKey $filterOperator $filterValue" -LogLevel "Information"
             # Don't encode null or empty string values
             return "$filterKey $filterOperator $filterValue"
         }
@@ -1866,24 +2151,33 @@ function ProcessFilterCondition()
         {
             # Remove quotes if present
             Write-Verbose "[$functionName] Checking for quotes and removing from value if present..."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking for quotes and removing from value if present..." -LogLevel "Verbose"
             Write-Verbose "[$functionName] Value before processing: $filterValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Value before processing: $filterValue" -LogLevel "Verbose"
             $filterValue = $filterValue -replace "^'|'$", ""
             Write-Verbose "[$functionName] Value after removing double quotes: $filterValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Value after removing double quotes: $filterValue" -LogLevel "Information"
             $filterValue = $filterValue -replace '^"|"$', ""
             Write-Verbose "[$functionName] Value after removing single quotes: $filterValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Value after removing single quotes: $filterValue" -LogLevel "Information"
             Write-Verbose "[$functionName] Filter Key: $FilterKey"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Key: $FilterKey" -LogLevel "Information"
             Write-Verbose "[$functionName] Filter Value: $FilterValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter Value: $FilterValue" -LogLevel "Information"
             $encodedFilterValue = [uri]::EscapeDataString($FilterValue)
             Write-Verbose "[$functionName] Encoded Filter Value: $encodedFilterValue"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Encoded Filter Value: $encodedFilterValue" -LogLevel "Information"
             # Add quotes back for the encoded value
             $returnFilter = "$filterKey $filterOperator '$encodedFilterValue'"
             Write-Verbose "[$functionName] Returning filter: $returnFilter"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning filter: $returnFilter" -LogLevel "Information"
             return $returnFilter
         }
     }
     else
     {
         Write-Verbose "[$functionName] Unrecognized filter condition format: $condition"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Unrecognized filter condition format: $condition" -LogLevel "Information"
         return $condition
     }
 }
@@ -1924,10 +2218,12 @@ function GetGraphAccessToken()
     }
 
     Write-Verbose "[$functionName] Reading config file $configFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Reading config file $configFile" -LogLevel "Information"
     try
     {
         $config = Get-Content -Raw -Path $configFile -Force | ConvertFrom-Json
         Write-Verbose "[$functionName] Config file loaded successfully"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config file loaded successfully" -LogLevel "Information"
     }
     catch
     {
@@ -1935,40 +2231,48 @@ function GetGraphAccessToken()
         return $null
     }
     Write-Verbose "[$functionName] Decrypting values from $configFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Decrypting values from $configFile" -LogLevel "Information"
     $configRefreshToken = $null
     if (isEncrypted -data $config)
     {
         Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config file is encrypted. Decrypting." -LogLevel "Information"
         $config = DecryptObject -encryptedObject $config
     }
     else
     {
         Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config file is not encrypted. Using as is." -LogLevel "Information"
     }    
     # Extract the refresh token if it exists
     if ($config.deligatedCredentials.refresh_token)
     {
         $configRefreshToken = $config.deligatedCredentials.refresh_token
         Write-Verbose "[$functionName] Found refresh token in encrypted config."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found refresh token in encrypted config." -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] No refresh token found in config."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No refresh token found in config." -LogLevel "Information"
     }
     # Handle ForceNewRefreshToken parameter
     if ($ForceNewRefreshToken -and $Deligated)
     {
         Write-Host "Force new refresh token requested. Invalidating existing refresh token." -ForegroundColor Yellow
         Write-Verbose "[$functionName] ForceNewRefreshToken requested. Clearing existing refresh token from memory."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ForceNewRefreshToken requested. Clearing existing refresh token from memory." -LogLevel "Information"
         
         # Clear the configRefreshToken variable so a new one will be obtained
         $configRefreshToken = $null
         Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cleared configRefreshToken variable. New refresh token will be obtained and saved to config." -LogLevel "Information"
     }    
     if ($config.tenantId)
     {
         $tenantId = $config.tenantId
         Write-Verbose "[$functionName] Tenant ID found in config: $tenantId"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Tenant ID found in config: $tenantId" -LogLevel "Information"
     }
     else
     {
@@ -1979,6 +2283,7 @@ function GetGraphAccessToken()
     {
         $domain = $config.domain
         Write-Verbose "[$functionName] Domain found in config: $domain"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Domain found in config: $domain" -LogLevel "Information"
     }
     else
     {
@@ -1989,6 +2294,7 @@ function GetGraphAccessToken()
     {
         $clientId = $config.appId
         Write-Verbose "[$functionName] Client ID found in config: $clientId"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Client ID found in config: $clientId" -LogLevel "Information"
     }
     else
     {
@@ -1999,10 +2305,12 @@ function GetGraphAccessToken()
     {
         $clientSecret = $config.AppSecret
         Write-Verbose "[$functionName] Client Secret found in config."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Client Secret found in config." -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] Client Secret not found in config file."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Client Secret not found in config file." -LogLevel "Information"
         Write-Verbose "Checking whether the authtype is public flow which does not require client secret."
         if ($AuthType -ne 'PublicAuthFlow')
         {
@@ -2010,18 +2318,23 @@ function GetGraphAccessToken()
             return $null
         }
         Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Public Auth Flow does not require Client Secret." -LogLevel "Information"
     }
     if ($deligated )
     {
         Write-Verbose "[$functionName] Delegated access selected. Checking for scope."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delegated access selected. Checking for scope." -LogLevel "Verbose"
         if ($null -eq $scope -or $scope -eq '')
         {
             Write-Verbose "[$functionName] No scope provided in parameters. Checking config file for scope."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scope provided in parameters. Checking config file for scope." -LogLevel "Verbose"
             if ($config.auth.scope)
             {
                 Write-Verbose "[$functionName] Found scope in config file."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found scope in config file." -LogLevel "Information"
                 $Scope = $config.auth.scope
                 Write-Verbose "[$functionName] Using scope from config file: $Scope"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using scope from config file: $Scope" -LogLevel "Information"
             }
             else
             {
@@ -2032,29 +2345,45 @@ function GetGraphAccessToken()
         else
         {
             Write-Verbose "[$functionName] Scope provided in parameters: $Scope"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scope provided in parameters: $Scope" -LogLevel "Information"
         }
     }
     else
     {
         Write-Verbose "[$functionName] Non-delegated access selected. No scope required."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Non-delegated access selected. No scope required." -LogLevel "Information"
         Write-Verbose "[$functionName] Using default scope: $Scope"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using default scope: $Scope" -LogLevel "Information"
     }
     #endregion Process config files
     
     #region Log parameters
     Write-Verbose "[$functionName] Received parameters:"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received parameters:" -LogLevel "Information"
     Write-Verbose "[$functionName] Configuration File: $configFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration File: $configFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Renewal Lead Time: $renewalLeadTime" 
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renewal Lead Time: $renewalLeadTime" " -LogLevel "Information"
     Write-Verbose "[$functionName] Secure String: $SecureString"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Secure String: $SecureString" -LogLevel "Information"
     Write-Verbose "[$functionName] Force New Token: $ForceNewToken"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Force New Token: $ForceNewToken" -LogLevel "Information"
     Write-Verbose "[$functionName] Force New Refresh Token: $ForceNewRefreshToken"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Force New Refresh Token: $ForceNewRefreshToken" -LogLevel "Information"
     Write-Verbose "[$functionName] Use Public Auth Flow: $UsePublicAuthFlow"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Use Public Auth Flow: $UsePublicAuthFlow" -LogLevel "Information"
     Write-Verbose "[$functionName] Interactive: $Interactive"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Interactive: $Interactive" -LogLevel "Information"
     Write-Verbose "[$functionName] Cache Type: $CacheType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cache Type: $CacheType" -LogLevel "Information"
     Write-Verbose "[$functionName] Domain: $domain"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Domain: $domain" -LogLevel "Information"
     Write-Verbose "[$functionName] Deligated: $Deligated"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Deligated: $Deligated" -LogLevel "Information"
     Write-Verbose "[$functionName] Scopes: $Scope"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scopes: $Scope" -LogLevel "Information"
     Write-Verbose "[$functionName] Config has refresh token: $($null -ne $configRefreshToken)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config has refresh token: $($null -ne $configRefreshToken)" -LogLevel "Information"
     #endregion Log parameters
     
     # Set up cache paths
@@ -2084,6 +2413,7 @@ function GetGraphAccessToken()
     if ($deligated)
     {
         Write-Verbose "[$functionName] Deligated authentication flow selected." 
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Deligated authentication flow selected." " -LogLevel "Information"
         $params = @{
             tenantId           = $tenantId 
             clientId           = $clientId 
@@ -2099,7 +2429,9 @@ function GetGraphAccessToken()
         
         # Debug the scopes parameter being passed
         Write-Verbose "[$functionName] Scope parameter value: '$Scope'"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scope parameter value: '$Scope'" -LogLevel "Information"
         Write-Verbose "[$functionName] Scope parameter type: $($Scope.GetType().Name)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Scope parameter type: $($Scope.GetType().Name)" -LogLevel "Information"
         if ([string]::IsNullOrEmpty($Scope))
         {
             Write-Warning "[$functionName] WARNING: Scope parameter is null or empty!"
@@ -2109,10 +2441,12 @@ function GetGraphAccessToken()
             PublicAuthFlow
             {
                 Write-Verbose "[$functionName] Using public authentication flow for delegated token."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using public authentication flow for delegated token." -LogLevel "Information"
             }
             Interactive
             {
                 Write-Verbose "[$functionName] Using interactive authentication flow for delegated token."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using interactive authentication flow for delegated token." -LogLevel "Information"
                 $params += @{
                     clientSecret = $clientSecret
                 }
@@ -2120,6 +2454,7 @@ function GetGraphAccessToken()
             Private
             {
                 Write-Verbose "[$functionName] Using private authentication flow for delegated token."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using private authentication flow for delegated token." -LogLevel "Information"
                 $params += @{
                     clientSecret = $clientSecret
                 }
@@ -2128,6 +2463,7 @@ function GetGraphAccessToken()
         if ($NoSaveRefreshToken)
         {
             Write-Verbose "[$functionName] No save refresh token option selected. Not saving refresh token."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No save refresh token option selected. Not saving refresh token." -LogLevel "Information"
             $params += @{
                 NoSaveRefreshToken = $NoSaveRefreshToken
             }
@@ -2135,6 +2471,7 @@ function GetGraphAccessToken()
         if ($ForceNewRefreshToken)
         {
             Write-Verbose "[$functionName] Force new refresh token requested. This will force a new authentication flow."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Force new refresh token requested. This will force a new authentication flow." -LogLevel "Information"
             # Add a marker to indicate this was a forced refresh token renewal
             $params += @{
                 ForcedRenewal = $true
@@ -2181,6 +2518,7 @@ function CallGraphAPI()
     if ($accessToken)
     {
         Write-Verbose "[$functionName] Access token provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token provided." -LogLevel "Information"
     }
     else
     {
@@ -2188,23 +2526,34 @@ function CallGraphAPI()
         return
     }
     Write-Verbose "[$functionName] Resource Path: $ResourcePath"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Resource Path: $ResourcePath" -LogLevel "Information"
     Write-Verbose "[$functionName] Method: $method"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Method: $method" -LogLevel "Information"
     Write-Verbose "[$functionName] Filter: $filter"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filter: $filter" -LogLevel "Information"
     Write-Verbose "[$functionName] Extra Parameters: $ExtraParameters"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extra Parameters: $ExtraParameters" -LogLevel "Information"
     Write-Verbose "[$functionName] Version: $APIVersion"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Version: $APIVersion" -LogLevel "Information"
     Write-Verbose "[$functionName] Consistency Level: $consistencyLevel"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Consistency Level: $consistencyLevel" -LogLevel "Information"
     Write-Verbose "[$functionName] Body: $body"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Body: $body" -LogLevel "Information"
     Write-Verbose "[$functionName] SecureString: $secureString"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "SecureString: $secureString" -LogLevel "Information"
     $uri = "https://graph.microsoft.com/$APIVersion/$ResourcePath"
     $statusCode = $null
     Write-Verbose "[$functionName] Uri: $uri"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Uri: $uri" -LogLevel "Information"
     #endregion
 
     #region Encode filter and add headers
     if ($Filter)
     {
         Write-Verbose "[$functionName] Processing filter string: $Filter"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing filter string: $Filter" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Splitting filter by logical operators while preserving operators."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Splitting filter by logical operators while preserving operators." -LogLevel "Information"
         $filterParts = [System.Collections.ArrayList]::new()
         $logicalOperators = [System.Collections.ArrayList]::new()
         # Pattern to match a logical operator with surrounding spaces
@@ -2213,70 +2562,90 @@ function CallGraphAPI()
         # Find all logical operators and their positions
         $logicalOperaterMatches = [regex]::Matches($Filter, $pattern)
         Write-Verbose "[$functionName] Found $($logicalOperaterMatches.Count) logical operators."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($logicalOperaterMatches.Count) logical operators." -LogLevel "Information"
         # If no logical operators, process as a single condition
         if ($logicalOperaterMatches.Count -eq 0)
         {
             Write-Verbose "[$functionName] No logical operators found. Processing as a single filter condition."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No logical operators found. Processing as a single filter condition." -LogLevel "Verbose"
             $processedFilter = ProcessFilterCondition -condition $Filter
             Write-Verbose "[$functionName] Processed single filter condition: $processedFilter"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed single filter condition: $processedFilter" -LogLevel "Information"
             $encodedFilter = $processedFilter
             Write-Verbose "[$functionName] Encoded filter: $encodedFilter"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Encoded filter: $encodedFilter" -LogLevel "Information"
         }
         else
         {
             # Process each part of the filter
             Write-Verbose "[$functionName] Logical operators found. Processing filter as multiple conditions."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Logical operators found. Processing filter as multiple conditions." -LogLevel "Verbose"
             foreach ($logicalOperatorMatch in $logicalOperaterMatches)
             {
                 Write-Verbose "[$functionName] Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))" -LogLevel "Verbose"
                 $condition = $Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex)
                 Write-Verbose "[$functionName] Condition to process: $condition"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Condition to process: $condition" -LogLevel "Information"
                 [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
                 Write-Verbose "[$functionName] Processed filter condition: $($filterParts[$filterParts.Count - 1])"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed filter condition: $($filterParts[$filterParts.Count - 1])" -LogLevel "Information"
                 # Store the logical operator (and, or)
                 [void]$logicalOperators.Add($logicalOperatorMatch.Value.Trim())
                 $lastIndex = $logicalOperatorMatch.Index + $logicalOperatorMatch.Length
                 Write-Verbose "[$functionName] Logical operators so far: $($logicalOperators -join ', ')"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Logical operators so far: $($logicalOperators -join ', ')" -LogLevel "Information"
             }
             # Don't forget the last part after the last logical operator
             if ($lastIndex -lt $Filter.Length)
             {
                 Write-Verbose "[$functionName] Processing filter condition after the last logical operator."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing filter condition after the last logical operator." -LogLevel "Verbose"
                 $condition = $Filter.Substring($lastIndex)
                 [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
                 Write-Verbose "[$functionName] Processed filter condition: $($filterParts[$filterParts.Count - 1])"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed filter condition: $($filterParts[$filterParts.Count - 1])" -LogLevel "Information"
             }
             # Rebuild the filter string with processed parts and original logical operators
             Write-Verbose "[$functionName] Rebuilding the filter string with processed parts and logical operators."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Rebuilding the filter string with processed parts and logical operators." -LogLevel "Information"
             $encodedFilter = $filterParts[0]
             for ($i = 0; $i -lt $logicalOperators.Count; $i++)
             {
                 $encodedFilter += " $($logicalOperators[$i]) $($filterParts[$i+1])"
                 Write-Verbose "[$functionName] Adding logical operator: $($logicalOperators[$i])"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding logical operator: $($logicalOperators[$i])" -LogLevel "Information"
             }
             Write-Verbose "[$functionName] Processed complex filter: $encodedFilter"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed complex filter: $encodedFilter" -LogLevel "Information"
         }
         $encodedUri = "$uri`?`$filter=$([uri]::EscapeUriString($encodedFilter))"
         Write-Verbose "[$functionName] Uri after applying filters: $encodedUri"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Uri after applying filters: $encodedUri" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] No filter provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No filter provided." -LogLevel "Information"
         $encodedUri = $uri
     }
     
     if ($extraParameters)
     {
         Write-Verbose "[$functionName] Extra parameters provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extra parameters provided." -LogLevel "Information"
         Write-Verbose "[$functionName] Splitting the extra parameters by ampersand to get individual key-value pairs."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Splitting the extra parameters by ampersand to get individual key-value pairs." -LogLevel "Information"
         # Initialize the parameter list
         $paramsList = @()
         # Split by ampersand to get individual key-value pairs
         $keyValuePairs = $extraParameters -split '&'
         Write-Verbose "[$functionName] Found $($keyValuePairs.Count) key-value pairs."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($keyValuePairs.Count) key-value pairs." -LogLevel "Information"
         foreach ($pair in $keyValuePairs)
         {
             Write-Verbose "[$functionName] Processing key-value pair: $pair"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing key-value pair: $pair" -LogLevel "Verbose"
             # Split each pair by equals sign to separate key and value
             $keyAndValue = $pair -split '=', 2
             if ($keyAndValue.Count -eq 2)
@@ -2284,10 +2653,13 @@ function CallGraphAPI()
                 $key = $keyAndValue[0].Trim()
                 $value = $keyAndValue[1].Trim()
                 Write-Verbose "[$functionName] Key: $key"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Key: $key" -LogLevel "Information"
                 Write-Verbose "[$functionName] Value: $value"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Value: $value" -LogLevel "Information"
                 # Add the $ prefix to the key for OData parameters
                 $formattedKey = "`$$key"
                 Write-Verbose "[$functionName] Formatted Key with $ prefix: $formattedKey"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted Key with $ prefix: $formattedKey" -LogLevel "Information"
                 # Add the formatted parameter to the list
                 $paramsList += "$formattedKey=$value"
             }
@@ -2297,28 +2669,34 @@ function CallGraphAPI()
             }
         }
         Write-Verbose "[$functionName] Final parameter list:"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Final parameter list:" -LogLevel "Information"
         $paramsList | ForEach-Object { Write-Verbose $_ }
         # Join the parameters with & to create a complete query string
         $queryString = $paramsList -join '&'
         Write-Verbose "[$functionName] Final query string: $queryString"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Final query string: $queryString" -LogLevel "Information"
         if ($filter) 
         {
             Write-Verbose "[$functionName] Adding extra parameters to the uri along with the filter."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding extra parameters to the uri along with the filter." -LogLevel "Information"
             $encodedUri = "$encodedUri`&$queryString"
         }
         else
         {
             Write-Verbose "[$functionName] No filter provided. Adding extra parameters to the uri."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No filter provided. Adding extra parameters to the uri." -LogLevel "Information"
             $encodedUri = "$encodedUri`?$queryString"
         }
     }
     else
     {
         Write-Verbose "[$functionName] No extra parameters provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No extra parameters provided." -LogLevel "Information"
     }
     if ($consistencyLevel)
     {
         Write-Verbose "[$functionName] Adding consistency level to the headers."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding consistency level to the headers." -LogLevel "Information"
         $headers = @{
             Authorization    = "Bearer $accessToken"
             'Content-Type'   = 'application/json'
@@ -2328,6 +2706,7 @@ function CallGraphAPI()
     else
     {
         Write-Verbose "[$functionName] No consistency level provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No consistency level provided." -LogLevel "Information"
         $headers = @{
             Authorization  = "Bearer $accessToken"
             'Content-Type' = 'application/json'
@@ -2338,6 +2717,7 @@ function CallGraphAPI()
     #region prepare the call
     # Create parameter hashtable for splatting
     Write-Verbose "[$functionName] Preparing parameters for Invoke-RestMethod call."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing parameters for Invoke-RestMethod call." -LogLevel "Information"
     $restParams = @{
         Method          = $method
         Uri             = $encodedUri
@@ -2348,27 +2728,36 @@ function CallGraphAPI()
     if ($body)
     {
         Write-Verbose "[$functionName] Body parameter provided. Adding to the request."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Body parameter provided. Adding to the request." -LogLevel "Information"
         $restParams['Body'] = $body
     }
     #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
     {
         Write-Verbose "[$functionName] PowerShell version is $($PSVersionTable.PSVersion.Major ). Adding StatusCodeVariable to the request."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "PowerShell version is $($PSVersionTable.PSVersion.Major ). Adding StatusCodeVariable to the request." -LogLevel "Information"
         Write-Verbose "[$functionName] Added StatusCodeVariable."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added StatusCodeVariable." -LogLevel "Information"
         $restParams['StatusCodeVariable'] = 'statusCode'
     }
     Write-Verbose "[$functionName] Making the following call to Microsoft Graph:" 
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Making the following call to Microsoft Graph:" " -LogLevel "Information"
     Write-Verbose "[$functionName] URI: $encodedUri." 
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "URI: $encodedUri." " -LogLevel "Information"
     Write-Verbose "[$functionName] Method: $method."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Method: $method." -LogLevel "Information"
     #endregion
     try
     {
         $response = Invoke-RestMethod @restParams
         Write-Verbose "[$functionName] NextLink: $($response.'@odata.nextLink')"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "NextLink: $($response.'@odata.nextLink')" -LogLevel "Information"
         Write-Verbose "[$functionName] Response count: $($response.value.count)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response count: $($response.value.count)" -LogLevel "Information"
         if ($response.'@odata.nextLink')
         {
             Write-Verbose "[$functionName] NextLink found. Fetching additional pages."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "NextLink found. Fetching additional pages." -LogLevel "Information"
             # Initialize an array to hold all items
             $allItems = @()
             $allItems += $response.value
@@ -2377,9 +2766,11 @@ function CallGraphAPI()
             {
                 $nextGroup = Invoke-RestMethod -Method $method -Uri $nextLink -Headers $headers -UseBasicParsing
                 Write-Verbose "[$functionName] Fetched next page with $($nextGroup.value.Count) items."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched next page with $($nextGroup.value.Count) items." -LogLevel "Information"
                 if ($nextGroup.value)
                 {
                     Write-Verbose "[$functionName] Adding items from next page to the collection."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding items from next page to the collection." -LogLevel "Information"
                     $allItems += $nextGroup.value
                 }
                 $nextLink = $nextGroup.'@odata.nextLink'
@@ -2387,24 +2778,31 @@ function CallGraphAPI()
             # Optionally, reconstruct a response object if needed
             $response.value = $allItems
             Write-Verbose "[$functionName] All items collected. Total count: $($Response.value.Count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "All items collected. Total count: $($Response.value.Count)" -LogLevel "Information"
         }
         else 
         {
             Write-Verbose "[$functionName] No nextLink found. Single page response received."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No nextLink found. Single page response received." -LogLevel "Information"
         }
         Write-Verbose "[$functionName] The call was successful."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The call was successful." -LogLevel "Information"
         if ($response.count)
         {
             Write-Verbose "[$functionName] Number of objects returned: $($response.count)."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of objects returned: $($response.count)." -LogLevel "Information"
         }
         if ($response.value.Count)
         {
             Write-Verbose "[$functionName] Number of items returned: $($response.value.Count)."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of items returned: $($response.value.Count)." -LogLevel "Information"
         }
         if ($PSVersionTable.PSVersion.Major -ge 7)
         {
             Write-Verbose "[$functionName] Status code: $statusCode"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $statusCode" -LogLevel "Information"
             Write-Verbose "[$functionName] Status code message: $statusCodeMessage"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code message: $statusCodeMessage" -LogLevel "Information"
         }
     }
     catch
@@ -2413,8 +2811,10 @@ function CallGraphAPI()
         {
             $statusCode = [regex]::Match($_.Exception.Message, '\d+').Value
             Write-Verbose "[$functionName] Status code: $statusCode"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $statusCode" -LogLevel "Information"
             $statusCodeMessage = $_.Exception | Out-String
             Write-Verbose "[$functionName] Status code message: $statusCodeMessage"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code message: $statusCodeMessage" -LogLevel "Information"
             $statusMessage = $statusCodeMessage
         }
         else
@@ -2428,21 +2828,25 @@ function CallGraphAPI()
             400
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $statusCode" -LogLevel "Information"
                 Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
             }
             401
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $statusCode" -LogLevel "Information"
                 Write-Host 'Unauthorized. Please check your access token.' -ForegroundColor Red 
             }
             403
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $statusCode" -LogLevel "Information"
                 Write-Host 'Forbidden. You do not have permission to access this resource.' -ForegroundColor Red 
             }
             404
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status code: $statusCode" -LogLevel "Information"
                 Write-Host 'Not found. The resource does not exist.' -ForegroundColor Red 
             }
             default
@@ -2466,14 +2870,23 @@ function CallGraphAPI()
             }
         }
         Write-Verbose "[$functionName] Failed to call the Graph API: $_"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to call the Graph API: $_" -LogLevel "Error"
         Write-Verbose "[$functionName] The status code is $statusCode"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The status code is $statusCode" -LogLevel "Information"
         Write-Verbose "[$functionName] $statusCode indicates $statusCodeMessage"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "$statusCode indicates $statusCodeMessage" -LogLevel "Information"
         Write-Verbose "[$functionName] Status message: $statusMessage"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Status message: $statusMessage" -LogLevel "Information"
         Write-Verbose "[$functionName] The full error message follows below:"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The full error message follows below:" -LogLevel "Error"
         Write-Verbose "[$functionName] ----------------------------------------------------------"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "----------------------------------------------------------" -LogLevel "Information"
         Write-Verbose "[$functionName] Error: $($_)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error: $($_)" -LogLevel "Error"
         Write-Verbose "[$functionName] Exception message: $($_.Exception.Message)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exception message: $($_.Exception.Message)" -LogLevel "Error"
         Write-Verbose "[$functionName] Exception response: $($_.Exception.Response)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exception response: $($_.Exception.Response)" -LogLevel "Error"
         if ($_.Exception.Response -and $psversionTable.PSVersion.Major -ge 7)
         {
             {
@@ -2482,13 +2895,16 @@ function CallGraphAPI()
                 $errorMessage = $streamReader.ReadToEnd()
                 $streamReader.Close()
                 Write-Verbose "[$functionName] Server Response: $errorMessage"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Server Response: $errorMessage" -LogLevel "Information"
             }   
         }
         return $statusCode
         # return $null
     }
     Write-Verbose "[$functionName] Response: $($response)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $($response)" -LogLevel "Information"
     Write-Verbose "[$functionName] Response value: $($response.value)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response value: $($response.value)" -LogLevel "Information"
     return $response
 }
 

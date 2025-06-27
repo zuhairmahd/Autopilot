@@ -11,25 +11,32 @@ function validateInput()
     $MaxSerialNumberLength = '11'
     $MinSerialNumberLength = '7'
     Write-Verbose "[$functionName] MaxSerialNumberLength: $MaxSerialNumberLength"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "MaxSerialNumberLength: $MaxSerialNumberLength" -LogLevel "Information"
     Write-Verbose "[$functionName] MinSerialNumberLength: $MinSerialNumberLength"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "MinSerialNumberLength: $MinSerialNumberLength" -LogLevel "Information"
     # Trim input to remove any leading or trailing spaces
     $UserInput = $UserInput.Trim()
     $returnValue = @{}
     Write-Verbose "[$functionName] Trimmed input: '$UserInput'"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Trimmed input: '$UserInput'" -LogLevel "Information"
     Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking serial number length: $($UserInput.Length)" -LogLevel "Verbose"
     if ($UserInput.Length -gt $MaxSerialNumberLength)
     {
         Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Serial number exceeds maximum length of $MaxSerialNumberLength characters" -LogLevel "Information"
         Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
     }
     elseif ($UserInput.Length -lt $MinSerialNumberLength)
     {
         Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Serial number is shorter than minimum length of $MinSerialNumberLength characters" -LogLevel "Information"
         Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
     }
     elseif ($UserInput -match '^[a-zA-Z0-9]+$') 
     {
         Write-Verbose "[$functionName] Serial number validation passed"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Serial number validation passed" -LogLevel "Information"
         $returnValue.valid = $true
         $returnValue.value = $UserInput
     }
@@ -38,7 +45,9 @@ function validateInput()
         Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
     }
     Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning validation result: $($returnValue.valid)" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning validation value: $($returnValue.value)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning validation value: $($returnValue.value)" -LogLevel "Information"
     return $returnValue
 }
 
@@ -52,7 +61,9 @@ function GetUserInput()
     #Get the function name
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Message: $Message"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Message: $Message" -LogLevel "Information"
     Write-Verbose "[$functionName] Prompt: $Prompt"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Prompt: $Prompt" -LogLevel "Information"
     Write-Host $Message
     # Updated instruction
     Write-Host "Press Enter without typing anything to return to the previous menu." 
@@ -60,10 +71,12 @@ function GetUserInput()
     {
         $inputItem = Read-Host $Prompt
         Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Item entered: '$inputItem'" # Added quotes for clarity" -LogLevel "Information"
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
             Write-Verbose "[$functionName] User pressed Enter. Returning $($returnValues.backoutText)."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "User pressed Enter. Returning $($returnValues.backoutText)." -LogLevel "Information"
             return $null # Return null to signal going back
         }
         # Validate the input if it's not empty
@@ -73,7 +86,9 @@ function GetUserInput()
         if ($inputResultValid)
         {
             Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Valid $inputType entered: $inputResultValid" -LogLevel "Information"
             Write-Verbose "[$functionName] Input result: $inputResult"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Input result: $inputResult" -LogLevel "Information"
             return $inputResult # Return the validated input
         }
         else
@@ -98,12 +113,17 @@ function PrepareImportDevice()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Preparing to import device with serial number: $($deviceObject.serialNumber)."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing to import device with serial number: $($deviceObject.serialNumber)." -LogLevel "Information"
     Write-Verbose "[$functionName] Getting the serial number for this device..."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting the serial number for this device..." -LogLevel "Information"
     Write-Verbose "[$functionName] Checking whether the script has sufficient permissions to run."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether the script has sufficient permissions to run." -LogLevel "Verbose"
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
         Write-Verbose "[$functionName] The script is running with sufficient permissions."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The script is running with sufficient permissions." -LogLevel "Information"
         Write-Verbose "[$functionName] Getting device object."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting device object." -LogLevel "Information"
         $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
     }
     else
@@ -117,16 +137,19 @@ function PrepareImportDevice()
         if ($customImport) 
         {
             Write-Verbose "[$functionName] Custom import is enabled."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Custom import is enabled." -LogLevel "Information"
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import' -CustomImport
             if ($result -eq $returnValues.backoutText)
             {
                 Write-Verbose "[$functionName] Custom import aborted. Returning $($returnValues.backoutText)."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Custom import aborted. Returning $($returnValues.backoutText)." -LogLevel "Information"
                 return $returnValues.backoutText
             }
         }
         else 
         {
             Write-Verbose "[$functionName] The device with serial number $($deviceObject.serialNumber) is ready for import."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device with serial number $($deviceObject.serialNumber) is ready for import." -LogLevel "Information"
             $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'import'
         }
     }
@@ -146,10 +169,12 @@ function DisplayDeviceAssignmentStatus()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device assignment status is $($deviceAssignment.deploymentProfileAssignmentStatus)" -LogLevel "Information"
     if ($deviceAssignment.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
     {
         Write-Host 'The device is already in Intune and is assigned to a profile.' -ForegroundColor Green
         Write-Verbose "[$functionName] The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The assignment date is $($deviceAssignment.deploymentProfileAssignedDateTime)." -LogLevel "Information"
         $profileAssignmentDate = ($deviceAssignment.deploymentProfileAssignedDateTime | FormatDateWithTimeZone) 
         Write-Host "The device was assigned to the deployment profile $($deviceAssignment.deploymentProfile.displayName) on $profileAssignmentDate." -ForegroundColor Green
         Write-Host "The device enrollment state is $($deviceAssignment.enrollmentState)." -ForegroundColor Green
@@ -194,6 +219,7 @@ function HandleDeviceEnrollmentState()
     $functionName = $MyInvocation.MyCommand.Name
     $enrollmentState = $deviceAssignment.enrollmentState
     Write-Verbose "[$functionName] Processing enrollment state: $enrollmentState"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing enrollment state: $enrollmentState" -LogLevel "Verbose"
     
     switch ($enrollmentState)
     {
@@ -202,6 +228,7 @@ function HandleDeviceEnrollmentState()
             Write-Host 'The device has not contacted the enrollment service.' -ForegroundColor Green
             Write-Host 'This is normal for a recently imported device.' -ForegroundColor Green
             Write-Verbose "[$functionName] Returning the message $($returnValues.notContactedMessage)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning the message $($returnValues.notContactedMessage)" -LogLevel "Information"
             return $returnValues.notContactedMessage
         }
         'enrolled'
@@ -212,8 +239,11 @@ function HandleDeviceEnrollmentState()
             $managedDeviceFilter = "serialNumber eq '$serialNumber'"
             $managedDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $deviceManagementUri -Filter $managedDeviceFilter).value
             Write-Verbose "[$functionName] Managed device user principal name: $($managedDevice.userPrincipalName)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device user principal name: $($managedDevice.userPrincipalName)" -LogLevel "Information"
             Write-Verbose "[$functionName] Managed device user display name: $($managedDevice.userDisplayName)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device user display name: $($managedDevice.userDisplayName)" -LogLevel "Information"
             Write-Verbose "[$functionName] Managed device last logon date: $($managedDevice.usersLoggedOn.lastLogOnDateTime)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device last logon date: $($managedDevice.usersLoggedOn.lastLogOnDateTime)" -LogLevel "Information"
 
             $hasUser = $false
             if ($managedDevice.userPrincipalName -match $domain)
@@ -288,6 +318,7 @@ function HandleCustomImportSettings()
     )
     
     Write-Verbose "[$functionName] Handling custom import settings"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Handling custom import settings" -LogLevel "Information"
     $maxWaitTime = $maxWaitTimeRef.Value
     $timeInSeconds = $timeInSecondsRef.Value
     
@@ -354,6 +385,7 @@ function ProcessImportResult()
     )
     
     Write-Verbose "[$functionName] Processing import result with status: $($device.state.deviceImportStatus)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing import result with status: $($device.state.deviceImportStatus)" -LogLevel "Verbose"
     if ($device.state.deviceImportStatus -eq 'complete')
     {
         $serialNumber = $device.SerialNumber
@@ -388,7 +420,9 @@ function ProcessAssignmentResult()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing assignment result"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing assignment result" -LogLevel "Verbose"
     Write-Verbose "[$functionName] The assignment details are: $($assignment | ConvertTo-Json)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The assignment details are: $($assignment | ConvertTo-Json)" -LogLevel "Information"
     
     if (-not $assignment)
     {
@@ -398,6 +432,7 @@ function ProcessAssignmentResult()
     }
     
     Write-Verbose "[$functionName] The assignment status is $($assignment.deploymentProfileAssignmentStatus)"    
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The assignment status is $($assignment.deploymentProfileAssignmentStatus)"    " -LogLevel "Information"
     if (($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or 
             $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync') -and 
         $null -ne $assignment.deploymentProfile.displayName)
@@ -460,25 +495,36 @@ function ImportAutopilotDevice()
     if ($accessToken)
     {
         Write-Verbose "[$functionName] AccessToken provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AccessToken provided." -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] AccessToken not provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AccessToken not provided." -LogLevel "Information"
         return $false
     }
     Write-Verbose "[$functionName] DeviceObject: $DeviceObject"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "DeviceObject: $DeviceObject" -LogLevel "Information"
     Write-Verbose "[$functionName] GroupTag: $GroupTag"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "GroupTag: $GroupTag" -LogLevel "Information"
     Write-Verbose "[$functionName] AssignedUser: $AssignedUser"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "AssignedUser: $AssignedUser" -LogLevel "Information"
     Write-Verbose "[$functionName] MaxWaitTime: $maxWaitTime"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "MaxWaitTime: $maxWaitTime" -LogLevel "Information"
     Write-Verbose "[$functionName] TimeInSeconds: $timeInSeconds"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "TimeInSeconds: $timeInSeconds" -LogLevel "Information"
     Write-Verbose "[$functionName] CustomImport: $CustomImport"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "CustomImport: $CustomImport" -LogLevel "Information"
     $uri = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
     $serialNumber = $DeviceObject.serialNumber
     Write-Verbose "[$functionName] Serial Number: $serialNumber"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Serial Number: $serialNumber" -LogLevel "Information"
     $make = $DeviceObject.manufacturer
     Write-Verbose "[$functionName] Make: $make"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Make: $make" -LogLevel "Information"
     $model = $DeviceObject.model
     Write-Verbose "[$functionName] Model: $model"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Model: $model" -LogLevel "Information"
     $hash = $DeviceObject.hardwareHash
     #endregion  
     #region prepare import object.
@@ -487,6 +533,7 @@ function ImportAutopilotDevice()
         do
         {
             Write-Verbose "[$functionName] CustomImport is set to true."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "CustomImport is set to true." -LogLevel "Information"
             Write-Host "Enter the desired Group Tag for the device:"
             Write-Host "Press enter to keep the default value of $GroupTag."
             Write-Host "Enter 'None' to enter a blank Group Tag"
@@ -570,6 +617,7 @@ function ImportAutopilotDevice()
     else
     {
         Write-Verbose "[$functionName] CustomImport is set to false."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "CustomImport is set to false." -LogLevel "Information"
     }
     $json = @"
 {
@@ -606,6 +654,7 @@ function ImportAutopilotDevice()
     while ($index -lt $maxWaitTime)
     {
         Write-Verbose "[$functionName] The device import status is $($device.state.deviceImportStatus)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device import status is $($device.state.deviceImportStatus)" -LogLevel "Information"
         if (($device.state.deviceImportStatus -ne 'unknown') -or ($index -gt $maxWaitTime))
         {
             break
@@ -619,6 +668,7 @@ function ImportAutopilotDevice()
     }
     Write-Host "The device import status is $($device.state.deviceImportStatus)"
     Write-Verbose "[$functionName] The index count is $index."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The index count is $index." -LogLevel "Information"
     if (($device.state.deviceImportStatus -eq 'unknown') -and ($index -gt $maxWaitTime))
     {
         Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
@@ -628,6 +678,7 @@ function ImportAutopilotDevice()
     else
     {
         Write-Verbose "[$functionName] The device import state is $($device.state.deviceImportStatus)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device import state is $($device.state.deviceImportStatus)" -LogLevel "Information"
         return $device
     }
 }
@@ -652,15 +703,20 @@ function CheckDeviceAssignment()
     #get the function name.
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Received parameters: serialNumber=$serialNumber."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received parameters: serialNumber=$serialNumber." -LogLevel "Information"
     if ($AccessToken)
     {
         Write-Verbose "[$functionName] Access token provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token provided." -LogLevel "Information"
     }
     Write-Verbose "[$functionName] WaitForAssignment switch: $WaitForAssignment."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "WaitForAssignment switch: $WaitForAssignment." -LogLevel "Information"
     if ($WaitForAssignment)
     {
         Write-Verbose "[$functionName] Wait time in seconds: $waitTimeInSeconds."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Wait time in seconds: $waitTimeInSeconds." -LogLevel "Information"
         Write-Verbose "[$functionName] Max wait time: $maxWaitTime."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Max wait time: $maxWaitTime." -LogLevel "Information"
     }
     $autoPilotDeviceURI = 'deviceManagement/windowsAutopilotDeviceIdentities'
     $autopilotDeviceFilter = "contains(serialNumber,'$serialNumber')"
@@ -668,34 +724,44 @@ function CheckDeviceAssignment()
     #endregion
     
     Write-Verbose "[$functionName] Checking whether the device with serial number $serialNumber is already in Intune."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether the device with serial number $serialNumber is already in Intune." -LogLevel "Verbose"
     if ($serialNumber -match 'vmware')
     {
         Write-Verbose "[$functionName] VMware device detected."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "VMware device detected." -LogLevel "Verbose"
         $autoPilotVMDevice = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $serialNumber
         Write-Verbose "[$functionName] Received $($autoPilotVMDevice.count) devices from Autopilot."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received $($autoPilotVMDevice.count) devices from Autopilot." -LogLevel "Information"
         if ($autoPilotVMDevice -ne '' -and $null -ne $autoPilotVMDevice)
         {
             Write-Verbose "[$functionName] Got an Autopilot Device with device id $($autoPilotVMDevice)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Got an Autopilot Device with device id $($autoPilotVMDevice)" -LogLevel "Information"
             $autopilotDeviceUriWithId = "$autopilotDeviceUri/$autoPilotVMDevice"
             $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceUriWithId
         }
         else
         {
             Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No match for device with serial number $serialNumber found in Autopilot." -LogLevel "Information"
             return $returnValues.notInIntuneMessage
         }
     }
     else
     {
         Write-Verbose "[$functionName] Not a VMWare device. Continuing"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Not a VMWare device. Continuing" -LogLevel "Information"
         $assignment = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceUri -filter $autopilotDeviceFilter).value
     }
     Write-Verbose "[$functionName] Found $($assignment.count) Autopilot devices."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($assignment.count) Autopilot devices." -LogLevel "Information"
     if ($null -ne $assignment -and $assignment -ne '')
     {
         Write-Verbose "[$functionName] Found the device matching serial number $serialNumber."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found the device matching serial number $serialNumber." -LogLevel "Information"
         Write-Verbose "[$functionName] The device is registered in Autopilot."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is registered in Autopilot." -LogLevel "Information"
         Write-Verbose "[$functionName] Checking profile assignment"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking profile assignment" -LogLevel "Verbose"
         $expandedDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities/$($assignment.id)"
         $extraProfileParameters = "expand=deploymentProfile"
         $assignment = CallGraphAPI -AccessToken $accessToken -ResourcePath $expandedDeviceURI -extraparameters $extraProfileParameters
@@ -715,6 +781,7 @@ function CheckDeviceAssignment()
                 Write-Host "Deployment Profile Assignment Status: $($assignment.deploymentProfileAssignmentStatus)."
             }
             Write-Verbose "[$functionName] Gop final device assignment status: $($assignment.deploymentProfileAssignmentStatus)."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Gop final device assignment status: $($assignment.deploymentProfileAssignmentStatus)." -LogLevel "Information"
             if ($assignment.deploymentProfileAssignmentStatus -notin @('assignedUnkownSyncState', 'assignedInSync') -and $index -gt $maxWaitTime)
             {
                 Write-Host "Finished checking $maxWaitTime times."
@@ -724,7 +791,9 @@ function CheckDeviceAssignment()
             elseif ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
                 Write-Verbose "[$functionName] Congratulations!!! " 
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Congratulations!!! " " -LogLevel "Information"
                 Write-Verbose "[$functionName] The device is successfully assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime)."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is successfully assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime)." -LogLevel "Information"
             }
         }
         else
@@ -732,21 +801,27 @@ function CheckDeviceAssignment()
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
                 Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device details: $($assignment | ConvertTo-Json -Depth 10)" -LogLevel "Information"
                 Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)." -LogLevel "Information"
                 Write-Verbose "[$functionName] The device is ready for enrollment."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is ready for enrollment." -LogLevel "Information"
                 Write-Verbose "[$functionName] Returning $($returnValues.deviceAssignedMessage)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning $($returnValues.deviceAssignedMessage)" -LogLevel "Information"
             }
             else
             {
                 Write-Host "The device is not assigned to a deployment profile."
                 Write-Host "Please check the Intune portal or contact an Intune administrator."
                 Write-Verbose "[$functionName] The device is not ready for enrollment."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is not ready for enrollment." -LogLevel "Information"
             }
         }
     }
     else
     {
         Write-Verbose "[$functionName] The device is not found in Intune."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is not found in Intune." -LogLevel "Information"
         return $returnValues.deviceNotInIntuneMessage
     }
     return $assignment
@@ -803,8 +878,11 @@ function GetDeviceInfo()
     $functionName = $MyInvocation.MyCommand.Name    
     #Print verbose logs of the received parameters.
     Write-Verbose "[$functionName] GroupTag: $GroupTag"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "GroupTag: $GroupTag" -LogLevel "Information"
     Write-Verbose "[$functionName] AssignedUser: $AssignedUser"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "AssignedUser: $AssignedUser" -LogLevel "Information"
     Write-Verbose "[$functionName] NoHash: $NoHash"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "NoHash: $NoHash" -LogLevel "Information"
 
     $device = @{}
     $session = New-CimSession
@@ -812,29 +890,37 @@ function GetDeviceInfo()
     #Add the serial number to the hash table.
     $device.Add('SerialNumber', $serial)
     Write-Verbose "[$functionName] The serial number is $serial."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The serial number is $serial." -LogLevel "Information"
     $cs = Get-CimInstance -CimSession $session -Class Win32_ComputerSystem
     $make = $cs.Manufacturer.Trim()
     $device.Add('Manufacturer', $make)
     Write-Verbose "[$functionName] The manufacturer is $make."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The manufacturer is $make." -LogLevel "Information"
     $model = $cs.Model.Trim()
     $device.Add('Model', $model)
     Write-Verbose "[$functionName] The model is $model."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The model is $model." -LogLevel "Information"
     $product = ''
     $device.add('Product', $product)
     Write-Verbose "[$functionName] The group tag is $GroupTag"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The group tag is $GroupTag" -LogLevel "Information"
     $device.add('GroupTag', $GroupTag)
     Write-Verbose "[$functionName] The assigned user is $AssignedUser"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The assigned user is $AssignedUser" -LogLevel "Information"
     $device.add('AssignedUser', $AssignedUser)
     if (-not $NoHash)
     {
         Write-Verbose "[$functionName] Checking for hardware hash."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking for hardware hash." -LogLevel "Verbose"
         $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
         Write-Verbose "[$functionName] The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device details are: $($devDetail | ConvertTo-Json -Depth 5)" -LogLevel "Information"
         if ($devDetail)
         {
             $hash = $devDetail.DeviceHardwareData
             $device.Add('HardwareHash', $hash)
             Write-Verbose "[$functionName] The hardware hash is $hash."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "The hardware hash is $hash." -LogLevel "Information"
         }
         else
         {
@@ -845,6 +931,7 @@ function GetDeviceInfo()
     else
     {
         Write-Verbose "[$functionName] No hardware hash was requested."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No hardware hash was requested." -LogLevel "Information"
     }
     Remove-CimSession $session
     return $device
@@ -865,17 +952,22 @@ function DeleteAutopilotDevice()
     $functionName = $MyInvocation.MyCommand.Name
     #region variables and logs.
     Write-Verbose "[$functionName] Received parameters:" 
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received parameters:" " -LogLevel "Information"
     if ($accessToken)
     {
         Write-Verbose "[$functionName]     AccessToken provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "AccessToken provided." -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName]     No AccessToken provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No AccessToken provided." -LogLevel "Information"
         return $null
     }
     Write-Verbose "[$functionName] Device identifier: $DeviceIdentifyer."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device identifier: $DeviceIdentifyer." -LogLevel "Information"
     Write-Verbose "[$functionName] Identifyer type: $IdentifyerType."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Identifyer type: $IdentifyerType." -LogLevel "Information"
     $success = $false
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
     #endregion
@@ -886,52 +978,71 @@ function DeleteAutopilotDevice()
         {
             $autopilotDeviceFilter = "contains(serialNumber,'$DeviceIdentifyer')"
             Write-Verbose "[$functionName] Identifyer Type is $IdentifyerType."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Identifyer Type is $IdentifyerType." -LogLevel "Information"
             if ($DeviceIdentifyer -match 'vmware')
             {
                 Write-Verbose "[$functionName] VMware device detected."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "VMware device detected." -LogLevel "Verbose"
                 $autoPilotDeviceId = GetVMAutopilotDeviceIdBySerialNumber -AccessToken $AccessToken -serialNumber $DeviceIdentifyer
                 Write-Verbose "[$functionName] Autopilot device Id for serial number $deviceIdentifyer is $autoPilotDeviceId"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot device Id for serial number $deviceIdentifyer is $autoPilotDeviceId" -LogLevel "Information"
                 if ($autoPilotDeviceId)
                 {
                     Write-Verbose "[$functionName] Device with Id $autoPilotDeviceId found in Autopilot."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device with Id $autoPilotDeviceId found in Autopilot." -LogLevel "Information"
                     Write-Verbose "[$functionName] Returning device id: $autoPilotDeviceId"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning device id: $autoPilotDeviceId" -LogLevel "Information"
                 }
                 else
                 {
                     Write-Verbose "[$functionName] No match for device with serial number $serialNumber found in Autopilot."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No match for device with serial number $serialNumber found in Autopilot." -LogLevel "Information"
                 }
             }
             else
             {
                 Write-Verbose "[$functionName] Not a VMWare device. Continuing"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Not a VMWare device. Continuing" -LogLevel "Information"
                 $autopilotDevice = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autoPilotDeviceURI -filter $autopilotDeviceFilter).value
                 Write-Verbose "[$functionName] Found $($autopilotDevice.count) Autopilot devices."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($autopilotDevice.count) Autopilot devices." -LogLevel "Information"
                 Write-Verbose "[$functionName] Autopilot Device serial number: $($autopilotDevice.serialNumber)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot Device serial number: $($autopilotDevice.serialNumber)" -LogLevel "Information"
                 $autoPilotDeviceId = $autopilotDevice.id
                 Write-Verbose "[$functionName] Autopilot Device Id: $($autoPilotDeviceId)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot Device Id: $($autoPilotDeviceId)" -LogLevel "Information"
             }
         }
         'DeviceId'
         {
             Write-Verbose "[$functionName] Parameter type is DeviceId."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Parameter type is DeviceId." -LogLevel "Information"
             Write-Verbose "[$functionName] $IdentifyerType is $deviceIdentifyer."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "$IdentifyerType is $deviceIdentifyer." -LogLevel "Information"
             $autoPilotDeviceId = $deviceIdentifyer
         }
     }
     if ($autoPilotDeviceId)
     {
         Write-Verbose "[$functionName] Found device with id $autoPilotDeviceId in Autopilot."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found device with id $autoPilotDeviceId in Autopilot." -LogLevel "Information"
         Write-Verbose "[$functionName] Defining variables:"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Defining variables:" -LogLevel "Information"
         $deleteUri = "$autopilotDeviceURI/$autoPilotDeviceId"
         Write-Verbose "[$functionName] Delete URI: $deleteUri"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delete URI: $deleteUri" -LogLevel "Information"
         Write-Host "Deleting autopilot device..."
         Write-Verbose "[$functionName] Calling Graph API to delete autopilot device with serial number $($autopilotDevice.serialNumber)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Calling Graph API to delete autopilot device with serial number $($autopilotDevice.serialNumber)" -LogLevel "Information"
         Write-Verbose "[$functionName] Passing the uri $deleteUri"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Passing the uri $deleteUri" -LogLevel "Information"
         $deleteResponse = CallGraphAPI -AccessToken $accessToken -ResourcePath $deleteUri -Method DELETE
         Write-Verbose "[$functionName] Delete response: $($deleteResponse | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delete response: $($deleteResponse | Out-String)" -LogLevel "Information"
         if ($null -eq $deleteResponse -or $deleteResponse -eq '')
         {
             Write-Verbose "[$functionName] Delete request initiated successfully. Beginning monitoring of device deletion..."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delete request initiated successfully. Beginning monitoring of device deletion..." -LogLevel "Information"
             
             #region Monitor the deletion process
             $retryCount = 0
@@ -943,6 +1054,7 @@ function DeleteAutopilotDevice()
                 $retryCount++
                 Write-Host "Verifying device deletion, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
                 Write-Verbose "[$functionName] Checking if device is still present after delete request (Attempt $retryCount of $MaxRetries)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device is still present after delete request (Attempt $retryCount of $MaxRetries)" -LogLevel "Verbose"
                 
                 # Sleep before checking
                 Start-Sleep -Seconds $RetryDelaySeconds
@@ -960,11 +1072,13 @@ function DeleteAutopilotDevice()
                     {
                         $deviceInfo = CallGraphAPI -AccessToken $accessToken -ResourcePath $checkUri -Method GET
                         Write-Verbose "[$functionName] Device check response: $($deviceInfo | Out-String)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device check response: $($deviceInfo | Out-String)" -LogLevel "Information"
                     } 
                     catch
                     {
                         # If the call fails with 404 (not found), the device is deleted
                         Write-Verbose "[$functionName] Error checking device: $_"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error checking device: $_" -LogLevel "Error"
                         if ($_.Exception.Response.StatusCode -eq 404)
                         {
                             $deviceInfo = $null
@@ -977,22 +1091,26 @@ function DeleteAutopilotDevice()
                     $isDeleted = $true
                     Write-Host "Device deletion confirmed!" -ForegroundColor Green
                     Write-Verbose "[$functionName] Device deletion confirmed at attempt $retryCount."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device deletion confirmed at attempt $retryCount." -LogLevel "Information"
                 }
                 else
                 {
                     Write-Verbose "[$functionName] Device still exists after attempt $retryCount. Waiting for $RetryDelaySeconds seconds before next check."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device still exists after attempt $retryCount. Waiting for $RetryDelaySeconds seconds before next check." -LogLevel "Information"
                 }
             }
             
             if ($isDeleted)
             {
                 Write-Verbose "[$functionName] Autopilot device with serial number $($autopilotDevice.serialNumber) deleted successfully."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot device with serial number $($autopilotDevice.serialNumber) deleted successfully." -LogLevel "Information"
                 $success = $true
             }
             else
             {
                 Write-Host "Device deletion verification timed out after $MaxRetries attempts." -ForegroundColor Red
                 Write-Verbose "[$functionName] Delete operation may have been queued but not completed within the monitoring period."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delete operation may have been queued but not completed within the monitoring period." -LogLevel "Information"
                 Write-Warning "Device may still be in the process of being deleted. Please check again later."
                 $success = $false
             }
@@ -1000,6 +1118,7 @@ function DeleteAutopilotDevice()
         else
         {
             Write-Verbose "[$functionName] Failed to delete autopilot device with serial number $($autopilotDevice.serialNumber)."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to delete autopilot device with serial number $($autopilotDevice.serialNumber)." -LogLevel "Error"
         }
     }
     else
@@ -1023,6 +1142,7 @@ function RestartDevice()
     {
         $reboot = Read-Host -Prompt $question
         Write-Verbose "[$functionName] User input: $reboot"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User input: $reboot" -LogLevel "Information"
         if ($reboot -notin ('Y', 'N'))
         {
             Write-Host "Invalid input. Please enter 'Y' for Yes or 'N' for No." -ForegroundColor Red
@@ -1032,12 +1152,14 @@ function RestartDevice()
     if ($reboot -eq 'Y')
     {
         Write-Verbose "[$functionName] User chose to reboot the device."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User chose to reboot the device." -LogLevel "Information"
         Write-Host $bootMessage -ForegroundColor Green
         Restart-Computer -Force
     }
     else
     {
         Write-Verbose "[$functionName] User chose not to reboot the device."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User chose not to reboot the device." -LogLevel "Information"
         Write-Host $reminderMessage -ForegroundColor Red
         return $false
     }

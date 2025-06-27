@@ -42,6 +42,7 @@ function Get-StringsFromJson
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Attempting to load strings from: $StringsFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to load strings from: $StringsFile" -LogLevel "Information"
     # Default fallback values organized by sections - PowerShell 5.1 compatible
     $defaultStringValues = @{
         returnValues  = @{
@@ -98,12 +99,14 @@ function Get-StringsFromJson
         # Use the consolidated configuration loader
         $stringsConfig = Get-JsonConfiguration -JsonFile $StringsFile -DefaultValues $defaultStringValues
         Write-Verbose "[$functionName] Successfully loaded strings configuration"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully loaded strings configuration" -LogLevel "Information"
         return $stringsConfig
     }
     catch
     {
         Write-Warning "[$functionName] Failed to load strings configuration: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Returning default values"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning default values" -LogLevel "Information"
         return $defaultStringValues
     }
 }
@@ -173,13 +176,16 @@ function Get-JsonConfiguration
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Attempting to load configuration from: $JsonFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to load configuration from: $JsonFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Configuration Type: $ConfigurationType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration Type: $ConfigurationType" -LogLevel "Information"
     
     try
     {
         if (Test-Path -Path $JsonFile)
         {
             Write-Verbose "[$functionName] Loading configuration from JSON file: $JsonFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Loading configuration from JSON file: $JsonFile" -LogLevel "Information"
             $jsonContent = Get-Content -Path $JsonFile -Raw -Force -ErrorAction Stop
             
             # Validate JSON syntax
@@ -187,17 +193,20 @@ function Get-JsonConfiguration
             {
                 $jsonData = $jsonContent | ConvertFrom-Json -ErrorAction Stop
                 Write-Verbose "[$functionName] JSON file is valid"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "JSON file is valid" -LogLevel "Information"
             }
             catch
             {
                 Write-Warning "[$functionName] Invalid JSON syntax in file: $JsonFile"
                 Write-Verbose "[$functionName] JSON Error: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "JSON Error: $($_.Exception.Message)" -LogLevel "Error"
                 throw "Invalid JSON format in configuration file"
             }
             # Handle different configuration types for init.json
             if ($JsonFile -like "*init.json" -and $ConfigurationType -ne 'default')
             {
                 Write-Verbose "[$functionName] Processing init.json with configuration type: $ConfigurationType"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing init.json with configuration type: $ConfigurationType" -LogLevel "Verbose"
                 # Use regular hashtable for PowerShell 5.1 compatibility
                 $processedData = @{}
                 
@@ -217,6 +226,7 @@ function Get-JsonConfiguration
                     
                     $processedData[$item.name] = $valueToUse
                     Write-Verbose "[$functionName] Set $($item.name) = $valueToUse"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Set $($item.name) = $valueToUse" -LogLevel "Information"
                 }
                 
                 return $processedData
@@ -234,6 +244,7 @@ function Get-JsonConfiguration
                     $jsonData.PSObject.Properties.Name -contains 'deviceActions')
                 {
                     Write-Verbose "[$functionName] Processing structured JSON with sections"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing structured JSON with sections" -LogLevel "Verbose"
                     foreach ($sectionName in $DefaultValues.Keys)
                     {
                         # Use regular hashtable for PowerShell 5.1 compatibility
@@ -243,6 +254,7 @@ function Get-JsonConfiguration
                         if ($jsonData.PSObject.Properties.Name -contains $sectionName)
                         {
                             Write-Verbose "[$functionName] Loading section '$sectionName' from JSON"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Loading section '$sectionName' from JSON" -LogLevel "Information"
                             
                             # Load defaults first
                             foreach ($key in $defaultSection.Keys)
@@ -254,6 +266,7 @@ function Get-JsonConfiguration
                                 else
                                 {
                                     Write-Verbose "[$functionName] Key '$key' not found in JSON section '$sectionName', using default"
+                                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Key '$key' not found in JSON section '$sectionName', using default" -LogLevel "Information"
                                     $sectionData[$key] = $defaultSection[$key]
                                 }
                             }
@@ -264,6 +277,7 @@ function Get-JsonConfiguration
                                 if (-not $sectionData.ContainsKey($property.Name))
                                 {
                                     Write-Verbose "[$functionName] Adding additional key '$($property.Name)' from JSON section '$sectionName'"
+                                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding additional key '$($property.Name)' from JSON section '$sectionName'" -LogLevel "Information"
                                     $sectionData[$property.Name] = $property.Value
                                 }
                             }
@@ -271,6 +285,7 @@ function Get-JsonConfiguration
                         else
                         {
                             Write-Verbose "[$functionName] Section '$sectionName' not found in JSON, using defaults"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Section '$sectionName' not found in JSON, using defaults" -LogLevel "Information"
                             # Create a copy of the defaults
                             $sectionData = @{}
                             foreach ($key in $defaultSection.Keys)
@@ -286,6 +301,7 @@ function Get-JsonConfiguration
                 {
                     # Simple flat JSON object
                     Write-Verbose "[$functionName] Processing flat JSON object"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing flat JSON object" -LogLevel "Verbose"
                     foreach ($property in $jsonData.PSObject.Properties)
                     {
                         $result[$property.Name] = $property.Value
@@ -297,12 +313,14 @@ function Get-JsonConfiguration
             else
             {
                 Write-Verbose "[$functionName] JSON data is array type, returning as-is"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "JSON data is array type, returning as-is" -LogLevel "Information"
                 return $jsonData
             }
         }
         else
         {
             Write-Verbose "[$functionName] Configuration file not found: $JsonFile, using default values"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration file not found: $JsonFile, using default values" -LogLevel "Information"
             return $DefaultValues
         }
     }
@@ -310,7 +328,9 @@ function Get-JsonConfiguration
     {
         Write-Warning "[$functionName] Error loading configuration from JSON file: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full error: $($_.Exception | Format-List * | Out-String)" -LogLevel "Error"
         Write-Verbose "[$functionName] Falling back to default values"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Falling back to default values" -LogLevel "Information"
         return $DefaultValues
     }
 }
@@ -362,7 +382,9 @@ function Get-InitConfiguration()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Loading initialization configuration from: $InitFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Loading initialization configuration from: $InitFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Configuration Type: $ConfigurationType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration Type: $ConfigurationType" -LogLevel "Information"
     # Default initialization values (fallback)
     $defaultInitValues = @{
         configFile          = ".\\.secrets\\config.json"
@@ -379,12 +401,14 @@ function Get-InitConfiguration()
     {
         $config = Get-JsonConfiguration -JsonFile $InitFile -DefaultValues $defaultInitValues -ConfigurationType $ConfigurationType
         Write-Verbose "[$functionName] Successfully loaded initialization configuration"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully loaded initialization configuration" -LogLevel "Information"
         return $config
     }
     catch
     {
         Write-Warning "[$functionName] Failed to load initialization configuration: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Returning default values"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning default values" -LogLevel "Information"
         return $defaultInitValues
     }
 }
@@ -412,6 +436,7 @@ function MergeSettings()
         if ($object -is [hashtable] -or $object -is [System.Collections.IDictionary])
         {
             Write-Verbose "[$functionName] Flattening hashtable/dictionary with $($object.Keys.Count) keys"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Flattening hashtable/dictionary with $($object.Keys.Count) keys" -LogLevel "Information"
             foreach ($key in $object.Keys)
             {
                 $fullKey = if ($prefix)
@@ -428,6 +453,7 @@ function MergeSettings()
                     ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0))
                 {
                     Write-Verbose "[$functionName] Found nested object at key: $fullKey"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found nested object at key: $fullKey" -LogLevel "Information"
                     $nestedFlat = ConvertTo-FlatHashtable $value $fullKey
                     foreach ($nestedKey in $nestedFlat.Keys)
                     {
@@ -437,6 +463,7 @@ function MergeSettings()
                 else
                 {
                     Write-Verbose "[$functionName] Adding flat key: $fullKey"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding flat key: $fullKey" -LogLevel "Information"
                     $flatHash[$fullKey] = $value
                 }
             }
@@ -444,6 +471,7 @@ function MergeSettings()
         elseif ($object -is [PSCustomObject])
         {
             Write-Verbose "[$functionName] Flattening PSCustomObject with $($object.PSObject.Properties.Count) properties"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Flattening PSCustomObject with $($object.PSObject.Properties.Count) properties" -LogLevel "Information"
             foreach ($property in $object.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' })
             {
                 $fullKey = if ($prefix)
@@ -460,6 +488,7 @@ function MergeSettings()
                     ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0))
                 {
                     Write-Verbose "[$functionName] Found nested object at property: $fullKey"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found nested object at property: $fullKey" -LogLevel "Information"
                     $nestedFlat = ConvertTo-FlatHashtable $value $fullKey
                     foreach ($nestedKey in $nestedFlat.Keys)
                     {
@@ -469,6 +498,7 @@ function MergeSettings()
                 else
                 {
                     Write-Verbose "[$functionName] Adding flat property: $fullKey"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Adding flat property: $fullKey" -LogLevel "Information"
                     $flatHash[$fullKey] = $value
                 }
             }
@@ -487,13 +517,17 @@ function MergeSettings()
     
     # Flatten local settings
     Write-Verbose "[$functionName] Flattening local settings"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Flattening local settings" -LogLevel "Information"
     $flatLocalSettings = ConvertTo-FlatHashtable $localSettings
     Write-Verbose "[$functionName] Local settings flattened to $($flatLocalSettings.Count) properties"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Local settings flattened to $($flatLocalSettings.Count) properties" -LogLevel "Information"
     
     # Flatten global settings
     Write-Verbose "[$functionName] Flattening global settings"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Flattening global settings" -LogLevel "Information"
     $flatGlobalSettings = ConvertTo-FlatHashtable $globalSettings
     Write-Verbose "[$functionName] Global settings flattened to $($flatGlobalSettings.Count) properties"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Global settings flattened to $($flatGlobalSettings.Count) properties" -LogLevel "Information"
     
     # Normalize all keys to simple format (remove any prefixes)
     function Get-SimpleKey($key)
@@ -512,6 +546,7 @@ function MergeSettings()
         $simpleKey = Get-SimpleKey $key
         $normalizedLocal[$simpleKey] = $flatLocalSettings[$key]
         Write-Verbose "[$functionName] Normalized local key: $key -> $simpleKey"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Normalized local key: $key -> $simpleKey" -LogLevel "Information"
     }
     
     $normalizedGlobal = @{}
@@ -520,6 +555,7 @@ function MergeSettings()
         $simpleKey = Get-SimpleKey $key
         $normalizedGlobal[$simpleKey] = $flatGlobalSettings[$key]
         Write-Verbose "[$functionName] Normalized global key: $key -> $simpleKey"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Normalized global key: $key -> $simpleKey" -LogLevel "Information"
     }
     
     # Start with local settings
@@ -527,6 +563,7 @@ function MergeSettings()
     {
         $merged[$key] = $normalizedLocal[$key]
         Write-Verbose "[$functionName] Added local setting: $key"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added local setting: $key" -LogLevel "Information"
     }
     
     # Merge global settings
@@ -535,6 +572,7 @@ function MergeSettings()
         if ($merged.ContainsKey($key))
         {
             Write-Verbose "[$functionName] Conflict detected for property: $key"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Conflict detected for property: $key" -LogLevel "Verbose"
             
             # If both are arrays, merge arrays
             if ($merged[$key] -is [System.Collections.IEnumerable] -and
@@ -543,6 +581,7 @@ function MergeSettings()
                 ($normalizedGlobal[$key] -isnot [string]))
             {
                 Write-Verbose "[$functionName] Both values are arrays, merging arrays for: $key"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Both values are arrays, merging arrays for: $key" -LogLevel "Information"
                 $merged[$key] = @($merged[$key] + $normalizedGlobal[$key])
             }
             else
@@ -551,11 +590,13 @@ function MergeSettings()
                 if ($ConflictResolution -eq 'Global')
                 {
                     Write-Verbose "[$functionName] Resolving conflict by using global value for: $key"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Resolving conflict by using global value for: $key" -LogLevel "Information"
                     $merged[$key] = $normalizedGlobal[$key]
                 }
                 else
                 {
                     Write-Verbose "[$functionName] Resolving conflict by keeping local value for: $key"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Resolving conflict by keeping local value for: $key" -LogLevel "Information"
                     # Keep the existing local value (do nothing)
                 }
             }
@@ -564,10 +605,12 @@ function MergeSettings()
         {
             $merged[$key] = $normalizedGlobal[$key]
             Write-Verbose "[$functionName] Added global setting: $key"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Added global setting: $key" -LogLevel "Information"
         }
     }
     
     Write-Verbose "[$functionName] Final merged settings count: $($merged.Count)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Final merged settings count: $($merged.Count)" -LogLevel "Information"
     return $merged
 }
 
@@ -623,8 +666,11 @@ function InitializeConfiguration()
     $functionName = $MyInvocation.MyCommand.Name
     #region print verbose log of received parameters
     Write-Verbose "[$functionName] Root folder: $RootFolder"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Root folder: $RootFolder" -LogLevel "Information"
     Write-Verbose "[$functionName] InitFile: $InitFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "InitFile: $InitFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Overwrite: $overwrite"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwrite: $overwrite" -LogLevel "Information"
     #endregion
     # PowerShell 5.1 compatible - using regular hashtables instead of OrderedDictionary
     $initVars = @(
@@ -643,6 +689,7 @@ function InitializeConfiguration()
     if (-not(Test-Path $InitFile))
     {
         Write-Verbose "[$functionName] Creating configuration file at $InitFile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating configuration file at $InitFile." -LogLevel "Information"
         $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
     }
     else
@@ -650,6 +697,7 @@ function InitializeConfiguration()
         if ($overwrite)
         {
             Write-Verbose "[$functionName] Overwriting configuration file at $InitFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting configuration file at $InitFile." -LogLevel "Information"
             $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
         }
         else
@@ -666,6 +714,7 @@ function InitializeConfiguration()
             if ($choice -eq 'y')
             {
                 Write-Verbose "[$functionName] Overwriting initialization file at $InitFile."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting initialization file at $InitFile." -LogLevel "Information"
                 $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
             }
             else
@@ -748,10 +797,15 @@ function CreateConfiguration()
     $functionName = $MyInvocation.MyCommand.Name    
     #region Variables and logs
     Write-Verbose "[$functionName] Root folder: $RootFolder"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Root folder: $RootFolder" -LogLevel "Information"
     Write-Verbose "[$functionName] Init file: $InitFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Init file: $InitFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Destination folder: $DestinationFolder"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Destination folder: $DestinationFolder" -LogLevel "Information"
     Write-Verbose "[$functionName] ConfigurationFile: $ConfigurationFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "ConfigurationFile: $ConfigurationFile" -LogLevel "Information"
     Write-Verbose "[$functionName] ConfigurationType: $ConfigurationType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "ConfigurationType: $ConfigurationType" -LogLevel "Information"
     $success = $false
     #endregion
     
@@ -760,6 +814,7 @@ function CreateConfiguration()
         if (Test-Path -Path $InitFile)
         {
             Write-Verbose "[$functionName] Found init file at $InitFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found init file at $InitFile." -LogLevel "Information"
             # Use the consolidated configuration loader with specific configuration type
             $configData = Get-InitConfiguration -InitFile $InitFile -ConfigurationType $ConfigurationType
         }
@@ -779,6 +834,7 @@ function CreateConfiguration()
             }
         }
         Write-Verbose "[$functionName] Config data: $($configData | ConvertTo-Json -Depth 10)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config data: $($configData | ConvertTo-Json -Depth 10)" -LogLevel "Information"
         
         # Create the settings.json structure with globalSettings and domains
         $settingsStructure = @{
@@ -795,6 +851,7 @@ function CreateConfiguration()
         if (Test-Path -Path $ConfigurationFile)
         {
             Write-Verbose "[$functionName] Configuration file created successfully at $ConfigurationFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration file created successfully at $ConfigurationFile." -LogLevel "Information"
             $success = $true
         }
         else
@@ -807,6 +864,7 @@ function CreateConfiguration()
     {
         Write-Warning "[$functionName] Error creating configuration: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full error: $($_.Exception | Format-List * | Out-String)" -LogLevel "Error"
         $success = $false
     }
     
@@ -909,9 +967,13 @@ function CreateFullConfiguration()
     $functionName = $MyInvocation.MyCommand.Name    
     #region Variables and logs
     Write-Verbose "[$functionName] Destination folder: $DestinationFolder"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Destination folder: $DestinationFolder" -LogLevel "Information"
     Write-Verbose "[$functionName] ConfigurationFile: $ConfigurationFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "ConfigurationFile: $ConfigurationFile" -LogLevel "Information"
     Write-Verbose "[$functionName] RootFolder: $RootFolder"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "RootFolder: $RootFolder" -LogLevel "Information"
     Write-Verbose "[$functionName] InitFile: $InitFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "InitFile: $InitFile" -LogLevel "Information"
     $success = $false
     #endregion
 
@@ -935,6 +997,7 @@ function CreateFullConfiguration()
 
         # Load init configuration using consolidated system (returns array for init.json)
         Write-Verbose "[$functionName] Loading init configuration from $InitFile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Loading init configuration from $InitFile." -LogLevel "Information"
         $defaultInitValues = @()  # For init.json arrays, start with empty array
         $valuesToEdit = Get-JsonConfiguration -JsonFile $InitFile -DefaultValues $defaultInitValues
 
@@ -985,6 +1048,7 @@ function CreateFullConfiguration()
         foreach ($config in $configObject.PSObject.Properties)
         {
             Write-Verbose "[$functionName] Configuration: $($config.Name) = $($config.Value)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration: $($config.Name) = $($config.Value)" -LogLevel "Information"
             
             # Find matching init configuration
             $initConfig = $valuesToEdit | Where-Object { $_.name -eq $config.Name }
@@ -997,15 +1061,22 @@ function CreateFullConfiguration()
                 if ($configValue -eq '')
                 {
                     Write-Verbose "[$functionName] Config value is empty."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Config value is empty." -LogLevel "Information"
                     Write-Verbose "[$functionName] Setting config value to 'none'."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Setting config value to 'none'." -LogLevel "Information"
                     $configValue = 'none'
                 }
                 
                 Write-Verbose "[$functionName] Stored Key name: $($config.Name)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Stored Key name: $($config.Name)" -LogLevel "Information"
                 Write-Verbose "[$functionName] Stored Key value: $($config.Value)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Stored Key value: $($config.Value)" -LogLevel "Information"
                 Write-Verbose "[$functionName] Possible Key values: $configValue"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Possible Key values: $configValue" -LogLevel "Information"
                 Write-Verbose "[$functionName] Key description: $configDescription"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Key description: $configDescription" -LogLevel "Information"
                 Write-Verbose "[$functionName] Key type: $configType"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Key type: $configType" -LogLevel "Information"
                 
                 switch ($configType)
                 {
@@ -1020,6 +1091,7 @@ function CreateFullConfiguration()
                         }
                         Write-Host "New value: $value"
                         Write-Verbose "[$functionName] Changing the value of $($config.Name) from $($config.Value) to $value"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Changing the value of $($config.Name) from $($config.Value) to $value" -LogLevel "Information"
                         $config.Value = $value
                     }
                     'array'
@@ -1036,6 +1108,7 @@ function CreateFullConfiguration()
                             {
                                 $currentlySelected = $i + 1
                                 Write-Verbose "[$functionName] The currently selected value is $currentlySelected"
+                                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The currently selected value is $currentlySelected" -LogLevel "Information"
                             }
                         }
                         
@@ -1058,11 +1131,13 @@ function CreateFullConfiguration()
                         
                         Write-Host "Value: $value"
                         Write-Verbose "[$functionName] Changing the value of $($config.Name) from $($config.Value) to $value"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Changing the value of $($config.Name) from $($config.Value) to $value" -LogLevel "Information"
                         $config.Value = $value
                     }
                     'static'
                     {
                         Write-Verbose "[$functionName] This is a static value and cannot be changed."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "This is a static value and cannot be changed." -LogLevel "Error"
                         Write-Host "Value: $($config.Value)" -ForegroundColor Yellow
                     }
                 }
@@ -1071,8 +1146,10 @@ function CreateFullConfiguration()
 
         # Print all the new configuration data but only in verbose mode
         Write-Verbose "[$functionName] New configuration data:"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "New configuration data:" -LogLevel "Information"
         $configObject.PSObject.Properties | ForEach-Object {
             Write-Verbose "[$functionName] $($_.Name) = $($_.Value)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "$($_.Name) = $($_.Value)" -LogLevel "Information"
         }        # Convert back to hashtable for saving
         $finalConfig = @{}
         foreach ($prop in $configObject.PSObject.Properties)
@@ -1085,19 +1162,23 @@ function CreateFullConfiguration()
 
         # Save the complete settings.json structure to the configuration file
         Write-Verbose "[$functionName] Saving configuration to $ConfigurationFile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Saving configuration to $ConfigurationFile." -LogLevel "Information"
         $settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigurationFile -Force
         Write-Verbose "[$functionName] Configuration saved to $ConfigurationFile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration saved to $ConfigurationFile." -LogLevel "Information"
         
         # Verify the file was saved successfully
         if (Test-Path -Path $ConfigurationFile)
         {
             Write-Verbose "[$functionName] Configuration saved successfully to $ConfigurationFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Configuration saved successfully to $ConfigurationFile." -LogLevel "Information"
             Write-Host "Configuration saved successfully." -ForegroundColor Green
             $success = $true
         }
         else
         {
             Write-Verbose "[$functionName] Failed to save configuration to $ConfigurationFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to save configuration to $ConfigurationFile." -LogLevel "Error"
             Write-Host "Failed to save configuration." -ForegroundColor Red
         }
     }
@@ -1105,6 +1186,7 @@ function CreateFullConfiguration()
     {
         Write-Warning "[$functionName] Error during configuration creation: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full error: $($_.Exception | Format-List * | Out-String)" -LogLevel "Error"
         Write-Host "An error occurred during configuration creation. Check verbose logs for details." -ForegroundColor Red
         $success = $false
     }
@@ -1161,6 +1243,7 @@ function Update-GlobalSetting()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating setting '$SettingName' to '$SettingValue' in file: $SettingsFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Updating setting '$SettingName' to '$SettingValue' in file: $SettingsFile" -LogLevel "Information"
     
     try
     {
@@ -1192,6 +1275,7 @@ function Update-GlobalSetting()
         # Update the specific setting
         $globalSettingsHash[$SettingName] = $SettingValue
         Write-Verbose "[$functionName] Updated globalSettings.$SettingName = $SettingValue"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Updated globalSettings.$SettingName = $SettingValue" -LogLevel "Information"
         
         # Convert back to PSCustomObject structure
         $settings.globalSettings = [PSCustomObject]$globalSettingsHash
@@ -1200,6 +1284,7 @@ function Update-GlobalSetting()
         $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
         Copy-Item -Path $SettingsFile -Destination $backupFile -Force
         Write-Verbose "[$functionName] Created backup: $backupFile"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Created backup: $backupFile" -LogLevel "Information"
         
         # Save updated settings
         $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $SettingsFile -Force
@@ -1212,6 +1297,7 @@ function Update-GlobalSetting()
             $verifySettings.globalSettings.$SettingName -eq $SettingValue)
         {
             Write-Verbose "[$functionName] Successfully updated and verified setting"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully updated and verified setting" -LogLevel "Information"
             return $true
         }
         else
@@ -1224,6 +1310,7 @@ function Update-GlobalSetting()
     {
         Write-Warning "[$functionName] Error updating global setting: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full error: $($_.Exception | Format-List * | Out-String)" -LogLevel "Error"
         return $false
     }
 }
@@ -1284,7 +1371,9 @@ function Update-DomainSettings()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating settings for domain '$DomainName' in file: $SettingsFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Updating settings for domain '$DomainName' in file: $SettingsFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Merge mode: $MergeSettings"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Merge mode: $MergeSettings" -LogLevel "Information"
     
     try
     {
@@ -1338,6 +1427,7 @@ function Update-DomainSettings()
         if (-not $domainsHash.ContainsKey($DomainName))
         {
             Write-Verbose "[$functionName] Creating new domain entry for: $DomainName"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new domain entry for: $DomainName" -LogLevel "Information"
             $domainsHash[$DomainName] = @{
                 "groupsToInclude" = @()
                 "groupsToExclude" = @()
@@ -1350,16 +1440,19 @@ function Update-DomainSettings()
         {
             # Merge with existing settings
             Write-Verbose "[$functionName] Merging settings with existing domain configuration"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Merging settings with existing domain configuration" -LogLevel "Information"
             foreach ($key in $Settings.Keys)
             {
                 $domainsHash[$DomainName]['settings'][$key] = $Settings[$key]
                 Write-Verbose "[$functionName] Updated domain setting: $key = $($Settings[$key])"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Updated domain setting: $key = $($Settings[$key])" -LogLevel "Information"
             }
         }
         else
         {
             # Replace entire settings section
             Write-Verbose "[$functionName] Replacing entire settings section for domain"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Replacing entire settings section for domain" -LogLevel "Information"
             $domainsHash[$DomainName]['settings'] = $Settings
         }
         
@@ -1383,6 +1476,7 @@ function Update-DomainSettings()
         $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
         Copy-Item -Path $SettingsFile -Destination $backupFile -Force
         Write-Verbose "[$functionName] Created backup: $backupFile"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Created backup: $backupFile" -LogLevel "Information"
         
         # Save updated settings
         $settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $SettingsFile -Force
@@ -1394,6 +1488,7 @@ function Update-DomainSettings()
         if ($verifySettings.domains.PSObject.Properties.Name -contains $DomainName)
         {
             Write-Verbose "[$functionName] Successfully updated and verified domain settings"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully updated and verified domain settings" -LogLevel "Information"
             return $true
         }
         else
@@ -1406,6 +1501,7 @@ function Update-DomainSettings()
     {
         Write-Warning "[$functionName] Error updating domain settings: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full error: $($_.Exception | Format-List * | Out-String)" -LogLevel "Error"
         return $false
     }
 }
@@ -1468,7 +1564,9 @@ function Set-SettingsJsonStructure()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Creating/updating settings structure in file: $SettingsFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating/updating settings structure in file: $SettingsFile" -LogLevel "Information"
     Write-Verbose "[$functionName] Preserve existing domains: $PreserveExistingDomains"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preserve existing domains: $PreserveExistingDomains" -LogLevel "Information"
     
     try
     {
@@ -1478,6 +1576,7 @@ function Set-SettingsJsonStructure()
         if ($PreserveExistingDomains -and (Test-Path -Path $SettingsFile))
         {
             Write-Verbose "[$functionName] Loading existing domains to preserve"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Loading existing domains to preserve" -LogLevel "Information"
             $existingContent = Get-Content -Path $SettingsFile -Raw -Force
             $existingSettings = $existingContent | ConvertFrom-Json
             
@@ -1506,12 +1605,14 @@ function Set-SettingsJsonStructure()
                     $existingDomains[$domainProperty.Name] = $domainHash
                 }
                 Write-Verbose "[$functionName] Preserved $($existingDomains.Count) existing domains"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preserved $($existingDomains.Count) existing domains" -LogLevel "Information"
             }
             
             # Create backup
             $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
             Copy-Item -Path $SettingsFile -Destination $backupFile -Force
             Write-Verbose "[$functionName] Created backup: $backupFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Created backup: $backupFile" -LogLevel "Information"
         }
         
         # Create the settings structure
@@ -1542,6 +1643,7 @@ function Set-SettingsJsonStructure()
                 $verifySettings.PSObject.Properties.Name -contains 'domains')
             {
                 Write-Verbose "[$functionName] Successfully created/updated settings.json structure"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully created/updated settings.json structure" -LogLevel "Information"
                 return $true
             }
         }
@@ -1553,6 +1655,7 @@ function Set-SettingsJsonStructure()
     {
         Write-Warning "[$functionName] Error creating/updating settings structure: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full error: $($_.Exception | Format-List * | Out-String)" -LogLevel "Error"
         return $false
     }
 }

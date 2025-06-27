@@ -11,34 +11,47 @@ function GetLatestGitlabRelease()
     $gitlabAPILatestReleaseEndpoint = "$gitlabAPIProjectEndpoint/releases/permalink/latest"
     $returnValue = $null
     Write-Verbose "[$functionName] GitLab URL: $gitlabURL"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "GitLab URL: $gitlabURL" -LogLevel "Information"
     Write-Verbose "[$functionName] GitLab API Endpoint: $gitlabAPIEndpoint"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "GitLab API Endpoint: $gitlabAPIEndpoint" -LogLevel "Information"
     Write-Verbose "[$functionName] GitLab API Project Endpoint: $gitlabAPIProjectEndpoint"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "GitLab API Project Endpoint: $gitlabAPIProjectEndpoint" -LogLevel "Information"
     Write-Verbose "[$functionName] GitLab API Latest Release Endpoint: $gitlabAPILatestReleaseEndpoint"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "GitLab API Latest Release Endpoint: $gitlabAPILatestReleaseEndpoint" -LogLevel "Information"
     Write-Verbose "[$functionName] Project ID: $ProjectID"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Project ID: $ProjectID" -LogLevel "Information"
     Write-Verbose "[$functionName] Attempting to retrieve the latest release from GitLab..."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to retrieve the latest release from GitLab..." -LogLevel "Information"
     Write-Verbose "[$functionName] getting latest release from $gitlabAPILatestReleaseEndpoint"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "getting latest release from $gitlabAPILatestReleaseEndpoint" -LogLevel "Information"
     $response = Invoke-RestMethod -Uri $gitlabAPILatestReleaseEndpoint -Method Get -ErrorAction SilentlyContinue
     if ($response)
     {
         Write-Verbose "[$functionName] Successfully retrieved the latest release. Tag Name: $($response.tag_name)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully retrieved the latest release. Tag Name: $($response.tag_name)" -LogLevel "Information"
         $returnValue = $response.tag_name
     }
     else 
     {
         Write-Verbose "[$functionName] Failed to retrieve the latest release from GitLab. Trying to get the default branch instead."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve the latest release from GitLab. Trying to get the default branch instead." -LogLevel "Error"
         Write-Verbose "[$functionName] Attempting to retrieve project details from: $gitlabAPIProjectEndpoint"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to retrieve project details from: $gitlabAPIProjectEndpoint" -LogLevel "Information"
         $response = Invoke-RestMethod -Uri $gitlabAPIProjectEndpoint -Method Get -ErrorAction SilentlyContinue
         if ($response)
         {
             Write-Verbose "[$functionName] Successfully retrieved project details. Default Branch: $($response.default_branch)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully retrieved project details. Default Branch: $($response.default_branch)" -LogLevel "Information"
             $returnValue = $response.default_branch
         }
         else
         {
             Write-Verbose "[$functionName] Failed to retrieve project details from GitLab."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve project details from GitLab." -LogLevel "Error"
         }
     }
     Write-Verbose "[$functionName] Returning value: $returnValue"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning value: $returnValue" -LogLevel "Information"
     return $returnValue
 }
 
@@ -50,10 +63,13 @@ function GetLatestGithubRelease()
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking the latest release for Repository: $Repository"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking the latest release for Repository: $Repository" -LogLevel "Verbose"
     $url = "https://api.github.com/repos/$Repository/releases/latest"
     Write-Verbose "[$functionName] Requesting URL: $url"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Requesting URL: $url" -LogLevel "Information"
     $response = Invoke-RestMethod -Uri $url -Method Get 
     Write-Verbose "[$functionName] Got response: $($response.tag_name)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Got response: $($response.tag_name)" -LogLevel "Information"
     if (($null -eq $response) -or ($null -eq $response.tag_name ))
     {
         Write-Host "Failed to retrieve the latest release information from GitHub."
@@ -78,12 +94,16 @@ function GetUpdates()
     $functionName = $MyInvocation.MyCommand.Name
     #region write a verbose log of received parameters.
     Write-Verbose "[$functionName] RootFolder: $RootFolder"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "RootFolder: $RootFolder" -LogLevel "Information"
     Write-Verbose "[$functionName] remoteVersionURL: $remoteVersionURL"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "remoteVersionURL: $remoteVersionURL" -LogLevel "Information"
     Write-Verbose "[$functionName] updateURL: $updateURL"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "updateURL: $updateURL" -LogLevel "Information"
     #endregion
 
     #region get local version
     Write-Verbose "[$functionName] Getting the local version."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting the local version." -LogLevel "Information"
     $LocalVersion = (Get-Item "$RootFolder\$executableFileName").VersionInfo.ProductVersion
     Write-Host "LocalVersion: $LocalVersion"
     $localVersion = [System.Version]::Parse($LocalVersion)
@@ -91,6 +111,7 @@ function GetUpdates()
 
     #region get the remote version.
     Write-Verbose "[$functionName] Getting remote version from $remoteVersionURL"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting remote version from $remoteVersionURL" -LogLevel "Information"
     try 
     {
         $remoteVersionResponse = Invoke-WebRequest -Uri $remoteVersionURL -Method Get -ErrorAction Stop
@@ -98,13 +119,18 @@ function GetUpdates()
     catch 
     {
         Write-Verbose "[$functionName] Response: $($remoteVersionResponse)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $($remoteVersionResponse)" -LogLevel "Information"
         Write-Verbose "[$functionName] Remote version response content: $($remoteVersionResponse.Content)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remote version response content: $($remoteVersionResponse.Content)" -LogLevel "Information"
         Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remote version status code: $($remoteVersionResponse.StatusCode)" -LogLevel "Information"
         return $null
     }    
     Write-Verbose "[$functionName] Returned remote version response: $remoteVersion"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returned remote version response: $remoteVersion" -LogLevel "Information"
     $remoteVersion = $remoteVersionResponse.content
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "remoteVersion = $remoteVersion" -LogLevel "Information"
     if ($null -eq $remoteVersion -or $remoteVersion -eq '')
     {
         Write-Host "Failed to get remote version from response. Please provide a valid remote version."
@@ -112,14 +138,17 @@ function GetUpdates()
     }
     $remoteVersion = [regex]::Match($remoteVersion, '\d+\.\d+\.\d').Value
     Write-Verbose "[$functionName] processed remote version: $remoteVersion"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "processed remote version: $remoteVersion" -LogLevel "Information"
     $remoteVersion = [System.Version]::Parse($remoteVersion)
     #endregion
     
     #region compare versions
     Write-Verbose "[$functionName] Comparing local version $localVersion with remote version $remoteVersion"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Comparing local version $localVersion with remote version $remoteVersion" -LogLevel "Information"
     if ($remoteVersion -gt $localVersion)
     {
         Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update." -LogLevel "Information"
         Write-Host "An update is available to version $remoteVersion. Downloading update from $updateURL."
         #make a backup of the executable
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$executableFileName.bak"
@@ -144,12 +173,14 @@ function GetUpdates()
         else
         {
             Write-Verbose "[$functionName] Update downloaded successfully to $updateFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update downloaded successfully to $updateFile." -LogLevel "Information"
             return $returnValues.UpdateSuccessMessage
         }
     }
     else
     {
         Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Local version $localVersion is up to date with remote version $remoteVersion. No update required." -LogLevel "Information"
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
