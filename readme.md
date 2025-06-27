@@ -238,4 +238,4 @@ The script includes comprehensive error handling:
 - [Microsoft Graph API Documentation](https://docs.microsoft.com/en-us/graph/)
 - [Intune Device Management](https://learn.microsoft.com/en-us/mem/intune/)
 
-For technical support or feature requests, please contact the script maintainer or submit an issue through the appropriate channels.
+For technical support or feature requests, please contact the script maintainer or submit an issue.
