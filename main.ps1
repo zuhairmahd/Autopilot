@@ -31,7 +31,7 @@ param(
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log"
 )
-
+. $pwd\functions\Write-Log.ps1
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
