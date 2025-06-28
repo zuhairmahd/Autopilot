@@ -190,6 +190,8 @@ function GetUpdates()
     else
     {
         Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
+        Write-Host "Current version: $localVersion"
+        Write-Host "Remote version: $remoteVersion"
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
