@@ -898,8 +898,9 @@ function ShowMenu()
     Write-Verbose "[$functionName] Current Menu: $($Menu.Title)"
     Write-Verbose "[$functionName] Previous menu (if available): $($Global:MenuHistory[-1].Title)"
     Write-Verbose "[$functionName] =================================="
-    #endregion    # Determine calling context if not explicitly provided
+    #endregion Initialize global variables if they don't exist and display debug
     
+    # Determine calling context if not explicitly provided
     if ($CalledBy -eq 'Unknown')
     {
         Write-Verbose "[$functionName] CalledBy is 'Unknown', determining calling context"
@@ -1020,7 +1021,11 @@ function ShowMenu()
         $choices += $item.Name
         $menuItems += $item
     }
-
+    
+    # Clear screen for better readability
+    # Clear-Host
+    Write-Verbose "[$functionName] Clearing the screen for better readability." 
+    
     # Add navigation options based on current depth
     if ($Global:MenuHistory.Count -gt 1)
     {

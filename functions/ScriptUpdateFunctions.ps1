@@ -107,12 +107,18 @@ function GetUpdates()
 
     #region define variables and write logs 
     $functionName = $MyInvocation.MyCommand.Name
-    $updateURL = "$updateURL/$executableFileName"
-    $tempUpdateFile = "$env:TEMP\$executableFileName"
+    $fileName = Split-Path -Path $executableFileName -Leaf
+    $updateURL = "$updateURL/$fileName"
+    $tempUpdateFile = "$env:TEMP\$fileName"
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Verbose "[$functionName] updateURL: $updateURL"
     #endregion
-    
+    if ($executableFileName -notmatch 'exe')
+    {
+        Write-Verbose "[$functionName] The provided executable file name '$executableFileName' does not match 'exe'."
+        return $returnValues.invalidFileType
+    }
+
     $localVersion = getFileVersion -executableFileName $executableFileName
     
     #region get the remote version.
@@ -126,7 +132,7 @@ function GetUpdates()
     try 
     {
         $response = Invoke-WebRequest -Uri $updateURL -OutFile $tempUpdateFile -Method Get -ErrorAction SilentlyContinue -PassThru
-        Write-Verbose "[$functionName] Response received from $updateURL."
+        Write-Verbose "[$functionName] Response received from $($updateURL): $($response.StatusCode)"
     }
     catch 
     {
@@ -144,7 +150,24 @@ function GetUpdates()
     if ($remoteVersion -gt $localVersion)
     {
         Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
-        Write-Host "Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
+        Write-Host "An update is available."
+        Write-Host "Current version: $localVersion"
+        Write-Host "New version: $remoteVersion"
+        Write-Host "Would you like to download the update?"
+        $userInput = Read-Host "Type 'yes' to proceed with the update, or 'no' to cancel"
+        while ($userInput -notin @('yes', 'no'))
+        {
+            Write-Host "Invalid input. Please type 'yes' to proceed with the update, or 'no' to cancel."
+            #beep
+            [console]::beep(1000, 500)
+            $userInput = Read-Host
+        }
+        if ($userInput -eq 'no')
+        {
+            Write-Host "Update cancelled by user."
+            return $returnValues.UpdateCancelledMessage
+        }
+        Write-Host "Proceeding with the update..."
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$executableFileName.bak"
         Write-Host "Backing up current $executableFileName to $backupFile."
         try

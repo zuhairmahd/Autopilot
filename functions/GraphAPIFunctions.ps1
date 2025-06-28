@@ -909,8 +909,9 @@ function Test-CachedTokenValidity()
     
     if ($absoluteExpiryTime -gt $timeBuffer)
     {
-        Write-Host "Access token for $domain is valid until $absoluteExpiryTime"
-        Write-Host "Using cached access token from $cacheType cache"
+        Write-Verbose "[$functionName] Access token for $domain is valid until $absoluteExpiryTime"
+        Write-Verbose "[$functionName] Using cached access token from $cacheType cache"
+        [console]::beep(200, 200)
         return $accessTokenObject.access_token
     }
     else

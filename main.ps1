@@ -8,6 +8,7 @@ param(
     [switch]$Reconfigure,
     [switch]$ReInitialize,
     [switch]$Update,
+    [switch]$showLicenseBanner,
     [switch]$showAuth,
     [switch]$showSettings,
     [switch]$SecureString,
@@ -773,10 +774,14 @@ else
 #write a nice welcome message with the version number and a copyright message.
 Write-Host "Welcome to the Intune Helpdesk Menu version $version" -ForegroundColor Cyan
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
-
+if ($showLicenseBanner)
+{
+    Write-Host "This script is licensed under the MIT License." 
+    Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
+}
 
 #region Menu Definitions
-$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu version $version.  What would you like to do?"
+$mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
 $deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
@@ -1381,39 +1386,31 @@ else
 {
     Write-Verbose "[$scriptName] App mode is test. Skipping Settings menu."
 }
-if ($settings.appMode -ne 'test')
-{
-    Write-Verbose "[$scriptName] App mode is not test. Adding script update check to main menu."
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
-        Write-Host "Checking for script updates..."
-        $updateResult = GetUpdates -RootFolder $pwd -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
-        Write-Verbose "[$scriptName] Update result: $updateResult"
-        switch ($updateResult)
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+    Write-Host "Checking for script updates..."
+    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
+    Write-Verbose "[$scriptName] Update result: $updateResult"
+    switch ($updateResult)
+    {
+        $returnValues.UpdateSuccessMessage
         {
-            $returnValues.UpdateSuccessMessage
-            {
-                Write-Host 'The script has been updated.' -ForegroundColor Green
-                Write-Host 'Please restart the script.' -ForegroundColor Green
-                exit 0
-            }
-            $returnValues.UpdateFailedMessage
-            {
-                Write-Host 'The script update failed.' -ForegroundColor Red
-            }
-            $returnValues.UpdateNotNeededMessage
-            {
-                Write-Host 'The script is up to date.' -ForegroundColor Green
-            }
-            default
-            {
-                Write-Host 'An unknown error occurred while checking for updates.' -ForegroundColor Red
-            }
+            Write-Host 'The script has been updated.' -ForegroundColor Green
+            Write-Host 'Please restart the script.' -ForegroundColor Green
+            exit 0
+        }
+        $returnValues.UpdateFailedMessage
+        {
+            Write-Host 'The script update failed.' -ForegroundColor Red
+        }
+        $returnValues.UpdateNotNeededMessage
+        {
+            Write-Host 'The script is up to date.' -ForegroundColor Green
+        }
+        default
+        {
+            $updateResult
         }
     }
-}
-else 
-{
-    Write-Verbose "[$scriptName] App mode is test. Skipping script update check."
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
