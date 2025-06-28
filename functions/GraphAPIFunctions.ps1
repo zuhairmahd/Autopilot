@@ -26,9 +26,11 @@ function DecodeJwtToken
     }
     $parts = $Token -split '\.'
     Write-Verbose "[$functionName] Token parts: $($parts.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Information"
     if ($parts.Length -lt 2)
     {
         Write-Verbose "[$functionName] Invalid JWT token format. Expected at least 2 parts."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid JWT token format. Expected at least 2 parts." -LogLevel "Error"
         return $returnValues.invalidJWTTokenMessage
     }
     $payload = $parts[1].Replace('-', '+').Replace('_', '/')
@@ -53,6 +55,7 @@ function DecodeJwtToken
     {
         # Convert all claims to human readable if possible
         Write-Verbose "[$functionName] Converting JWT claims to human readable format."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting JWT claims to human readable format" -LogLevel "Debug"
         $humanClaims = [ordered]@{}
         foreach ($key in $claims.PSObject.Properties.Name)
         {
@@ -168,6 +171,7 @@ function FormatScopes()
     {
         Write-Verbose "[$functionName] No scopes provided. Returning empty string."
         Write-Warning "[$functionName] WARNING: Scopes parameter is null or empty!"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scopes provided - scopes parameter is null or empty" -LogLevel "Warning"
         return ""
     }
     
@@ -179,6 +183,7 @@ function FormatScopes()
         # Reverse mode: Remove Graph API prefixes and don't add default scopes
         Write-Verbose "[$functionName] Reverse mode: Removing Graph API prefixes"
         Write-Verbose "[$functionName] Converting scopes to array for processing"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting scopes to array for processing" -LogLevel "Verbose"
         $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
         $formattedScopesArray = @()
         Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
@@ -539,6 +544,7 @@ function Save-TokenToCache()
         catch
         {
             Write-Error "[$functionName] Failed to save token to cache file: $_"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to save token to cache file: $_" -LogLevel "Error"
             throw
         }
     }

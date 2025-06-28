@@ -82,7 +82,7 @@ if (Test-Path $configFile)
     foreach ($key in $authConfiguration.PSObject.Properties.Name)
     {
         Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Checking if $($key) was provided on the command line." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Processing configuration key: $key" -LogLevel "Debug"
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
         {
             Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($authConfiguration.$key)"
@@ -92,7 +92,7 @@ if (Test-Path $configFile)
             if ($authConfiguration.$key -in ('true', 'false'))
             {
                 Write-Verbose "[$scriptName] Converting $key to boolean."
-                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Converting $key to boolean." -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Converting parameter $key to boolean value" -LogLevel "Debug"
                 $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
                 $auth.add($key, $keyBooleanValue)
                 Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
