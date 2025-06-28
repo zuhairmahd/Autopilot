@@ -168,7 +168,7 @@ function GetUpdates()
             return $returnValues.UpdateCancelledMessage
         }
         Write-Host "Proceeding with the update..."
-        $backupFile = Join-Path -Path $env:TEMP -ChildPath "$executableFileName.bak"
+        $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
         Write-Host "Backing up current $executableFileName to $backupFile."
         try
         {
