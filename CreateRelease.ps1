@@ -7,7 +7,8 @@ param(
     [string]$outputFile = '',
     [string]$CompanyName = 'Zuhair Mahmoud',
     [switch]$CreateModule,
-    [switch]$Overwrite
+    [switch]$Overwrite,
+    [switch]$NoVersionUpdate
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
@@ -590,7 +591,8 @@ else
 } 
 Write-Host "Current version: $version"
 Write-Host "Maintain current version: $maintainCurrentVersion"
-if ($maintainCurrentVersion)
+Write-Verbose "[$scriptName] No version update: $NoVersionUpdate"
+if ($maintainCurrentVersion -or $NoVersionUpdate)
 {
     Write-Host "Maintaining current version: $version"
 }

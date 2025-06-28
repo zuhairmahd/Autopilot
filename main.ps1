@@ -46,8 +46,10 @@ else
     if (!$ScriptPath)
     {
         Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
-        $ScriptPath = "."
+        $ScriptPath = "$PWD"
         $scriptName = 'main.exe'
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
     }
 }
 
@@ -223,10 +225,12 @@ else
     $latestRelease = 'main'
 }
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-$version = if (-not  (GetFileVersion -executableFileName "$scriptPath\$scriptName"))
+$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+Write-Verbose "[$scriptName] Version: $version"
+if (-not $version)
 {
     Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
-    '1.0.0.0'
+    $version = '1.0.0.0'
 }
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
@@ -295,6 +299,8 @@ Write-Verbose "[$scriptName] Secure string: $auth.SecureString"
 Write-Verbose "[$scriptName] App mode: $settings.appMode"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+Write-Verbose "[$scriptName] Script path: $ScriptPath"
+Write-Verbose "[$scriptName] Version: $version"
 #endregion logging
 
 #region helper functions
@@ -763,6 +769,11 @@ else
     exit 1
 }
 #endregion initialization block
+
+#write a nice welcome message with the version number and a copyright message.
+Write-Host "Welcome to the Intune Helpdesk Menu version $version" -ForegroundColor Cyan
+Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu version $version.  What would you like to do?"
