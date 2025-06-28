@@ -62,38 +62,66 @@ function GetLatestGithubRelease()
     return $response.tag_name
 }
 
+function getFileVersion()
+{
+    [CmdletBinding()]    
+    param(
+        [string]$executableFileName
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    if (-not $executableFileName -or -not (Test-Path $executableFileName) -or $executableFileName -match '.ps1')
+    {
+        Write-Verbose "[$functionName] Executable file name is not provided."
+        return $null
+    }
+    if (Test-Path $executableFileName -PathType Leaf -ErrorAction SilentlyContinue)
+    {
+        Write-Verbose "[$functionName] Found the local version file."
+        Write-Verbose "[$functionName] Getting the local version."
+        $LocalVersion = (Get-Item "$RootFolder\$executableFileName").VersionInfo.ProductVersion
+        Write-Host "LocalVersion: $LocalVersion"
+        $localVersion = [System.Version]::Parse($LocalVersion)
+        return $localVersion
+    }
+    else
+    {
+        Write-Error "Executable file '$executableFileName' not found in the current directory."
+        return $null
+    }
+}
+
 function GetUpdates()
 {
     param (
-        $returnValues = $returnValues,
         [Parameter(Mandatory = $false)]
-        [string]$RootFolder,
-        [Parameter(Mandatory = $false)]
-        [string]$executableFileName = 'main.exe',
-        [Parameter(Mandatory = $true)]
-        [string]$remoteVersionURL,
+        [string]$executableFileName = "$pwd\main.exe",
         [Parameter(Mandatory = $true)]
         [string]$updateURL
     )
+
+    #region define variables and write logs 
     $functionName = $MyInvocation.MyCommand.Name
-    #region write a verbose log of received parameters.
-    Write-Verbose "[$functionName] RootFolder: $RootFolder"
-    Write-Verbose "[$functionName] remoteVersionURL: $remoteVersionURL"
+    $updateURL = "$updateURL/$executableFileName"
+    $tempUpdateFile = "$env:TEMP\$executableFileName"
+    Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Verbose "[$functionName] updateURL: $updateURL"
     #endregion
-
-    #region get local version
-    Write-Verbose "[$functionName] Getting the local version."
-    $LocalVersion = (Get-Item "$RootFolder\$executableFileName").VersionInfo.ProductVersion
-    Write-Host "LocalVersion: $LocalVersion"
-    $localVersion = [System.Version]::Parse($LocalVersion)
-    #endregion
-
+    
+    $localVersion = getFileVersion -executableFileName $executableFileName
+    
     #region get the remote version.
-    Write-Verbose "[$functionName] Getting remote version from $remoteVersionURL"
+    Write-Verbose "[$functionName] Checking whether the temp update file $tempUpdateFile exists."
+    if (Test-Path $tempUpdateFile)
+    {
+        Write-Verbose "[$functionName] Temp update file $tempUpdateFile exists. Removing it."
+        Remove-Item -Path $tempUpdateFile -Force
+    }
+    Write-Verbose "[$functionName] Getting remote file from $updateURL"
     try 
     {
-        $remoteVersionResponse = Invoke-WebRequest -Uri $remoteVersionURL -Method Get -ErrorAction Stop
+        $response = Invoke-WebRequest -Uri $updateURL -OutFile $tempUpdateFile -Method Get -ErrorAction SilentlyContinue -PassThru
+        Write-Verbose "[$functionName] Response received from $updateURL."
     }
     catch 
     {
@@ -102,17 +130,8 @@ function GetUpdates()
         Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
         return $null
     }    
-    Write-Verbose "[$functionName] Returned remote version response: $remoteVersion"
-    $remoteVersion = $remoteVersionResponse.content
+    $remoteVersion = GetFileVersion -executableFileName $tempUpdateFile
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
-    if ($null -eq $remoteVersion -or $remoteVersion -eq '')
-    {
-        Write-Host "Failed to get remote version from response. Please provide a valid remote version."
-        return $null
-    }
-    $remoteVersion = [regex]::Match($remoteVersion, '\d+\.\d+\.\d').Value
-    Write-Verbose "[$functionName] processed remote version: $remoteVersion"
-    $remoteVersion = [System.Version]::Parse($remoteVersion)
     #endregion
     
     #region compare versions
@@ -120,31 +139,24 @@ function GetUpdates()
     if ($remoteVersion -gt $localVersion)
     {
         Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
-        Write-Host "An update is available to version $remoteVersion. Downloading update from $updateURL."
-        #make a backup of the executable
+        Write-Host "Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$executableFileName.bak"
-        if (Test-Path $backupFile)
-        {
-            Write-Host "Backup file already exists. Deleting old backup file."
-            Remove-Item -Path $backupFile -Force
-        }
         Write-Host "Backing up current $executableFileName to $backupFile."
-        Copy-Item -Path "$RootFolder\$executableFileName" -Destination $backupFile -Force
-        #download the update file.
-        $updateFile = Join-Path -Path $RootFolder -ChildPath $executableFileName
-        $updateURL = "$updateURL/$executableFileName"
-        Write-Verbose "Downloading the update file $updateFile from $updateURL"
-        $response = Invoke-WebRequest -Uri $updateURL -OutFile $updateFile -Method Get -ErrorAction Stop -PassThru
-        #check the return code.
-        if ($response.StatusCode -ne 200)
+        try
         {
-            Write-Host "Failed to download update from $updateURL. Status code: $($response.StatusCode)"
-            return $returnValues.UpdateFailedMessage
+            Copy-Item -Path $executableFileName -Destination $backupFile -Force
+            Write-Host "Backup created successfully."
+            Write-Host "Renaming $executableFileName to $executableFileName.old"
+            Rename-Item -Path $executableFileName -NewName "$executableFileName.old" -Force
+            Write-Host "Copying the update file from $tempUpdateFile to $executableFileName"
+            Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
         }
-        else
+        catch
         {
-            Write-Verbose "[$functionName] Update downloaded successfully to $updateFile."
-            return $returnValues.UpdateSuccessMessage
+            Write-Error "Failed to update $executableFileName. Please check the error message above."
+            Write-Host "Restoring backup from $backupFile to $executableFileName"
+            Copy-Item -Path $backupFile -Destination $executableFileName -Force
+            return $false
         }
     }
     else
@@ -153,4 +165,7 @@ function GetUpdates()
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
+    return $returnValues.UpdateSuccessMessage
 }
+
+

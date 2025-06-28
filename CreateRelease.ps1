@@ -161,6 +161,34 @@ function CopyFiles()
     return $success
 }
 
+function IncrementRevision()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version,
+        [Parameter(Mandatory = $false)]
+        [int]$IncrementBy = 1
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Incrementing revision for version: $Version by $IncrementBy"
+    
+    try
+    {
+        $versionObj = [System.Version]::Parse($Version)
+        $newRevision = $versionObj.Revision + $IncrementBy
+        $newVersion = New-Object System.Version($versionObj.Major, $versionObj.Minor, $versionObj.Build, $newRevision)
+        Write-Verbose "[$functionName] New version: $newVersion"
+        return $newVersion.ToString()
+    }
+    catch
+    {
+        Write-Error "Failed to increment revision: $_"
+        return $null
+    }
+}
+
 function MergeFunctions()
 {
     [CmdletBinding()]
@@ -350,7 +378,8 @@ function CopySecrets()
         Write-Host 'No secrets found.'
         return $false
     }
-    else
+    
+    if (-not $Overwrite)
     {
         Write-Host "Found $($secrets.Count) secret files."
         Write-Host 'Please choose the secret you would like to copy to the release folder.'
@@ -407,6 +436,12 @@ function CopySecrets()
         }
         $secret = $secrets[$choice - 1]        
     }
+    else
+    {
+        Write-Host "Copying default secret in $SourceFolder\.secrets"
+        $secret = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse | Where-Object { $_.Name -eq 'config.json' }
+        Write-Host "Using default secrets file: $($secret.Name)"
+    }
     
     Write-Host "Copying $($secret.FullName) to $DestinationFolder"
     try
@@ -424,9 +459,10 @@ function CopySecrets()
 }
 #endregion
 
-#region Main code
 #region Define variables
 $initFile = "init.json"
+$lastRunFile = "$pwd\lastrun.json"
+$maintainCurrentVersion = $false
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.json', 'strings.json', 'init.json') 
 $successMessage = "$OutputFile written"
@@ -483,6 +519,88 @@ else
 {
     Write-Host "Found initialization file $($initFile)..."
 }
+
+#region Determine version number and increment if necessary
+if (Test-Path -Path $lastRunFile)
+{
+    Write-Verbose "[$scriptName] Last run file found: $lastRunFile"
+    $lastRun = Get-Content -Path $lastRunFile -Raw | ConvertFrom-Json
+}
+else
+{
+    Write-Verbose "[$scriptName] Last run file not found: $lastRunFile"
+    $lastRun = @{}
+}
+Write-Host "Last run date: $($lastRun.date)"
+Write-Host "Last run version: $($lastRun.version)"
+
+if ([string]::IsNullOrWhiteSpace($Version) -and [string]::IsNullOrWhiteSpace($lastRun.Version))
+{
+    Write-Host "What version number would you like to use for this build?"
+    Write-Host "Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)"
+    $version = Read-Host "Enter version number"
+    while ($version -notmatch '^\d+\.\d+\.\d+\.\d+$')
+    {
+        Write-Host "Invalid version format. Please use the format xx.yy.zz"
+        [console]::beep(1000, 500)
+        $version = Read-Host "Enter a valid version number"
+    }
+    $maintainCurrentVersion = $true
+}
+elseif (-not ([string]::IsNullOrWhiteSpace($Version)) -and -not ([string]::IsNullOrWhiteSpace($lastRun.Version)))
+{
+    Write-Host "Supplied version: $version"
+    Write-Host "Last run version: $($lastRun.version)"
+    Write-Host "Which version would you like to use? (S for supplied, L for last run)"
+    $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
+    while ($response -notin 'S', 'L', 'E')
+    {
+        Write-Host "Invalid response. Please enter S, L, or E."
+        [console]::beep(1000, 500)
+        $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
+    }   
+    switch ($response)
+    {
+        S
+        {
+            Write-Host "Using supplied version: $version"
+            $maintainCurrentVersion = $true
+        }
+        L
+        {
+            Write-Host "Using last run version: $($lastRun.version)"
+            $version = $lastRun.version
+        }
+        E
+        {
+            Write-Host "Exiting script."
+            exit 0
+        }
+    }
+}
+elseif (-not ([string]::IsNullOrWhiteSpace($lastRun.Version)) -and [string]::IsNullOrWhiteSpace($Version))
+{
+    Write-Host "No version supplied. Using last run version: $($lastRun.version)"
+    $version = $lastRun.version
+}
+else
+{
+    Write-Host "Using supplied version: $version"
+    $maintainCurrentVersion = $true
+} 
+Write-Host "Current version: $version"
+Write-Host "Maintain current version: $maintainCurrentVersion"
+if ($maintainCurrentVersion)
+{
+    Write-Host "Maintaining current version: $version"
+}
+else
+{
+    Write-Host "Incrementing revision number for version: $version"
+    $Version = IncrementRevision -Version ([System.Version]::Parse($Version))
+    Write-Host "New version: $Version"
+}
+#endregion
 
 if (-not $Overwrite)
 {
@@ -619,6 +737,7 @@ else
 }
 #endregion
 
+#region Main code
 if (Test-Path $outputFile)
 {
     Write-Host "The output file $outputFile already exists. Do you want to replace it? (Y/N)"
@@ -661,6 +780,23 @@ else
 {
     Write-Host "Failed to sign executable: $OutputFile"
     exit 1
+}
+
+#write the new version to the lastrun file.
+Write-Host "Writing last run information to $lastRunFile"
+$lastRun = @{
+    date    = $todaysDate
+    version = $Version
+}
+try
+{
+    $lastRun | ConvertTo-Json | Set-Content -Path $lastRunFile -Force
+    Write-Host "Last run information written successfully to $lastRunFile"
+}
+catch
+{
+    Write-Host "Failed to write last run information to $lastRunFile"
+    Write-Error $_
 }
 
 if (CopyFiles -Source $filesToCopy -Destination $parentFolder)

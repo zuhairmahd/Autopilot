@@ -47,7 +47,7 @@ else
     {
         Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
         $ScriptPath = "."
-        $scriptName = 'main.ps1'
+        $scriptName = 'main.exe'
     }
 }
 
@@ -223,6 +223,11 @@ else
     $latestRelease = 'main'
 }
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$version = if (-not  (GetFileVersion -executableFileName "$scriptPath\$scriptName"))
+{
+    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
+    '1.0.0.0'
+}
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -249,9 +254,6 @@ foreach ($key in $getTokenParams.Keys)
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
-$versionFile = 'version.txt'
-Write-Verbose "[$scriptName] Version file: $versionFile"
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/$versionFile"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $stringsFile = "$PWD\strings.json"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -763,7 +765,7 @@ else
 #endregion initialization block
 
 #region Menu Definitions
-$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
+$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu version $version.  What would you like to do?"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
 $deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
