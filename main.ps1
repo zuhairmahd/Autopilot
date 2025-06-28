@@ -772,7 +772,7 @@ else
 #endregion initialization block
 
 #write a nice welcome message with the version number and a copyright message.
-Write-Host "Welcome to the Intune Helpdesk Menu version $version" -ForegroundColor Cyan
+Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) ($($version.revision))"
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
 if ($showLicenseBanner)
 {
