@@ -1576,8 +1576,7 @@ function Get-DelegatedToken()
                 Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
                 if ($ForcedRenewal)
                 {
-                    Write-Host "New refresh token has been successfully obtained and saved to configuration." -ForegroundColor Green
-                    Write-Verbose "[$functionName] Forced refresh token renewal completed successfully."
+                    Write-Verbose "[$functionName] Forced refresh token renewed and saved to config file $configFilePath"
                 }
             }
             else
