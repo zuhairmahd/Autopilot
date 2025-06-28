@@ -3,6 +3,7 @@
   "version": "1.0",
   "globalSettings": {
     "operatingSystem": "Windows",
+    "showLicenseBanner": true,
     "testMode": false,
     "configFile": ".\\\\.secrets\\\\config.json",
     "maxWaitTime": "30",
@@ -103,6 +104,7 @@
       "groupsToExclude": [],
       "settings": {
         "domain": "gao.gov",
+        "showLicenseBanner": false,
         "appMode": "test",
         "deviceNamePrefix": "w11-",
         "maxNumberOfDevicesAllowed": 20,
