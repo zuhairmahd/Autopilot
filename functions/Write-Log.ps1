@@ -6,17 +6,9 @@ function Write-Log()
         [string]$Message,
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
         [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]        [ValidateScript({
-                # Handle relative paths with no backslashes (current directory files)
-                if (-not ($_ -match '[\\\/]'))
-                {
-                    # File is in current directory, no parent directory validation needed
-                    Write-Verbose "Log file is in current directory: $_"
-                    return $true
-                }
-                
+        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
+        [ValidateScript({
                 $parentDir = Split-Path $_ -Parent
-                Write-Verbose "Checking if log directory exists: $parentDir"
                 if (-not (Test-Path $parentDir))
                 {
                     try
@@ -49,30 +41,49 @@ function Write-Log()
         [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
         [switch]$StartLogging,
         [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
-        [switch]$FinishLogging
+        [switch]$FinishLogging,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
+        [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+        [string]$MinimumLogLevel
     )
-    
-    #write verbodse log of received parameters.
-    Write-Verbose "Parameters received: Message='$Message', LogFile='$LogFile', Module='$Module', LogLevel='$LogLevel', CMTraceFormat=$CMTraceFormat, MaxLogSizeMB=$MaxLogSizeMB, PassThru=$PassThru, StartLogging=$StartLogging, FinishLogging=$FinishLogging"
-    # Validate that either StartLogging or FinishLogging is specified
     try
     {
+        # Use global minimum log level if not provided
+        if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
+        {
+            $MinimumLogLevel = $Global:MinimumLogLevel
+        }
+        elseif (-not $MinimumLogLevel)
+        {
+            $MinimumLogLevel = 'Information'
+        }
+        
+        # Define log level hierarchy (higher numbers = more detailed logging)
+        $logLevelHierarchy = @{
+            'Error' = 1
+            'Warning' = 2
+            'Information' = 3
+            'Verbose' = 4
+            'Debug' = 5
+        }
+        
         # Handle StartLogging and FinishLogging switches
         if ($StartLogging -or $FinishLogging)
         {
             # Set default values when using StartLogging or FinishLogging
             $Module = $MyInvocation.MyCommand.Name
             $LogLevel = "Information"
-            # Create separator line and start/finish message
+            
+            # Create separator line
             $separatorLine = "=" * 80
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-            $startFinishMessage = if ($StartLogging)
+            
+            # Ensure log directory exists
+            $logDir = Split-Path $LogFile -Parent
+            if (-not (Test-Path $logDir))
             {
-                "Script started at $timestamp" 
-            }
-            else
-            {
-                "Script completed at $timestamp" 
+                New-Item -Path $logDir -ItemType Directory -Force | Out-Null
             }
             
             # Check for log rotation if file exists and is too large
@@ -82,50 +93,19 @@ function Write-Log()
                 Move-Item -Path $LogFile -Destination $archiveFile -Force
                 Write-Verbose "Log file rotated to: $archiveFile"
             }
-            # Prepare log entries
-            $logEntries = @()
             
             if ($CMTraceFormat)
             {
-                # For CMTrace format - prepare message with full logging components
+                # For CMTrace format, still use the separator but in CMTrace format
                 $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
                 $cmDate = Get-Date -Format "MM-dd-yyyy"
                 $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-                $messageEntry = "<![LOG[$startFinishMessage]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
-                
-                # Order entries based on start vs finish logging
-                if ($StartLogging)
-                {
-                    # For start: separator first, then message
-                    $logEntries += $separatorLine
-                    $logEntries += $messageEntry
-                }
-                else
-                {
-                    # For finish: message first, then separator
-                    $logEntries += $messageEntry
-                    $logEntries += $separatorLine
-                }
+                $logEntry = "<![LOG[$separatorLine]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
             }
             else
             {
-                # For standard format - prepare message with full logging components
-                $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-                $messageEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] $startFinishMessage"
-                
-                # Order entries based on start vs finish logging
-                if ($StartLogging)
-                {
-                    # For start: separator first, then message
-                    $logEntries += $separatorLine
-                    $logEntries += $messageEntry
-                }
-                else
-                {
-                    # For finish: message first, then separator
-                    $logEntries += $messageEntry
-                    $logEntries += $separatorLine
-                }
+                # For standard format, just use the separator line without timestamp
+                $logEntry = $separatorLine
             }
             
             # Use mutex for thread safety
@@ -135,32 +115,65 @@ function Write-Log()
             try
             {
                 $mutex.WaitOne() | Out-Null
-                foreach ($entry in $logEntries)
-                {
-                    Add-Content -Path $LogFile -Value $entry -Encoding UTF8 -Force
-                }
+                Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
             }
             finally
             {
                 $mutex.ReleaseMutex()
                 $mutex.Dispose()
             }
-            # Write to console with same ordering as log file
-            if ($StartLogging)
-            {
-                # For start: separator first, then message
-                Write-Host $separatorLine
-                Write-Host $startFinishMessage
-            }
-            else
-            {
-                # For finish: message first, then separator
-                Write-Host $startFinishMessage
-                Write-Host $separatorLine
-            }
+            
+            # Write to console
+            Write-Host $separatorLine
             
             return
-        }        
+        }
+        
+        # Check if this log entry should be written based on minimum log level
+        # Only continue if the current log level meets or exceeds the minimum threshold
+        if (-not ($StartLogging -or $FinishLogging))
+        {
+            $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
+            $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
+            
+            if ($currentLogLevelValue -gt $minimumLogLevelValue)
+            {
+                # Current log level is more detailed than the minimum, skip logging to file
+                # But still write to console streams
+                switch ($LogLevel)
+                {
+                    "Error"
+                    {
+                        Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                    }
+                    "Warning"
+                    {
+                        Write-Warning "[$Module] $Message" 
+                    }
+                    "Verbose"
+                    {
+                        Write-Verbose "[$Module] $Message" 
+                    }
+                    "Debug"
+                    {
+                        Write-Debug "[$Module] $Message" 
+                    }
+                    default
+                    {
+                        # For Information level, we don't output to console in this case
+                    }
+                }
+                return
+            }
+        }
+        
+        # Ensure log directory exists
+        $logDir = Split-Path $LogFile -Parent
+        if (-not (Test-Path $logDir))
+        {
+            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+        }
+        
         # Check for log rotation if file exists and is too large
         if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
         {
@@ -174,7 +187,7 @@ function Write-Log()
         
         if ($CMTraceFormat)
         {
-            # True CMTrace format: <![LOG[Message]LOG]!><time="HH:mm:ss.fff+000" date="MM-dd-yyyy" component="Component" context="" type="1" thread="1234" file="">
+            # True CMTrace format: 
             $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
             $cmDate = Get-Date -Format "MM-dd-yyyy"
             $severity = switch ($LogLevel)
