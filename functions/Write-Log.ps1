@@ -41,10 +41,34 @@ function Write-Log()
         [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
         [switch]$StartLogging,
         [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
-        [switch]$FinishLogging
+        [switch]$FinishLogging,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
+        [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+        [string]$MinimumLogLevel
     )
     try
     {
+        # Use global minimum log level if not provided
+        if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
+        {
+            $MinimumLogLevel = $Global:MinimumLogLevel
+        }
+        elseif (-not $MinimumLogLevel)
+        {
+            $MinimumLogLevel = 'Information'
+        }
+        
+        # Define log level hierarchy (higher numbers = more detailed logging)
+        $logLevelHierarchy = @{
+            'Error' = 1
+            'Warning' = 2
+            'Information' = 3
+            'Verbose' = 4
+            'Debug' = 5
+        }
+        
         # Handle StartLogging and FinishLogging switches
         if ($StartLogging -or $FinishLogging)
         {
@@ -103,6 +127,44 @@ function Write-Log()
             Write-Host $separatorLine
             
             return
+        }
+        
+        # Check if this log entry should be written based on minimum log level
+        # Only continue if the current log level meets or exceeds the minimum threshold
+        if (-not ($StartLogging -or $FinishLogging))
+        {
+            $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
+            $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
+            
+            if ($currentLogLevelValue -gt $minimumLogLevelValue)
+            {
+                # Current log level is more detailed than the minimum, skip logging to file
+                # But still write to console streams
+                switch ($LogLevel)
+                {
+                    "Error"
+                    {
+                        Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                    }
+                    "Warning"
+                    {
+                        Write-Warning "[$Module] $Message" 
+                    }
+                    "Verbose"
+                    {
+                        Write-Verbose "[$Module] $Message" 
+                    }
+                    "Debug"
+                    {
+                        Write-Debug "[$Module] $Message" 
+                    }
+                    default
+                    {
+                        # For Information level, we don't output to console in this case
+                    }
+                }
+                return
+            }
         }
         
         # Ensure log directory exists

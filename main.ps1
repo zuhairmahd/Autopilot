@@ -8,6 +8,7 @@ param(
     [switch]$Reconfigure,
     [switch]$ReInitialize,
     [switch]$Update,
+    [switch]$showLicenseBanner,
     [switch]$showAuth,
     [switch]$showSettings,
     [switch]$SecureString,
@@ -29,9 +30,18 @@ param(
     [string]$Release = 'main',
     [ValidateSet('full', 'helpDesk', 'registration')]
     [string]$appMode,
-    [string]$LogFile = "$pwd\Logs\Autopilot.log"
+    [string]$LogFile = "$pwd\Logs\Autopilot.log",
+    [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+    [string]$LogLevel = 'Information'
 )
 . $pwd\functions\Write-Log.ps1
+
+# Set global log level for all Write-Log calls
+$Global:MinimumLogLevel = $LogLevel
+
+# Initialize logging
+Write-Log -LogFile $LogFile -StartLogging
+
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
