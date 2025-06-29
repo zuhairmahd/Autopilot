@@ -26,8 +26,9 @@ param(
     [string]$AuthType,
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
-    [string]$Repo = 'github',
-    [string]$Release = 'main',
+    [ValidateSet('github', 'gitlab')]
+    [string]$Repo,  
+    [string]$Release,
     [ValidateSet('full', 'helpDesk', 'registration')]
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log",
@@ -422,19 +423,16 @@ if (Test-Path -Path $InitFile)
                 $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
                 $globalSettings.add($key, $keyBooleanValue)
                 Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-                # Set-Variable -Name $key -Value $keyBooleanValue
             }
             else
             {
                 Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($globalConfigData.$key))."
-                # Set-Variable -Name $key -Value $globalConfigData.$key
                 $globalSettings.add($key, $globalConfigData.$key)
             }
         }
         else
         {
             Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            #add it to the global settings hashtable.
             $globalSettings.add($key, $PSBoundParameters[$key])
         }
     }
@@ -470,7 +468,6 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
-    
 }
 else
 {
@@ -498,17 +495,25 @@ else
 #endregion import functions.
 
 #region Define variables
-if ($repo -eq 'github')
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+if ($settings.Repo -eq 'github')
 {
+    Write-Verbose "[$scriptName] Using GitHub repository."
     $baseSourceURL = 'https://raw.githubusercontent.com'
+    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
     $repoPath = 'zuhairmahd'
+    Write-Verbose "[$scriptName] Repository path: $repoPath"
     $repoName = 'autopilot'
-    if ($release -eq 'auto')
+    Write-Verbose "[$scriptName] Repository name: $repoName"
+    if ($settings.release -eq 'auto')
     {
+        Write-Verbose "[$scriptName] Release is set to 'auto'. Fetching the latest release from GitHub."
         $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
+        Write-Verbose "[$scriptName] Latest release fetched: $latestRelease"
         if ($latestRelease)
         {
-            Write-Host "The latest release is $latestRelease"
+            Write-Verbose "[$scriptName] Successfully retrieved the latest release information from GitHub."
+            Write-Host "Latest release: $latestRelease"
         }
         else
         {
@@ -519,10 +524,11 @@ if ($repo -eq 'github')
     }
     else
     {
-        $latestRelease = $Release
+        Write-Verbose "[$scriptName] Using specified release: $($settings.release)"
+        $latestRelease = $settings.release
     }
 }
-elseif ($repo -eq 'gitlab')
+elseif ($settings.Repo -eq 'gitlab')
 {
     $baseSourceURL = 'https://git.gao.gov'
     $repoPath = 'mahmoudz'
@@ -536,8 +542,11 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.'
     $latestRelease = 'main'
 }
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
+Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
+$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
+Write-Verbose "[$scriptName] Update URL: $updateURL"
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 Write-Verbose "[$scriptName] Version: $version"
 if (-not $version)
@@ -569,7 +578,6 @@ foreach ($key in $getTokenParams.Keys)
     }
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
-$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $stringsFile = "$PWD\strings.json"
@@ -585,7 +593,6 @@ $Global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:previousMenu = New-Object System.Collections.Hashtable
 # Device enrollment state cache content
 $script:DeviceEnrollmentCache = @{}
-$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 #endregion Define variables
 
 #region logging
