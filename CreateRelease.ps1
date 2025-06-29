@@ -419,15 +419,15 @@ function CopySecrets()
             }
             Write-Host "$index. $($name): $domain ($fileName,  $encryption, $deligatedStatus)"
         }
-        $choice = Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)'
+        [int32]$choice = (Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)')
         Write-Verbose "[$functionName] User selected: $choice"
-        while ($choice -lt 0 -or $choice -ge $secrets.Count)
+        while ([int32]$choice -lt 0 -or [int32]$choice -gt $secrets.Count)
         {
-            Write-Host 'Invalid choice.'
+            Write-Host "Sorry: $choice is an invalid choice."
             #beep
             [console]::beep(500, 300)
             Write-Host "Please choose a number between 1 and $($secrets.Count), or 0 to exit."
-            $choice = Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)'
+            [int32]$choice = (Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)')
             Write-Verbose "[$functionName] User selected: $choice"
         }
         if ($choice -eq 0)
@@ -447,6 +447,7 @@ function CopySecrets()
     Write-Host "Copying $($secret.FullName) to $DestinationFolder"
     try
     {
+        Write-Host "Copying $($secret.FullName) to $DestinationFolder\.secrets"
         Copy-Item -Path $secret.FullName -Destination "$DestinationFolder\.secrets\config.json" -Force
         Write-Verbose "[$functionName] Secrets copied successfully."
     }
