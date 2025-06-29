@@ -1,17 +1,76 @@
 [CmdletBinding()]
-param
-(
-    $userName,
-    $repo = 'Github', # Options: Github, gitlab
-    $release = 'auto',
-    $configFile = "$pwd\.secrets\config.json",
-    $outputFile = "$pwd\deviceMemory-export.csv",
+param(
+    [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
-    [switch]$forceNewToken
+    [int]$maxWaitTime,
+    [int]$timeInSeconds,
+    [String] $GroupTag,
+    [switch]$Reconfigure,
+    [switch]$ReInitialize,
+    [switch]$Update,
+    [switch]$showLicenseBanner,
+    [switch]$showAuth,
+    [switch]$showSettings,
+    [switch]$SecureString,
+    [switch]$ForceNewToken,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$Deligated,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$ForceNewRefreshToken,
+    [parameter(parameterSetName = 'Deligated')]
+    [switch]$NoSaveRefreshToken,
+    [parameter(parameterSetName = 'Deligated')]
+    [string]$Scope,
+    [parameter(parameterSetName = 'Deligated')]
+    [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
+    [string]$AuthType,
+    [ValidateSet('file', 'memory')]
+    [string]$CacheType,
+    [string]$Repo = 'github',
+    [string]$Release = 'main',
+    [ValidateSet('full', 'helpDesk', 'registration')]
+    [string]$appMode,
+    [string]$LogFile = "$pwd\Logs\Autopilot.log",
+    [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+    [string]$LogLevel = 'Information'
 )
 
+#region Initialize script
+. $pwd\functions\Write-Log.ps1
+$scriptName = $MyInvocation.MyCommand.Name
+# Set global log level for all Write-Log calls
+$Global:MinimumLogLevel = $LogLevel
+# Initialize logging
+Write-Log -LogFile $LogFile -StartLogging
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
+    }
+}
+#endregion Initialize script
+
 #region Load parameters from the configuration file if it exists
-Write-Host "Loading configuration file: $configFile"
+Write-Verbose "[$scriptName] Checking configuration file: $configFile"
 if (Test-Path $configFile)
 {
     $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
@@ -46,7 +105,6 @@ if (Test-Path $configFile)
         }
     }
 }
-Write-Host "Loading settings file: $initFile"
 if (Test-Path -Path $InitFile)
 {
     Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
@@ -124,17 +182,15 @@ else
 }
 #endregion Load parameters from the configuration file if it exists
 
-
-
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
-    Write-Verbose "Importing functions from $functionsFolder"
+    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
     foreach ($function in $functions)
     {
-        Write-Verbose "Importing function $function"
+        Write-Verbose "[$scriptName] Importing function $function"
         . $function.FullName
     }
 }
@@ -143,7 +199,7 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
-#endregion
+#endregion import functions.
 
 #region variables
 $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
@@ -182,7 +238,10 @@ $requiredScopes = $settings.requiredScopes
 # "unmanaged" = $unmanagedDevices
 # }
 #endregion variables
+$url = "https://raw.githubusercontent.com/zuhairmahd/autopilot/main/lastrun.json"
+$global:update = CheckForUpdates -remoteVersionURL $url
 
+exit 0
 foreach ($scope in $requiredScopes)
 {
     Write-Verbose "Checking if the scope $scope is granted."

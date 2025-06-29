@@ -26,9 +26,11 @@ function DecodeJwtToken
     }
     $parts = $Token -split '\.'
     Write-Verbose "[$functionName] Token parts: $($parts.Length)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Information"
     if ($parts.Length -lt 2)
     {
         Write-Verbose "[$functionName] Invalid JWT token format. Expected at least 2 parts."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid JWT token format. Expected at least 2 parts." -LogLevel "Error"
         return $returnValues.invalidJWTTokenMessage
     }
     $payload = $parts[1].Replace('-', '+').Replace('_', '/')
@@ -53,6 +55,7 @@ function DecodeJwtToken
     {
         # Convert all claims to human readable if possible
         Write-Verbose "[$functionName] Converting JWT claims to human readable format."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting JWT claims to human readable format" -LogLevel "Debug"
         $humanClaims = [ordered]@{}
         foreach ($key in $claims.PSObject.Properties.Name)
         {
@@ -168,6 +171,7 @@ function FormatScopes()
     {
         Write-Verbose "[$functionName] No scopes provided. Returning empty string."
         Write-Warning "[$functionName] WARNING: Scopes parameter is null or empty!"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scopes provided - scopes parameter is null or empty" -LogLevel "Warning"
         return ""
     }
     
@@ -179,6 +183,7 @@ function FormatScopes()
         # Reverse mode: Remove Graph API prefixes and don't add default scopes
         Write-Verbose "[$functionName] Reverse mode: Removing Graph API prefixes"
         Write-Verbose "[$functionName] Converting scopes to array for processing"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting scopes to array for processing" -LogLevel "Verbose"
         $scopesArray = $scopes.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)
         $formattedScopesArray = @()
         Write-Verbose "[$functionName] Processing scope array with $($scopesArray.Count) items"
@@ -539,6 +544,7 @@ function Save-TokenToCache()
         catch
         {
             Write-Error "[$functionName] Failed to save token to cache file: $_"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to save token to cache file: $_" -LogLevel "Error"
             throw
         }
     }
@@ -711,30 +717,36 @@ function Get-RefreshToken()
         [string]$configFilePath
     )
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Host "Using refresh token to get a new access token..."
+    Write-Verbose "[$functionName] Attempting to use refresh token to get a new access token"
+    write-log-LogFile $LogFile -Module "$functionName" -Message "Attempting to use refresh token to get a new access token" -LogLevel "Information"
     try
     {
         # First test if the refresh token is valid
         $isValid, $tokenResponse = Test-RefreshTokenValidity -refreshToken $accessTokenObject.refresh_token -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain
         if (-not $isValid)
         {
-            Write-Host "Refresh token is invalid or expired."
+            Write-Verbose "[$functionName] Refresh token is invalid or expired. Cannot proceed with token refresh."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Refresh token is invalid or expired. Cannot proceed with token refresh." -LogLevel "Error"
             return $null
         }
-        Write-Host "Successfully refreshed access token."
+        Write-Verbose "[$functionName] Refresh token is valid. Proceeding to get new access token."
+        write-log -LogFile $LogFile -Module "$functionName" -Message "Refresh token is valid. Proceeding to get new access token." -LogLevel "Information"
         $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain -refreshToken $tokenResponse.refresh_token
         # Cache the access token based on cache type
         Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
         # Only save the refresh token if it's different from the one we already have
         Write-Verbose "[$functionName] Checking whether to save the refresh token..."
+        write-log -LogFile $LogFile -Module "$functionName" -Message "Checking whether to save the refresh token..." -LogLevel "Verbose"
         if ($tokenResponse.refresh_token -and $tokenResponse.refresh_token -ne $accessTokenObject.refresh_token)
         {
             Write-Verbose "[$functionName] Saving new refresh token as it differs from the existing one."
+            write-log -LogFile $LogFile -Module "$functionName" -Message "Saving new refresh token as it differs from the existing one." -LogLevel "Verbose"
             Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
         }
         else
         {
             Write-Verbose "[$functionName] No need to save refresh token as it hasn't changed."
+            write-log -LogFile $LogFile -Module "$functionName" -Message "No need to save refresh token as it hasn't changed." -LogLevel "Verbose"
         }
         return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
     }
@@ -742,6 +754,7 @@ function Get-RefreshToken()
     {
         Write-Host "Failed to use refresh token: $_. Will request new authorization."
         Write-Host "Refresh token might be expired or revoked, proceeding with new authorization."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to use refresh token: $_. Will request new authorization." -LogLevel "Error"
         return $null
     }
 }
@@ -916,7 +929,10 @@ function Test-CachedTokenValidity()
     }
     else
     {
-        Write-Host "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)"
+        Write-Verbose "[$functionName] Access token for $domain is expired or invalid"
+        Write-Verbose "[$functionName] Absolute expiry time: $absoluteExpiryTime, Time buffer: $timeBuffer"
+        Write-Verbose "[$functionName] Will attempt to refresh token"
+        write-LogFile $logFile -Module "$functionName" -Message "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)" -LogLevel "Warning"
         return $null
     }
 }

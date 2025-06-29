@@ -29,15 +29,26 @@ param(
     [string]$Repo = 'github',
     [string]$Release = 'main',
     [ValidateSet('full', 'helpDesk', 'registration')]
-    [string]$appMode
+    [string]$appMode,
+    [string]$LogFile = "$pwd\Logs\Autopilot.log",
+    [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+    [string]$LogLevel = 'Information'
 )
 
+#region Initialize script
+. $pwd\functions\Write-Log.ps1
 $scriptName = $MyInvocation.MyCommand.Name
+# Set global log level for all Write-Log calls
+$Global:MinimumLogLevel = $LogLevel
+# Initialize logging
+Write-Log -LogFile $LogFile -StartLogging
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
-    Write-Verbose "[$scriptName] Running as an external script."
     $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
     Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
 }
 else
 {
@@ -46,13 +57,17 @@ else
     Write-Verbose "[$scriptName] Script path: $ScriptPath"
     if (!$ScriptPath)
     {
-        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
-        $ScriptPath = "$PWD"
         $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
         $fullScriptPath = "$scriptPath\$scriptName"
         Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
     }
 }
+#endregion Initialize script
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -226,12 +241,13 @@ else
     $latestRelease = 'main'
 }
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 Write-Verbose "[$scriptName] Version: $version"
 if (-not $version)
 {
     Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
-    $version = '1.0.0.0'
+    $version = [System.Version]::Parse('1.0.0.0')
 }
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
@@ -273,35 +289,68 @@ $Global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:previousMenu = New-Object System.Collections.Hashtable
 # Device enrollment state cache content
 $script:DeviceEnrollmentCache = @{}
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 #endregion Define variables
 
 #region logging
 Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)" -LogLevel "Information"
 Write-Verbose "[$scriptName] The current parameter set is $($PSCmdlet.ParameterSetName)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The current parameter set is $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
 Write-Verbose "[$scriptName] Configuration file: $configFile"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Configuration file: $configFile" -LogLevel "Information"
+Write-Verbose "[$scriptName] Initialization file: $InitFile"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initialization file: $InitFile" -LogLevel "Information"
+Write-Verbose "Log filename: $LogFile"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log filename: $LogFile" -LogLevel "Information"
+Write-Verbose "[$scriptName] Show settings: $showSettings"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show settings: $showSettings" -LogLevel "Information"
+Write-Verbose "[$scriptName] Show auth: $showAuth"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
+Write-Verbose "[$scriptName] Log level: $LogLevel"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
 Write-Verbose "[$scriptName] App mode is $($settings.appMode)."
-Write-Verbose "[$scriptName] Computer name: $Name"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode is $($settings.appMode)." -LogLevel "Information"
 Write-Verbose "[$scriptName] Group tag: $settings.GroupTag"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
 Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Assigned user: $AssignedUser" -LogLevel "Information"
 Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Reconfigure: $Reconfigure" -LogLevel "Information"
 Write-Verbose "[$scriptName] Repository: $settings.Repo"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Repository: $settings.Repo" -LogLevel "Information"
 Write-Verbose "[$scriptName] Release: $settings.Release"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Release: $settings.Release" -LogLevel "Information"
 Write-Verbose "[$scriptName]    Domain: $domain"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain: $domain" -LogLevel "Information"
 Write-Verbose "[$scriptName] Max wait time: $settings.maxWaitTime"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Max wait time: $settings.maxWaitTime" -LogLevel "Information"
 Write-Verbose "[$scriptName] Time in seconds: $settings.timeInSeconds"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Time in seconds: $settings.timeInSeconds" -LogLevel "Information"
 Write-Verbose "[$scriptName] Auth type: $auth.AuthType"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auth type: $auth.AuthType" -LogLevel "Information"
 Write-Verbose "[$scriptName] Cache type: $auth.CacheType"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Cache type: $auth.CacheType" -LogLevel "Information"
 Write-Verbose "[$scriptName] Force new token: $auth.ForceNewToken"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new token: $auth.ForceNewToken" -LogLevel "Information"
 Write-Verbose "[$scriptName] Force new refresh token: $auth.ForceNewRefreshToken"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new refresh token: $auth.ForceNewRefreshToken" -LogLevel "Information"
 Write-Verbose "[$scriptName] No save refresh token: $auth.NoSaveRefreshToken"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No save refresh token: $auth.NoSaveRefreshToken" -LogLevel "Information"
 Write-Verbose "[$scriptName] Deligated: $auth.Deligated"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Deligated: $auth.Deligated" -LogLevel "Information"
 Write-Verbose "[$scriptName] Scope: $auth.Scope"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Scope: $auth.Scope" -LogLevel "Information"
 Write-Verbose "[$scriptName] Secure string: $auth.SecureString"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Secure string: $auth.SecureString" -LogLevel "Information"
 Write-Verbose "[$scriptName] App mode: $settings.appMode"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode: $settings.appMode" -LogLevel "Information"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Functions folder: $functionsFolder" -LogLevel "Information"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
-Write-Verbose "[$scriptName] Script path: $ScriptPath"
-Write-Verbose "[$scriptName] Version: $version"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
+Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: $remoteVersionURL" -LogLevel "Information"
 #endregion logging
 
 #region helper functions
@@ -313,7 +362,6 @@ function ProcessDevice()
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         $DeviceObject,
-        $returnValues = $returnValues,
         [Parameter(Mandatory = $true)]
         [ValidateSet('import', 'check', 'delete')]
         [string]$action,
@@ -323,24 +371,34 @@ function ProcessDevice()
     #region check and initialize variables
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking access token..."
+        
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking access token..." -LogLevel "Verbose"
     if ($accessToken)
     {
         Write-Verbose "[$functionName] Access token provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token provided." -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] Access token not provided. Returning Null."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token not provided. Returning Null." -LogLevel "Information"
         return $null
     }
     Write-Verbose "[$functionName] Processing serial number: $($deviceObject.SerialNumber)."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing serial number: $($deviceObject.SerialNumber)." -LogLevel "Verbose"
     Write-Verbose "[$functionName] Action: $action"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action: $action" -LogLevel "Information"
     Write-Verbose "[$functionName] Custom import: $CustomImport"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Custom import: $CustomImport" -LogLevel "Information"
     $serialNumber = $deviceObject.serialNumber
     Write-Verbose "[$functionName] The serial number is $serialNumber."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The serial number is $serialNumber." -LogLevel "Information"
     $make = $deviceObject.manufacturer
     Write-Verbose "[$functionName] The manufacturer is $make"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The manufacturer is $make" -LogLevel "Information"
     $model = $deviceObject.model
     Write-Verbose "[$functionName] The model is $model"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The model is $model" -LogLevel "Information"
     #endregion check and initialize variables
     
     switch ($action)
@@ -348,13 +406,16 @@ function ProcessDevice()
         'import'
         {
             Write-Verbose "[$functionName] Importing device with serial number $serialNumber."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Importing device with serial number $serialNumber." -LogLevel "Information"
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             Write-Verbose "[$functionName] Device assignment check returned: $deviceAssignment"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment check returned: $deviceAssignment" -LogLevel "Information"
             if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
                 $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
                 Write-Verbose "[$functionName] Device assignment status: $isAssigned"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment status: $isAssigned" -LogLevel "Information"
                 if ($isAssigned)
                 {
                     return $returnValues.deviceAssignedMessage
@@ -364,6 +425,7 @@ function ProcessDevice()
             {
                 Write-Host "The device is not in Intune." 
             }
+            
             #region Add the device to Intune
             Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) into Autopilot."
             $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
@@ -371,7 +433,6 @@ function ProcessDevice()
             {
                 Write-Host "Invalid choice. Please enter 'yes' or 'no'."
                 #beep
-                [console]::beep(1000, 500)
                 $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
             }
             if ($choice -eq 'no')
@@ -384,6 +445,7 @@ function ProcessDevice()
             if ($device -eq $returnValues.backoutText)
             {
                 Write-Verbose "[$functionName] The import function returned $device."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The import function returned $device." -LogLevel "Information"
                 return $returnValues.backoutText
             }
             $importResult = ProcessImportResult -device $device -returnValues $returnValues
@@ -391,10 +453,8 @@ function ProcessDevice()
             {
                 return $importResult
             }
-            
             Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
             Start-Sleep -Seconds $timeInSeconds
-            
             $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
             return ProcessAssignmentResult -assignment $assignment -importStart $importStart -returnValues $returnValues
             #endregion Add the device to Intune.
@@ -431,9 +491,12 @@ function ProcessDevice()
                     $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
                         Write-Host "Restarting the device..."
                         Write-Verbose "[$functionName] User chose to restart the device."
+
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User chose to restart the device." -LogLevel "Information"
                         if (-not (RestartDevice))
                         {
                             Write-Verbose "[$functionName] RestartDevice function returned false."
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "RestartDevice function returned false." -LogLevel "Information"
                             return $returnValues.noRestartMessage 
                         }
                     }
@@ -457,14 +520,17 @@ function ProcessDevice()
                     }
                     $result = ShowMenu -Menu $deviceWaitMenu -CalledBy 'Action'
                     Write-Verbose "[$functionName] Result from device wait menu: $result"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Result from device wait menu: $result" -LogLevel "Information"
                     if ($result -eq $returnValues.backoutText)
                     {
                         Write-Verbose "[$functionName] User selected Back from device wait menu."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected Back from device wait menu." -LogLevel "Information"
                         return $returnValues.backoutText
                     }
                     elseif ($result -eq "EXIT_APPLICATION")
                     {
                         Write-Verbose "[$functionName] User selected to exit the application."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected to exit the application." -LogLevel "Information"
                         return "EXIT_APPLICATION"
                     }
                     else 
@@ -507,6 +573,7 @@ function ProcessDevice()
         default
         {
             Write-Verbose "[$functionName] Invalid action: $action"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid action: $action" -LogLevel "Error"
             return $returnValues.unknownErrorMessage
         }
     }
@@ -525,13 +592,14 @@ function ProcessSerialNumber()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing device lookup for serial number: $SerialNumber" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Information"
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
         return $null # Return null to signal no valid serial number
     }
-    $success = $false
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
     $enrollmentState = GetCachedDeviceEnrollmentState -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
@@ -539,13 +607,18 @@ function ProcessSerialNumber()
     {
         $success = $true
         Write-Verbose "[$functionName] Device lookup successful"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup successful" -LogLevel "Information"
         # Display basic device information
         Write-Host "`n=== Device Information ===" -ForegroundColor Green
         Write-Host "Serial Number: $SerialNumber"
         Write-Verbose "[$scriptName] Device is managed: $($enrollmentState.managed)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device is managed: $($enrollmentState.managed)" -LogLevel "Information"
         Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Has device object: $($enrollmentState.hasDeviceObject)" -LogLevel "Information"
         Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
         Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
         if ($CheckUserReadiness)
         {
             return GetNextUserReadinessReport -enrollmentState $enrollmentState
@@ -562,6 +635,7 @@ function ProcessSerialNumber()
                 Write-Host "=============================`n" -ForegroundColor Green
                 $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
                 Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
                 Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
@@ -583,7 +657,9 @@ function ProcessSerialNumber()
         if ($enrollmentState.Imported)
         {
             Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported in Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
             Write-Verbose "[$scriptName] Imported count: $($enrollmentState.Imported)"
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported count: $($enrollmentState.Imported)" -LogLevel "Information"
             if ($enrollmentState.Imported -gt 1)
             {
                 Write-Host "This device was imported into Autopilot $($enrollmentState.Imported) times." -ForegroundColor Green
@@ -608,6 +684,7 @@ function ProcessSerialNumber()
         else
         {
             Write-Verbose "This device was not recently imported into Autopilot."
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "This device was not recently imported into Autopilot." -LogLevel "Warning"
         }
         if ($enrollmentState.managed)
         {
@@ -622,6 +699,7 @@ function ProcessSerialNumber()
             Write-Host "=============================`n" -ForegroundColor Green
             $pendingActions = getDevicePendingActions -enrollmentState $enrollmentState
             Write-Verbose "[$functionName] Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)" -LogLevel "Information"
             if ($pendingActions.isPendingAction)
             {
                 Write-Host "This device has pending actions:"
@@ -635,9 +713,11 @@ function ProcessSerialNumber()
             else
             {
                 Write-Verbose "[$functionName] No pending actions for this device."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions for this device." -LogLevel "Information"
             }
             # Create and show device actions menu using main.ps1 menu structure
             Write-Verbose "[$functionName] Starting device actions menu loop"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Information"
             $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
             #region Process devices
             # Add menu items for each device action
@@ -654,7 +734,9 @@ function ProcessSerialNumber()
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
             Write-Verbose "[$functionName] Checking if device has LAPS credentials."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device has LAPS credentials." -LogLevel "Verbose"
             Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)" -LogLevel "Information"
             if ($enrollmentState.managedDevice.laps.credentials.count -gt 0)
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
@@ -663,10 +745,12 @@ function ProcessSerialNumber()
             }            
             Write-Verbose "Checking if we have bitlocker keys for this device."
             Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)" -LogLevel "Information"
             if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
                     Write-Verbose "[$scriptName] Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
                     GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                 }
             }
@@ -677,20 +761,24 @@ function ProcessSerialNumber()
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
                 Write-Verbose "[$functionName] Device report: $deviceReport"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report: $deviceReport" -LogLevel "Information"
                 # Handle navigation responses from ShowReport
                 if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
                 {
                     Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
                     return $returnValues.backoutText
                 }
                 elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
                 {
                     Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }
                 elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
                 {
                     Write-Verbose "[$scriptName] User requested application exit from device selection."
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User requested application exit from device selection." -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }        
                 elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
@@ -704,6 +792,7 @@ function ProcessSerialNumber()
                         Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
                     }
                     Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
                 }
                 return $returnValues.backoutText
             }
@@ -711,10 +800,13 @@ function ProcessSerialNumber()
                 return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
             }            # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)" -LogLevel "Information"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             #endregion Process devices
             Write-Verbose "[$functionName] Device actions menu returned result: $result"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device actions menu returned result: $result" -LogLevel "Information"
             Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning from device actions menu with result: $result" -LogLevel "Information"
             return $result
         }
         else
@@ -737,6 +829,7 @@ function ProcessSerialNumber()
     {
         # Explicitly return $null if no enrollmentState
         Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Error"
         return $null
     }
     
@@ -772,12 +865,24 @@ else
 #endregion initialization block
 
 #write a nice welcome message with the version number and a copyright message.
-Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) ($($version.revision))"
+Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
 if ($showLicenseBanner)
 {
     Write-Host "This script is licensed under the MIT License." 
     Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
+}
+if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
+{
+    Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "Please run the update command to get the latest version." -ForegroundColor Yellow
+}
+else
+{
+    Write-Verbose "[$scriptName] No updates available or current version is up to date."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "  No updates available or current version is up to date." -LogLevel "Information"
 }
 
 #region Menu Definitions
@@ -1455,3 +1560,8 @@ else
     Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion Show Menu
+
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+
+    
