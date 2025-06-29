@@ -501,6 +501,8 @@ if ($settings.Repo -eq 'github')
     Write-Verbose "[$scriptName] Using GitHub repository."
     $baseSourceURL = 'https://raw.githubusercontent.com'
     Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+    $baseURL = "https://www.github.com"
+    Write-Verbose "[$scriptName] Base URL: $baseURL"
     $repoPath = 'zuhairmahd'
     Write-Verbose "[$scriptName] Repository path: $repoPath"
     $repoName = 'autopilot'
@@ -531,6 +533,9 @@ if ($settings.Repo -eq 'github')
 elseif ($settings.Repo -eq 'gitlab')
 {
     $baseSourceURL = 'https://git.gao.gov'
+    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+    $baseURL = "https://git.gao.gov"
+    Write-Verbose "[$scriptName] Base URL: $baseURL"
     $repoPath = 'mahmoudz'
     $repoName = 'autopilot-deployment'
     $repoId = '1031'
@@ -1170,22 +1175,35 @@ else
 #write a nice welcome message with the version number and a copyright message.
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
-if ($showLicenseBanner)
+
+if ($settings.showLicenseBanner)
 {
+    Write-Host "==========================================================`n"     
     Write-Host "This script is licensed under the MIT License." 
     Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
+    Write-Host ""
+    Write-Host "Report issues at $baseURL/$repoPath/$repoName/issues"
+    Write-Host "For the changeLog, go to $baseURL/$repoPath/$repoName/releases"
+    Write-Host "==========================================================`n"
+    Write-Host " DISCLAIMER: This script is provided AS IS without warranty of any kind." -ForegroundColor Red
+    Write-Host "The author makes no guarantees about the script's functionality or suitability for any purpose." -ForegroundColor Red
+    Write-Host "It is your responsibility to test and validate the script in your environment before using it." -ForegroundColor Red
+    Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
+    Write-Host "==========================================================`n"
 }
 if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "==========================================================`n"    
     Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
     Write-Host "Please run the update command to get the latest version." -ForegroundColor Yellow
+    Write-Host "==========================================================`n"
 }
 else
 {
-    Write-Verbose "[$scriptName] No updates available or current version is up to date."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "  No updates available or current version is up to date." -LogLevel "Information"
+    Write-Verbose "[$scriptName] No updates available or current script is up to date."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
 }
 
 #region Menu Definitions

@@ -932,7 +932,7 @@ function Test-CachedTokenValidity()
         Write-Verbose "[$functionName] Access token for $domain is expired or invalid"
         Write-Verbose "[$functionName] Absolute expiry time: $absoluteExpiryTime, Time buffer: $timeBuffer"
         Write-Verbose "[$functionName] Will attempt to refresh token"
-        write-LogFile $logFile -Module "$functionName" -Message "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)" -LogLevel "Warning"
+        write-Log -LogFile $logFile -Module "$functionName" -Message "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)" -LogLevel "Warning"
         return $null
     }
 }
