@@ -718,7 +718,7 @@ function Get-RefreshToken()
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Attempting to use refresh token to get a new access token"
-    write-log-LogFile $LogFile -Module "$functionName" -Message "Attempting to use refresh token to get a new access token" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Attempting to use refresh token to get a new access token" -LogLevel "Information"
     try
     {
         # First test if the refresh token is valid
