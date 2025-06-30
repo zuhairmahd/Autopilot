@@ -205,15 +205,16 @@ function GetUpdates()
         }
         Write-Host "Proceeding with the update..."
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
-        Write-Host "Backing up current $executableFileName to $backupFile."
+        Write-Verbose "[$functionName] Backing up current $executableFileName to $backupFile."
         try
         {
             Copy-Item -Path $executableFileName -Destination $backupFile -Force
-            Write-Host "Backup created successfully."
-            Write-Host "Renaming $executableFileName to $executableFileName.old"
+            Write-Verbose "[$functionName] Backup created successfully."
+            Write-Verbose "[$functionName] Renaming $executableFileName to $executableFileName.old"
             Rename-Item -Path $executableFileName -NewName "$executableFileName.old" -Force
-            Write-Host "Copying the update file from $tempUpdateFile to $executableFileName"
+            Write-Verbose "[$functionName] Copying the update file from $tempUpdateFile to $executableFileName"
             Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
+            Write-Verbose "[$functionName] Update completed successfully. New version: $remoteVersion"
         }
         catch
         {

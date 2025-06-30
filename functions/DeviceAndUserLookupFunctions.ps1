@@ -1237,6 +1237,7 @@ function GetBitLockerRecoveryKey()
         Write-Host "Key: $($recoveryKeyDetails.key)" -ForegroundColor Yellow
         Write-Host "Created: $($key.createdDateTime |FormatDateWithTimeZone)" -ForegroundColor Yellow
         Write-Host "Volume Type: $($volumeTypes[$key.volumeType])" -ForegroundColor Yellow
+        return $recoveryKeyDetails.key
     }
     catch
     {
