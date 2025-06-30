@@ -211,16 +211,65 @@ function GetUpdates()
             Copy-Item -Path $executableFileName -Destination $backupFile -Force
             Write-Verbose "[$functionName] Backup created successfully."
             Write-Verbose "[$functionName] Renaming $executableFileName to $executableFileName.old"
+            if (Test-Path "$executableFileName.old")
+            {
+                Write-Verbose "[$functionName] Old backup file $executableFileName.old already exists. Removing it."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing old backup file $executableFileName.old" -LogLevel "Information"
+                Remove-Item -Path "$executableFileName.old" -Force
+                Write-Verbose "[$functionName] Old backup file removed."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Old backup file $executableFileName.old removed" -LogLevel "Information"
+            }
             Rename-Item -Path $executableFileName -NewName "$executableFileName.old" -Force
+            Write-Verbose "[$functionName] Renamed $executableFileName to $executableFileName.old"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $executableFileName to $executableFileName.old" -LogLevel "Information"
             Write-Verbose "[$functionName] Copying the update file from $tempUpdateFile to $executableFileName"
             Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
             Write-Verbose "[$functionName] Update completed successfully. New version: $remoteVersion"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update completed successfully. New version: $remoteVersion" -LogLevel "Information"
         }
         catch
         {
+            Write-Error "[$functionName] Error during update: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error during update: $($_.Exception.Message)" -LogLevel "Error"
             Write-Error "Failed to update $executableFileName. Please check the error message above."
-            Write-Host "Restoring backup from $backupFile to $executableFileName"
-            Copy-Item -Path $backupFile -Destination $executableFileName -Force
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extended error message: $_" -LogLevel "Error"
+            if ($localVersion -ne (getFileVersion -executableFileName $executableFileName))
+            {
+                $backupFileName = Split-Path -Path $backupFile -Leaf
+                $executableFileParrentFolder = Split-Path -Path $executableFileName -Parent
+                Write-Host "Restoring backup from $backupFile to $executableFileName"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Restoring backup from $backupFile to $executableFileName" -LogLevel "Error"
+                Copy-Item -Path $backupFile -Destination $executableFileParrentFolder -Force
+                Write-Verbose "[$functionName] copied backup file $backupFile to $executableFileParrentFolder directory."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Copied backup file $backupFile to $executableFileParrentFolder directory." -LogLevel "Error"
+                Write-Verbose "[$functionName] Extracted backup file name: $backupFileName"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted backup file name: $backupFileName" -LogLevel "Error"
+                Rename-Item -Path $executableFileName -NewName "$executableFileName.tmp" -Force
+                Write-Verbose "[$functionName] Renamed $executableFileName to $executableFileName.tmp"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $executableFileName to $executableFileName.tmp" -LogLevel "Error"
+                Rename-Item -Path $backupFileName -NewName $executableFileName -Force
+                Write-Verbose "[$functionName] Renamed $backupFileName to $executableFileName"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $backupFileName to $executableFileName" -LogLevel "Error"
+                Write-Host "The update has been rolled back to the previous version."
+                Remove-Item -Path "$executableFileName.tmp" -Force
+                Write-Verbose "[$functionName] Removed temporary file $executableFileName.tmp"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed temporary file $executableFileName.tmp" -LogLevel "Error"
+                Write-Host "Please try the update again later."
+            }
+            #cleanup temp files if they exist.
+            if (Test-Path $tempUpdateFile)
+            {
+                Write-Verbose "[$functionName] Removing temporary update file $tempUpdateFile"
+                Remove-Item -Path $tempUpdateFile -Force
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed temporary update file $tempUpdateFile" -LogLevel "Error"
+            }
+            #same for the backup file.
+            if (Test-Path $backupFile)
+            {
+                Write-Verbose "[$functionName] Removing backup file $backupFile"
+                Remove-Item -Path $backupFile -Force
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed backup file $backupFile" -LogLevel "Error"
+            }
             return $false
         }
     }
