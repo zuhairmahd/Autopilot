@@ -507,6 +507,8 @@ if ($settings.Repo -eq 'github')
     Write-Verbose "[$scriptName] Repository path: $repoPath"
     $repoName = 'autopilot'
     Write-Verbose "[$scriptName] Repository name: $repoName"
+    $defaultBranch = 'master'
+    Write-Verbose "[$scriptName] Default branch: $defaultBranch"
     if ($settings.release -eq 'auto')
     {
         Write-Verbose "[$scriptName] Release is set to 'auto'. Fetching the latest release from GitHub."
@@ -520,8 +522,8 @@ if ($settings.Repo -eq 'github')
         else
         {
             Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
-            Write-Host 'Defaulting to main branch.'
-            $latestRelease = 'main'
+            Write-Host "Defaulting to $defaultBranch branch."
+            $latestRelease = $defaultBranch
         }
     }
     else
@@ -545,7 +547,7 @@ else
 {
     Write-Host 'Invalid repository specified.'
     Write-Host 'Defaulting to the main branch from GitHub.'
-    $latestRelease = 'main'
+    $latestRelease = $defaultBranch
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
