@@ -9,7 +9,7 @@
     "maxWaitTime": "30",
     "maxUserMatchDisplay": "10",
     "timeInSeconds": "60",
-    "Release": "stable",
+    "Release": "master",
     "Repo": "Github",
     "appMode": "full",
     "requiredScopes": [
