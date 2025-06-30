@@ -1051,6 +1051,16 @@ function ProcessSerialNumber()
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
                     GetDeviceLAPSCredentials -enrollmentState $enrollmentState
+                    try
+                    {
+                        Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enrollmentState.managedDevice.LAPS.credentials[0].passwordBase64)))
+                        Write-Host "`nLAPS LAPS password copied to clipboard." -ForegroundColor Green
+                    }
+                    catch
+                    {
+                        Write-Host "`nFailed to copy LAPS password to clipboard. Please check your permissions." -ForegroundColor Red
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy LAPS password to clipboard. Error: $_" -LogLevel "Error"
+                    }
                 }
             }            
             Write-Verbose "Checking if we have bitlocker keys for this device."

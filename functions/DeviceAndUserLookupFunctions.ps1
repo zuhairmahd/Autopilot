@@ -1189,7 +1189,6 @@ function GetDeviceLAPSCredentials()
         Write-Host "Account Name: $($returnObject.AccountName)" -ForegroundColor Cyan
         Write-Host "Backup DateTime: $($returnObject.BackupDateTime | FormatDateWithTimeZone)" -ForegroundColor Cyan
         Write-Host "Clear Text Password: $($returnObject.ClearTextPassword)" -ForegroundColor Cyan
-        return "`n"
         # return $lapsCredentials 
         return "`n"
     }
