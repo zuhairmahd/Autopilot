@@ -21,11 +21,19 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 - **Encrypted Configuration**: Secure storage of authentication credentials
 - **Principle of Least Privilege**: Minimal required permissions for operations
 - **Rotating Secret Keys**: Enhanced security through credential rotation
+- **Automatic Clipboard Integration**: LAPS passwords and BitLocker keys automatically copied to clipboard
+- **Enhanced Token Management**: Improved token validation and refresh mechanisms
 
 ### Operational Modes
 - **Full Mode**: Complete feature set for administrators
 - **Help Desk Mode**: Limited features appropriate for help desk personnel  
 - **Registration Mode**: Focused on device registration tasks
+
+### Additional Features
+- **Windows Updates Tracking**: Monitor and display Windows update history
+- **Enhanced Logging**: CMTrace format support with automatic log rotation
+- **Multi-Repository Support**: GitHub and GitLab repository integration
+- **Automatic Credential Management**: Clipboard integration for secure credential handling
 
 ## Prerequisites
 
@@ -54,11 +62,30 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
 ```json
 {
   "auth": {
-    "tenantId": "your-tenant-id",
-    "clientId": "your-client-id",
-    "clientSecret": "your-client-secret"
+    "Deligated": true,
+    "authType": "PublicAuthFlow",
+    "renewalLeadTime": 5,
+    "NoSaveRefreshToken": false,
+    "SecureString": false,
+    "ForceNewToken": false,
+    "CacheType": "Memory",
+    "scope": [
+      "offline_access",
+      "openid",
+      "Device.ReadWrite.All",
+      "DeviceManagementApps.Read.All",
+      "DeviceManagementConfiguration.ReadWrite.All",
+      "DeviceManagementManagedDevices.PrivilegedOperations.All",
+      "DeviceManagementManagedDevices.ReadWrite.All",
+      "DeviceManagementServiceConfig.ReadWrite.All"
+    ]
   },
-  "domain": "your-domain.com"
+  "domain": "your-domain.com",
+  "TenantId": "your-tenant-id",
+  "AppId": "your-app-id",
+  "AppSecret": "your-app-secret",
+  "Thumbprint": "your-cert-thumbprint",
+  "Subject": "your-certificate-subject"
 }
 ```
 
@@ -116,6 +143,10 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
 - `-ForceNewRefreshToken`: Force generation of new refresh token
 - `-NoSaveRefreshToken`: Don't save refresh token for future use
 
+### Logging Parameters
+- `-LogFile`: Path to custom log file (default: `$pwd\\Logs\\Autopilot.log`)
+- `-LogLevel`: Set logging verbosity (`Error`, `Warning`, `Information`, `Verbose`, `Debug`)
+
 ### Configuration Parameters
 - `-InitFile`: Path to settings configuration file (default: `settings.json`)
 - `-appMode`: Application mode (`full`, `helpDesk`, `registration`)
@@ -125,7 +156,7 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
 
 ### Repository Parameters
 - `-Repo`: Repository source (`github`, `gitlab`)
-- `-Release`: Release branch to use (default: `main`)
+- `-Release`: Release branch to use (default: `master`)
 - `-Update`: Check for and apply script updates
 - `-ForceUpdate`: Force update even if local files exist
 
@@ -186,11 +217,14 @@ The script requires the following Microsoft Graph API permissions:
 - `User.Read.All`: Read user profiles and group memberships
 - `Device.Read.All`: Read device objects
 - `DeviceManagementApps.ReadWrite.All`: Manage app assignments
-- `DeviceManagementConfiguration.Read.All`: Read device configuration policies
-- `DeviceManagementManagedDevices.Read.All`: Read managed device properties
+- `DeviceManagementConfiguration.ReadWrite.All`: Read and write device configuration policies
+- `DeviceManagementManagedDevices.ReadWrite.All`: Read and write managed device properties
 - `DeviceManagementManagedDevices.PrivilegedOperations.All`: Privileged operations (LAPS passwords)
 - `DeviceManagementServiceConfig.ReadWrite.All`: Manage Autopilot device identities
 - `BitlockerKey.Read.All`: Read BitLocker recovery keys
+- `offline_access`: Maintain access with refresh tokens
+- `openid`: User sign-in with OpenID Connect
+- `profile`: Basic user profile information during sign-in
 
 ## Advanced Features
 
@@ -202,6 +236,9 @@ The script requires the following Microsoft Graph API permissions:
 
 ### Logging and Debugging
 - Use `-Verbose` for detailed operation logging
+- Use `-LogLevel` to control log verbosity (Error, Warning, Information, Verbose, Debug)
+- CMTrace format support for enhanced log viewing
+- Automatic log rotation with size management
 - Check log outputs for troubleshooting
 - Settings validation occurs automatically
 
@@ -209,6 +246,17 @@ The script requires the following Microsoft Graph API permissions:
 - Export device lists in CSV format
 - Bulk device management operations
 - Automated profile assignment verification
+
+### Windows Updates Module
+- Track and display Windows update installation history
+- Comprehensive logging of update information
+- Integration with device management workflows
+
+### Clipboard Integration
+- LAPS passwords automatically copied to clipboard for secure access
+- BitLocker recovery keys automatically copied to clipboard
+- Device authentication codes copied for easy access
+- Reduced verbosity for sensitive operations
 
 ## Troubleshooting
 
