@@ -18,31 +18,31 @@
         "Reason": "Required to read user profiles, group memberships, and registered devices.",
         "Endpoints": [
           "/users",
-          "/users/{id}",
-          "/users/{id}/memberOf",
-          "/users/{id}/registeredDevices"
+          "users/{id}",
+          "users/{id}/memberOf",
+          "users/{id}/registeredDevices"
         ]
       },
       {
         "Scope": "Device.Read.All",
         "Reason": "Required to read Microsoft Entra ID device objects.",
         "Endpoints": [
-          "/devices"
+          "devices"
         ]
       },
       {
         "Scope": "DeviceManagementApps.ReadWrite.All",
         "Reason": "Required to read application information and manage app assignments.",
         "Endpoints": [
-          "/deviceAppManagement/mobileApps",
-          "/deviceAppManagement/mobileApps/{id}/assignments"
+          "deviceAppManagement/mobileApps",
+          "deviceAppManagement/mobileApps/{id}/assignments"
         ]
       },
       {
         "Scope": "DeviceManagementConfiguration.Read.All",
         "Reason": "Required to read Intune device configuration policies.",
         "Endpoints": [
-          "/deviceManagement/deviceConfigurations"
+          "deviceManagement/deviceConfigurations"
         ]
       },
       {
@@ -50,30 +50,30 @@
         "Reason": "Required to read Intune managed device properties.",
         "Endpoints": [
           "/deviceManagement/managedDevices",
-          "/deviceManagement/managedDevices/{id}"
+          "deviceManagement/managedDevices/{id}"
         ]
       },
       {
         "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
         "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
         "Endpoints": [
-          "/directory/deviceLocalCredentials"
+          "directory/deviceLocalCredentials"
         ]
       },
       {
         "Scope": "DeviceManagementServiceConfig.ReadWrite.All",
         "Reason": "Required to read Autopilot events and to read and manage Autopilot device identities.",
         "Endpoints": [
-          "/deviceManagement/autopilotEvents",
-          "/deviceManagement/importedWindowsAutopilotDeviceIdentities",
-          "/deviceManagement/windowsAutopilotDeviceIdentities"
+          "deviceManagement/autopilotEvents",
+          "deviceManagement/importedWindowsAutopilotDeviceIdentities",
+          "deviceManagement/windowsAutopilotDeviceIdentities"
         ]
       },
       {
         "Scope": "BitlockerKey.Read.All",
         "Reason": "Required to read BitLocker recovery keys for all devices.",
         "Endpoints": [
-          "/informationProtection/bitlocker/recoveryKeys"
+          "informationProtection/bitlocker/recoveryKeys"
         ]
       },
       {

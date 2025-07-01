@@ -2,6 +2,7 @@ function DecodeJwtToken
 {
     [CmdletBinding()]
     param(
+        [Parameter(Mandatory = $true)]
         [string]$Token,
         [switch]$raw,
         [switch]$RawJSON
@@ -37,8 +38,14 @@ function DecodeJwtToken
     Write-Verbose "[$functionName] Payload part: $($payload.Length)"
     switch ($payload.Length % 4)
     {
-        2 { Write-Verbose "[$functionName] Adjusting payload length by adding two padding characters."; $payload += '==' }
-        3 { Write-Verbose "[$functionName] Adjusting payload length by adding one padding character."; $payload += '=' }
+        2
+        {
+            Write-Verbose "[$functionName] Adjusting payload length by adding two padding characters."; $payload += '==' 
+        }
+        3
+        {
+            Write-Verbose "[$functionName] Adjusting payload length by adding one padding character."; $payload += '=' 
+        }
     }
     Write-Verbose "[$functionName] Adjusted payload for Base64 decoding: $($payload.Length)"
     $bytes = [System.Convert]::FromBase64String($payload)
@@ -730,23 +737,23 @@ function Get-RefreshToken()
             return $null
         }
         Write-Verbose "[$functionName] Refresh token is valid. Proceeding to get new access token."
-        write-log -LogFile $LogFile -Module "$functionName" -Message "Refresh token is valid. Proceeding to get new access token." -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Refresh token is valid. Proceeding to get new access token." -LogLevel "Information"
         $cachedToken = Get-TokenFromResponse -tokenResponse $tokenResponse -domain $domain -refreshToken $tokenResponse.refresh_token
         # Cache the access token based on cache type
         Save-TokenToCache -cachedToken $cachedToken -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder
         # Only save the refresh token if it's different from the one we already have
         Write-Verbose "[$functionName] Checking whether to save the refresh token..."
-        write-log -LogFile $LogFile -Module "$functionName" -Message "Checking whether to save the refresh token..." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether to save the refresh token..." -LogLevel "Verbose"
         if ($tokenResponse.refresh_token -and $tokenResponse.refresh_token -ne $accessTokenObject.refresh_token)
         {
             Write-Verbose "[$functionName] Saving new refresh token as it differs from the existing one."
-            write-log -LogFile $LogFile -Module "$functionName" -Message "Saving new refresh token as it differs from the existing one." -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Saving new refresh token as it differs from the existing one." -LogLevel "Verbose"
             Save-RefreshTokenToConfig -refreshToken $tokenResponse -configFilePath $configFilePath
         }
         else
         {
             Write-Verbose "[$functionName] No need to save refresh token as it hasn't changed."
-            write-log -LogFile $LogFile -Module "$functionName" -Message "No need to save refresh token as it hasn't changed." -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No need to save refresh token as it hasn't changed." -LogLevel "Verbose"
         }
         return Format-TokenOutput -token $tokenResponse.access_token -secureString $SecureString
     }
@@ -932,7 +939,7 @@ function Test-CachedTokenValidity()
         Write-Verbose "[$functionName] Access token for $domain is expired or invalid"
         Write-Verbose "[$functionName] Absolute expiry time: $absoluteExpiryTime, Time buffer: $timeBuffer"
         Write-Verbose "[$functionName] Will attempt to refresh token"
-        write-Log -LogFile $logFile -Module "$functionName" -Message "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)" -LogLevel "Warning"
+        Write-Log -LogFile $logFile -Module "$functionName" -Message "Access token in $cacheType cache is expired or invalid (expires: $absoluteExpiryTime, buffer: $timeBuffer)" -LogLevel "Warning"
         return $null
     }
 }
