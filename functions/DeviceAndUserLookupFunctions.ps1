@@ -474,6 +474,7 @@ function GetEntraUser()
     if ($userInfo -in 400, 401, 403, 404 -and -not $FindSimilar)
     {
         Write-Verbose "[$functionName] Exact match failed with error code: $userInfo"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User lookup failed with error code: $userInfo" -LogLevel "Error"
         
         # Display appropriate error message to user based on error code
         switch ($userInfo)
@@ -1188,7 +1189,6 @@ function GetDeviceLAPSCredentials()
         Write-Host "Account Name: $($returnObject.AccountName)" -ForegroundColor Cyan
         Write-Host "Backup DateTime: $($returnObject.BackupDateTime | FormatDateWithTimeZone)" -ForegroundColor Cyan
         Write-Host "Clear Text Password: $($returnObject.ClearTextPassword)" -ForegroundColor Cyan
-        return "`n"
         # return $lapsCredentials 
         return "`n"
     }
@@ -1237,6 +1237,7 @@ function GetBitLockerRecoveryKey()
         Write-Host "Key: $($recoveryKeyDetails.key)" -ForegroundColor Yellow
         Write-Host "Created: $($key.createdDateTime |FormatDateWithTimeZone)" -ForegroundColor Yellow
         Write-Host "Volume Type: $($volumeTypes[$key.volumeType])" -ForegroundColor Yellow
+        return $recoveryKeyDetails.key
     }
     catch
     {

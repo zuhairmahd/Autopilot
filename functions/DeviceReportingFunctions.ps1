@@ -13,6 +13,7 @@ function ExportDeviceReport()
 
     $functionName = "ExportDeviceReport"
     Write-Verbose "[$functionName] Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'" -LogLevel "Information"
     # Validate ExportFormat
     if ($ExportFormat -notin @("HTML", "CSV"))
     {
@@ -27,15 +28,18 @@ function ExportDeviceReport()
         {
             $DeviceName = "Device"
             Write-Verbose "[$functionName] Using default device name for export"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using default device name for export" -LogLevel "Information"
         }
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $fileName = "$DeviceName`_Report_$timestamp"
         Write-Verbose "[$functionName] Generated filename: $fileName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Generated filename: $fileName" -LogLevel "Information"
     }
     else
     {
         $fileName = [System.IO.Path]::GetFileNameWithoutExtension($outputFile)
         Write-Verbose "[$functionName] Using provided output file name: $fileName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using provided output file name: $fileName" -LogLevel "Information"
     }
     
     # Determine final export format
@@ -44,6 +48,7 @@ function ExportDeviceReport()
     {
         $htmlPath = "$pwd\$fileName.html"
         Write-Verbose "[$functionName] Exporting to HTML: $htmlPath"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to HTML: $htmlPath" -LogLevel "Information"
         $htmlHeader = @"
 <!DOCTYPE html>
 <html>
@@ -90,11 +95,13 @@ function ExportDeviceReport()
             $htmlContent | Out-File -FilePath $htmlPath -Encoding UTF8
             Write-Host "HTML report exported to: $htmlPath" -ForegroundColor Green
             Write-Verbose "[$functionName] Successfully exported HTML report to $htmlPath"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported HTML report to $htmlPath" -LogLevel "Information"
         }
         catch
         {
             Write-Error "[$functionName] Failed to export HTML report: $($_.Exception.Message)"
             Write-Verbose "[$functionName] HTML export error details: $($_.Exception)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "HTML export error details: $($_.Exception)" -LogLevel "Error"
             return $false
         }
     }
@@ -102,6 +109,7 @@ function ExportDeviceReport()
     {
         $csvPath = "$pwd\$fileName.csv"
         Write-Verbose "[$functionName] Exporting to CSV: $csvPath"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to CSV: $csvPath" -LogLevel "Information"
         try
         {
             $csvData = foreach ($key in $formattedOutput.Keys)
@@ -114,11 +122,13 @@ function ExportDeviceReport()
             $csvData | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
             Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
             Write-Verbose "[$functionName] Successfully exported CSV report to $csvPath"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported CSV report to $csvPath" -LogLevel "Information"
         }
         catch
         {
             Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
             Write-Verbose "[$functionName] CSV export error details: $($_.Exception)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV export error details: $($_.Exception)" -LogLevel "Error"
             return $false
         }
     }
@@ -128,6 +138,7 @@ function ExportDeviceReport()
         return $false
     }
     Write-Verbose "[$functionName] Export completed successfully."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Export completed successfully." -LogLevel "Information"
     return $true
 }
 
@@ -153,14 +164,18 @@ function ExportDeviceStorage()
     if ($filter)
     {
         Write-Verbose "[$functionName] - Using filter: $filter"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using filter: $filter" -LogLevel "Information"
         $managedDeviceFilter = $Filter
     }
     else 
     {
         Write-Verbose "[$functionName] - No filter provided, using default filter: $managedDeviceFilter"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No filter provided, using default filter: $managedDeviceFilter" -LogLevel "Information"
     }
     Write-Verbose "[$functionName] - Starting device memory export process"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device memory export process" -LogLevel "Information"
     Write-Verbose "[$functionName] - Using batch size of $BatchSize for API requests"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using batch size of $BatchSize for API requests" -LogLevel "Information"
     
     # Store all devices in an array
     $allDevices = [System.Collections.ArrayList]@()
@@ -168,6 +183,7 @@ function ExportDeviceStorage()
     try
     {
         Write-Verbose "[$functionName] - Getting device list from Graph API"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Getting device list from Graph API" -LogLevel "Information"
         $deviceListResponse = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $AccessToken -Filter $managedDeviceFilter -consistencyLevel -extraParameters "top=999"
         
         if ($null -eq $deviceListResponse -or $null -eq $deviceListResponse.value -or $deviceListResponse.value.count -eq 0)
@@ -180,6 +196,7 @@ function ExportDeviceStorage()
         $deviceListResponse.value | ForEach-Object { $null = $allDevices.Add($_) }
         
         Write-Verbose "[$functionName] - Retrieved a total of $($allDevices.Count) devices"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Retrieved a total of $($allDevices.Count) devices" -LogLevel "Information"
         
         # Create CSV object to store the results
         $CSVObject = [System.Collections.ArrayList]@()
@@ -210,6 +227,7 @@ function ExportDeviceStorage()
             }
             
             Write-Verbose "[$functionName] - Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Information"
             $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth 10)
             
             # Process batch responses
@@ -301,12 +319,14 @@ function ExportDeviceStorage()
                             }
                             
                             Write-Verbose "[$functionName] - Processed device: $($deviceBasic.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)"
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Processed device: $($deviceBasic.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)" -LogLevel "Information"
                             $null = $CSVObject.Add($exportObject)
                         }
                     }
                     else
                     {
                         Write-Verbose "[$functionName] - Failed to get details for device ID $($response.id). Status: $($response.status)"
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Failed to get details for device ID $($response.id). Status: $($response.status)" -LogLevel "Error"
                     }
                 }
             }
@@ -319,6 +339,7 @@ function ExportDeviceStorage()
         if ($CSVObject.Count -gt 0)
         {
             Write-Verbose "[$functionName] - Exporting data for $($CSVObject.Count) devices to file $OutputFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Exporting data for $($CSVObject.Count) devices to file $OutputFile" -LogLevel "Information"
             $CSVObject | Export-Csv -Path $OutputFile -NoTypeInformation -Force
             Write-Host "Successfully exported device information to $OutputFile" -ForegroundColor Green
             Write-Host "Exported $($CSVObject.Count) devices with memory and storage information" -ForegroundColor Green
@@ -378,36 +399,46 @@ function ExportDeviceList()
         'autopilot'
         {
             Write-Verbose "[$functionName] fetching Autopilot devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Autopilot devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
             Write-Verbose "[$functionName] Fetched $($devices.value.Count) Autopilot devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) Autopilot devices." -LogLevel "Information"
         }
         'imported'
         {
             Write-Verbose "[$functionName] fetching Imported Autopilot devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Imported Autopilot devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -extraParameters $importedAutopilotExtraParameters
             Write-Verbose "[$functionName] Fetched $($devices.value.Count) imported Autopilot devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) imported Autopilot devices." -LogLevel "Information"
         }
         'unmanaged'
         {
             Write-Verbose "[$functionName] fetching Unmanaged devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Unmanaged devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken -filter $unmanagedDeviceFilter -extraParameters $unmanagedDeviceExtraParameters
             Write-Verbose "[$functionName] Fetched $($devices.value.Count) unmanaged devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) unmanaged devices." -LogLevel "Information"
         }
         'managed'
         {
             Write-Verbose "[$functionName] fetching Managed devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Managed devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter -extraParameters $managedDeviceExtraParameters
             Write-Verbose "[$functionName] Fetched $($devices.value.Count) managed devices."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) managed devices." -LogLevel "Information"
         }
     }
     
     Write-Verbose "[$functionName] Processing $($devices.value.Count) $deviceType devices for export."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing $($devices.value.Count) $deviceType devices for export." -LogLevel "Verbose"
     for ($i = 0; $i -lt $devices.value.count; $i++)
     {
         $device = $devices.value[$i]
         if (-not $device)
         {
             Write-Verbose "[$functionName] Skipping null or invalid $deviceType device at index $i."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping null or invalid $deviceType device at index $i." -LogLevel "Error"
             continue
         }
         switch ($deviceType)
@@ -415,6 +446,7 @@ function ExportDeviceList()
             'autopilot'
             {
                 Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $deviceType device with serial number $($device.serialNumber) for export." -LogLevel "Information"
                 if ($null -ne $device.lastContactedDateTime)
                 {
                     $lastContactedDateTime = $device.lastContactedDateTime | FormatDateWithTimeZone
@@ -433,6 +465,7 @@ function ExportDeviceList()
             'imported'
             {
                 Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $deviceType device with serial number $($device.serialNumber) for export." -LogLevel "Information"
                 $exportObject = [PSCustomObject] @{
                     serialNumber         = $device.serialNumber
                     importId             = $device.importId
@@ -446,6 +479,7 @@ function ExportDeviceList()
             'unmanaged'
             {
                 Write-Verbose "[$functionName] Preparing $devicetype device with display name $($device.displayName) for export."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $devicetype device with display name $($device.displayName) for export." -LogLevel "Information"
                 $createdDateTime = $device.createdDateTime
                 $registrationDateTime = $device.registrationDateTime
                 $approximateLastSignInDateTime = $device.approximateLastSignInDateTime
@@ -480,6 +514,7 @@ function ExportDeviceList()
             'managed'
             {
                 Write-Verbose "[$functionName] Preparing $devicetype device object for export."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $devicetype device object for export." -LogLevel "Information"
                 $enrollmentDate = $device.enrolledDateTime
                 $LastSync = $device.lastSyncDateTime
                 $lastLoggedOn = $device.usersLoggedOn.lastLogOnDateTime
@@ -518,39 +553,46 @@ function ExportDeviceList()
     if ($CSVObject.Count -gt 0)
     {
         Write-Verbose "[$functionName] exporting $($CSVObject.Count) $deviceType devices to $outputFile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
         #Check if the file exists and ask if the user wants to overwrite.
         if (Test-Path $outputFile)
         {
             if ($fileMode -eq 'Append')
             {
                 Write-Verbose "[$functionName] Appending to existing file $outputFile."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
             }
             else
             {
                 Write-Verbose "[$functionName] Overwriting existing file $outputFile."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Information"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
             }
         }
         else
         {
             Write-Verbose "[$functionName] Creating new file $outputFile."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new file $outputFile." -LogLevel "Information"
         }
         $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
     }
     else
     {
         Write-Verbose "[$functionName] No devices found for export."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Information"
     }
     #check if the csv file exists.
     if (Test-Path $outputFile)
     {
         Write-Verbose "[$functionName] CSV file $outputFile created successfully."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV file $outputFile created successfully." -LogLevel "Information"
         $success = $true
     }
     else
     {
         Write-Verbose "[$functionName] Failed to create CSV file $outputFile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to create CSV file $outputFile." -LogLevel "Error"
         $success = $false
     }
     return $success, $outputFile
@@ -569,52 +611,67 @@ function ConvertUserDisplayName()
     # otherwise to "Firstname Middle Lastname"
     # Also handles "Lastname, Firstname M." format where M. is a middle initial
     Write-Verbose "[$functionName] Converting user display name: $UserDisplayName"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Converting user display name: $UserDisplayName" -LogLevel "Verbose"
     if ($UserDisplayName -match '^(.*), (.*?)(?:\s([A-Z]\.?))?(?: \((.*?)\))?$')
     {
         Write-Verbose "[$functionName] Extracting first name, last name, middle initial and nickname."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracting first name, last name, middle initial and nickname." -LogLevel "Information"
         $lastName = $matches[1].Trim()
         Write-Verbose "[$functionName] Last name: $lastName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last name: $lastName" -LogLevel "Information"
         $firstName = $matches[2].Trim()
         Write-Verbose "[$functionName] First name: $firstName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "First name: $firstName" -LogLevel "Information"
         $middleInitial = if ($matches[3])
         {
             $matches[3].Trim() 
             Write-Verbose "[$functionName] Middle initial: $middleInitial"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Middle initial: $middleInitial" -LogLevel "Information"
         }
         else
         {
             $null 
             Write-Verbose "[$functionName] No middle initial found."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No middle initial found." -LogLevel "Information"
         }
         $nickname = $matches[4]
         Write-Verbose "[$functionName] Nickname: $nickname"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Nickname: $nickname" -LogLevel "Information"
         $fullName = if ($middleInitial)
         {
             "$firstName $middleInitial $lastName"
             Write-Verbose "[$functionName] Full name with middle initial: $fullName"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full name with middle initial: $fullName" -LogLevel "Information"
         }
         else
         {
             "$firstName $lastName"
             Write-Verbose "[$functionName] Full name without middle initial: $fullName"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Full name without middle initial: $fullName" -LogLevel "Information"
         }
         if ($nickname)
         {
             Write-Verbose "[$functionName] Nickname found: $nickname"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Nickname found: $nickname" -LogLevel "Information"
             $currentUser = "$fullName ($nickname)"
             Write-Verbose "[$functionName] Current user with nickname: $currentUser"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current user with nickname: $currentUser" -LogLevel "Information"
         }
         else
         {
             Write-Verbose "[$functionName] No nickname found."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No nickname found." -LogLevel "Information"
             $currentUser = $fullName
             Write-Verbose "[$functionName] Current user without nickname: $currentUser"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current user without nickname: $currentUser" -LogLevel "Information"
         }
     }
     else
     {
         Write-Verbose "[$functionName] No match found for user display name format."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No match found for user display name format." -LogLevel "Information"
         Write-Verbose "[$functionName] Returning original display name."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning original display name." -LogLevel "Information"
         $currentUser = $UserDisplayName
     }
     #Add what we got the the processedUser hashtable
@@ -639,26 +696,36 @@ function GetManagedDeviceRelevantProperties()
     if ($null -eq $settings.MinimumDevicePhysicalMemoryInGB -or $settings.MinimumDevicePhysicalMemoryInGB -eq 0)
     {
         Write-Verbose "[$functionName] No minimum device physical memory specified in settings."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No minimum device physical memory specified in settings." -LogLevel "Information"
         Write-Verbose "[$functionName] Setting default value to 16GB."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Setting default value to 16GB." -LogLevel "Information"
         $MinimumDevicePhysicalMemoryInGB = 16
     }
     else
     {
         $MinimumDevicePhysicalMemoryInGB = $settings.MinimumDevicePhysicalMemoryInGB
         Write-Verbose "[$functionName] Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB" -LogLevel "Information"
     }
     Write-Host "Checking managed device..."
     Write-Verbose "[$functionName] Managed device: $($enrollmentState.managed)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device: $($enrollmentState.managed)" -LogLevel "Information"
     if ($enrollmentState.managed)
     {
         Write-Verbose "[$functionName] Found a managed device."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a managed device." -LogLevel "Information"
         Write-Verbose "[$functionName] Checking whether this is an orphan device..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether this is an orphan device..." -LogLevel "Verbose"
         Write-Verbose "[$functionName] Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)" -LogLevel "Information"
         Write-Verbose "[$functionName] Managed device id: $($enrollmentState.managedDevice.device.id)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device id: $($enrollmentState.managedDevice.device.id)" -LogLevel "Information"
         Write-Verbose "[$functionName] Checking if they are the same..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if they are the same..." -LogLevel "Verbose"
         if ($enrollmentState.managedDevice.device.id -eq $enrollmentState.autopilot.device.managedDeviceId)
         {
             Write-Verbose "[$functionName] Device Id's match."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device Id's match." -LogLevel "Information"
             Write-Host "The device is not an orphan device."
             $orphanDevice = $false
             Write-Host "Checking whether the device has enough RAM..."
@@ -677,9 +744,13 @@ function GetManagedDeviceRelevantProperties()
             if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
             {
                 Write-Verbose "[$functionName] Found a user..."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a user..." -LogLevel "Information"
                 Write-Verbose "[$functionName] User display name: $($enrollmentState.managedDevice.users.userDisplayName)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "User display name: $($enrollmentState.managedDevice.users.userDisplayName)" -LogLevel "Information"
                 Write-Verbose "[$functionName] User id: $($enrollmentState.managedDevice.device.userId)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "User id: $($enrollmentState.managedDevice.device.userId)" -LogLevel "Information"
                 Write-Verbose "[$functionName] User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)" -LogLevel "Information"
                 $hasUser = $true
                 if ($enrollmentState.managedDevice.users.azureUser)
                 {
@@ -707,6 +778,7 @@ function GetManagedDeviceRelevantProperties()
             else
             {
                 Write-Verbose "[$functionName] The managed device is not associated with a user."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The managed device is not associated with a user." -LogLevel "Information"
                 Write-Host "The device is not associated with a user."
                 $hasUser = $false
             }
@@ -715,7 +787,9 @@ function GetManagedDeviceRelevantProperties()
         {
             $orphanDevice = $true
             Write-Verbose "[$functionName] Device Id's do not match."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device Id's do not match." -LogLevel "Information"
             Write-Verbose "[$functionName] The device is an orphan device."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is an orphan device." -LogLevel "Information"
         }
     }
 
@@ -723,11 +797,13 @@ function GetManagedDeviceRelevantProperties()
     {
         $readyForNextUser = $true
         Write-Verbose "[$functionName] Device is ready for the next user"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is ready for the next user" -LogLevel "Information"
     }
     else
     {
         $readyForNextUser = $false
         Write-Verbose "[$functionName] Device is not ready for the next user"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is not ready for the next user" -LogLevel "Information"
     }
     $managedDeviceProperties.Add('OrphanDevice', $orphanDevice)
     $managedDeviceProperties.Add('CorrectRam', $correctRam)
@@ -751,22 +827,27 @@ function GetAutopilotDeviceRelevantProperties()
     if ($null -eq $settings.DesiredAutopilotProfiles -or $settings.DesiredAutopilotProfiles.Count -eq 0)
     {
         Write-Verbose "[$functionName] No desired autopilot profiles specified in settings."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No desired autopilot profiles specified in settings." -LogLevel "Information"
         Write-Verbose "[$functionName] Setting default value to 'None'."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Setting default value to 'None'." -LogLevel "Information"
         $desiredAutopilotProfiles = $null
     }
     else
     {
         $desiredAutopilotProfiles = $settings.DesiredAutopilotProfiles
         Write-Verbose "[$functionName] Desired autopilot profiles specified in settings: $desiredAutopilotProfiles"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Desired autopilot profiles specified in settings: $desiredAutopilotProfiles" -LogLevel "Information"
     }
     if ($null -ne $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -and $enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedUnkownSyncState', 'assignedInSync'))
     {
         Write-Verbose "[$functionName] The device profile assignment state is valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device profile assignment state is valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)." -LogLevel "Information"
         $profileAssigned = $true
     }
     else
     {
         Write-Verbose "[$functionName] The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device profile assignment state is not valid: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)." -LogLevel "Information"
         $profileAssigned = $false
     }
     if ($null -ne $desiredAutopilotProfiles -and $enrollmentState.autopilot.device.deploymentProfile.displayName -in $desiredAutopilotProfiles -and $profileAssigned -eq $true)
@@ -777,6 +858,7 @@ function GetAutopilotDeviceRelevantProperties()
     else
     {
         Write-Verbose "[$functionName] The device is not assigned to the correct autopilot profile."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is not assigned to the correct autopilot profile." -LogLevel "Information"
         $correctProfile = $false
     }
     Write-Host "Autopilot profile Deployment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)."
@@ -787,12 +869,15 @@ function GetAutopilotDeviceRelevantProperties()
     if ($null -ne $enrollmentState.autopilot.device.remediationState -and $enrollmentState.autopilot.device.remediationState -in @('noRemediationRequired', 'unknownFutureValue'))
     {
         Write-Verbose "[$functionName] The device profile remediation state is valid: $($enrollmentState.autopilot.device.remediationState)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device profile remediation state is valid: $($enrollmentState.autopilot.device.remediationState)." -LogLevel "Information"
         $remediationStateGood = $true
         Write-Verbose "[$functionName] Remediation state last modified date: $lastRemediationDate"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Remediation state last modified date: $lastRemediationDate" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] The device profile remediation state is not valid: $($enrollmentState.autopilot.device.remediationState)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device profile remediation state is not valid: $($enrollmentState.autopilot.device.remediationState)." -LogLevel "Information"
         $remediationStateGood = $false
     }
     Write-Host "Remediation state: $($enrollmentState.autopilot.device.remediationState)"
@@ -801,6 +886,7 @@ function GetAutopilotDeviceRelevantProperties()
     if ($null -ne $enrollmentState.autopilot.device.enrollmentState -and $enrollmentState.autopilot.device.enrollmentState -in @('enrolled', 'notContacted'))
     {
         Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)." -LogLevel "Information"
         #Check the last enrollment status.
         if ($enrollmentState.autopilot.events.count -gt 0)
         {
@@ -836,21 +922,25 @@ function GetAutopilotDeviceRelevantProperties()
     else
     {
         Write-Verbose "[$functionName] The device enrollment state is not valid: $($enrollmentState.autopilot.device.enrollmentState)."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device enrollment state is not valid: $($enrollmentState.autopilot.device.enrollmentState)." -LogLevel "Information"
         $enrollmentStateGood = $false
     }
     Write-Host "Enrollment state: $($enrollmentState.autopilot.device.enrollmentState)"
     if ($CorrectProfile -and $ProfileAssigned -and $RemediationStateGood -and $EnrollmentStateGood)
     {
         Write-Verbose "[$functionName] Autopilot assignment is good..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot assignment is good..." -LogLevel "Information"
         $AutopilotAssignmentGood = $true
     }
     else
     {
         Write-Verbose "[$functionName] There are issues with this device's autopilot assignment."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "There are issues with this device's autopilot assignment." -LogLevel "Information"
         $AutopilotAssignmentGood = $false
         
     }
     Write-Verbose "[$functionName] Autopilot assignment good: $AutopilotAssignmentGood"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot assignment good: $AutopilotAssignmentGood" -LogLevel "Information"
     #Add what we got the the autopilotDeviceProperties hashtable
     $autopilotDeviceProperties.Add('CorrectProfile', $correctProfile)
     $autopilotDeviceProperties.Add('ProfileAssigned', $profileAssigned)
@@ -874,9 +964,13 @@ function AssessDeviceState()
     $functionName = $MyInvocation.MyCommand.Name
     #region Write verbose log of received parameters.
     Write-Verbose "[$functionName] Received parameters:"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received parameters:" -LogLevel "Information"
     Write-Verbose "[$functionName] Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)" -LogLevel "Information"
     Write-Verbose "[$functionName] Assessment type: $AssessmentType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Assessment type: $AssessmentType" -LogLevel "Information"
     Write-Verbose "[$functionName] Settings: $($settings | ConvertTo-Json -Depth 10)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Settings: $($settings | ConvertTo-Json -Depth 10)" -LogLevel "Information"
     $returnValue = [ordered] @{}
     $readinessState = $null
     $action = $null
@@ -884,6 +978,7 @@ function AssessDeviceState()
     #endregion
 
     Write-Verbose "[$functionName] Type of assessment: $AssessmentType"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Type of assessment: $AssessmentType" -LogLevel "Information"
     switch ($AssessmentType)
     {
         'PropperEnrollmentVerification'
@@ -895,19 +990,23 @@ function AssessDeviceState()
         {
             Write-Host "Checking if the device is ready for the next user..."
             Write-Verbose "[$functionName] Checking if the device is registered in Autopilot..."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if the device is registered in Autopilot..." -LogLevel "Verbose"
             Write-Verbose "[$functionName] In Autopilot: $($enrollmentState.inAutopilot)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
                 if (-not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
                 {   
                     Write-Verbose "[$functionName] Getting managed device properties."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting managed device properties." -LogLevel "Information"
                     $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
                     $memoryMessage = "`n"
                 }
                 else 
                 {
                     Write-Verbose "[$functionName] Device enrollment state is 'notContacted', skipping managed device readiness check."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device enrollment state is 'notContacted', skipping managed device readiness check." -LogLevel "Information"
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
@@ -1012,8 +1111,11 @@ function AssessDeviceState()
     $returnValue.Add('Action', $action)
     $returnValue.Add('Device', $device)
     Write-Verbose "[$functionName] Returning readiness state: $readinessState"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning readiness state: $readinessState" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning action: $action"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning action: $action" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning device: $device"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning device: $device" -LogLevel "Information"
     return $returnValue
 }
 
@@ -1042,21 +1144,31 @@ function ShowDeviceReport()
     $functionName = $MyInvocation.MyCommand.Name
     #region write verbose log of received parameters
     Write-Verbose "[$functionName] Starting device report generation"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device report generation" -LogLevel "Information"
     Write-Verbose "[$functionName] Parameter Set: $($PSCmdlet.ParameterSetName)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Parameter Set: $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
     Write-Verbose "[$functionName] Export: $Export"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Export: $Export" -LogLevel "Information"
     Write-Verbose "[$functionName] ExportFormat: $ExportFormat"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "ExportFormat: $ExportFormat" -LogLevel "Information"
     Write-Verbose "[$functionName] OutputFile: $OutputFile"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "OutputFile: $OutputFile" -LogLevel "Information"
     Write-Verbose "[$functionName] PrefixList: $($PrefixList -join ', ')"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "PrefixList: $($PrefixList -join ', ')" -LogLevel "Information"
     if ($PSCmdlet.ParameterSetName -eq 'EnrollmentState')
     {
         Write-Verbose "[$functionName] Enrollment state provided"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Enrollment state provided" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] Report hashtable provided with $($report.Keys.Count) properties"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Report hashtable provided with $($report.Keys.Count) properties" -LogLevel "Information"
     }
     Write-Verbose "[$functionName] DeviceName: $DeviceName"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "DeviceName: $DeviceName" -LogLevel "Information"
     Write-Verbose "[$functionName] SerialNumber: $SerialNumber"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "SerialNumber: $SerialNumber" -LogLevel "Information"
     #endregion write verbose log of received parameters
     #region Build report data
     $output = [ordered]@{}
@@ -1064,17 +1176,20 @@ function ShowDeviceReport()
     if ($PSCmdlet.ParameterSetName -eq 'EnrollmentState')
     {
         Write-Verbose "[$functionName] Building report from enrollment state"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Building report from enrollment state" -LogLevel "Information"
         
         # Get latest autopilot event
         if ($enrollmentState.autopilot.events -and $enrollmentState.autopilot.events.Count -gt 0)
         {
             $latestAutopilotEvent = $enrollmentState.autopilot.events | Select-Object -First 1
             Write-Verbose "[$functionName] Found $($enrollmentState.autopilot.events.Count) autopilot events"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($enrollmentState.autopilot.events.Count) autopilot events" -LogLevel "Information"
         }
         else
         {
             $latestAutopilotEvent = $null
             Write-Verbose "[$functionName] No autopilot events found"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No autopilot events found" -LogLevel "Information"
         }
         
         $output = [ordered] @{
@@ -1180,17 +1295,20 @@ function ShowDeviceReport()
     else
     {
         Write-Verbose "[$functionName] Using provided report hashtable"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using provided report hashtable" -LogLevel "Information"
         $output = $report
     }
     #endregion Build report data
     
     #region Format property names and display report
     Write-Verbose "[$functionName] Formatting output for display"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatting output for display" -LogLevel "Information"
     $formattedOutput = [System.Collections.Specialized.OrderedDictionary]::new()
     
     foreach ($key in $output.Keys)
     {
         Write-Verbose "[$functionName] Processing property: $key"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing property: $key" -LogLevel "Verbose"
         
         # Format the property name to be more readable
         $readableKey = $key
@@ -1203,6 +1321,7 @@ function ShowDeviceReport()
             {
                 $matchedPrefix = $prefix
                 Write-Verbose "[$functionName] Found prefix '$prefix' for key '$key'"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found prefix '$prefix' for key '$key'" -LogLevel "Information"
                 break
             }
         }
@@ -1226,6 +1345,7 @@ function ShowDeviceReport()
         if ($output[$key] -is [DateTime])
         {
             Write-Verbose "[$functionName] Formatting DateTime value for key '$key'"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatting DateTime value for key '$key'" -LogLevel "Information"
             $formattedValue = FormatDateWithTimeZone -DateTime $output[$key]
         }
         elseif ($null -eq $output[$key])
@@ -1239,11 +1359,13 @@ function ShowDeviceReport()
         Write-Host "$readableKey`: $formattedValue"
     }
     Write-Verbose "[$functionName] Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Formatted $($formattedOutput.Keys.Count) properties for display"    #endregion Format property names and display report" -LogLevel "Information"
     #endregion Display report
     
     #region Handle export decision
     $HTMLAction = {
         Write-Verbose "[$functionName] User selected HTML export"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected HTML export" -LogLevel "Information"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "HTML"
         if ($exportResult)
         {
@@ -1257,6 +1379,7 @@ function ShowDeviceReport()
     } 
     $CSVAction = {
         Write-Verbose "[$functionName] User selected CSV export"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected CSV export" -LogLevel "Information"
         $exportResult = ExportDeviceReport -formattedOutput $formattedOutput -ExportFormat "CSV"
         if ($exportResult)
         {
@@ -1269,6 +1392,7 @@ function ShowDeviceReport()
         return $exportResult 
     } 
     Write-Verbose "[$functionName] Prompting user for export decision"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Prompting user for export decision" -LogLevel "Information"
     $exportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
     $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $exportMenu = AddMenuItem -Menu $exportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
@@ -1277,20 +1401,24 @@ function ShowDeviceReport()
     if ($null -ne $selection )
     {
         Write-Verbose "[$functionName] ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned: '$selection' (Type: $($selection.GetType().Name))" -LogLevel "Information"
         # Validate that we got a proper selection, not a navigation option
         if ($selection -eq "Back" -or $selection -eq "Main Menu" -or $selection -eq 0 -or $selection -eq "0")
         {
             Write-Verbose "[$functionName] ShowMenu returned navigation option: '$selection', treating as navigation"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowMenu returned navigation option: '$selection', treating as navigation" -LogLevel "Information"
             return $selection
         }
     }
     else
     {
         Write-Verbose "[$functionName] No export selected. Exiting."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No export selected. Exiting." -LogLevel "Information"
         return $null
     }
     #endregion Handle export decision
     Write-Verbose "[$functionName] Device report generation completed"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report generation completed" -LogLevel "Information"
     return $true
 }
 
@@ -1306,6 +1434,7 @@ function GetNextUserReadinessReport()
     Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
     $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
     Write-Verbose "[$functionName] Device assessment state: $DeviceAssessmentState"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
     if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
     {
         Write-Host $DeviceAssessmentState.ready
@@ -1354,10 +1483,13 @@ function getDevicePendingActions()
     $pendingActions = [PSCustomObject]@{}
     $isPendingAction = $false
     Write-Verbose "[$functionName] Checking for pending actions on the device..."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking for pending actions on the device..." -LogLevel "Verbose"
     Write-Verbose "[$functionName] Device management state: $($enrollmentState.managedDevice.device.managementState)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device management state: $($enrollmentState.managedDevice.device.managementState)" -LogLevel "Information"
     if ($enrollmentState.managedDevice.device.managementState -in $deviceActions)
     {
         Write-Verbose "[$functionName] The device has pending actions."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device has pending actions." -LogLevel "Information"
         $isPendingAction = $true
         Write-Verbose "Action name $($enrollmentState.managedDevice.device.managementState)"
         Write-Verbose "Action status $($enrollmentState.managedDevice.device.managementState)"
@@ -1369,7 +1501,9 @@ function getDevicePendingActions()
     else
     {
         Write-Verbose "[$functionName] The device has no pending actions."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device has no pending actions." -LogLevel "Information"
         Write-Verbose "[$functionName] Device management state: $($enrollmentState.managedDevice.device.managementState)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device management state: $($enrollmentState.managedDevice.device.managementState)" -LogLevel "Information"
         $isPendingAction = $false
     }
 
@@ -1387,9 +1521,11 @@ function getDevicePendingActions()
         }
     }        
     Write-Verbose "[$functionName] Is pending action: $isPendingAction"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Is pending action: $isPendingAction" -LogLevel "Information"
     if ($isPendingAction -eq $true)
     {
         Write-Verbose "[$functionName] There are pending actions for the device."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "There are pending actions for the device." -LogLevel "Information"
         $returnObject.Add('PendingActions', $pendingActions)
         $returnObject.Add('IsPendingAction', $isPendingAction)
         return $returnObject
@@ -1397,6 +1533,7 @@ function getDevicePendingActions()
     else
     {
         Write-Verbose "[$functionName] No pending actions found for the device."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions found for the device." -LogLevel "Information"
         $returnObject.Add('PendingActions', $null)
         $returnObject.Add('IsPendingAction', $isPendingAction)
         return $returnObject

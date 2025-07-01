@@ -8,6 +8,7 @@ param(
     [switch]$Reconfigure,
     [switch]$ReInitialize,
     [switch]$Update,
+    [switch]$showLicenseBanner,
     [switch]$showAuth,
     [switch]$showSettings,
     [switch]$SecureString,
@@ -25,18 +26,326 @@ param(
     [string]$AuthType,
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
-    [string]$Repo = 'github',
-    [string]$Release = 'main',
+    [ValidateSet('github', 'gitlab')]
+    [string]$Repo,  
+    [string]$Release,
     [ValidateSet('full', 'helpDesk', 'registration')]
-    [string]$appMode
+    [string]$appMode,
+    [string]$LogFile = "$pwd\Logs\Autopilot.log",
+    [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+    [string]$LogLevel = 'Information'
 )
 
+#region Initialize script
+function Write-Log()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
+        [string]$Message,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
+        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
+        [ValidateScript({
+                $parentDir = Split-Path $_ -Parent
+                if (-not (Test-Path $parentDir))
+                {
+                    try
+                    {
+                        New-Item -Path $parentDir -ItemType Directory -Force | Out-Null
+                    }
+                    catch
+                    {
+                        throw "Failed to create log directory: $_. Exception: $($_.Exception.Message)"
+                    }
+                }
+                return $true
+            })]
+        [string]$LogFile,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
+        [string]$Module,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [ValidateSet("Verbose", "Debug", "Information", "Warning", "Error")]
+        [string]$LogLevel = "Information",
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
+        [switch]$CMTraceFormat,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
+        [int]$MaxLogSizeMB = 10,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [switch]$PassThru,
+        [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
+        [switch]$StartLogging,
+        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
+        [switch]$FinishLogging,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
+        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
+        [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
+        [string]$MinimumLogLevel
+    )
+    try
+    {
+        # Use global minimum log level if not provided
+        if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
+        {
+            $MinimumLogLevel = $Global:MinimumLogLevel
+        }
+        elseif (-not $MinimumLogLevel)
+        {
+            $MinimumLogLevel = 'Information'
+        }
+        
+        # Define log level hierarchy (higher numbers = more detailed logging)
+        $logLevelHierarchy = @{
+            'Error'       = 1
+            'Warning'     = 2
+            'Information' = 3
+            'Verbose'     = 4
+            'Debug'       = 5
+        }
+        
+        # Handle StartLogging and FinishLogging switches
+        if ($StartLogging -or $FinishLogging)
+        {
+            # Set default values when using StartLogging or FinishLogging
+            $Module = $MyInvocation.MyCommand.Name
+            $LogLevel = "Information"
+            
+            # Create separator line
+            $separatorLine = "=" * 80
+            
+            # Ensure log directory exists
+            $logDir = Split-Path $LogFile -Parent
+            if (-not (Test-Path $logDir))
+            {
+                New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+            }
+            
+            # Check for log rotation if file exists and is too large
+            if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
+            {
+                $archiveFile = $LogFile -replace '\.log$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+                Move-Item -Path $LogFile -Destination $archiveFile -Force
+                Write-Verbose "Log file rotated to: $archiveFile"
+            }
+            
+            if ($CMTraceFormat)
+            {
+                # For CMTrace format, still use the separator but in CMTrace format
+                $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
+                $cmDate = Get-Date -Format "MM-dd-yyyy"
+                $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
+                $logEntry = "<![LOG[$separatorLine]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
+            }
+            else
+            {
+                # For standard format, just use the separator line without timestamp
+                $logEntry = $separatorLine
+            }
+            
+            # Use mutex for thread safety
+            $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
+            $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+            
+            try
+            {
+                $mutex.WaitOne() | Out-Null
+                Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+            }
+            finally
+            {
+                $mutex.ReleaseMutex()
+                $mutex.Dispose()
+            }
+            
+            # Write to console
+            Write-Host $separatorLine
+            
+            return
+        }
+        
+        # Check if this log entry should be written based on minimum log level
+        # Only continue if the current log level meets or exceeds the minimum threshold
+        if (-not ($StartLogging -or $FinishLogging))
+        {
+            $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
+            $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
+            
+            if ($currentLogLevelValue -gt $minimumLogLevelValue)
+            {
+                # Current log level is more detailed than the minimum, skip logging to file
+                # But still write to console streams
+                switch ($LogLevel)
+                {
+                    "Error"
+                    {
+                        Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                    }
+                    "Warning"
+                    {
+                        Write-Warning "[$Module] $Message" 
+                    }
+                    "Verbose"
+                    {
+                        Write-Verbose "[$Module] $Message" 
+                    }
+                    "Debug"
+                    {
+                        Write-Debug "[$Module] $Message" 
+                    }
+                    default
+                    {
+                        # For Information level, we don't output to console in this case
+                    }
+                }
+                return
+            }
+        }
+        
+        # Ensure log directory exists
+        $logDir = Split-Path $LogFile -Parent
+        if (-not (Test-Path $logDir))
+        {
+            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+        }
+        
+        # Check for log rotation if file exists and is too large
+        if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
+        {
+            $archiveFile = $LogFile -replace '\.log$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+            Move-Item -Path $LogFile -Destination $archiveFile -Force
+            Write-Verbose "Log file rotated to: $archiveFile"
+        }
+        
+        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+        $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
+        
+        if ($CMTraceFormat)
+        {
+            # True CMTrace format: 
+            $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
+            $cmDate = Get-Date -Format "MM-dd-yyyy"
+            $severity = switch ($LogLevel)
+            {
+                "Error"
+                {
+                    3 
+                }
+                "Warning"
+                {
+                    2 
+                }
+                default
+                {
+                    1 
+                }
+            }
+            $logEntry = "<![LOG[$Message]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"$severity`" thread=`"$thread`" file=`"`">"
+        }
+        else
+        {
+            # Enhanced standard format with thread ID
+            $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] $Message"
+        }
+        
+        # Use mutex for thread safety in concurrent scenarios
+        $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
+        $mutex = New-Object System.Threading.Mutex($false, $mutexName)
+        
+        try
+        {
+            $mutex.WaitOne() | Out-Null
+            Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+        }
+        finally
+        {
+            $mutex.ReleaseMutex()
+            $mutex.Dispose()
+        }
+        
+        # Write to appropriate PowerShell stream based on log level
+        switch ($LogLevel)
+        {
+            "Error"
+            {
+                Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+            }
+            "Warning"
+            {
+                Write-Warning "[$Module] $Message" 
+            }
+            "Verbose"
+            {
+                Write-Verbose "[$Module] $Message" 
+            }
+            "Debug"
+            {
+                Write-Debug "[$Module] $Message" 
+            }
+            default
+            {
+                Write-Verbose "Logged: $logEntry" 
+            }
+        }
+        
+        # Return log entry if PassThru is specified
+        if ($PassThru)
+        {
+            return [PSCustomObject]@{
+                Timestamp = $timestamp
+                LogLevel  = $LogLevel
+                Module    = $Module
+                Message   = $Message
+                Thread    = $thread
+                LogFile   = $LogFile
+                Entry     = $logEntry
+            }
+        }
+    }
+    catch
+    {
+        Write-Error "Failed to write to log file '$LogFile': $_"
+        # Fallback to console output
+        Write-Host "$timestamp [$LogLevel] [$Module] $Message" -ForegroundColor $(
+            switch ($LogLevel)
+            {
+                "Error"
+                {
+                    "Red" 
+                }
+                "Warning"
+                {
+                    "Yellow" 
+                }
+                "Debug"
+                {
+                    "Cyan" 
+                }
+                default
+                {
+                    "White" 
+                }
+            }
+        )
+    }
+}
+
 $scriptName = $MyInvocation.MyCommand.Name
+# Set global log level for all Write-Log calls
+$Global:MinimumLogLevel = $LogLevel
+# Initialize logging
+Write-Log -LogFile $LogFile -StartLogging
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
-    Write-Verbose "[$scriptName] Running as an external script."
     $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
     Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
 }
 else
 {
@@ -45,11 +354,17 @@ else
     Write-Verbose "[$scriptName] Script path: $ScriptPath"
     if (!$ScriptPath)
     {
-        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory."
-        $ScriptPath = "."
-        $scriptName = 'main.ps1'
+        $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
     }
 }
+#endregion Initialize script
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -108,19 +423,16 @@ if (Test-Path -Path $InitFile)
                 $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
                 $globalSettings.add($key, $keyBooleanValue)
                 Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-                # Set-Variable -Name $key -Value $keyBooleanValue
             }
             else
             {
                 Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($globalConfigData.$key))."
-                # Set-Variable -Name $key -Value $globalConfigData.$key
                 $globalSettings.add($key, $globalConfigData.$key)
             }
         }
         else
         {
             Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            #add it to the global settings hashtable.
             $globalSettings.add($key, $PSBoundParameters[$key])
         }
     }
@@ -156,7 +468,6 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
-    
 }
 else
 {
@@ -184,33 +495,49 @@ else
 #endregion import functions.
 
 #region Define variables
-if ($repo -eq 'github')
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+if ($settings.Repo -eq 'github')
 {
+    Write-Verbose "[$scriptName] Using GitHub repository."
     $baseSourceURL = 'https://raw.githubusercontent.com'
+    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+    $baseURL = "https://www.github.com"
+    Write-Verbose "[$scriptName] Base URL: $baseURL"
     $repoPath = 'zuhairmahd'
+    Write-Verbose "[$scriptName] Repository path: $repoPath"
     $repoName = 'autopilot'
-    if ($release -eq 'auto')
+    Write-Verbose "[$scriptName] Repository name: $repoName"
+    $defaultBranch = 'master'
+    Write-Verbose "[$scriptName] Default branch: $defaultBranch"
+    if ($settings.release -eq 'auto')
     {
+        Write-Verbose "[$scriptName] Release is set to 'auto'. Fetching the latest release from GitHub."
         $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
+        Write-Verbose "[$scriptName] Latest release fetched: $latestRelease"
         if ($latestRelease)
         {
-            Write-Host "The latest release is $latestRelease"
+            Write-Verbose "[$scriptName] Successfully retrieved the latest release information from GitHub."
+            Write-Host "Latest release: $latestRelease"
         }
         else
         {
             Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
-            Write-Host 'Defaulting to main branch.'
-            $latestRelease = 'main'
+            Write-Host "Defaulting to $defaultBranch branch."
+            $latestRelease = $defaultBranch
         }
     }
     else
     {
-        $latestRelease = $Release
+        Write-Verbose "[$scriptName] Using specified release: $($settings.release)"
+        $latestRelease = $settings.release
     }
 }
-elseif ($repo -eq 'gitlab')
+elseif ($settings.Repo -eq 'gitlab')
 {
     $baseSourceURL = 'https://git.gao.gov'
+    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+    $baseURL = "https://git.gao.gov"
+    Write-Verbose "[$scriptName] Base URL: $baseURL"
     $repoPath = 'mahmoudz'
     $repoName = 'autopilot-deployment'
     $repoId = '1031'
@@ -220,9 +547,20 @@ else
 {
     Write-Host 'Invalid repository specified.'
     Write-Host 'Defaulting to the main branch from GitHub.'
-    $latestRelease = 'main'
+    $latestRelease = $defaultBranch
 }
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
+Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
+$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
+Write-Verbose "[$scriptName] Update URL: $updateURL"
+$updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
+$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+Write-Verbose "[$scriptName] Version: $version"
+if (-not $version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
+    $version = [System.Version]::Parse('1.0.0.0')
+}
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -247,11 +585,7 @@ foreach ($key in $getTokenParams.Keys)
     }
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
-$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
-$versionFile = 'version.txt'
-Write-Verbose "[$scriptName] Version file: $versionFile"
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/$versionFile"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $stringsFile = "$PWD\strings.json"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
@@ -270,29 +604,63 @@ $script:DeviceEnrollmentCache = @{}
 
 #region logging
 Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)" -LogLevel "Information"
 Write-Verbose "[$scriptName] The current parameter set is $($PSCmdlet.ParameterSetName)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The current parameter set is $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
 Write-Verbose "[$scriptName] Configuration file: $configFile"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Configuration file: $configFile" -LogLevel "Information"
+Write-Verbose "[$scriptName] Initialization file: $InitFile"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initialization file: $InitFile" -LogLevel "Information"
+Write-Verbose "Log filename: $LogFile"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log filename: $LogFile" -LogLevel "Information"
+Write-Verbose "[$scriptName] Show settings: $showSettings"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show settings: $showSettings" -LogLevel "Information"
+Write-Verbose "[$scriptName] Show auth: $showAuth"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
+Write-Verbose "[$scriptName] Log level: $LogLevel"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
 Write-Verbose "[$scriptName] App mode is $($settings.appMode)."
-Write-Verbose "[$scriptName] Computer name: $Name"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode is $($settings.appMode)." -LogLevel "Information"
 Write-Verbose "[$scriptName] Group tag: $settings.GroupTag"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
 Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Assigned user: $AssignedUser" -LogLevel "Information"
 Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Reconfigure: $Reconfigure" -LogLevel "Information"
 Write-Verbose "[$scriptName] Repository: $settings.Repo"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Repository: $settings.Repo" -LogLevel "Information"
 Write-Verbose "[$scriptName] Release: $settings.Release"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Release: $settings.Release" -LogLevel "Information"
 Write-Verbose "[$scriptName]    Domain: $domain"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain: $domain" -LogLevel "Information"
 Write-Verbose "[$scriptName] Max wait time: $settings.maxWaitTime"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Max wait time: $settings.maxWaitTime" -LogLevel "Information"
 Write-Verbose "[$scriptName] Time in seconds: $settings.timeInSeconds"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Time in seconds: $settings.timeInSeconds" -LogLevel "Information"
 Write-Verbose "[$scriptName] Auth type: $auth.AuthType"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auth type: $auth.AuthType" -LogLevel "Information"
 Write-Verbose "[$scriptName] Cache type: $auth.CacheType"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Cache type: $auth.CacheType" -LogLevel "Information"
 Write-Verbose "[$scriptName] Force new token: $auth.ForceNewToken"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new token: $auth.ForceNewToken" -LogLevel "Information"
 Write-Verbose "[$scriptName] Force new refresh token: $auth.ForceNewRefreshToken"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new refresh token: $auth.ForceNewRefreshToken" -LogLevel "Information"
 Write-Verbose "[$scriptName] No save refresh token: $auth.NoSaveRefreshToken"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No save refresh token: $auth.NoSaveRefreshToken" -LogLevel "Information"
 Write-Verbose "[$scriptName] Deligated: $auth.Deligated"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Deligated: $auth.Deligated" -LogLevel "Information"
 Write-Verbose "[$scriptName] Scope: $auth.Scope"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Scope: $auth.Scope" -LogLevel "Information"
 Write-Verbose "[$scriptName] Secure string: $auth.SecureString"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Secure string: $auth.SecureString" -LogLevel "Information"
 Write-Verbose "[$scriptName] App mode: $settings.appMode"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode: $settings.appMode" -LogLevel "Information"
 Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Functions folder: $functionsFolder" -LogLevel "Information"
 Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
+Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: $remoteVersionURL" -LogLevel "Information"
 #endregion logging
 
 #region helper functions
@@ -304,7 +672,6 @@ function ProcessDevice()
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         $DeviceObject,
-        $returnValues = $returnValues,
         [Parameter(Mandatory = $true)]
         [ValidateSet('import', 'check', 'delete')]
         [string]$action,
@@ -314,24 +681,34 @@ function ProcessDevice()
     #region check and initialize variables
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking access token..."
+        
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking access token..." -LogLevel "Verbose"
     if ($accessToken)
     {
         Write-Verbose "[$functionName] Access token provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token provided." -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] Access token not provided. Returning Null."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Access token not provided. Returning Null." -LogLevel "Information"
         return $null
     }
     Write-Verbose "[$functionName] Processing serial number: $($deviceObject.SerialNumber)."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing serial number: $($deviceObject.SerialNumber)." -LogLevel "Verbose"
     Write-Verbose "[$functionName] Action: $action"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action: $action" -LogLevel "Information"
     Write-Verbose "[$functionName] Custom import: $CustomImport"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Custom import: $CustomImport" -LogLevel "Information"
     $serialNumber = $deviceObject.serialNumber
     Write-Verbose "[$functionName] The serial number is $serialNumber."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The serial number is $serialNumber." -LogLevel "Information"
     $make = $deviceObject.manufacturer
     Write-Verbose "[$functionName] The manufacturer is $make"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The manufacturer is $make" -LogLevel "Information"
     $model = $deviceObject.model
     Write-Verbose "[$functionName] The model is $model"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "The model is $model" -LogLevel "Information"
     #endregion check and initialize variables
     
     switch ($action)
@@ -339,13 +716,16 @@ function ProcessDevice()
         'import'
         {
             Write-Verbose "[$functionName] Importing device with serial number $serialNumber."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Importing device with serial number $serialNumber." -LogLevel "Information"
             Write-Host "Checking to make sure the device hash is not already in Intune..."
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             Write-Verbose "[$functionName] Device assignment check returned: $deviceAssignment"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment check returned: $deviceAssignment" -LogLevel "Information"
             if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
                 $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
                 Write-Verbose "[$functionName] Device assignment status: $isAssigned"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment status: $isAssigned" -LogLevel "Information"
                 if ($isAssigned)
                 {
                     return $returnValues.deviceAssignedMessage
@@ -355,6 +735,7 @@ function ProcessDevice()
             {
                 Write-Host "The device is not in Intune." 
             }
+            
             #region Add the device to Intune
             Write-Host "This will import the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) into Autopilot."
             $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
@@ -362,7 +743,6 @@ function ProcessDevice()
             {
                 Write-Host "Invalid choice. Please enter 'yes' or 'no'."
                 #beep
-                [console]::beep(1000, 500)
                 $choice = Read-Host "Are you sure you want to import this device? (yes/no)"
             }
             if ($choice -eq 'no')
@@ -375,6 +755,7 @@ function ProcessDevice()
             if ($device -eq $returnValues.backoutText)
             {
                 Write-Verbose "[$functionName] The import function returned $device."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "The import function returned $device." -LogLevel "Information"
                 return $returnValues.backoutText
             }
             $importResult = ProcessImportResult -device $device -returnValues $returnValues
@@ -382,10 +763,8 @@ function ProcessDevice()
             {
                 return $importResult
             }
-            
             Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
             Start-Sleep -Seconds $timeInSeconds
-            
             $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
             return ProcessAssignmentResult -assignment $assignment -importStart $importStart -returnValues $returnValues
             #endregion Add the device to Intune.
@@ -422,9 +801,12 @@ function ProcessDevice()
                     $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
                         Write-Host "Restarting the device..."
                         Write-Verbose "[$functionName] User chose to restart the device."
+
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User chose to restart the device." -LogLevel "Information"
                         if (-not (RestartDevice))
                         {
                             Write-Verbose "[$functionName] RestartDevice function returned false."
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "RestartDevice function returned false." -LogLevel "Information"
                             return $returnValues.noRestartMessage 
                         }
                     }
@@ -448,14 +830,17 @@ function ProcessDevice()
                     }
                     $result = ShowMenu -Menu $deviceWaitMenu -CalledBy 'Action'
                     Write-Verbose "[$functionName] Result from device wait menu: $result"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Result from device wait menu: $result" -LogLevel "Information"
                     if ($result -eq $returnValues.backoutText)
                     {
                         Write-Verbose "[$functionName] User selected Back from device wait menu."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected Back from device wait menu." -LogLevel "Information"
                         return $returnValues.backoutText
                     }
                     elseif ($result -eq "EXIT_APPLICATION")
                     {
                         Write-Verbose "[$functionName] User selected to exit the application."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected to exit the application." -LogLevel "Information"
                         return "EXIT_APPLICATION"
                     }
                     else 
@@ -498,6 +883,7 @@ function ProcessDevice()
         default
         {
             Write-Verbose "[$functionName] Invalid action: $action"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid action: $action" -LogLevel "Error"
             return $returnValues.unknownErrorMessage
         }
     }
@@ -516,13 +902,14 @@ function ProcessSerialNumber()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing device lookup for serial number: $SerialNumber" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Information"
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
         return $null # Return null to signal no valid serial number
     }
-    $success = $false
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
     $enrollmentState = GetCachedDeviceEnrollmentState -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
@@ -530,13 +917,18 @@ function ProcessSerialNumber()
     {
         $success = $true
         Write-Verbose "[$functionName] Device lookup successful"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup successful" -LogLevel "Information"
         # Display basic device information
         Write-Host "`n=== Device Information ===" -ForegroundColor Green
         Write-Host "Serial Number: $SerialNumber"
         Write-Verbose "[$scriptName] Device is managed: $($enrollmentState.managed)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device is managed: $($enrollmentState.managed)" -LogLevel "Information"
         Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Has device object: $($enrollmentState.hasDeviceObject)" -LogLevel "Information"
         Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
         Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
         if ($CheckUserReadiness)
         {
             return GetNextUserReadinessReport -enrollmentState $enrollmentState
@@ -553,6 +945,7 @@ function ProcessSerialNumber()
                 Write-Host "=============================`n" -ForegroundColor Green
                 $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
                 Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
+                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
                 Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
@@ -574,7 +967,9 @@ function ProcessSerialNumber()
         if ($enrollmentState.Imported)
         {
             Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported in Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
             Write-Verbose "[$scriptName] Imported count: $($enrollmentState.Imported)"
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported count: $($enrollmentState.Imported)" -LogLevel "Information"
             if ($enrollmentState.Imported -gt 1)
             {
                 Write-Host "This device was imported into Autopilot $($enrollmentState.Imported) times." -ForegroundColor Green
@@ -599,6 +994,7 @@ function ProcessSerialNumber()
         else
         {
             Write-Verbose "This device was not recently imported into Autopilot."
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "This device was not recently imported into Autopilot." -LogLevel "Warning"
         }
         if ($enrollmentState.managed)
         {
@@ -613,6 +1009,7 @@ function ProcessSerialNumber()
             Write-Host "=============================`n" -ForegroundColor Green
             $pendingActions = getDevicePendingActions -enrollmentState $enrollmentState
             Write-Verbose "[$functionName] Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)" -LogLevel "Information"
             if ($pendingActions.isPendingAction)
             {
                 Write-Host "This device has pending actions:"
@@ -626,9 +1023,11 @@ function ProcessSerialNumber()
             else
             {
                 Write-Verbose "[$functionName] No pending actions for this device."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions for this device." -LogLevel "Information"
             }
             # Create and show device actions menu using main.ps1 menu structure
             Write-Verbose "[$functionName] Starting device actions menu loop"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Information"
             $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
             #region Process devices
             # Add menu items for each device action
@@ -645,20 +1044,48 @@ function ProcessSerialNumber()
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
             Write-Verbose "[$functionName] Checking if device has LAPS credentials."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device has LAPS credentials." -LogLevel "Verbose"
             Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)" -LogLevel "Information"
             if ($enrollmentState.managedDevice.laps.credentials.count -gt 0)
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
                     GetDeviceLAPSCredentials -enrollmentState $enrollmentState
+                    try
+                    {
+                        Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enrollmentState.managedDevice.LAPS.credentials[0].passwordBase64)))
+                        Write-Host "`LAPS password copied to clipboard." -ForegroundColor Green
+                    }
+                    catch
+                    {
+                        Write-Host "`nFailed to copy LAPS password to clipboard. Please check your permissions." -ForegroundColor Red
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy LAPS password to clipboard. Error: $_" -LogLevel "Error"
+                    }
                 }
             }            
             Write-Verbose "Checking if we have bitlocker keys for this device."
             Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)" -LogLevel "Information"
             if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
                     Write-Verbose "[$scriptName] Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
-                    GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
+                    $bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
+                    if ($bitlockerKey -ne "`n")
+                    {
+                        try
+                        {
+                            Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enrollmentState.managedDevice.LAPS.credentials[0].passwordBase64)))
+                            Write-Host "`nBitlocker key copied to clipboard." -ForegroundColor Green
+                        }
+                        catch
+                        {
+                            Write-Host "`nFailed to copy Bitlocker key to clipboard. Please check your permissions." -ForegroundColor Red
+                            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy Bitlocker key to clipboard. Error: $_" -LogLevel "Error"
+                        }
+                
+                    }
                 }
             }
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
@@ -668,20 +1095,24 @@ function ProcessSerialNumber()
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
                 Write-Verbose "[$functionName] Device report: $deviceReport"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report: $deviceReport" -LogLevel "Information"
                 # Handle navigation responses from ShowReport
                 if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
                 {
                     Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
                     return $returnValues.backoutText
                 }
                 elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
                 {
                     Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }
                 elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
                 {
                     Write-Verbose "[$scriptName] User requested application exit from device selection."
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User requested application exit from device selection." -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }        
                 elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
@@ -695,6 +1126,7 @@ function ProcessSerialNumber()
                         Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
                     }
                     Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
+                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
                 }
                 return $returnValues.backoutText
             }
@@ -702,10 +1134,13 @@ function ProcessSerialNumber()
                 return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
             }            # Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)" -LogLevel "Information"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             #endregion Process devices
             Write-Verbose "[$functionName] Device actions menu returned result: $result"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device actions menu returned result: $result" -LogLevel "Information"
             Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning from device actions menu with result: $result" -LogLevel "Information"
             return $result
         }
         else
@@ -728,6 +1163,7 @@ function ProcessSerialNumber()
     {
         # Explicitly return $null if no enrollmentState
         Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Error"
         return $null
     }
     
@@ -762,8 +1198,42 @@ else
 }
 #endregion initialization block
 
+#write a nice welcome message with the version number and a copyright message.
+Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
+Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+
+if ($settings.showLicenseBanner)
+{
+    Write-Host "==========================================================`n"     
+    Write-Host "This script is licensed under the MIT License." 
+    Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
+    Write-Host ""
+    Write-Host "Report issues at $baseURL/$repoPath/$repoName/issues"
+    Write-Host "For the changeLog, go to $baseURL/$repoPath/$repoName/releases"
+    Write-Host "==========================================================`n"
+    Write-Host " DISCLAIMER: This script is provided AS IS without warranty of any kind." -ForegroundColor Red
+    Write-Host "The author makes no guarantees about the script's functionality or suitability for any purpose." -ForegroundColor Red
+    Write-Host "It is your responsibility to test and validate the script in your environment before using it." -ForegroundColor Red
+    Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
+    Write-Host "==========================================================`n"
+}
+if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
+{
+    Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "==========================================================`n"    
+    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "Please run the update command to get the latest version." -ForegroundColor Yellow
+    Write-Host "==========================================================`n"
+}
+else
+{
+    Write-Verbose "[$scriptName] No updates available or current script is up to date."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
+}
+
 #region Menu Definitions
-$mainMenu = NewMenu -Title "Main Menu" -Description "Welcome to the Intune Helpdesk menu.  What would you like to do?"
+$mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
 $deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
@@ -1368,39 +1838,31 @@ else
 {
     Write-Verbose "[$scriptName] App mode is test. Skipping Settings menu."
 }
-if ($settings.appMode -ne 'test')
-{
-    Write-Verbose "[$scriptName] App mode is not test. Adding script update check to main menu."
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
-        Write-Host "Checking for script updates..."
-        $updateResult = GetUpdates -RootFolder $pwd -remoteVersionURL $remoteVersionURL -updateURL $updateURL -returnValues $returnValues
-        Write-Verbose "[$scriptName] Update result: $updateResult"
-        switch ($updateResult)
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+    Write-Host "Checking for script updates..."
+    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
+    Write-Verbose "[$scriptName] Update result: $updateResult"
+    switch ($updateResult)
+    {
+        $returnValues.UpdateSuccessMessage
         {
-            $returnValues.UpdateSuccessMessage
-            {
-                Write-Host 'The script has been updated.' -ForegroundColor Green
-                Write-Host 'Please restart the script.' -ForegroundColor Green
-                exit 0
-            }
-            $returnValues.UpdateFailedMessage
-            {
-                Write-Host 'The script update failed.' -ForegroundColor Red
-            }
-            $returnValues.UpdateNotNeededMessage
-            {
-                Write-Host 'The script is up to date.' -ForegroundColor Green
-            }
-            default
-            {
-                Write-Host 'An unknown error occurred while checking for updates.' -ForegroundColor Red
-            }
+            Write-Host 'The script has been updated.' -ForegroundColor Green
+            Write-Host 'Please restart the script.' -ForegroundColor Green
+            exit 0
+        }
+        $returnValues.UpdateFailedMessage
+        {
+            Write-Host 'The script update failed.' -ForegroundColor Red
+        }
+        $returnValues.UpdateNotNeededMessage
+        {
+            Write-Host 'The script is up to date.' -ForegroundColor Green
+        }
+        default
+        {
+            $updateResult
         }
     }
-}
-else 
-{
-    Write-Verbose "[$scriptName] App mode is test. Skipping script update check."
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
@@ -1445,3 +1907,8 @@ else
     Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion Show Menu
+
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+
+

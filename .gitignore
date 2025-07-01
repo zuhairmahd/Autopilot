@@ -10,6 +10,7 @@ Desktop.ini
 
 .secrets/
 .vscode/
+.vs/
 release/
 build/
 TestReports/
