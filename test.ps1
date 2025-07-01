@@ -544,59 +544,133 @@ function HasScope()
         $requiredScopes = $settings.requiredScopes,
         $accessToken
     )
+    
     $functionName = $MyInvocation.MyCommand.Name
-    $authorizedScopes = (DecodeJwtToken -Token $accessToken).roles
-    #print verbose output
-    Write-Verbose "[$functionName] Checking $($resourcePath.count) resource paths for required scopes."
-    foreach ($uri in $resourcePath)
+    Write-Verbose "[$functionName] Starting scope validation for $($ResourcePath.Count) resource paths"
+    
+    # Get authorized scopes from the access token
+    $global:authorizedScopes = (DecodeJwtToken -Token $accessToken).roles
+    Write-Verbose "[$functionName] Total authorized scopes/roles: $($authorizedScopes.Count)"
+    $returnObjects = @()
+    $allScopesAuthorized = $true
+    Write-Verbose "[$functionName] Checking $($ResourcePath.Count) resource paths for required scopes."
+    foreach ($uri in $ResourcePath)
     {
         Write-Verbose "[$functionName] Checking resource path: $uri"
-        if ($uri -match 'https?://[^/]+/v1.0/')
+        Write-Host "Checking resource path: $uri"
+        
+        # Normalize $uri to relative path for endpoint comparison
+        if ($uri -match 'https?://[^/]+/(v1\.0|beta)/(.+)')
         {
-            Write-Verbose "[$functionName] Resource path is a v1.0 endpoint."
-            Write-Verbose "[$functionName] Stripping uri and version from resource path."
-            $resourcePath = $uri -replace 'https?://[^/]+/v1.0/', ''
-            Write-Verbose "[$functionName] Resource path after stripping uri and version: $resourcePath"
-        }
-        elseif ($uri -match 'https?://[^/]+/beta/')
-        {
-            Write-Verbose "[$functionName] Resource path is a beta endpoint."
-            Write-Verbose "[$functionName] Stripping uri and version from resource path."
-            $resourcePath = $uri -replace 'https?://[^/]+/beta/', ''
-            Write-Verbose "[$functionName] Resource path after stripping uri and version: $resourcePath"
+            $relativeUri = $Matches[2]
+            Write-Verbose "[$functionName] Normalized URI for endpoint comparison: $relativeUri"
         }
         else
         {
-            Write-Verbose "[$functionName] Processing $uri as a relative resource path."
+            $relativeUri = $uri
+            Write-Verbose "[$functionName] Using URI as-is for endpoint comparison: $relativeUri"
         }
-        Write-Verbose "[$functionName] Checking the resource against $($requiredScopes.count) scopes."
-        foreach ($requiredScope in $requiredScopes)
+        Write-Host "Normalized URI for endpoint comparison: $relativeUri"
+        
+        # Find required scopes for this endpoint
+        [array]$global:matchingScopes = $requiredScopes | Where-Object { 
+            $_.endpoints -contains $relativeUri -or 
+            ($_.endpoints | Where-Object { $relativeUri -like $_.Replace('{id}', '*') })
+        }
+        Write-Host "Number of matching scopes: $($global:matchingScopes.Count)"
+        Write-Host "Matching required scopes: $($matchingScopes | Out-String) scopes."
+        $uriAuthorized = $false
+        foreach ($scopeInfo in $matchingScopes)
         {
-            Write-Host "Required scope: $($requiredScope.scope)"
-            Write-Host "Scope reason: $($requiredScope.reason)"
-            Write-Host "Covered endpoints: $($requiredScope.endpoints -join ', ')"
-            if ($resourcePath -match $requiredScope.endpoints -join '|')
+            # Handle both "Scope" and "scope" property names
+            $global:requiredScope = if ($scopeInfo.Scope) { $scopeInfo.Scope } else { $scopeInfo.scope }
+            Write-Verbose "[$functionName] Checking if scope '$requiredScope' is authorized"
+            Write-Host "Required scope: $requiredScope"
+            
+            if ($authorizedScopes -contains $requiredScope)
             {
-                Write-Host "The resource path $($resourcePath) is covered by the scope $($requiredScope.scope)."
-                if ($requiredScope.scope -in $global:authorizedScopes)
-                {
-                    Write-Host "The scope $($requiredScope.scope) is granted." -ForegroundColor Green
-                    return $true
-                }
-                else
-                {
-                    Write-Host "The scope $($requiredScope.scope) is not granted." -ForegroundColor Red
-                    return $false
-                }
+                Write-Host "Scope '$requiredScope' is authorized" -ForegroundColor Green
+                $uriAuthorized = $true
+            }
+            else
+            {
+                Write-Host "Scope '$requiredScope' is NOT authorized" -ForegroundColor Red
+                $allScopesAuthorized = $false
             }
         }
+        
+        # Create return object for this URI
+        $returnObject = [PSCustomObject]@{
+            Uri              = $uri
+            RelativeUri      = $relativeUri
+            RequiredScopes   = $matchingScopes
+            IsAuthorized     = $uriAuthorized
+            AuthorizedScopes = $authorizedScopes
+        }
+        
+        $returnObjects += $returnObject
+        Write-Verbose "[$functionName] URI '$uri' authorization status: $uriAuthorized"
+    }
+    
+    Write-Verbose "[$functionName] Overall authorization status: $allScopesAuthorized"
+    Write-Host "Overall authorization status: $allScopesAuthorized" 
+    
+    # Return both the detailed objects and the overall status
+    return @{
+        IsAuthorized     = $allScopesAuthorized
+        Details          = $returnObjects
+        AuthorizedScopes = $authorizedScopes
     }
 }
 
-hasScope -ResourcePath 'https://graph.microsoft.com/v1.0/users"' -accessToken $accessToken -requiredScopes $global:requiredScopes
+
+$global:authorizationResult = HasScope -ResourcePath @('devices', 'users') -accessToken $accessToken -requiredScopes $global:requiredScopes
+$global:isAuthorized = $global:authorizationResult.IsAuthorized
+
+# Debug the required scopes structure
+Write-Host "`n=== Debug: Required Scopes Structure ===" -ForegroundColor Cyan
+Write-Host "Global required scopes type: $($global:requiredScopes.GetType().Name)" -ForegroundColor Yellow
+Write-Host "Global required scopes count: $($global:requiredScopes.Count)" -ForegroundColor Yellow
+if ($global:requiredScopes -is [array] -and $global:requiredScopes.Count -gt 0)
+{
+    Write-Host "First scope object type: $($global:requiredScopes[0].GetType().Name)" -ForegroundColor Yellow
+    Write-Host "First scope properties: $($global:requiredScopes[0].PSObject.Properties.Name -join ', ')" -ForegroundColor Yellow
+    if ($global:requiredScopes[0].Scope)
+    {
+        Write-Host "First scope value: $($global:requiredScopes[0].Scope)" -ForegroundColor Yellow
+    }
+    if ($global:requiredScopes[0].endpoints)
+    {
+        Write-Host "First scope endpoints: $($global:requiredScopes[0].endpoints -join ', ')" -ForegroundColor Yellow
+    }
+}
+else
+{
+    Write-Host "Required scopes is not an array or is empty" -ForegroundColor Red
+}
+
+Write-Host "==========================================`n" -ForegroundColor Cyan
+
+$global:authorizationResult = HasScope -ResourcePath @('devices', 'users') -accessToken $accessToken -requiredScopes $global:requiredScopes
+$global:isAuthorized = $global:authorizationResult.IsAuthorized
+
+Write-Host "`n=== Authorization Summary ===" -ForegroundColor Cyan
+Write-Host "Is Authorized: $($global:isAuthorized)" -ForegroundColor $(if ($global:isAuthorized) { 'Green' } else { 'Red' })
+Write-Host "Authorized Scopes Count: $($global:authorizationResult.AuthorizedScopes.Count)" -ForegroundColor Yellow
+Write-Host "Authorized Scopes: $($global:authorizationResult.AuthorizedScopes -join ', ')" -ForegroundColor Yellow
+Write-Host "Required Scopes Structure Count: $($global:requiredScopes.Count)" -ForegroundColor Magenta
+if ($global:requiredScopes.Count -gt 0)
+{
+    Write-Host "First Required Scope Properties: $($global:requiredScopes[0] | Get-Member -MemberType Properties | Select-Object -ExpandProperty Name)" -ForegroundColor Magenta
+}
+Write-Host "================================`n" -ForegroundColor Cyan
+
+
+
+
 exit 0
 
-Write-Host "Required scopes: $($global:requiredScopes.count) scopes."
+
 for ($i = 0; $i -lt $global:requiredScopes.count; $i++)
 {
     $requiredScope = $global:requiredScopes[$i]
@@ -618,7 +692,7 @@ for ($i = 0; $i -lt $global:requiredScopes.count; $i++)
 }
 
 
-exit 0
+
 # Define required permissions with reasons
 $requiredPermissions = @(
     @{
@@ -822,5 +896,236 @@ Write-Host "Sorting and removing duplicates from URIs..."
 $uris = $uris | Sort-Object -Unique
 Write-Host "Found $($uris.count) unique URIs after sorting."
 Set-Content -Path 'uris.txt' -Value $uris -Force
+
+
+exit 0
+
+Write-Host "Required scopes: $($global:requiredScopes.count) scopes."
+for ($i = 0; $i -lt $global:requiredScopes.count; $i++)
+{
+    $requiredScope = $global:requiredScopes[$i]
+    Write-Host "Required scope: $($requiredScope.scope)"
+    Write-Host "Checking if the scope $($requiredScope.scope) is granted."
+    Write-Host "Scope reason: $($requiredScope.reason)"
+    Write-Host "Covered endpoints:"
+    $requiredScope.endpoints | ForEach-Object {
+        Write-Host " - $_"
+    }
+    if ($requiredScope.scope -in $authorizedScopes)
+    {
+        Write-Host "The scope $($requiredScope.scope) is not granted. Exiting script." -ForegroundColor Red
+    }
+    else
+    {
+        Write-Host "The scope $($requiredScope.scope) is granted."
+    }
+}
+
+
+
+# Define required permissions with reasons
+$requiredPermissions = @(
+    @{
+        Permission = "User.Read.All"
+        Reason     = "Required to read user profile information and check group memberships"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+        Reason     = "Needed to perform privileged operations on managed devices, such as wiping or retiring devices and reading LAPS passwords"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.ReadWrite.All"
+        Reason     = "Required to read and write managed device information, including compliance policies and device configurations"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.ReadWrite.All"
+        Reason     = "Needed to read and write Intune device configuration policies and their assignments"
+    },
+    @{
+        Permission = "DeviceManagementServiceConfig.ReadWrite.All"
+        Reason     = "Needed to read and write Intune service configuration settings"
+    },
+    @{
+        Permission = "offline_access"
+        Reason     = "Needed to maintain access to resources when the user is not actively using the application"
+    },
+    @{ 
+        Permission = "openid"
+        Reason     = "Needed for OpenID Connect authentication to verify user identity"
+    },
+    @{
+        Permission = "Device.ReadWrite.All"
+        Reason     = "Needed to import devices into Autopilot"
+    },    
+    @{
+        Permission = "Group.Read.All"
+        Reason     = "Needed to read group information and memberships"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.Read.All"
+        Reason     = "Allows reading Intune device configuration policies and their assignments"
+    },
+    @{
+        Permission = "DeviceManagementApps.Read.All"
+        Reason     = "Necessary to read mobile app management policies and app configurations"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.Read.All"
+        Reason     = "Required to read managed device information and compliance policies"
+    },
+    @{
+        Permission = "Device.Read.All"
+        Reason     = "Needed to read device information from Entra ID"
+    }
+)
+
+# Required permissions based on specific API endpoint access, following the principle of least privilege.
+$requiredPermissions = @(
+    @{
+        Permission = "User.Read.All"
+        Reason     = "Required to read user profiles, group memberships, and registered devices."
+        endpoints  = @("users", "users/{id}", "users/{id}/memberOf", "users/{id}/registeredDevices")
+    },
+    @{
+        Permission = "Device.Read.All"
+        Reason     = "Required to read Microsoft Entra ID device objects."
+        endpoints  = @("devices")
+    },
+    @{
+        Permission = "DeviceManagementApps.ReadWrite.All"
+        Reason     = "Required to read application information and manage app assignments."
+        endpoints  = @("deviceAppManagement/mobileApps", "deviceAppManagement/mobileApps/{id}/assignments")
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.Read.All"
+        Reason     = "Required to read Intune device configuration policies."
+        endpoints  = @("deviceManagement/deviceConfigurations", "deviceManagement/deviceConfigurations/{id}")
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.Read.All"
+        Reason     = "Required to read Intune managed device properties."
+        endpoints  = @("deviceManagement/managedDevices", "deviceManagement/managedDevices/{id}")
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+        Reason     = "Required for highly privileged operations, specifically to read local admin (LAPS) passwords."
+        endpoints  = @("directory/deviceLocalCredentials")
+    },
+    @{
+        Permission = "DeviceManagementServiceConfig.ReadWrite.All"
+        Reason     = "Required to read Autopilot events and to read and manage Autopilot device identities."
+        endpoints  = @("deviceManagement/autopilotEvents", "importedWindowsAutopilotDeviceIdentities", "/windowsAutopilotDeviceIdentities")
+    },
+    @{
+        Permission = "BitlockerKey.Read.All"
+        Reason     = "Required to read BitLocker recovery keys for all devices."
+        endpoints  = @("informationProtection/bitlocker/recoveryKeys")
+    },
+    @{
+        Permission = "openid"
+        Reason     = "Standard scope required for user sign-in with OpenID Connect."
+        endpoints  = @("openid")
+    },
+    @{
+        Permission = "profile"
+        Reason     = "Standard scope to get basic user profile information during sign-in."
+        endpoints  = @("profile")
+    },
+    @{
+        Permission = "offline_access"
+        Reason     = "Standard scope that provides refresh tokens to maintain access when the user is not active."
+        endpoints  = @("offline_access")
+    }
+)
+
+# Define revised required permissions with reasons
+$requiredPermissions = @(
+    @{
+        Permission = "User.Read.All"
+        Reason     = "Required to read user profile information and check group memberships"
+    },
+    @{
+        Permission = "Group.Read.All"
+        Reason     = "Needed to read group information and memberships"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+        Reason     = "Needed to perform privileged operations on managed devices, such as wiping or retiring devices and reading LAPS passwords"
+    },
+    @{
+        Permission = "DeviceManagementManagedDevices.ReadWrite.All"
+        Reason     = "Required to read and write managed device information and compliance policies"
+    },
+    @{
+        Permission = "DeviceManagementConfiguration.ReadWrite.All"
+        Reason     = "Needed to read and write Intune device configuration policies and their assignments"
+    },
+    @{
+        Permission = "DeviceManagementApps.Read.All"
+        Reason     = "Necessary to read mobile app management policies and app configurations"
+    },
+    @{
+        Permission = "DeviceManagementServiceConfig.ReadWrite.All"
+        Reason     = "Needed to read/write Intune service configuration settings and to import devices into Autopilot"
+    },
+    @{
+        Permission = "openid"
+        Reason     = "Needed for OpenID Connect authentication to verify user identity"
+    },
+    @{
+        Permission = "offline_access"
+        Reason     = "Needed to maintain access to resources when the user is not actively using the application"
+    }
+)
+$uris = @()
+# Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http
+$queryPattern = '\$\w*uri\s*=\s*(?!\$|(?i:http))'
+$filesToSearch = Get-ChildItem "$pwd\*.ps1" -Recurse 
+Write-Host "Found $($filesToSearch.count) files."
+#Search each file for variables ending with 'uri' and extract their assigned values
+foreach ($file in $filesToSearch)
+{
+    Write-Host "Searching in $($file.Name)"
+    $lines = Select-String -Path $file.FullName -Pattern $queryPattern -AllMatches
+    if ($lines)
+    {
+        Write-Host "Found $($lines.count) lines in $($file.Name)" 
+        foreach ($line in $lines)
+        {
+            # Extract the value after the = sign, handling quoted and unquoted strings
+            $match = $line.Line -match '\$\w*uri\s*=\s*([\x27\x22]?)([^\x27\x22#\r\n]+)\1'
+            if ($match)
+            {
+                $extractedUri = $matches[2].Trim()
+                if ($extractedUri -and $extractedUri -notmatch '^(\$|(?i:http))')
+                {
+                    $uris += $extractedUri
+                    Write-Verbose "Found URI: $extractedUri in $($file.Name) at line $($line.LineNumber)"
+                }
+            }
+        }
+    }
+    else
+    {
+        Write-Host "No matches found in $($file.Name)"
+    }
+}
+#sort uris and remove dupicates
+Write-Host "Found $($uris.count) URIs."
+if ($uris.count -eq 0)
+{
+    Write-Host "No URIs found. Exiting script." -ForegroundColor Red
+    exit 1
+}
+else
+{
+    Write-Host "Found $($uris.count) unique URIs."
+}
+# Remove duplicates and sort the URIs
+Write-Host "Sorting and removing duplicates from URIs..."
+$uris = $uris | Sort-Object -Unique
+Write-Host "Found $($uris.count) unique URIs after sorting."
+Set-Content -Path 'uris.txt' -Value $uris -Force
+
 
 
