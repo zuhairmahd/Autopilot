@@ -1,0 +1,55 @@
+# A descriptive name for your workflow
+name: Build PowerShell Executable on Release
+
+# This is the trigger event.
+# The workflow runs when a release is "created".
+on:
+  release:
+    types: [created]
+
+# Jobs to run as part of the workflow
+jobs:
+  build:
+    # A name for the job
+    name: Build and Package for Windows
+
+    # 1. Use the latest Windows virtual machine
+    runs-on: windows-latest
+
+    # Set the default shell to PowerShell for all 'run' steps
+    defaults:
+      run:
+        shell: powershell
+
+    # The sequence of tasks that make up the job
+    steps:
+      # Step 1: Check out your repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Install the required PowerShell module
+      - name: Install ps2exe Module
+        run: Install-Module -Name ps2exe -Repository PSGallery -Force -Scope CurrentUser
+
+      # Step 3: Run your custom build script
+      # This runs your script which should use ps2exe to create the executable.
+      - name: Create Executable from PowerShell Script
+        run: .\CreateRelease.ps1 -inputFile main.ps1
+
+      # Step 4: Upload the build output to the release
+      # IMPORTANT: Adjust the 'asset_path' and 'asset_name' to match the actual output of your script.
+      # This example assumes your script creates 'main.exe' in the root directory.
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          # This is the URL for uploading assets to the release that triggered the workflow
+          upload_url: ${{ github.event.release.upload_url }}
+          # The path to the asset you want to upload
+          asset_path: ./build/main.exe
+          # The name for the asset file in the release
+          asset_name: main.exe
+          # The content type of the asset
+          asset_content_type: application/octet-stream
+        env:
+          # The GITHUB_TOKEN is automatically created and provided by GitHub Actions
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
