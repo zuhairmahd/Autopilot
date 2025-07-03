@@ -2515,3 +2515,14 @@ function CallGraphAPI()
     return $response
 }
 
+
+function GetAccessTokenFromMGGraph()
+
+{
+    [CmdletBinding()]
+    param()
+    $connection = Connect-MgGraph
+    $data = Invoke-MgGraphRequest -Uri "https://graph.microsoft.com/v1.0/me" -Method GET -OutputType HttpResponseMessage
+    $accessToken = $data.RequestMessage.Headers.Authorization.Parameter
+    return $accessToken
+}
