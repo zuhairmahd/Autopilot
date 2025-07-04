@@ -195,7 +195,7 @@ function Get-JsonConfiguration
                 throw "Invalid JSON format in configuration file"
             }
             # Handle different configuration types for init.json
-            if ($JsonFile -like "*init.json" -and $ConfigurationType -ne 'default')
+            if ($JsonFile -like "*init.json")
             {
                 Write-Verbose "[$functionName] Processing init.json with configuration type: $ConfigurationType"
                 # Use regular hashtable for PowerShell 5.1 compatibility
@@ -902,7 +902,8 @@ function CreateFullConfiguration()
     param
     (
         [Parameter(Mandatory = $true)]
-        [string]$RootFolder, [string]$DestinationFolder = $RootFolder,
+        [string]$RootFolder, 
+        [string]$DestinationFolder = $RootFolder,
         [string]$ConfigurationFile = "$DestinationFolder\settings.json",
         [string]$InitFile = "$RootFolder\init.json"
     )
@@ -932,12 +933,11 @@ function CreateFullConfiguration()
                 return $success
             }
         }
-
         # Load init configuration using consolidated system (returns array for init.json)
         Write-Verbose "[$functionName] Loading init configuration from $InitFile."
-        $defaultInitValues = @()  # For init.json arrays, start with empty array
+        $defaultInitValues = @{}  # For init.json arrays, start with empty array
         $valuesToEdit = Get-JsonConfiguration -JsonFile $InitFile -DefaultValues $defaultInitValues
-
+        Write-Verbose "[$functionName] Loaded init configuration values: $($valuesToEdit.count) items"
         # Ensure configuration file exists using consolidated system
         if (-not(Test-Path -Path $ConfigurationFile))
         {
@@ -952,19 +952,23 @@ function CreateFullConfiguration()
                 Write-Host "Failed to create configuration file."
                 return $success
             }
-        }        # Load current configuration using consolidated system
+        }        
+        # Load current configuration using consolidated system
         Write-Host "Loading configuration values from $ConfigurationFile."
         # Load the entire settings.json structure
         $settingsContent = Get-Content -Path $ConfigurationFile -Raw -Force
         $settingsObj = $settingsContent | ConvertFrom-Json
         
         # Extract globalSettings for editing
+        Write-Verbose "[$functionName] Extracting globalSettings from configuration."
         if ($settingsObj.PSObject.Properties.Name -contains 'globalSettings')
         {
+            Write-Verbose "[$functionName] Found globalSettings section in configuration."
             $configData = @{}
             foreach ($property in $settingsObj.globalSettings.PSObject.Properties)
             {
                 $configData[$property.Name] = $property.Value
+                Write-Verbose "[$functionName] Loaded global setting: $($property.Name) = $($property.Value)"
             }
             Write-Host "Found $($configData.Keys.Count) global settings."
         }
@@ -975,24 +979,32 @@ function CreateFullConfiguration()
         }
 
         # Convert the loaded configuration to a PSCustomObject for compatibility with existing logic
+        Write-Verbose "[$functionName] Converting configuration data to PSCustomObject."
         $configObject = [PSCustomObject]@{}
+        # Add each key-value pair from the configuration data to the configObject
+        Write-Verbose "[$functionName] Adding configuration data to configObject."
         foreach ($key in $configData.Keys)
         {
             $configObject | Add-Member -MemberType NoteProperty -Name $key -Value $configData[$key]
+            Write-Verbose "[$functionName] Added $key = $($configData[$key]) to configObject."
         }
 
         # Iterate over the configuration data and prompt the user to choose a value
+        Write-Host "Configuring settings interactively. Please follow the prompts."
         foreach ($config in $configObject.PSObject.Properties)
         {
             Write-Verbose "[$functionName] Configuration: $($config.Name) = $($config.Value)"
-            
+            Write-Host "Current value: $($config.Value)"
             # Find matching init configuration
+            Write-Verbose "[$functionName] Searching for init configuration for $($config.Name)."
             $initConfig = $valuesToEdit | Where-Object { $_.name -eq $config.Name }
+            Write-Verbose "[$functionName] Value in init configuration: $($initConfig | ConvertTo-Json -Depth 10)"
             if ($initConfig)
             {
                 $configType = $initConfig.type
                 $configDescription = $initConfig.description
                 $configValue = $initConfig.value
+                Write-Verbose "[$functionName] Found init configuration for $($config.Name)."
                 
                 if ($configValue -eq '')
                 {
@@ -1067,21 +1079,29 @@ function CreateFullConfiguration()
                     }
                 }
             }
+            else
+            {
+                Write-Verbose "[$functionName] No matching init configuration found for $($config.Name)."
+            }
         }
 
         # Print all the new configuration data but only in verbose mode
         Write-Verbose "[$functionName] New configuration data:"
         $configObject.PSObject.Properties | ForEach-Object {
             Write-Verbose "[$functionName] $($_.Name) = $($_.Value)"
-        }        # Convert back to hashtable for saving
+        }        
+        # Convert back to hashtable for saving
+        Write-Verbose "[$functionName] Converting configObject back to hashtable for saving."
         $finalConfig = @{}
         foreach ($prop in $configObject.PSObject.Properties)
         {
             $finalConfig[$prop.Name] = $prop.Value
+            Write-Verbose "[$functionName] Final config: $($prop.Name) = $($prop.Value)"
         }
 
         # Preserve the settings.json structure with updated globalSettings
         $settingsObj.globalSettings = [PSCustomObject]$finalConfig
+        Write-Verbose "[$functionName] Updated globalSettings in settingsObj."
 
         # Save the complete settings.json structure to the configuration file
         Write-Verbose "[$functionName] Saving configuration to $ConfigurationFile."
@@ -1089,6 +1109,7 @@ function CreateFullConfiguration()
         Write-Verbose "[$functionName] Configuration saved to $ConfigurationFile."
         
         # Verify the file was saved successfully
+        Write-Verbose "[$functionName] Verifying configuration file at $ConfigurationFile."
         if (Test-Path -Path $ConfigurationFile)
         {
             Write-Verbose "[$functionName] Configuration saved successfully to $ConfigurationFile."
@@ -1108,7 +1129,6 @@ function CreateFullConfiguration()
         Write-Host "An error occurred during configuration creation. Check verbose logs for details." -ForegroundColor Red
         $success = $false
     }
-    
     return $success
 }
 

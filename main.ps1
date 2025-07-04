@@ -1505,7 +1505,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
     Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
+    if (CreateFullConfiguration -RootFolder $pwd -verbose)
     {
         Write-Host 'The script has been reconfigured.' -ForegroundColor Green
     }
