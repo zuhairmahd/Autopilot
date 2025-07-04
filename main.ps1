@@ -1172,7 +1172,7 @@ function ProcessSerialNumber()
 }
 #endregion helper functions
 
-#region initialization block
+#region initialization block with access token
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Verbose "[$scriptName] Force new token: $($auth.ForceNewToken )"
 Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshToken )"
@@ -1196,9 +1196,9 @@ else
     Write-Host "Please check your authentication parameters and try again." 
     exit 1
 }
-#endregion initialization block
+#endregion initialization block with access token
 
-#write a nice welcome message with the version number and a copyright message.
+#region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
 
@@ -1231,6 +1231,7 @@ else
     Write-Verbose "[$scriptName] No updates available or current script is up to date."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
 }
+#endregion banner
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
