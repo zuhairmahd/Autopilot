@@ -43,6 +43,13 @@
       ]
     },
     {
+      "Scope": "BitlockerKey.Read.All",
+      "Reason": "Required to read BitLocker recovery keys for all devices.",
+      "Endpoints": [
+        "informationProtection/bitlocker/recoveryKeys"
+      ]
+    },
+    {
       "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
       "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
       "Endpoints": [
@@ -123,15 +130,6 @@
     "arabictutor.com": {
       "groupsToInclude": [],
       "groupsToExclude": [],
-      "additionalScopes": [
-        {
-          "Scope": "BitlockerKey.Read.All",
-          "Reason": "Required to read BitLocker recovery keys for all devices.",
-          "Endpoints": [
-            "informationProtection/bitlocker/recoveryKeys"
-          ]
-        }
-      ],
       "settings": {
         "domain": "arabictutor.com",
         "deviceNamePrefix": "vmware",
