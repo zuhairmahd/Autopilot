@@ -59,13 +59,6 @@
       ]
     },
     {
-      "Scope": "BitlockerKey.Read.All",
-      "Reason": "Required to read BitLocker recovery keys for all devices.",
-      "Endpoints": [
-        "informationProtection/bitlocker/recoveryKeys"
-      ]
-    },
-    {
       "Scope": "openid",
       "Reason": "Standard scope required for user sign-in with OpenID Connect.",
       "Endpoints": []
@@ -130,6 +123,15 @@
     "arabictutor.com": {
       "groupsToInclude": [],
       "groupsToExclude": [],
+      "additionalScopes": [
+        {
+          "Scope": "BitlockerKey.Read.All",
+          "Reason": "Required to read BitLocker recovery keys for all devices.",
+          "Endpoints": [
+            "informationProtection/bitlocker/recoveryKeys"
+          ]
+        }
+      ],
       "settings": {
         "domain": "arabictutor.com",
         "deviceNamePrefix": "vmware",

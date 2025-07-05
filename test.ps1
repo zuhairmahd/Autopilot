@@ -470,12 +470,42 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
-    $requiredScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
+    
+    #region handle scopes
+    $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
+    $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
+    # Ensure arrays are properly handled and merge them, eliminating duplicates
+    Write-Verbose "[$scriptName] Merging basicScopes and additionalScopes and removing duplicates."
+    # Initialize as empty arrays if null
+    if ($null -eq $basicScopes) 
+    { 
+        Write-Verbose "[$scriptName] No basic scopes found in the configuration file. Initializing as empty array."
+        $basicScopes = @() 
+    }
+    if ($null -eq $additionalScopes) 
+    { 
+        Write-Verbose "[$scriptName] No additional scopes found in the configuration file. Initializing as empty array."
+        $additionalScopes = @() 
+    }
+    # Ensure they are arrays
+    Write-Verbose "[$scriptName] Ensuring basicScopes and additionalScopes are arrays."
+    $basicScopes = @($basicScopes)
+    Write-Verbose "[$scriptName] Basic scopes has $($basicScopes.Count) items."
+    $additionalScopes = @($additionalScopes)
+    Write-Verbose "[$scriptName] Additional scopes has $($additionalScopes.Count) items."
+    # Merge arrays and remove duplicates based on Scope property
+    Write-Verbose "[$scriptName] Merging scopes and removing duplicates."
+    $allScopes = @($basicScopes) + @($additionalScopes)
+    Write-Verbose "[$scriptName] Total scopes before deduplication: $($allScopes.Count)"
+    $global:requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
+    Write-Verbose "[$scriptName] Merged scopes - Total unique scopes: $($requiredScopes.Count)"
+    #endregion handle scopes
 }
 else
 {
     Write-Host "Configuration file $initFile not found. Using default values."
 }
+
 #endregion Load parameters from the configuration file if it exists
 
 #region import functions.

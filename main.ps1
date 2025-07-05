@@ -408,7 +408,6 @@ if (Test-Path -Path $InitFile)
     $global:globalSettings = @{}
     $global:localSettings = @{}
     $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
-    $global:requiredScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
     Write-Verbose "[$scriptName] Reading global settings..."
     Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $globalConfigData.PSObject.Properties.Name)
@@ -469,6 +468,35 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    #region handle scopes
+    $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
+    $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
+    # Ensure arrays are properly handled and merge them, eliminating duplicates
+    Write-Verbose "[$scriptName] Merging basicScopes and additionalScopes and removing duplicates."
+    # Initialize as empty arrays if null
+    if ($null -eq $basicScopes) 
+    { 
+        Write-Verbose "[$scriptName] No basic scopes found in the configuration file. Initializing as empty array."
+        $basicScopes = @() 
+    }
+    if ($null -eq $additionalScopes) 
+    { 
+        Write-Verbose "[$scriptName] No additional scopes found in the configuration file. Initializing as empty array."
+        $additionalScopes = @() 
+    }
+    # Ensure they are arrays
+    Write-Verbose "[$scriptName] Ensuring basicScopes and additionalScopes are arrays."
+    $basicScopes = @($basicScopes)
+    Write-Verbose "[$scriptName] Basic scopes has $($basicScopes.Count) items."
+    $additionalScopes = @($additionalScopes)
+    Write-Verbose "[$scriptName] Additional scopes has $($additionalScopes.Count) items."
+    # Merge arrays and remove duplicates based on Scope property
+    Write-Verbose "[$scriptName] Merging scopes and removing duplicates."
+    $allScopes = @($basicScopes) + @($additionalScopes)
+    Write-Verbose "[$scriptName] Total scopes before deduplication: $($allScopes.Count)"
+    $requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
+    Write-Verbose "[$scriptName] Merged scopes - Total unique scopes: $($requiredScopes.Count)"
+    #endregion handle scopes
 }
 else
 {
