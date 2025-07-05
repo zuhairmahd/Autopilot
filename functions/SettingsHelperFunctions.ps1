@@ -205,9 +205,18 @@ function Get-JsonConfiguration
                 {
                     $valueToUse = switch ($ConfigurationType)
                     {
-                        'dev' { $item.devdefault }
-                        'release' { $item.reldefault }
-                        default { $item.default }
+                        'dev'
+                        {
+                            $item.devdefault 
+                        }
+                        'release'
+                        {
+                            $item.reldefault 
+                        }
+                        default
+                        {
+                            $item.default 
+                        }
                     }
                     
                     if ($null -eq $valueToUse)
@@ -389,6 +398,43 @@ function Get-InitConfiguration()
     }
 }
 
+<#
+.SYNOPSIS
+    Merges two hashtables (local and global settings) into a single flat hashtable with conflict resolution.
+
+.DESCRIPTION
+    The MergeSettings function combines local and global settings into a single hashtable, flattening nested structures and resolving conflicts according to the specified strategy. It supports merging arrays, nested hashtables, and PSCustomObjects. Keys are normalized to their simplest form (last segment after any dot notation). The function provides detailed verbose logging for each step, including flattening, normalization, and conflict resolution.
+
+.PARAMETER localSettings
+    The hashtable containing local (user or environment-specific) settings. These take precedence unless overridden by the ConflictResolution parameter.
+
+.PARAMETER globalSettings
+    The hashtable containing global (default or organization-wide) settings. These are merged in after local settings and may override them depending on the ConflictResolution parameter.
+
+.PARAMETER ConflictResolution
+    Determines which value to use when a key exists in both local and global settings:
+    - 'Local': Keep the value from localSettings (default behavior)
+    - 'Global': Use the value from globalSettings
+    If both values are arrays, they are merged.
+
+.OUTPUTS
+    System.Collections.Hashtable
+    Returns a flat hashtable containing the merged settings, with conflicts resolved as specified.
+
+.EXAMPLE
+    # Merge local and global settings, preferring global values on conflict
+    $merged = MergeSettings -localSettings $local -globalSettings $global -ConflictResolution 'Global'
+
+.EXAMPLE
+    # Merge settings, keeping local values on conflict (default)
+    $merged = MergeSettings -localSettings $local -globalSettings $global
+
+.NOTES
+    - Flattens nested hashtables and PSCustomObjects for key normalization
+    - Merges arrays when both local and global values are arrays
+    - Provides verbose logging for troubleshooting and auditing
+    - Compatible with PowerShell 5.1 and later
+#>
 function MergeSettings()
 {
     [CmdletBinding()]
@@ -853,46 +899,6 @@ function CreateConfiguration()
     - Provides interactive prompts for each configurable value
     - Supports different input types (string, array, static)
     - Includes comprehensive error handling and validation
-#>
-<#
-.SYNOPSIS
-    Creates a comprehensive configuration file through interactive user prompts.
-
-.DESCRIPTION
-    This function provides an interactive configuration experience where users can customize
-    configuration values based on initialization templates. It uses the consolidated JSON
-    configuration system for robust file handling and validation.
-
-.PARAMETER RootFolder
-    The root folder containing the source init.json file.
-
-.PARAMETER DestinationFolder
-    The folder where the vars.json file should be created. Defaults to $RootFolder.
-
-.PARAMETER ConfigurationFile
-    The full path for the output configuration file. Defaults to "$DestinationFolder\vars.json".
-
-.PARAMETER InitFile
-    The path to the init.json file. Defaults to "$RootFolder\init.json".
-
-.OUTPUTS
-    System.Boolean
-    Returns $true if the configuration file was created successfully, $false otherwise.
-
-.EXAMPLE
-    # Create interactive configuration in current project
-    $success = CreateFullConfiguration -RootFolder "C:\MyProject"
-
-.EXAMPLE
-    # Create configuration with custom paths
-    $success = CreateFullConfiguration -RootFolder "C:\Source" -DestinationFolder "C:\Config"
-
-.NOTES
-    - Uses consolidated JSON configuration system for consistency and reliability
-    - Automatically creates missing init.json and vars.json files
-    - Provides interactive prompts for each configurable value
-    - Supports different input types (string, array, static)
-    - Includes comprehensive error handling and validation
     - Improved array handling with better user experience
     - Enhanced error reporting and user feedback
 #>
@@ -919,6 +925,7 @@ function CreateFullConfiguration()
     try
     {
         # Ensure init file exists using consolidated system
+        Write-Verbose "[$functionName] Checking for init file at $InitFile."
         if (-not(Test-Path -Path $InitFile))
         {
             Write-Host "No init file found at $InitFile."
@@ -933,11 +940,13 @@ function CreateFullConfiguration()
                 return $success
             }
         }
-        # Load init configuration using consolidated system (returns array for init.json)
-        Write-Verbose "[$functionName] Loading init configuration from $InitFile."
-        $defaultInitValues = @{}  # For init.json arrays, start with empty array
-        $valuesToEdit = Get-JsonConfiguration -JsonFile $InitFile -DefaultValues $defaultInitValues
-        Write-Verbose "[$functionName] Loaded init configuration values: $($valuesToEdit.count) items"
+        # Load raw init configuration directly to get full objects with type, description, value properties
+        Write-Verbose "[$functionName] Loading raw init configuration from $InitFile."
+        Write-Host "Loading initialization values from init file $InitFile."
+        $initContent = Get-Content -Path $InitFile -Raw -Force
+        $valuesToEdit = $initContent | ConvertFrom-Json
+        Write-Verbose "[$functionName] Loaded raw init configuration values: $($valuesToEdit.count) items"
+        Write-Host "Loaded $($valuesToEdit.count) initialization items from init file $InitFile."
         # Ensure configuration file exists using consolidated system
         if (-not(Test-Path -Path $ConfigurationFile))
         {
@@ -954,11 +963,10 @@ function CreateFullConfiguration()
             }
         }        
         # Load current configuration using consolidated system
-        Write-Host "Loading configuration values from $ConfigurationFile."
+        Write-Host "Loading settings from $ConfigurationFile."
         # Load the entire settings.json structure
         $settingsContent = Get-Content -Path $ConfigurationFile -Raw -Force
         $settingsObj = $settingsContent | ConvertFrom-Json
-        
         # Extract globalSettings for editing
         Write-Verbose "[$functionName] Extracting globalSettings from configuration."
         if ($settingsObj.PSObject.Properties.Name -contains 'globalSettings')
@@ -977,7 +985,6 @@ function CreateFullConfiguration()
             Write-Warning "[$functionName] Configuration file does not contain globalSettings section"
             $configData = @{}
         }
-
         # Convert the loaded configuration to a PSCustomObject for compatibility with existing logic
         Write-Verbose "[$functionName] Converting configuration data to PSCustomObject."
         $configObject = [PSCustomObject]@{}
@@ -994,7 +1001,7 @@ function CreateFullConfiguration()
         foreach ($config in $configObject.PSObject.Properties)
         {
             Write-Verbose "[$functionName] Configuration: $($config.Name) = $($config.Value)"
-            Write-Host "Current value: $($config.Value)"
+            Write-Verbose "[$functionName] Current value: $($config.Value)"
             # Find matching init configuration
             Write-Verbose "[$functionName] Searching for init configuration for $($config.Name)."
             $initConfig = $valuesToEdit | Where-Object { $_.name -eq $config.Name }
@@ -1005,20 +1012,18 @@ function CreateFullConfiguration()
                 $configDescription = $initConfig.description
                 $configValue = $initConfig.value
                 Write-Verbose "[$functionName] Found init configuration for $($config.Name)."
-                
                 if ($configValue -eq '')
                 {
                     Write-Verbose "[$functionName] Config value is empty."
                     Write-Verbose "[$functionName] Setting config value to 'none'."
                     $configValue = 'none'
                 }
-                
                 Write-Verbose "[$functionName] Stored Key name: $($config.Name)"
                 Write-Verbose "[$functionName] Stored Key value: $($config.Value)"
                 Write-Verbose "[$functionName] Possible Key values: $configValue"
                 Write-Verbose "[$functionName] Key description: $configDescription"
                 Write-Verbose "[$functionName] Key type: $configType"
-                
+                Write-Host "Name: $($config.Name)."
                 switch ($configType)
                 {
                     'string'
@@ -1081,7 +1086,18 @@ function CreateFullConfiguration()
             }
             else
             {
-                Write-Verbose "[$functionName] No matching init configuration found for $($config.Name)."
+                Write-Verbose "[$functionName] No matching init configuration found for $($config.Name). Using default string input."
+                # If no init configuration is found, treat it as a simple string input
+                Write-Host "Please enter a new value for $($config.Name)."
+                Write-Host "Description: Advanced setting - no specific description available"
+                $value = Read-Host -Prompt "Press enter to keep the current value: ($($config.Value))"
+                if ($value -eq '' -or $null -eq $value)
+                {
+                    $value = $config.Value
+                }
+                Write-Host "New value: $value"
+                Write-Verbose "[$functionName] Changing the value of $($config.Name) from $($config.Value) to $value"
+                $config.Value = $value
             }
         }
 

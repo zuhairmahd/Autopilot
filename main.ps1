@@ -1505,7 +1505,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
     Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -RootFolder $pwd -verbose)
+    if (CreateFullConfiguration -RootFolder $pwd)
     {
         Write-Host 'The script has been reconfigured.' -ForegroundColor Green
     }
@@ -1540,7 +1540,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application creden
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
     Write-Host 'Restoring the script to its default settings...'
-    if (InitializeConfiguration -RootFolder $pwd -overWrite)
+    if (InitializeConfiguration -RootFolder $pwd -overwrite)
     {
         Write-Host 'The script defaults have been restored.' -ForegroundColor Green
     }
