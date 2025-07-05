@@ -408,6 +408,7 @@ if (Test-Path -Path $InitFile)
     $global:globalSettings = @{}
     $global:localSettings = @{}
     $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
+    $global:requiredScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
     Write-Verbose "[$scriptName] Reading global settings..."
     Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $globalConfigData.PSObject.Properties.Name)

@@ -470,7 +470,7 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
-    
+    $requiredScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
 }
 else
 {
@@ -500,7 +500,6 @@ else
 #region variables
 $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-$global:requiredScopes = $settings.requiredScopes
 # $scope = $auth.scope
 # $logfile = "mylog.log"
 # $serialNumber = '0F3CFP724223KV'
