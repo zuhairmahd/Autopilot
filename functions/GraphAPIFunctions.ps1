@@ -1502,6 +1502,24 @@ function LaunchBrowser()
     return $true
 }
 
+function GetTokenFromMGGraph()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        $scope,
+        $apiVersion = 'Beta'
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Starting to get access token from Microsoft Graph with scope: $scope"
+    Write-Verbose "[$functionName] Attempting to get access token from Microsoft Graph."
+    Connect-MgGraph -UseDeviceCode -Scopes $scope  
+    $global:data = Invoke-MgGraphRequest -Uri "https://graph.microsoft.com/$apiVersion/me" -Method GET -OutputType HttpResponseMessage
+    $accessToken = $data.RequestMessage.Headers.Authorization.Parameter
+    Write-Verbose "[$functionName] Successfully obtained access token."
+    return $accessToken
+}
+
 function Get-DelegatedToken()
 {
     param($tenantId, $clientId, $clientSecret, [string[]]$scopes, $domain, $cacheType, $cacheTokenFile, $cacheFolder, $configFilePath, $configRefreshToken, $AuthType, $NoSaveRefreshToken, $ForcedRenewal, $settings = $settings)
@@ -1819,6 +1837,21 @@ function Get-DelegatedToken()
             Write-Verbose "[$functionName] Redirect URI: $redirectUri"
             $encodedRedirectUri = [uri]::EscapeDataString($redirectUri)
             Write-Verbose "[$functionName] Encoded Redirect URI: $encodedRedirectUri"
+        }
+        MGGraph
+        {
+            Write-Verbose "[$functionName] Using Microsoft Graph device code flow."
+            $accessToken = GetTokenFromMGGraph -scope $scopes -apiVersion $apiVersion
+            if ($accessToken)
+            {
+                Write-Verbose "[$functionName] Access token obtained from Microsoft Graph."
+                return Format-TokenOutput -token $accessToken -secureString $SecureString
+            }
+            else
+            {
+                Write-Error "Failed to obtain access token from Microsoft Graph."
+                return $null
+            }
         }
         default
         {
@@ -2284,14 +2317,15 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'Deligated')]
         [string[]]$Scope,
         [parameter(parameterSetName = 'Deligated')]
-        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
+        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private', 'MGGraph')]
         [string]$AuthType = 'Private', 
         [parameter(parameterSetName = 'Deligated')]
         [switch]$ForceNewToken,
         [parameter(parameterSetName = 'Deligated')]
         [switch]$ForceNewRefreshToken,
         [ValidateSet('file', 'memory')]
-        [string]$CacheType = 'Memory'
+        [string]$CacheType = 'Memory',
+        [string]$APIVersion = 'Beta'
     )
     
     #region Process config files
@@ -2505,6 +2539,13 @@ function GetGraphAccessToken()
                     clientSecret = $clientSecret
                 }
             }        
+            MGGraph
+            {
+                Write-Verbose "[$functionName] Using Microsoft Graph authentication flow for delegated token."
+                $params += @{
+                    APIVersion = $APIVersion
+                }
+            }
         }
         if ($NoSaveRefreshToken)
         {
@@ -2872,16 +2913,3 @@ function CallGraphAPI()
     Write-Verbose "[$functionName] Response value: $($response.value)"
     return $response
 }
-
-function GetAccessTokenFromMGGraph()
-
-{
-    [CmdletBinding()]
-    param()
-    $functionName = $MyInvocation.MyCommand.Name
-    $connection = Connect-MgGraph
-    $global:data = Invoke-MgGraphRequest -Uri "https://graph.microsoft.com/v1.0/me" -Method GET -OutputType HttpResponseMessage
-    $accessToken = $data.RequestMessage.Headers.Authorization.Parameter
-    return $accessToken
-}
-
