@@ -1272,7 +1272,7 @@ $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device i
 
 #region export menu
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'autopilot'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
     {
         Write-Host "Exported Autopilot devices to $($outputFile)." -ForegroundColor Green
@@ -1283,7 +1283,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot 
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'imported'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
     if ($exported)
     {
         Write-Host "Exported Imported Autopilot devices to $($outputFile)." -ForegroundColor Green
@@ -1294,7 +1294,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported A
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'managed'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
     if ($exported)
     {
         Write-Host "Exported Managed devices to $($outputFile)." -ForegroundColor Green
@@ -1305,7 +1305,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Wi
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'unmanaged'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
     if ($exported)
     {
         Write-Host "Exported Unmanaged devices to $($outputFile)." -ForegroundColor Green
