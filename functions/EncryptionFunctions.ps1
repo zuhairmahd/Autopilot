@@ -1,3 +1,79 @@
+<#
+.SYNOPSIS
+    Encrypts or decrypts a JSON file using AES-256 encryption with a key derived from a user-provided string.
+.DESCRIPTION
+    This function securely encrypts or decrypts the contents of a JSON file using AES-256-CBC. The encryption key is derived from the provided passphrase using SHA256. Optionally, a backup of the original file can be created before modification. The function provides detailed verbose logging for all operations, including error handling and resource cleanup.
+.PARAMETER FilePath
+    Path to the JSON file to encrypt or decrypt. Must exist and be accessible.
+.PARAMETER Key
+    Passphrase used to derive the AES-256 encryption key (via SHA256).
+.PARAMETER Decrypt
+    If specified, the function will decrypt the file. If not specified, the file will be encrypted.
+.PARAMETER BackupOriginal
+    If specified, creates a .bak backup of the original file before modifying it.
+.EXAMPLE
+    # Encrypt a JSON file and create a backup
+    Invoke-JsonFileEncryption -FilePath "C:\data\settings.json" -Key "MySecretPassphrase" -BackupOriginal
+.EXAMPLE
+    # Decrypt a JSON file
+    Invoke-JsonFileEncryption -FilePath "C:\data\settings.json" -Key "MySecretPassphrase" -Decrypt
+.NOTES
+    - Returns $true on success, $false on failure (with error details written to the console and verbose stream).
+    - Cleans up cryptographic resources and forces garbage collection to clear sensitive data from memory.
+    - Designed for secure, auditable encryption/decryption of JSON files with strong error handling and logging.
+#>
+
+function Test-FileEncryptionStatus()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateScript({Test-Path $_ -PathType Leaf})]
+        [string]$FilePath
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Checking encryption status of file: $FilePath"
+    
+    try
+    {
+        $fileContent = Get-Content $FilePath -Raw -Encoding UTF8 -ErrorAction Stop
+        
+        if ([string]::IsNullOrEmpty($fileContent))
+        {
+            Write-Verbose "[$functionName] File is empty - considered unencrypted"
+            return $false
+        }
+        
+        # Check if content looks like encrypted data (base64)
+        try
+        {
+            $encryptedData = [Convert]::FromBase64String($fileContent)
+            # Additional validation: encrypted data should be at least 16 bytes (IV) + some content
+            if ($encryptedData.Length -ge 16)
+            {
+                Write-Verbose "[$functionName] File appears to be encrypted (valid base64 with sufficient length)"
+                return $true
+            }
+            else
+            {
+                Write-Verbose "[$functionName] File contains base64 data but is too short to be encrypted"
+                return $false
+            }
+        }
+        catch
+        {
+            Write-Verbose "[$functionName] File content is not valid base64 - considered unencrypted"
+            return $false
+        }
+    }
+    catch
+    {
+        Write-Verbose "[$functionName] Error reading file: $($_.Exception.Message)"
+        throw "Failed to read file for encryption status check: $($_.Exception.Message)"
+    }
+}
+
 function Invoke-JsonFileEncryption
 {
     [CmdletBinding()]
@@ -41,7 +117,6 @@ function Invoke-JsonFileEncryption
             Write-Host "CRITICAL ERROR: File not found at path '$FilePath'. `n Please verify that The file path is correct `n  - The file exists, `n and that You have read permissions to the file. `n `n"
             Write-Verbose "[$functionName] File validation failed: File does not exist"
         }
-    
         # Check file accessibility
         try
         {
@@ -61,16 +136,42 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] File accessibility check failed: $($_.Exception.Message)"
             return $false
         }        
-
         # Get absolute path
         $FilePath = Resolve-Path $FilePath
         Write-Verbose "[$functionName] File path resolved to: $FilePath"
         Write-Verbose "[$functionName] File validation completed successfully"
+        
+        # Check current encryption status before proceeding
+        Write-Verbose "[$functionName] Checking current file encryption status..."
+        try
+        {
+            $isCurrentlyEncrypted = Test-FileEncryptionStatus -FilePath $FilePath
+            Write-Verbose "[$functionName] Current encryption status: $isCurrentlyEncrypted"
+            
+            # Pre-operation validation
+            if ($Decrypt -and -not $isCurrentlyEncrypted)
+            {
+                Write-Host "INFO: File '$FilePath' is already decrypted." -ForegroundColor Yellow
+                Write-Host "No decryption operation needed." -ForegroundColor Yellow
+                return $true
+            }
+            
+            if (-not $Decrypt -and $isCurrentlyEncrypted)
+            {
+                Write-Host "INFO: File '$FilePath' is already encrypted." -ForegroundColor Yellow
+                Write-Host "No encryption operation needed." -ForegroundColor Yellow
+                return $true
+            }
+        }
+        catch
+        {
+            Write-Warning "Could not determine current encryption status: $($_.Exception.Message)"
+            Write-Verbose "[$functionName] Proceeding with requested operation despite status check failure"
+        }
         $operationStartTime = Get-Date
         Write-Verbose "[$functionName] =========================================="
         Write-Verbose "[$functionName] Starting main processing at $($operationStartTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
         Write-Verbose "[$functionName] =========================================="
-    
         # Create backup if requested
         if ($BackupOriginal)
         {
@@ -96,7 +197,6 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] No backup requested - proceeding without backup. The original file will be overwritten if the operation succeeds."
             Write-Verbose "[$functionName] Consider using -BackupOriginal for safer operations, especially on sensitive or production files."
         }
-    
         # Read file content
         Write-Verbose "[$functionName] Reading source file content..."
         try
@@ -121,7 +221,6 @@ function Invoke-JsonFileEncryption
             Write-Warning "No operation will be performed on empty file."
             return $false
         }
-    
         # Initialize cryptographic components
         Write-Verbose "[$functionName] Initializing cryptographic components..."
         Write-Verbose "[$functionName] Setting up AES encryption with the following parameters:"
@@ -133,7 +232,6 @@ function Invoke-JsonFileEncryption
         $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
         $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
         Write-Verbose "[$functionName] AES provider initialized successfully"
-    
         # Create 256-bit key from the provided string using SHA256
         Write-Verbose "[$functionName] Generating 256-bit encryption key from user-provided string..."
         Write-Verbose "[$functionName] Input key length: $($Key.Length) characters"
@@ -145,7 +243,6 @@ function Invoke-JsonFileEncryption
         $first8 = $keyBytes[0..7] | ForEach-Object { '{0:X2}' -f $_ }
         Write-Verbose ("Key hash (first 8 bytes): {0}" -f ($first8 -join ''))
         Write-Verbose "[$functionName] Key length: $($keyBytes.Length) bytes"
-    
         if ($Decrypt)
         {
             Write-Verbose "[$functionName] =========================================="
@@ -153,7 +250,6 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] =========================================="
             # Pre-decryption validation
             Write-Verbose "[$functionName] Performing pre-decryption validation checks..."
-        
             # Check if content looks like encrypted data (base64)
             Write-Verbose "[$functionName] Validating encrypted data format..."
             try
@@ -194,7 +290,6 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName]   - Encrypted content length: $($encryptedContent.Length) bytes"
             Write-Verbose "[$functionName] Total encrypted data: $($encryptedData.Length) bytes"
             Write-Verbose "[$functionName] Beginning AES decryption process..."
-        
             # Attempt decryption
             try
             {
@@ -226,7 +321,6 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] Decryption failed with unexpected error: $($_.Exception.Message)"
                 return $false
             }
-        
             # Validate decrypted content is valid JSON
             Write-Verbose "[$functionName] Validating decrypted content format..."
             try
@@ -239,9 +333,12 @@ function Invoke-JsonFileEncryption
             catch
             {
                 Write-Host "DECRYPTION ERROR: Decrypted content is not valid JSON."
-                Write-Host "⚠️  POSSIBLE INCORRECT DECRYPTION KEY"
+                Write-Host "⚠️  INCORRECT DECRYPTION KEY"
                 Write-Host "`nThe decryption process completed, but the result is not valid JSON."
-                Write-Host "`nThis strongly suggests the wrong decryption key was used."
+                Write-Host "`nThis indicates the wrong decryption key was used."
+                Write-Verbose "[$functionName] JSON validation failed after decryption: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] Expected: Valid JSON data"
+                Write-Verbose "[$functionName] Actual: Garbled or corrupted text"
                 if ($null -ne $decryptedText)
                 {
                     Write-Verbose "[$functionName] Decrypted content preview:"
@@ -251,12 +348,8 @@ function Invoke-JsonFileEncryption
                         Write-Verbose "[$functionName] `n... (truncated)" 
                     }
                 }
-                Write-Verbose "[$functionName] Expected: Valid JSON data"
-                Write-Verbose "[$functionName] Actual: Garbled or corrupted text"
-                Write-Verbose "[$functionName] JSON validation failed after decryption: $($_.Exception.Message)"
                 return $false
             }
-        
             # Write decrypted content back to file
             Write-Verbose "[$functionName] Writing decrypted content back to original file..."
             try
@@ -341,7 +434,6 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] IV value: $($ivValue -join '')"
             Write-Verbose "[$functionName] IV provides unique encryption for this session"
             Write-Verbose "[$functionName] Beginning AES encryption process..."
-        
             # Encrypt the content
             try
             {
@@ -372,14 +464,12 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] IV length: $($aes.IV.Length) bytes"
             Write-Verbose "[$functionName] Encrypted content length: $($encryptedBytes.Length) bytes"
             Write-Verbose "[$functionName] Total combined length: $($combinedBytes.Length) bytes"
-        
             # Convert to base64 for safe text storage
             Write-Verbose "[$functionName] Converting encrypted data to base64 format..."
             $base64String = [Convert]::ToBase64String($combinedBytes)
             Write-Verbose "[$functionName] Base64 conversion completed"
             Write-Verbose "[$functionName] Base64 string length: $($base64String.Length) characters"
             Write-Verbose "[$functionName] Compression ratio: $([Math]::Round(($base64String.Length / $fileContent.Length) * 100, 2))% of original size"
-        
             # Write encrypted content back to file
             Write-Verbose "[$functionName] Writing encrypted content to original file..."
             try
@@ -406,7 +496,6 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] File write failed: $($_.Exception.Message)"
                 Write-Host $errorMsg
             }
-        
             $operationEndTime = Get-Date
             $operationDuration = $operationEndTime - $operationStartTime
             Write-Verbose "[$functionName] =========================================="
@@ -418,7 +507,6 @@ function Invoke-JsonFileEncryption
             Write-Host "Encryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
             Write-Host "File is now secured with AES-256 encryption"
         }
-    
         return $true
     }
     catch
@@ -447,7 +535,6 @@ function Invoke-JsonFileEncryption
         Write-Verbose "[$functionName] Call stack:"
         $_.ScriptStackTrace -split "`n" | ForEach-Object { Write-Verbose "[$functionName]   $_" }
         Write-Error "Operation failed: $($_.Exception.Message)"
-                
         # If backup exists and operation failed, provide restoration guidance
         if ($BackupOriginal -and (Test-Path "$FilePath.bak"))
         {
@@ -461,7 +548,6 @@ function Invoke-JsonFileEncryption
     {
         # Clean up cryptographic objects
         Write-Verbose "[$functionName] Performing cleanup of cryptographic resources..."
-                
         if ($null -ne $aes)
         {
             try
@@ -474,7 +560,6 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] ⚠️  Warning: Error disposing AES object: $($_.Exception.Message)"
             }
         }
-                
         if ($null -ne $sha256)
         {
             try
@@ -487,7 +572,6 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] ⚠️  Warning: Error disposing SHA256 object: $($_.Exception.Message)"
             }
         }
-                
         if ($null -ne $encryptor)
         {
             try
@@ -500,7 +584,6 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] ⚠️  Warning: Error disposing encryptor: $($_.Exception.Message)"
             }
         }
-                
         if ($null -ne $decryptor)
         {
             try
@@ -513,7 +596,6 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] ⚠️  Warning: Error disposing decryptor: $($_.Exception.Message)"
             }
         }
-                
         # Force garbage collection to clear sensitive data from memory
         Write-Verbose "[$functionName] Forcing garbage collection to clear sensitive data..."
         [System.GC]::Collect()
@@ -529,7 +611,6 @@ function Invoke-JsonFileEncryption
         Write-Verbose "[$functionName] Function execution finished"
     }
 }
-
 
 #region Legacy Encryption functions
 $excludeFields = @('domain', 'name', 'scope', 'auth')

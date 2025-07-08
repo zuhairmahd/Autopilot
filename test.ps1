@@ -528,9 +528,9 @@ else
 #endregion import functions.
 
 #region variables
-$auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-$scope = $auth.scope
+# $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+# $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+# $scope = $auth.scope
 # $logfile = "mylog.log"
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
@@ -551,7 +551,7 @@ $scope = $auth.scope
 # $deviceConfigurationUri = "deviceManagement/deviceConfigurations"
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
-$accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
+# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
@@ -565,7 +565,39 @@ $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $sc
 # }
 #endregion variables
 
-
+$inputFile = Read-Host "Enter the path to the input file"
+if (-not (Test-Path $inputFile))
+{
+    Write-Host "Input file not found. Exiting script." -ForegroundColor Red
+    exit 1
+}
+else
+{
+    Write-Host "Input file found: $inputFile"
+}
+Write-Host "Enter the password you want to use for encryption:"
+$password = Read-Host -AsSecureString "Password"
+#decode the $password to a plain text string
+$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToGlobalAllocUnicode($password))
+Write-Host "Using $password for encryption/decryption."
+Write-Host "What would you like to do with the file?"
+$choice = Read-Host "Press d to decrypt, e to encrypt"
+while ($choice -notin @('d', 'e'))
+{
+    Write-Host "Invalid choice. Please enter 'd' to decrypt or 'e' to encrypt."
+    #beep
+    [console]::beep(1000, 500)
+    $choice = Read-Host "Press d to decrypt, e to encrypt"
+}
+if ($choice -eq 'd')
+{
+    Invoke-JsonFileEncryption -filePath $inputFile -Key $password -Decrypt 
+}
+elseif ($choice -eq 'e')
+{
+    Invoke-JsonFileEncryption -filePath $inputFile -Key $password
+}
+Write-Host "Script completed successfully." -ForegroundColor Green
 
 exit 0
 
