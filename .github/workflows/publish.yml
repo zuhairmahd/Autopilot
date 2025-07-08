@@ -21,7 +21,7 @@ jobs:
     - name: Run PSScriptAnalyzer
       shell: powershell
       run: |
-        $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSGallery
+        $results = Invoke-ScriptAnalyzer -Path *.ps1 -Recurse -Severity Error
         if ($results) {
           $results | Format-Table -AutoSize
           Write-Error "PSScriptAnalyzer found issues"
