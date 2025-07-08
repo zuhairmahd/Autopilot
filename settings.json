@@ -79,6 +79,41 @@
       "Scope": "offline_access",
       "Reason": "Standard scope that provides refresh tokens to maintain access when the user is not active.",
       "Endpoints": []
+    },
+    {
+      "Scope": "DeviceManagementConfiguration.ReadWrite.All",
+      "Reason": "Required to create, update, and delete Intune device configuration policies.",
+      "Endpoints": [
+        "deviceManagement/deviceConfigurations"
+      ]
+    },
+    {
+      "Scope": "DeviceManagementApps.Read.All",
+      "Reason": "Required to read application information in Intune.",
+      "Endpoints": [
+        "deviceAppManagement/mobileApps"
+      ]
+    },
+    {
+      "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
+      "Reason": "Required to create, update, and delete Intune managed device properties.",
+      "Endpoints": [
+        "deviceManagement/managedDevices"
+      ]
+    },
+    {
+      "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
+      "Reason": "Required for privileged operations on managed devices, such as reading LAPS passwords.",
+      "Endpoints": [
+        "deviceManagement/managedDevices"
+      ]
+    },
+    {
+      "Scope": "BitlockerKey.Read.All",
+      "Reason": "Required to read BitLocker recovery keys for all devices.",
+      "Endpoints": [
+        "informationProtection/bitlocker/recoveryKeys"
+      ]
     }
   ],
   "globalSettings": {
@@ -89,7 +124,7 @@
     "maxWaitTime": "30",
     "maxUserMatchDisplay": "10",
     "timeInSeconds": "60",
-    "Release": "master",
+    "Release": "dev",
     "Repo": "Github",
     "appMode": "full"
   },
@@ -140,7 +175,7 @@
         "MinSerialNumberLength": 7,
         "MinimumDevicePhysicalMemoryInGB": 8,
         "preferredBrowser": "Chrome",
-        "privateSession": true,
+        "privateSession": false,
         "GroupTag": "ENTRA",
         "maxNumberOfDevicesAllowed": 15,
         "DesiredAutopilotProfiles": [
