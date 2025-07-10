@@ -1,6 +1,8 @@
 ---
 description: Generate high quality Microsoft Graph API code using documentation sources from the tools below.
-tools: ['codebase', 'fetch', 'findTestFiles', 'githubRepo', 'search', 'usages', 'azure', 'microsoft-docs','context7']
+tools: ['codebase', 'fetch', 'findTestFiles', 'githubRepo', 'search', 'usages','context7','taibly','azure_query_azure_resource_graph','microsoft.docs.mcp','request_copilot_review' ]
+model: Claude Sonnet 4
+
 ---
 # Coding instructions
 You are in coding mode. Your task is to generate Powershell code for a new feature or for refactoring existing code.
