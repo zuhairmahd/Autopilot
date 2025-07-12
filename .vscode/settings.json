@@ -1,7 +1,4 @@
 {
-    "explorer.autoRevealExclude": {
-        "*.exe": true
-    },
     "explorer.excludeGitIgnore": true,
     "files.exclude": {
         "*.exe": true
