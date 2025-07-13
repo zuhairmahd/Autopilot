@@ -347,10 +347,14 @@ function Clear-SecureMemory
     
     .PARAMETER Variables
     Array of variable names to clear from memory.
+    
+    .PARAMETER ClearScriptVariables
+    If specified, also clears script-level temporary encryption variables.
     #>
     [CmdletBinding()]
     param(
-        [string[]]$Variables = @()
+        [string[]]$Variables = @(),
+        [switch]$ClearScriptVariables
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -366,17 +370,20 @@ function Clear-SecureMemory
         }
     }
     
-    # Clear script-level variables
-    if (Get-Variable -Name "TempEncryptedConfig" -Scope Script -ErrorAction SilentlyContinue)
+    # Clear script-level variables only if explicitly requested
+    if ($ClearScriptVariables)
     {
-        Remove-Variable -Name "TempEncryptedConfig" -Scope Script -Force -ErrorAction SilentlyContinue
-        Write-Verbose "[$functionName] Cleared script variable: TempEncryptedConfig"
-    }
-    
-    if (Get-Variable -Name "TempEncryptionKey" -Scope Script -ErrorAction SilentlyContinue)
-    {
-        Remove-Variable -Name "TempEncryptionKey" -Scope Script -Force -ErrorAction SilentlyContinue
-        Write-Verbose "[$functionName] Cleared script variable: TempEncryptionKey"
+        if (Get-Variable -Name "TempEncryptedConfig" -Scope Script -ErrorAction SilentlyContinue)
+        {
+            Remove-Variable -Name "TempEncryptedConfig" -Scope Script -Force -ErrorAction SilentlyContinue
+            Write-Verbose "[$functionName] Cleared script variable: TempEncryptedConfig"
+        }
+        
+        if (Get-Variable -Name "TempEncryptionKey" -Scope Script -ErrorAction SilentlyContinue)
+        {
+            Remove-Variable -Name "TempEncryptionKey" -Scope Script -Force -ErrorAction SilentlyContinue
+            Write-Verbose "[$functionName] Cleared script variable: TempEncryptionKey"
+        }
     }
     
     # Force garbage collection
@@ -1455,7 +1462,7 @@ if (Test-Path $configFile)
         {
             Write-Host "Failed to decrypt configuration file after $maxRetries attempts." -ForegroundColor Red
             Write-Host "Please verify your password and try again." -ForegroundColor Red
-            Clear-SecureMemory
+            Clear-SecureMemory -ClearScriptVariables
             exit 1
         }
         
@@ -1558,7 +1565,7 @@ if (Test-Path $configFile)
         else
         {
             Write-Host "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
-            Clear-SecureMemory
+            Clear-SecureMemory -ClearScriptVariables
             exit 1
         }
         
@@ -3120,6 +3127,6 @@ else
 Write-Log -LogFile $LogFile -FinishLogging
 
 # Clear sensitive data from memory before exiting
-Clear-SecureMemory
+Clear-SecureMemory -ClearScriptVariables
 
 
