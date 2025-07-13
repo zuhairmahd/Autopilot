@@ -2128,7 +2128,7 @@ function GetGraphAccessToken()
             Write-Verbose "[$functionName] No scope provided in parameters. Checking config file for scope."
             try
             {
-                $configScope = Get-DecryptedConfigValue -PropertyPath "auth.scope"
+                $configScope = Get-AuthConfigValue -PropertyPath "scope"
                 if ($configScope)
                 {
                     Write-Verbose "[$functionName] Found scope in config file."

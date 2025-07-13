@@ -552,6 +552,60 @@ function Get-DecryptedConfigValue
     }
 }
 
+function Get-AuthConfigValue
+{
+    <#
+    .SYNOPSIS
+    Retrieves an authentication configuration value from the init file.
+    
+    .DESCRIPTION
+    This function retrieves authentication configuration values from the script-level $Auth variable
+    which is loaded from the init file.
+    
+    .PARAMETER PropertyPath
+    The path to the property to retrieve (e.g., "scope", "authType").
+    
+    .EXAMPLE
+    Get-AuthConfigValue -PropertyPath "scope"
+    
+    .EXAMPLE
+    Get-AuthConfigValue -PropertyPath "authType"
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyPath
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Retrieving auth config value for path: $PropertyPath"
+    
+    if (-not $script:Auth)
+    {
+        Write-Error "No auth configuration available"
+        return $null
+    }
+    
+    # Navigate the property path
+    $pathParts = $PropertyPath.Split('.')
+    $current = $script:Auth
+    
+    foreach ($part in $pathParts)
+    {
+        if ($current.ContainsKey($part))
+        {
+            $current = $current[$part]
+        }
+        else
+        {
+            Write-Warning "Property path '$PropertyPath' not found in auth configuration"
+            return $null
+        }
+    }
+    
+    return $current
+}
+
 function ConvertFrom-SecureString-ToPlainText
 {
     <#
@@ -1576,16 +1630,34 @@ if (Test-Path $configFile)
     # Parse the configuration content
     $configJson = ConvertFrom-Json $configContent
     $domain = $configJson.domain
-    $authConfiguration = $configJson.auth
+    
+    # Clear the config content from memory
+    $configContent = $null
+}
+else
+{
+    Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
+    Write-Host "Please create a configuration file or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+}
+if (Test-Path -Path $InitFile)
+{
+    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
+    $global:globalSettings = @{}
+    $global:localSettings = @{}
+    
+    # Load the init file content
+    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+    
+    # Load auth configuration from init file
+    $authConfiguration = $initFileContent.auth
     $auth = @{}
-    Write-Verbose "[$scriptName] Domain: $domain"
-    Write-Verbose "[$scriptName] Loading Auth configuration from decrypted content"
+    Write-Verbose "[$scriptName] Loading Auth configuration from init file"
     foreach ($key in $authConfiguration.PSObject.Properties.Name)
     {
         Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
         {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($authConfiguration.$key)"
+            Write-Verbose "[$scriptName] Read parameter $key from the init file as $($authConfiguration.$key)"
             Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
             if ($authConfiguration.$key -in ('true', 'false'))
             {
@@ -1607,22 +1679,10 @@ if (Test-Path $configFile)
         }
     }
     
-    # Clear the config content from memory
-    $configContent = $null
-}
-else
-{
-    Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Host "Please create a configuration file or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
-    # Set empty auth array to prevent errors
-    $auth = @{}
-}
-if (Test-Path -Path $InitFile)
-{
-    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    $global:globalSettings = @{}
-    $global:localSettings = @{}
-    $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
+    # Set auth as a script variable so it can be accessed by functions
+    $script:Auth = $auth
+    
+    $globalConfigData = $initFileContent | Select-Object -ExpandProperty 'globalSettings'
     Write-Verbose "[$scriptName] Reading global settings..."
     Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $globalConfigData.PSObject.Properties.Name)
@@ -1651,7 +1711,7 @@ if (Test-Path -Path $InitFile)
             $globalSettings.add($key, $PSBoundParameters[$key])
         }
     }
-    $localConfigData = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain
+    $localConfigData = ($initFileContent | Select-Object -ExpandProperty "domains").$domain
     Write-Verbose "[$scriptName] Reading local settings for domain $domain..."
     Write-Verbose "[$scriptName] Found $($localConfigData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $localConfigData.PSObject.Properties.Name)
@@ -1687,6 +1747,10 @@ if (Test-Path -Path $InitFile)
 else
 {
     Write-Host "Configuration file $initFile not found. Using default values."
+    # Set empty auth array to prevent errors
+    $auth = @{}
+    # Set auth as a script variable so it can be accessed by functions
+    $script:Auth = $auth
 }
 #endregion Load parameters from the configuration file if it exists
 
