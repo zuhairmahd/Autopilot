@@ -1,3 +1,273 @@
+function Get-SecurePassword
+{
+    <#
+    .SYNOPSIS
+    Prompts the user for a secure password with confirmation.
+    
+    .DESCRIPTION
+    This function prompts the user to enter a password securely, with an optional confirmation prompt.
+    The password is returned as a SecureString for security.
+    
+    .PARAMETER Message
+    The message to display to the user when prompting for the password.
+    
+    .PARAMETER RequireConfirmation
+    If specified, the user will be prompted to confirm their password.
+    
+    .PARAMETER MinLength
+    The minimum length required for the password (default: 8).
+    
+    .OUTPUTS
+    Returns the password as a SecureString.
+    
+    .EXAMPLE
+    $password = Get-SecurePassword -Message "Enter your encryption password" -RequireConfirmation
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+        [switch]$RequireConfirmation,
+        [int]$MinLength = 8
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Prompting user for secure password"
+    
+    do {
+        $validPassword = $true
+        $password = Read-Host -Prompt $Message -AsSecureString
+        
+        # Convert to plain text temporarily for validation
+        $plainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password))
+        
+        # Validate password length
+        if ($plainPassword.Length -lt $MinLength) {
+            Write-Host "Password must be at least $MinLength characters long. Please try again." -ForegroundColor Yellow
+            $validPassword = $false
+            continue
+        }
+        
+        # Confirm password if required
+        if ($RequireConfirmation) {
+            $confirmPassword = Read-Host -Prompt "Confirm password" -AsSecureString
+            $plainConfirmPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($confirmPassword))
+            
+            if ($plainPassword -ne $plainConfirmPassword) {
+                Write-Host "Passwords do not match. Please try again." -ForegroundColor Yellow
+                $validPassword = $false
+                continue
+            }
+        }
+        
+        # Clear plain text passwords from memory
+        $plainPassword = $null
+        if ($plainConfirmPassword) {
+            $plainConfirmPassword = $null
+        }
+        
+    } while (-not $validPassword)
+    
+    Write-Verbose "[$functionName] Password obtained successfully"
+    return $password
+}
+
+function Get-DecryptedConfigValue
+{
+    <#
+    .SYNOPSIS
+    Retrieves a configuration value from the temporarily encrypted configuration.
+    
+    .DESCRIPTION
+    This function decrypts the temporary configuration and retrieves a specific value.
+    This is used during runtime to access configuration values without keeping them in plain text.
+    
+    .PARAMETER PropertyPath
+    The path to the property to retrieve (e.g., "auth.AppId").
+    
+    .OUTPUTS
+    Returns the decrypted configuration value.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyPath
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Retrieving config value for path: $PropertyPath"
+    
+    if (-not $script:TempEncryptedConfig -or -not $script:TempEncryptionKey) {
+        Write-Error "No temporary encrypted configuration available"
+        return $null
+    }
+    
+    # Create a temporary file to decrypt
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try {
+        Set-Content -Path $tempFile -Value $script:TempEncryptedConfig -Encoding UTF8
+        
+        # Decrypt the content
+        $decryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $script:TempEncryptionKey -Decrypt -InMemoryOnly
+        
+        if ($decryptResult.Success) {
+            $config = ConvertFrom-Json $decryptResult.Content
+            
+            # Navigate the property path
+            $pathParts = $PropertyPath.Split('.')
+            $current = $config
+            
+            foreach ($part in $pathParts) {
+                if ($current.PSObject.Properties.Name -contains $part) {
+                    $current = $current.$part
+                } else {
+                    Write-Warning "Property path '$PropertyPath' not found in configuration"
+                    return $null
+                }
+            }
+            
+            return $current
+        } else {
+            Write-Error "Failed to decrypt temporary configuration: $($decryptResult.ErrorMessage)"
+            return $null
+        }
+    } finally {
+        # Clean up temporary file
+        if (Test-Path $tempFile) {
+            Remove-Item $tempFile -Force
+        }
+    }
+}
+
+function ConvertFrom-SecureString-ToPlainText
+{
+    <#
+    .SYNOPSIS
+    Converts a SecureString to plain text.
+    
+    .DESCRIPTION
+    This function converts a SecureString to plain text for use in encryption operations.
+    The plain text should be cleared from memory as soon as possible after use.
+    
+    .PARAMETER SecureString
+    The SecureString to convert.
+    
+    .OUTPUTS
+    Returns the plain text string.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [SecureString]$SecureString
+    )
+    
+    return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString))
+}
+
+function Test-FileEncryptionStatus
+{
+    <#
+    .SYNOPSIS
+    Tests whether a JSON file is encrypted or not.
+    
+    .DESCRIPTION
+    This function examines a file to determine if it contains encrypted content.
+    It checks if the file content is valid Base64 (indicating encryption) or valid JSON (indicating unencrypted).
+    
+    .PARAMETER FilePath
+    The path to the file to check.
+    
+    .OUTPUTS
+    Returns a hashtable with the following properties:
+    - IsEncrypted: Boolean indicating if the file is encrypted
+    - IsValidFile: Boolean indicating if the file exists and is readable
+    - FileContent: The raw content of the file (for debugging)
+    - ErrorMessage: Any error encountered during the check
+    
+    .EXAMPLE
+    $status = Test-FileEncryptionStatus -FilePath "C:\config.json"
+    if ($status.IsEncrypted) {
+        Write-Host "File is encrypted"
+    } else {
+        Write-Host "File is not encrypted"
+    }
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Checking encryption status of file: $FilePath"
+    
+    # Initialize result object
+    $result = @{
+        IsEncrypted = $false
+        IsValidFile = $false
+        FileContent = $null
+        ErrorMessage = $null
+    }
+    
+    try {
+        # Check if file exists
+        if (-not (Test-Path $FilePath)) {
+            $result.ErrorMessage = "File does not exist: $FilePath"
+            Write-Verbose "[$functionName] File not found: $FilePath"
+            return $result
+        }
+        
+        # Read file content
+        $fileContent = Get-Content -Path $FilePath -Raw -Encoding UTF8 -ErrorAction Stop
+        $result.FileContent = $fileContent
+        $result.IsValidFile = $true
+        
+        if ([string]::IsNullOrWhiteSpace($fileContent)) {
+            $result.ErrorMessage = "File is empty or contains only whitespace"
+            Write-Verbose "[$functionName] File is empty: $FilePath"
+            return $result
+        }
+        
+        Write-Verbose "[$functionName] File content length: $($fileContent.Length) characters"
+        
+        # First, try to parse as JSON (unencrypted)
+        try {
+            $null = ConvertFrom-Json $fileContent -ErrorAction Stop
+            $result.IsEncrypted = $false
+            Write-Verbose "[$functionName] File contains valid JSON - not encrypted"
+            return $result
+        }
+        catch {
+            Write-Verbose "[$functionName] File is not valid JSON, checking if it's encrypted..."
+        }
+        
+        # If not JSON, check if it's Base64 encoded (encrypted)
+        try {
+            $decodedBytes = [Convert]::FromBase64String($fileContent.Trim())
+            if ($decodedBytes.Length -ge 16) {  # Minimum size for IV + some encrypted content
+                $result.IsEncrypted = $true
+                Write-Verbose "[$functionName] File contains valid Base64 with sufficient length - appears encrypted"
+                return $result
+            }
+            else {
+                $result.ErrorMessage = "File appears to be Base64 but is too short to be properly encrypted"
+                Write-Verbose "[$functionName] Base64 data too short for encryption"
+                return $result
+            }
+        }
+        catch {
+            $result.ErrorMessage = "File is neither valid JSON nor valid Base64 - unknown format"
+            Write-Verbose "[$functionName] File is not valid Base64 either: $($_.Exception.Message)"
+            return $result
+        }
+    }
+    catch {
+        $result.ErrorMessage = "Error reading file: $($_.Exception.Message)"
+        Write-Verbose "[$functionName] Error reading file: $($_.Exception.Message)"
+        return $result
+    }
+}
+
 function Invoke-JsonFileEncryption
 {
     [CmdletBinding()]
@@ -11,7 +281,9 @@ function Invoke-JsonFileEncryption
         [Parameter(Mandatory = $false)]
         [switch]$Decrypt,
         [Parameter(Mandatory = $false)]
-        [switch]$BackupOriginal
+        [switch]$BackupOriginal,
+        [Parameter(Mandatory = $false)]
+        [switch]$InMemoryOnly
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -21,6 +293,7 @@ function Invoke-JsonFileEncryption
     Write-Verbose "[$functionName] File path: $FilePath"
     Write-Verbose "[$functionName] Operation mode: $(if ($Decrypt) { 'DECRYPT' } else { 'ENCRYPT' })"
     Write-Verbose "[$functionName] Backup original: $BackupOriginal"
+    Write-Verbose "[$functionName] In-memory only: $InMemoryOnly"
     Write-Verbose "[$functionName] PowerShell version: $($PSVersionTable.PSVersion)"
     Write-Verbose "[$functionName] Current user: $env:USERNAME"
     Write-Verbose "[$functionName] Timestamp: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
@@ -59,7 +332,13 @@ function Invoke-JsonFileEncryption
             $errorMsg += "`nPlease verify you have the necessary permissions to access this file."
             Write-Host $errorMsg
             Write-Verbose "[$functionName] File accessibility check failed: $($_.Exception.Message)"
-            return $false
+            return @{
+                Success = $false
+                Content = $null
+                Operation = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+                InMemoryOnly = $InMemoryOnly
+                ErrorMessage = $errorMsg
+            }
         }        
 
         # Get absolute path
@@ -111,7 +390,13 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] File read failed: $($_.Exception.Message)"
             $errorMsg = "CRITICAL ERROR: Failed to read file '$FilePath'."
             Write-Host $errorMsg
-            return $false
+            return @{
+                Success = $false
+                Content = $null
+                Operation = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+                InMemoryOnly = $InMemoryOnly
+                ErrorMessage = $errorMsg
+            }
         }
         if ([string]::IsNullOrEmpty($fileContent))
         {
@@ -119,7 +404,13 @@ function Invoke-JsonFileEncryption
             Write-Verbose $warningMsg
             Write-Warning $warningMsg
             Write-Warning "No operation will be performed on empty file."
-            return $false
+            return @{
+                Success = $false
+                Content = $null
+                Operation = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+                InMemoryOnly = $InMemoryOnly
+                ErrorMessage = $warningMsg
+            }
         }
     
         # Initialize cryptographic components
@@ -167,7 +458,13 @@ function Invoke-JsonFileEncryption
             {
                 Write-Verbose "[$functionName] Base64 validation failed: $($_.Exception.Message)"
                 Write-Host "DECRYPTION ERROR: The file content is not valid base64 encoded data."
-                return $false
+                return @{
+                    Success = $false
+                    Content = $null
+                    Operation = "Decrypt"
+                    InMemoryOnly = $InMemoryOnly
+                    ErrorMessage = "The file content is not valid base64 encoded data."
+                }
             }
             # Validate encrypted data structure
             Write-Verbose "[$functionName] Validating encrypted data structure..."
@@ -180,7 +477,13 @@ function Invoke-JsonFileEncryption
                 $errorMsg += "`n`nThis indicates the encrypted file is corrupted or was not properly encrypted."
                 Write-Verbose "[$functionName] Encrypted data structure validation failed: Data too short"
                 Write-Host $errorMsg
-                return $false
+                return @{
+                    Success = $false
+                    Content = $null
+                    Operation = "Decrypt"
+                    InMemoryOnly = $InMemoryOnly
+                    ErrorMessage = $errorMsg
+                }
             }
             # Extract IV and encrypted content
             Write-Verbose "[$functionName] Extracting initialization vector (IV) and encrypted content..."
@@ -212,7 +515,13 @@ function Invoke-JsonFileEncryption
             {
                 Write-Host "`n`nThe decryption key you provided does not match the key used to encrypt this file."
                 Write-Verbose "[$functionName] Decryption failed with CryptographicException (likely wrong key): $($_.Exception.Message)"
-                return $false
+                return @{
+                    Success = $false
+                    Content = $null
+                    Operation = "Decrypt"
+                    InMemoryOnly = $InMemoryOnly
+                    ErrorMessage = "The decryption key you provided does not match the key used to encrypt this file."
+                }
             }
             catch
             {
@@ -224,7 +533,13 @@ function Invoke-JsonFileEncryption
                 Write-Host "`n Incompatible encryption method"
                 Write-Host "`n  - System cryptography issue"
                 Write-Verbose "[$functionName] Decryption failed with unexpected error: $($_.Exception.Message)"
-                return $false
+                return @{
+                    Success = $false
+                    Content = $null
+                    Operation = "Decrypt"
+                    InMemoryOnly = $InMemoryOnly
+                    ErrorMessage = "Unexpected error during decryption process: $($_.Exception.Message)"
+                }
             }
         
             # Validate decrypted content is valid JSON
@@ -254,45 +569,77 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] Expected: Valid JSON data"
                 Write-Verbose "[$functionName] Actual: Garbled or corrupted text"
                 Write-Verbose "[$functionName] JSON validation failed after decryption: $($_.Exception.Message)"
-                return $false
+                return @{
+                    Success = $false
+                    Content = $decryptedText
+                    Operation = "Decrypt"
+                    InMemoryOnly = $InMemoryOnly
+                    ErrorMessage = "Decrypted content is not valid JSON - possible incorrect decryption key"
+                }
             }
         
-            # Write decrypted content back to file
-            Write-Verbose "[$functionName] Writing decrypted content back to original file..."
-            try
-            {
-                Set-Content $FilePath -Value $decryptedText -Encoding UTF8 -NoNewline -ErrorAction Stop
-                Write-Verbose "[$functionName] Decrypted content written successfully"
-                # Verify the write operation
-                $verifyContent = Get-Content $FilePath -Raw -Encoding UTF8
-                if ($verifyContent -eq $decryptedText)
-                {
-                    Write-Verbose "[$functionName] File write verification successful"
+            # Write decrypted content back to file or return it
+            if ($InMemoryOnly) {
+                Write-Verbose "[$functionName] In-memory mode: returning decrypted content without writing to disk"
+                $operationEndTime = Get-Date
+                $operationDuration = $operationEndTime - $operationStartTime
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] DECRYPTION COMPLETED SUCCESSFULLY (IN-MEMORY)"
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
+                Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
+                Write-Verbose "[$functionName] Decrypted content length: $($decryptedText.Length) characters"
+                
+                # Return both success status and decrypted content
+                return @{
+                    Success = $true
+                    Content = $decryptedText
+                    Operation = "Decrypt"
+                    InMemoryOnly = $true
                 }
-                else
+            } else {
+                Write-Verbose "[$functionName] Writing decrypted content back to original file..."
+                try
                 {
-                    Write-Warning "File write verification failed - content may not have been written correctly"
+                    Set-Content $FilePath -Value $decryptedText -Encoding UTF8 -NoNewline -ErrorAction Stop
+                    Write-Verbose "[$functionName] Decrypted content written successfully"
+                    # Verify the write operation
+                    $verifyContent = Get-Content $FilePath -Raw -Encoding UTF8
+                    if ($verifyContent -eq $decryptedText)
+                    {
+                        Write-Verbose "[$functionName] File write verification successful"
+                    }
+                    else
+                    {
+                        Write-Warning "File write verification failed - content may not have been written correctly"
+                    }
                 }
+                catch
+                {
+                    $errorMsg = "CRITICAL ERROR: Failed to write decrypted content to file."
+                    $errorMsg += "`nFile path: $FilePath"
+                    $errorMsg += "`nError details: $($_.Exception.Message)"
+                    $errorMsg += "`n`nThe decryption was successful, but the file could not be updated."
+                    Write-Host $errorMsg
+                    Write-Verbose "[$functionName] File write failed: $($_.Exception.Message)"
+                    return @{
+                        Success = $false
+                        Content = $decryptedText
+                        Operation = "Decrypt"
+                        InMemoryOnly = $false
+                        ErrorMessage = $errorMsg
+                    }
+                }
+                $operationEndTime = Get-Date
+                $operationDuration = $operationEndTime - $operationStartTime
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] DECRYPTION COMPLETED SUCCESSFULLY"
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
+                Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
+                Write-Host "File '$FilePath' has been decrypted successfully." -ForegroundColor Green
+                Write-Host "  Decryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
             }
-            catch
-            {
-                $errorMsg = "CRITICAL ERROR: Failed to write decrypted content to file."
-                $errorMsg += "`nFile path: $FilePath"
-                $errorMsg += "`nError details: $($_.Exception.Message)"
-                $errorMsg += "`n`nThe decryption was successful, but the file could not be updated."
-                Write-Host $errorMsg
-                Write-Verbose "[$functionName] File write failed: $($_.Exception.Message)"
-                return $false
-            }
-            $operationEndTime = Get-Date
-            $operationDuration = $operationEndTime - $operationStartTime
-            Write-Verbose "[$functionName] =========================================="
-            Write-Verbose "[$functionName] DECRYPTION COMPLETED SUCCESSFULLY"
-            Write-Verbose "[$functionName] =========================================="
-            Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
-            Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
-            Write-Host "File '$FilePath' has been decrypted successfully." -ForegroundColor Green
-            Write-Host "  Decryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
         }
         else
         {
@@ -330,7 +677,13 @@ function Invoke-JsonFileEncryption
                 $errorMsg += "`n`nPlease ensure the file contains valid JSON before encryption."
                 Write-Verbose "[$functionName] JSON validation failed: $($_.Exception.Message)"
                 Write-Host $errorMsg 
-                return $false   
+                return @{
+                    Success = $false
+                    Content = $null
+                    Operation = "Encrypt"
+                    InMemoryOnly = $false
+                    ErrorMessage = $errorMsg
+                }
             }
             # Generate random IV for this encryption
             Write-Verbose "[$functionName] Generating cryptographically secure random initialization vector (IV)..."
@@ -363,7 +716,13 @@ function Invoke-JsonFileEncryption
                 $errorMsg += "`nError type: $($_.Exception.GetType().Name)"
                 Write-Verbose "[$functionName] Encryption process failed: $($_.Exception.Message)"
                 Write-Host $errorMsg
-                return $false
+                return @{
+                    Success = $false
+                    Content = $null
+                    Operation = "Encrypt"
+                    InMemoryOnly = $InMemoryOnly
+                    ErrorMessage = $errorMsg
+                }
             }
             # Combine IV and encrypted content for storage
             Write-Verbose "[$functionName] Preparing encrypted data for storage..."
@@ -380,46 +739,79 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] Base64 string length: $($base64String.Length) characters"
             Write-Verbose "[$functionName] Compression ratio: $([Math]::Round(($base64String.Length / $fileContent.Length) * 100, 2))% of original size"
         
-            # Write encrypted content back to file
-            Write-Verbose "[$functionName] Writing encrypted content to original file..."
-            try
-            {
-                Set-Content $FilePath -Value $base64String -Encoding UTF8 -NoNewline -ErrorAction Stop
-                Write-Verbose "[$functionName] Encrypted content written successfully"
-                # Verify the write operation
-                $verifyContent = Get-Content $FilePath -Raw -Encoding UTF8
-                if ($verifyContent -eq $base64String)
-                {
-                    Write-Verbose "[$functionName] File write verification successful"
+            # Write encrypted content back to file or return it
+            if ($InMemoryOnly) {
+                Write-Verbose "[$functionName] In-memory mode: returning encrypted content without writing to disk"
+                $operationEndTime = Get-Date
+                $operationDuration = $operationEndTime - $operationStartTime
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] ENCRYPTION COMPLETED SUCCESSFULLY (IN-MEMORY)"
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
+                Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
+                Write-Verbose "[$functionName] Encrypted content length: $($base64String.Length) characters"
+                
+                # Return both success status and encrypted content
+                return @{
+                    Success = $true
+                    Content = $base64String
+                    Operation = "Encrypt"
+                    InMemoryOnly = $true
                 }
-                else
+            } else {
+                Write-Verbose "[$functionName] Writing encrypted content to original file..."
+                try
                 {
-                    Write-Warning "File write verification failed - content may not have been written correctly"
+                    Set-Content $FilePath -Value $base64String -Encoding UTF8 -NoNewline -ErrorAction Stop
+                    Write-Verbose "[$functionName] Encrypted content written successfully"
+                    # Verify the write operation
+                    $verifyContent = Get-Content $FilePath -Raw -Encoding UTF8
+                    if ($verifyContent -eq $base64String)
+                    {
+                        Write-Verbose "[$functionName] File write verification successful"
+                    }
+                    else
+                    {
+                        Write-Warning "File write verification failed - content may not have been written correctly"
+                    }
                 }
-            }
-            catch
-            {
-                $errorMsg = "CRITICAL ERROR: Failed to write encrypted content to file."
-                $errorMsg += "`nFile path: $FilePath"
-                $errorMsg += "`nError details: $($_.Exception.Message)"
-                $errorMsg += "`n`nThe encryption was successful, but the file could not be updated."
-                Write-Verbose "[$functionName] File write failed: $($_.Exception.Message)"
-                Write-Host $errorMsg
-            }
+                catch
+                {
+                    $errorMsg = "CRITICAL ERROR: Failed to write encrypted content to file."
+                    $errorMsg += "`nFile path: $FilePath"
+                    $errorMsg += "`nError details: $($_.Exception.Message)"
+                    $errorMsg += "`n`nThe encryption was successful, but the file could not be updated."
+                    Write-Verbose "[$functionName] File write failed: $($_.Exception.Message)"
+                    Write-Host $errorMsg
+                    return @{
+                        Success = $false
+                        Content = $base64String
+                        Operation = "Encrypt"
+                        InMemoryOnly = $false
+                        ErrorMessage = $errorMsg
+                    }
+                }
         
-            $operationEndTime = Get-Date
-            $operationDuration = $operationEndTime - $operationStartTime
-            Write-Verbose "[$functionName] =========================================="
-            Write-Verbose "[$functionName] ENCRYPTION COMPLETED SUCCESSFULLY"
-            Write-Verbose "[$functionName] =========================================="
-            Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
-            Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
-            Write-Host "File '$FilePath' has been encrypted successfully." -ForegroundColor Green
-            Write-Host "Encryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
-            Write-Host "File is now secured with AES-256 encryption"
+                $operationEndTime = Get-Date
+                $operationDuration = $operationEndTime - $operationStartTime
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] ENCRYPTION COMPLETED SUCCESSFULLY"
+                Write-Verbose "[$functionName] =========================================="
+                Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
+                Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
+                Write-Host "File '$FilePath' has been encrypted successfully." -ForegroundColor Green
+                Write-Host "Encryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
+                Write-Host "File is now secured with AES-256 encryption"
+            }
         }
     
-        return $true
+        # Return success for non-in-memory operations
+        return @{
+            Success = $true
+            Content = $null
+            Operation = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+            InMemoryOnly = $false
+        }
     }
     catch
     {
@@ -455,7 +847,13 @@ function Invoke-JsonFileEncryption
             Write-Warning "   You can restore the original file if needed using:"
             Write-Warning "   Copy-Item '$FilePath.bak' '$FilePath' -Force"
         }
-        return $false
+        return @{
+            Success = $false
+            Content = $null
+            Operation = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+            InMemoryOnly = $InMemoryOnly
+            ErrorMessage = "Operation failed: $($_.Exception.Message)"
+        }
     }
     finally
     {

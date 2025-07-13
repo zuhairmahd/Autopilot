@@ -368,13 +368,127 @@ else
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
+
+# Check if the .secrets directory exists, create it if it doesn't
+$secretsDir = Split-Path $configFile -Parent
+if (-not (Test-Path $secretsDir)) {
+    Write-Verbose "[$scriptName] Creating secrets directory: $secretsDir"
+    New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null
+}
+
+# Initialize variables for encryption handling
+$configContent = $null
+$userPassword = $null
+$tempEncryptionKey = $null
+
 if (Test-Path $configFile)
 {
-    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-    $authConfiguration = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+    # Check if the config file is encrypted
+    $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFile
+    
+    if ($encryptionStatus.IsEncrypted) {
+        Write-Host "The configuration file is encrypted. Please enter your password to decrypt it." -ForegroundColor Cyan
+        
+        # Get the password from user
+        $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password"
+        $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+        
+        # Decrypt the file in memory
+        $decryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword -Decrypt -InMemoryOnly
+        
+        if ($decryptResult.Success) {
+            Write-Host "Configuration file decrypted successfully." -ForegroundColor Green
+            $configContent = $decryptResult.Content
+            
+            # Generate a temporary encryption key for in-memory use
+            $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
+            Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
+            
+            # Re-encrypt the content with the temporary key for in-memory use
+            $tempFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
+                $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
+                
+                if ($tempEncryptResult.Success) {
+                    Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
+                    # Store the encrypted content for later use during the session
+                    $script:TempEncryptedConfig = $tempEncryptResult.Content
+                    $script:TempEncryptionKey = $tempEncryptionKey
+                } else {
+                    Write-Warning "Failed to re-encrypt content with temporary key"
+                }
+            } finally {
+                # Clean up temporary file
+                if (Test-Path $tempFile) {
+                    Remove-Item $tempFile -Force
+                }
+            }
+        } else {
+            Write-Host "Failed to decrypt configuration file: $($decryptResult.ErrorMessage)" -ForegroundColor Red
+            Write-Host "Please check your password and try again." -ForegroundColor Red
+            exit 1
+        }
+        
+        # Clear the user password from memory
+        $userPassword = $null
+    } else {
+        # File is not encrypted - this is a first run scenario
+        Write-Host "Configuration file is not encrypted. Setting up encryption..." -ForegroundColor Yellow
+        
+        # Get password from user for first-time setup
+        $userPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt your configuration file" -RequireConfirmation
+        $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+        
+        # Read the current config content
+        $configContent = Get-Content -Path $configFile -Raw -Encoding UTF8
+        
+        # Encrypt the file on disk
+        $encryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword
+        
+        if ($encryptResult.Success) {
+            Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
+            
+            # Generate a temporary encryption key for in-memory use
+            $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
+            Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
+            
+            # Re-encrypt the content with the temporary key for in-memory use
+            $tempFile = [System.IO.Path]::GetTempFileName()
+            try {
+                Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
+                $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
+                
+                if ($tempEncryptResult.Success) {
+                    Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
+                    # Store the encrypted content for later use during the session
+                    $script:TempEncryptedConfig = $tempEncryptResult.Content
+                    $script:TempEncryptionKey = $tempEncryptionKey
+                } else {
+                    Write-Warning "Failed to re-encrypt content with temporary key"
+                }
+            } finally {
+                # Clean up temporary file
+                if (Test-Path $tempFile) {
+                    Remove-Item $tempFile -Force
+                }
+            }
+        } else {
+            Write-Host "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
+            exit 1
+        }
+        
+        # Clear the user password from memory
+        $userPassword = $null
+    }
+    
+    # Parse the configuration content
+    $configJson = ConvertFrom-Json $configContent
+    $domain = $configJson.domain
+    $authConfiguration = $configJson.auth
     $auth = @{}
     Write-Verbose "[$scriptName] Domain: $domain"
-    Write-Verbose "[$scriptName] Loading Auth configuration from $configFile"
+    Write-Verbose "[$scriptName] Loading Auth configuration from decrypted content"
     foreach ($key in $authConfiguration.PSObject.Properties.Name)
     {
         Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
@@ -401,6 +515,14 @@ if (Test-Path $configFile)
             $auth.add($key, $PSBoundParameters[$key])
         }
     }
+    
+    # Clear the config content from memory
+    $configContent = $null
+}
+else
+{
+    Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
+    Write-Host "Please create a configuration file or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
 }
 if (Test-Path -Path $InitFile)
 {
