@@ -569,20 +569,36 @@ function Save-RefreshTokenToConfig()
         Write-Verbose "[$functionName] No refresh token to save"
         return
     }
-    # Read the current config and check if it is encrypted
-    $config = Get-Content -Raw -Path $configFilePath | ConvertFrom-Json
-    if (isEncrypted -data $config)
+    
+    # Read the current config from disk (it should be encrypted)
+    try
     {
-        Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-        $config = DecryptObject -encryptedObject $config
-        $encrypted = $true
+        $encryptedContent = Get-Content -Raw -Path $configFilePath -ErrorAction Stop
+        Write-Verbose "[$functionName] Successfully read config file from disk"
+    }
+    catch
+    {
+        Write-Error "[$functionName] Failed to read config file: $_"
+        return
+    }
+    
+    # Check if config is encrypted (it should be in the new system)
+    $configObject = ConvertFrom-Json $encryptedContent
+    if (-not (isEncrypted -data $configObject))
+    {
+        Write-Warning "[$functionName] Config file is not encrypted. This may indicate an issue with the encryption system."
+        # For backward compatibility, handle unencrypted config
+        $config = $configObject
+        $needsEncryption = $true
     }
     else
     {
-        Write-Verbose "[$functionName] Config file is not encrypted. No decryption needed."
-        $encrypted = $false
+        Write-Verbose "[$functionName] Config file is encrypted. Decrypting for modification."
+        $config = DecryptObject -encryptedObject $configObject
+        $needsEncryption = $true
     }
     
+    # Format scopes
     if ($refreshToken.scope)
     {
         Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
@@ -601,6 +617,7 @@ function Save-RefreshTokenToConfig()
         $formattedScopes = @()
     }
 
+    # Update the config with the new refresh token
     if ($config.deligatedCredentials)
     {
         Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
@@ -615,16 +632,56 @@ function Save-RefreshTokenToConfig()
         $config | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $DeligatedCredentials
     }
 
-    # Re-encrypt the config if it was encrypted before
-    if ($encrypted)
+    # Re-encrypt the config and save it
+    if ($needsEncryption)
     {
         Write-Verbose "[$functionName] Re-encrypting config with refresh token"
         $Config = EncryptObject -DecryptedObject $config 
     }   
+    
     # Save the updated config
     Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
     $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
     Write-Verbose "[$functionName] Refresh token saved to config file"
+    
+    # Also update the temporary encrypted config if it exists
+    if ($script:TempEncryptedConfig -and $script:TempEncryptionKey)
+    {
+        Write-Verbose "[$functionName] Updating temporary encrypted config with new refresh token"
+        try
+        {
+            # Create a temporary file with the decrypted config
+            $tempFile = [System.IO.Path]::GetTempFileName()
+            try
+            {
+                $config | ConvertTo-Json -Depth 10 | Set-Content -Path $tempFile -Encoding UTF8
+                
+                # Re-encrypt with the temporary key
+                $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $script:TempEncryptionKey -InMemoryOnly
+                
+                if ($tempEncryptResult.Success)
+                {
+                    $script:TempEncryptedConfig = $tempEncryptResult.Content
+                    Write-Verbose "[$functionName] Successfully updated temporary encrypted config"
+                }
+                else
+                {
+                    Write-Warning "[$functionName] Failed to update temporary encrypted config: $($tempEncryptResult.ErrorMessage)"
+                }
+            }
+            finally
+            {
+                if (Test-Path $tempFile)
+                {
+                    Remove-Item $tempFile -Force
+                }
+            }
+        }
+        catch
+        {
+            Write-Warning "[$functionName] Failed to update temporary encrypted config: $_"
+        }
+    }
 }
 
 function Format-TokenOutput()
@@ -1946,37 +2003,25 @@ function GetGraphAccessToken()
         return $null
     }
 
-    Write-Verbose "[$functionName] Reading config file $configFile"
+    Write-Verbose "[$functionName] Accessing config values from in-memory encrypted config"
+    $configRefreshToken = $null
+    
+    # Extract the refresh token if it exists using the new encryption system
     try
     {
-        $config = Get-Content -Raw -Path $configFile -Force | ConvertFrom-Json
-        Write-Verbose "[$functionName] Config file loaded successfully"
+        $configRefreshToken = Get-DecryptedConfigValue -PropertyPath "deligatedCredentials.refresh_token"
+        if ($configRefreshToken)
+        {
+            Write-Verbose "[$functionName] Found refresh token in encrypted config."
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No refresh token found in config."
+        }
     }
     catch
     {
-        Write-Error "Failed to read or process config file: $_"
-        return $null
-    }
-    Write-Verbose "[$functionName] Decrypting values from $configFile"
-    $configRefreshToken = $null
-    if (isEncrypted -data $config)
-    {
-        Write-Verbose "[$functionName] Config file is encrypted. Decrypting."
-        $config = DecryptObject -encryptedObject $config
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Config file is not encrypted. Using as is."
-    }    
-    # Extract the refresh token if it exists
-    if ($config.deligatedCredentials.refresh_token)
-    {
-        $configRefreshToken = $config.deligatedCredentials.refresh_token
-        Write-Verbose "[$functionName] Found refresh token in encrypted config."
-    }
-    else
-    {
-        Write-Verbose "[$functionName] No refresh token found in config."
+        Write-Verbose "[$functionName] No deligatedCredentials.refresh_token found in config."
     }
     # Handle ForceNewRefreshToken parameter
     if ($ForceNewRefreshToken -and $Deligated)
@@ -1988,42 +2033,83 @@ function GetGraphAccessToken()
         $configRefreshToken = $null
         Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
     }    
-    if ($config.tenantId)
+    
+    try
     {
-        $tenantId = $config.tenantId
-        Write-Verbose "[$functionName] Tenant ID found in config: $tenantId"
+        $tenantId = Get-DecryptedConfigValue -PropertyPath "tenantId"
+        if ($tenantId)
+        {
+            Write-Verbose "[$functionName] Tenant ID found in config: $tenantId"
+        }
+        else
+        {
+            Write-Error "Tenant ID not found in config file."
+            return $null
+        }
     }
-    else
+    catch
     {
         Write-Error "Tenant ID not found in config file."
         return $null
     }
-    if ($config.domain)
+    try
     {
-        $domain = $config.domain
-        Write-Verbose "[$functionName] Domain found in config: $domain"
+        $domain = Get-DecryptedConfigValue -PropertyPath "domain"
+        if ($domain)
+        {
+            Write-Verbose "[$functionName] Domain found in config: $domain"
+        }
+        else
+        {
+            Write-Error "Domain not found in config file."
+            return $null
+        }
     }
-    else
+    catch
     {
         Write-Error "Domain not found in config file."
         return $null
     }
-    if ($config.appId)
+    
+    try
     {
-        $clientId = $config.appId
-        Write-Verbose "[$functionName] Client ID found in config: $clientId"
+        $clientId = Get-DecryptedConfigValue -PropertyPath "appId"
+        if ($clientId)
+        {
+            Write-Verbose "[$functionName] Client ID found in config: $clientId"
+        }
+        else
+        {
+            Write-Error "Client ID not found in config file."
+            return $null
+        }
     }
-    else
+    catch
     {
         Write-Error "Client ID not found in config file."
         return $null
     }
-    if ($config.AppSecret)
+    
+    try
     {
-        $clientSecret = $config.AppSecret
-        Write-Verbose "[$functionName] Client Secret found in config."
+        $clientSecret = Get-DecryptedConfigValue -PropertyPath "AppSecret"
+        if ($clientSecret)
+        {
+            Write-Verbose "[$functionName] Client Secret found in config."
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Client Secret not found in config file."
+            Write-Verbose "Checking whether the authtype is public flow which does not require client secret."
+            if ($AuthType -ne 'PublicAuthFlow')
+            {
+                Write-Error "Client Secret is required for the selected authentication type."
+                return $null
+            }
+            Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+        }
     }
-    else
+    catch
     {
         Write-Verbose "[$functionName] Client Secret not found in config file."
         Write-Verbose "Checking whether the authtype is public flow which does not require client secret."
@@ -2040,13 +2126,22 @@ function GetGraphAccessToken()
         if ($null -eq $scope -or $scope -eq '')
         {
             Write-Verbose "[$functionName] No scope provided in parameters. Checking config file for scope."
-            if ($config.auth.scope)
+            try
             {
-                Write-Verbose "[$functionName] Found scope in config file."
-                $Scope = $config.auth.scope
-                Write-Verbose "[$functionName] Using scope from config file: $Scope"
+                $configScope = Get-DecryptedConfigValue -PropertyPath "auth.scope"
+                if ($configScope)
+                {
+                    Write-Verbose "[$functionName] Found scope in config file."
+                    $Scope = $configScope
+                    Write-Verbose "[$functionName] Using scope from config file: $Scope"
+                }
+                else
+                {
+                    Write-Error "No scope provided."
+                    return $null
+                }
             }
-            else
+            catch
             {
                 Write-Error "No scope provided."
                 return $null
