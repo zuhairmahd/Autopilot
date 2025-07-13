@@ -1,3 +1,51 @@
+function Clear-SecureMemory
+{
+    <#
+    .SYNOPSIS
+    Clears sensitive data from memory and forces garbage collection.
+    
+    .DESCRIPTION
+    This function helps ensure sensitive data like passwords and encryption keys
+    are properly cleared from memory and garbage collected.
+    
+    .PARAMETER Variables
+    Array of variable names to clear from memory.
+    #>
+    [CmdletBinding()]
+    param(
+        [string[]]$Variables = @()
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Clearing sensitive data from memory"
+    
+    # Clear specified variables
+    foreach ($varName in $Variables) {
+        if (Get-Variable -Name $varName -ErrorAction SilentlyContinue) {
+            Remove-Variable -Name $varName -Force -ErrorAction SilentlyContinue
+            Write-Verbose "[$functionName] Cleared variable: $varName"
+        }
+    }
+    
+    # Clear script-level variables
+    if (Get-Variable -Name "TempEncryptedConfig" -Scope Script -ErrorAction SilentlyContinue) {
+        Remove-Variable -Name "TempEncryptedConfig" -Scope Script -Force -ErrorAction SilentlyContinue
+        Write-Verbose "[$functionName] Cleared script variable: TempEncryptedConfig"
+    }
+    
+    if (Get-Variable -Name "TempEncryptionKey" -Scope Script -ErrorAction SilentlyContinue) {
+        Remove-Variable -Name "TempEncryptionKey" -Scope Script -Force -ErrorAction SilentlyContinue
+        Write-Verbose "[$functionName] Cleared script variable: TempEncryptionKey"
+    }
+    
+    # Force garbage collection
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+    [System.GC]::Collect()
+    
+    Write-Verbose "[$functionName] Memory cleanup completed"
+}
+
 function Get-SecurePassword
 {
     <#

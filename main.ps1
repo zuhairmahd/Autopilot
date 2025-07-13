@@ -386,52 +386,83 @@ if (Test-Path $configFile)
     # Check if the config file is encrypted
     $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFile
     
+    if (-not $encryptionStatus.IsValidFile) {
+        Write-Host "Configuration file exists but cannot be read: $($encryptionStatus.ErrorMessage)" -ForegroundColor Red
+        Write-Host "Please check file permissions and try again." -ForegroundColor Red
+        exit 1
+    }
+    
     if ($encryptionStatus.IsEncrypted) {
         Write-Host "The configuration file is encrypted. Please enter your password to decrypt it." -ForegroundColor Cyan
         
-        # Get the password from user
-        $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password"
-        $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+        $maxRetries = 3
+        $retryCount = 0
+        $decryptResult = $null
         
-        # Decrypt the file in memory
-        $decryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword -Decrypt -InMemoryOnly
-        
-        if ($decryptResult.Success) {
-            Write-Host "Configuration file decrypted successfully." -ForegroundColor Green
-            $configContent = $decryptResult.Content
+        do {
+            $retryCount++
+            Write-Verbose "[$scriptName] Password attempt $retryCount of $maxRetries"
             
-            # Generate a temporary encryption key for in-memory use
-            $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
-            Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
+            # Get the password from user
+            $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password (Attempt $retryCount of $maxRetries)"
+            $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
             
-            # Re-encrypt the content with the temporary key for in-memory use
-            $tempFile = [System.IO.Path]::GetTempFileName()
-            try {
-                Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
-                $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
-                
-                if ($tempEncryptResult.Success) {
-                    Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
-                    # Store the encrypted content for later use during the session
-                    $script:TempEncryptedConfig = $tempEncryptResult.Content
-                    $script:TempEncryptionKey = $tempEncryptionKey
-                } else {
-                    Write-Warning "Failed to re-encrypt content with temporary key"
-                }
-            } finally {
-                # Clean up temporary file
-                if (Test-Path $tempFile) {
-                    Remove-Item $tempFile -Force
+            # Decrypt the file in memory
+            $decryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword -Decrypt -InMemoryOnly
+            
+            if ($decryptResult.Success) {
+                Write-Host "Configuration file decrypted successfully." -ForegroundColor Green
+                $configContent = $decryptResult.Content
+                break
+            } else {
+                Write-Host "Decryption failed: $($decryptResult.ErrorMessage)" -ForegroundColor Red
+                if ($retryCount -lt $maxRetries) {
+                    Write-Host "Please try again." -ForegroundColor Yellow
                 }
             }
-        } else {
-            Write-Host "Failed to decrypt configuration file: $($decryptResult.ErrorMessage)" -ForegroundColor Red
-            Write-Host "Please check your password and try again." -ForegroundColor Red
+            
+            # Clear the password from memory
+            Clear-SecureMemory -Variables @("userPassword")
+            
+        } while ($retryCount -lt $maxRetries -and -not $decryptResult.Success)
+        
+        if (-not $decryptResult.Success) {
+            Write-Host "Failed to decrypt configuration file after $maxRetries attempts." -ForegroundColor Red
+            Write-Host "Please verify your password and try again." -ForegroundColor Red
+            Clear-SecureMemory
             exit 1
         }
         
+        # Generate a temporary encryption key for in-memory use
+        $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
+        Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
+        
+        # Re-encrypt the content with the temporary key for in-memory use
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        try {
+            Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
+            $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
+            
+            if ($tempEncryptResult.Success) {
+                Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
+                # Store the encrypted content for later use during the session
+                $script:TempEncryptedConfig = $tempEncryptResult.Content
+                $script:TempEncryptionKey = $tempEncryptionKey
+            } else {
+                Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
+                # Continue without temporary encryption but with a warning
+            }
+        } catch {
+            Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
+        } finally {
+            # Clean up temporary file
+            if (Test-Path $tempFile) {
+                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+        
         # Clear the user password from memory
-        $userPassword = $null
+        Clear-SecureMemory -Variables @("userPassword", "tempEncryptionKey")
     } else {
         # File is not encrypted - this is a first run scenario
         Write-Host "Configuration file is not encrypted. Setting up encryption..." -ForegroundColor Yellow
@@ -465,21 +496,25 @@ if (Test-Path $configFile)
                     $script:TempEncryptedConfig = $tempEncryptResult.Content
                     $script:TempEncryptionKey = $tempEncryptionKey
                 } else {
-                    Write-Warning "Failed to re-encrypt content with temporary key"
+                    Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
+                    # Continue without temporary encryption but with a warning
                 }
+            } catch {
+                Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
             } finally {
                 # Clean up temporary file
                 if (Test-Path $tempFile) {
-                    Remove-Item $tempFile -Force
+                    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
                 }
             }
         } else {
             Write-Host "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
+            Clear-SecureMemory
             exit 1
         }
         
         # Clear the user password from memory
-        $userPassword = $null
+        Clear-SecureMemory -Variables @("userPassword", "tempEncryptionKey")
     }
     
     # Parse the configuration content
@@ -523,6 +558,8 @@ else
 {
     Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
     Write-Host "Please create a configuration file or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+    # Set empty auth array to prevent errors
+    $auth = @{}
 }
 if (Test-Path -Path $InitFile)
 {
@@ -2032,5 +2069,8 @@ else
 
 # Finish logging
 Write-Log -LogFile $LogFile -FinishLogging
+
+# Clear sensitive data from memory before exiting
+Clear-SecureMemory
 
 
