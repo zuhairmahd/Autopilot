@@ -468,6 +468,35 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    #region handle scopes
+    $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
+    $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
+    # Ensure arrays are properly handled and merge them, eliminating duplicates
+    Write-Verbose "[$scriptName] Merging basicScopes and additionalScopes and removing duplicates."
+    # Initialize as empty arrays if null
+    if ($null -eq $basicScopes) 
+    { 
+        Write-Verbose "[$scriptName] No basic scopes found in the configuration file. Initializing as empty array."
+        $basicScopes = @() 
+    }
+    if ($null -eq $additionalScopes) 
+    { 
+        Write-Verbose "[$scriptName] No additional scopes found in the configuration file. Initializing as empty array."
+        $additionalScopes = @() 
+    }
+    # Ensure they are arrays
+    Write-Verbose "[$scriptName] Ensuring basicScopes and additionalScopes are arrays."
+    $basicScopes = @($basicScopes)
+    Write-Verbose "[$scriptName] Basic scopes has $($basicScopes.Count) items."
+    $additionalScopes = @($additionalScopes)
+    Write-Verbose "[$scriptName] Additional scopes has $($additionalScopes.Count) items."
+    # Merge arrays and remove duplicates based on Scope property
+    Write-Verbose "[$scriptName] Merging scopes and removing duplicates."
+    $allScopes = @($basicScopes) + @($additionalScopes)
+    Write-Verbose "[$scriptName] Total scopes before deduplication: $($allScopes.Count)"
+    $requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
+    Write-Verbose "[$scriptName] Merged scopes - Total unique scopes: $($requiredScopes.Count)"
+    #endregion handle scopes
 }
 else
 {
@@ -1172,7 +1201,7 @@ function ProcessSerialNumber()
 }
 #endregion helper functions
 
-#region initialization block
+#region initialization block with access token
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Verbose "[$scriptName] Force new token: $($auth.ForceNewToken )"
 Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshToken )"
@@ -1196,9 +1225,9 @@ else
     Write-Host "Please check your authentication parameters and try again." 
     exit 1
 }
-#endregion initialization block
+#endregion initialization block with access token
 
-#write a nice welcome message with the version number and a copyright message.
+#region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
 
@@ -1231,6 +1260,7 @@ else
     Write-Verbose "[$scriptName] No updates available or current script is up to date."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
 }
+#endregion banner
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
@@ -1242,7 +1272,7 @@ $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device i
 
 #region export menu
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'autopilot'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
     {
         Write-Host "Exported Autopilot devices to $($outputFile)." -ForegroundColor Green
@@ -1253,7 +1283,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot 
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported Autopilot Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'imported'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
     if ($exported)
     {
         Write-Host "Exported Imported Autopilot devices to $($outputFile)." -ForegroundColor Green
@@ -1264,7 +1294,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported A
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'managed'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
     if ($exported)
     {
         Write-Host "Exported Managed devices to $($outputFile)." -ForegroundColor Green
@@ -1275,7 +1305,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Wi
     }
 }
 $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Windows Devices" -Action {
-    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $PSScriptRoot -deviceType 'unmanaged'
+    $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
     if ($exported)
     {
         Write-Host "Exported Unmanaged devices to $($outputFile)." -ForegroundColor Green
@@ -1504,7 +1534,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
     Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -DestinationFolder $pwd -RootFolder $pwd)
+    if (CreateFullConfiguration -RootFolder $pwd)
     {
         Write-Host 'The script has been reconfigured.' -ForegroundColor Green
     }
@@ -1539,7 +1569,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application creden
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
     Write-Host 'Restoring the script to its default settings...'
-    if (InitializeConfiguration -RootFolder $pwd -overWrite)
+    if (InitializeConfiguration -RootFolder $pwd -overwrite)
     {
         Write-Host 'The script defaults have been restored.' -ForegroundColor Green
     }
