@@ -143,7 +143,7 @@
     "maxWaitTime": "30",
     "maxUserMatchDisplay": "10",
     "timeInSeconds": "60",
-    "Release": "dev",
+    "Release": "master",
     "Repo": "Github",
     "appMode": "full"
   },
