@@ -36,8 +36,39 @@ param(
     [string]$LogLevel = 'Information'
 )
 
-$scriptName = $MyInvocation.MyCommand.Name
+
+
 #region Initialize script
+$scriptName = $MyInvocation.MyCommand.Name
+# Set global log level for all Write-Log calls
+$Global:MinimumLogLevel = $LogLevel
+Write-Log -LogFile $LogFile -StartLogging
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
+    }
+}
+
 function Write-Log()
 {
     [CmdletBinding()]
@@ -334,6 +365,7 @@ function Write-Log()
         )
     }
 }
+
 function Clear-SecureMemory
 {
     <#
@@ -1117,8 +1149,7 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] =========================================="
                 Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
                 Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
-                Write-Host "File '$FilePath' has been decrypted successfully." -ForegroundColor Green
-                Write-Host "  Decryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
+                Write-Verbose "[$functionName]  Decryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms"
             }
         }
         else
@@ -1186,7 +1217,7 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] UTF-8 bytes length: $($contentBytes.Length) bytes"
                 Write-Verbose "[$functionName] Encrypting content block..."
                 $encryptedBytes = $encryptor.TransformFinalBlock($contentBytes, 0, $contentBytes.Length)
-                Write-Host "Encryption completed successfully"
+                Write-Verbose "[$functionName] Encryption completed successfully"
                 Write-Verbose "[$functionName] Encrypted data length: $($encryptedBytes.Length) bytes"
             }
             catch
@@ -1282,9 +1313,8 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] =========================================="
                 Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
                 Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
-                Write-Host "File '$FilePath' has been encrypted successfully." -ForegroundColor Green
-                Write-Host "Encryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms" -ForegroundColor Green
-                Write-Host "File is now secured with AES-256 encryption"
+                Write-Verbose "[$functionName] File '$FilePath' has been encrypted successfully."
+                Write-Verbose "[$functionName] Encryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms"    
             }
         }
     
@@ -1410,37 +1440,6 @@ function Invoke-JsonFileEncryption
         Write-Verbose "[$functionName] Function execution finished"
     }
 }
-
-
-# Set global log level for all Write-Log calls
-$Global:MinimumLogLevel = $LogLevel
-# Initialize logging
-Write-Log -LogFile $LogFile -StartLogging
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
-{
-    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    Write-Verbose "[$scriptName] Running as an external script."
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
-}
-else
-{
-    Write-Verbose "[$scriptName] Running as a script block."
-    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    if (!$ScriptPath)
-    {
-        $scriptName = 'main.exe'
-        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
-        $ScriptPath = "$PWD"
-        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
-        $fullScriptPath = "$scriptPath\$scriptName"
-        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
-    }
-}
 #endregion Initialize script
 
 #region Load parameters from the configuration file if it exists
@@ -1473,8 +1472,8 @@ if (Test-Path $configFile)
     
     if ($encryptionStatus.IsEncrypted)
     {
-        Write-Host "The configuration file is encrypted. Please enter your password to decrypt it." -ForegroundColor Cyan
-        
+        Write-Host "Please enter your password to continue." -ForegroundColor Cyan
+
         $maxRetries = 3
         $retryCount = 0
         $decryptResult = $null
@@ -1493,7 +1492,7 @@ if (Test-Path $configFile)
             
             if ($decryptResult.Success)
             {
-                Write-Host "Configuration file decrypted successfully." -ForegroundColor Green
+                Write-Verbose "[$scriptName] Configuration file decrypted successfully."
                 $configContent = $decryptResult.Content
                 break
             }
