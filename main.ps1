@@ -365,6 +365,7 @@ else
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
     }
 }
+
 function Clear-SecureMemory
 {
     <#
@@ -587,8 +588,8 @@ function Get-DecryptedConfigValue
                 }
                 else
                 {
-                    Write-Warning "Property path '$PropertyPath' not found in configuration"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Property path '$PropertyPath' not found in configuration" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Property path '$PropertyPath' not found in configuration"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Property path '$PropertyPath' not found in configuration" -LogLevel "debug"
                     return $null
                 }
             }
@@ -660,7 +661,7 @@ function Get-AuthConfigValue
         }
         else
         {
-            Write-Warning "Property path '$PropertyPath' not found in auth configuration"
+            Write-Verbose "[$functionName] Property path '$PropertyPath' not found in auth configuration"
             return $null
         }
     }
@@ -871,7 +872,7 @@ function Invoke-JsonFileEncryption
         Write-Verbose "[$functionName] Validating file existence and accessibility..."
         if (-not (Test-Path $FilePath))
         {
-            Write-Host "CRITICAL ERROR: File not found at path '$FilePath'. `n Please verify that The file path is correct `n  - The file exists, `n and that You have read permissions to the file. `n `n"
+            Write-Host "CRITICAL ERROR: File not found at path '$FilePath'. `n Please verify that The file path is correct `n - The file exists, `n and that You have read permissions to the file. `n `n"
             Write-Verbose "[$functionName] File validation failed: File does not exist"
             Write-Log -LogFile $LogFile -Module $functionName -Message "File validation failed: File does not exist at path '$FilePath'" -LogLevel "Error"
         }
@@ -927,9 +928,9 @@ function Invoke-JsonFileEncryption
                 Copy-Item $FilePath $backupPath -Force -ErrorAction Stop
                 $backupInfo = Get-Item $backupPath
                 Write-Verbose "[$functionName] Backup created successfully:"
-                Write-Verbose "[$functionName]   - Backup path: $($backupInfo.FullName)"
-                Write-Verbose "[$functionName]   - Backup size: $($backupInfo.Length) bytes"
-                Write-Verbose "[$functionName]   - Backup timestamp: $($backupInfo.CreationTime)"
+                Write-Verbose "[$functionName] - Backup path: $($backupInfo.FullName)"
+                Write-Verbose "[$functionName] - Backup size: $($backupInfo.Length) bytes"
+                Write-Verbose "[$functionName] - Backup timestamp: $($backupInfo.CreationTime)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Backup created successfully. Size: $($backupInfo.Length) bytes" -LogLevel "Information"
             }
             catch
@@ -1067,9 +1068,9 @@ function Invoke-JsonFileEncryption
             $aes.IV = $iv
             Write-Verbose "[$functionName] Data structure analysis:"
             $first16 = $iv | ForEach-Object { '{0:X2}' -f $_ }
-            Write-Verbose "[$functionName]   - IV (first 16 bytes): $($first16 -join '')"
-            Write-Verbose "[$functionName]   - IV length: $($iv.Length) bytes"
-            Write-Verbose "[$functionName]   - Encrypted content length: $($encryptedContent.Length) bytes"
+            Write-Verbose "[$functionName] - IV (first 16 bytes): $($first16 -join '')"
+            Write-Verbose "[$functionName] - IV length: $($iv.Length) bytes"
+            Write-Verbose "[$functionName] - Encrypted content length: $($encryptedContent.Length) bytes"
             Write-Verbose "[$functionName] Total encrypted data: $($encryptedData.Length) bytes"
             Write-Verbose "[$functionName] Beginning AES decryption process..."
         
@@ -1106,7 +1107,7 @@ function Invoke-JsonFileEncryption
                 Write-Host "`n`nThis may indicate:"
                 Write-Host "`n File corruption"
                 Write-Host "`n Incompatible encryption method"
-                Write-Host "`n  - System cryptography issue"
+                Write-Host "`n - System cryptography issue"
                 Write-Verbose "[$functionName] Decryption failed with unexpected error: $($_.Exception.Message)"
                 return @{
                     Success      = $false
@@ -1129,7 +1130,7 @@ function Invoke-JsonFileEncryption
             catch
             {
                 Write-Host "DECRYPTION ERROR: Decrypted content is not valid JSON."
-                Write-Host "⚠️  POSSIBLE INCORRECT DECRYPTION KEY"
+                Write-Host "⚠️ POSSIBLE INCORRECT DECRYPTION KEY"
                 Write-Host "`nThe decryption process completed, but the result is not valid JSON."
                 Write-Host "`nThis strongly suggests the wrong decryption key was used."
                 if ($null -ne $decryptedText)
@@ -1215,7 +1216,7 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName] =========================================="
                 Write-Verbose "[$functionName] Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
                 Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
-                Write-Verbose "[$functionName]  Decryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms"
+                Write-Verbose "[$functionName] Decryption completed in $([Math]::Round($operationDuration.TotalMilliseconds, 2)) ms"
             }
         }
         else
@@ -1236,15 +1237,15 @@ function Invoke-JsonFileEncryption
                 if ($jsonObject -is [PSCustomObject])
                 {
                     $propertyCount = ($jsonObject | Get-Member -MemberType NoteProperty).Count
-                    Write-Verbose "[$functionName]   - JSON properties count: $propertyCount"
+                    Write-Verbose "[$functionName] - JSON properties count: $propertyCount"
                 }
             }
             catch
             {
                 $errorMsg = "ENCRYPTION ERROR: Source file does not contain valid JSON data."
                 $errorMsg += "`n`nJSON validation failed:"
-                $errorMsg += "`n  Error: $($_.Exception.Message)"
-                $errorMsg += "`n  Line: $($_.Exception.ItemName)"
+                $errorMsg += "`n Error: $($_.Exception.Message)"
+                $errorMsg += "`n Line: $($_.Exception.ItemName)"
                 $errorMsg += "`n`nFile content preview:"
                 $errorMsg += "`n$($fileContent.Substring(0, [Math]::Min(300, $fileContent.Length)))"
                 if ($fileContent.Length -gt 300)
@@ -1416,15 +1417,15 @@ function Invoke-JsonFileEncryption
         }
         # Log the full call stack for debugging
         Write-Verbose "[$functionName] Call stack:"
-        $_.ScriptStackTrace -split "`n" | ForEach-Object { Write-Verbose "[$functionName]   $_" }
+        $_.ScriptStackTrace -split "`n" | ForEach-Object { Write-Verbose "[$functionName] $_" }
         Write-Error "Operation failed: $($_.Exception.Message)"
                 
         # If backup exists and operation failed, provide restoration guidance
         if ($BackupOriginal -and (Test-Path "$FilePath.bak"))
         {
             Write-Warning "BACKUP AVAILABLE: A backup file exists at '$FilePath.bak'"
-            Write-Warning "   You can restore the original file if needed using:"
-            Write-Warning "   Copy-Item '$FilePath.bak' '$FilePath' -Force"
+            Write-Warning " You can restore the original file if needed using:"
+            Write-Warning " Copy-Item '$FilePath.bak' '$FilePath' -Force"
         }
         return @{
             Success      = $false
@@ -1448,7 +1449,7 @@ function Invoke-JsonFileEncryption
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️  Warning: Error disposing AES object: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing AES object: $($_.Exception.Message)"
             }
         }
                 
@@ -1461,7 +1462,7 @@ function Invoke-JsonFileEncryption
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️  Warning: Error disposing SHA256 object: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing SHA256 object: $($_.Exception.Message)"
             }
         }
                 
@@ -1474,7 +1475,7 @@ function Invoke-JsonFileEncryption
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️  Warning: Error disposing encryptor: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing encryptor: $($_.Exception.Message)"
             }
         }
                 
@@ -1487,7 +1488,7 @@ function Invoke-JsonFileEncryption
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️  Warning: Error disposing decryptor: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing decryptor: $($_.Exception.Message)"
             }
         }
                 
@@ -2016,7 +2017,7 @@ Write-Verbose "[$scriptName] Repository: $settings.Repo"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Repository: $settings.Repo" -LogLevel "Information"
 Write-Verbose "[$scriptName] Release: $settings.Release"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Release: $settings.Release" -LogLevel "Information"
-Write-Verbose "[$scriptName]    Domain: $domain"
+Write-Verbose "[$scriptName] Domain: $domain"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain: $domain" -LogLevel "Information"
 Write-Verbose "[$scriptName] Max wait time: $settings.maxWaitTime"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Max wait time: $settings.maxWaitTime" -LogLevel "Information"
