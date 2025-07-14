@@ -920,7 +920,7 @@ function Save-RefreshTokenToConfig()
     param($refreshToken, $configFilePath)
 
     $functionName = $MyInvocation.MyCommand.Name
-    $DeligatedCredentials = @{}
+    $delegatedCredentials = @{}
     $userPassword = $null
     $usingTempConfig = $false
     
@@ -1032,7 +1032,7 @@ function Save-RefreshTokenToConfig()
     # Format scopes
     if ($refreshToken.scope)
     {
-        Write-Verbose "[$functionName] Adding scope to new deligatedCredentials"
+        Write-Verbose "[$functionName] Adding scope to new delegatedCredentials"
         $formattedScopes = FormatScopes -scopes $refreshToken.scope -Reverse
         Write-Verbose "[$functionName] Formatted scopes object type: $($formattedScopes.GetType().Name)"
         #If it is not an array, make it int an array
@@ -1049,18 +1049,18 @@ function Save-RefreshTokenToConfig()
     }
 
     # Update the config with the new refresh token
-    if ($config.deligatedCredentials)
+    if ($config.delegatedCredentials)
     {
-        Write-Verbose "[$functionName] Updating existing deligatedCredentials property"
-        $config.deligatedCredentials.refresh_token = $refreshToken.refresh_token
-        $config.deligatedCredentials.scope = $formattedScopes
+        Write-Verbose "[$functionName] Updating existing delegatedCredentials property"
+        $config.delegatedCredentials.refresh_token = $refreshToken.refresh_token
+        $config.delegatedCredentials.scope = $formattedScopes
     }
     else
     {
-        Write-Verbose "[$functionName] Creating new deligatedCredentials property"
-        $deligatedCredentials.refresh_token = $refreshToken.refresh_token
-        $deligatedCredentials.scope = $formattedScopes
-        $config | Add-Member -MemberType NoteProperty -Name 'deligatedCredentials' -Value $DeligatedCredentials
+        Write-Verbose "[$functionName] Creating new delegatedCredentials property"
+        $delegatedCredentials.refresh_token = $refreshToken.refresh_token
+        $delegatedCredentials.scope = $formattedScopes
+        $config | Add-Member -MemberType NoteProperty -Name 'delegatedCredentials' -Value $delegatedCredentials
     }
 
     # Re-encrypt the config and save it
@@ -1331,7 +1331,7 @@ function Get-TokenFromCache()
         [string]$clientSecret,
         [string]$tenantId,
         [string[]]$scopes,
-        [bool]$deligated,
+        [bool]$delegated,
         [string]$cacheFolder,
         [string]$cacheTokenFile,
         [bool]$secureString,
@@ -1341,7 +1341,7 @@ function Get-TokenFromCache()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting token cache retrieval for domain: $domain"
-    Write-Verbose "[$functionName] Cache type: $cacheType, Delegated: $deligated"
+    Write-Verbose "[$functionName] Cache type: $cacheType, Delegated: $delegated"
     
     # Calculate time buffer for token renewal
     $timeBuffer = (Get-Date).AddMinutes($renewalLeadTime)
@@ -1360,7 +1360,7 @@ function Get-TokenFromCache()
         }
         
         # Token is expired, try to refresh it
-        $refreshedToken = Invoke-TokenRefresh -accessTokenObject $accessTokenObject -deligated $deligated -configRefreshToken $configRefreshToken -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath 
+        $refreshedToken = Invoke-TokenRefresh -accessTokenObject $accessTokenObject -delegated $delegated -configRefreshToken $configRefreshToken -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $scopes -domain $domain -cacheType $cacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -configFilePath $configFilePath 
         if ($refreshedToken)
         {
             return $refreshedToken
@@ -1368,7 +1368,7 @@ function Get-TokenFromCache()
     }
     
     # No cached token found, try config refresh token as fallback
-    if ($deligated -and $configRefreshToken)
+    if ($delegated -and $configRefreshToken)
     {
         Write-Verbose "[$functionName] No valid cached token found, attempting to use config refresh token"
         $refreshTokenObject = @{ refresh_token = $configRefreshToken }
@@ -1545,7 +1545,7 @@ function Invoke-TokenRefresh()
     [CmdletBinding()]
     param(
         [object]$accessTokenObject,
-        [bool]$deligated,
+        [bool]$delegated,
         [string]$configRefreshToken,
         [string]$clientId,
         [string]$clientSecret,
@@ -1558,7 +1558,7 @@ function Invoke-TokenRefresh()
         [string]$configFilePath
     )
     $functionName = $MyInvocation.MyCommand.Name
-    if (-not $deligated)
+    if (-not $delegated)
     {
         Write-Verbose "[$functionName] Not using delegated authentication, skipping refresh token logic"
         return $null
@@ -2278,9 +2278,9 @@ function BuildAuthSplatTable()
     $getTokenParams = @{
         configFile = $configFile
     }    # Define valid parameters for GetGraphAccessToken function (case-insensitive comparison)
-    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewToken', 'ForceNewRefreshToken', 'CacheType', 'configFile')
-    # Define parameters that are only valid when Deligated is true (parameterSetName = 'Deligated')
-    $deligatedOnlyParams = @('NoSaveRefreshToken', 'Deligated', 'Scope', 'AuthType', 'ForceNewRefreshToken')
+    $validParams = @('renewalLeadTime', 'SecureString', 'NoSaveRefreshToken', 'delegated', 'Scope', 'AuthType', 'ForceNewToken', 'ForceNewRefreshToken', 'CacheType', 'configFile')
+    # Define parameters that are only valid when delegated is true (parameterSetName = 'delegated')
+    $delegatedOnlyParams = @('NoSaveRefreshToken', 'delegated', 'Scope', 'AuthType', 'ForceNewRefreshToken')
 
     Write-Verbose "[$functionName] Debugging BuildAuthSplatTable - Auth object properties:"
     foreach ($key in $auth.Keys)
@@ -2324,28 +2324,28 @@ function BuildAuthSplatTable()
             Write-Verbose "[$functionName] Skipping parameter '$paramName' due to null/empty/false value"
             continue
         }        # Check if this is a delegated-only parameter (case-insensitive)
-        $isDelegatedOnlyParam = $deligatedOnlyParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
+        $isDelegatedOnlyParam = $delegatedOnlyParams | Where-Object { $_ -ieq $paramName } | Select-Object -First 1
         if ($isDelegatedOnlyParam)
         {
-            # Only add if Deligated is true in the auth object
+            # Only add if delegated is true in the auth object
             # Handle both hashtable and PSObject cases
             $hasDelegatedProperty = $false
             $delegatedValue = $false
             
             if ($auth -is [hashtable])
             {
-                $hasDelegatedProperty = $auth.ContainsKey('Deligated')
+                $hasDelegatedProperty = $auth.ContainsKey('delegated')
                 if ($hasDelegatedProperty)
                 {
-                    $delegatedValue = $auth.Deligated
+                    $delegatedValue = $auth.delegated
                 }
             }
             else
             {
-                $hasDelegatedProperty = $auth.PSObject.Properties.Name -contains 'Deligated'
+                $hasDelegatedProperty = $auth.PSObject.Properties.Name -contains 'delegated'
                 if ($hasDelegatedProperty)
                 {
-                    $delegatedValue = $auth.Deligated
+                    $delegatedValue = $auth.delegated
                 }
             }
             
@@ -2372,7 +2372,7 @@ function BuildAuthSplatTable()
             }
             else
             {
-                Write-Verbose "[$functionName] Skipping delegated parameter '$paramName' because Deligated is not true (HasProperty=$hasDelegatedProperty, Value=$delegatedValue)"
+                Write-Verbose "[$functionName] Skipping delegated parameter '$paramName' because delegated is not true (HasProperty=$hasDelegatedProperty, Value=$delegatedValue)"
             }
         }
         else
@@ -2505,18 +2505,18 @@ function GetGraphAccessToken()
         [string]$configFile,
         [int]$renewalLeadTime = 5,
         [switch]$SecureString,
-        [parameter(parameterSetName = 'Deligated')]
+        [parameter(parameterSetName = 'delegated')]
         [switch]$NoSaveRefreshToken,
-        [parameter(parameterSetName = 'Deligated')]
-        [switch]$Deligated,
-        [parameter(parameterSetName = 'Deligated')]
+        [parameter(parameterSetName = 'delegated')]
+        [switch]$delegated,
+        [parameter(parameterSetName = 'delegated')]
         [string[]]$Scope,
-        [parameter(parameterSetName = 'Deligated')]
+        [parameter(parameterSetName = 'delegated')]
         [ValidateSet('PublicAuthFlow', 'Interactive', 'Private', 'MGGraph')]
         [string]$AuthType = 'Private', 
-        [parameter(parameterSetName = 'Deligated')]
+        [parameter(parameterSetName = 'delegated')]
         [switch]$ForceNewToken,
-        [parameter(parameterSetName = 'Deligated')]
+        [parameter(parameterSetName = 'delegated')]
         [switch]$ForceNewRefreshToken,
         [ValidateSet('file', 'memory')]
         [string]$CacheType = 'Memory',
@@ -2542,7 +2542,7 @@ function GetGraphAccessToken()
     # Extract the refresh token if it exists using the new encryption system
     try
     {
-        $configRefreshToken = Get-DecryptedConfigValue -PropertyPath "deligatedCredentials.refresh_token"
+        $configRefreshToken = Get-DecryptedConfigValue -PropertyPath "delegatedCredentials.refresh_token"
         if ($configRefreshToken)
         {
             Write-Verbose "[$functionName] Found refresh token in encrypted config."
@@ -2556,10 +2556,10 @@ function GetGraphAccessToken()
     }
     catch
     {
-        Write-Verbose "[$functionName] No deligatedCredentials.refresh_token found in config."
+        Write-Verbose "[$functionName] No delegatedCredentials.refresh_token found in config."
     }
     # Handle ForceNewRefreshToken parameter
-    if ($ForceNewRefreshToken -and $Deligated)
+    if ($ForceNewRefreshToken -and $delegated)
     {
         Write-Host "Force new refresh token requested. Invalidating existing refresh token." -ForegroundColor Yellow
         Write-Verbose "[$functionName] ForceNewRefreshToken requested. Clearing existing refresh token from memory."
@@ -2655,7 +2655,7 @@ function GetGraphAccessToken()
         }
         Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
     }
-    if ($deligated )
+    if ($delegated )
     {
         Write-Verbose "[$functionName] Delegated access selected. Checking for scope."
         if ($null -eq $scope -or $scope -eq '')
@@ -2705,7 +2705,7 @@ function GetGraphAccessToken()
     Write-Verbose "[$functionName] Interactive: $Interactive"
     Write-Verbose "[$functionName] Cache Type: $CacheType"
     Write-Verbose "[$functionName] Domain: $domain"
-    Write-Verbose "[$functionName] Deligated: $Deligated"
+    Write-Verbose "[$functionName] delegated: $delegated"
     Write-Verbose "[$functionName] Scopes: $Scope"
     Write-Verbose "[$functionName] Config has refresh token: $($null -ne $configRefreshToken)"
     #endregion Log parameters
@@ -2720,7 +2720,7 @@ function GetGraphAccessToken()
     {
         $accessToken = Get-TokenFromCache -cacheType $CacheType -domain $domain -renewalLeadTime $renewalLeadTime `
             -clientId $clientId -clientSecret $clientSecret -tenantId $tenantId -scopes $Scope `
-            -deligated $Deligated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile `
+            -delegated $delegated -cacheFolder $cacheFolder -cacheTokenFile $cacheTokenFile `
             -secureString $SecureString -configFilePath $configFile -configRefreshToken $configRefreshToken
         if ($accessToken)
         {
@@ -2734,9 +2734,9 @@ function GetGraphAccessToken()
     #endregion Try to get token from cache if not forcing new token
     
     #region Authentication flow
-    if ($deligated)
+    if ($delegated)
     {
-        Write-Verbose "[$functionName] Deligated authentication flow selected." 
+        Write-Verbose "[$functionName] delegated authentication flow selected." 
         $params = @{
             tenantId           = $tenantId 
             clientId           = $clientId 
