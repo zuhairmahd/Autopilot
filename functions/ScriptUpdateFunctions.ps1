@@ -71,6 +71,7 @@ function CheckForUpdates()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $returnObject = @{}
     Write-Verbose "[$functionName] Remote Version URL: $remoteVersionURL"
     Write-Verbose "[$functionName] Getting remote version from $remoteVersionURL"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting remote version from $remoteVersionURL" -LogLevel "Information"
@@ -80,6 +81,8 @@ function CheckForUpdates()
         Write-Verbose "[$functionName] Response received from $($remoteVersionURL): $($remoteVersionResponse.StatusCode)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($remoteVersionURL): $($remoteVersionResponse.StatusCode)" -LogLevel "Information"
         $remoteVersion = ($remoteVersionResponse.Content | ConvertFrom-Json).version
+        $remoteStringVersion = ($remoteVersionResponse.Content | ConvertFrom-Json).stringVersion
+        $remoteSettingsVersion = ($remoteVersionResponse.Content | ConvertFrom-Json).settingsVersion
     }
     catch 
     {
@@ -93,11 +96,17 @@ function CheckForUpdates()
     }    
     Write-Verbose "[$functionName] Returned remote version response: $remoteVersion"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returned remote version response: $remoteVersion" -LogLevel "Information"
+    
+    $returnObject.add('remoteVersion', [System.Version]::Parse($remoteVersion))
+    $returnObject.add('remoteStringVersion', [System.Version]::Parse($remoteStringVersion))
+    $returnObject.add('remoteSettingsVersion', [System.Version]::Parse($remoteSettingsVersion))
+    $returnObject.add('remoteVersionResponse', $remoteVersionResponse)
+    
     $remoteVersion = [System.Version]::Parse($remoteVersion)
     return $remoteVersion, $true
     #endregion
 }   
-    
+
 function getFileVersion()
 {
     [CmdletBinding()]    
