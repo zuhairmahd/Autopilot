@@ -37,7 +37,6 @@ param(
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
-. functions\EncryptionFunctions.ps1
 #region Initialize script
 function Write-Log()
 {
@@ -2810,11 +2809,41 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application creden
         domain    = $appDomain
         name      = $appName
     }
-    $encryptedConfigObject = EncryptObject -decryptedObject $configObject -excludeFields @('name', 'domain')
-    $json = $encryptedConfigObject | ConvertTo-Json -Depth 10
-    Write-Host "Saving configuration to $configFile"
-    Set-Content -Path $configFile -Value $json -Force
-    Write-Host 'The application credentials have been changed.' -ForegroundColor Green
+    # Get password for encryption
+    $userPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt the configuration file" -Confirm
+    $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+    
+    # Create temporary file for encryption
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try
+    {
+        $json = $configObject | ConvertTo-Json -Depth 10
+        Set-Content -Path $tempFile -Value $json -Force
+        
+        # Encrypt the configuration file
+        $encryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $userPassword
+        
+        if ($encryptResult.Success)
+        {
+            Write-Host "Saving encrypted configuration to $configFile"
+            Copy-Item -Path $tempFile -Destination $configFile -Force
+            Write-Host 'The application credentials have been changed and encrypted.' -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "Failed to encrypt configuration: $($encryptResult.ErrorMessage)" -ForegroundColor Red
+            return
+        }
+    }
+    finally
+    {
+        if (Test-Path $tempFile)
+        {
+            Remove-Item $tempFile -Force
+        }
+        # Clear password from memory
+        Clear-SecureMemory -Variables @("userPassword")
+    }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
     Write-Host 'Restoring the script to its default settings...'
