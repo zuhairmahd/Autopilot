@@ -563,6 +563,8 @@ function Save-RefreshTokenToConfig()
 
     $functionName = $MyInvocation.MyCommand.Name
     $DeligatedCredentials = @{}
+    $userPassword = $null
+    
     Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
     if (-not $refreshToken)
     {
@@ -583,18 +585,31 @@ function Save-RefreshTokenToConfig()
     }
     
     # Check if config is encrypted (it should be in the new system)
-    $configObject = ConvertFrom-Json $encryptedContent
-    if (-not (isEncrypted -data $configObject))
+    $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFilePath
+    if (-not $encryptionStatus.IsEncrypted)
     {
         Write-Warning "[$functionName] Config file is not encrypted. This may indicate an issue with the encryption system."
         # For backward compatibility, handle unencrypted config
-        $config = $configObject
+        $config = ConvertFrom-Json $encryptedContent
         $needsEncryption = $true
     }
     else
     {
-        Write-Verbose "[$functionName] Config file is encrypted. Decrypting for modification."
-        $config = DecryptObject -encryptedObject $configObject
+        Write-Verbose "[$functionName] Config file is encrypted. Prompting for password to decrypt for modification."
+        # Need to get the user's password to decrypt the config file
+        $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password to update the refresh token"
+        $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+        
+        # Decrypt the config file
+        $decryptResult = Invoke-JsonFileEncryption -FilePath $configFilePath -Key $userPassword -Decrypt -InMemoryOnly
+        
+        if (-not $decryptResult.Success)
+        {
+            Write-Error "[$functionName] Failed to decrypt config file: $($decryptResult.ErrorMessage)"
+            return
+        }
+        
+        $config = ConvertFrom-Json $decryptResult.Content
         $needsEncryption = $true
     }
     
@@ -636,12 +651,41 @@ function Save-RefreshTokenToConfig()
     if ($needsEncryption)
     {
         Write-Verbose "[$functionName] Re-encrypting config with refresh token"
-        $Config = EncryptObject -DecryptedObject $config 
-    }   
-    
-    # Save the updated config
-    Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
-    $Config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
+        # Create a temporary file for the updated config
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        try
+        {
+            $config | ConvertTo-Json -Depth 10 | Set-Content -Path $tempFile -Encoding UTF8
+            
+            # Re-encrypt with the user's password
+            $encryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $userPassword
+            
+            if ($encryptResult.Success)
+            {
+                Write-Verbose "[$functionName] Config re-encrypted successfully"
+                # Move the encrypted temp file to the original location
+                Copy-Item -Path $tempFile -Destination $configFilePath -Force
+            }
+            else
+            {
+                Write-Error "[$functionName] Failed to re-encrypt config: $($encryptResult.ErrorMessage)"
+                return
+            }
+        }
+        finally
+        {
+            if (Test-Path $tempFile)
+            {
+                Remove-Item $tempFile -Force
+            }
+        }
+    }
+    else
+    {
+        # Save the updated config without encryption
+        Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
+        $config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
+    }
     Write-Verbose "[$functionName] Refresh token saved to config file"
     
     # Also update the temporary encrypted config if it exists
@@ -681,6 +725,12 @@ function Save-RefreshTokenToConfig()
         {
             Write-Warning "[$functionName] Failed to update temporary encrypted config: $_"
         }
+    }
+    
+    # Clear the user password from memory
+    if ($userPassword)
+    {
+        Clear-SecureMemory -Variables @("userPassword")
     }
 }
 
