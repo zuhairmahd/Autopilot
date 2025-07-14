@@ -1,8 +1,8 @@
 {
-  "description": "This is the configuration file for the initVerify script. It contains the settings for the script to run correctly.",
-  "version": "1.0",
+  "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
+  "version": "1.1",
   "auth": {
-    "Deligated": true,
+    "Deligated": false,
     "authType": "PublicAuthFlow",
     "renewalLeadTime": 5,
     "NoSaveRefreshToken": false,
@@ -135,7 +135,6 @@
       ]
     }
   ],
->>>>>>> origin/master
   "globalSettings": {
     "operatingSystem": "Windows",
     "showLicenseBanner": true,
@@ -175,6 +174,7 @@
           "-cma",
           "-test",
           "onmicrosoft.com",
+          "-sup",
           "-a"
         ],
         "DesiredAutopilotProfiles": [
