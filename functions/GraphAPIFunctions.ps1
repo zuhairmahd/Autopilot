@@ -1066,13 +1066,22 @@ function Save-RefreshTokenToConfig()
     # Re-encrypt the config and save it
     if ($needsEncryption)
     {
-        # If we used temporary config but don't have user password, we need to get it for disk encryption
+        # If we used temporary config but don't have user password, check if it's available in script variable
         if ($usingTempConfig -and -not $userPassword)
         {
-            Write-Verbose "[$functionName] Need user password for disk encryption"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Prompting for password to encrypt updated config to disk" -LogLevel "Debug"
-            $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password to save the updated configuration"
-            $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+            if ($script:UserEncryptionPassword)
+            {
+                Write-Verbose "[$functionName] Using cached user password from startup for disk encryption"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Using cached user password from startup - no additional prompt needed" -LogLevel "Information"
+                $userPassword = $script:UserEncryptionPassword
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Need user password for disk encryption"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Prompting for password to encrypt updated config to disk" -LogLevel "Debug"
+                $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password to save the updated configuration"
+                $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+            }
         }
         
         Write-Verbose "[$functionName] Re-encrypting config with refresh token for disk storage"

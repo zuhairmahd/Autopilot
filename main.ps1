@@ -404,6 +404,13 @@ function Clear-SecureMemory
             Write-Verbose "[$functionName] Cleared variable: $varName"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared variable from memory" -LogLevel "Debug"
         }
+        elseif (Get-Variable -Name $varName -Scope Script -ErrorAction SilentlyContinue)
+        {
+            Remove-Variable -Name $varName -Scope Script -Force -ErrorAction SilentlyContinue
+            $clearedVariables += $varName
+            Write-Verbose "[$functionName] Cleared script variable: $varName"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable from memory" -LogLevel "Debug"
+        }
     }
     
     # Clear script-level variables only if explicitly requested
@@ -423,6 +430,13 @@ function Clear-SecureMemory
             Remove-Variable -Name "TempEncryptionKey" -Scope Script -Force -ErrorAction SilentlyContinue
             Write-Verbose "[$functionName] Cleared script variable: TempEncryptionKey"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: TempEncryptionKey" -LogLevel "Debug"
+        }
+        
+        if (Get-Variable -Name "UserEncryptionPassword" -Scope Script -ErrorAction SilentlyContinue)
+        {
+            Remove-Variable -Name "UserEncryptionPassword" -Scope Script -Force -ErrorAction SilentlyContinue
+            Write-Verbose "[$functionName] Cleared script variable: UserEncryptionPassword"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: UserEncryptionPassword" -LogLevel "Debug"
         }
     }
     
@@ -1630,6 +1644,9 @@ if (Test-Path $configFile)
             }
         }
         
+        # Store the user password for later use during authentication (for refresh token save)
+        $script:UserEncryptionPassword = $userPassword
+        
         # Clear the user password from memory
         Clear-SecureMemory -Variables @("userPassword", "tempEncryptionKey")
     }
@@ -1700,6 +1717,9 @@ if (Test-Path $configFile)
             Clear-SecureMemory -ClearScriptVariables
             exit 1
         }
+        
+        # Store the user password for later use during authentication (for refresh token save)
+        $script:UserEncryptionPassword = $userPassword
         
         # Clear the user password from memory
         Clear-SecureMemory -Variables @("userPassword", "tempEncryptionKey")
@@ -2565,6 +2585,14 @@ Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshTok
 Write-Verbose "[$scriptName] No save refresh token: $($auth.NoSaveRefreshToken )"
 Write-Verbose "[$scriptName] Getting access token..."
 $accessToken = GetGraphAccessToken @getTokenParams
+
+# Clear the cached user password now that authentication is complete
+if ($script:UserEncryptionPassword)
+{
+    Write-Verbose "[$scriptName] Clearing cached user password after authentication"
+    Clear-SecureMemory -Variables @("UserEncryptionPassword")
+}
+
 if ($accessToken)
 {
     Write-Verbose "[$scriptName] Access token retrieved successfully."
