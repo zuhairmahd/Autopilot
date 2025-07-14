@@ -96,14 +96,18 @@ function Get-StringsFromJson
     try
     {
         # Use the consolidated configuration loader
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Loading strings configuration from: $StringsFile" -LogLevel "Debug"
         $stringsConfig = Get-JsonConfiguration -JsonFile $StringsFile -DefaultValues $defaultStringValues
         Write-Verbose "[$functionName] Successfully loaded strings configuration"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully loaded strings configuration" -LogLevel "Debug"
         return $stringsConfig
     }
     catch
     {
         Write-Warning "[$functionName] Failed to load strings configuration: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Returning default values"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to load strings configuration: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Returning default values" -LogLevel "Warning"
         return $defaultStringValues
     }
 }
@@ -172,6 +176,7 @@ function Get-JsonConfiguration
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Attempting to load configuration from: $JsonFile" -LogLevel "Debug"
     Write-Verbose "[$functionName] Attempting to load configuration from: $JsonFile"
     Write-Verbose "[$functionName] Configuration Type: $ConfigurationType"
     
@@ -180,6 +185,7 @@ function Get-JsonConfiguration
         if (Test-Path -Path $JsonFile)
         {
             Write-Verbose "[$functionName] Loading configuration from JSON file: $JsonFile"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Loading configuration from JSON file: $JsonFile" -LogLevel "Debug"
             $jsonContent = Get-Content -Path $JsonFile -Raw -Force -ErrorAction Stop
             
             # Validate JSON syntax
@@ -187,11 +193,13 @@ function Get-JsonConfiguration
             {
                 $jsonData = $jsonContent | ConvertFrom-Json -ErrorAction Stop
                 Write-Verbose "[$functionName] JSON file is valid"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "JSON file is valid" -LogLevel "Debug"
             }
             catch
             {
                 Write-Warning "[$functionName] Invalid JSON syntax in file: $JsonFile"
                 Write-Verbose "[$functionName] JSON Error: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid JSON syntax in file: $JsonFile - $($_.Exception.Message)" -LogLevel "Error"
                 throw "Invalid JSON format in configuration file"
             }
             # Handle different configuration types for init.json

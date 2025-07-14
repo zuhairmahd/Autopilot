@@ -389,7 +389,10 @@ function Clear-SecureMemory
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure memory cleanup operation" -LogLevel "Debug"
     Write-Verbose "[$functionName] Clearing sensitive data from memory"
+    
+    $clearedVariables = @()
     
     # Clear specified variables
     foreach ($varName in $Variables)
@@ -397,23 +400,29 @@ function Clear-SecureMemory
         if (Get-Variable -Name $varName -ErrorAction SilentlyContinue)
         {
             Remove-Variable -Name $varName -Force -ErrorAction SilentlyContinue
+            $clearedVariables += $varName
             Write-Verbose "[$functionName] Cleared variable: $varName"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared variable from memory" -LogLevel "Debug"
         }
     }
     
     # Clear script-level variables only if explicitly requested
     if ($ClearScriptVariables)
     {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Clearing script-level encryption variables" -LogLevel "Debug"
+        
         if (Get-Variable -Name "TempEncryptedConfig" -Scope Script -ErrorAction SilentlyContinue)
         {
             Remove-Variable -Name "TempEncryptedConfig" -Scope Script -Force -ErrorAction SilentlyContinue
             Write-Verbose "[$functionName] Cleared script variable: TempEncryptedConfig"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: TempEncryptedConfig" -LogLevel "Debug"
         }
         
         if (Get-Variable -Name "TempEncryptionKey" -Scope Script -ErrorAction SilentlyContinue)
         {
             Remove-Variable -Name "TempEncryptionKey" -Scope Script -Force -ErrorAction SilentlyContinue
             Write-Verbose "[$functionName] Cleared script variable: TempEncryptionKey"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: TempEncryptionKey" -LogLevel "Debug"
         }
     }
     
@@ -423,6 +432,7 @@ function Clear-SecureMemory
     [System.GC]::Collect()
     
     Write-Verbose "[$functionName] Memory cleanup completed"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Memory cleanup completed successfully. Variables cleared: $($clearedVariables.Count)" -LogLevel "Debug"
 }
 
 function Get-SecurePassword
@@ -459,11 +469,16 @@ function Get-SecurePassword
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure password prompt. RequireConfirmation: $RequireConfirmation, MinLength: $MinLength" -LogLevel "Debug"
     Write-Verbose "[$functionName] Prompting user for secure password"
     
+    $attemptCount = 0
     do
     {
+        $attemptCount++
         $validPassword = $true
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Password prompt attempt $attemptCount" -LogLevel "Debug"
+        
         $password = Read-Host -Prompt $Message -AsSecureString
         
         # Convert to plain text temporarily for validation
@@ -473,6 +488,7 @@ function Get-SecurePassword
         if ($plainPassword.Length -lt $MinLength)
         {
             Write-Host "Password must be at least $MinLength characters long. Please try again." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Password validation failed: insufficient length" -LogLevel "Warning"
             $validPassword = $false
             continue
         }
@@ -480,15 +496,19 @@ function Get-SecurePassword
         # Confirm password if required
         if ($RequireConfirmation)
         {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Prompting for password confirmation" -LogLevel "Debug"
             $confirmPassword = Read-Host -Prompt "Confirm password" -AsSecureString
             $plainConfirmPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($confirmPassword))
             
             if ($plainPassword -ne $plainConfirmPassword)
             {
                 Write-Host "Passwords do not match. Please try again." -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Password confirmation failed: passwords do not match" -LogLevel "Warning"
                 $validPassword = $false
                 continue
             }
+            
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Password confirmation successful" -LogLevel "Debug"
         }
         
         # Clear plain text passwords from memory
@@ -501,6 +521,7 @@ function Get-SecurePassword
     } while (-not $validPassword)
     
     Write-Verbose "[$functionName] Password obtained successfully"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Secure password obtained successfully after $attemptCount attempts" -LogLevel "Information"
     return $password
 }
 
@@ -527,16 +548,20 @@ function Get-DecryptedConfigValue
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving config value for path: $PropertyPath" -LogLevel "Debug"
     Write-Verbose "[$functionName] Retrieving config value for path: $PropertyPath"
     
     if (-not $script:TempEncryptedConfig -or -not $script:TempEncryptionKey)
     {
         Write-Error "No temporary encrypted configuration available"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No temporary encrypted configuration available" -LogLevel "Error"
         return $null
     }
     
     # Create a temporary file to decrypt
     $tempFile = [System.IO.Path]::GetTempFileName()
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Created temporary file for decryption" -LogLevel "Debug"
+    
     try
     {
         Set-Content -Path $tempFile -Value $script:TempEncryptedConfig -Encoding UTF8
@@ -546,11 +571,14 @@ function Get-DecryptedConfigValue
         
         if ($decryptResult.Success)
         {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully decrypted configuration for property access" -LogLevel "Debug"
             $config = ConvertFrom-Json $decryptResult.Content
             
             # Navigate the property path
             $pathParts = $PropertyPath.Split('.')
             $current = $config
+            
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Navigating property path with $($pathParts.Length) segments" -LogLevel "Debug"
             
             foreach ($part in $pathParts)
             {
@@ -561,15 +589,18 @@ function Get-DecryptedConfigValue
                 else
                 {
                     Write-Warning "Property path '$PropertyPath' not found in configuration"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Property path '$PropertyPath' not found in configuration" -LogLevel "Warning"
                     return $null
                 }
             }
             
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully retrieved configuration value for path: $PropertyPath" -LogLevel "Debug"
             return $current
         }
         else
         {
             Write-Error "Failed to decrypt temporary configuration: $($decryptResult.ErrorMessage)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to decrypt temporary configuration: $($decryptResult.ErrorMessage)" -LogLevel "Error"
             return $null
         }
     }
@@ -579,6 +610,7 @@ function Get-DecryptedConfigValue
         if (Test-Path $tempFile)
         {
             Remove-Item $tempFile -Force
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleaned up temporary file" -LogLevel "Debug"
         }
     }
 }
@@ -697,6 +729,7 @@ function Test-FileEncryptionStatus
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting file encryption status check for: $FilePath" -LogLevel "Debug"
     Write-Verbose "[$functionName] Checking encryption status of file: $FilePath"
     
     # Initialize result object
@@ -714,6 +747,7 @@ function Test-FileEncryptionStatus
         {
             $result.ErrorMessage = "File does not exist: $FilePath"
             Write-Verbose "[$functionName] File not found: $FilePath"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File not found: $FilePath" -LogLevel "Error"
             return $result
         }
         
@@ -722,10 +756,13 @@ function Test-FileEncryptionStatus
         $result.FileContent = $fileContent
         $result.IsValidFile = $true
         
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read file. Content length: $($fileContent.Length) characters" -LogLevel "Debug"
+        
         if ([string]::IsNullOrWhiteSpace($fileContent))
         {
             $result.ErrorMessage = "File is empty or contains only whitespace"
             Write-Verbose "[$functionName] File is empty: $FilePath"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File is empty or contains only whitespace" -LogLevel "Warning"
             return $result
         }
         
@@ -737,11 +774,13 @@ function Test-FileEncryptionStatus
             $null = ConvertFrom-Json $fileContent -ErrorAction Stop
             $result.IsEncrypted = $false
             Write-Verbose "[$functionName] File contains valid JSON - not encrypted"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File contains valid JSON - not encrypted" -LogLevel "Debug"
             return $result
         }
         catch
         {
             Write-Verbose "[$functionName] File is not valid JSON, checking if it's encrypted..."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File is not valid JSON, checking if it's encrypted" -LogLevel "Debug"
         }
         
         # If not JSON, check if it's Base64 encoded (encrypted)
@@ -753,12 +792,14 @@ function Test-FileEncryptionStatus
                 # Minimum size for IV + some encrypted content
                 $result.IsEncrypted = $true
                 Write-Verbose "[$functionName] File contains valid Base64 with sufficient length - appears encrypted"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "File contains valid Base64 with sufficient length - appears encrypted" -LogLevel "Debug"
                 return $result
             }
             else
             {
                 $result.ErrorMessage = "File appears to be Base64 but is too short to be properly encrypted"
                 Write-Verbose "[$functionName] Base64 data too short for encryption"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Base64 data too short for encryption" -LogLevel "Warning"
                 return $result
             }
         }
@@ -766,6 +807,7 @@ function Test-FileEncryptionStatus
         {
             $result.ErrorMessage = "File is neither valid JSON nor valid Base64 - unknown format"
             Write-Verbose "[$functionName] File is not valid Base64 either: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File is neither valid JSON nor valid Base64 - unknown format" -LogLevel "Warning"
             return $result
         }
     }
@@ -773,6 +815,7 @@ function Test-FileEncryptionStatus
     {
         $result.ErrorMessage = "Error reading file: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Error reading file: $($_.Exception.Message)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading file: $($_.Exception.Message)" -LogLevel "Error"
         return $result
     }
 }
@@ -796,11 +839,19 @@ function Invoke-JsonFileEncryption
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $operationMode = if ($Decrypt) { 'DECRYPT' } else { 'ENCRYPT' }
+    
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting JSON file encryption/decryption operation" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Operation mode: $operationMode" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "File path: $FilePath" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Backup original: $BackupOriginal" -LogLevel "Debug"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "In-memory only: $InMemoryOnly" -LogLevel "Debug"
+    
     Write-Verbose "[$functionName] =========================================="
     Write-Verbose "[$functionName] Starting JSON file encryption/decryption operation"
     Write-Verbose "[$functionName] =========================================="
     Write-Verbose "[$functionName] File path: $FilePath"
-    Write-Verbose "[$functionName] Operation mode: $(if ($Decrypt) { 'DECRYPT' } else { 'ENCRYPT' })"
+    Write-Verbose "[$functionName] Operation mode: $operationMode"
     Write-Verbose "[$functionName] Backup original: $BackupOriginal"
     Write-Verbose "[$functionName] In-memory only: $InMemoryOnly"
     Write-Verbose "[$functionName] PowerShell version: $($PSVersionTable.PSVersion)"
@@ -817,11 +868,13 @@ function Invoke-JsonFileEncryption
     try
     {
         # Validate file exists and is accessible
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Validating file existence and accessibility" -LogLevel "Debug"
         Write-Verbose "[$functionName] Validating file existence and accessibility..."
         if (-not (Test-Path $FilePath))
         {
             Write-Host "CRITICAL ERROR: File not found at path '$FilePath'. `n Please verify that The file path is correct `n  - The file exists, `n and that You have read permissions to the file. `n `n"
             Write-Verbose "[$functionName] File validation failed: File does not exist"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File validation failed: File does not exist at path '$FilePath'" -LogLevel "Error"
         }
     
         # Check file accessibility
@@ -833,6 +886,7 @@ function Invoke-JsonFileEncryption
             Write-Verbose "[$functionName] Size: $($fileInfo.Length) bytes"
             Write-Verbose "[$functionName] Last modified: $($fileInfo.LastWriteTime)"
             Write-Verbose "[$functionName] Is read-only: $($fileInfo.IsReadOnly)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File found successfully. Size: $($fileInfo.Length) bytes" -LogLevel "Debug"
         }
         catch
         {
@@ -841,10 +895,11 @@ function Invoke-JsonFileEncryption
             $errorMsg += "`nPlease verify you have the necessary permissions to access this file."
             Write-Host $errorMsg
             Write-Verbose "[$functionName] File accessibility check failed: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File accessibility check failed: $($_.Exception.Message)" -LogLevel "Error"
             return @{
                 Success      = $false
                 Content      = $null
-                Operation    = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+                Operation    = $operationMode
                 InMemoryOnly = $InMemoryOnly
                 ErrorMessage = $errorMsg
             }
@@ -854,15 +909,18 @@ function Invoke-JsonFileEncryption
         $FilePath = Resolve-Path $FilePath
         Write-Verbose "[$functionName] File path resolved to: $FilePath"
         Write-Verbose "[$functionName] File validation completed successfully"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "File validation completed successfully" -LogLevel "Debug"
         $operationStartTime = Get-Date
         Write-Verbose "[$functionName] =========================================="
         Write-Verbose "[$functionName] Starting main processing at $($operationStartTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
         Write-Verbose "[$functionName] =========================================="
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Starting main processing" -LogLevel "Debug"
     
         # Create backup if requested
         if ($BackupOriginal)
         {
             Write-Verbose "[$functionName] Backup requested... creating backup copy..."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Creating backup copy" -LogLevel "Information"
             $backupPath = "$FilePath.bak"
             Write-Verbose "[$functionName] Backup destination: $backupPath"
             try
@@ -873,36 +931,42 @@ function Invoke-JsonFileEncryption
                 Write-Verbose "[$functionName]   - Backup path: $($backupInfo.FullName)"
                 Write-Verbose "[$functionName]   - Backup size: $($backupInfo.Length) bytes"
                 Write-Verbose "[$functionName]   - Backup timestamp: $($backupInfo.CreationTime)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Backup created successfully. Size: $($backupInfo.Length) bytes" -LogLevel "Information"
             }
             catch
             {
                 Write-Verbose "[$functionName] Backup creation failed: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Backup creation failed: $($_.Exception.Message)" -LogLevel "Error"
             }
         }
         else
         {
             Write-Verbose "[$functionName] No backup requested - proceeding without backup. The original file will be overwritten if the operation succeeds."
             Write-Verbose "[$functionName] Consider using -BackupOriginal for safer operations, especially on sensitive or production files."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No backup requested - proceeding without backup" -LogLevel "Debug"
         }
     
         # Read file content
         Write-Verbose "[$functionName] Reading source file content..."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Reading source file content" -LogLevel "Debug"
         try
         {
             $fileContent = Get-Content $FilePath -Raw -Encoding UTF8 -ErrorAction Stop
             Write-Verbose "[$functionName] File content read successfully:"
             Write-Verbose "[$functionName] Content length: $($fileContent.Length) characters"
             Write-Verbose "[$functionName] First 100 characters: $($fileContent.Substring(0, [Math]::Min(100, $fileContent.Length)))"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File content read successfully. Length: $($fileContent.Length) characters" -LogLevel "Debug"
         }
         catch
         {
             Write-Verbose "[$functionName] File read failed: $($_.Exception.Message)"
             $errorMsg = "CRITICAL ERROR: Failed to read file '$FilePath'."
             Write-Host $errorMsg
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File read failed: $($_.Exception.Message)" -LogLevel "Error"
             return @{
                 Success      = $false
                 Content      = $null
-                Operation    = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+                Operation    = $operationMode
                 InMemoryOnly = $InMemoryOnly
                 ErrorMessage = $errorMsg
             }
@@ -913,10 +977,11 @@ function Invoke-JsonFileEncryption
             Write-Verbose $warningMsg
             Write-Warning $warningMsg
             Write-Warning "No operation will be performed on empty file."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "File appears to be empty - no operation performed" -LogLevel "Warning"
             return @{
                 Success      = $false
                 Content      = $null
-                Operation    = $(if ($Decrypt) { "Decrypt" } else { "Encrypt" })
+                Operation    = $operationMode
                 InMemoryOnly = $InMemoryOnly
                 ErrorMessage = $warningMsg
             }
@@ -924,6 +989,7 @@ function Invoke-JsonFileEncryption
     
         # Initialize cryptographic components
         Write-Verbose "[$functionName] Initializing cryptographic components..."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Initializing cryptographic components (AES-256)" -LogLevel "Debug"
         Write-Verbose "[$functionName] Setting up AES encryption with the following parameters:"
         Write-Verbose "[$functionName] Algorithm: AES (Advanced Encryption Standard)"
         Write-Verbose "[$functionName] Key size: 256 bits"
@@ -938,6 +1004,7 @@ function Invoke-JsonFileEncryption
         Write-Verbose "[$functionName] Generating 256-bit encryption key from user-provided string..."
         Write-Verbose "[$functionName] Input key length: $($Key.Length) characters"
         Write-Verbose "[$functionName] Using SHA256 hash algorithm for key derivation"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Generating 256-bit encryption key using SHA256" -LogLevel "Debug"
         $sha256 = [System.Security.Cryptography.SHA256]::Create()
         $keyBytes = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Key))
         $aes.Key = $keyBytes
@@ -1482,6 +1549,7 @@ if (Test-Path $configFile)
         {
             $retryCount++
             Write-Verbose "[$scriptName] Password attempt $retryCount of $maxRetries"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password attempt $retryCount of $maxRetries" -LogLevel "Debug"
             
             # Get the password from user
             $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password (Attempt $retryCount of $maxRetries)"
@@ -1493,12 +1561,14 @@ if (Test-Path $configFile)
             if ($decryptResult.Success)
             {
                 Write-Verbose "[$scriptName] Configuration file decrypted successfully."
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file decrypted successfully" -LogLevel "Information"
                 $configContent = $decryptResult.Content
                 break
             }
             else
             {
                 Write-Host "Decryption failed: $($decryptResult.ErrorMessage)" -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Decryption failed: $($decryptResult.ErrorMessage)" -LogLevel "Error"
                 if ($retryCount -lt $maxRetries)
                 {
                     Write-Host "Please try again." -ForegroundColor Yellow
@@ -1514,6 +1584,7 @@ if (Test-Path $configFile)
         {
             Write-Host "Failed to decrypt configuration file after $maxRetries attempts." -ForegroundColor Red
             Write-Host "Please verify your password and try again." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to decrypt configuration file after $maxRetries attempts" -LogLevel "Error"
             Clear-SecureMemory -ClearScriptVariables
             exit 1
         }
@@ -1521,6 +1592,7 @@ if (Test-Path $configFile)
         # Generate a temporary encryption key for in-memory use
         $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
         Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Generated temporary encryption key for in-memory operations" -LogLevel "Debug"
         
         # Re-encrypt the content with the temporary key for in-memory use
         $tempFile = [System.IO.Path]::GetTempFileName()
@@ -1532,6 +1604,7 @@ if (Test-Path $configFile)
             if ($tempEncryptResult.Success)
             {
                 Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Content re-encrypted with temporary key for in-memory use" -LogLevel "Debug"
                 # Store the encrypted content for later use during the session
                 $script:TempEncryptedConfig = $tempEncryptResult.Content
                 $script:TempEncryptionKey = $tempEncryptionKey
@@ -1539,12 +1612,14 @@ if (Test-Path $configFile)
             else
             {
                 Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)" -LogLevel "Error"
                 # Continue without temporary encryption but with a warning
             }
         }
         catch
         {
             Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Error during temporary encryption setup: $($_.Exception.Message)" -LogLevel "Error"
         }
         finally
         {
@@ -1562,6 +1637,7 @@ if (Test-Path $configFile)
     {
         # File is not encrypted - this is a first run scenario
         Write-Host "Configuration file is not encrypted. Setting up encryption..." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file is not encrypted. Setting up encryption for first run" -LogLevel "Information"
         
         # Get password from user for first-time setup
         $userPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt your configuration file" -RequireConfirmation
@@ -1576,10 +1652,12 @@ if (Test-Path $configFile)
         if ($encryptResult.Success)
         {
             Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file encrypted successfully" -LogLevel "Information"
             
             # Generate a temporary encryption key for in-memory use
             $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
             Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Generated temporary encryption key for in-memory operations" -LogLevel "Debug"
             
             # Re-encrypt the content with the temporary key for in-memory use
             $tempFile = [System.IO.Path]::GetTempFileName()
@@ -1591,6 +1669,7 @@ if (Test-Path $configFile)
                 if ($tempEncryptResult.Success)
                 {
                     Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Content re-encrypted with temporary key for in-memory use" -LogLevel "Debug"
                     # Store the encrypted content for later use during the session
                     $script:TempEncryptedConfig = $tempEncryptResult.Content
                     $script:TempEncryptionKey = $tempEncryptionKey
@@ -1598,6 +1677,7 @@ if (Test-Path $configFile)
                 else
                 {
                     Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)" -LogLevel "Error"
                     # Continue without temporary encryption but with a warning
                 }
             }

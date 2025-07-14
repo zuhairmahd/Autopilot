@@ -11,6 +11,7 @@ function DisplayNumericMenu()
     )
     #region Print a verbose message with received parameters
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying numeric menu with $($choices.Count) options" -LogLevel "Debug"
     Write-Verbose "[$functionName] Received parameters: $($choices | Out-String)"
     Write-Verbose "[$functionName] Prompt: $Prompt"
     Write-Verbose "[$functionName] ErrorMessage: $errorMessage"
@@ -32,11 +33,13 @@ function DisplayNumericMenu()
         $validKeys += $i.ToString()
     }
     Write-Verbose "[$functionName] Valid keys: $($validKeys -join ', ')"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', ')" -LogLevel "Debug"
     
     if ($RequireEnter)
     {
         # Original behavior with ReadLine
         Write-Verbose "[$functionName] Using ReadLine for input (requires Enter key)..."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using ReadLine for input (requires Enter key)" -LogLevel "Debug"
         Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
         $selection = $host.UI.ReadLine()
         Write-Verbose "[$functionName] User input received: '$selection'"
@@ -49,6 +52,7 @@ function DisplayNumericMenu()
     {
         # New behavior with immediate keystroke capture
         Write-Verbose "[$functionName] Waiting for keystroke input (no Enter required)..."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Waiting for keystroke input (no Enter required)" -LogLevel "Debug"
         Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
         $keyInfo = $null
         $selection = $null
@@ -75,6 +79,7 @@ function DisplayNumericMenu()
             catch
             {
                 Write-Verbose "[$functionName] Error reading key: $_"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Error"
                 $selection = $null
             }
         } until ($validKeys -contains $selection)
@@ -82,6 +87,7 @@ function DisplayNumericMenu()
         # Echo the selection so user can see what was chosen
         Write-Host $selection
         Write-Verbose "[$functionName] Valid key pressed: '$selection'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
     }
     
     # Validate the selection
@@ -89,6 +95,7 @@ function DisplayNumericMenu()
     {
         Write-Host $errorMessage -ForegroundColor Red
         Write-Verbose "[$functionName] Invalid selection: '$selection'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid selection: '$selection'" -LogLevel "Warning"
         [console]::beep(1000, 500)
         
         if ($RequireEnter)
@@ -110,12 +117,14 @@ function DisplayNumericMenu()
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
         Write-Verbose "[$functionName] Returning choice at index $($index): '$($choices[$index])'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choices[$index])'" -LogLevel "Information"
         # Return the selected choice
         return $choices[$index]
     }
     else
     {
         Write-Verbose "[$functionName] Exiting script with selection: $selection"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected exit option" -LogLevel "Information"
         # Return integer 0 for exit option to ensure proper type matching
         return [int]$selection
     }

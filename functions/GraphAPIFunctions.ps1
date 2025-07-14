@@ -565,10 +565,13 @@ function Save-RefreshTokenToConfig()
     $DeligatedCredentials = @{}
     $userPassword = $null
     
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh token save operation" -LogLevel "Information"
     Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
+    
     if (-not $refreshToken)
     {
         Write-Verbose "[$functionName] No refresh token to save"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token provided - operation skipped" -LogLevel "Warning"
         return
     }
     
@@ -577,18 +580,23 @@ function Save-RefreshTokenToConfig()
     {
         $encryptedContent = Get-Content -Raw -Path $configFilePath -ErrorAction Stop
         Write-Verbose "[$functionName] Successfully read config file from disk"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read config file from disk" -LogLevel "Debug"
     }
     catch
     {
         Write-Error "[$functionName] Failed to read config file: $_"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to read config file: $_" -LogLevel "Error"
         return
     }
     
     # Check if config is encrypted (it should be in the new system)
     $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFilePath
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Config file encryption status: $($encryptionStatus.IsEncrypted)" -LogLevel "Debug"
+    
     if (-not $encryptionStatus.IsEncrypted)
     {
         Write-Warning "[$functionName] Config file is not encrypted. This may indicate an issue with the encryption system."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Config file is not encrypted - handling for backward compatibility" -LogLevel "Warning"
         # For backward compatibility, handle unencrypted config
         $config = ConvertFrom-Json $encryptedContent
         $needsEncryption = $true
@@ -596,6 +604,7 @@ function Save-RefreshTokenToConfig()
     else
     {
         Write-Verbose "[$functionName] Config file is encrypted. Prompting for password to decrypt for modification."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Config file is encrypted - prompting for password to decrypt for modification" -LogLevel "Debug"
         # Need to get the user's password to decrypt the config file
         $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password to update the refresh token"
         $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
@@ -606,6 +615,7 @@ function Save-RefreshTokenToConfig()
         if (-not $decryptResult.Success)
         {
             Write-Error "[$functionName] Failed to decrypt config file: $($decryptResult.ErrorMessage)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to decrypt config file: $($decryptResult.ErrorMessage)" -LogLevel "Error"
             return
         }
         
@@ -2045,15 +2055,18 @@ function GetGraphAccessToken()
     
     #region Process config files
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting Graph access token retrieval" -LogLevel "Information"
     
     # Read and process configuration file
     if (-not $configFile)
     {
         Write-Error "Config file not found. Please provide a valid config file."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Config file not found. Please provide a valid config file." -LogLevel "Error"
         return $null
     }
 
     Write-Verbose "[$functionName] Accessing config values from in-memory encrypted config"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Accessing config values from in-memory encrypted config" -LogLevel "Debug"
     $configRefreshToken = $null
     
     # Extract the refresh token if it exists using the new encryption system
@@ -2063,10 +2076,12 @@ function GetGraphAccessToken()
         if ($configRefreshToken)
         {
             Write-Verbose "[$functionName] Found refresh token in encrypted config."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Found refresh token in encrypted config" -LogLevel "Debug"
         }
         else
         {
             Write-Verbose "[$functionName] No refresh token found in config."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token found in config" -LogLevel "Debug"
         }
     }
     catch

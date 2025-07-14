@@ -10,32 +10,40 @@ function validateInput()
     $functionName = $MyInvocation.MyCommand.Name
     $MaxSerialNumberLength = '11'
     $MinSerialNumberLength = '7'
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting serial number validation" -LogLevel "Debug"
     Write-Verbose "[$functionName] MaxSerialNumberLength: $MaxSerialNumberLength"
     Write-Verbose "[$functionName] MinSerialNumberLength: $MinSerialNumberLength"
+    
     # Trim input to remove any leading or trailing spaces
     $UserInput = $UserInput.Trim()
     $returnValue = @{}
     Write-Verbose "[$functionName] Trimmed input: '$UserInput'"
     Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Validating serial number length: $($UserInput.Length)" -LogLevel "Debug"
+    
     if ($UserInput.Length -gt $MaxSerialNumberLength)
     {
         Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
         Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation failed: exceeds maximum length of $MaxSerialNumberLength characters" -LogLevel "Warning"
     }
     elseif ($UserInput.Length -lt $MinSerialNumberLength)
     {
         Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
         Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation failed: shorter than minimum length of $MinSerialNumberLength characters" -LogLevel "Warning"
     }
     elseif ($UserInput -match '^[a-zA-Z0-9]+$') 
     {
         Write-Verbose "[$functionName] Serial number validation passed"
         $returnValue.valid = $true
         $returnValue.value = $UserInput
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation passed" -LogLevel "Debug"
     }
     else
     {
         Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation failed: invalid format (non-alphanumeric characters)" -LogLevel "Warning"
     }
     Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"
     Write-Verbose "[$functionName] Returning validation value: $($returnValue.value)"
@@ -51,6 +59,7 @@ function GetUserInput()
     )
     #Get the function name
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting user input collection" -LogLevel "Debug"
     Write-Verbose "[$functionName] Message: $Message"
     Write-Verbose "[$functionName] Prompt: $Prompt"
     Write-Host $Message
@@ -60,12 +69,16 @@ function GetUserInput()
     {
         $inputItem = Read-Host $Prompt
         Write-Verbose "[$functionName] Item entered: '$inputItem'" # Added quotes for clarity
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User input received" -LogLevel "Debug"
+        
         # Check if the user just pressed Enter (empty string OR null)
         if ($null -eq $inputItem -or $inputItem -eq '')
         {
             Write-Verbose "[$functionName] User pressed Enter. Returning $($returnValues.backoutText)."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "User pressed Enter to return to previous menu" -LogLevel "Debug"
             return $null # Return null to signal going back
         }
+        
         # Validate the input if it's not empty
         $validationResult = validateInput -UserInput $inputItem
         $inputResultValid = $validationResult.valid
@@ -74,6 +87,7 @@ function GetUserInput()
         {
             Write-Verbose "[$functionName] Valid $inputType entered: $inputResultValid"
             Write-Verbose "[$functionName] Input result: $inputResult"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Valid input received and validated" -LogLevel "Debug"
             return $inputResult # Return the validated input
         }
         else
@@ -82,6 +96,7 @@ function GetUserInput()
             [console]::beep(1000, 500)
             # Updated error message
             Write-Host "Invalid $inputType. Please try again or press Enter to return." -ForegroundColor Red 
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid input provided - prompting user to try again" -LogLevel "Warning"
             # The loop will continue, prompting the user again
         }
     }
