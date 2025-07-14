@@ -18,7 +18,10 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 
 ### Security Features
 - **Azure App Registration Authentication**: Uses application credentials for secure API access
-- **Encrypted Configuration**: Secure storage of authentication credentials
+- **Password-Based Configuration Encryption**: AES-256 encryption for secure storage of sensitive credentials
+- **In-Memory Security**: Configuration decryption happens in memory only - never stored as plaintext on disk
+- **Automatic Encryption Setup**: First-run encryption setup with password confirmation
+- **Secure Password Handling**: PowerShell SecureString objects for sensitive data protection
 - **Principle of Least Privilege**: Minimal required permissions for operations
 - **Rotating Secret Keys**: Enhanced security through credential rotation
 - **Automatic Clipboard Integration**: LAPS passwords and BitLocker keys automatically copied to clipboard
@@ -54,10 +57,32 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 1. **Clone or download** the script files to a local directory
 2. **Create the secrets folder**: Create a `.secrets` folder in the script directory
 3. **Configure authentication**: Place your `config.json` file in the `.secrets` folder
-4. **Verify settings**: Ensure `settings.json` is configured for your environment
+4. **Configure application settings**: Ensure `settings.json` is configured for your environment
+5. **Set up encryption**: On first run, the script will prompt you to encrypt your configuration file
 
 ### 2. Authentication Configuration
+
+#### Configuration File Structure
+The authentication system uses two separate configuration files:
+- `config.json`: Contains sensitive credentials (automatically encrypted)
+- `settings.json`: Contains application settings and authentication scope (plaintext)
+
+#### Creating the Configuration File
 Create a `config.json` file in the `.secrets` folder with your Azure App Registration details:
+
+```json
+{
+  "domain": "your-domain.com",
+  "TenantId": "your-tenant-id",
+  "AppId": "your-app-id",
+  "AppSecret": "your-app-secret",
+  "Thumbprint": "your-cert-thumbprint",
+  "Subject": "your-certificate-subject"
+}
+```
+
+#### Authentication Settings
+The authentication settings are configured in the `settings.json` file at the root level under the `auth` object:
 
 ```json
 {
@@ -79,27 +104,53 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
       "DeviceManagementManagedDevices.ReadWrite.All",
       "DeviceManagementServiceConfig.ReadWrite.All"
     ]
-  },
-  "domain": "your-domain.com",
-  "TenantId": "your-tenant-id",
-  "AppId": "your-app-id",
-  "AppSecret": "your-app-secret",
-  "Thumbprint": "your-cert-thumbprint",
-  "Subject": "your-certificate-subject"
+  }
 }
 ```
 
-### 3. First Run
+### 3. Password-Based Encryption Setup
+
+#### First Run Experience
+When you run the script for the first time with an unencrypted configuration file:
+
+1. **Detection**: The script automatically detects that your `config.json` is not encrypted
+2. **Setup Prompt**: You'll see: `"Configuration file is not encrypted. Setting up encryption..."`
+3. **Password Creation**: You'll be prompted to create an encryption password with confirmation
+4. **Automatic Encryption**: The configuration file is encrypted using AES-256 encryption
+5. **Confirmation**: You'll see: `"Configuration file encrypted successfully."`
+
+#### Subsequent Runs
+For all subsequent runs with an encrypted configuration file:
+
+1. **Detection**: The script detects the encrypted configuration file
+2. **Password Prompt**: You'll see: `"The configuration file is encrypted. Please enter your password to decrypt it."`
+3. **Password Entry**: Enter your encryption password (up to 3 attempts allowed)
+4. **In-Memory Decryption**: The configuration is decrypted in memory only - never stored as plaintext on disk
+5. **Confirmation**: You'll see: `"Configuration file decrypted successfully."`
+
+#### Security Benefits
+- **AES-256 Encryption**: Military-grade encryption for your sensitive credentials
+- **No Plaintext Storage**: Configuration file remains encrypted on disk at all times
+- **Secure Memory Handling**: Decryption happens in memory with automatic cleanup
+- **Password Protection**: Your credentials are protected even if someone accesses your files
+- **Retry Protection**: Up to 3 password attempts with clear error messages
+
+### 4. First Run
 1. Open PowerShell as Administrator
 2. Navigate to the script directory
 3. Run: `.\main.ps1`
-4. Follow the interactive setup prompts
+4. **Set up encryption** when prompted (first run only)
+5. **Enter your password** for subsequent runs
+6. Follow the interactive setup prompts
 
 ## Usage
 
 ### Basic Usage
 ```powershell
-# Run with default settings
+# First run - will prompt for encryption password setup
+.\main.ps1
+
+# Subsequent runs - will prompt for decryption password
 .\main.ps1
 
 # Run with custom settings file
@@ -111,6 +162,11 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
 # Run with verbose logging
 .\main.ps1 -Verbose
 ```
+
+**Note**: The script will automatically detect whether your configuration file is encrypted and prompt accordingly:
+- **First run**: Prompts to set up encryption with password confirmation
+- **Subsequent runs**: Prompts for your encryption password (up to 3 attempts)
+- **Security**: Configuration file remains encrypted on disk at all times
 
 ### Interactive Operations
 
@@ -169,13 +225,32 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
 
 ## Settings.json Configuration
 
-The `settings.json` file contains the primary configuration for the script with a hierarchical structure supporting global settings and domain-specific overrides.
+The `settings.json` file contains the primary configuration for the script with a hierarchical structure supporting global settings, authentication configuration, and domain-specific overrides.
 
 ### Structure Overview
 ```json
 {
   "description": "Configuration file for the Autopilot script",
   "version": "1.0",
+  "auth": {
+    "Deligated": true,
+    "authType": "PublicAuthFlow",
+    "renewalLeadTime": 5,
+    "NoSaveRefreshToken": false,
+    "SecureString": false,
+    "ForceNewToken": false,
+    "CacheType": "Memory",
+    "scope": [
+      "offline_access",
+      "openid",
+      "Device.ReadWrite.All",
+      "DeviceManagementApps.Read.All",
+      "DeviceManagementConfiguration.ReadWrite.All",
+      "DeviceManagementManagedDevices.PrivilegedOperations.All",
+      "DeviceManagementManagedDevices.ReadWrite.All",
+      "DeviceManagementServiceConfig.ReadWrite.All"
+    ]
+  },
   "globalSettings": {
     // Global configuration applied to all domains
   },
@@ -189,6 +264,17 @@ The `settings.json` file contains the primary configuration for the script with 
   }
 }
 ```
+
+### Authentication Configuration
+The `auth` object at the root level of `settings.json` contains all authentication-related settings:
+- `Deligated`: Whether to use delegated authentication (boolean)
+- `authType`: Type of authentication flow ("PublicAuthFlow", "Interactive", "Private")
+- `renewalLeadTime`: Time in minutes before token expiration to renew
+- `NoSaveRefreshToken`: Whether to save refresh tokens (boolean)
+- `SecureString`: Whether to use secure string for sensitive inputs (boolean)
+- `ForceNewToken`: Whether to force generation of new tokens (boolean)
+- `CacheType`: Token cache type ("Memory", "File")
+- `scope`: Array of required Microsoft Graph API scopes
 
 ### Global Settings
 - `operatingSystem`: Target operating system (default: "Windows")
@@ -235,12 +321,20 @@ The script requires the following Microsoft Graph API permissions:
 - Type 'quit' or 'q' to exit the application
 
 ### Logging and Debugging
-- Use `-Verbose` for detailed operation logging
+- Use `-Verbose` for detailed operation logging including encryption operations
 - Use `-LogLevel` to control log verbosity (Error, Warning, Information, Verbose, Debug)
 - CMTrace format support for enhanced log viewing
 - Automatic log rotation with size management
-- Check log outputs for troubleshooting
+- Check log outputs for troubleshooting authentication and encryption issues
 - Settings validation occurs automatically
+- Encryption process is logged for security auditing
+
+### Configuration Security
+- **Encrypted Storage**: Sensitive credentials are always encrypted on disk
+- **Password Protection**: Only you can decrypt your configuration with your password
+- **No Plaintext Leakage**: Configuration is never stored as plaintext after initial encryption
+- **Secure Memory Handling**: Decrypted data is automatically cleaned from memory
+- **Audit Trail**: All encryption/decryption operations are logged for security monitoring
 
 ### Batch Operations
 - Export device lists in CSV format
@@ -251,6 +345,29 @@ The script requires the following Microsoft Graph API permissions:
 - Track and display Windows update installation history
 - Comprehensive logging of update information
 - Integration with device management workflows
+
+### Password-Based Configuration Encryption
+The script includes a comprehensive encryption system for protecting sensitive configuration data:
+
+#### Security Features
+- **AES-256 Encryption**: Military-grade encryption for configuration files
+- **SHA-256 Key Derivation**: Secure key generation from user passwords
+- **Memory-Only Decryption**: Configuration never stored as plaintext on disk
+- **Automatic Key Cleanup**: Sensitive data automatically cleared from memory
+- **Password Retry Protection**: Up to 3 password attempts with clear error messages
+- **Secure Password Handling**: PowerShell SecureString objects for input protection
+
+#### User Experience
+- **First Run**: Automatic detection and setup of encryption with password confirmation
+- **Subsequent Runs**: Seamless password-based decryption workflow
+- **Error Handling**: Clear error messages and retry mechanisms
+- **Backward Compatibility**: Existing unencrypted files are automatically detected and can be encrypted
+
+#### Technical Implementation
+- **Temporary Encryption Keys**: Generated for secure in-memory operations during runtime
+- **Base64 Encoding**: Encrypted data is stored as Base64 for safe file storage
+- **JSON Validation**: Automatic detection of encrypted vs. unencrypted configuration files
+- **Memory Protection**: Automatic cleanup of sensitive variables and garbage collection
 
 ### Clipboard Integration
 - LAPS passwords automatically copied to clipboard for secure access
@@ -265,6 +382,14 @@ The script requires the following Microsoft Graph API permissions:
 2. **Device Not Found**: Check serial number format and Intune enrollment status
 3. **Permission Denied**: Ensure PowerShell is running as Administrator for device operations
 4. **Network Connectivity**: Verify access to Microsoft Graph API endpoints
+5. **Password Authentication Issues**: 
+   - **Forgotten Password**: The encryption password cannot be recovered - you'll need to delete the encrypted config file and recreate it
+   - **Invalid Password**: Check for typos and ensure correct password entry (up to 3 attempts allowed)
+   - **Configuration Corruption**: If the encrypted file becomes corrupted, delete it and recreate from your backup
+6. **Configuration File Issues**:
+   - **Missing Config**: Ensure `config.json` exists in the `.secrets` folder
+   - **Invalid Format**: Verify JSON syntax in configuration files
+   - **Auth Settings**: Ensure authentication settings are properly configured in `settings.json`
 
 ### Error Handling
 The script includes comprehensive error handling:
