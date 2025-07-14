@@ -36,7 +36,24 @@ param(
     [string]$LogLevel = 'Information'
 )
 
-
+#region import functions.
+$functionsFolder = "$PWD\functions"
+if (Test-Path $functionsFolder)
+{
+    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    foreach ($function in $functions)
+    {
+        Write-Verbose "[$scriptName] Importing function $function"
+        . $function.FullName
+    }
+}
+else
+{
+    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    exit 1
+}
+#endregion import functions.
 
 #region Initialize script
 $scriptName = $MyInvocation.MyCommand.Name
@@ -427,25 +444,6 @@ else
     $script:Auth = $auth
 }
 #endregion Load parameters from the configuration file if it exists
-
-#region import functions.
-$functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder)
-{
-    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-    foreach ($function in $functions)
-    {
-        Write-Verbose "[$scriptName] Importing function $function"
-        . $function.FullName
-    }
-}
-else
-{
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
-    exit 1
-}
-#endregion import functions.
 
 #region Define variables
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
