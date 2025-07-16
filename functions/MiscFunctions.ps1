@@ -599,6 +599,8 @@ function Write-Log()
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
         [string]$Module,
         [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
+        [bool]$WriteToConsole = $false,
+        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
         [ValidateSet("Verbose", "Debug", "Information", "Warning", "Error")]
         [string]$LogLevel = "Information",
         [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
@@ -697,8 +699,10 @@ function Write-Log()
             }
             
             # Write to console
-            Write-Host $separatorLine
-            
+            if ($WriteToConsole)
+            {
+                Write-Host $separatorLine
+            }
             return
         }
         
@@ -717,19 +721,31 @@ function Write-Log()
                 {
                     "Error"
                     {
-                        Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                        if ($WriteToConsole)
+                        {
+                            Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                        }
                     }
                     "Warning"
                     {
-                        Write-Warning "[$Module] $Message" 
+                        if ($WriteToConsole)
+                        {
+                            Write-Warning "[$Module] $Message" 
+                        }
                     }
                     "Verbose"
                     {
-                        Write-Verbose "[$Module] $Message" 
+                        if ($WriteToConsole)
+                        {
+                            Write-Verbose "[$Module] $Message" 
+                        }
                     }
                     "Debug"
                     {
-                        Write-Debug "[$Module] $Message" 
+                        if ($WriteToConsole)
+                        {
+                            Write-Debug "[$Module] $Message" 
+                        }
                     }
                     default
                     {
@@ -806,23 +822,38 @@ function Write-Log()
         {
             "Error"
             {
-                Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                if ($WriteToConsole)
+                {
+                    Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
+                }
             }
             "Warning"
             {
-                Write-Warning "[$Module] $Message" 
+                if ($WriteToConsole)
+                {
+                    Write-Warning "[$Module] $Message" 
+                }
             }
             "Verbose"
             {
-                Write-Verbose "[$Module] $Message" 
+                if ($WriteToConsole)
+                {
+                    Write-Verbose "[$Module] $Message" 
+                }
             }
             "Debug"
             {
-                Write-Debug "[$Module] $Message" 
+                if ($WriteToConsole)
+                {
+                    Write-Debug "[$Module] $Message" 
+                }
             }
             default
             {
-                Write-Verbose "Logged: $logEntry" 
+                if ($WriteToConsole)
+                {
+                    Write-Verbose "Logged: $logEntry" 
+                }
             }
         }
         

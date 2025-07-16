@@ -217,9 +217,24 @@ if (Test-Path $configFile)
     else
     {
         # File is not encrypted - this is a first run scenario
-        Write-Host "Configuration file is not encrypted. Setting up encryption..." -ForegroundColor Yellow
+        Write-Host "Configuration file is not encrypted." -ForegroundColor Yellow
+        Write-Host "You must encrypt the file and set a password to continue." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file is not encrypted. Setting up encryption for first run" -LogLevel "Information"
-        
+        $answer = Read-Host "Do you want to encrypt the configuration file? (Y/N)"
+        while ($answer -notin @('Y', 'y', 'Yes', 'yes', 'N', 'n', 'No', 'no'))
+        {
+            Write-Host "Invalid input. Please enter Y or N." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid input for encryption choice. Prompting user again." -LogLevel "Warning"
+            [console]::beep(1000, 500)
+            $answer = Read-Host "Do you want to encrypt the configuration file? (Y/N)"
+        }
+        if ($answer -notin @('Y', 'y', 'Yes', 'yes'))
+        {
+            Write-Host "Exiting script without encryption." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "User chose not to encrypt the configuration file. Exiting script." -LogLevel "Information"
+            Clear-SecureMemory -ClearScriptVariables
+            exit 0
+        }
         # Get password from user for first-time setup
         $userPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt your configuration file" -RequireConfirmation
         $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
