@@ -12,6 +12,8 @@ param(
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
+$logFile = "$pwd\logs\createRelease.log"
+
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -30,6 +32,8 @@ else
     exit 1
 }
 #endregion import functions.
+
+Write-Log -logFile $logFile -startLogging
 
 #region helper functions
 function SignScripts()
@@ -329,39 +333,52 @@ function CopySecrets()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] [$functionName] Starting to copy secrets from $SourceFolder to $DestinationFolder"
+    write-log -logFile $logFile -Message "Starting to copy secrets from $SourceFolder to $DestinationFolder" -module $functionName
     #region Print logs
     Write-Verbose "[$functionName] Received the following parameters:"
+    write-log -logFile $logFile -Message "Received the following parameters:" -module $functionName
     Write-Verbose "[$functionName] SourceFolder: $SourceFolder"
+    write-log -logFile $logFile -Message "SourceFolder: $SourceFolder" -module $functionName
     Write-Verbose "[$functionName] DestinationFolder: $DestinationFolder"
+    write-log -logFile $logFile -Message "DestinationFolder: $DestinationFolder" -module $functionName
     Write-Verbose "[$functionName] Overwrite: $Overwrite"
+    write-log -logFile $logFile -Message "Overwrite: $Overwrite" -module $functionName
     #endregion
     
     if (Test-Path -Path "$DestinationFolder\.secrets")
     {
         Write-Host "the folder $DestinationFolder\.secrets already exists."
+        Write-log -logFile $logFile -Message "The folder $DestinationFolder\.secrets already exists." -module $functionName
         if ($Overwrite)
         {
             Write-Host 'Removing .secrets folder...'
+            Write-log -logFile $logFile -Message "Overwrite is set to true. Removing .secrets folder." -module $functionName
             Remove-Item -Path "$DestinationFolder\.secrets" -Force | Out-Null
         }
         else 
         {
+            Write-Log -logFile $logFile -Message "The folder $DestinationFolder\.secrets already exists. Getting user input." -module $functionName
             $response = Read-Host 'Overwrite? (Y/N)'
             Write-Verbose "[$functionName] User response: $response"
+            write-log -logFile $logFile -Message "User response: $response" -module $functionName
             while ($response -notin 'Y', 'N')
             {
                 $response = Read-Host 'Invalid input. Please enter Y or N: '
+                
                 Write-Verbose "[$functionName] User response: $response"
+                write-log -logFile $logFile -Message "User response: $response" -module $functionName
                 [console]::beep(500, 300)
             }
             if ($response -eq 'Y')
             {
                 Write-Host 'Removing .secrets folder...'
+                Write-log -logFile $logFile -Message "User chose to overwrite. Removing .secrets folder." -module $functionName
                 Remove-Item -Path "$DestinationFolder\.secrets" -Force | Out-Null
             }
             else
             {
                 Write-Host 'Exiting without copying secrets.'
+                Write-log -logFile $logFile -Message "User chose not to overwrite. Exiting without copying secrets." -module $functionName
                 return $false
             }   
         }
@@ -369,61 +386,59 @@ function CopySecrets()
     else
     {
         Write-Host "Creating .secrets folder in: $DestinationFolder"
+        Write-log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
         New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
     }
     
     Write-Host 'Looking for secrets...'
+    Write-log -logFile $logFile -Message "Looking for secrets in $SourceFolder\.secrets" -module $functionName  
     $secrets = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse
     if ($secrets.Count -eq 0)
     {
         Write-Host 'No secrets found.'
+        Write-log -logFile $logFile -Message "No secrets found in $SourceFolder\.secrets" -module $functionName
         return $false
     }
     
     if (-not $Overwrite)
     {
-        Write-Host "Found $($secrets.Count) secret files."
         Write-Host 'Please choose the secret you would like to copy to the release folder.'
+        Write-log -logFile $logFile -Message "User is prompted to choose a secret to copy." -module $functionName
         for ($i = 0; $i -lt $secrets.Count; $i++)
         {
-            $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
             $fileName = $secrets[$i].Name
-            $domain = $data.domain
-            $name = $data.name
-            $encrypted = (isEncrypted -data $data)
-            $deligated = $data.auth.deligated
+            Write-log -logFile $logFile -Message "Found secret: $fileName" -module $functionName
+            $encrypted = (Test-FileEncryptionStatus -filePath $fileName).isEncrypted
+            Write-log -logFile $logFile -Message "Secret $fileName is encrypted: $encrypted" -module $functionName
             $index = $i + 1
             if ($encrypted)
             {
-                $encryption = 'Encrypted'
+                Write-Log -logFile $logFile -message "$index. $($name): $domain (Encrypted) ($fileName)" -module $functionName
+                break
             }
-            else
-            {
-                $encryption = 'Unencrypted'
-            }
+            
+            $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
+            $name = $data.name
+            $domain = $data.domain
             if (-not $domain)
             {
                 $domain = 'Unknown'
+                Write-log -logFile $logFile -Message "Secret $fileName has unknown domain." -module $functionName
             }
             if (-not $name)
             {
                 $name = 'Unknown'
+                Write-log -logFile $logFile -Message "Secret $fileName has unknown name." -module $functionName
             }
-            if ($deligated)
-            {
-                $deligatedStatus = 'Delegated'
-            }
-            else
-            {
-                $deligatedStatus = 'Client'
-            }
-            Write-Host "$index. $($name): $domain ($fileName,  $encryption, $deligatedStatus)"
+            Write-Host "$index. $($name): $domain ($fileName)"
         }
         [int32]$choice = (Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)')
         Write-Verbose "[$functionName] User selected: $choice"
+        write-log -logFile $logFile -Message "User selected: $choice" -module $functionName
         while ([int32]$choice -lt 0 -or [int32]$choice -gt $secrets.Count)
         {
             Write-Host "Sorry: $choice is an invalid choice."
+            Write-log -logFile $logFile -Message "User entered an invalid choice: $choice" -module $functionName
             #beep
             [console]::beep(500, 300)
             Write-Host "Please choose a number between 1 and $($secrets.Count), or 0 to exit."
@@ -432,29 +447,35 @@ function CopySecrets()
         }
         if ($choice -eq 0)
         {
-            Write-Host 'Exiting...'
+            Write-log -logFile $logFile -Message "User chose to cancel. Exiting without copying secrets." -module $functionName
             return $false
         }
         $secret = $secrets[$choice - 1]        
+        write-log -logFile $logFile -Message "User selected secret: $($secret.Name)" -module $functionName
     }
     else
     {
-        Write-Host "Copying default secret in $SourceFolder\.secrets"
+        Write-log -logFile $logFile -Message "Copying default secret in $SourceFolder\.secrets" -module $functionName
         $secret = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse | Where-Object { $_.Name -eq 'config.json' }
         Write-Host "Using default secrets file: $($secret.Name)"
+        Write-log -logFile $logFile -Message "Using default secrets file: $($secret.Name)" -module $functionName    
     }
     
     Write-Host "Copying $($secret.FullName) to $DestinationFolder"
+    Write-log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName 
     try
     {
         Write-Host "Copying $($secret.FullName) to $DestinationFolder\.secrets"
+        Write-log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName
         Copy-Item -Path $secret.FullName -Destination "$DestinationFolder\.secrets\config.json" -Force
         Write-Verbose "[$functionName] Secrets copied successfully."
+        Write-log -logFile $logFile -Message "Secrets copied successfully to $DestinationFolder\.secrets\config.json" -module $functionName
     }
     catch
     {
         Write-Error "Failed to copy $($secret.FullName) to $DestinationFolder\.secrets"
         Write-Error $_.Exception.Message
+        Write-log -logFile $logFile -Message "Failed to copy $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName -LogLevel 'Error'
         return $false
     }
     return $true
@@ -467,8 +488,9 @@ $lastRunFile = "$pwd\lastrun.json"
 $maintainCurrentVersion = $false
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.json', 'strings.json', 'init.json') 
+$settingsVersion = (Get-Content -Path "$pwd\settings.json" | ConvertFrom-Json).version
+$stringsVersion = (Get-Content -Path "$pwd\strings.json" | ConvertFrom-Json).version
 $successMessage = "$OutputFile written"
-$scriptName = $MyInvocation.MyCommand.Name
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
@@ -788,8 +810,10 @@ else
 #write the new version to the lastrun file.
 Write-Host "Writing last run information to $lastRunFile"
 $lastRun = @{
-    date    = $todaysDate
-    version = $Version
+    date            = $todaysDate
+    version         = $Version
+    settingsVersion = $settingsVersion
+    stringsVersion  = $stringsVersion
 }
 try
 {
@@ -894,5 +918,6 @@ else
     Write-Host "Executable not copied."
 }
 Write-Host "Script completed successfully."
+write-log -logFile $logFile -finishLogging
 exit 0
 #endregion Main code
