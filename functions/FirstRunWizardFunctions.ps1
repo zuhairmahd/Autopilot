@@ -611,18 +611,33 @@ function New-ConfigurationFile {
             Write-SafeLog "Using default encryption password in silent mode" "Information"
         } else {
             do {
-                $encryptionPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt your configuration file" -RequireConfirmation
-                $encryptionPassword = ConvertFrom-SecureString-ToPlainText -SecureString $encryptionPasswordSecure
+                $encryptionPasswordSecure = Read-Host -Prompt "Enter a password to encrypt your configuration file" -AsSecureString
                 
-                if ([string]::IsNullOrWhiteSpace($encryptionPassword)) {
+                # Validate password is not empty
+                if ($encryptionPasswordSecure.Length -eq 0) {
                     Write-Host "Encryption password cannot be empty. Please try again." -ForegroundColor Red
                     continue
                 }
+                
+                # Convert to plain text for length validation
+                $encryptionPassword = ConvertFrom-SecureString-ToPlainText -SecureString $encryptionPasswordSecure
                 
                 if ($encryptionPassword.Length -lt 8) {
                     Write-Host "Password must be at least 8 characters long. Please try again." -ForegroundColor Red
                     continue
                 }
+                
+                # Get confirmation
+                $confirmPasswordSecure = Read-Host -Prompt "Confirm password" -AsSecureString
+                $confirmPassword = ConvertFrom-SecureString-ToPlainText -SecureString $confirmPasswordSecure
+                
+                if ($encryptionPassword -ne $confirmPassword) {
+                    Write-Host "Passwords do not match. Please try again." -ForegroundColor Red
+                    continue
+                }
+                
+                # Clear confirmation password from memory
+                $confirmPassword = $null
                 
                 break
             } while ($true)
@@ -633,11 +648,13 @@ function New-ConfigurationFile {
         $encryptResult = Invoke-JsonFileEncryption -FilePath $ConfigFile -Key $encryptionPassword
         
         if ($encryptResult.Success) {
-            Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
+            if (-not $Silent) {
+                Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
+            }
             Write-SafeLog "Configuration file encrypted successfully" "Information"
             
             # Store the password for session use
-            $script:UserEncryptionPassword = $encryptionPassword
+            $global:UserEncryptionPassword = $encryptionPassword
             
             return $true
         } else {
@@ -693,6 +710,15 @@ function Ensure-SettingsJsonExists {
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Ensuring settings.json exists: $SettingsFile"
     
+    # Helper function for safe logging
+    function Write-SafeLog {
+        param($Message, $LogLevel = "Information")
+        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
+            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
+        }
+        Write-Verbose "[$functionName] $Message"
+    }
+    
     try {
         if (Test-Path -Path $SettingsFile) {
             Write-Verbose "[$functionName] Settings file already exists: $SettingsFile"
@@ -705,102 +731,64 @@ function Ensure-SettingsJsonExists {
             Write-Host "Creating default settings.json file..." -ForegroundColor White
         }
         
-        # Create settings.json directly using the structure from the existing file
-        # Read the existing settings.json as template if it exists elsewhere
-        $templateSettingsPath = "$PWD\settings.json"
-        if (Test-Path $templateSettingsPath) {
-            # Copy the existing template
-            Copy-Item -Path $templateSettingsPath -Destination $SettingsFile -Force
-            Write-Verbose "[$functionName] Copied existing settings.json template"
-            
-            # Update the authentication settings in the copied file
-            $settingsContent = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
-            
-            # Add auth section if it doesn't exist or update if it does
-            if (-not $settingsContent.auth) {
-                $settingsContent | Add-Member -NotePropertyName "auth" -NotePropertyValue @{
-                    Delegated = $IsDelegated
-                    authType = "PublicAuthFlow"
-                    renewalLeadTime = 5
-                    NoSaveRefreshToken = $false
-                    SecureString = $false
-                    ForceNewToken = $false
-                    CacheType = "Memory"
-                    scope = @(
-                        "offline_access",
-                        "openid",
-                        "Device.ReadWrite.All",
-                        "DeviceManagementApps.Read.All",
-                        "DeviceManagementConfiguration.ReadWrite.All",
-                        "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                        "DeviceManagementManagedDevices.ReadWrite.All",
-                        "DeviceManagementServiceConfig.ReadWrite.All"
-                    )
-                }
-                Write-Verbose "[$functionName] Added auth section with Delegated: $IsDelegated"
-            } else {
-                $settingsContent.auth.Delegated = $IsDelegated
-                Write-Verbose "[$functionName] Updated Delegated setting to: $IsDelegated"
+        # Get the requiredScopes from init.json as the template
+        $initJsonPath = "$PWD\init.json"
+        $requiredScopes = @()
+        if (Test-Path $initJsonPath) {
+            try {
+                $initData = Get-Content -Path $initJsonPath -Raw | ConvertFrom-Json
+                $requiredScopes = $initData | Where-Object { $_.name -eq "requiredScopes" } | Select-Object -ExpandProperty value
+                Write-Verbose "[$functionName] Loaded requiredScopes from init.json: $($requiredScopes.Count) scopes"
+            } catch {
+                Write-SafeLog "Warning: Could not load requiredScopes from init.json: $($_.Exception.Message)" "Warning"
             }
-            
-            # Save the updated settings back to the file
-            $settingsJson = $settingsContent | ConvertTo-Json -Depth 10
-            Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
-            Write-Verbose "[$functionName] Updated settings file with authentication type: $AuthType"
-        } else {
-            # Create a basic settings.json with minimal structure
-            $basicSettings = @{
-                description = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-                version = "1.1.0.0"
-                auth = @{
-                    Delegated = $IsDelegated
-                    authType = "PublicAuthFlow"
-                    renewalLeadTime = 5
-                    NoSaveRefreshToken = $false
-                    SecureString = $false
-                    ForceNewToken = $false
-                    CacheType = "Memory"
-                    scope = @(
-                        "offline_access",
-                        "openid",
-                        "Device.ReadWrite.All",
-                        "DeviceManagementApps.Read.All",
-                        "DeviceManagementConfiguration.ReadWrite.All",
-                        "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                        "DeviceManagementManagedDevices.ReadWrite.All",
-                        "DeviceManagementServiceConfig.ReadWrite.All"
-                    )
-                }
-                globalSettings = @{
-                    operatingSystem = "Windows"
-                    showLicenseBanner = $true
-                    testMode = $false
-                    configFile = ".\\\.secrets\\config.json"
-                    maxWaitTime = "30"
-                    maxUserMatchDisplay = "10"
-                    timeInSeconds = "60"
-                    Release = "master"
-                    Repo = "Github"
-                    appMode = "full"
-                    requiredScopes = @(
-                        "offline_access",
-                        "openid",
-                        "Device.ReadWrite.All",
-                        "DeviceManagementApps.Read.All",
-                        "DeviceManagementConfiguration.ReadWrite.All",
-                        "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                        "DeviceManagementManagedDevices.ReadWrite.All",
-                        "DeviceManagementServiceConfig.ReadWrite.All"
-                    )
-                }
-                domains = @{}
-            }
-            
-            # Convert to JSON and write to file
-            $settingsJson = $basicSettings | ConvertTo-Json -Depth 10
-            Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
-            Write-Verbose "[$functionName] Created basic settings.json"
         }
+        
+        # Create comprehensive settings.json using ordered dictionary
+        $settings = [ordered]@{
+            description = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+            version = "1.1.0.0"
+            auth = [ordered]@{
+                Delegated = $IsDelegated
+                authType = "PublicAuthFlow"
+                renewalLeadTime = 5
+                NoSaveRefreshToken = $false
+                SecureString = $false
+                ForceNewToken = $false
+                CacheType = "Memory"
+                scope = @(
+                    "offline_access",
+                    "openid",
+                    "Device.ReadWrite.All",
+                    "DeviceManagementApps.Read.All",
+                    "DeviceManagementConfiguration.ReadWrite.All",
+                    "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                    "DeviceManagementManagedDevices.ReadWrite.All",
+                    "DeviceManagementServiceConfig.ReadWrite.All",
+                    "BitlockerKey.Read.All",
+                    "User.Read.All"
+                )
+            }
+            globalSettings = [ordered]@{
+                operatingSystem = "Windows"
+                showLicenseBanner = $true
+                testMode = $false
+                configFile = ".\.secrets\config.json"
+                maxWaitTime = "30"
+                maxUserMatchDisplay = "10"
+                timeInSeconds = "60"
+                Release = "main"
+                Repo = "Github"
+                appMode = "helpdesk"
+            }
+            requiredScopes = $requiredScopes
+            domains = [ordered]@{}
+        }
+        
+        # Convert to JSON and write to file
+        $settingsJson = $settings | ConvertTo-Json -Depth 10
+        Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
+        Write-Verbose "[$functionName] Created comprehensive settings.json with requiredScopes"
         
         $success = $true
         
@@ -852,6 +840,15 @@ function Ensure-StringsJsonExists {
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Ensuring strings.json exists: $StringsFile"
     
+    # Helper function for safe logging
+    function Write-SafeLog {
+        param($Message, $LogLevel = "Information")
+        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
+            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
+        }
+        Write-Verbose "[$functionName] $Message"
+    }
+    
     try {
         if (Test-Path -Path $StringsFile) {
             Write-Verbose "[$functionName] Strings file already exists: $StringsFile"
@@ -864,11 +861,11 @@ function Ensure-StringsJsonExists {
             Write-Host "Creating default strings.json file..." -ForegroundColor White
         }
         
-        # Use the existing Get-StringsFromJson function defaults
-        $defaultStrings = @{
+        # Create default strings.json using ordered dictionary with comprehensive structure
+        $defaultStrings = [ordered]@{
             Description = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
             version = "1.1.0.0"
-            returnValues = @{
+            returnValues = [ordered]@{
                 unknownErrorMessage = "An unknown error occurred."
                 deviceActionPendingMessage = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."
                 backoutText = "Returning to previous menu"
@@ -914,11 +911,11 @@ function Ensure-StringsJsonExists {
                 "10002" = "Some updates were installed"
                 "1003" = "Updates failed to install"
             }
-            deviceStates = @{
+            deviceStates = [ordered]@{
                 Ready = "The device is ready for the next user"
                 NotReady = "The device is not ready for the next user"
             }
-            deviceActions = @{
+            deviceActions = [ordered]@{
                 none = "No action"
                 contactAdmin = "Contact an Intune administrator"
                 contactHelpdesk = "Contact the helpdesk"

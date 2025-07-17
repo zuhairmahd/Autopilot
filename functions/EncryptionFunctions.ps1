@@ -78,9 +78,9 @@ function Load-EncryptedConfigFile
                 
                 # Get the password
                 $userPassword = $null
-                if ($UseStoredPassword -and $script:UserEncryptionPassword) {
+                if ($UseStoredPassword -and ($script:UserEncryptionPassword -or $global:UserEncryptionPassword)) {
                     Write-Verbose "[$functionName] Using stored password from session"
-                    $userPassword = $script:UserEncryptionPassword
+                    $userPassword = if ($script:UserEncryptionPassword) { $script:UserEncryptionPassword } else { $global:UserEncryptionPassword }
                 } else {
                     # Prompt for password
                     $userPasswordSecure = Get-SecurePassword -Message "$PasswordPrompt (Attempt $retryCount of $MaxRetries)"
@@ -98,6 +98,7 @@ function Load-EncryptedConfigFile
                     
                     # Store the password for session use
                     $script:UserEncryptionPassword = $userPassword
+                    $global:UserEncryptionPassword = $userPassword
                     break
                 } else {
                     $errorMsg = "Decryption failed: $($decryptResult.ErrorMessage)"
