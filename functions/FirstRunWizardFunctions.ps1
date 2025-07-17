@@ -53,7 +53,17 @@ function Start-FirstRunWizard {
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting First Run Wizard" -LogLevel "Information"
+    
+    # Helper function for safe logging
+    function Write-SafeLog {
+        param($Message, $LogLevel = "Information")
+        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
+            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
+        }
+        Write-Verbose "[$functionName] $Message"
+    }
+    
+    Write-SafeLog "Starting First Run Wizard" "Information"
     Write-Verbose "[$functionName] Starting First Run Wizard"
     
     try {
@@ -75,20 +85,20 @@ function Start-FirstRunWizard {
         }
         
         # Step 1: Collect basic configuration
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Collecting basic configuration parameters" -LogLevel "Information"
+        Write-SafeLog "Collecting basic configuration parameters" "Information"
         $config = Get-BasicConfigurationFromUser -Silent:$Silent
         
         if (-not $config) {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to collect basic configuration" -LogLevel "Error"
+            Write-SafeLog "Failed to collect basic configuration" "Error"
             return $false
         }
         
         # Step 2: Collect authentication configuration
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Collecting authentication configuration" -LogLevel "Information"
+        Write-SafeLog "Collecting authentication configuration" "Information"
         $authConfig = Get-AuthenticationConfigurationFromUser -Silent:$Silent
         
         if (-not $authConfig) {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to collect authentication configuration" -LogLevel "Error"
+            Write-SafeLog "Failed to collect authentication configuration" "Error"
             return $false
         }
         
@@ -103,28 +113,28 @@ function Start-FirstRunWizard {
         }
         
         # Step 4: Create and encrypt configuration file
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Creating configuration file at: $ConfigFile" -LogLevel "Information"
+        Write-SafeLog "Creating configuration file at: $ConfigFile" "Information"
         $configCreated = New-ConfigurationFile -ConfigFile $ConfigFile -ConfigData $finalConfig -Silent:$Silent
         
         if (-not $configCreated) {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to create configuration file" -LogLevel "Error"
+            Write-SafeLog "Failed to create configuration file" "Error"
             return $false
         }
         
         # Step 5: Ensure settings.json exists with defaults
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Ensuring settings.json exists with defaults" -LogLevel "Information"
+        Write-SafeLog "Ensuring settings.json exists with defaults" "Information"
         $settingsCreated = Ensure-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent
         
         if (-not $settingsCreated) {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to ensure settings.json exists" -LogLevel "Warning"
+            Write-SafeLog "Failed to ensure settings.json exists" "Warning"
         }
         
         # Step 6: Ensure strings.json exists with defaults
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Ensuring strings.json exists with defaults" -LogLevel "Information"
+        Write-SafeLog "Ensuring strings.json exists with defaults" "Information"
         $stringsCreated = Ensure-StringsJsonExists -StringsFile $StringsFile -Silent:$Silent
         
         if (-not $stringsCreated) {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to ensure strings.json exists" -LogLevel "Warning"
+            Write-SafeLog "Failed to ensure strings.json exists" "Warning"
         }
         
         # Step 7: Display completion message
@@ -141,11 +151,11 @@ function Start-FirstRunWizard {
             Write-Host "`nYou can now run the application normally." -ForegroundColor White
         }
         
-        Write-Log -LogFile $LogFile -Module $functionName -Message "First Run Wizard completed successfully" -LogLevel "Information"
+        Write-SafeLog "First Run Wizard completed successfully" "Information"
         return $true
         
     } catch {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "First Run Wizard failed with error: $($_.Exception.Message)" -LogLevel "Error"
+        Write-SafeLog "First Run Wizard failed with error: $($_.Exception.Message)" "Error"
         Write-Host "An error occurred during setup: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error details: $($_.Exception.StackTrace)"
         return $false
@@ -174,7 +184,17 @@ function Get-BasicConfigurationFromUser {
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Collecting basic configuration parameters"
+    
+    # Helper function for safe logging
+    function Write-SafeLog {
+        param($Message, $LogLevel = "Information")
+        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
+            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
+        }
+        Write-Verbose "[$functionName] $Message"
+    }
+    
+    Write-SafeLog "Collecting basic configuration parameters"
     
     $config = @{}
     
@@ -187,7 +207,7 @@ function Get-BasicConfigurationFromUser {
         do {
             if ($Silent) {
                 $appId = "00000000-0000-0000-0000-000000000000"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Using default App ID in silent mode" -LogLevel "Information"
+                Write-SafeLog "Using default App ID in silent mode" "Information"
                 break
             }
             
@@ -209,13 +229,14 @@ function Get-BasicConfigurationFromUser {
         } while ($true)
         
         $config.AppId = $appId
-        Write-Log -LogFile $LogFile -Module $functionName -Message "App ID collected: $appId" -LogLevel "Debug"
+        Write-SafeLog "App ID collected: $appId" "Debug"
+        Write-Verbose "[$functionName] App ID collected: $appId"
         
         # Collect Tenant ID
         do {
             if ($Silent) {
                 $tenantId = "00000000-0000-0000-0000-000000000000"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Using default Tenant ID in silent mode" -LogLevel "Information"
+                Write-SafeLog "Using default Tenant ID in silent mode" "Information"
                 break
             }
             
@@ -236,13 +257,16 @@ function Get-BasicConfigurationFromUser {
         } while ($true)
         
         $config.TenantId = $tenantId
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Tenant ID collected: $tenantId" -LogLevel "Debug"
+        if ($LogFile) {
+            Write-SafeLog "Tenant ID collected: $tenantId" "Debug"
+        }
+        Write-Verbose "[$functionName] Tenant ID collected: $tenantId"
         
         # Collect Domain Name
         do {
             if ($Silent) {
                 $domain = "example.com"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Using default domain in silent mode" -LogLevel "Information"
+                Write-SafeLog "Using default domain in silent mode" "Information"
                 break
             }
             
@@ -264,13 +288,16 @@ function Get-BasicConfigurationFromUser {
         } while ($true)
         
         $config.domain = $domain
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Domain collected: $domain" -LogLevel "Debug"
+        if ($LogFile) {
+            Write-SafeLog "Domain collected: $domain" "Debug"
+        }
+        Write-Verbose "[$functionName] Domain collected: $domain"
         
         Write-Verbose "[$functionName] Basic configuration collected successfully"
         return $config
         
     } catch {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error collecting basic configuration: $($_.Exception.Message)" -LogLevel "Error"
+        Write-SafeLog "Error collecting basic configuration: $($_.Exception.Message)" "Error"
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $null
     }
@@ -298,7 +325,17 @@ function Get-AuthenticationConfigurationFromUser {
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Collecting authentication configuration"
+    
+    # Helper function for safe logging
+    function Write-SafeLog {
+        param($Message, $LogLevel = "Information")
+        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
+            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
+        }
+        Write-Verbose "[$functionName] $Message"
+    }
+    
+    Write-SafeLog "Collecting authentication configuration"
     
     $authConfig = @{
         AppSecret = ""
@@ -318,7 +355,7 @@ function Get-AuthenticationConfigurationFromUser {
         $authType = ""
         if ($Silent) {
             $authType = "1"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Using delegated authentication in silent mode" -LogLevel "Information"
+            Write-SafeLog "Using delegated authentication in silent mode" "Information"
         } else {
             do {
                 $authType = Read-Host "Enter your choice (1 or 2)"
@@ -329,7 +366,7 @@ function Get-AuthenticationConfigurationFromUser {
             } while ($true)
         }
         
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Authentication type selected: $authType" -LogLevel "Debug"
+        Write-SafeLog "Authentication type selected: $authType" "Debug"
         
         if ($authType -eq "1") {
             # Delegated Authentication
@@ -343,7 +380,7 @@ function Get-AuthenticationConfigurationFromUser {
             $credType = ""
             if ($Silent) {
                 $credType = "1"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Using app secret in silent mode" -LogLevel "Information"
+                Write-SafeLog "Using app secret in silent mode" "Information"
             } else {
                 do {
                     $credType = Read-Host "Enter your choice (1 or 2)"
@@ -358,7 +395,7 @@ function Get-AuthenticationConfigurationFromUser {
                 # App Secret
                 if ($Silent) {
                     $authConfig.AppSecret = "default_app_secret_placeholder"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Using default app secret in silent mode" -LogLevel "Information"
+                    Write-SafeLog "Using default app secret in silent mode" "Information"
                 } else {
                     do {
                         $appSecret = Read-Host "Enter your App Secret" -AsSecureString
@@ -378,7 +415,7 @@ function Get-AuthenticationConfigurationFromUser {
                 if ($Silent) {
                     $authConfig.Thumbprint = "0000000000000000000000000000000000000000"
                     $authConfig.Subject = "CN=DefaultCertificate"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Using default certificate in silent mode" -LogLevel "Information"
+                    Write-SafeLog "Using default certificate in silent mode" "Information"
                 } else {
                     do {
                         $thumbprint = Read-Host "Enter your Certificate Thumbprint"
@@ -422,7 +459,7 @@ function Get-AuthenticationConfigurationFromUser {
         return $authConfig
         
     } catch {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error collecting authentication configuration: $($_.Exception.Message)" -LogLevel "Error"
+        Write-SafeLog "Error collecting authentication configuration: $($_.Exception.Message)" "Error"
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $null
     }
@@ -470,7 +507,7 @@ function New-ConfigurationFile {
         if (-not (Test-Path -Path $configDir)) {
             Write-Verbose "[$functionName] Creating directory: $configDir"
             New-Item -Path $configDir -ItemType Directory -Force | Out-Null
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Created directory: $configDir" -LogLevel "Information"
+            Write-SafeLog "Created directory: $configDir" "Information"
         }
         
         # Create the configuration JSON
@@ -479,7 +516,7 @@ function New-ConfigurationFile {
         # Write the configuration to file
         Write-Verbose "[$functionName] Writing configuration to file"
         Set-Content -Path $ConfigFile -Value $configJson -Encoding UTF8 -Force
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file created: $ConfigFile" -LogLevel "Information"
+        Write-SafeLog "Configuration file created: $ConfigFile" "Information"
         
         # Encrypt the file
         if (-not $Silent) {
@@ -490,7 +527,7 @@ function New-ConfigurationFile {
         $encryptionPassword = ""
         if ($Silent) {
             $encryptionPassword = "DefaultPassword123!"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Using default encryption password in silent mode" -LogLevel "Information"
+            Write-SafeLog "Using default encryption password in silent mode" "Information"
         } else {
             do {
                 $encryptionPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt your configuration file" -RequireConfirmation
@@ -516,7 +553,7 @@ function New-ConfigurationFile {
         
         if ($encryptResult.Success) {
             Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file encrypted successfully" -LogLevel "Information"
+            Write-SafeLog "Configuration file encrypted successfully" "Information"
             
             # Store the password for session use
             $script:UserEncryptionPassword = $encryptionPassword
@@ -524,12 +561,12 @@ function New-ConfigurationFile {
             return $true
         } else {
             Write-Host "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -LogLevel "Error"
+            Write-SafeLog "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" "Error"
             return $false
         }
         
     } catch {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error creating configuration file: $($_.Exception.Message)" -LogLevel "Error"
+        Write-SafeLog "Error creating configuration file: $($_.Exception.Message)" "Error"
         Write-Host "Error creating configuration file: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $false
@@ -574,7 +611,7 @@ function Ensure-SettingsJsonExists {
     try {
         if (Test-Path -Path $SettingsFile) {
             Write-Verbose "[$functionName] Settings file already exists: $SettingsFile"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file already exists: $SettingsFile" -LogLevel "Information"
+            Write-SafeLog "Settings file already exists: $SettingsFile" "Information"
             return $true
         }
         
@@ -639,16 +676,16 @@ function Ensure-SettingsJsonExists {
         
         if ($success) {
             Write-Host "Settings file created successfully." -ForegroundColor Green
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file created successfully: $SettingsFile" -LogLevel "Information"
+            Write-SafeLog "Settings file created successfully: $SettingsFile" "Information"
             return $true
         } else {
             Write-Host "Failed to create settings file." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to create settings file: $SettingsFile" -LogLevel "Error"
+            Write-SafeLog "Failed to create settings file: $SettingsFile" "Error"
             return $false
         }
         
     } catch {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error ensuring settings.json exists: $($_.Exception.Message)" -LogLevel "Error"
+        Write-SafeLog "Error ensuring settings.json exists: $($_.Exception.Message)" "Error"
         Write-Host "Error creating settings file: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $false
@@ -688,7 +725,7 @@ function Ensure-StringsJsonExists {
     try {
         if (Test-Path -Path $StringsFile) {
             Write-Verbose "[$functionName] Strings file already exists: $StringsFile"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Strings file already exists: $StringsFile" -LogLevel "Information"
+            Write-SafeLog "Strings file already exists: $StringsFile" "Information"
             return $true
         }
         
@@ -764,11 +801,11 @@ function Ensure-StringsJsonExists {
         Set-Content -Path $StringsFile -Value $stringsJson -Encoding UTF8 -Force
         
         Write-Host "Strings file created successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Strings file created successfully: $StringsFile" -LogLevel "Information"
+        Write-SafeLog "Strings file created successfully: $StringsFile" "Information"
         return $true
         
     } catch {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error ensuring strings.json exists: $($_.Exception.Message)" -LogLevel "Error"
+        Write-SafeLog "Error ensuring strings.json exists: $($_.Exception.Message)" "Error"
         Write-Host "Error creating strings file: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $false
