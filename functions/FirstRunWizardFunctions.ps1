@@ -107,10 +107,26 @@ function Start-FirstRunWizard {
             domain = $config.domain
             TenantId = $config.TenantId
             AppId = $config.AppId
-            AppSecret = $authConfig.AppSecret
-            Thumbprint = $authConfig.Thumbprint
-            Subject = $authConfig.Subject
         }
+        
+        # Add authentication credentials based on type
+        if ($authConfig.IsDelegated) {
+            $finalConfig.delegatedCredentials = @{
+                refresh_token = ""
+                scope = @()
+            }
+        } else {
+            $finalConfig.appCredentials = @{
+                AppSecret = $authConfig.AppSecret
+                Thumbprint = $authConfig.Thumbprint
+                Subject = $authConfig.Subject
+            }
+        }
+        
+        # Legacy fields for backward compatibility
+        $finalConfig.AppSecret = $authConfig.AppSecret
+        $finalConfig.Thumbprint = $authConfig.Thumbprint
+        $finalConfig.Subject = $authConfig.Subject
         
         # Step 4: Create and encrypt configuration file
         Write-SafeLog "Creating configuration file at: $ConfigFile" "Information"
@@ -655,6 +671,7 @@ function New-ConfigurationFile {
             
             # Store the password for session use
             $global:UserEncryptionPassword = $encryptionPassword
+            $script:UserEncryptionPassword = $encryptionPassword
             
             return $true
         } else {

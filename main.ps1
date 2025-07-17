@@ -116,49 +116,12 @@ if (Test-Path $configFile)
     
     $configContent = $loadResult.Content
     
-    # Generate a temporary encryption key for in-memory use
-    $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
-    Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Generated temporary encryption key for in-memory operations" -LogLevel "Debug"
-    
-    # Re-encrypt the content with the temporary key for in-memory use
-    $tempFile = [System.IO.Path]::GetTempFileName()
-    try
-    {
-        Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
-        $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
-        
-        if ($tempEncryptResult.Success)
-        {
-            Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Content re-encrypted with temporary key for in-memory use" -LogLevel "Debug"
-            # Store the encrypted content for later use during the session
-            $script:TempEncryptedConfig = $tempEncryptResult.Content
-            $script:TempEncryptionKey = $tempEncryptionKey
-        }
-        else
-        {
-            Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)" -LogLevel "Error"
-            # Continue without temporary encryption but with a warning
-        }
+    # Setup temporary encryption for in-memory access
+    $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
+    if (-not $tempEncryptionResult) {
+        Write-Warning "Temporary encryption setup failed, some features may not work properly"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
     }
-    catch
-    {
-        Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Error during temporary encryption setup: $($_.Exception.Message)" -LogLevel "Error"
-    }
-    finally
-    {
-        # Clean up temporary file
-        if (Test-Path $tempFile)
-        {
-            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-        }
-    }
-    
-    # Clear the user password from memory
-    Clear-SecureMemory -Variables @("tempEncryptionKey")
     
     # Parse the configuration content
     $configJson = ConvertFrom-Json $configContent
@@ -200,10 +163,20 @@ else
             
             $configContent = $loadResult.Content
             
+            # Setup temporary encryption for in-memory access
+            $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
+            if (-not $tempEncryptionResult) {
+                Write-Warning "Temporary encryption setup failed, some features may not work properly"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
+            }
+            
             # Parse the configuration content
             $configJson = ConvertFrom-Json $configContent
             $domain = $configJson.domain
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+            
+            # Clear the config content from memory
+            $configContent = $null
         } else {
             Write-Host "Configuration file was not created successfully." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
