@@ -123,7 +123,7 @@ function Start-FirstRunWizard {
         
         # Step 5: Ensure settings.json exists with defaults
         Write-SafeLog "Ensuring settings.json exists with defaults" "Information"
-        $settingsCreated = Ensure-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent
+        $settingsCreated = Ensure-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated
         
         if (-not $settingsCreated) {
             Write-SafeLog "Failed to ensure settings.json exists" "Warning"
@@ -341,6 +341,8 @@ function Get-AuthenticationConfigurationFromUser {
         AppSecret = ""
         Thumbprint = ""
         Subject = ""
+        AuthType = ""
+        IsDelegated = $true
     }
     
     try {
@@ -367,6 +369,15 @@ function Get-AuthenticationConfigurationFromUser {
         }
         
         Write-SafeLog "Authentication type selected: $authType" "Debug"
+        
+        # Set authentication type flags
+        if ($authType -eq "1") {
+            $authConfig.AuthType = "Delegated"
+            $authConfig.IsDelegated = $true
+        } else {
+            $authConfig.AuthType = "Application"
+            $authConfig.IsDelegated = $false
+        }
         
         if ($authType -eq "1") {
             # Delegated Authentication
@@ -450,9 +461,79 @@ function Get-AuthenticationConfigurationFromUser {
                 }
             }
         } else {
-            # Application Authentication - typically doesn't need additional credentials
-            Write-Host "`nApplication Authentication Selected" -ForegroundColor Green
-            Write-Host "Note: Application authentication uses the app registration's configured credentials." -ForegroundColor Yellow
+            # Application Authentication - still needs credentials
+            if (-not $Silent) {
+                Write-Host "`nApplication Authentication Selected" -ForegroundColor Green
+                Write-Host "Choose your credential type:" -ForegroundColor White
+                Write-Host "1. App Secret" -ForegroundColor White
+                Write-Host "2. Certificate (Thumbprint)" -ForegroundColor White
+            }
+            
+            $credType = ""
+            if ($Silent) {
+                $credType = "1"
+                Write-SafeLog "Using app secret for application authentication in silent mode" "Information"
+            } else {
+                do {
+                    $credType = Read-Host "Enter your choice (1 or 2)"
+                    if ($credType -in @("1", "2")) {
+                        break
+                    }
+                    Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
+                } while ($true)
+            }
+            
+            if ($credType -eq "1") {
+                # App Secret
+                if ($Silent) {
+                    $authConfig.AppSecret = "default_app_secret_placeholder"
+                    Write-SafeLog "Using default app secret for application authentication in silent mode" "Information"
+                } else {
+                    do {
+                        $appSecret = Read-Host "Enter your App Secret" -AsSecureString
+                        $appSecretPlain = ConvertFrom-SecureString-ToPlainText -SecureString $appSecret
+                        
+                        if ([string]::IsNullOrWhiteSpace($appSecretPlain)) {
+                            Write-Host "App Secret cannot be empty. Please try again." -ForegroundColor Red
+                            continue
+                        }
+                        
+                        $authConfig.AppSecret = $appSecretPlain
+                        break
+                    } while ($true)
+                }
+            } else {
+                # Certificate
+                if ($Silent) {
+                    $authConfig.Thumbprint = "0000000000000000000000000000000000000000"
+                    $authConfig.Subject = "CN=DefaultCertificate"
+                    Write-SafeLog "Using default certificate for application authentication in silent mode" "Information"
+                } else {
+                    do {
+                        $thumbprint = Read-Host "Enter your Certificate Thumbprint"
+                        
+                        if ([string]::IsNullOrWhiteSpace($thumbprint)) {
+                            Write-Host "Certificate Thumbprint cannot be empty. Please try again." -ForegroundColor Red
+                            continue
+                        }
+                        
+                        $authConfig.Thumbprint = $thumbprint
+                        break
+                    } while ($true)
+                    
+                    do {
+                        $subject = Read-Host "Enter your Certificate Subject (e.g., CN=MyCertificate)"
+                        
+                        if ([string]::IsNullOrWhiteSpace($subject)) {
+                            Write-Host "Certificate Subject cannot be empty. Please try again." -ForegroundColor Red
+                            continue
+                        }
+                        
+                        $authConfig.Subject = $subject
+                        break
+                    } while ($true)
+                }
+            }
         }
         
         Write-Verbose "[$functionName] Authentication configuration collected successfully"
@@ -602,7 +683,11 @@ function Ensure-SettingsJsonExists {
         [Parameter(Mandatory = $true)]
         [string]$SettingsFile,
         
-        [switch]$Silent
+        [switch]$Silent,
+        
+        [string]$AuthType = "Delegated",
+        
+        [bool]$IsDelegated = $true
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -627,13 +712,48 @@ function Ensure-SettingsJsonExists {
             # Copy the existing template
             Copy-Item -Path $templateSettingsPath -Destination $SettingsFile -Force
             Write-Verbose "[$functionName] Copied existing settings.json template"
+            
+            # Update the authentication settings in the copied file
+            $settingsContent = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
+            
+            # Add auth section if it doesn't exist or update if it does
+            if (-not $settingsContent.auth) {
+                $settingsContent | Add-Member -NotePropertyName "auth" -NotePropertyValue @{
+                    Delegated = $IsDelegated
+                    authType = "PublicAuthFlow"
+                    renewalLeadTime = 5
+                    NoSaveRefreshToken = $false
+                    SecureString = $false
+                    ForceNewToken = $false
+                    CacheType = "Memory"
+                    scope = @(
+                        "offline_access",
+                        "openid",
+                        "Device.ReadWrite.All",
+                        "DeviceManagementApps.Read.All",
+                        "DeviceManagementConfiguration.ReadWrite.All",
+                        "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                        "DeviceManagementManagedDevices.ReadWrite.All",
+                        "DeviceManagementServiceConfig.ReadWrite.All"
+                    )
+                }
+                Write-Verbose "[$functionName] Added auth section with Delegated: $IsDelegated"
+            } else {
+                $settingsContent.auth.Delegated = $IsDelegated
+                Write-Verbose "[$functionName] Updated Delegated setting to: $IsDelegated"
+            }
+            
+            # Save the updated settings back to the file
+            $settingsJson = $settingsContent | ConvertTo-Json -Depth 10
+            Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
+            Write-Verbose "[$functionName] Updated settings file with authentication type: $AuthType"
         } else {
             # Create a basic settings.json with minimal structure
             $basicSettings = @{
                 description = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
                 version = "1.1.0.0"
                 auth = @{
-                    Delegated = $true
+                    Delegated = $IsDelegated
                     authType = "PublicAuthFlow"
                     renewalLeadTime = 5
                     NoSaveRefreshToken = $false
@@ -662,6 +782,16 @@ function Ensure-SettingsJsonExists {
                     Release = "master"
                     Repo = "Github"
                     appMode = "full"
+                    requiredScopes = @(
+                        "offline_access",
+                        "openid",
+                        "Device.ReadWrite.All",
+                        "DeviceManagementApps.Read.All",
+                        "DeviceManagementConfiguration.ReadWrite.All",
+                        "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                        "DeviceManagementManagedDevices.ReadWrite.All",
+                        "DeviceManagementServiceConfig.ReadWrite.All"
+                    )
                 }
                 domains = @{}
             }
