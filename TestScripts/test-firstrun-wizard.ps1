@@ -115,7 +115,7 @@ try {
     
     # Test Get-AuthenticationConfigurationFromUser in silent mode
     $authConfig = Get-AuthenticationConfigurationFromUser -Silent
-    if ($authConfig -and $authConfig.AppSecret) {
+    if ($authConfig -and ($authConfig.AuthType -eq "Delegated") -and ($authConfig.IsDelegated -eq $true)) {
         Write-Host "✓ Get-AuthenticationConfigurationFromUser works in silent mode" -ForegroundColor Green
     } else {
         Write-Host "✗ Get-AuthenticationConfigurationFromUser failed in silent mode" -ForegroundColor Red

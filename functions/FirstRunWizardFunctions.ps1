@@ -139,7 +139,7 @@ function Start-FirstRunWizard {
         
         # Step 5: Ensure settings.json exists with defaults
         Write-SafeLog "Ensuring settings.json exists with defaults" "Information"
-        $settingsCreated = Ensure-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated
+        $settingsCreated = Ensure-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $config.domain
         
         if (-not $settingsCreated) {
             Write-SafeLog "Failed to ensure settings.json exists" "Warning"
@@ -396,86 +396,12 @@ function Get-AuthenticationConfigurationFromUser {
         }
         
         if ($authType -eq "1") {
-            # Delegated Authentication
+            # Delegated Authentication - no credentials needed from user
             if (-not $Silent) {
                 Write-Host "`nDelegated Authentication Selected" -ForegroundColor Green
-                Write-Host "Choose your credential type:" -ForegroundColor White
-                Write-Host "1. App Secret" -ForegroundColor White
-                Write-Host "2. Certificate (Thumbprint)" -ForegroundColor White
+                Write-Host "Note: Delegated authentication uses interactive sign-in. No app secrets or certificates required." -ForegroundColor Yellow
             }
-            
-            $credType = ""
-            if ($Silent) {
-                $credType = "1"
-                Write-SafeLog "Using app secret in silent mode" "Information"
-            } else {
-                do {
-                    $credType = Read-Host "Enter your choice (1 or 2)"
-                    if ($credType -in @("1", "2")) {
-                        break
-                    }
-                    Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
-                } while ($true)
-            }
-            
-            if ($credType -eq "1") {
-                # App Secret
-                if ($Silent) {
-                    $authConfig.AppSecret = "default_app_secret_placeholder"
-                    Write-SafeLog "Using default app secret in silent mode" "Information"
-                } else {
-                    do {
-                        $appSecret = Read-Host "Enter your App Secret" -AsSecureString
-                        $appSecretPlain = ConvertFrom-SecureString-ToPlainText -SecureString $appSecret
-                        
-                        if ([string]::IsNullOrWhiteSpace($appSecretPlain)) {
-                            Write-Host "App Secret cannot be empty. Please try again." -ForegroundColor Red
-                            continue
-                        }
-                        
-                        $authConfig.AppSecret = $appSecretPlain
-                        break
-                    } while ($true)
-                }
-            } else {
-                # Certificate
-                if ($Silent) {
-                    $authConfig.Thumbprint = "0000000000000000000000000000000000000000"
-                    $authConfig.Subject = "CN=DefaultCertificate"
-                    Write-SafeLog "Using default certificate in silent mode" "Information"
-                } else {
-                    do {
-                        $thumbprint = Read-Host "Enter your Certificate Thumbprint"
-                        
-                        if ([string]::IsNullOrWhiteSpace($thumbprint)) {
-                            Write-Host "Certificate Thumbprint cannot be empty. Please try again." -ForegroundColor Red
-                            continue
-                        }
-                        
-                        # Validate thumbprint format (40 hex characters)
-                        $thumbprintPattern = '^[0-9a-fA-F]{40}$'
-                        if ($thumbprint -notmatch $thumbprintPattern) {
-                            Write-Host "Invalid thumbprint format. Please enter a valid 40-character hex string." -ForegroundColor Red
-                            continue
-                        }
-                        
-                        $authConfig.Thumbprint = $thumbprint
-                        break
-                    } while ($true)
-                    
-                    do {
-                        $subject = Read-Host "Enter your Certificate Subject (e.g., CN=MyCertificate)"
-                        
-                        if ([string]::IsNullOrWhiteSpace($subject)) {
-                            Write-Host "Certificate Subject cannot be empty. Please try again." -ForegroundColor Red
-                            continue
-                        }
-                        
-                        $authConfig.Subject = $subject
-                        break
-                    } while ($true)
-                }
-            }
+            Write-SafeLog "Delegated authentication configured - no additional credentials required" "Information"
         } else {
             # Application Authentication - still needs credentials
             if (-not $Silent) {
@@ -708,6 +634,9 @@ function Ensure-SettingsJsonExists {
     .PARAMETER Silent
         If specified, skips confirmation prompts.
     
+    .PARAMETER DomainName
+        The domain name to use for domain-specific configuration defaults.
+    
     .OUTPUTS
         System.Boolean
         Returns $true if the file exists or was created successfully, $false otherwise.
@@ -721,7 +650,9 @@ function Ensure-SettingsJsonExists {
         
         [string]$AuthType = "Delegated",
         
-        [bool]$IsDelegated = $true
+        [bool]$IsDelegated = $true,
+        
+        [string]$DomainName = "example.com"
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -799,7 +730,15 @@ function Ensure-SettingsJsonExists {
                 appMode = "helpdesk"
             }
             requiredScopes = $requiredScopes
-            domains = [ordered]@{}
+            domains = [ordered]@{
+                $DomainName = [ordered]@{
+                    groupsToInclude = @()
+                    groupsToExclude = @()
+                    settings = [ordered]@{
+                        domain = $DomainName
+                    }
+                }
+            }
         }
         
         # Convert to JSON and write to file
