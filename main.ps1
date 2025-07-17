@@ -159,7 +159,6 @@ if (Test-Path $configFile)
     
     # Clear the user password from memory
     Clear-SecureMemory -Variables @("tempEncryptionKey")
-    }
     
     # Parse the configuration content
     $configJson = ConvertFrom-Json $configContent
