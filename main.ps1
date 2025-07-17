@@ -313,8 +313,90 @@ if (Test-Path $configFile)
 }
 else
 {
+    # Configuration file not found - launch first run wizard
     Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Host "Please create a configuration file or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Information"
+    
+    Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
+    
+    # Launch the first run wizard
+    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
+    
+    if ($wizardResult) {
+        Write-Host "First run wizard completed successfully." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
+        
+        # Now try to load the newly created configuration
+        Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
+        
+        # Re-run the configuration loading logic
+        if (Test-Path $configFile) {
+            # Check if the config file is encrypted
+            $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFile
+            
+            if (-not $encryptionStatus.IsValidFile) {
+                Write-Host "Configuration file exists but cannot be read: $($encryptionStatus.ErrorMessage)" -ForegroundColor Red
+                Write-Host "Please check file permissions and try again." -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($encryptionStatus.ErrorMessage)" -LogLevel "Error"
+                exit 1
+            }
+            
+            if ($encryptionStatus.IsEncrypted) {
+                Write-Host "Please enter your password to continue with the newly created configuration." -ForegroundColor Cyan
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Prompting for password to decrypt newly created configuration" -LogLevel "Information"
+                
+                # Use the stored password from the wizard if available
+                if ($script:UserEncryptionPassword) {
+                    Write-Verbose "[$scriptName] Using password from wizard session"
+                    $userPassword = $script:UserEncryptionPassword
+                } else {
+                    # Prompt for password
+                    $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password"
+                    $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+                }
+                
+                # Decrypt the file in memory
+                $decryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword -Decrypt -InMemoryOnly
+                
+                if ($decryptResult.Success) {
+                    Write-Verbose "[$scriptName] Configuration file decrypted successfully."
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file decrypted successfully" -LogLevel "Information"
+                    $configContent = $decryptResult.Content
+                    
+                    # Parse the configuration content
+                    $configJson = ConvertFrom-Json $configContent
+                    $domain = $configJson.domain
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+                    
+                    # Store the user password for later use during authentication
+                    $script:UserEncryptionPassword = $userPassword
+                    
+                    # Clear the user password from memory
+                    Clear-SecureMemory -Variables @("userPassword")
+                } else {
+                    Write-Host "Failed to decrypt configuration file: $($decryptResult.ErrorMessage)" -ForegroundColor Red
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to decrypt configuration file: $($decryptResult.ErrorMessage)" -LogLevel "Error"
+                    exit 1
+                }
+            } else {
+                # File is not encrypted - read directly
+                $configContent = Get-Content -Path $configFile -Raw -Encoding UTF8
+                $configJson = ConvertFrom-Json $configContent
+                $domain = $configJson.domain
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+            }
+        } else {
+            Write-Host "Configuration file was not created successfully." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+            exit 1
+        }
+    } else {
+        Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
+        Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+        exit 1
+    }
 }
 if (Test-Path -Path $InitFile)
 {
