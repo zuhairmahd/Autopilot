@@ -101,14 +101,14 @@ if (-not (Test-Path $secretsDir))
 # Initialize variables for encryption handling
 $configContent = $null
 $userPassword = $null
-$tempEncryptionKey = $null
 
 if (Test-Path $configFile)
 {
     # Load the encrypted configuration file
     $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your encryption password"
     
-    if (-not $loadResult.Success) {
+    if (-not $loadResult.Success)
+    {
         Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
         Write-Host "Please check file permissions and try again." -ForegroundColor Red
         exit 1
@@ -118,7 +118,8 @@ if (Test-Path $configFile)
     
     # Setup temporary encryption for in-memory access
     $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
-    if (-not $tempEncryptionResult) {
+    if (-not $tempEncryptionResult)
+    {
         Write-Warning "Temporary encryption setup failed, some features may not work properly"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
     }
@@ -141,7 +142,8 @@ else
     # Launch the first run wizard
     $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
     
-    if ($wizardResult) {
+    if ($wizardResult)
+    {
         Write-Host "First run wizard completed successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
         
@@ -150,11 +152,13 @@ else
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
         
         # Re-run the configuration loading logic
-        if (Test-Path $configFile) {
+        if (Test-Path $configFile)
+        {
             # Load the encrypted configuration file
             $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your encryption password"
             
-            if (-not $loadResult.Success) {
+            if (-not $loadResult.Success)
+            {
                 Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($loadResult.ErrorMessage)" -LogLevel "Error"
@@ -165,7 +169,8 @@ else
             
             # Setup temporary encryption for in-memory access
             $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
-            if (-not $tempEncryptionResult) {
+            if (-not $tempEncryptionResult)
+            {
                 Write-Warning "Temporary encryption setup failed, some features may not work properly"
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
             }
@@ -177,12 +182,16 @@ else
             
             # Clear the config content from memory
             $configContent = $null
-        } else {
+        }
+        else
+        {
             Write-Host "Configuration file was not created successfully." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
             exit 1
         }
-    } else {
+    }
+    else
+    {
         Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
         Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow

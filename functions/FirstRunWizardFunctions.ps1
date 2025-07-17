@@ -1,4 +1,16 @@
-function Start-FirstRunWizard {
+# Helper function for safe logging
+function Write-SafeLog()
+{
+    param($Message, $LogLevel = "Information")
+    if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue))
+    {
+        Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
+    }
+    Write-Verbose "[$functionName] $Message"
+}
+
+function Start-FirstRunWizard()
+{
     <#
     .SYNOPSIS
         Launches the first run wizard to set up initial configuration for the Autopilot application.
@@ -53,22 +65,14 @@ function Start-FirstRunWizard {
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    
-    # Helper function for safe logging
-    function Write-SafeLog {
-        param($Message, $LogLevel = "Information")
-        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
-            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
-        }
-        Write-Verbose "[$functionName] $Message"
-    }
-    
     Write-SafeLog "Starting First Run Wizard" "Information"
     Write-Verbose "[$functionName] Starting First Run Wizard"
     
-    try {
+    try
+    {
         # Display welcome message
-        if (-not $Silent) {
+        if (-not $Silent)
+        {
             Write-Host "`n" -ForegroundColor Green
             Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Green
             Write-Host "                    Welcome to the Autopilot First Run Wizard                  " -ForegroundColor Green  
@@ -88,7 +92,8 @@ function Start-FirstRunWizard {
         Write-SafeLog "Collecting basic configuration parameters" "Information"
         $config = Get-BasicConfigurationFromUser -Silent:$Silent
         
-        if (-not $config) {
+        if (-not $config)
+        {
             Write-SafeLog "Failed to collect basic configuration" "Error"
             return $false
         }
@@ -97,29 +102,27 @@ function Start-FirstRunWizard {
         Write-SafeLog "Collecting authentication configuration" "Information"
         $authConfig = Get-AuthenticationConfigurationFromUser -Silent:$Silent
         
-        if (-not $authConfig) {
+        if (-not $authConfig)
+        {
             Write-SafeLog "Failed to collect authentication configuration" "Error"
             return $false
         }
         
         # Step 3: Merge configurations
         $finalConfig = @{
-            domain = $config.domain
+            domain   = $config.domain
             TenantId = $config.TenantId
-            AppId = $config.AppId
+            AppId    = $config.AppId
+            Name     = $config.Name
         }
         
         # Add authentication credentials based on type
-        if ($authConfig.IsDelegated) {
-            $finalConfig.delegatedCredentials = @{
-                refresh_token = ""
-                scope = @()
-            }
-        } else {
+        if (-not ($authConfig.IsDelegated))
+        {
             $finalConfig.appCredentials = @{
-                AppSecret = $authConfig.AppSecret
+                AppSecret  = $authConfig.AppSecret
                 Thumbprint = $authConfig.Thumbprint
-                Subject = $authConfig.Subject
+                Subject    = $authConfig.Subject
             }
         }
         
@@ -132,29 +135,33 @@ function Start-FirstRunWizard {
         Write-SafeLog "Creating configuration file at: $ConfigFile" "Information"
         $configCreated = New-ConfigurationFile -ConfigFile $ConfigFile -ConfigData $finalConfig -Silent:$Silent
         
-        if (-not $configCreated) {
+        if (-not $configCreated)
+        {
             Write-SafeLog "Failed to create configuration file" "Error"
             return $false
         }
         
         # Step 5: Ensure settings.json exists with defaults
         Write-SafeLog "Ensuring settings.json exists with defaults" "Information"
-        $settingsCreated = Ensure-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $config.domain
+        $settingsCreated = Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $config.domain
         
-        if (-not $settingsCreated) {
+        if (-not $settingsCreated)
+        {
             Write-SafeLog "Failed to ensure settings.json exists" "Warning"
         }
         
         # Step 6: Ensure strings.json exists with defaults
         Write-SafeLog "Ensuring strings.json exists with defaults" "Information"
-        $stringsCreated = Ensure-StringsJsonExists -StringsFile $StringsFile -Silent:$Silent
+        $stringsCreated = Test-StringsJsonExists -StringsFile $StringsFile -Silent:$Silent
         
-        if (-not $stringsCreated) {
+        if (-not $stringsCreated)
+        {
             Write-SafeLog "Failed to ensure strings.json exists" "Warning"
         }
         
         # Step 7: Display completion message
-        if (-not $Silent) {
+        if (-not $Silent)
+        {
             Write-Host "`n" -ForegroundColor Green
             Write-Host "═══════════════════════════════════════════════════════════════════════════════" -ForegroundColor Green
             Write-Host "                          Setup Complete!                                       " -ForegroundColor Green
@@ -170,7 +177,9 @@ function Start-FirstRunWizard {
         Write-SafeLog "First Run Wizard completed successfully" "Information"
         return $true
         
-    } catch {
+    }
+    catch
+    {
         Write-SafeLog "First Run Wizard failed with error: $($_.Exception.Message)" "Error"
         Write-Host "An error occurred during setup: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error details: $($_.Exception.StackTrace)"
@@ -178,7 +187,8 @@ function Start-FirstRunWizard {
     }
 }
 
-function Get-BasicConfigurationFromUser {
+function Get-BasicConfigurationFromUser()
+{
     <#
     .SYNOPSIS
         Collects basic configuration parameters from the user.
@@ -201,27 +211,22 @@ function Get-BasicConfigurationFromUser {
     
     $functionName = $MyInvocation.MyCommand.Name
     
-    # Helper function for safe logging
-    function Write-SafeLog {
-        param($Message, $LogLevel = "Information")
-        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
-            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
-        }
-        Write-Verbose "[$functionName] $Message"
-    }
-    
     Write-SafeLog "Collecting basic configuration parameters"
     
     $config = @{}
     
-    try {
-        if (-not $Silent) {
+    try
+    {
+        if (-not $Silent)
+        {
             Write-Host "`n── Basic Configuration ──" -ForegroundColor Cyan
         }
         
         # Collect App ID
-        do {
-            if ($Silent) {
+        do
+        {
+            if ($Silent)
+            {
                 $appId = "00000000-0000-0000-0000-000000000000"
                 Write-SafeLog "Using default App ID in silent mode" "Information"
                 break
@@ -229,14 +234,16 @@ function Get-BasicConfigurationFromUser {
             
             $appId = Read-Host "Enter your Azure AD Application ID (GUID format)"
             
-            if ([string]::IsNullOrWhiteSpace($appId)) {
+            if ([string]::IsNullOrWhiteSpace($appId))
+            {
                 Write-Host "Application ID cannot be empty. Please try again." -ForegroundColor Red
                 continue
             }
             
             # Validate GUID format
             $guidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            if ($appId -notmatch $guidPattern) {
+            if ($appId -notmatch $guidPattern)
+            {
                 Write-Host "Invalid GUID format. Please enter a valid Application ID." -ForegroundColor Red
                 continue
             }
@@ -249,8 +256,10 @@ function Get-BasicConfigurationFromUser {
         Write-Verbose "[$functionName] App ID collected: $appId"
         
         # Collect Tenant ID
-        do {
-            if ($Silent) {
+        do
+        {
+            if ($Silent)
+            {
                 $tenantId = "00000000-0000-0000-0000-000000000000"
                 Write-SafeLog "Using default Tenant ID in silent mode" "Information"
                 break
@@ -258,13 +267,15 @@ function Get-BasicConfigurationFromUser {
             
             $tenantId = Read-Host "Enter your Azure AD Tenant ID (GUID format)"
             
-            if ([string]::IsNullOrWhiteSpace($tenantId)) {
+            if ([string]::IsNullOrWhiteSpace($tenantId))
+            {
                 Write-Host "Tenant ID cannot be empty. Please try again." -ForegroundColor Red
                 continue
             }
             
             # Validate GUID format
-            if ($tenantId -notmatch $guidPattern) {
+            if ($tenantId -notmatch $guidPattern)
+            {
                 Write-Host "Invalid GUID format. Please enter a valid Tenant ID." -ForegroundColor Red
                 continue
             }
@@ -273,14 +284,17 @@ function Get-BasicConfigurationFromUser {
         } while ($true)
         
         $config.TenantId = $tenantId
-        if ($LogFile) {
+        if ($LogFile)
+        {
             Write-SafeLog "Tenant ID collected: $tenantId" "Debug"
         }
         Write-Verbose "[$functionName] Tenant ID collected: $tenantId"
         
         # Collect Domain Name
-        do {
-            if ($Silent) {
+        do
+        {
+            if ($Silent)
+            {
                 $domain = "example.com"
                 Write-SafeLog "Using default domain in silent mode" "Information"
                 break
@@ -288,14 +302,16 @@ function Get-BasicConfigurationFromUser {
             
             $domain = Read-Host "Enter your domain name (e.g., contoso.com)"
             
-            if ([string]::IsNullOrWhiteSpace($domain)) {
+            if ([string]::IsNullOrWhiteSpace($domain))
+            {
                 Write-Host "Domain name cannot be empty. Please try again." -ForegroundColor Red
                 continue
             }
             
             # Basic domain validation
             $domainPattern = '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
-            if ($domain -notmatch $domainPattern) {
+            if ($domain -notmatch $domainPattern)
+            {
                 Write-Host "Invalid domain format. Please enter a valid domain name." -ForegroundColor Red
                 continue
             }
@@ -304,22 +320,53 @@ function Get-BasicConfigurationFromUser {
         } while ($true)
         
         $config.domain = $domain
-        if ($LogFile) {
+        if ($LogFile)
+        {
             Write-SafeLog "Domain collected: $domain" "Debug"
         }
         Write-Verbose "[$functionName] Domain collected: $domain"
+
+        #collect appname.
+        do
+        {
+            if ($Silent)
+            {
+                $appName = "Intune Helpdesk"
+                Write-SafeLog "Using default application name in silent mode" "Information"
+                break
+            }
+            
+            $appName = Read-Host "Enter your Azure registered application name (e.g., Intune Helpdesk)"
+            
+            if ([string]::IsNullOrWhiteSpace($appName))
+            {
+                Write-Host "Application name cannot be empty. Please try again." -ForegroundColor Red
+                continue
+            }
+            
+            break
+        } while ($true)
+        $config.Name = $appName
+        if ($LogFile)
+        {
+            Write-SafeLog "Application name collected: $appName" "Debug"
+        }
+        Write-Verbose "[$functionName] Application name collected: $appName"
         
         Write-Verbose "[$functionName] Basic configuration collected successfully"
         return $config
         
-    } catch {
+    }
+    catch
+    {
         Write-SafeLog "Error collecting basic configuration: $($_.Exception.Message)" "Error"
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $null
     }
 }
 
-function Get-AuthenticationConfigurationFromUser {
+function Get-AuthenticationConfigurationFromUser()
+{
     <#
     .SYNOPSIS
         Collects authentication configuration parameters from the user.
@@ -342,27 +389,20 @@ function Get-AuthenticationConfigurationFromUser {
     
     $functionName = $MyInvocation.MyCommand.Name
     
-    # Helper function for safe logging
-    function Write-SafeLog {
-        param($Message, $LogLevel = "Information")
-        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
-            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
-        }
-        Write-Verbose "[$functionName] $Message"
-    }
-    
     Write-SafeLog "Collecting authentication configuration"
     
     $authConfig = @{
-        AppSecret = ""
-        Thumbprint = ""
-        Subject = ""
-        AuthType = ""
+        AppSecret   = ""
+        Thumbprint  = ""
+        Subject     = ""
+        AuthType    = ""
         IsDelegated = $true
     }
     
-    try {
-        if (-not $Silent) {
+    try
+    {
+        if (-not $Silent)
+        {
             Write-Host "`n── Authentication Configuration ──" -ForegroundColor Cyan
             Write-Host "Choose your authentication method:" -ForegroundColor White
             Write-Host "1. Delegated Authentication (recommended for interactive use)" -ForegroundColor White
@@ -371,13 +411,18 @@ function Get-AuthenticationConfigurationFromUser {
         
         # Get authentication type
         $authType = ""
-        if ($Silent) {
+        if ($Silent)
+        {
             $authType = "1"
             Write-SafeLog "Using delegated authentication in silent mode" "Information"
-        } else {
-            do {
+        }
+        else
+        {
+            do
+            {
                 $authType = Read-Host "Enter your choice (1 or 2)"
-                if ($authType -in @("1", "2")) {
+                if ($authType -in @("1", "2"))
+                {
                     break
                 }
                 Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
@@ -387,24 +432,32 @@ function Get-AuthenticationConfigurationFromUser {
         Write-SafeLog "Authentication type selected: $authType" "Debug"
         
         # Set authentication type flags
-        if ($authType -eq "1") {
+        if ($authType -eq "1")
+        {
             $authConfig.AuthType = "Delegated"
             $authConfig.IsDelegated = $true
-        } else {
+        }
+        else
+        {
             $authConfig.AuthType = "Application"
             $authConfig.IsDelegated = $false
         }
         
-        if ($authType -eq "1") {
+        if ($authType -eq "1")
+        {
             # Delegated Authentication - no credentials needed from user
-            if (-not $Silent) {
+            if (-not $Silent)
+            {
                 Write-Host "`nDelegated Authentication Selected" -ForegroundColor Green
                 Write-Host "Note: Delegated authentication uses interactive sign-in. No app secrets or certificates required." -ForegroundColor Yellow
             }
             Write-SafeLog "Delegated authentication configured - no additional credentials required" "Information"
-        } else {
+        }
+        else
+        {
             # Application Authentication - still needs credentials
-            if (-not $Silent) {
+            if (-not $Silent)
+            {
                 Write-Host "`nApplication Authentication Selected" -ForegroundColor Green
                 Write-Host "Choose your credential type:" -ForegroundColor White
                 Write-Host "1. App Secret" -ForegroundColor White
@@ -412,30 +465,41 @@ function Get-AuthenticationConfigurationFromUser {
             }
             
             $credType = ""
-            if ($Silent) {
+            if ($Silent)
+            {
                 $credType = "1"
                 Write-SafeLog "Using app secret for application authentication in silent mode" "Information"
-            } else {
-                do {
+            }
+            else
+            {
+                do
+                {
                     $credType = Read-Host "Enter your choice (1 or 2)"
-                    if ($credType -in @("1", "2")) {
+                    if ($credType -in @("1", "2"))
+                    {
                         break
                     }
                     Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
                 } while ($true)
             }
             
-            if ($credType -eq "1") {
+            if ($credType -eq "1")
+            {
                 # App Secret
-                if ($Silent) {
+                if ($Silent)
+                {
                     $authConfig.AppSecret = "default_app_secret_placeholder"
                     Write-SafeLog "Using default app secret for application authentication in silent mode" "Information"
-                } else {
-                    do {
+                }
+                else
+                {
+                    do
+                    {
                         $appSecret = Read-Host "Enter your App Secret" -AsSecureString
                         $appSecretPlain = ConvertFrom-SecureString-ToPlainText -SecureString $appSecret
                         
-                        if ([string]::IsNullOrWhiteSpace($appSecretPlain)) {
+                        if ([string]::IsNullOrWhiteSpace($appSecretPlain))
+                        {
                             Write-Host "App Secret cannot be empty. Please try again." -ForegroundColor Red
                             continue
                         }
@@ -444,17 +508,24 @@ function Get-AuthenticationConfigurationFromUser {
                         break
                     } while ($true)
                 }
-            } else {
+            }
+            else
+            {
                 # Certificate
-                if ($Silent) {
+                if ($Silent)
+                {
                     $authConfig.Thumbprint = "0000000000000000000000000000000000000000"
                     $authConfig.Subject = "CN=DefaultCertificate"
                     Write-SafeLog "Using default certificate for application authentication in silent mode" "Information"
-                } else {
-                    do {
+                }
+                else
+                {
+                    do
+                    {
                         $thumbprint = Read-Host "Enter your Certificate Thumbprint"
                         
-                        if ([string]::IsNullOrWhiteSpace($thumbprint)) {
+                        if ([string]::IsNullOrWhiteSpace($thumbprint))
+                        {
                             Write-Host "Certificate Thumbprint cannot be empty. Please try again." -ForegroundColor Red
                             continue
                         }
@@ -463,10 +534,12 @@ function Get-AuthenticationConfigurationFromUser {
                         break
                     } while ($true)
                     
-                    do {
+                    do
+                    {
                         $subject = Read-Host "Enter your Certificate Subject (e.g., CN=MyCertificate)"
                         
-                        if ([string]::IsNullOrWhiteSpace($subject)) {
+                        if ([string]::IsNullOrWhiteSpace($subject))
+                        {
                             Write-Host "Certificate Subject cannot be empty. Please try again." -ForegroundColor Red
                             continue
                         }
@@ -481,14 +554,17 @@ function Get-AuthenticationConfigurationFromUser {
         Write-Verbose "[$functionName] Authentication configuration collected successfully"
         return $authConfig
         
-    } catch {
+    }
+    catch
+    {
         Write-SafeLog "Error collecting authentication configuration: $($_.Exception.Message)" "Error"
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $null
     }
 }
 
-function New-ConfigurationFile {
+function New-ConfigurationFile()
+{
     <#
     .SYNOPSIS
         Creates and encrypts a new configuration file with the provided data.
@@ -524,10 +600,12 @@ function New-ConfigurationFile {
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Creating configuration file: $ConfigFile"
     
-    try {
+    try
+    {
         # Ensure the directory exists
         $configDir = Split-Path -Path $ConfigFile -Parent
-        if (-not (Test-Path -Path $configDir)) {
+        if (-not (Test-Path -Path $configDir))
+        {
             Write-Verbose "[$functionName] Creating directory: $configDir"
             New-Item -Path $configDir -ItemType Directory -Force | Out-Null
             Write-SafeLog "Created directory: $configDir" "Information"
@@ -542,21 +620,27 @@ function New-ConfigurationFile {
         Write-SafeLog "Configuration file created: $ConfigFile" "Information"
         
         # Encrypt the file
-        if (-not $Silent) {
+        if (-not $Silent)
+        {
             Write-Host "`n── Encryption Setup ──" -ForegroundColor Cyan
             Write-Host "Your configuration file needs to be encrypted for security." -ForegroundColor White
         }
         
         $encryptionPassword = ""
-        if ($Silent) {
+        if ($Silent)
+        {
             $encryptionPassword = "DefaultPassword123!"
             Write-SafeLog "Using default encryption password in silent mode" "Information"
-        } else {
-            do {
+        }
+        else
+        {
+            do
+            {
                 $encryptionPasswordSecure = Read-Host -Prompt "Enter a password to encrypt your configuration file" -AsSecureString
                 
                 # Validate password is not empty
-                if ($encryptionPasswordSecure.Length -eq 0) {
+                if ($encryptionPasswordSecure.Length -eq 0)
+                {
                     Write-Host "Encryption password cannot be empty. Please try again." -ForegroundColor Red
                     continue
                 }
@@ -564,7 +648,8 @@ function New-ConfigurationFile {
                 # Convert to plain text for length validation
                 $encryptionPassword = ConvertFrom-SecureString-ToPlainText -SecureString $encryptionPasswordSecure
                 
-                if ($encryptionPassword.Length -lt 8) {
+                if ($encryptionPassword.Length -lt 8)
+                {
                     Write-Host "Password must be at least 8 characters long. Please try again." -ForegroundColor Red
                     continue
                 }
@@ -573,7 +658,8 @@ function New-ConfigurationFile {
                 $confirmPasswordSecure = Read-Host -Prompt "Confirm password" -AsSecureString
                 $confirmPassword = ConvertFrom-SecureString-ToPlainText -SecureString $confirmPasswordSecure
                 
-                if ($encryptionPassword -ne $confirmPassword) {
+                if ($encryptionPassword -ne $confirmPassword)
+                {
                     Write-Host "Passwords do not match. Please try again." -ForegroundColor Red
                     continue
                 }
@@ -589,8 +675,10 @@ function New-ConfigurationFile {
         Write-Verbose "[$functionName] Encrypting configuration file"
         $encryptResult = Invoke-JsonFileEncryption -FilePath $ConfigFile -Key $encryptionPassword
         
-        if ($encryptResult.Success) {
-            if (-not $Silent) {
+        if ($encryptResult.Success)
+        {
+            if (-not $Silent)
+            {
                 Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
             }
             Write-SafeLog "Configuration file encrypted successfully" "Information"
@@ -600,26 +688,33 @@ function New-ConfigurationFile {
             $script:UserEncryptionPassword = $encryptionPassword
             
             return $true
-        } else {
+        }
+        else
+        {
             Write-Host "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
             Write-SafeLog "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" "Error"
             return $false
         }
-        
-    } catch {
+    }
+    catch
+    {
         Write-SafeLog "Error creating configuration file: $($_.Exception.Message)" "Error"
         Write-Host "Error creating configuration file: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         return $false
-    } finally {
+    }
+    finally
+    {
         # Clear sensitive data from memory
-        if ($encryptionPassword) {
+        if ($encryptionPassword)
+        {
             Clear-SecureMemory -Variables @("encryptionPassword")
         }
     }
 }
 
-function Ensure-SettingsJsonExists {
+function Test-SettingsJsonExists()
+{
     <#
     .SYNOPSIS
         Ensures that settings.json exists with default values.
@@ -657,24 +752,17 @@ function Ensure-SettingsJsonExists {
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Ensuring settings.json exists: $SettingsFile"
-    
-    # Helper function for safe logging
-    function Write-SafeLog {
-        param($Message, $LogLevel = "Information")
-        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
-            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
-        }
-        Write-Verbose "[$functionName] $Message"
-    }
-    
-    try {
-        if (Test-Path -Path $SettingsFile) {
+    try
+    {
+        if (Test-Path -Path $SettingsFile)
+        {
             Write-Verbose "[$functionName] Settings file already exists: $SettingsFile"
             Write-SafeLog "Settings file already exists: $SettingsFile" "Information"
             return $true
         }
         
-        if (-not $Silent) {
+        if (-not $Silent)
+        {
             Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan
             Write-Host "Creating default settings.json file..." -ForegroundColor White
         }
@@ -682,29 +770,33 @@ function Ensure-SettingsJsonExists {
         # Get the requiredScopes from init.json as the template
         $initJsonPath = "$PWD\init.json"
         $requiredScopes = @()
-        if (Test-Path $initJsonPath) {
-            try {
+        if (Test-Path $initJsonPath)
+        {
+            try
+            {
                 $initData = Get-Content -Path $initJsonPath -Raw | ConvertFrom-Json
                 $requiredScopes = $initData | Where-Object { $_.name -eq "requiredScopes" } | Select-Object -ExpandProperty value
                 Write-Verbose "[$functionName] Loaded requiredScopes from init.json: $($requiredScopes.Count) scopes"
-            } catch {
+            }
+            catch
+            {
                 Write-SafeLog "Warning: Could not load requiredScopes from init.json: $($_.Exception.Message)" "Warning"
             }
         }
         
         # Create comprehensive settings.json using ordered dictionary
         $settings = [ordered]@{
-            description = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version = "1.1.0.0"
-            auth = [ordered]@{
-                Delegated = $IsDelegated
-                authType = "PublicAuthFlow"
-                renewalLeadTime = 5
+            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+            version        = "1.1.0.0"
+            auth           = [ordered]@{
+                Delegated          = $IsDelegated
+                authType           = "PublicAuthFlow"
+                renewalLeadTime    = 5
                 NoSaveRefreshToken = $false
-                SecureString = $false
-                ForceNewToken = $false
-                CacheType = "Memory"
-                scope = @(
+                SecureString       = $false
+                ForceNewToken      = $false
+                CacheType          = "Memory"
+                scope              = @(
                     "offline_access",
                     "openid",
                     "Device.ReadWrite.All",
@@ -718,24 +810,39 @@ function Ensure-SettingsJsonExists {
                 )
             }
             globalSettings = [ordered]@{
-                operatingSystem = "Windows"
-                showLicenseBanner = $true
-                testMode = $false
-                configFile = ".\.secrets\config.json"
-                maxWaitTime = "30"
+                operatingSystem     = "Windows"
+                showLicenseBanner   = $true
+                testMode            = $false
+                configFile          = ".\.secrets\config.json"
+                maxWaitTime         = "30"
                 maxUserMatchDisplay = "10"
-                timeInSeconds = "60"
-                Release = "main"
-                Repo = "Github"
-                appMode = "helpdesk"
+                timeInSeconds       = "60"
+                Release             = "main"
+                Repo                = "Github"
+                appMode             = "helpdesk"
             }
             requiredScopes = $requiredScopes
-            domains = [ordered]@{
+            domains        = [ordered]@{
                 $DomainName = [ordered]@{
                     groupsToInclude = @()
                     groupsToExclude = @()
-                    settings = [ordered]@{
-                        domain = $DomainName
+                    settings        = [ordered]@{
+                        domain                          = $DomainName
+                        deviceNamePrefix                = ""
+                        operatingSystem                 = "Windows"
+                        MinUsernameLength               = 3
+                        MaxUserNameLength               = 50
+                        MaxSerialNumberLength           = 50
+                        MinSerialNumberLength           = 7
+                        MinimumDevicePhysicalMemoryInGB = 8
+                        maxNumberOfDevicesAllowed       = 15
+                        preferredBrowser                = "Chrome"
+                        privateSession                  = $false
+                        userPatternsToExclude           = @( 
+                            "-test",
+                            "onmicrosoft.com"
+                        )
+                        DesiredAutopilotProfiles        = @()
                     }
                 }
             }
@@ -748,17 +855,22 @@ function Ensure-SettingsJsonExists {
         
         $success = $true
         
-        if ($success) {
+        if ($success)
+        {
             Write-Host "Settings file created successfully." -ForegroundColor Green
             Write-SafeLog "Settings file created successfully: $SettingsFile" "Information"
             return $true
-        } else {
+        }
+        else
+        {
             Write-Host "Failed to create settings file." -ForegroundColor Red
             Write-SafeLog "Failed to create settings file: $SettingsFile" "Error"
             return $false
         }
         
-    } catch {
+    }
+    catch
+    {
         Write-SafeLog "Error ensuring settings.json exists: $($_.Exception.Message)" "Error"
         Write-Host "Error creating settings file: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
@@ -766,7 +878,8 @@ function Ensure-SettingsJsonExists {
     }
 }
 
-function Ensure-StringsJsonExists {
+function Test-StringsJsonExists()
+{
     <#
     .SYNOPSIS
         Ensures that strings.json exists with default values.
@@ -796,86 +909,80 @@ function Ensure-StringsJsonExists {
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Ensuring strings.json exists: $StringsFile"
     
-    # Helper function for safe logging
-    function Write-SafeLog {
-        param($Message, $LogLevel = "Information")
-        if ($script:LogFile -and (Get-Command Write-Log -ErrorAction SilentlyContinue)) {
-            Write-Log -Message $Message -LogFile $script:LogFile -Module $functionName -LogLevel $LogLevel
-        }
-        Write-Verbose "[$functionName] $Message"
-    }
-    
-    try {
-        if (Test-Path -Path $StringsFile) {
+    try
+    {
+        if (Test-Path -Path $StringsFile)
+        {
             Write-Verbose "[$functionName] Strings file already exists: $StringsFile"
             Write-SafeLog "Strings file already exists: $StringsFile" "Information"
             return $true
         }
         
-        if (-not $Silent) {
+        if (-not $Silent)
+        {
             Write-Host "`n── Strings Configuration ──" -ForegroundColor Cyan
             Write-Host "Creating default strings.json file..." -ForegroundColor White
         }
         
         # Create default strings.json using ordered dictionary with comprehensive structure
         $defaultStrings = [ordered]@{
-            Description = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
-            version = "1.1.0.0"
-            returnValues = [ordered]@{
-                unknownErrorMessage = "An unknown error occurred."
-                deviceActionPendingMessage = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."
-                backoutText = "Returning to previous menu"
-                invalidFileType = "Invalid file type."
-                UpdateCancelledMessage = "The update was cancelled."
-                noRestartMessage = "Device not restarted."
-                invalidJWTTokenMessage = "Invalid JWT token format. Expected at least 2 parts."
-                noLAPSFoundMessage = "No LAPS password found for this device."
-                EnrolledMessage = "The device is enrolled."
-                notContactedMessage = "The device has not contacted the enrollment service."
-                PendingResetMessage = "The device is pending a reset."
-                EnrollmentFailedMessage = "The device enrollment failed."
-                deviceNotAssignedMessage = "The device is not assigned to a deployment profile."
+            Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
+            version       = "1.1.0.0"
+            returnValues  = [ordered]@{
+                unknownErrorMessage            = "An unknown error occurred."
+                deviceActionPendingMessage     = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."
+                backoutText                    = "Returning to previous menu"
+                invalidFileType                = "Invalid file type."
+                UpdateCancelledMessage         = "The update was cancelled."
+                noRestartMessage               = "Device not restarted."
+                invalidJWTTokenMessage         = "Invalid JWT token format. Expected at least 2 parts."
+                noLAPSFoundMessage             = "No LAPS password found for this device."
+                EnrolledMessage                = "The device is enrolled."
+                notContactedMessage            = "The device has not contacted the enrollment service."
+                PendingResetMessage            = "The device is pending a reset."
+                EnrollmentFailedMessage        = "The device enrollment failed."
+                deviceNotAssignedMessage       = "The device is not assigned to a deployment profile."
                 deviceAssignmentPendingMessage = "The device is pending assignment to a deployment profile."
-                deviceNotInIntuneMessage = "The device is not in Intune."
-                noUserDeviceFoundMessage = "No user or device found."
-                noUserFoundInDirectoryMessage = "This user does not exist"
-                noBitLockerKeysFoundMessage = "No BitLocker keys found for this device."
-                noDeviceFound = "No device found"
-                deviceAssignedMessage = "The device is assigned to a deployment profile."
-                deviceUnknownActionMessage = "The action may still be in progress. You can check the device status in the Intune portal."
-                deviceImportSuccessMessage = "The device was imported successfully."
-                deviceImportFailedMessage = "The device import failed."
-                deviceDeleteSuccessMessage = "The device was deleted successfully."
-                deviceDeleteFailedMessage = "The device deletion failed."
-                deviceWipeSuccessMessage = "The device was wiped successfully."
-                deviceWipeFailedMessage = "The device wipe failed."
-                deviceSyncSuccessMessage = "The device sync was successful."
-                deviceSyncFailedMessage = "The device sync failed."
-                deviceRestartSuccessMessage = "The device was restarted successfully."
-                deviceRestartFailedMessage = "The device restart failed."
-                deviceCleanSuccessMessage = "The device was cleaned successfully."
-                deviceCleanFailedMessage = "The device clean failed."
-                serialNumberNotFoundMessage = "The serial number was not found."
-                UpdateFailedMessage = "Could not download update."
-                noAccessTokenMessage = "Could not obtain an access token. Please check your credentials."
-                UpdateSuccessMessage = "The script was updated successfully."
-                UpdateNotNeededMessage = "The script is already up to date."
-                userCanceledMessage = "Operation canceled by user"
-                "999" = "No updates were found"
-                "1000" = "All updates were installed"
-                "1001" = "Some updates were installed"
-                "10002" = "Some updates were installed"
-                "1003" = "Updates failed to install"
+                deviceNotInIntuneMessage       = "The device is not in Intune."
+                noUserDeviceFoundMessage       = "No user or device found."
+                noUserFoundInDirectoryMessage  = "This user does not exist"
+                noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
+                noDeviceFound                  = "No device found"
+                deviceAssignedMessage          = "The device is assigned to a deployment profile."
+                deviceUnknownActionMessage     = "The action may still be in progress. You can check the device status in the Intune portal."
+                deviceImportSuccessMessage     = "The device was imported successfully."
+                deviceImportFailedMessage      = "The device import failed."
+                deviceDeleteSuccessMessage     = "The device was deleted successfully."
+                deviceDeleteFailedMessage      = "The device deletion failed."
+                deviceWipeSuccessMessage       = "The device was wiped successfully."
+                deviceWipeFailedMessage        = "The device wipe failed."
+                deviceSyncSuccessMessage       = "The device sync was successful."
+                deviceSyncFailedMessage        = "The device sync failed."
+                deviceRestartSuccessMessage    = "The device was restarted successfully."
+                deviceRestartFailedMessage     = "The device restart failed."
+                deviceCleanSuccessMessage      = "The device was cleaned successfully."
+                deviceCleanFailedMessage       = "The device clean failed."
+                serialNumberNotFoundMessage    = "The serial number was not found."
+                UpdateFailedMessage            = "Could not download update."
+                noAccessTokenMessage           = "Could not obtain an access token. Please check your credentials."
+                UpdateSuccessMessage           = "The script was updated successfully."
+                UpdateNotNeededMessage         = "The script is already up to date."
+                userCanceledMessage            = "Operation canceled by user"
+                "999"                          = "No updates were found"
+                "1000"                         = "All updates were installed"
+                "1001"                         = "Some updates were installed"
+                "10002"                        = "Some updates were installed"
+                "1003"                         = "Updates failed to install"
             }
-            deviceStates = [ordered]@{
-                Ready = "The device is ready for the next user"
+            deviceStates  = [ordered]@{
+                Ready    = "The device is ready for the next user"
                 NotReady = "The device is not ready for the next user"
             }
             deviceActions = [ordered]@{
-                none = "No action"
-                contactAdmin = "Contact an Intune administrator"
+                none            = "No action"
+                contactAdmin    = "Contact an Intune administrator"
                 contactHelpdesk = "Contact the helpdesk"
-                WipeOrClean = "Wipe or clean the device"
+                WipeOrClean     = "Wipe or clean the device"
             }
         }
         
@@ -887,7 +994,9 @@ function Ensure-StringsJsonExists {
         Write-SafeLog "Strings file created successfully: $StringsFile" "Information"
         return $true
         
-    } catch {
+    }
+    catch
+    {
         Write-SafeLog "Error ensuring strings.json exists: $($_.Exception.Message)" "Error"
         Write-Host "Error creating strings file: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
