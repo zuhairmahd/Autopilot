@@ -335,8 +335,14 @@ if (Test-Path -Path $InitFile)
 else
 {
     Write-Host "Configuration file $initFile not found. Using default values."
-    # Set empty auth array to prevent errors
-    $auth = @{}
+    
+    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
+    if (-not $settingsCreated)
+    {
+            
+    }
+        
+
     # Set auth as a script variable so it can be accessed by functions
     $script:Auth = $auth
 }

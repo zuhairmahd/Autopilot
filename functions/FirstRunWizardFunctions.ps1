@@ -740,13 +740,9 @@ function Test-SettingsJsonExists()
     param(
         [Parameter(Mandatory = $true)]
         [string]$SettingsFile,
-        
         [switch]$Silent,
-        
         [string]$AuthType = "Delegated",
-        
         [bool]$IsDelegated = $true,
-        
         [string]$DomainName = "example.com"
     )
     
@@ -765,23 +761,6 @@ function Test-SettingsJsonExists()
         {
             Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan
             Write-Host "Creating default settings.json file..." -ForegroundColor White
-        }
-        
-        # Get the requiredScopes from init.json as the template
-        $initJsonPath = "$PWD\init.json"
-        $requiredScopes = @()
-        if (Test-Path $initJsonPath)
-        {
-            try
-            {
-                $initData = Get-Content -Path $initJsonPath -Raw | ConvertFrom-Json
-                $requiredScopes = $initData | Where-Object { $_.name -eq "requiredScopes" } | Select-Object -ExpandProperty value
-                Write-Verbose "[$functionName] Loaded requiredScopes from init.json: $($requiredScopes.Count) scopes"
-            }
-            catch
-            {
-                Write-SafeLog "Warning: Could not load requiredScopes from init.json: $($_.Exception.Message)" "Warning"
-            }
         }
         
         # Create comprehensive settings.json using ordered dictionary
@@ -821,7 +800,87 @@ function Test-SettingsJsonExists()
                 Repo                = "Github"
                 appMode             = "helpdesk"
             }
-            requiredScopes = $requiredScopes
+            requiredScopes = @(
+                @{
+                    Scope     = "User.Read.All"
+                    Reason    = "Required to read user profiles, group memberships, and registered devices."
+                    Endpoints = @(
+                        "/users",
+                        "users/{id}",
+                        "users/{id}/memberOf",
+                        "users/{id}/registeredDevices"
+                    )
+                },
+                @{
+                    Scope     = "Device.Read.All"
+                    Reason    = "Required to read Microsoft Entra ID device objects."
+                    Endpoints = @(
+                        "devices"
+                    )
+                },
+                @{
+                    Scope     = "DeviceManagementApps.ReadWrite.All"
+                    Reason    = "Required to read application information and manage app assignments."
+                    Endpoints = @(
+                        "deviceAppManagement/mobileApps",
+                        "deviceAppManagement/mobileApps/{id}/assignments"
+                    )
+                },
+                @{
+                    Scope     = "DeviceManagementConfiguration.Read.All"
+                    Reason    = "Required to read Intune device configuration policies."
+                    Endpoints = @(
+                        "deviceManagement/deviceConfigurations"
+                    )
+                },
+                @{
+                    Scope     = "DeviceManagementManagedDevices.Read.All"
+                    Reason    = "Required to read Intune managed device properties."
+                    Endpoints = @(
+                        "/deviceManagement/managedDevices",
+                        "deviceManagement/managedDevices/{id}"
+                    )
+                },
+                @{
+                    Scope     = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+                    Reason    = "Required for highly privileged operations, specifically to read local admin (LAPS) passwords."
+                    Endpoints = @(
+                        "directory/deviceLocalCredentials"
+                    )
+                },
+                @{
+                    Scope     = "DeviceManagementServiceConfig.ReadWrite.All"
+                    Reason    = "Required to read Autopilot events and to read and manage Autopilot device identities."
+                    Endpoints = @(
+                        "deviceManagement/autopilotEvents",
+                        "deviceManagement/importedWindowsAutopilotDeviceIdentities",
+                        "deviceManagement/windowsAutopilotDeviceIdentities"
+                    )
+                },
+                @{
+                    Scope     = "BitlockerKey.Read.All"
+                    Reason    = "Required to read BitLocker recovery keys for all devices."
+                    Endpoints = @(
+                        "informationProtection/bitlocker/recoveryKeys"
+                    )
+                },
+                @{
+                    Scope     = "openid"
+                    Reason    = "Standard scope required for user sign-in with OpenID Connect."
+                    Endpoints = @()
+                },
+                @{
+                    Scope     = "profile"
+                    Reason    = "Standard scope to get basic user profile information during sign-in."
+                    Endpoints = @()
+                },
+                @{
+                    Scope     = "offline_access"
+                    Reason    = "Standard scope that provides refresh tokens to maintain access when the user is not active."
+                    Endpoints = @()
+                }
+            )
+
             domains        = [ordered]@{
                 $DomainName = [ordered]@{
                     groupsToInclude = @()
