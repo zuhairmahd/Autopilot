@@ -92,7 +92,7 @@ if (Test-Path $oldExecutableFileName)
     Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
     Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
-    Remove-Item -Path "$oldExecutableFileName   " -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
 }
 #endregion Initialize script
 
