@@ -13,7 +13,7 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 - **Interactive Menu System**: User-friendly interface with navigation and context-aware options
 - **Autopilot Device Management**: Import devices into Autopilot with automated hash generation
 - **Device Status Monitoring**: Real-time device enrollment and readiness status checking
-- **User Verification**: Validate user readiness for device assignment based on group memberships
+- **User Verification**: Validate user readiness for device assignment based on group memberships and other criteria
 - **Bulk Operations**: Export device lists and perform batch operations
 - **Settings Management**: Configure application settings through interactive menus
 
@@ -25,8 +25,6 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 - **Automatic Encryption Setup**: First-run encryption setup with password confirmation
 - **Secure Password Handling**: PowerShell SecureString objects for sensitive data protection
 - **Principle of Least Privilege**: Minimal required permissions for operations
-- **Rotating Secret Keys**: Enhanced security through credential rotation
-- **Automatic Clipboard Integration**: LAPS passwords and BitLocker keys automatically copied to clipboard
 - **Enhanced Token Management**: Improved token validation and refresh mechanisms
 
 ### Operational Modes
@@ -37,7 +35,7 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 
 ### Additional Features
 
-- **Windows Updates Tracking**: Monitor and display Windows update history
+- **Windows Updates Tracking**: Apply Windows Updates while provisioning a device
 - **Enhanced Logging**: CMTrace format support with automatic log rotation
 - **Multi-Repository Support**: GitHub and GitLab repository integration
 
@@ -74,7 +72,7 @@ The First Run Wizard will guide you through:
 4. **File Creation**: Automatic creation and encryption of configuration files
 5. **Default Settings**: Generation of comprehensive `settings.json` and `strings.json` with sensible defaults
 
-**Required Information**: Have ready your Azure AD App ID, Tenant ID, domain name, and authentication credentials.
+**Required Information**: Have your Azure AD App ID, Tenant ID, domain name, and authentication credentials ready.
 
 ### 2. Manual Setup (Advanced Users Only)
 
@@ -88,7 +86,7 @@ The First Run Wizard will guide you through:
 
 ### 3. Authentication Configuration
 
-The script can use "Delegated" or "App" permissions to authenticate. Autopilot device registration operations can work with application permissions only, honoring the principle of least privilege. Other operations require you to use delegated authentication. Delegated authentication provides you with the ability to better audit operations executed by the app and allows dynamic scopes based on the user's existing roles.
+The script can use "Delegated" or "App" permissions to authenticate. Delegated authentication provides you with the ability to better audit operations executed by the app and allows dynamic scopes based on the user's existing roles.
 
 Create a `config.json` file in the `.secrets` folder with your Azure App Registration details:
 
@@ -98,8 +96,7 @@ Create a `config.json` file in the `.secrets` folder with your Azure App Registr
   "TenantId": "your-tenant-id",
   "AppId": "your-app-id",
   "AppSecret": "your-app-secret",
-  "Thumbprint": "your-cert-thumbprint",
-  "Subject": "your-certificate-subject"
+  "Thumbprint": "your-cert-thumbprint", 
 }
 ```
 
@@ -149,103 +146,6 @@ The authentication settings are configured in the `settings.json` file at the ro
 
 # Domain-specific configuration override
 .\main.ps1 -configFile "custom-config.json" -appMode "helpDesk"
-```
-
-#### Environment Setup
-```powershell
-# Switch to GAO configuration
-.\gao.bat
-
-# Switch to ZM configuration  
-.\zmc.bat
-```
-
-## Architecture
-
-### Function Loading System
-All PowerShell functions are dynamically loaded from the `/functions/` directory at startup using dot-sourcing. Functions are loaded alphabetically with no dependency resolution, so maintain independence between modules.
-
-### Configuration Hierarchy
-The application uses a three-tier configuration system:
-1. **Runtime Parameters** (highest priority)
-2. **Domain-Specific Settings** (`settings.json` → `domains[domain].settings`)
-3. **Global Settings** (`settings.json` → `globalSettings`)
-
-Configuration merging is handled by `MergeSettings` function in `/functions/SettingsHelperFunctions.ps1`.
-
-### Authentication Flow
-OAuth 2.0 implementation supports multiple authentication types:
-- **Interactive**: Browser-based user authentication
-- **PublicAuthFlow**: Public client MSAL authentication
-- **Private**: Confidential client with app secrets
-
-Token management includes automatic refresh, caching, and secure storage in encrypted `.secrets/config.json`.
-
-### Menu System Architecture
-Hierarchical menu navigation with stack-based history tracking:
-- `NewMenu` - Create menu objects
-- `AddMenuItem` - Add actions or submenus  
-- `ShowMenu` - Display and handle interactions
-- `Get-CallingContext` - Manage navigation context
-
-Menu state is maintained in global variables `$global:History` and `$global:MenuHistory`.
-
-## Key Modules
-
-### Core Function Modules (`/functions/`)
-- **AutopilotDeviceFunctions.ps1**: Device import, validation, assignment checking
-- **DeviceAndUserLookupFunctions.ps1**: User/device queries, BitLocker keys, LAPS credentials
-- **DeviceReportingFunctions.ps1**: Export functionality and reporting
-- **GraphAPIFunctions.ps1**: Authentication, token management, JWT handling
-- **MenuFunctions.ps1**: Interactive UI navigation system
-- **SettingsHelperFunctions.ps1**: Configuration management and merging
-- **EncryptionFunctions.ps1**: Secure configuration file handling
-
-### Configuration Files
-
-#### Automatically Created Files
-The First Run Wizard automatically creates these files with secure defaults:
-- **settings.json**: Main configuration with global and domain-specific settings, including comprehensive Microsoft Graph API scopes and operational parameters
-- **strings.json**: Localized messages and return values for all user-facing text
-- **.secrets/config.json**: Encrypted authentication credentials with password protection
-
-#### Template Files
-- **init.json**: Default configuration template used by the First Run Wizard
-- **config-sample.json**: Sample configuration file for reference (advanced users)
-
-## Testing
-
-### Testing Approach
-
-Tests are located in `/TestScripts/` and follow this pattern:
-1. Create isolated test environment
-2. Load specific function modules
-3. Execute test scenarios with validation
-4. Cleanup test environment
-
-Current test coverage focuses on configuration system and device selection functions.
-
-```powershell
-# Run configuration system tests
-.\TestScripts\test-settings-functions.ps1
-
-# Run device selection tests
-.\TestScripts\test-device-selection.ps1
-
-# Run all tests in test folder
-Get-ChildItem .\TestScripts\test-*.ps1 | ForEach-Object { & $_.FullName }
-```
-
-### Building and Deployment
-```powershell
-# Create signed release executable
-.\CreateRelease.ps1 -InputFile "main.ps1" -Version "1.2.3"
-
-# Create PowerShell module
-.\CreateRelease.ps1 -InputFile "main.ps1" -CreateModule
-
-# Build without version update
-.\CreateRelease.ps1 -InputFile "main.ps1" -NoVersionUpdate
 ```
 
 ## Usage
