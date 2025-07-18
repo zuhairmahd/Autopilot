@@ -394,7 +394,6 @@ function Get-AuthenticationConfigurationFromUser()
     $authConfig = @{
         AppSecret   = ""
         Thumbprint  = ""
-        Subject     = ""
         AuthType    = ""
         IsDelegated = $true
     }
@@ -515,7 +514,6 @@ function Get-AuthenticationConfigurationFromUser()
                 if ($Silent)
                 {
                     $authConfig.Thumbprint = "0000000000000000000000000000000000000000"
-                    $authConfig.Subject = "CN=DefaultCertificate"
                     Write-SafeLog "Using default certificate for application authentication in silent mode" "Information"
                 }
                 else
@@ -533,27 +531,12 @@ function Get-AuthenticationConfigurationFromUser()
                         $authConfig.Thumbprint = $thumbprint
                         break
                     } while ($true)
-                    
-                    do
-                    {
-                        $subject = Read-Host "Enter your Certificate Subject (e.g., CN=MyCertificate)"
-                        
-                        if ([string]::IsNullOrWhiteSpace($subject))
-                        {
-                            Write-Host "Certificate Subject cannot be empty. Please try again." -ForegroundColor Red
-                            continue
-                        }
-                        
-                        $authConfig.Subject = $subject
-                        break
-                    } while ($true)
                 }
             }
         }
         
         Write-Verbose "[$functionName] Authentication configuration collected successfully"
         return $authConfig
-        
     }
     catch
     {
