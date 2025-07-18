@@ -6,11 +6,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a PowerShell-based Windows Autopilot device enrollment tool that integrates with Microsoft Graph API to manage Intune device registration. The application provides a menu-driven interface for helpdesk operations including device assignment, status checking, and Autopilot management.
 
-## Development Commands
+## Getting Started
+
+### First Run Setup
+The application includes an interactive setup wizard that automatically launches when configuration files are missing:
+
+```powershell
+# First time running the application
+.\main.ps1
+```
+
+The First Run Wizard will guide you through:
+1. **Azure AD Configuration**: App ID, Tenant ID, Domain Name, and Application Name
+2. **Authentication Setup**: Choose between delegated (interactive) or application (service) authentication
+3. **Credential Collection**: App secrets or certificate details for application authentication
+4. **File Creation**: Automatic creation and encryption of configuration files
+5. **Default Settings**: Generation of comprehensive `settings.json` and `strings.json` with sensible defaults
+
+**Required Information**: Have ready your Azure AD App ID, Tenant ID, domain name, and authentication credentials.
 
 ### Running the Application
 ```powershell
-# Standard execution
+# Standard execution (launches wizard if first run)
 .\main.ps1
 
 # Development/testing with specific configuration
@@ -98,10 +115,23 @@ Menu state is maintained in global variables `$global:History` and `$global:Menu
 - **EncryptionFunctions.ps1**: Secure configuration file handling
 
 ### Configuration Files
-- **settings.json**: Main configuration with global and domain-specific settings
-- **strings.json**: Localized messages and return values
-- **.secrets/config.json**: Encrypted authentication credentials (use `config-sample.json` as template)
-- **init.json**: Default configuration template
+
+#### Automatically Created Files
+The First Run Wizard automatically creates these files with secure defaults:
+- **settings.json**: Main configuration with global and domain-specific settings, including comprehensive Microsoft Graph API scopes and operational parameters
+- **strings.json**: Localized messages and return values for all user-facing text
+- **.secrets/config.json**: Encrypted authentication credentials with password protection
+
+#### Template Files
+- **init.json**: Default configuration template used by the First Run Wizard
+- **config-sample.json**: Sample configuration file for reference (advanced users)
+
+#### First Run Wizard Features
+- **Automatic Detection**: Detects missing configuration files and launches setup wizard
+- **Interactive Setup**: Guides users through Azure AD app registration and authentication setup
+- **Secure Encryption**: Encrypts sensitive configuration data with user-defined password
+- **Comprehensive Defaults**: Creates fully functional configurations with all required scopes and settings
+- **Authentication Options**: Supports both delegated (interactive) and application (service) authentication flows
 
 ## Microsoft Graph API Integration
 
@@ -146,3 +176,38 @@ The application supports multiple domains with specific settings:
 - **arabictutor.com**: Test environment with different device naming conventions
 
 Each domain can override global settings for device naming, group memberships, Autopilot profiles, and security restrictions.
+
+## Advanced Configuration
+
+### Manual Configuration Setup
+*Note: Manual configuration is only needed for advanced scenarios. The First Run Wizard handles standard setups automatically.*
+
+#### Manual Config File Creation
+For advanced users who need custom configuration:
+
+1. **Create the secrets directory**:
+   ```powershell
+   New-Item -Path ".secrets" -ItemType Directory -Force
+   ```
+
+2. **Create config.json from template**:
+   ```powershell
+   Copy-Item "config-sample.json" ".secrets\config.json"
+   ```
+
+3. **Encrypt the configuration file**:
+   Use the encryption functions in `EncryptionFunctions.ps1` to secure your credentials.
+
+#### Custom Settings Configuration
+Advanced users can manually customize `settings.json` for:
+- Complex domain-specific configurations
+- Custom authentication scopes
+- Specialized device naming patterns
+- Advanced group filtering rules
+
+#### Manual Authentication Setup
+For environments requiring specific authentication configurations:
+- Certificate-based authentication with custom certificate stores
+- Proxy authentication scenarios
+- Custom token caching strategies
+- Multi-tenant configurations

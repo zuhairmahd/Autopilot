@@ -58,7 +58,27 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 
 ## Setup Instructions
 
-### 1. Initial Setup
+### 1. First Run Setup (Recommended)
+
+The application includes an interactive setup wizard that automatically launches when configuration files are missing:
+
+```powershell
+# First time running the application
+.\main.ps1
+```
+
+The First Run Wizard will guide you through:
+1. **Azure AD Configuration**: App ID, Tenant ID, Domain Name, and Application Name
+2. **Authentication Setup**: Choose between delegated (interactive) or application (service) authentication
+3. **Credential Collection**: App secrets or certificate details for application authentication
+4. **File Creation**: Automatic creation and encryption of configuration files
+5. **Default Settings**: Generation of comprehensive `settings.json` and `strings.json` with sensible defaults
+
+**Required Information**: Have ready your Azure AD App ID, Tenant ID, domain name, and authentication credentials.
+
+### 2. Manual Setup (Advanced Users Only)
+
+*Note: Manual configuration is only needed for advanced scenarios. The First Run Wizard handles standard setups automatically.*
 
 1. **Clone or download** the script files to a local directory
 2. **Create the secrets folder**: Create a `.secrets` folder in the script directory
@@ -66,7 +86,7 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 4. **Configure application settings**: Ensure `settings.json` is configured for your environment
 5. **Set up encryption**: On first run, the script will prompt you to encrypt your configuration file
 
-### 2. Authentication Configuration
+### 3. Authentication Configuration
 
 The script can use "Delegated" or "App" permissions to authenticate. Autopilot device registration operations can work with application permissions only, honoring the principle of least privilege. Other operations require you to use delegated authentication. Delegated authentication provides you with the ability to better audit operations executed by the app and allows dynamic scopes based on the user's existing roles.
 
@@ -115,11 +135,118 @@ The authentication settings are configured in the `settings.json` file at the ro
 }
 ```
 
-### 3. First Run
+### 4. Running the Application
 
-1. Open PowerShell and navigate to the script directory
-2. Run: `./main.ps1`
-3. Follow the menu prompts
+```powershell
+# Standard execution (launches wizard if first run)
+.\main.ps1
+
+# Development/testing with specific configuration
+.\main.ps1 -appMode "test" -Verbose -LogLevel "Debug"
+
+# Force authentication refresh
+.\main.ps1 -ForceNewToken -Deligated
+
+# Domain-specific configuration override
+.\main.ps1 -configFile "custom-config.json" -appMode "helpDesk"
+```
+
+#### Environment Setup
+```powershell
+# Switch to GAO configuration
+.\gao.bat
+
+# Switch to ZM configuration  
+.\zmc.bat
+```
+
+## Architecture
+
+### Function Loading System
+All PowerShell functions are dynamically loaded from the `/functions/` directory at startup using dot-sourcing. Functions are loaded alphabetically with no dependency resolution, so maintain independence between modules.
+
+### Configuration Hierarchy
+The application uses a three-tier configuration system:
+1. **Runtime Parameters** (highest priority)
+2. **Domain-Specific Settings** (`settings.json` → `domains[domain].settings`)
+3. **Global Settings** (`settings.json` → `globalSettings`)
+
+Configuration merging is handled by `MergeSettings` function in `/functions/SettingsHelperFunctions.ps1`.
+
+### Authentication Flow
+OAuth 2.0 implementation supports multiple authentication types:
+- **Interactive**: Browser-based user authentication
+- **PublicAuthFlow**: Public client MSAL authentication
+- **Private**: Confidential client with app secrets
+
+Token management includes automatic refresh, caching, and secure storage in encrypted `.secrets/config.json`.
+
+### Menu System Architecture
+Hierarchical menu navigation with stack-based history tracking:
+- `NewMenu` - Create menu objects
+- `AddMenuItem` - Add actions or submenus  
+- `ShowMenu` - Display and handle interactions
+- `Get-CallingContext` - Manage navigation context
+
+Menu state is maintained in global variables `$global:History` and `$global:MenuHistory`.
+
+## Key Modules
+
+### Core Function Modules (`/functions/`)
+- **AutopilotDeviceFunctions.ps1**: Device import, validation, assignment checking
+- **DeviceAndUserLookupFunctions.ps1**: User/device queries, BitLocker keys, LAPS credentials
+- **DeviceReportingFunctions.ps1**: Export functionality and reporting
+- **GraphAPIFunctions.ps1**: Authentication, token management, JWT handling
+- **MenuFunctions.ps1**: Interactive UI navigation system
+- **SettingsHelperFunctions.ps1**: Configuration management and merging
+- **EncryptionFunctions.ps1**: Secure configuration file handling
+
+### Configuration Files
+
+#### Automatically Created Files
+The First Run Wizard automatically creates these files with secure defaults:
+- **settings.json**: Main configuration with global and domain-specific settings, including comprehensive Microsoft Graph API scopes and operational parameters
+- **strings.json**: Localized messages and return values for all user-facing text
+- **.secrets/config.json**: Encrypted authentication credentials with password protection
+
+#### Template Files
+- **init.json**: Default configuration template used by the First Run Wizard
+- **config-sample.json**: Sample configuration file for reference (advanced users)
+
+## Testing
+
+### Testing Approach
+
+Tests are located in `/TestScripts/` and follow this pattern:
+1. Create isolated test environment
+2. Load specific function modules
+3. Execute test scenarios with validation
+4. Cleanup test environment
+
+Current test coverage focuses on configuration system and device selection functions.
+
+```powershell
+# Run configuration system tests
+.\TestScripts\test-settings-functions.ps1
+
+# Run device selection tests
+.\TestScripts\test-device-selection.ps1
+
+# Run all tests in test folder
+Get-ChildItem .\TestScripts\test-*.ps1 | ForEach-Object { & $_.FullName }
+```
+
+### Building and Deployment
+```powershell
+# Create signed release executable
+.\CreateRelease.ps1 -InputFile "main.ps1" -Version "1.2.3"
+
+# Create PowerShell module
+.\CreateRelease.ps1 -InputFile "main.ps1" -CreateModule
+
+# Build without version update
+.\CreateRelease.ps1 -InputFile "main.ps1" -NoVersionUpdate
+```
 
 ## Usage
 
@@ -297,7 +424,25 @@ Each domain can have specific configuration:
 - `groupsToExclude`: Array of groups that users should not be a part of, otherwise their enrollment may fail
 - `settings`: Domain-specific overrides for global settings. You can use any of the settings documented in GlobalSettings above. If a setting exists in both the Global Settings and Domain Settings, the Domain setting will take precedence.
 
-### Required API Scopes
+## Microsoft Graph API Integration
+
+### Required Scopes
+The application requires these Microsoft Graph API permissions:
+- `User.Read.All` - User profile and group membership access
+- `Device.Read.All` - Entra ID device object access
+- `DeviceManagementManagedDevices.ReadWrite.All` - Intune device management
+- `DeviceManagementServiceConfig.ReadWrite.All` - Autopilot device management
+- `DeviceManagementManagedDevices.PrivilegedOperations.All` - LAPS password access
+- `BitlockerKey.Read.All` - BitLocker recovery key access
+
+### API Endpoints
+Primary endpoints used:
+- `/deviceManagement/windowsAutopilotDeviceIdentities` - Autopilot device management
+- `/users/{id}/registeredDevices` - User device associations
+- `/deviceManagement/managedDevices` - Intune managed device data
+- `/directory/deviceLocalCredentials` - LAPS credentials
+
+### Required API Scopes (Detailed)
 
 We recommend you use "Delegated" authentication in order to decrease exposure (through leakage of secrets) and to ensure that users have access to the scopes they require, while preventing them from accessing resources they do not have permissions to access.
 The script requires the following Microsoft Graph API permissions, which can either be assigned to your Azure app (and thus not require user interaction), or can be requested by the user when they first sign in (using Delegated Authentication). Additional permissions may be required (for reading LAPS passwords or BitLocker recovery keys) and to support future functionality. See the Microsoft Graph API documentation for more details.
@@ -409,6 +554,22 @@ The script includes comprehensive error handling:
 - Fallback to default values
 - Detailed logging for troubleshooting
 - Graceful exception handling
+
+## Domain Configuration
+
+The application supports multiple domains with specific settings:
+- **gao.gov**: Production environment with group-based access control
+- **arabictutor.com**: Test environment with different device naming conventions
+
+Each domain can override global settings for device naming, group memberships, Autopilot profiles, and security restrictions.
+
+## Security Considerations
+
+- Configuration files in `.secrets/` directory are encrypted using `EncryptionFunctions.ps1`
+- Code signing is implemented via Azure Trusted Signing service
+- Authentication tokens are cached securely with automatic refresh
+- Domain-specific settings allow environment isolation
+- All Microsoft Graph API calls use least-privilege scopes
 
 ## Support and Resources
 

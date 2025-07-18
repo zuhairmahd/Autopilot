@@ -1,4 +1,245 @@
-function Clear-SecureMemory
+function Load-EncryptedConfigFile()
+{
+    <#
+    .SYNOPSIS
+    Loads and decrypts an encrypted configuration file with retry logic.
+    
+    .DESCRIPTION
+    This function handles the complete process of loading an encrypted configuration file,
+    including checking encryption status, prompting for password with retry logic,
+    decrypting the file, and returning the configuration content.
+    
+    .PARAMETER ConfigFile
+    Path to the configuration file to load.
+    
+    .PARAMETER MaxRetries
+    Maximum number of password attempts allowed. Defaults to 3.
+    
+    .PARAMETER UseStoredPassword
+    If specified, attempts to use the stored password from $script:UserEncryptionPassword.
+    
+    .PARAMETER PasswordPrompt
+    Custom prompt message for password input.
+    
+    .OUTPUTS
+    System.Object
+    Returns an object with Success (boolean), Content (string), and ErrorMessage (string) properties.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ConfigFile,
+        
+        [int]$MaxRetries = 3,
+        
+        [switch]$UseStoredPassword,
+        
+        [string]$PasswordPrompt = "Enter your encryption password"
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Loading encrypted configuration file: $ConfigFile" -LogLevel "Debug"
+    Write-Verbose "[$functionName] Loading encrypted configuration file: $ConfigFile"
+    
+    $result = @{
+        Success      = $false
+        Content      = ""
+        ErrorMessage = ""
+    }
+    
+    try
+    {
+        # Check if file exists
+        if (-not (Test-Path $ConfigFile))
+        {
+            $result.ErrorMessage = "Configuration file not found: $ConfigFile"
+            Write-Log -LogFile $LogFile -Module $functionName -Message $result.ErrorMessage -LogLevel "Error"
+            return $result
+        }
+        
+        # Check encryption status
+        $encryptionStatus = Test-FileEncryptionStatus -FilePath $ConfigFile
+        
+        if (-not $encryptionStatus.IsValidFile)
+        {
+            $result.ErrorMessage = "Configuration file exists but cannot be read: $($encryptionStatus.ErrorMessage)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message $result.ErrorMessage -LogLevel "Error"
+            return $result
+        }
+        
+        if ($encryptionStatus.IsEncrypted)
+        {
+            Write-Host "Please enter your password to continue." -ForegroundColor Cyan
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file is encrypted, prompting for password" -LogLevel "Information"
+            
+            $retryCount = 0
+            $decryptResult = $null
+            
+            do
+            {
+                $retryCount++
+                Write-Verbose "[$functionName] Password attempt $retryCount of $MaxRetries"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Password attempt $retryCount of $MaxRetries" -LogLevel "Debug"
+                
+                # Get the password
+                $userPassword = $null
+                if ($UseStoredPassword -and ($script:UserEncryptionPassword -or $global:UserEncryptionPassword))
+                {
+                    Write-Verbose "[$functionName] Using stored password from session"
+                    $userPassword = if ($script:UserEncryptionPassword) { $script:UserEncryptionPassword } else { $global:UserEncryptionPassword }
+                }
+                else
+                {
+                    # Prompt for password
+                    $userPasswordSecure = Get-SecurePassword -Message "$PasswordPrompt (Attempt $retryCount of $MaxRetries)"
+                    $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
+                }
+                
+                # Decrypt the file in memory
+                $decryptResult = Invoke-JsonFileEncryption -FilePath $ConfigFile -Key $userPassword -Decrypt -InMemoryOnly
+                
+                if ($decryptResult.Success)
+                {
+                    Write-Verbose "[$functionName] Configuration file decrypted successfully."
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file decrypted successfully" -LogLevel "Information"
+                    $result.Success = $true
+                    $result.Content = $decryptResult.Content
+                    
+                    # Store the password for session use
+                    $script:UserEncryptionPassword = $userPassword
+                    $global:UserEncryptionPassword = $userPassword
+                    break
+                }
+                else
+                {
+                    $errorMsg = "Decryption failed: $($decryptResult.ErrorMessage)"
+                    Write-Host $errorMsg -ForegroundColor Red
+                    Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
+                    
+                    if ($retryCount -lt $MaxRetries)
+                    {
+                        Write-Host "Please try again." -ForegroundColor Yellow
+                    }
+                }
+                
+                # Clear the password from memory
+                Clear-SecureMemory -Variables @("userPassword")
+                
+            } while ($retryCount -lt $MaxRetries -and -not $decryptResult.Success)
+            
+            if (-not $decryptResult.Success)
+            {
+                $result.ErrorMessage = "Failed to decrypt configuration file after $MaxRetries attempts"
+                Write-Log -LogFile $LogFile -Module $functionName -Message $result.ErrorMessage -LogLevel "Error"
+                Clear-SecureMemory -ClearScriptVariables
+                return $result
+            }
+        }
+        else
+        {
+            # File is not encrypted - read directly
+            Write-Verbose "[$functionName] Configuration file is not encrypted, reading directly"
+            $result.Content = Get-Content -Path $ConfigFile -Raw -Encoding UTF8
+            $result.Success = $true
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file read successfully (unencrypted)" -LogLevel "Information"
+        }
+        
+        return $result
+        
+    }
+    catch
+    {
+        $result.ErrorMessage = "Error loading configuration file: $($_.Exception.Message)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message $result.ErrorMessage -LogLevel "Error"
+        Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
+        return $result
+    }
+}
+
+function Setup-TemporaryEncryption()
+{
+    <#
+    .SYNOPSIS
+    Sets up temporary encrypted configuration for secure in-memory access.
+    
+    .DESCRIPTION
+    This function creates a temporary encryption key and re-encrypts the configuration
+    content for secure in-memory access during the session. This allows configuration
+    values to be accessed without repeatedly prompting for the user's password.
+    
+    .PARAMETER ConfigContent
+    The decrypted configuration content to be temporarily encrypted.
+    
+    .OUTPUTS
+    System.Boolean
+    Returns $true if temporary encryption was set up successfully, $false otherwise.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ConfigContent
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Setting up temporary encryption for configuration" -LogLevel "Debug"
+    Write-Verbose "[$functionName] Setting up temporary encryption for configuration"
+    
+    try
+    {
+        # Generate a random temporary encryption key
+        $tempEncryptionKey = [System.Guid]::NewGuid().ToString() + [System.Guid]::NewGuid().ToString()
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Generated temporary encryption key" -LogLevel "Debug"
+        
+        # Create a temporary file to encrypt the content
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Created temporary file for encryption" -LogLevel "Debug"
+        
+        try
+        {
+            Set-Content -Path $tempFile -Value $ConfigContent -Encoding UTF8
+            $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
+            
+            if ($tempEncryptResult.Success)
+            {
+                Write-Verbose "[$functionName] Content re-encrypted with temporary key for in-memory use"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Content re-encrypted with temporary key for in-memory use" -LogLevel "Debug"
+                
+                # Store the encrypted content for later use during the session
+                $script:TempEncryptedConfig = $tempEncryptResult.Content
+                $script:TempEncryptionKey = $tempEncryptionKey
+                
+                return $true
+            }
+            else
+            {
+                Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)" -LogLevel "Error"
+                return $false
+            }
+        }
+        finally
+        {
+            # Clean up temporary file
+            if (Test-Path $tempFile)
+            {
+                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error during temporary encryption setup: $($_.Exception.Message)" -LogLevel "Error"
+        return $false
+    }
+    finally
+    {
+        # Clear the temporary encryption key from memory
+        Clear-SecureMemory -Variables @("tempEncryptionKey")
+    }
+}
+
+function Clear-SecureMemory()
 {
     <#
     .SYNOPSIS
@@ -81,7 +322,7 @@ function Clear-SecureMemory
     Write-Log -LogFile $LogFile -Module $functionName -Message "Memory cleanup completed successfully. Variables cleared: $($clearedVariables.Count)" -LogLevel "Debug"
 }
 
-function Get-SecurePassword
+function Get-SecurePassword()
 {
     <#
     .SYNOPSIS
@@ -171,7 +412,7 @@ function Get-SecurePassword
     return $password
 }
 
-function Get-DecryptedConfigValue
+function Get-DecryptedConfigValue()
 {
     <#
     .SYNOPSIS
@@ -261,7 +502,7 @@ function Get-DecryptedConfigValue
     }
 }
 
-function Get-AuthConfigValue
+function Get-AuthConfigValue()
 {
     <#
     .SYNOPSIS
@@ -315,7 +556,7 @@ function Get-AuthConfigValue
     return $current
 }
 
-function ConvertFrom-SecureString-ToPlainText
+function ConvertFrom-SecureString-ToPlainText()
 {
     <#
     .SYNOPSIS
@@ -340,7 +581,7 @@ function ConvertFrom-SecureString-ToPlainText
     return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString))
 }
 
-function Test-FileEncryptionStatus
+function Test-FileEncryptionStatus()
 {
     <#
     .SYNOPSIS
@@ -466,7 +707,7 @@ function Test-FileEncryptionStatus
     }
 }
 
-function Invoke-JsonFileEncryption
+function Invoke-JsonFileEncryption()
 {
     [CmdletBinding()]
     param(
@@ -1154,685 +1395,3 @@ function Invoke-JsonFileEncryption
     }
 }
 
-
-#region Legacy Encryption functions
-$excludeFields = @('domain', 'name', 'scope', 'auth')
-function TestIsBase64String()
-{
-    param (
-        [string]$Value
-    )
-
-    if ([string]::IsNullOrEmpty($Value))
-    {
-        return $false
-    }
-    # A common check: length must be a multiple of 4.
-    # And it should not contain characters outside the Base64 character set.
-    # This is a basic check; more robust validation might be needed for edge cases.
-    if (($Value.Length % 4 -ne 0) -or ($Value -notmatch "^[a-zA-Z0-9+/]*=*$"))
-    {
-        return $false
-    }
-
-    try
-    {
-        $null = [Convert]::FromBase64String($Value)
-        return $true
-    }
-    catch
-    {
-        return $false
-    }
-}
-
-function isEncrypted()
-{
-    [CmdletBinding()]
-    param (
-        [psObject]$data,
-        [string[]]$excludeFields = $excludeFields
-    )
-    
-    function CountEncryptionStatus
-    {
-        [CmdletBinding()]
-        param (
-            [Parameter(ValueFromPipeline)]
-            [object]$InputObject,
-            [string[]]$ExcludeFields = $excludeFields
-        )
-        
-        $functionName = $MyInvocation.MyCommand.Name
-        Write-Verbose "[$functionName] Initializing encryption status count object."
-        $result = [PSCustomObject]@{
-            EncryptedCount   = 0
-            UnencryptedCount = 0
-        }
-        Write-Verbose "[$functionName] Checking whether the input object is null."
-        if ($null -eq $InputObject)
-        {
-            Write-Verbose "[$functionName] Input object is null, returning default counts."
-            return $result
-        }
-        Write-Verbose "[$functionName] Checking input object type"
-        if ($InputObject -is [array])
-        {
-            Write-Verbose "[$functionName] Input object is an array, iterating through its items."
-            foreach ($item in $InputObject)
-            {
-                Write-Verbose "[$functionName] Checking item $item."
-                $itemStatus = CountEncryptionStatus -InputObject $item
-                Write-Verbose "[$functionName] Item encryption status: EncryptedCount=$($itemStatus.EncryptedCount), UnencryptedCount=$($itemStatus.UnencryptedCount)"
-                $result.EncryptedCount += $itemStatus.EncryptedCount
-                $result.UnencryptedCount += $itemStatus.UnencryptedCount
-                Write-Verbose "[$functionName] Updated counts: EncryptedCount=$($result.EncryptedCount), UnencryptedCount=$($result.UnencryptedCount)"
-            }
-            Write-Verbose "[$functionName] Finished processing array. Returning counts."
-        }
-        elseif ($InputObject -is [PSCustomObject] -or $InputObject -is [hashtable])
-        {
-            Write-Verbose "[$functionName] Input object is a PSCustomObject or hashtable, iterating through its properties."
-            foreach ($prop in $InputObject.PSObject.Properties)
-            {
-                Write-Verbose "[$functionName] Checking property $($prop.Name) with value $($prop.Value)."
-                if ($prop.Name -notin $ExcludeFields)
-                {
-                    Write-Verbose "[$functionName] Property $($prop.Name) is not excluded, checking its value."
-                    if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                    {
-                        Write-Verbose "[$functionName] Property $($prop.Name) is a nested object or array, recursing into it."
-                        $nestedStatus = CountEncryptionStatus -InputObject $prop.Value
-                        $result.EncryptedCount += $nestedStatus.EncryptedCount
-                        $result.UnencryptedCount += $nestedStatus.UnencryptedCount
-                        Write-Verbose "[$functionName] Nested property $($prop.Name) counts: EncryptedCount=$($nestedStatus.EncryptedCount), UnencryptedCount=$($nestedStatus.UnencryptedCount)"
-                    }
-                    elseif ($prop.Value -is [string] -and $prop.Value.Length -gt 0)
-                    {
-                        Write-Verbose "[$functionName] Checking if the value of $($prop.Name) is encrypted."
-                        if (TestIsBase64String -Value $prop.Value)
-                        {
-                            Write-Verbose "[$functionName] The value of $($prop.Name) is encrypted."
-                            $result.EncryptedCount++
-                        }
-                        else
-                        {
-                            Write-Verbose "[$functionName] The value of $($prop.Name) is not encrypted."
-                            $result.UnencryptedCount++
-                        }
-                    }
-                    else
-                    {
-                        Write-Verbose "[$functionName] The value of $($prop.Name) is not a string, skipping."
-                        $result.UnencryptedCount++
-                    }
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Property $($prop.Name) is excluded, skipping."
-                }
-            }
-        }
-        else
-        {
-            if ($InputObject -is [string] -and $InputObject.Length -gt 0)
-            {
-                Write-Verbose "[$functionName] Input object is a string, checking if it is encrypted."
-                if ($inputObject -notin $ExcludeFields)
-                {
-
-                    if (TestIsBase64String -Value $InputObject)
-                    {
-                        Write-Verbose "[$functionName] The input string is encrypted."
-                        $result.EncryptedCount++
-                    }
-                    else
-                    {
-                        Write-Verbose "[$functionName] The input string is not encrypted."
-                        $result.UnencryptedCount++
-                    }
-                }
-            }
-            else
-            {
-                Write-Verbose "[$functionName] Input object is not a string or is empty, treating as unencrypted."
-                $result.UnencryptedCount++
-            }
-        }
-        Write-Verbose "[$functionName] Final counts: EncryptedCount=$($result.EncryptedCount), UnencryptedCount=$($result.UnencryptedCount)"
-        return $result
-    }
-
-    $functionName = $MyInvocation.MyCommand.Name
-    $isEncrypted = $false
-    Write-Verbose "[$functionName] Checking if the data is encrypted."
-    
-    $encryptionStatus = CountEncryptionStatus -InputObject $data
-    $encryptedCount = $encryptionStatus.EncryptedCount
-    $unencryptedCount = $encryptionStatus.UnencryptedCount
-    Write-Verbose "[$functionName] The number of encrypted values is $encryptedCount"
-    Write-Verbose "[$functionName] The number of unencrypted values is $unencryptedCount"
-    
-    # If the number of encrypted values is greater than the number of unencrypted values, the data is encrypted.
-    if ($encryptedCount -gt $unencryptedCount -and $encryptedCount -gt 0)
-    {
-        Write-Verbose "[$functionName] The data is considered encrypted."
-        $isEncrypted = $true
-    }
-    Write-Verbose "[$functionName] The data is encrypted: $isEncrypted"
-    return $isEncrypted
-}
-
-function DecryptObject()
-{
-    [CmdletBinding()]
-    param (
-        [object]$encryptedObject,
-        [string[]]$excludeFields = $excludeFields
-    )
-    
-    function Invoke-RecursiveDecryption
-    {
-        param (
-            [Parameter(ValueFromPipeline)]
-            [object]$InputObject,
-            [string[]]$ExcludeFields,
-            [string]$ParentPath = "",
-            [bool]$ParentIsExcluded = $false # New parameter
-        )
-
-        if ($null -eq $InputObject)
-        {
-            return $null 
-        }
-        Write-Verbose "[DECRYPT] Path: '$ParentPath', ParentIsExcluded: $ParentIsExcluded, Type: $($InputObject.GetType().FullName)"
-
-        if ($InputObject -is [array])
-        {
-            Write-Verbose "[DECRYPT] Processing array at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $resultArray = @()
-            for ($i = 0; $i -lt $InputObject.Count; $i++)
-            {
-                $element = $InputObject[$i]
-                $currentElementPath = if ($ParentPath)
-                {
-                    "$ParentPath[$i]" 
-                }
-                else
-                {
-                    "[$i]" 
-                }
-                # Pass ParentIsExcluded status to array elements
-                $resultArray += Invoke-RecursiveDecryption -InputObject $element -ExcludeFields $ExcludeFields -ParentPath $currentElementPath -ParentIsExcluded $ParentIsExcluded
-            }
-            return $resultArray
-        }
-        elseif ($InputObject -is [hashtable])
-        {
-            Write-Verbose "[DECRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-        
-            # Process hashtable by enumerating through the key-value pairs directly
-            foreach ($entry in $InputObject.GetEnumerator())
-            {
-                $key = $entry.Key
-                $value = $entry.Value
-            
-                Write-Verbose "[DECRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[DECRYPT] Value type: $($value.GetType().FullName)"
-            
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$key" 
-                }
-                else
-                {
-                    $key 
-                }
-            
-                $isPropertyItselfExcluded = $ExcludeFields -contains $key
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
-                Write-Verbose "[DECRYPT] Hashtable key: '$key' at path '$currentPropertyPath'. KeyItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
-                if ($value -is [PSCustomObject] -or $value -is [hashtable] -or $value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$key] = Invoke-RecursiveDecryption -InputObject $value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[DECRYPT] Hashtable key '$key' is effectively excluded. Assigning original value."
-                    $result[$key] = $value
-                }
-                else # Not effectively excluded, attempt to decrypt if it's a string
-                {
-                    if ($value -is [string] -and (TestIsBase64String -Value $value))
-                    {
-                        Write-Verbose ("[DECRYPT] Attempting to decrypt string value for {0}" -f $currentPropertyPath)
-                        try
-                        {
-                            $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($value))
-                            $result[$key] = $decodedValue
-                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPropertyPath, $decodedValue)
-                        }
-                        catch
-                        {
-                            Write-Warning "[DECRYPT] Failed to decode Base64 string for key '$key' at path '$currentPropertyPath'. Value: '$value'. Assigning original value."
-                            $result[$key] = $value # Keep original if not valid Base64 or UTF8
-                        }
-                    }
-                    else
-                    {
-                        # Not a string, not Base64, or some other primitive type that wasn't encrypted
-                        Write-Verbose "[DECRYPT] Hashtable key '$key' is not a decodable string. Assigning original value."
-                        $result[$key] = $value
-                    }
-                }
-            }
-        
-            return $result
-        }
-        elseif ($InputObject -is [PSCustomObject])
-        {
-            Write-Verbose "[DECRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-            foreach ($prop in $InputObject.PSObject.Properties)
-            {
-                Write-Verbose "[DECRYPT] Processing property '$($prop.Name)' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[decrypt] Property type: $($prop.Value.GetType().FullName)"
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$($prop.Name)" 
-                }
-                else
-                {
-                    $prop.Name 
-                }
-                $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
-                Write-Verbose "[DECRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
-                if ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$prop.Name] = Invoke-RecursiveDecryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[DECRYPT] Property '$($prop.Name)' is effectively excluded. Assigning original value."
-                    $result[$prop.Name] = $prop.Value
-                }
-                else # Not effectively excluded, attempt to decrypt if it's a string
-                {
-                    if ($prop.Value -is [string] -and (TestIsBase64String -Value $prop.Value))
-                    {
-                        Write-Verbose ("[DECRYPT] Attempting to decrypt string value for {0}" -f $currentPropertyPath)
-                        try
-                        {
-                            $decodedValue = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($prop.Value))
-                            $result[$prop.Name] = $decodedValue
-                            Write-Verbose ("[DECRYPT] Decrypted value for {0}: {1}" -f $currentPropertyPath, $decodedValue)
-                        }
-                        catch
-                        {
-                            Write-Warning "[DECRYPT] Failed to decode Base64 string for property '$($prop.Name)' at path '$currentPropertyPath'. Value: '$($prop.Value)'. Assigning original value."
-                            $result[$prop.Name] = $prop.Value # Keep original if not valid Base64 or UTF8
-                        }
-                    }
-                    else
-                    {
-                        # Not a string, not Base64, or some other primitive type that wasn't encrypted
-                        Write-Verbose "[DECRYPT] Property '$($prop.Name)' is not a decodable string. Assigning original value."
-                        $result[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            return [PSCustomObject]$result
-        }
-        # Handle standalone primitive types (e.g., a string element directly in an array)
-        elseif ($InputObject -is [string])
-        {
-            if ($ParentIsExcluded) # If the parent (e.g. an array holding this string) was excluded
-            {
-                Write-Verbose "[DECRYPT] Primitive string at path '$ParentPath' is part of an excluded parent. Returning as-is."
-                return $InputObject
-            }
-            elseif (TestIsBase64String -Value $InputObject)
-            {
-                Write-Verbose ("[DECRYPT] Attempting to decrypt primitive string value at path '{0}'" -f $ParentPath)
-                try
-                {
-                    $decodedValuePrim = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($InputObject))
-                    Write-Verbose ("[DECRYPT] Decrypted primitive value at path '{0}': {1}" -f $ParentPath, $decodedValuePrim)
-                    return $decodedValuePrim
-                }
-                catch
-                {
-                    Write-Warning "[DECRYPT] Failed to decode Base64 string for primitive at path '$ParentPath'. Value: '$InputObject'. Returning original value."
-                    return $InputObject # Keep original if not valid Base64 or UTF8
-                }
-            }
-            else
-            {
-                # Not Base64, return as is
-                Write-Verbose "[DECRYPT] Primitive string at path '$ParentPath' is not Base64. Returning as-is."
-                return $InputObject
-            }
-        }
-        else # Other primitive types (int, bool, etc.) or other object types, return as is
-        {
-            Write-Verbose "[DECRYPT] Value type '$($InputObject.GetType().FullName)' at path '$ParentPath' not a string or already handled. Returning as-is."
-            return $InputObject
-        }
-    }
-    
-    $result = Invoke-RecursiveDecryption -InputObject $encryptedObject -ExcludeFields $excludeFields
-    
-    if ($null -eq $result)
-    {
-        Write-Error 'No values were decrypted.'
-        return $null
-    }
-    
-    Write-Verbose "Decryption complete"
-    return $result
-}
-
-function EncryptObject()
-{
-    [CmdletBinding()]
-    param (
-        [object]$decryptedObject,
-        [string[]]$excludeFields = $excludeFields
-    )
-
-
-    function Invoke-RecursiveEncryption
-    {
-        param (
-            [Parameter(ValueFromPipeline)]
-            [object]$InputObject,
-            [string[]]$ExcludeFields,
-            [string]$ParentPath = "",
-            [bool]$ParentIsExcluded = $false # New parameter
-        )
-
-        if ($null -eq $InputObject)
-        {
-            Write-Verbose "[ENCRYPT] InputObject is null at path '$ParentPath'. Returning null."; return $null 
-        }
-        Write-Verbose "[ENCRYPT] Path: '$ParentPath', ParentIsExcluded: $ParentIsExcluded, Type: $($InputObject.GetType().FullName)"
-
-        if ($InputObject -is [array])
-        {
-            Write-Verbose "[ENCRYPT] Processing array at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $resultArray = @()
-            for ($i = 0; $i -lt $InputObject.Count; $i++)
-            {
-                $element = $InputObject[$i]
-                $currentElementPath = if ($ParentPath)
-                {
-                    "$ParentPath[$i]" 
-                }
-                else
-                {
-                    "[$i]" 
-                }
-                # Pass ParentIsExcluded status to array elements
-                $resultArray += Invoke-RecursiveEncryption -InputObject $element -ExcludeFields $ExcludeFields -ParentPath $currentElementPath -ParentIsExcluded $ParentIsExcluded
-            }
-            return $resultArray
-        }
-        elseif ($InputObject -is [hashtable])
-        {
-            Write-Verbose "[ENCRYPT] Processing hashtable at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-        
-            # Process hashtable by enumerating through the key-value pairs directly
-            foreach ($entry in $InputObject.GetEnumerator())
-            {
-                $key = $entry.Key
-                $value = $entry.Value
-            
-                Write-Verbose "[ENCRYPT] Processing hashtable key '$key' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[ENCRYPT] Value type: $($value.GetType().FullName)"
-                Write-Verbose "[ENCRYPT] Value: $value"
-            
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$key" 
-                }
-                else
-                {
-                    $key 
-                }
-            
-                $isPropertyItselfExcluded = $ExcludeFields -contains $key
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-
-                Write-Verbose "[ENCRYPT] Hashtable key: '$key' at path '$currentPropertyPath'. KeyItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-
-                if ($null -eq $value)
-                {
-                    Write-Verbose "[ENCRYPT] Hashtable key '$key' has null value. Assigning null."
-                    $result[$key] = $null
-                }
-                elseif ($value -is [PSCustomObject] -or $value -is [hashtable] -or $value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$key] = Invoke-RecursiveEncryption -InputObject $value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[ENCRYPT] Hashtable key '$key' is effectively excluded. Assigning original value."
-                    $result[$key] = $value
-                }
-                else # Not effectively excluded, encrypt appropriate types
-                {
-                    # Encrypt strings, numbers, booleans. Other complex types not directly handled here will be returned as-is by the final 'else'.
-                    if ($value -is [string] -or $value -is [int] -or $value -is [bool] -or $value -is [double])
-                    {
-                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}" -f $currentPropertyPath)
-                        $stringValue = $value.ToString() # Convert boolean/numbers to string before encoding
-                        $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
-                        $result[$key] = $encodedValue
-                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, $encodedValue)
-                    }
-                    else
-                    {
-                        Write-Verbose "[ENCRYPT] Hashtable key '$key' value type '$($value.GetType().FullName)' not directly encrypted. Assigning original value."
-                        $result[$key] = $value
-                    }
-                }
-            }
-        
-            return $result
-        }
-        elseif ($InputObject -is [PSCustomObject])
-        {
-            Write-Verbose "[ENCRYPT] Processing object at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-            $result = [ordered]@{}
-            foreach ($prop in $InputObject.PSObject.Properties)
-            {
-                Write-Verbose "[ENCRYPT] Processing property '$($prop.Name)' at path '$ParentPath'. Inherited ParentIsExcluded: $ParentIsExcluded"
-                Write-Verbose "[ENCRYPT] Property type: $($prop.Value.GetType().FullName)"
-                if ($prop.Name -in $excludeFields)
-                {
-                    Write-Verbose "[ENCRYPT] Property value: $($prop.Value)"    
-                }
-                $currentPropertyPath = if ($ParentPath)
-                {
-                    "$ParentPath.$($prop.Name)" 
-                }
-                else
-                {
-                    $prop.Name 
-                }
-                $isPropertyItselfExcluded = $ExcludeFields -contains $prop.Name
-                $isEffectivelyExcluded = $ParentIsExcluded -or $isPropertyItselfExcluded
-                Write-Verbose "[ENCRYPT] Property: '$($prop.Name)' at path '$currentPropertyPath'. PropItselfExcluded: $isPropertyItselfExcluded, ParentIsExcluded: $ParentIsExcluded, EffectiveExcluded: $isEffectivelyExcluded"
-                if ($null -eq $prop.Value)
-                {
-                    Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is null. Assigning null."
-                    $result[$prop.Name] = $null
-                }
-                elseif ($prop.Value -is [PSCustomObject] -or $prop.Value -is [hashtable] -or $prop.Value -is [array])
-                {
-                    # Recurse for nested structures, passing the effective exclusion status
-                    $result[$prop.Name] = Invoke-RecursiveEncryption -InputObject $prop.Value -ExcludeFields $ExcludeFields -ParentPath $currentPropertyPath -ParentIsExcluded $isEffectivelyExcluded
-                }
-                elseif ($isEffectivelyExcluded)
-                {
-                    Write-Verbose "[ENCRYPT] Property '$($prop.Name)' is effectively excluded. Assigning original value."
-                    $result[$prop.Name] = $prop.Value
-                }
-                else # Not effectively excluded, encrypt appropriate types
-                {
-                    # Encrypt strings, numbers, booleans. Other complex types not directly handled here will be returned as-is by the final 'else'.
-                    if ($prop.Value -is [string] -or $prop.Value -is [int] -or $prop.Value -is [bool] -or $prop.Value -is [double])
-                    {
-                        Write-Verbose ("[ENCRYPT] Encrypting value for {0}" -f $currentPropertyPath)
-                        $stringValue = $prop.Value.ToString() # Convert boolean/numbers to string before encoding
-                        $encodedValue = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValue))
-                        $result[$prop.Name] = $encodedValue
-                        Write-Verbose ("[ENCRYPT] Encrypted value for {0}: {1}" -f $currentPropertyPath, 'redacted')
-                    }
-                    else
-                    {
-                        Write-Verbose "[ENCRYPT] Property '$($prop.Name)' type '$($prop.Value.GetType().FullName)' not directly encrypted. Assigning original value."
-                        $result[$prop.Name] = $prop.Value
-                    }
-                }
-            }
-            return [PSCustomObject]$result
-        }
-        # Handle standalone primitive types (e.g., a string/number/bool element directly in an array)
-        elseif (($InputObject -is [string] -or $InputObject -is [int] -or $InputObject -is [bool] -or $InputObject -is [double]))
-        {
-            if ($ParentIsExcluded) # If the parent (e.g. an array holding this primitive) was excluded
-            {
-                Write-Verbose "[ENCRYPT] Primitive value at path '$ParentPath' is part of an excluded parent. Returning as-is."
-                return $InputObject
-            }
-            else
-            {
-                Write-Verbose ("[ENCRYPT] Encrypting primitive value at path '{0}'" -f $ParentPath)
-                $stringValuePrim = $InputObject.ToString()
-                $encodedValuePrim = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($stringValuePrim))
-                Write-Verbose ("[ENCRYPT] Encrypted primitive value at path '{0}': {1}" -f $ParentPath, $encodedValuePrim)
-                return $encodedValuePrim
-            }
-        }
-        else # Other types not explicitly handled (e.g. custom objects not PSCustomObject/hashtable, or other primitive types if any), return as is.
-        {
-            Write-Verbose "[ENCRYPT] Value type '$($InputObject.GetType().FullName)' at path '$ParentPath' not processed for encryption. Returning as-is."
-            return $InputObject
-        }
-    }
-
-    $result = Invoke-RecursiveEncryption -InputObject $decryptedObject -ExcludeFields $excludeFields
-    
-    if ($null -eq $result)
-    {
-        Write-Error 'No values were encrypted.'
-        return $null
-    }
-    
-    Write-Verbose "Encryption complete"
-    return $result
-}
-
-function DecryptAndEncrypt()
-{
-    param (
-        $data,
-        [string[]]$excludeFields = $excludeFields,
-        [string]$operation
-    )
-    
-    # ### Main script ###
-    if ($operation -eq 'encrypt')
-    {
-        if (isEncrypted -data $data)
-        {
-            Write-Host 'The data is already encrypted.'
-            Write-Host 'Nothing to do.'
-            exit
-        }
-        $encodedData = EncryptObject -decryptedObject $data -excludeFields $excludeFields
-    }
-    elseif ($operation -eq 'decrypt')
-    {
-        if (!(isEncrypted -data $data))
-        {
-            Write-Host 'The data is already decrypted.'
-            Write-Host 'Nothing to do.'
-            exit
-        }
-        $encodedData = DecryptObject -encryptedObject $data -excludeFields $excludeFields
-    }
-    elseif ($operation -eq 'check')
-    {
-        if (isEncrypted -data $data)
-        {
-            Write-Host 'The data is encrypted.'
-        }
-        else
-        {
-            Write-Host "The data in $inputFile is not encrypted."
-        }
-        exit
-    }
-    else
-    {
-        Write-Error 'No operation was specified.'
-        exit
-    }
-
-
-    #make sure the output file exists.  If so, prompt to overwrite., otherwise create, unless the Force switch is set.
-    if (Test-Path $outputFile)
-    {
-        if ($Force)
-        {
-            Clear-Content -Path $OutputFile
-        }
-        else
-        {
-            $overwrite = Read-Host -Prompt "The file $outputFile already exists.  Do you want to overwrite it? (Y/N)"
-            if ($overwrite -eq 'Y')
-            {
-                Clear-Content -Path $OutputFile
-            }
-            else
-            {
-                Write-Host "The file $outputFile was not overwritten.  Exiting."
-                exit
-            }
-        }
-    }
-    else
-    {
-        New-Item -Path $OutputFile -ItemType File -Force | Out-Null
-    }
-
-
-    #write the encoded data to the output file if it is not null.
-    if ($encodedData)
-    {
-        Write-Host "Processing data in $inputFile"
-        Write-Host "Writing data to $outputFile"
-        Write-Verbose "The encoded data is: $($encodedData | ConvertTo-Json)"
-       
-        $encodedData | ConvertTo-Json | Set-Content -Path $outputFile -ErrorAction Stop
-        Write-Host 'Data processed successfully.'
-    }
-    else
-    {
-        Write-Host 'No data was processed.'
-        exit
-    }
-}
-#endregion Encryption functions

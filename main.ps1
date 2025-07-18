@@ -101,207 +101,27 @@ if (-not (Test-Path $secretsDir))
 # Initialize variables for encryption handling
 $configContent = $null
 $userPassword = $null
-$tempEncryptionKey = $null
 
 if (Test-Path $configFile)
 {
-    # Check if the config file is encrypted
-    $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFile
+    # Load the encrypted configuration file
+    $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your encryption password"
     
-    if (-not $encryptionStatus.IsValidFile)
+    if (-not $loadResult.Success)
     {
-        Write-Host "Configuration file exists but cannot be read: $($encryptionStatus.ErrorMessage)" -ForegroundColor Red
+        Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
         Write-Host "Please check file permissions and try again." -ForegroundColor Red
         exit 1
     }
     
-    if ($encryptionStatus.IsEncrypted)
+    $configContent = $loadResult.Content
+    
+    # Setup temporary encryption for in-memory access
+    $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
+    if (-not $tempEncryptionResult)
     {
-        Write-Host "Please enter your password to continue." -ForegroundColor Cyan
-
-        $maxRetries = 3
-        $retryCount = 0
-        $decryptResult = $null
-        
-        do
-        {
-            $retryCount++
-            Write-Verbose "[$scriptName] Password attempt $retryCount of $maxRetries"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password attempt $retryCount of $maxRetries" -LogLevel "Debug"
-            
-            # Get the password from user
-            $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password (Attempt $retryCount of $maxRetries)"
-            $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
-            
-            # Decrypt the file in memory
-            $decryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword -Decrypt -InMemoryOnly
-            
-            if ($decryptResult.Success)
-            {
-                Write-Verbose "[$scriptName] Configuration file decrypted successfully."
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file decrypted successfully" -LogLevel "Information"
-                $configContent = $decryptResult.Content
-                break
-            }
-            else
-            {
-                Write-Host "Decryption failed: $($decryptResult.ErrorMessage)" -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Decryption failed: $($decryptResult.ErrorMessage)" -LogLevel "Error"
-                if ($retryCount -lt $maxRetries)
-                {
-                    Write-Host "Please try again." -ForegroundColor Yellow
-                }
-            }
-            
-            # Clear the password from memory
-            Clear-SecureMemory -Variables @("userPassword")
-            
-        } while ($retryCount -lt $maxRetries -and -not $decryptResult.Success)
-        
-        if (-not $decryptResult.Success)
-        {
-            Write-Host "Failed to decrypt configuration file after $maxRetries attempts." -ForegroundColor Red
-            Write-Host "Please verify your password and try again." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to decrypt configuration file after $maxRetries attempts" -LogLevel "Error"
-            Clear-SecureMemory -ClearScriptVariables
-            exit 1
-        }
-        
-        # Generate a temporary encryption key for in-memory use
-        $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
-        Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Generated temporary encryption key for in-memory operations" -LogLevel "Debug"
-        
-        # Re-encrypt the content with the temporary key for in-memory use
-        $tempFile = [System.IO.Path]::GetTempFileName()
-        try
-        {
-            Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
-            $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
-            
-            if ($tempEncryptResult.Success)
-            {
-                Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Content re-encrypted with temporary key for in-memory use" -LogLevel "Debug"
-                # Store the encrypted content for later use during the session
-                $script:TempEncryptedConfig = $tempEncryptResult.Content
-                $script:TempEncryptionKey = $tempEncryptionKey
-            }
-            else
-            {
-                Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)" -LogLevel "Error"
-                # Continue without temporary encryption but with a warning
-            }
-        }
-        catch
-        {
-            Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Error during temporary encryption setup: $($_.Exception.Message)" -LogLevel "Error"
-        }
-        finally
-        {
-            # Clean up temporary file
-            if (Test-Path $tempFile)
-            {
-                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            }
-        }
-        
-        # Store the user password for later use during authentication (for refresh token save)
-        $script:UserEncryptionPassword = $userPassword
-        
-        # Clear the user password from memory
-        Clear-SecureMemory -Variables @("userPassword", "tempEncryptionKey")
-    }
-    else
-    {
-        # File is not encrypted - this is a first run scenario
-        Write-Host "Configuration file is not encrypted." -ForegroundColor Yellow
-        Write-Host "You must encrypt the file and set a password to continue." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file is not encrypted. Setting up encryption for first run" -LogLevel "Information"
-        $answer = Read-Host "Do you want to encrypt the configuration file? (Y/N)"
-        while ($answer -notin @('Y', 'y', 'Yes', 'yes', 'N', 'n', 'No', 'no'))
-        {
-            Write-Host "Invalid input. Please enter Y or N." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid input for encryption choice. Prompting user again." -LogLevel "Warning"
-            [console]::beep(1000, 500)
-            $answer = Read-Host "Do you want to encrypt the configuration file? (Y/N)"
-        }
-        if ($answer -notin @('Y', 'y', 'Yes', 'yes'))
-        {
-            Write-Host "Exiting script without encryption." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "User chose not to encrypt the configuration file. Exiting script." -LogLevel "Information"
-            Clear-SecureMemory -ClearScriptVariables
-            exit 0
-        }
-        # Get password from user for first-time setup
-        $userPasswordSecure = Get-SecurePassword -Message "Enter a password to encrypt your configuration file" -RequireConfirmation
-        $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
-        
-        # Read the current config content
-        $configContent = Get-Content -Path $configFile -Raw -Encoding UTF8
-        
-        # Encrypt the file on disk
-        $encryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key $userPassword
-        
-        if ($encryptResult.Success)
-        {
-            Write-Host "Configuration file encrypted successfully." -ForegroundColor Green
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file encrypted successfully" -LogLevel "Information"
-            
-            # Generate a temporary encryption key for in-memory use
-            $tempEncryptionKey = [System.Guid]::NewGuid().ToString()
-            Write-Verbose "[$scriptName] Generated temporary encryption key for in-memory operations"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Generated temporary encryption key for in-memory operations" -LogLevel "Debug"
-            
-            # Re-encrypt the content with the temporary key for in-memory use
-            $tempFile = [System.IO.Path]::GetTempFileName()
-            try
-            {
-                Set-Content -Path $tempFile -Value $configContent -Encoding UTF8
-                $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $tempEncryptionKey -InMemoryOnly
-                
-                if ($tempEncryptResult.Success)
-                {
-                    Write-Verbose "[$scriptName] Content re-encrypted with temporary key for in-memory use"
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Content re-encrypted with temporary key for in-memory use" -LogLevel "Debug"
-                    # Store the encrypted content for later use during the session
-                    $script:TempEncryptedConfig = $tempEncryptResult.Content
-                    $script:TempEncryptionKey = $tempEncryptionKey
-                }
-                else
-                {
-                    Write-Warning "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)"
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to re-encrypt content with temporary key: $($tempEncryptResult.ErrorMessage)" -LogLevel "Error"
-                    # Continue without temporary encryption but with a warning
-                }
-            }
-            catch
-            {
-                Write-Warning "Error during temporary encryption setup: $($_.Exception.Message)"
-            }
-            finally
-            {
-                # Clean up temporary file
-                if (Test-Path $tempFile)
-                {
-                    Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-                }
-            }
-        }
-        else
-        {
-            Write-Host "Failed to encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
-            Clear-SecureMemory -ClearScriptVariables
-            exit 1
-        }
-        
-        # Store the user password for later use during authentication (for refresh token save)
-        $script:UserEncryptionPassword = $userPassword
-        
-        # Clear the user password from memory
-        Clear-SecureMemory -Variables @("userPassword", "tempEncryptionKey")
+        Write-Warning "Temporary encryption setup failed, some features may not work properly"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
     }
     
     # Parse the configuration content
@@ -313,8 +133,70 @@ if (Test-Path $configFile)
 }
 else
 {
+    # Configuration file not found - launch first run wizard
     Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Host "Please create a configuration file or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Information"
+    
+    Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
+    
+    # Launch the first run wizard
+    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
+    
+    if ($wizardResult)
+    {
+        Write-Host "First run wizard completed successfully." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
+        
+        # Now try to load the newly created configuration
+        Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
+        
+        # Re-run the configuration loading logic
+        if (Test-Path $configFile)
+        {
+            # Load the encrypted configuration file
+            $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your encryption password"
+            
+            if (-not $loadResult.Success)
+            {
+                Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
+                Write-Host "Please check file permissions and try again." -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($loadResult.ErrorMessage)" -LogLevel "Error"
+                exit 1
+            }
+            
+            $configContent = $loadResult.Content
+            
+            # Setup temporary encryption for in-memory access
+            $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
+            if (-not $tempEncryptionResult)
+            {
+                Write-Warning "Temporary encryption setup failed, some features may not work properly"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
+            }
+            
+            # Parse the configuration content
+            $configJson = ConvertFrom-Json $configContent
+            $domain = $configJson.domain
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+            
+            # Clear the config content from memory
+            $configContent = $null
+        }
+        else
+        {
+            Write-Host "Configuration file was not created successfully." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
+        Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+        exit 1
+    }
 }
 if (Test-Path -Path $InitFile)
 {
@@ -453,8 +335,14 @@ if (Test-Path -Path $InitFile)
 else
 {
     Write-Host "Configuration file $initFile not found. Using default values."
-    # Set empty auth array to prevent errors
-    $auth = @{}
+    
+    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
+    if (-not $settingsCreated)
+    {
+            
+    }
+        
+
     # Set auth as a script variable so it can be accessed by functions
     $script:Auth = $auth
 }

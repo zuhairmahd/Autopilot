@@ -16,8 +16,8 @@ if (Test-Path $TestFolder) {
 # Create test folder
 New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
 
-# Load the functions from MiscFunctions.ps1
-. ".\functions\MiscFunctions.ps1"
+# Load the functions from SettingsHelperFunctions.ps1
+. ".\functions\SettingsHelperFunctions.ps1"
 
 try {
     Write-Host "`n1. Testing InitializeConfiguration..." -ForegroundColor Cyan
