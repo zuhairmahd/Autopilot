@@ -57,14 +57,7 @@ else
 
 #region Initialize script
 $scriptName = $MyInvocation.MyCommand.Name
-$executableFileName = 'main.exe'
-if (Test-Path "$executableFileName.old")
-{
-    Write-Verbose "[$scriptName] Old backup executable file found: $executableFileName.old"
-    Write-Verbose "$scriptName] removing old executable file: $executableFileName.old."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $executableFileName.old" -LogLevel "Information"
-    Remove-Item -Path "$executableFileName.old" -Force -ErrorAction SilentlyContinue
-}
+$oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $Global:MinimumLogLevel = $LogLevel
 Write-Log -LogFile $LogFile -StartLogging
@@ -92,6 +85,14 @@ else
         Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
     }
+}
+
+if (Test-Path $oldExecutableFileName)
+{
+    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
+    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
+    Remove-Item -Path "$oldExecutableFileName   " -Force -ErrorAction SilentlyContinue
 }
 #endregion Initialize script
 
