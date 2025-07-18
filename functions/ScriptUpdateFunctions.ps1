@@ -226,9 +226,6 @@ function GetUpdates()
             Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
             Write-Verbose "[$functionName] Update completed successfully. New version: $remoteVersion"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update completed successfully. New version: $remoteVersion" -LogLevel "Information"
-            Write-Verbose "[$functionName] Removing old executable file $executableFileName.old"
-            Remove-Item -Path "$executableFileName.old" -Force
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed old executable file $executableFileName.old" -LogLevel "Information"
         }
         catch
         {
