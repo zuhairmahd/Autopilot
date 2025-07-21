@@ -1102,25 +1102,44 @@ function AddCorporateDeviceIdentifier()
     Adds a device identifier to Windows Corporate Device Identifiers in Intune.
     
     .DESCRIPTION
-    This function adds a device identifier (such as serial number or IMEI) to the corporate 
-    device identifiers list in Microsoft Intune. This helps identify corporate-owned devices 
-    for enrollment and management purposes.
+    This function adds a device identifier to the corporate device identifiers list in Microsoft Intune. 
+    This helps identify corporate-owned devices for enrollment and management purposes.
+    
+    Supports three types of identifiers:
+    - SerialNumber: Just the device serial number
+    - IMEI: Device IMEI number (for mobile devices)
+    - manufacturerModelSerial: Comma-separated string "Manufacturer,Model,SerialNumber" (Windows-specific)
     
     .PARAMETER AccessToken
     Valid Microsoft Graph API access token with deviceManagement permissions.
     
     .PARAMETER DeviceIdentifier
-    The device identifier to add (e.g., serial number, IMEI).
+    The device identifier to add. Format depends on IdentifierType:
+    - For SerialNumber: Just the serial number (e.g., "ABC123456789")
+    - For IMEI: Just the IMEI number (e.g., "123456789012345")
+    - For manufacturerModelSerial: "Manufacturer,Model,SerialNumber" (e.g., "Microsoft Corporation,Virtual Machine,ABC123456789")
     
     .PARAMETER IdentifierType
-    Type of identifier being provided. Valid values are 'SerialNumber' or 'IMEI'.
-    Default is 'SerialNumber'.
+    Type of identifier being provided. Valid values are:
+    - 'SerialNumber': Device serial number only
+    - 'IMEI': Device IMEI number only  
+    - 'manufacturerModelSerial': Windows-specific format with manufacturer, model, and serial
+    Default is 'manufacturerModelSerial'.
+    
+    .PARAMETER OverwriteImportedDeviceIdentities
+    Switch to enable overwriting existing device identities if they already exist.
     
     .EXAMPLE
     AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
     
     .EXAMPLE
     AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI"
+    
+    .EXAMPLE
+    AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "Microsoft Corporation,Virtual Machine,ABC123456789" -IdentifierType "manufacturerModelSerial"
+    
+    .EXAMPLE
+    AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "Dell Inc.,OptiPlex 7090,DEL123456" -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
     
     .NOTES
     This function was created to resolve Autopilot V2 device import issues where devices
@@ -1129,6 +1148,8 @@ function AddCorporateDeviceIdentifier()
     Requires Microsoft Graph API permissions:
     - DeviceManagementManagedDevices.ReadWrite.All
     - DeviceManagementConfiguration.ReadWrite.All
+    
+    API Endpoint: https://graph.microsoft.com/beta/deviceManagement/importedDeviceIdentities/importDeviceIdentityList
     #>
     [CmdletBinding()]
     param (
@@ -1167,27 +1188,47 @@ function AddCorporateDeviceIdentifier()
     Write-Verbose "[$functionName] Overwrite Imported Device Identities: $OverwriteImportedDeviceIdentities"
     
     # Microsoft Graph API endpoint for Windows Corporate Device Identifiers
-    # According to Microsoft Graph API documentation, there are several ways to mark devices as corporate:
-    # 1. Through deviceManagement/importedDeviceIdentities (for IMEI/Serial numbers)
-    # 2. Through deviceManagement/deviceEnrollmentConfigurations 
-    # 3. Through deviceManagement/importedWindowsAutopilotDeviceIdentities (for Autopilot)
+    # Based on Microsoft Graph API documentation and community examples:
+    # The correct endpoint is: deviceManagement/importedDeviceIdentities/importDeviceIdentityList
     
-    # Based on the issue description mentioning "Windows Corporate Identifiers",
-    # this likely refers to the importedDeviceIdentities endpoint
-    #consider "deviceManagement/importedDeviceIdentities/importDeviceIdentityList" as well.
-
-    $uri = "deviceManagement/importedDeviceIdentities/importDeviceIdentityList" 
+    $uri = "deviceManagement/importedDeviceIdentities/importDeviceIdentityList"
+    
+    # Handle different identifier types with proper formatting
+    $formattedIdentifier = $DeviceIdentifier
+    $formattedType = $IdentifierType.ToLower()
+    
+    # For manufacturerModelSerial, ensure proper comma-separated format
+    if ($IdentifierType -eq 'manufacturerModelSerial') {
+        # DeviceIdentifier should already be in format "Manufacturer,Model,SerialNumber"
+        # But let's validate and clean it up
+        $parts = $DeviceIdentifier -split ','
+        if ($parts.Count -eq 3) {
+            $manufacturer = $parts[0].Trim()
+            $model = $parts[1].Trim()
+            $serial = $parts[2].Trim()
+            $formattedIdentifier = "$manufacturer,$model,$serial"
+            $formattedType = "manufacturerModelSerial"
+        } else {
+            throw "Invalid manufacturerModelSerial format. Expected 'Manufacturer,Model,SerialNumber' but got: $DeviceIdentifier"
+        }
+    } elseif ($IdentifierType -eq 'SerialNumber') {
+        $formattedType = "serialNumber"
+    } elseif ($IdentifierType -eq 'IMEI') {
+        $formattedType = "imei"
+    }
     
     $body = @{
         overwriteImportedDeviceIdentities = $deviceOverwrite 
         importedDeviceIdentities          = @(
             @{ 
-                importedDeviceIdentifier   = $Identifier
-                importedDeviceIdentityType = $IdentifierType 
+                "@odata.type" = "#microsoft.graph.importedDeviceIdentity"
+                importedDeviceIdentifier   = $formattedIdentifier
+                importedDeviceIdentityType = $formattedType
+                description = "Added via PowerShell Autopilot Tool"
             }
         )
     } | ConvertTo-Json -Depth 10
-    Write-Verbose "[$functionName] Request body: $json"
+    Write-Verbose "[$functionName] Request body: $body"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call" -LogLevel "Debug"
     
     try

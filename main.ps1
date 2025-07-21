@@ -1315,8 +1315,9 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     $deviceIdentifier = GetCorpDeviceIdentifier
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
     {
-        $identifier = "$deviceIdentifier.Manufacturer, $deviceIdentifier.Model, $deviceIdentifier.SerialNumber "
-        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceIdentifier $identifier
+        # For manufacturerModelSerial type, format as comma-separated string
+        $identifier = "$($deviceIdentifier.Manufacturer),$($deviceIdentifier.Model),$($deviceIdentifier.SerialNumber)"
+        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
         if ($result)
         {
             Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green
