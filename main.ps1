@@ -1332,7 +1332,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
         Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifyer for manual upload for Device Preparation (requires admin rights)" -action {
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifyer for manual upload to Device Preparation (requires admin rights)" -action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {

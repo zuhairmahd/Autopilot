@@ -1198,22 +1198,30 @@ function AddCorporateDeviceIdentifier()
     $formattedType = $IdentifierType.ToLower()
     
     # For manufacturerModelSerial, ensure proper comma-separated format
-    if ($IdentifierType -eq 'manufacturerModelSerial') {
+    if ($IdentifierType -eq 'manufacturerModelSerial')
+    {
         # DeviceIdentifier should already be in format "Manufacturer,Model,SerialNumber"
         # But let's validate and clean it up
         $parts = $DeviceIdentifier -split ','
-        if ($parts.Count -eq 3) {
+        if ($parts.Count -eq 3)
+        {
             $manufacturer = $parts[0].Trim()
             $model = $parts[1].Trim()
             $serial = $parts[2].Trim()
             $formattedIdentifier = "$manufacturer,$model,$serial"
             $formattedType = "manufacturerModelSerial"
-        } else {
+        }
+        else
+        {
             throw "Invalid manufacturerModelSerial format. Expected 'Manufacturer,Model,SerialNumber' but got: $DeviceIdentifier"
         }
-    } elseif ($IdentifierType -eq 'SerialNumber') {
+    }
+    elseif ($IdentifierType -eq 'SerialNumber')
+    {
         $formattedType = "serialNumber"
-    } elseif ($IdentifierType -eq 'IMEI') {
+    }
+    elseif ($IdentifierType -eq 'IMEI')
+    {
         $formattedType = "imei"
     }
     
@@ -1221,10 +1229,10 @@ function AddCorporateDeviceIdentifier()
         overwriteImportedDeviceIdentities = $deviceOverwrite 
         importedDeviceIdentities          = @(
             @{ 
-                "@odata.type" = "#microsoft.graph.importedDeviceIdentity"
+                "@odata.type"              = "#microsoft.graph.importedDeviceIdentity"
                 importedDeviceIdentifier   = $formattedIdentifier
                 importedDeviceIdentityType = $formattedType
-                description = "Added via PowerShell Autopilot Tool"
+                description                = "Added via PowerShell Autopilot Tool"
             }
         )
     } | ConvertTo-Json -Depth 10
@@ -1234,8 +1242,8 @@ function AddCorporateDeviceIdentifier()
     try
     {
         Write-Host "Adding device identifier to corporate identifiers..." -ForegroundColor Yellow
-        $result = CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body
-        
+        $result = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body).value
+        Start-Sleep -Seconds 5 # Allow time for the API to process
         if ($result -and $result.id)
         {
             Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
@@ -1260,4 +1268,3 @@ function AddCorporateDeviceIdentifier()
         return $null
     }
 }
-
