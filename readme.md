@@ -12,10 +12,57 @@ The script leverages the Microsoft Graph API to communicate with Intune and prov
 
 - **Interactive Menu System**: User-friendly interface with navigation and context-aware options
 - **Autopilot Device Management**: Import devices into Autopilot with automated hash generation
+- **Device Identifier Management**: Mark devices as corporate-owned in Intune using serial number, IMEI, or manufacturer/model/serial composite. Supports overwrite protection and validation. (See [Device Identifier Management](#device-identifier-management))
 - **Device Status Monitoring**: Real-time device enrollment and readiness status checking
 - **User Verification**: Validate user readiness for device assignment based on group memberships and other criteria
 - **Bulk Operations**: Export device lists and perform batch operations
 - **Settings Management**: Configure application settings through interactive menus
+### Device Identifier Management
+
+The script now supports comprehensive management of Windows Corporate Device Identifiers in Intune, enabling you to mark devices as corporate-owned for Autopilot V2 and Intune enrollment scenarios. This is essential for environments where devices must be recognized as corporate assets before enrollment.
+
+#### Key Functions
+
+- **GetCorpDeviceIdentifier**: Automatically retrieves the current device's manufacturer, model, and serial number using WMI. Returns a PowerShell object with these properties for use in device registration workflows.
+- **AddCorporateDeviceIdentifier**: Adds a device identifier to the corporate device identifiers list in Intune via Microsoft Graph API. Supports three identifier types:
+  - `SerialNumber`: Device serial number only (e.g., `"ABC123456789"`)
+  - `IMEI`: Device IMEI number (e.g., `"123456789012345"`)
+  - `manufacturerModelSerial`: Composite string in the format `"Manufacturer,Model,SerialNumber"` (e.g., `"Microsoft Corporation,Virtual Machine,ABC123456789"`)
+  - The `-OverwriteImportedDeviceIdentities` switch allows you to overwrite existing entries if needed.
+
+#### Usage Examples
+
+```powershell
+# Add current device using manufacturerModelSerial (Windows-specific)
+$deviceInfo = GetCorpDeviceIdentifier
+$identifier = "$($deviceInfo.Manufacturer),$($deviceInfo.Model),$($deviceInfo.SerialNumber)"
+AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial"
+
+# Add device by serial number only
+AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
+
+# Add mobile device by IMEI with overwrite enabled
+AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI" -OverwriteImportedDeviceIdentities
+```
+
+#### Overwrite Protection
+
+By default, the script will not overwrite existing device identifiers. Use the `-OverwriteImportedDeviceIdentities` switch to force an update if a device is already present in Intune.
+
+#### Logging and Error Handling
+
+Both functions include extensive logging and error handling for troubleshooting and auditing. All operations are logged in CMTrace-compatible format.
+### About Menu Option
+
+A new **About** menu option has been added to the main menu. This option provides version information, copyright, licensing, and a summary of the application's capabilities. It is accessible from the main menu and is useful for users who need to quickly reference the application's version, authorship, or support resources.
+
+To access the About menu:
+
+1. Launch the script as usual (`./main.ps1`)
+2. From the main menu, select the "About" option
+3. Review the displayed information
+
+This feature helps with support, compliance, and user education.
 
 ### Security Features
 
