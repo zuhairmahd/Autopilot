@@ -1024,6 +1024,77 @@ function DeleteAutopilotDevice()
     return $success
 }
 
+function RestartDevice()
+{
+    [CmdletBinding()]
+    param (
+        [string]$question = 'Do you want to reboot the device now? (Y/N)',
+        [string]$bootMessage = 'Rebooting the device...',
+        [string]$reminderMessage = 'Remember to reboot the device to start the device enrollment.'
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    $reboot = Read-Host -Prompt $question
+    while ($reboot -notin ('Y', 'N'))
+    {
+        $reboot = Read-Host -Prompt $question
+        Write-Verbose "[$functionName] User input: $reboot"
+        if ($reboot -notin ('Y', 'N'))
+        {
+            Write-Host "Invalid input. Please enter 'Y' for Yes or 'N' for No." -ForegroundColor Red
+            [console]::beep(1000, 500)
+        }
+    }
+    if ($reboot -eq 'Y')
+    {
+        Write-Verbose "[$functionName] User chose to reboot the device."
+        Write-Host $bootMessage -ForegroundColor Green
+        Restart-Computer -Force
+    }
+    else
+    {
+        Write-Verbose "[$functionName] User chose not to reboot the device."
+        Write-Host $reminderMessage -ForegroundColor Red
+        return $false
+    }
+}
+
+function GetCorpDeviceIdentifier()
+{
+    [CmdletBinding()]
+    param (
+        [string]$OutputPath = "$pwd\corp_device_info.csv"
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Exporting corporate device information to $OutputPath"
+    # Get computer system information
+    try
+    {
+        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem 
+        Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth 5)"
+        $bios = Get-CimInstance -ClassName Win32_BIOS
+        Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth 5)"
+    }
+    catch
+    {
+        Write-Error "Failed to retrieve computer system information: $_"
+        return $false
+    }
+    # Extract the desired properties
+    $make = $computerSystem.Manufacturer
+    $model = $computerSystem.Model
+    $serialNumber = $bios.SerialNumber
+    # Output the information
+    Write-Host "Device Manufacturer: $make"
+    Write-Host "Device Model: $model"
+    Write-Host "Device Serial Number: $serialNumber"
+    $deviceInfo = [PSCustomObject]@{
+        Manufacturer = $make
+        Model        = $model
+        SerialNumber = $serialNumber
+    }
+    return $deviceInfo
+}
+
 function AddCorporateDeviceIdentifier()
 {
     <#
@@ -1066,8 +1137,9 @@ function AddCorporateDeviceIdentifier()
         [Parameter(Mandatory = $true)]
         [string]$DeviceIdentifier,
         [Parameter(Mandatory = $false)]
-        [ValidateSet('SerialNumber', 'IMEI')]
-        [string]$IdentifierType = 'SerialNumber'
+        [ValidateSet('SerialNumber', 'IMEI', 'manufacturerModelSerial')]
+        [string]$IdentifierType = 'manufacturerModelSerial',
+        [switch]$OverwriteImportedDeviceIdentities
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -1075,6 +1147,24 @@ function AddCorporateDeviceIdentifier()
     Write-Verbose "[$functionName] Device Identifier: $DeviceIdentifier"
     Write-Verbose "[$functionName] Identifier Type: $IdentifierType"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Adding corporate device identifier: $DeviceIdentifier (Type: $IdentifierType)" -LogLevel "Information"
+    if ($AccessToken -eq '' -or $null -eq $AccessToken)
+    {
+        Write-Verbose "[$functionName] No AccessToken provided."
+        return $false
+    }
+    else
+    {
+        Write-Verbose "[$functionName] AccessToken provided."
+    }
+    if ($OverwriteImportedDeviceIdentities)
+    {
+        $deviceOverwrite = $true
+    }
+    else
+    {
+        $deviceOverwrite = $false
+    }
+    Write-Verbose "[$functionName] Overwrite Imported Device Identities: $OverwriteImportedDeviceIdentities"
     
     # Microsoft Graph API endpoint for Windows Corporate Device Identifiers
     # According to Microsoft Graph API documentation, there are several ways to mark devices as corporate:
@@ -1084,43 +1174,45 @@ function AddCorporateDeviceIdentifier()
     
     # Based on the issue description mentioning "Windows Corporate Identifiers",
     # this likely refers to the importedDeviceIdentities endpoint
-    $uri = "deviceManagement/importedDeviceIdentities"
+    #consider "deviceManagement/importedDeviceIdentities/importDeviceIdentityList" as well.
+
+    $uri = "deviceManagement/importedDeviceIdentities/importDeviceIdentityList" 
     
-    # Create the request body according to Microsoft Graph API schema for imported device identities
-    $deviceIdentifierObject = @{
-        "@odata.type" = "#microsoft.graph.importedDeviceIdentity"
-        "importedDeviceIdentifier" = $DeviceIdentifier
-        "importedDeviceIdentityType" = $IdentifierType.ToLower()
-        "lastModifiedDateTime" = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-        "createdDateTime" = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
-        "description" = "Corporate device identifier added via Autopilot tool"
-        "enrollmentState" = "notContacted"
-        "platform" = "windows"
-    }
-    
-    $json = $deviceIdentifierObject | ConvertTo-Json -Depth 3
+    $body = @{
+        overwriteImportedDeviceIdentities = $deviceOverwrite 
+        importedDeviceIdentities          = @(
+            @{ 
+                importedDeviceIdentifier   = $Identifier
+                importedDeviceIdentityType = $IdentifierType 
+            }
+        )
+    } | ConvertTo-Json -Depth 10
     Write-Verbose "[$functionName] Request body: $json"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call" -LogLevel "Debug"
     
-    try {
+    try
+    {
         Write-Host "Adding device identifier to corporate identifiers..." -ForegroundColor Yellow
-        $result = CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $json
+        $result = CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body
         
-        if ($result -and $result.id) {
+        if ($result -and $result.id)
+        {
             Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
             Write-Host "Corporate identifier ID: $($result.id)" -ForegroundColor Green
             Write-Verbose "[$functionName] Successfully added corporate device identifier with ID: $($result.id)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifier with ID: $($result.id)" -LogLevel "Information"
             return $result
         }
-        else {
+        else
+        {
             Write-Host "Failed to add device identifier to corporate identifiers." -ForegroundColor Red
             Write-Verbose "[$functionName] API call returned unexpected result: $($result | ConvertTo-Json -Depth 3)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to add corporate device identifier - unexpected API response" -LogLevel "Error"
             return $null
         }
     }
-    catch {
+    catch
+    {
         Write-Host "Error adding device identifier to corporate identifiers: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error details: $($_.Exception | Format-List * | Out-String)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error adding corporate device identifier: $($_.Exception.Message)" -LogLevel "Error"
@@ -1128,36 +1220,3 @@ function AddCorporateDeviceIdentifier()
     }
 }
 
-function RestartDevice()
-{
-    [CmdletBinding()]
-    param (
-        [string]$question = 'Do you want to reboot the device now? (Y/N)',
-        [string]$bootMessage = 'Rebooting the device...',
-        [string]$reminderMessage = 'Remember to reboot the device to start the device enrollment.'
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    $reboot = Read-Host -Prompt $question
-    while ($reboot -notin ('Y', 'N'))
-    {
-        $reboot = Read-Host -Prompt $question
-        Write-Verbose "[$functionName] User input: $reboot"
-        if ($reboot -notin ('Y', 'N'))
-        {
-            Write-Host "Invalid input. Please enter 'Y' for Yes or 'N' for No." -ForegroundColor Red
-            [console]::beep(1000, 500)
-        }
-    }
-    if ($reboot -eq 'Y')
-    {
-        Write-Verbose "[$functionName] User chose to reboot the device."
-        Write-Host $bootMessage -ForegroundColor Green
-        Restart-Computer -Force
-    }
-    else
-    {
-        Write-Verbose "[$functionName] User chose not to reboot the device."
-        Write-Host $reminderMessage -ForegroundColor Red
-        return $false
-    }
-}
