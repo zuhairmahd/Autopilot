@@ -1026,6 +1026,39 @@ function DeleteAutopilotDevice()
 
 function AddCorporateDeviceIdentifier()
 {
+    <#
+    .SYNOPSIS
+    Adds a device identifier to Windows Corporate Device Identifiers in Intune.
+    
+    .DESCRIPTION
+    This function adds a device identifier (such as serial number or IMEI) to the corporate 
+    device identifiers list in Microsoft Intune. This helps identify corporate-owned devices 
+    for enrollment and management purposes.
+    
+    .PARAMETER AccessToken
+    Valid Microsoft Graph API access token with deviceManagement permissions.
+    
+    .PARAMETER DeviceIdentifier
+    The device identifier to add (e.g., serial number, IMEI).
+    
+    .PARAMETER IdentifierType
+    Type of identifier being provided. Valid values are 'SerialNumber' or 'IMEI'.
+    Default is 'SerialNumber'.
+    
+    .EXAMPLE
+    AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
+    
+    .EXAMPLE
+    AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI"
+    
+    .NOTES
+    This function was created to resolve Autopilot V2 device import issues where devices
+    need to be marked as corporate-owned before enrollment.
+    
+    Requires Microsoft Graph API permissions:
+    - DeviceManagementManagedDevices.ReadWrite.All
+    - DeviceManagementConfiguration.ReadWrite.All
+    #>
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]

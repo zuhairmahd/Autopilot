@@ -106,7 +106,7 @@ Menu state is maintained in global variables `$global:History` and `$global:Menu
 ## Key Modules
 
 ### Core Function Modules (`/functions/`)
-- **AutopilotDeviceFunctions.ps1**: Device import, validation, assignment checking
+- **AutopilotDeviceFunctions.ps1**: Device import, validation, assignment checking, corporate device identifier management
 - **DeviceAndUserLookupFunctions.ps1**: User/device queries, BitLocker keys, LAPS credentials
 - **DeviceReportingFunctions.ps1**: Export functionality and reporting
 - **GraphAPIFunctions.ps1**: Authentication, token management, JWT handling
