@@ -135,7 +135,6 @@ function Start-FirstRunWizard()
         # Step 4: Create and encrypt configuration file
         Write-SafeLog "Creating configuration file at: $ConfigFile" "Information"
         $configCreated = New-ConfigurationFile -ConfigFile $ConfigFile -ConfigData $finalConfig -Silent:$Silent
-        
         if (-not $configCreated)
         {
             Write-SafeLog "Failed to create configuration file" "Error"
@@ -620,8 +619,9 @@ function New-ConfigurationFile()
         $encryptionPassword = ""
         if ($Silent)
         {
-            $encryptionPassword = "DefaultPassword123!"
-            Write-SafeLog "Using default encryption password in silent mode" "Information"
+            # Use a randomly generated GUID as the default encryption password in silent mode
+            $encryptionPassword = [guid]::NewGuid().ToString()
+            Write-SafeLog "Using randomly generated GUID as encryption password in silent mode" "Information"
         }
         else
         {

@@ -37,6 +37,29 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+$scriptName = $MyInvocation.MyCommand.Name
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+    }
+}
+
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -57,37 +80,10 @@ else
 #endregion import functions.
 
 #region Initialize script
-$scriptName = $MyInvocation.MyCommand.Name
 $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $Global:MinimumLogLevel = $LogLevel
 Write-Log -LogFile $LogFile -StartLogging
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
-{
-    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    Write-Verbose "[$scriptName] Running as an external script."
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
-}
-else
-{
-    Write-Verbose "[$scriptName] Running as a script block."
-    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    if (!$ScriptPath)
-    {
-        $scriptName = 'main.exe'
-        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
-        $ScriptPath = "$PWD"
-        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
-        $fullScriptPath = "$scriptPath\$scriptName"
-        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
-    }
-}
-
 if (Test-Path $oldExecutableFileName)
 {
     Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
