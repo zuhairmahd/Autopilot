@@ -1299,6 +1299,45 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         return $returnValues.backoutText
     }
 }
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Add device to Corporate Identifiers" -action {
+    Write-Verbose "[$scriptName] Adding device to corporate identifiers."
+    if ($accessToken)
+    {
+        Write-Host "Adding device to Windows Corporate Device Identifiers..."
+        
+        # Get device serial number
+        if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+        {
+            $deviceInfo = GetDeviceInfo -NoHash
+            if ($deviceInfo -and $deviceInfo.SerialNumber)
+            {
+                $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceIdentifier $deviceInfo.SerialNumber -IdentifierType "SerialNumber"
+                if ($result)
+                {
+                    Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host "Failed to add device to corporate identifiers." -ForegroundColor Red
+                }
+            }
+            else
+            {
+                Write-Host "Could not retrieve device serial number." -ForegroundColor Red
+            }
+        }
+        else
+        {
+            Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+            Write-Host 'Please run the script as an administrator.' -ForegroundColor Red
+        }
+    }
+    else
+    {
+        Write-Host "Access token not available. Please authenticate first." -ForegroundColor Red
+        return $returnValues.notAuthenticatedMessage
+    }
+}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {

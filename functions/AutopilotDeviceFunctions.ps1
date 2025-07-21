@@ -1024,6 +1024,77 @@ function DeleteAutopilotDevice()
     return $success
 }
 
+function AddCorporateDeviceIdentifier()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$DeviceIdentifier,
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('SerialNumber', 'IMEI')]
+        [string]$IdentifierType = 'SerialNumber'
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Starting corporate device identifier addition"
+    Write-Verbose "[$functionName] Device Identifier: $DeviceIdentifier"
+    Write-Verbose "[$functionName] Identifier Type: $IdentifierType"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Adding corporate device identifier: $DeviceIdentifier (Type: $IdentifierType)" -LogLevel "Information"
+    
+    # Microsoft Graph API endpoint for Windows Corporate Device Identifiers
+    # According to Microsoft Graph API documentation, there are several ways to mark devices as corporate:
+    # 1. Through deviceManagement/importedDeviceIdentities (for IMEI/Serial numbers)
+    # 2. Through deviceManagement/deviceEnrollmentConfigurations 
+    # 3. Through deviceManagement/importedWindowsAutopilotDeviceIdentities (for Autopilot)
+    
+    # Based on the issue description mentioning "Windows Corporate Identifiers",
+    # this likely refers to the importedDeviceIdentities endpoint
+    $uri = "deviceManagement/importedDeviceIdentities"
+    
+    # Create the request body according to Microsoft Graph API schema for imported device identities
+    $deviceIdentifierObject = @{
+        "@odata.type" = "#microsoft.graph.importedDeviceIdentity"
+        "importedDeviceIdentifier" = $DeviceIdentifier
+        "importedDeviceIdentityType" = $IdentifierType.ToLower()
+        "lastModifiedDateTime" = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        "createdDateTime" = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        "description" = "Corporate device identifier added via Autopilot tool"
+        "enrollmentState" = "notContacted"
+        "platform" = "windows"
+    }
+    
+    $json = $deviceIdentifierObject | ConvertTo-Json -Depth 3
+    Write-Verbose "[$functionName] Request body: $json"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call" -LogLevel "Debug"
+    
+    try {
+        Write-Host "Adding device identifier to corporate identifiers..." -ForegroundColor Yellow
+        $result = CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $json
+        
+        if ($result -and $result.id) {
+            Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
+            Write-Host "Corporate identifier ID: $($result.id)" -ForegroundColor Green
+            Write-Verbose "[$functionName] Successfully added corporate device identifier with ID: $($result.id)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifier with ID: $($result.id)" -LogLevel "Information"
+            return $result
+        }
+        else {
+            Write-Host "Failed to add device identifier to corporate identifiers." -ForegroundColor Red
+            Write-Verbose "[$functionName] API call returned unexpected result: $($result | ConvertTo-Json -Depth 3)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to add corporate device identifier - unexpected API response" -LogLevel "Error"
+            return $null
+        }
+    }
+    catch {
+        Write-Host "Error adding device identifier to corporate identifiers: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Verbose "[$functionName] Error details: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error adding corporate device identifier: $($_.Exception.Message)" -LogLevel "Error"
+        return $null
+    }
+}
+
 function RestartDevice()
 {
     [CmdletBinding()]
