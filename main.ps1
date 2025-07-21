@@ -12,6 +12,7 @@ param(
     [switch]$showAuth,
     [switch]$showSettings,
     [switch]$SecureString,
+    [switch]$ResetAuth,
     [switch]$ForceNewToken,
     [parameter(parameterSetName = 'delegated')]
     [switch]$delegated,
@@ -36,6 +37,29 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+$scriptName = $MyInvocation.MyCommand.Name
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+    }
+}
+
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -56,37 +80,10 @@ else
 #endregion import functions.
 
 #region Initialize script
-$scriptName = $MyInvocation.MyCommand.Name
 $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $Global:MinimumLogLevel = $LogLevel
 Write-Log -LogFile $LogFile -StartLogging
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
-{
-    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    Write-Verbose "[$scriptName] Running as an external script."
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
-}
-else
-{
-    Write-Verbose "[$scriptName] Running as a script block."
-    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    if (!$ScriptPath)
-    {
-        $scriptName = 'main.exe'
-        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
-        $ScriptPath = "$PWD"
-        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
-        $fullScriptPath = "$scriptPath\$scriptName"
-        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
-    }
-}
-
 if (Test-Path $oldExecutableFileName)
 {
     Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
@@ -136,6 +133,9 @@ if (Test-Path $configFile)
     # Parse the configuration content
     $configJson = ConvertFrom-Json $configContent
     $domain = $configJson.domain
+    $appId = $configJson.appId
+    $tenantId = $configJson.tenantId
+    $name = $configJson.name
     
     # Clear the config content from memory
     $configContent = $null
@@ -1036,6 +1036,19 @@ function ProcessSerialNumber()
 #endregion helper functions
 
 #region initialization block with access token
+if ($ResetAuth)
+{
+    if (Start-FirstRunWizard -authOnly)
+    {
+        Write-Host "The authentication information has been changed." -ForegroundColor Green
+    }
+    else 
+    {
+        Write-Host "Failed to change the authentication information." -ForegroundColor Red
+        Write-Host "Please check the logs for more information." -ForegroundColor Red
+        exit 1
+    }
+}
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Verbose "[$scriptName] Force new token: $($auth.ForceNewToken )"
 Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshToken )"
@@ -1065,7 +1078,36 @@ else
 {
     Write-Host "Failed to retrieve access token." -ForegroundColor Red
     Write-Host "Please check your authentication parameters and try again." 
-    exit 1
+    Write-Host "Would you like to re-enter your authentication information?"
+    Write-Host "note that this will reset your password and require you to re-enter your application authentication information."
+    $retry = Read-Host "Enter 'yes' to re-enter authentication, or 'no' to exit"
+    while ($retry -notin @('yes', 'no'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+        [console]::beep()
+        $retry = Read-Host "Enter 'yes' to re-enter authentication, or 'no' to exit"
+    }   
+    if ($retry -eq 'yes')
+    {
+        # Reset the authentication information
+        if (Start-FirstRunWizard -authOnly)
+        {
+            Write-Host "The authentication information has been changed." -ForegroundColor Green
+            Write-Host "Getting access token with new authentication information..."
+            $accessToken = GetGraphAccessToken @getTokenParams
+        }
+        else 
+        {
+            Write-Host "Failed to change the authentication information." -ForegroundColor Red
+            Write-Host "Please check the logs for more information." -ForegroundColor Red
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Host "Exiting script due to authentication failure." -ForegroundColor Red
+        exit 1
+    }
 }
 #endregion initialization block with access token
 
@@ -1811,6 +1853,31 @@ else
 {
     Write-Verbose "[$scriptName] App mode is test. Skipping Settings menu."
 }
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Change authentication information" -Action {
+    Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
+    $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
+    while ($choice -notin @('yes', 'no'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+        #beep
+        [console]::beep(1000, 500)
+        $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
+    }
+    if ($choice -eq 'no')
+    {
+        Write-Host "Exiting..."
+        return $returnValues.backoutText
+    }
+    if (Start-FirstRunWizard -authOnly)
+    {
+        Write-Host "The authentication information has been changed." -ForegroundColor Green
+    }
+    else 
+    {
+        Write-Host "Failed to change the authentication information." -ForegroundColor Red
+        Write-Host "Please check the logs for more information." -ForegroundColor Red
+    }
+}
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
@@ -1846,6 +1913,21 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceExportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+    $uri = "applications(appId='$appId')"
+    $extraParameters = "select=displayName"
+    $registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
+    Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+    Write-Host "==========================================================`n"    
+    Write-Host "Domain: $domain"
+    Write-Host "Application name from config: $name"
+    Write-Host "Registered application name: $registeredAppName"
+    Write-Host "Application id: $appId"
+    Write-Host "Tenant id: $tenantId"
+    Write-Host "Delegated authentication: $($auth.delegated)."
+    Write-Host "Authentication type: $($auth.AuthType)"
+}
 #endregion Menu Definitions
 
 #region Show Menu

@@ -35,351 +35,172 @@ param(
     [string]$LogLevel = 'Information'
 )
 
-#region Initialize script
-function Write-Log()
+#region import functions.
+$functionsFolder = "$PWD\functions"
+if (Test-Path $functionsFolder)
 {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
-        [string]$Message,
-        [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
-        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
-        [ValidateScript({
-                $parentDir = Split-Path $_ -Parent
-                if (-not (Test-Path $parentDir))
-                {
-                    try
-                    {
-                        New-Item -Path $parentDir -ItemType Directory -Force | Out-Null
-                    }
-                    catch
-                    {
-                        throw "Failed to create log directory: $_. Exception: $($_.Exception.Message)"
-                    }
-                }
-                return $true
-            })]
-        [string]$LogFile,
-        [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
-        [string]$Module,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
-        [ValidateSet("Verbose", "Debug", "Information", "Warning", "Error")]
-        [string]$LogLevel = "Information",
-        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
-        [switch]$CMTraceFormat,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
-        [int]$MaxLogSizeMB = 10,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
-        [switch]$PassThru,
-        [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
-        [switch]$StartLogging,
-        [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
-        [switch]$FinishLogging,
-        [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
-        [Parameter(Mandatory = $false, ParameterSetName = 'FinishLogging')]
-        [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
-        [string]$MinimumLogLevel
-    )
-    try
+    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    foreach ($function in $functions)
     {
-        # Use global minimum log level if not provided
-        if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
-        {
-            $MinimumLogLevel = $Global:MinimumLogLevel
-        }
-        elseif (-not $MinimumLogLevel)
-        {
-            $MinimumLogLevel = 'Information'
-        }
-        
-        # Define log level hierarchy (higher numbers = more detailed logging)
-        $logLevelHierarchy = @{
-            'Error'       = 1
-            'Warning'     = 2
-            'Information' = 3
-            'Verbose'     = 4
-            'Debug'       = 5
-        }
-        
-        # Handle StartLogging and FinishLogging switches
-        if ($StartLogging -or $FinishLogging)
-        {
-            # Set default values when using StartLogging or FinishLogging
-            $Module = $MyInvocation.MyCommand.Name
-            $LogLevel = "Information"
-            
-            # Create separator line
-            $separatorLine = "=" * 80
-            
-            # Ensure log directory exists
-            $logDir = Split-Path $LogFile -Parent
-            if (-not (Test-Path $logDir))
-            {
-                New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-            }
-            
-            # Check for log rotation if file exists and is too large
-            if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
-            {
-                $archiveFile = $LogFile -replace '\.log$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
-                Move-Item -Path $LogFile -Destination $archiveFile -Force
-                Write-Verbose "Log file rotated to: $archiveFile"
-            }
-            
-            if ($CMTraceFormat)
-            {
-                # For CMTrace format, still use the separator but in CMTrace format
-                $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
-                $cmDate = Get-Date -Format "MM-dd-yyyy"
-                $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-                $logEntry = "<![LOG[$separatorLine]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
-            }
-            else
-            {
-                # For standard format, just use the separator line without timestamp
-                $logEntry = $separatorLine
-            }
-            
-            # Use mutex for thread safety
-            $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
-            $mutex = New-Object System.Threading.Mutex($false, $mutexName)
-            
-            try
-            {
-                $mutex.WaitOne() | Out-Null
-                Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
-            }
-            finally
-            {
-                $mutex.ReleaseMutex()
-                $mutex.Dispose()
-            }
-            
-            # Write to console
-            Write-Host $separatorLine
-            
-            return
-        }
-        
-        # Check if this log entry should be written based on minimum log level
-        # Only continue if the current log level meets or exceeds the minimum threshold
-        if (-not ($StartLogging -or $FinishLogging))
-        {
-            $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
-            $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
-            
-            if ($currentLogLevelValue -gt $minimumLogLevelValue)
-            {
-                # Current log level is more detailed than the minimum, skip logging to file
-                # But still write to console streams
-                switch ($LogLevel)
-                {
-                    "Error"
-                    {
-                        Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
-                    }
-                    "Warning"
-                    {
-                        Write-Warning "[$Module] $Message" 
-                    }
-                    "Verbose"
-                    {
-                        Write-Verbose "[$Module] $Message" 
-                    }
-                    "Debug"
-                    {
-                        Write-Debug "[$Module] $Message" 
-                    }
-                    default
-                    {
-                        # For Information level, we don't output to console in this case
-                    }
-                }
-                return
-            }
-        }
-        
-        # Ensure log directory exists
-        $logDir = Split-Path $LogFile -Parent
-        if (-not (Test-Path $logDir))
-        {
-            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-        }
-        
-        # Check for log rotation if file exists and is too large
-        if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))
-        {
-            $archiveFile = $LogFile -replace '\.log$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
-            Move-Item -Path $LogFile -Destination $archiveFile -Force
-            Write-Verbose "Log file rotated to: $archiveFile"
-        }
-        
-        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-        $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-        
-        if ($CMTraceFormat)
-        {
-            # True CMTrace format: 
-            $cmTime = Get-Date -Format "HH:mm:ss.fff+000"
-            $cmDate = Get-Date -Format "MM-dd-yyyy"
-            $severity = switch ($LogLevel)
-            {
-                "Error"
-                {
-                    3 
-                }
-                "Warning"
-                {
-                    2 
-                }
-                default
-                {
-                    1 
-                }
-            }
-            $logEntry = "<![LOG[$Message]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"$severity`" thread=`"$thread`" file=`"`">"
-        }
-        else
-        {
-            # Enhanced standard format with thread ID
-            $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] $Message"
-        }
-        
-        # Use mutex for thread safety in concurrent scenarios
-        $mutexName = "LogMutex_" + ($LogFile -replace '[\\/:*?"<>|]', '_')
-        $mutex = New-Object System.Threading.Mutex($false, $mutexName)
-        
-        try
-        {
-            $mutex.WaitOne() | Out-Null
-            Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
-        }
-        finally
-        {
-            $mutex.ReleaseMutex()
-            $mutex.Dispose()
-        }
-        
-        # Write to appropriate PowerShell stream based on log level
-        switch ($LogLevel)
-        {
-            "Error"
-            {
-                Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
-            }
-            "Warning"
-            {
-                Write-Warning "[$Module] $Message" 
-            }
-            "Verbose"
-            {
-                Write-Verbose "[$Module] $Message" 
-            }
-            "Debug"
-            {
-                Write-Debug "[$Module] $Message" 
-            }
-            default
-            {
-                Write-Verbose "Logged: $logEntry" 
-            }
-        }
-        
-        # Return log entry if PassThru is specified
-        if ($PassThru)
-        {
-            return [PSCustomObject]@{
-                Timestamp = $timestamp
-                LogLevel  = $LogLevel
-                Module    = $Module
-                Message   = $Message
-                Thread    = $thread
-                LogFile   = $LogFile
-                Entry     = $logEntry
-            }
-        }
+        Write-Verbose "[$scriptName] Importing function $function"
+        . $function.FullName
     }
-    catch
-    {
-        Write-Error "Failed to write to log file '$LogFile': $_"
-        # Fallback to console output
-        Write-Host "$timestamp [$LogLevel] [$Module] $Message" -ForegroundColor $(
-            switch ($LogLevel)
-            {
-                "Error"
-                {
-                    "Red" 
-                }
-                "Warning"
-                {
-                    "Yellow" 
-                }
-                "Debug"
-                {
-                    "Cyan" 
-                }
-                default
-                {
-                    "White" 
-                }
-            }
-        )
-    }
-}
-
-$scriptName = $MyInvocation.MyCommand.Name
-# Set global log level for all Write-Log calls
-$Global:MinimumLogLevel = $LogLevel
-# Initialize logging
-Write-Log -LogFile $LogFile -StartLogging
-if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
-{
-    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
-    Write-Verbose "[$scriptName] Running as an external script."
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Running as an external script." -LogLevel "Information"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path: $ScriptPath" -LogLevel "Information"
 }
 else
 {
-    Write-Verbose "[$scriptName] Running as a script block."
-    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    Write-Verbose "[$scriptName] Script path: $ScriptPath"
-    if (!$ScriptPath)
-    {
-        $scriptName = 'main.exe'
-        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
-        $ScriptPath = "$PWD"
-        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Script path is not set. Defaulting to current directory: $pwd" -LogLevel "Information"
-        $fullScriptPath = "$scriptPath\$scriptName"
-        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Full script path: $fullScriptPath" -LogLevel "Information"
-    }
+    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    exit 1
+}
+#endregion import functions.
+
+#region Initialize script
+$oldExecutableFileName = 'main.exe.old'
+# Set global log level for all Write-Log calls
+$Global:MinimumLogLevel = $LogLevel
+Write-Log -LogFile $LogFile -StartLogging
+if (Test-Path $oldExecutableFileName)
+{
+    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
+    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
+    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
 }
 #endregion Initialize script
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
+
+# Check if the .secrets directory exists, create it if it doesn't
+$secretsDir = Split-Path $configFile -Parent
+if (-not (Test-Path $secretsDir))
+{
+    Write-Verbose "[$scriptName] Creating secrets directory: $secretsDir"
+    New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null
+}
+
+# Initialize variables for encryption handling
+$configContent = $null
+$userPassword = $null
+
 if (Test-Path $configFile)
 {
-    $domain = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty domain
-    $authConfiguration = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
+    # Load the encrypted configuration file
+    $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your encryption password"
+    
+    if (-not $loadResult.Success)
+    {
+        Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
+        Write-Host "Please check file permissions and try again." -ForegroundColor Red
+        exit 1
+    }
+    
+    $configContent = $loadResult.Content
+    
+    # Setup temporary encryption for in-memory access
+    $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
+    if (-not $tempEncryptionResult)
+    {
+        Write-Warning "Temporary encryption setup failed, some features may not work properly"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
+    }
+    
+    # Parse the configuration content
+    $configJson = ConvertFrom-Json $configContent
+    $domain = $configJson.domain
+    $appId = $configJson.appId
+    $tenantId = $configJson.tenantId
+    $name = $configJson.name
+    
+    # Clear the config content from memory
+    $configContent = $null
+}
+else
+{
+    # Configuration file not found - launch first run wizard
+    Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Information"
+    
+    Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
+    
+    # Launch the first run wizard
+    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
+    
+    if ($wizardResult)
+    {
+        Write-Host "First run wizard completed successfully." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
+        
+        # Now try to load the newly created configuration
+        Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
+        
+        # Re-run the configuration loading logic
+        if (Test-Path $configFile)
+        {
+            # Load the encrypted configuration file
+            $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your encryption password"
+            
+            if (-not $loadResult.Success)
+            {
+                Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
+                Write-Host "Please check file permissions and try again." -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($loadResult.ErrorMessage)" -LogLevel "Error"
+                exit 1
+            }
+            
+            $configContent = $loadResult.Content
+            
+            # Setup temporary encryption for in-memory access
+            $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
+            if (-not $tempEncryptionResult)
+            {
+                Write-Warning "Temporary encryption setup failed, some features may not work properly"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
+            }
+            
+            # Parse the configuration content
+            $configJson = ConvertFrom-Json $configContent
+            $domain = $configJson.domain
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+            
+            # Clear the config content from memory
+            $configContent = $null
+        }
+        else
+        {
+            Write-Host "Configuration file was not created successfully." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
+        Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+        exit 1
+    }
+}
+if (Test-Path -Path $InitFile)
+{
+    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
+    $global:globalSettings = @{}
+    $global:localSettings = @{}
+    
+    # Load the init file content
+    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+    
+    # Load auth configuration from init file
+    $authConfiguration = $initFileContent.auth
     $auth = @{}
-    Write-Verbose "[$scriptName] Domain: $domain"
-    Write-Verbose "[$scriptName] Loading Auth configuration from $configFile"
+    Write-Verbose "[$scriptName] Loading Auth configuration from init file"
     foreach ($key in $authConfiguration.PSObject.Properties.Name)
     {
         Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
         {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($authConfiguration.$key)"
+            Write-Verbose "[$scriptName] Read parameter $key from the init file as $($authConfiguration.$key)"
             Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
             if ($authConfiguration.$key -in ('true', 'false'))
             {
@@ -400,13 +221,11 @@ if (Test-Path $configFile)
             $auth.add($key, $PSBoundParameters[$key])
         }
     }
-}
-if (Test-Path -Path $InitFile)
-{
-    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    $global:globalSettings = @{}
-    $global:localSettings = @{}
-    $globalConfigData = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'globalSettings'
+    
+    # Set auth as a script variable so it can be accessed by functions
+    $script:Auth = $auth
+    
+    $globalConfigData = $initFileContent | Select-Object -ExpandProperty 'globalSettings'
     Write-Verbose "[$scriptName] Reading global settings..."
     Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $globalConfigData.PSObject.Properties.Name)
@@ -422,23 +241,20 @@ if (Test-Path -Path $InitFile)
                 $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
                 $globalSettings.add($key, $keyBooleanValue)
                 Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-                # Set-Variable -Name $key -Value $keyBooleanValue
             }
             else
             {
                 Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($globalConfigData.$key))."
-                # Set-Variable -Name $key -Value $globalConfigData.$key
                 $globalSettings.add($key, $globalConfigData.$key)
             }
         }
         else
         {
             Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            #add it to the global settings hashtable.
             $globalSettings.add($key, $PSBoundParameters[$key])
         }
     }
-    $localConfigData = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain
+    $localConfigData = ($initFileContent | Select-Object -ExpandProperty "domains").$domain
     Write-Verbose "[$scriptName] Reading local settings for domain $domain..."
     Write-Verbose "[$scriptName] Found $($localConfigData.PSObject.Properties.Name.count) configurations."
     foreach ($key in $localConfigData.PSObject.Properties.Name)
@@ -470,7 +286,6 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
-    
     #region handle scopes
     $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
     $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
@@ -497,38 +312,27 @@ if (Test-Path -Path $InitFile)
     Write-Verbose "[$scriptName] Merging scopes and removing duplicates."
     $allScopes = @($basicScopes) + @($additionalScopes)
     Write-Verbose "[$scriptName] Total scopes before deduplication: $($allScopes.Count)"
-    $global:requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
+    $requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
     Write-Verbose "[$scriptName] Merged scopes - Total unique scopes: $($requiredScopes.Count)"
     #endregion handle scopes
 }
 else
 {
     Write-Host "Configuration file $initFile not found. Using default values."
-}
+    
+    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
+    if (-not $settingsCreated)
+    {
+            
+    }
+        
 
+    # Set auth as a script variable so it can be accessed by functions
+    $script:Auth = $auth
+}
 #endregion Load parameters from the configuration file if it exists
 
-#region import functions.
-$functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder)
-{
-    Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
-    foreach ($function in $functions)
-    {
-        Write-Verbose "[$scriptName] Importing function $function"
-        . $function.FullName
-    }
-}
-else
-{
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
-    exit 1
-}
-#endregion import functions.
-
 #region variables
-# $auth = Get-Content -Path $configFile -Raw -Force -ErrorAction Stop | ConvertFrom-Json | Select-Object -ExpandProperty auth
 # $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # $scope = $auth.scope
 # $logfile = "mylog.log"
@@ -552,7 +356,7 @@ else
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
-# $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'PublicAuthFlow'
+$accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -565,6 +369,12 @@ else
 # }
 #endregion variables
 
+$uri = "applications(appId='$appId')"
+$extraParameters = "select=displayName"
+$registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
+
+
+exit 0 
 $inputFile = Read-Host "Enter the path to the input file"
 if (-not (Test-Path $inputFile))
 {
@@ -600,7 +410,6 @@ elseif ($choice -eq 'e')
 Write-Host "Script completed successfully." -ForegroundColor Green
 
 exit 0
-
 
 $uris = @()
 # Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http
