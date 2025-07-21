@@ -150,6 +150,44 @@ Primary endpoints used:
 - `/users/{id}/registeredDevices` - User device associations
 - `/deviceManagement/managedDevices` - Intune managed device data
 - `/directory/deviceLocalCredentials` - LAPS credentials
+- `/deviceManagement/importedDeviceIdentities/importDeviceIdentityList` - Corporate device identifier management
+
+### Corporate Device Identifier Management
+The `AddCorporateDeviceIdentifier` function enables marking devices as corporate-owned in Microsoft Intune, which is essential for Autopilot V2 device enrollment. This addresses the common issue where devices cannot be enrolled until they are recognized as corporate assets.
+
+#### Supported Identifier Types
+1. **SerialNumber**: Device serial number only
+   - Format: `"ABC123456789"`
+   - Use case: Standard Windows devices with unique serial numbers
+
+2. **IMEI**: Device IMEI number only
+   - Format: `"123456789012345"`
+   - Use case: Mobile devices and cellular-enabled laptops
+
+3. **manufacturerModelSerial**: Windows-specific composite identifier
+   - Format: `"Manufacturer,Model,SerialNumber"`
+   - Example: `"Microsoft Corporation,Virtual Machine,ABC123456789"`
+   - Use case: Windows devices where additional context is needed for identification
+
+#### Key Features
+- **Automatic Device Detection**: `GetCorpDeviceIdentifier()` function retrieves local device information using WMI
+- **Overwrite Protection**: Optional `-OverwriteImportedDeviceIdentities` switch for handling existing entries
+- **Comprehensive Error Handling**: Detailed logging and validation for troubleshooting
+- **Menu Integration**: Direct integration with main application menu system
+
+#### Usage Examples
+```powershell
+# Add current device using manufacturerModelSerial (Windows-specific)
+$deviceInfo = GetCorpDeviceIdentifier
+$identifier = "$($deviceInfo.Manufacturer),$($deviceInfo.Model),$($deviceInfo.SerialNumber)"
+AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial"
+
+# Add device by serial number only
+AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
+
+# Add mobile device by IMEI with overwrite enabled
+AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI" -OverwriteImportedDeviceIdentities
+```
 
 ## Testing Approach
 
