@@ -61,7 +61,8 @@ function Start-FirstRunWizard()
         [string]$ConfigFile = "$PWD\.secrets\config.json",
         [string]$SettingsFile = "$PWD\settings.json",  
         [string]$StringsFile = "$PWD\strings.json",
-        [switch]$Silent
+        [switch]$Silent,
+        [switch]$authOnly
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -139,6 +140,13 @@ function Start-FirstRunWizard()
         {
             Write-SafeLog "Failed to create configuration file" "Error"
             return $false
+        }
+        
+        if ($authOnly)
+        {
+            Write-SafeLog "Authentication configuration completed successfully" "Information"
+            Write-Host "Authentication configuration completed successfully." -ForegroundColor Green
+            return $true
         }
         
         # Step 5: Ensure settings.json exists with defaults
