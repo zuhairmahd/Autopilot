@@ -1360,7 +1360,9 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device
             $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -Force
             Write-Host "Device information exported to $outputFile"
             Write-Host "Since you are running under Powershell 5 or earlier, the CSV file will contain a header row."
-            Write-Host "Be sure to remove the header row if you want to use this file for Autopilot device preparation."
+            Write-Host "Be sure to remove the header row if you want to use this file for upload to Autopilot device preparation."
+            Write-Host "You can use a text editor or a CSV editing tool to remove the header row."
+            Write-Host "If you do not remove the header row, the upload to Autopilot device preparation will fail."
         }
     }
     else

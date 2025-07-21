@@ -1065,33 +1065,54 @@ function GetCorpDeviceIdentifier()
         [string]$OutputPath = "$pwd\corp_device_info.csv"
     )
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Exporting corporate device information to $OutputPath"
+    Write-Verbose "[$functionName] Entered function. OutputPath: $OutputPath"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting GetCorpDeviceIdentifier. OutputPath: $OutputPath" -LogLevel "Information"
+
     # Get computer system information
     try
     {
+        Write-Verbose "[$functionName] Attempting to retrieve computer system information via Win32_ComputerSystem."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving Win32_ComputerSystem info..." -LogLevel "Debug"
         $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem 
         Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth 5)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_ComputerSystem info: $($computerSystem | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
+
+        Write-Verbose "[$functionName] Attempting to retrieve BIOS information via Win32_BIOS."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving Win32_BIOS info..." -LogLevel "Debug"
         $bios = Get-CimInstance -ClassName Win32_BIOS
         Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth 5)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_BIOS info: $($bios | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
     }
     catch
     {
         Write-Error "Failed to retrieve computer system information: $_"
+        Write-Verbose "[$functionName] Exception occurred: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error retrieving system info: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
+
     # Extract the desired properties
+    Write-Verbose "[$functionName] Extracting Manufacturer, Model, and SerialNumber."
     $make = $computerSystem.Manufacturer
     $model = $computerSystem.Model
     $serialNumber = $bios.SerialNumber
+    Write-Verbose "[$functionName] Extracted values: Manufacturer='$make', Model='$model', SerialNumber='$serialNumber'"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Extracted device info: Manufacturer='$make', Model='$model', SerialNumber='$serialNumber'" -LogLevel "Information"
+
     # Output the information
     Write-Host "Device Manufacturer: $make"
     Write-Host "Device Model: $model"
     Write-Host "Device Serial Number: $serialNumber"
+    Write-Verbose "[$functionName] Outputting device info to host."
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Outputting device info to host." -LogLevel "Debug"
+
     $deviceInfo = [PSCustomObject]@{
         Manufacturer = $make
         Model        = $model
         SerialNumber = $serialNumber
     }
+    Write-Verbose "[$functionName] Returning device info object."
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth 3)" -LogLevel "Debug"
     return $deviceInfo
 }
 
@@ -1164,44 +1185,49 @@ function AddCorporateDeviceIdentifier()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting corporate device identifier addition"
-    Write-Verbose "[$functionName] Device Identifier: $DeviceIdentifier"
-    Write-Verbose "[$functionName] Identifier Type: $IdentifierType"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Adding corporate device identifier: $DeviceIdentifier (Type: $IdentifierType)" -LogLevel "Information"
+    Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting AddCorporateDeviceIdentifier. DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'" -LogLevel "Information"
+
     if ($AccessToken -eq '' -or $null -eq $AccessToken)
     {
-        Write-Verbose "[$functionName] No AccessToken provided."
+        Write-Verbose "[$functionName] No AccessToken provided. Aborting."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No AccessToken provided. Aborting." -LogLevel "Error"
         return $false
     }
     else
     {
         Write-Verbose "[$functionName] AccessToken provided."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken provided." -LogLevel "Debug"
     }
+
     if ($OverwriteImportedDeviceIdentities)
     {
         $deviceOverwrite = $true
+        Write-Verbose "[$functionName] OverwriteImportedDeviceIdentities switch is set. Will overwrite existing device identities."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "OverwriteImportedDeviceIdentities is set to true." -LogLevel "Debug"
     }
     else
     {
         $deviceOverwrite = $false
+        Write-Verbose "[$functionName] OverwriteImportedDeviceIdentities switch is NOT set. Will NOT overwrite existing device identities."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "OverwriteImportedDeviceIdentities is set to false." -LogLevel "Debug"
     }
-    Write-Verbose "[$functionName] Overwrite Imported Device Identities: $OverwriteImportedDeviceIdentities"
-    
+
     # Microsoft Graph API endpoint for Windows Corporate Device Identifiers
-    # Based on Microsoft Graph API documentation and community examples:
-    # The correct endpoint is: deviceManagement/importedDeviceIdentities/importDeviceIdentityList
-    
     $uri = "deviceManagement/importedDeviceIdentities/importDeviceIdentityList"
-    
+    Write-Verbose "[$functionName] Using Graph API endpoint: $uri"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Using Graph API endpoint: $uri" -LogLevel "Debug"
+
     # Handle different identifier types with proper formatting
     $formattedIdentifier = $DeviceIdentifier
     $formattedType = $IdentifierType.ToLower()
-    
+    Write-Verbose "[$functionName] Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType" -LogLevel "Debug"
+
     # For manufacturerModelSerial, ensure proper comma-separated format
     if ($IdentifierType -eq 'manufacturerModelSerial')
     {
-        # DeviceIdentifier should already be in format "Manufacturer,Model,SerialNumber"
-        # But let's validate and clean it up
+        Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Validating format."
         $parts = $DeviceIdentifier -split ','
         if ($parts.Count -eq 3)
         {
@@ -1210,21 +1236,29 @@ function AddCorporateDeviceIdentifier()
             $serial = $parts[2].Trim()
             $formattedIdentifier = "$manufacturer,$model,$serial"
             $formattedType = "manufacturerModelSerial"
+            Write-Verbose "[$functionName] manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'" -LogLevel "Debug"
         }
         else
         {
+            Write-Verbose "[$functionName] Invalid manufacturerModelSerial format. Throwing error."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid manufacturerModelSerial format: $DeviceIdentifier" -LogLevel "Error"
             throw "Invalid manufacturerModelSerial format. Expected 'Manufacturer,Model,SerialNumber' but got: $DeviceIdentifier"
         }
     }
     elseif ($IdentifierType -eq 'SerialNumber')
     {
         $formattedType = "serialNumber"
+        Write-Verbose "[$functionName] IdentifierType is SerialNumber. formattedType set to 'serialNumber'."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is SerialNumber. formattedType set to 'serialNumber'." -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'IMEI')
     {
         $formattedType = "imei"
+        Write-Verbose "[$functionName] IdentifierType is IMEI. formattedType set to 'imei'."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is IMEI. formattedType set to 'imei'." -LogLevel "Debug"
     }
-    
+
     $body = @{
         overwriteImportedDeviceIdentities = $deviceOverwrite 
         importedDeviceIdentities          = @(
@@ -1237,12 +1271,16 @@ function AddCorporateDeviceIdentifier()
         )
     } | ConvertTo-Json -Depth 10
     Write-Verbose "[$functionName] Request body: $body"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call" -LogLevel "Debug"
-    
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call: $body" -LogLevel "Debug"
+
     try
     {
         Write-Host "Adding device identifier to corporate identifiers..." -ForegroundColor Yellow
+        Write-Verbose "[$functionName] Calling CallGraphAPI with POST to $uri."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Calling CallGraphAPI with POST to $uri." -LogLevel "Information"
         $result = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body).value
+        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 5)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
         Start-Sleep -Seconds 5 # Allow time for the API to process
         if ($result -and $result.id)
         {
@@ -1256,7 +1294,7 @@ function AddCorporateDeviceIdentifier()
         {
             Write-Host "Failed to add device identifier to corporate identifiers." -ForegroundColor Red
             Write-Verbose "[$functionName] API call returned unexpected result: $($result | ConvertTo-Json -Depth 3)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to add corporate device identifier - unexpected API response" -LogLevel "Error"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to add corporate device identifier - unexpected API response: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Error"
             return $null
         }
     }
@@ -1265,6 +1303,7 @@ function AddCorporateDeviceIdentifier()
         Write-Host "Error adding device identifier to corporate identifiers: $($_.Exception.Message)" -ForegroundColor Red
         Write-Verbose "[$functionName] Error details: $($_.Exception | Format-List * | Out-String)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error adding corporate device identifier: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Exception details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
         return $null
     }
 }
