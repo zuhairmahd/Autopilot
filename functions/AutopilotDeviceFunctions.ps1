@@ -1282,12 +1282,12 @@ function AddCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 5)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
         Start-Sleep -Seconds 5 # Allow time for the API to process
-        if ($result -and $result.id)
+        if ($result -and $result.importedDeviceIdentities -is [array] -and $result.importedDeviceIdentities.Count -gt 0)
         {
             Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
-            Write-Host "Corporate identifier ID: $($result.id)" -ForegroundColor Green
-            Write-Verbose "[$functionName] Successfully added corporate device identifier with ID: $($result.id)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifier with ID: $($result.id)" -LogLevel "Information"
+            Write-Host "Number of imported device identities: $($result.importedDeviceIdentities.Count)" -ForegroundColor Green
+            Write-Verbose "[$functionName] Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth 5)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Information"
             return $result
         }
         else
