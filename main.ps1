@@ -1375,7 +1375,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     }
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifyer for manual upload to Device Preparation (requires admin rights)" -action {
-    Write-Verbose "[$scriptName] Custom import device into Autopilot."
+    Write-Verbose "[$scriptName] Exporting Corporate Device Identifier for manual upload to Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
         Write-Verbose "[$scriptName] The script is running with sufficient permissions."
