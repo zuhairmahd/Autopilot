@@ -565,6 +565,31 @@ else
 # }
 #endregion variables
 
+
+
+$Status = Add-CorporateDeviceIdentifiers -IdentifierType imei -OverwriteImportedDeviceIdentities false -Identifier "123456789012345" -Description "Test Device"
+
+if ($Status.status -eq $true)
+{
+
+    Write-Host "Device" $status.importedDeviceIdentifier "added to the Intune Service..." -ForegroundColor Green
+    $Status
+
+}
+
+elseif ($Status.status -eq $false)
+{
+
+    Write-Host "Device" $status.importedDeviceIdentifier "import failed, the device identifier could have already been added to the service..." -ForegroundColor Red
+
+}
+
+Write-Host
+
+
+exit 0
+
+
 $inputFile = Read-Host "Enter the path to the input file"
 if (-not (Test-Path $inputFile))
 {

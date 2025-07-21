@@ -1299,7 +1299,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         return $returnValues.backoutText
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Device Hash for manual upload to Autopilot (requires admin rights)" -action {
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
         Write-Verbose "[$scriptName] The script is running with sufficient permissions."
@@ -1327,6 +1327,74 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for man
         {
             Write-Host 'Failed to create device hash.' -ForegroundColor Red
         }
+    }
+}
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
+    Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    $deviceIdentifier = GetCorpDeviceIdentifier
+    if ($null -ne $deviceIdentifier)
+    {
+        $identifier = "$deviceIdentifier.Manufacturer, $deviceIdentifier.Model, $deviceIdentifier.SerialNumber "
+    }
+    else
+    {
+        Write-Host 'Failed to get Corporate Device Identifier.' -ForegroundColor Red
+    }
+    $global:deviceResult = AddCorporateDeviceIdentifier -AccessToken $accessToken -Identifyer $identifier -OverwriteImportedDeviceIdentities -verbose 
+    if ($deviceResult)
+    {
+        Write-Host "Corporate Device Identifier imported successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to import Corporate Device Identifier." -ForegroundColor Red
+    }
+}
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifyer for manual upload for Device Preparation (requires admin rights)" -action {
+    Write-Verbose "[$scriptName] Custom import device into Autopilot."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Checking for Windows updates."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    $deviceIdentifier = GetCorpDeviceIdentifier
+    if ($null -ne $deviceIdentifier)
+    {
+        $outputFile = "$pwd\CorporateDeviceIdentifier_$($deviceIdentifier.SerialNumber).csv"
+        #if we are running under PowerShell 7 or later, we can use Export-Csv with -NoTypeInformation and -NoHeader
+        if ($PSVersionTable.PSVersion.Major -ge 7)
+        {
+            $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -NoHeader -Force
+            Write-Host "Device information exported to $outputFile"
+        }
+        else
+        {
+            $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -Force
+            Write-Host "Device information exported to $outputFile"
+            Write-Host "Since you are running under Powershell 5 or earlier, the CSV file will contain a header row."
+            Write-Host "Be sure to remove the header row if you want to use this file for Autopilot device preparation."
+        }
+    }
+    else
+    {
+        Write-Host 'Failed to export Corporate Device Identifier.' -ForegroundColor Red
     }
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
@@ -1370,7 +1438,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
-
 #endregion Autopilot menu
 
 #region Settings menu

@@ -703,7 +703,7 @@ function CheckDeviceAssignment()
     else
     {
         Write-Verbose "[$functionName] Not a VMWare device. Continuing"
-        $assignment = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceUri -filter $autopilotDeviceFilter).value
+        $assignment = (CallGraphAPI -AccessToken $accessToken -ResourcePath $autopilotDeviceURI -filter $autopilotDeviceFilter).value
     }
     Write-Verbose "[$functionName] Found $($assignment.count) Autopilot devices."
     if ($null -ne $assignment -and $assignment -ne '')
@@ -1057,3 +1057,119 @@ function RestartDevice()
         return $false
     }
 }
+
+function GetCorpDeviceIdentifier()
+{
+    [CmdletBinding()]
+    param (
+        [string]$OutputPath = "$pwd\corp_device_info.csv"
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Exporting corporate device information to $OutputPath"
+    # Get computer system information
+    try
+    {
+        $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem 
+        Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth 5)"
+        $bios = Get-CimInstance -ClassName Win32_BIOS
+        Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth 5)"
+    }
+    catch
+    {
+        Write-Error "Failed to retrieve computer system information: $_"
+        return $false
+    }
+    # Extract the desired properties
+    $make = $computerSystem.Manufacturer
+    $model = $computerSystem.Model
+    $serialNumber = $bios.SerialNumber
+    # Output the information
+    Write-Host "Device Manufacturer: $make"
+    Write-Host "Device Model: $model"
+    Write-Host "Device Serial Number: $serialNumber"
+    $deviceInfo = [PSCustomObject]@{
+        Manufacturer = $make
+        Model        = $model
+        SerialNumber = $serialNumber
+    }
+    return $deviceInfo
+}
+
+function AddCorporateDeviceIdentifier()
+{
+    [cmdletbinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$Identifyer,
+        [switch]$OverwriteImportedDeviceIdentities
+    )        
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Adding corporate device identifiers."
+    if ($AccessToken -eq '' -or $null -eq $AccessToken)
+    {
+        Write-Verbose "[$functionName] No AccessToken provided."
+        return $false
+    }
+    else
+    {
+        Write-Verbose "[$functionName] AccessToken provided."
+    }
+    if ($OverwriteImportedDeviceIdentities)
+    {
+        $deviceOverwrite = $true
+    }
+    else
+    {
+        $deviceOverwrite = $false
+    }
+    Write-Verbose "[$functionName] Overwrite Imported Device Identities: $OverwriteImportedDeviceIdentities"
+    $corpDeviceImportURI = "deviceManagement/importedDeviceIdentities/importDeviceIdentityList"
+    $body = @{
+        overwriteImportedDeviceIdentities = $deviceOverwrite 
+        importedDeviceIdentities          = @(
+            @{ 
+                importedDeviceIdentifier   = $Identifier
+                importedDeviceIdentityType = "manufacturerModelSerial"
+            }
+        )
+    } | ConvertTo-Json -Depth 10
+
+    try
+    {
+        $response = CallGraphAPI -AccessToken $AccessToken -ResourcePath $corpDeviceImportURI -Method POST -Body $body
+        # Check if response is a string and contains any of the status codes 400, 401, 402, 403, or 404 (no regex)
+        $codes = @('400', '401', '402', '403', '404')
+        if ($response -is [string] -and ($codes | Where-Object { $response -like "*$_*" }))
+        {
+            Write-Host "Failed to add corporate device identifiers." -ForegroundColor Red
+            return $false
+        }
+        else
+        {
+            Write-Host "Corporate device identifiers added successfully." -ForegroundColor Green
+            return $true
+        }
+    }
+    catch
+    {
+        $ex = $_.Exception
+        $errorResponse = $ex.Response.GetResponseStream()
+        $reader = New-Object System.IO.StreamReader($errorResponse)
+        $reader.BaseStream.Position = 0
+        $reader.DiscardBufferedData()
+        $responseBody = $reader.ReadToEnd()
+        $line = $_.InvocationInfo.ScriptLineNumber
+        $msg = $ex.message
+        $ErrorMessage += "$responseBody`n"
+        $ErrorMessage += "Exception: $msg on line $line"
+        Write-Error $ErrorMessage
+        break
+    }
+    return $false
+}
+
+
