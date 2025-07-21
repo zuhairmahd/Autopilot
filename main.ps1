@@ -133,6 +133,9 @@ if (Test-Path $configFile)
     # Parse the configuration content
     $configJson = ConvertFrom-Json $configContent
     $domain = $configJson.domain
+    $appId = $configJson.appId
+    $tenantId = $configJson.tenantId
+    $name = $configJson.name
     
     # Clear the config content from memory
     $configContent = $null
@@ -1839,6 +1842,21 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceExportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+    $uri = "applications(appId='$appId')"
+    $extraParameters = "select=displayName"
+    $registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
+    Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+    Write-Host "==========================================================`n"    
+    Write-Host "Domain: $domain"
+    Write-Host "Application name from config: $name"
+    Write-Host "Registered application name: $registeredAppName"
+    Write-Host "Application id: $appId"
+    Write-Host "Tenant id: $tenantId"
+    Write-Host "Delegated authentication: $($auth.delegated)."
+    Write-Host "Authentication type: $($auth.AuthType)"
+}
 #endregion Menu Definitions
 
 #region Show Menu
