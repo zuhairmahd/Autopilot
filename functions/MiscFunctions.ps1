@@ -599,7 +599,7 @@ function Write-Log()
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
         [string]$Module,
         [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
-        [bool]$WriteToConsole = $false,
+        [switch]$WriteToConsole,
         [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
         [ValidateSet("Verbose", "Debug", "Information", "Warning", "Error")]
         [string]$LogLevel = "Information",
@@ -699,7 +699,7 @@ function Write-Log()
             }
             
             # Write to console
-            if ($WriteToConsole)
+            if ($OutputToConsole)
             {
                 Write-Host $separatorLine
             }
@@ -721,28 +721,28 @@ function Write-Log()
                 {
                     "Error"
                     {
-                        if ($WriteToConsole)
+                        if ($OutputToConsole)
                         {
                             Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
                         }
                     }
                     "Warning"
                     {
-                        if ($WriteToConsole)
+                        if ($OutputToConsole)
                         {
                             Write-Warning "[$Module] $Message" 
                         }
                     }
                     "Verbose"
                     {
-                        if ($WriteToConsole)
+                        if ($OutputToConsole)
                         {
                             Write-Verbose "[$Module] $Message" 
                         }
                     }
                     "Debug"
                     {
-                        if ($WriteToConsole)
+                        if ($OutputToConsole)
                         {
                             Write-Debug "[$Module] $Message" 
                         }
@@ -773,7 +773,7 @@ function Write-Log()
         
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
         $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-        
+        $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)        
         if ($CMTraceFormat)
         {
             # True CMTrace format: 
@@ -799,7 +799,7 @@ function Write-Log()
         else
         {
             # Enhanced standard format with thread ID
-            $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] $Message"
+            $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] [Context:$Context] $Message"
         }
         
         # Use mutex for thread safety in concurrent scenarios
@@ -822,35 +822,35 @@ function Write-Log()
         {
             "Error"
             {
-                if ($WriteToConsole)
+                if ($OutputToConsole)
                 {
                     Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
                 }
             }
             "Warning"
             {
-                if ($WriteToConsole)
+                if ($OutputToConsole)
                 {
                     Write-Warning "[$Module] $Message" 
                 }
             }
             "Verbose"
             {
-                if ($WriteToConsole)
+                if ($OutputToConsole)
                 {
                     Write-Verbose "[$Module] $Message" 
                 }
             }
             "Debug"
             {
-                if ($WriteToConsole)
+                if ($OutputToConsole)
                 {
                     Write-Debug "[$Module] $Message" 
                 }
             }
             default
             {
-                if ($WriteToConsole)
+                if ($OutputToConsole)
                 {
                     Write-Verbose "Logged: $logEntry" 
                 }
@@ -898,4 +898,3 @@ function Write-Log()
         )
     }
 }
-
