@@ -1388,10 +1388,10 @@ function DeleteCorporateDeviceIdentifier()
     if ($IdentifierType -eq 'manufacturerModelSerial')
     {
         Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Building identifier from DeviceInfo object."
-        $global:manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
-        $global:modelEscaped = $DeviceInfo.Model -replace ',', '\,'
-        $global:serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
-        $global:formattedIdentifier = ("$manufacturerEscaped,$modelEscaped,$serialEscaped" -replace '[^\w,]', '')
+        $manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
+        $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
+        $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
+        $formattedIdentifier = ("$manufacturerEscaped,$modelEscaped,$serialEscaped" -replace '[^\w,]', '')
         Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
