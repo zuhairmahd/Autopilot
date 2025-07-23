@@ -746,8 +746,8 @@ function CheckDeviceAssignment()
         {
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
-                Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 10)"
-                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
+                Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 100)"
+                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentP1078rofile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
                 Write-Verbose "[$functionName] The device is ready for enrollment."
                 Write-Verbose "[$functionName] Returning $($returnValues.deviceAssignedMessage)"
             }
@@ -844,7 +844,7 @@ function GetDeviceInfo()
     {
         Write-Verbose "[$functionName] Checking for hardware hash."
         $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
-        Write-Verbose "[$functionName] The device details are: $($devDetail | ConvertTo-Json -Depth 5)"
+        Write-Verbose "[$functionName] The device details are: $($devDetail | ConvertTo-Json -Depth 100)"
         if ($devDetail)
         {
             $hash = $devDetail.DeviceHardwareData
@@ -1074,14 +1074,14 @@ function GetCorpDeviceIdentifier()
         Write-Verbose "[$functionName] Attempting to retrieve computer system information via Win32_ComputerSystem."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving Win32_ComputerSystem info..." -LogLevel "Debug"
         $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem 
-        Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth 5)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_ComputerSystem info: $($computerSystem | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth 100)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_ComputerSystem info: $($computerSystem | ConvertTo-Json -Depth 100)" -LogLevel "Debug"
 
         Write-Verbose "[$functionName] Attempting to retrieve BIOS information via Win32_BIOS."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving Win32_BIOS info..." -LogLevel "Debug"
         $bios = Get-CimInstance -ClassName Win32_BIOS
-        Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth 5)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_BIOS info: $($bios | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth 100)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_BIOS info: $($bios | ConvertTo-Json -Depth 100)" -LogLevel "Debug"
     }
     catch
     {
@@ -1112,7 +1112,7 @@ function GetCorpDeviceIdentifier()
         SerialNumber = $serialNumber
     }
     Write-Verbose "[$functionName] Returning device info object."
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth 3)" -LogLevel "Debug"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth 10)" -LogLevel "Debug"
     return $deviceInfo
 }
 
@@ -1226,7 +1226,7 @@ function AddCorporateDeviceIdentifier()
         $manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
         $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
         $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
-        $formattedIdentifier = "$manufacturerEscaped,$modelEscaped,$serialEscaped"
+        $global:formattedIdentifier = ("$manufacturerEscaped,$modelEscaped,$serialEscaped" -replace '[^\w,]', '').ToUpper()
         Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
@@ -1255,7 +1255,7 @@ function AddCorporateDeviceIdentifier()
                 description                = "Added via PowerShell Autopilot Tool"
             }
         )
-    } | ConvertTo-Json -Depth 10
+    } | ConvertTo-Json -Depth 100
     Write-Verbose "[$functionName] Request body: $body"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call: $body" -LogLevel "Debug"
 
@@ -1265,13 +1265,12 @@ function AddCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Calling CallGraphAPI with POST to $uri."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Calling CallGraphAPI with POST to $uri." -LogLevel "Information"
         $result = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body).value
-        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 10)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 10)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 100)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 100)" -LogLevel "Debug"
         Start-Sleep -Seconds 5 # Allow time for the API to process
         if ($result -and $result.id)
         {
             Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
-            Write-Host "Number of imported device identities: $($result.importedDeviceIdentities.Count)" -ForegroundColor Green
             Write-Verbose "[$functionName] Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth 5)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Information"
             return $result
@@ -1389,10 +1388,10 @@ function DeleteCorporateDeviceIdentifier()
     if ($IdentifierType -eq 'manufacturerModelSerial')
     {
         Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Building identifier from DeviceInfo object."
-        $manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
-        $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
-        $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
-        $formattedIdentifier = "$manufacturerEscaped,$modelEscaped,$serialEscaped"
+        $global:manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
+        $global:modelEscaped = $DeviceInfo.Model -replace ',', '\,'
+        $global:serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
+        $global:formattedIdentifier = ("$manufacturerEscaped,$modelEscaped,$serialEscaped" -replace '[^\w,]', '')
         Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
@@ -1423,36 +1422,44 @@ function DeleteCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Getting all imported device identities to filter client-side"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Getting all imported device identities to filter client-side" -LogLevel "Debug"
         
-        $allDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -verbose).value
+        $allDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri).value
         Write-Verbose "[$functionName] Retrieved $($allDevices.Count) total imported device identities"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($allDevices.Count) total imported device identities" -LogLevel "Debug"
         
         # Filter client-side based on identifier type and value
         $existingDevices = @()
-        foreach ($device in $allDevices) {
+        foreach ($device in $allDevices)
+        {
             # Check if this device matches our search criteria
             $deviceMatches = $false
             
-            if ($IdentifierType -eq 'SerialNumber') {
+            if ($IdentifierType -eq 'SerialNumber')
+            {
                 # For serial number, check if the importedDeviceIdentifier matches the device serial
-                if ($device.importedDeviceIdentifier -eq $formattedIdentifier) {
+                if ($device.importedDeviceIdentifier -eq $formattedIdentifier)
+                {
                     $deviceMatches = $true
                 }
             }
-            elseif ($IdentifierType -eq 'IMEI') {
+            elseif ($IdentifierType -eq 'IMEI')
+            {
                 # For IMEI, check if the importedDeviceIdentifier matches the IMEI
-                if ($device.importedDeviceIdentifier -eq $formattedIdentifier) {
+                if ($device.importedDeviceIdentifier -eq $formattedIdentifier)
+                {
                     $deviceMatches = $true
                 }
             }
-            elseif ($IdentifierType -eq 'manufacturerModelSerial') {
+            elseif ($IdentifierType -eq 'manufacturerModelSerial')
+            {
                 # For manufacturerModelSerial, check if the importedDeviceIdentifier matches the formatted string
-                if ($device.importedDeviceIdentifier -eq $formattedIdentifier) {
+                if ($device.importedDeviceIdentifier -eq $formattedIdentifier)
+                {
                     $deviceMatches = $true
                 }
             }
             
-            if ($deviceMatches) {
+            if ($deviceMatches)
+            {
                 $existingDevices += $device
                 Write-Verbose "[$functionName] Found matching device: ID=$($device.id), Identifier=$($device.importedDeviceIdentifier), Type=$($device.importedDeviceIdentityType)"
             }
@@ -1486,82 +1493,16 @@ function DeleteCorporateDeviceIdentifier()
             # Verify deletion (Graph API DELETE typically returns null/empty on success)
             if ($null -eq $deleteResponse -or $deleteResponse -eq '')
             {
-                Write-Verbose "[$functionName] Delete request initiated successfully. Beginning verification of device deletion..."
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Delete request initiated successfully. Beginning verification." -LogLevel "Information"
-                
-                # Monitor the deletion process
-                $retryCount = 0
-                $isDeleted = $false
-                
-                while (-not $isDeleted -and $retryCount -lt $MaxRetries)
-                {
-                    $retryCount++
-                    Write-Host "Verifying device deletion, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
-                    Write-Verbose "[$functionName] Checking if device is still present after delete request (Attempt $retryCount of $MaxRetries)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Verification attempt $retryCount of $MaxRetries" -LogLevel "Debug"
-                    
-                    # Sleep before checking
-                    Start-Sleep -Seconds $RetryDelaySeconds
-                    
-                    # Check if the device still exists
-                    try
-                    {
-                        $verifyResponse = CallGraphAPI -AccessToken $AccessToken -ResourcePath $deleteUri -Method GET
-                        Write-Verbose "[$functionName] Verification response: $($verifyResponse | Out-String)"
-                        
-                        if ($null -eq $verifyResponse -or $verifyResponse -eq '')
-                        {
-                            $isDeleted = $true
-                            Write-Host "Device deletion confirmed!" -ForegroundColor Green
-                            Write-Verbose "[$functionName] Device deletion confirmed at attempt $retryCount."
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Device deletion confirmed at attempt $retryCount" -LogLevel "Information"
-                        }
-                        else
-                        {
-                            Write-Verbose "[$functionName] Device still exists after attempt $retryCount. Waiting for $RetryDelaySeconds seconds before next check."
-                        }
-                    }
-                    catch
-                    {
-                        # If the call fails with 404 (not found), the device is deleted
-                        Write-Verbose "[$functionName] Error checking device: $_"
-                        if ($_.Exception.Response.StatusCode -eq 404)
-                        {
-                            $isDeleted = $true
-                            Write-Host "Device deletion confirmed!" -ForegroundColor Green
-                            Write-Verbose "[$functionName] Device deletion confirmed (404 response) at attempt $retryCount."
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Device deletion confirmed (404 response) at attempt $retryCount" -LogLevel "Information"
-                        }
-                        else
-                        {
-                            Write-Verbose "[$functionName] Unexpected error during verification: $_"
-                            Write-Log -LogFile $LogFile -Module $functionName -Message "Unexpected error during verification: $($_.Exception.Message)" -LogLevel "Warning"
-                        }
-                    }
-                }
-                
-                if ($isDeleted)
-                {
-                    Write-Host "Successfully deleted corporate device identifier." -ForegroundColor Green
-                    Write-Verbose "[$functionName] Corporate device identifier deleted successfully."
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Corporate device identifier deleted successfully" -LogLevel "Information"
-                    return $true
-                }
-                else
-                {
-                    Write-Host "Device deletion verification timed out after $MaxRetries attempts." -ForegroundColor Red
-                    Write-Verbose "[$functionName] Delete operation may have been queued but not completed within the monitoring period."
-                    Write-Warning "Device may still be in the process of being deleted. Please check again later."
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Device deletion verification timed out after $MaxRetries attempts" -LogLevel "Warning"
-                    return $false
-                }
+                Write-Verbose "[$functionName] Delete request initiated successfully."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Delete request initiated successfully." -LogLevel "Information"
+                return $returnValues.deviceDeleteSuccessMessage
             }
             else
             {
                 Write-Host "Failed to delete corporate device identifier." -ForegroundColor Red
                 Write-Verbose "[$functionName] API call returned unexpected result: $($deleteResponse | ConvertTo-Json -Depth 3)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to delete corporate device identifier - unexpected API response: $($deleteResponse | ConvertTo-Json -Depth 5)" -LogLevel "Error"
-                return $false
+                return $returnValues.deviceDeleteFailedMessage
             }
         }
         else
@@ -1569,7 +1510,7 @@ function DeleteCorporateDeviceIdentifier()
             Write-Host "No corporate device identifier found matching the specified criteria." -ForegroundColor Yellow
             Write-Verbose "[$functionName] No device found with identifier '$formattedIdentifier' and type '$formattedType'"
             Write-Log -LogFile $LogFile -Module $functionName -Message "No device found with identifier '$formattedIdentifier' and type '$formattedType'" -LogLevel "Warning"
-            return $false
+            return $returnValues.noDeviceFound
         }
     }
     catch
@@ -1578,6 +1519,6 @@ function DeleteCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Error details: $($_.Exception | Format-List * | Out-String)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error deleting corporate device identifier: $($_.Exception.Message)" -LogLevel "Error"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Exception details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
-        return $false
+        return $returnValues.deviceDeleteFailedMessage
     }
 }

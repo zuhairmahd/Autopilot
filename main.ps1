@@ -1407,13 +1407,13 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device
             return $null
         }
         $result = DeleteCorporateDeviceIdentifier -AccessToken $accessToken -deviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial"
-        if ($result)
+        if ($result -in $returnValues.deviceDeleteSuccessMessage)
         {
             Write-Host "Device successfully removed from corporate identifiers." -ForegroundColor Green
         }
         else
         {
-            Write-Host "Failed to remove device from corporate identifiers." -ForegroundColor Red
+            Write-Host $result
         }
     }
     else
