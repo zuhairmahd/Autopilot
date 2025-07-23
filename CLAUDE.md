@@ -153,7 +153,7 @@ Primary endpoints used:
 - `/deviceManagement/importedDeviceIdentities/importDeviceIdentityList` - Corporate device identifier management
 
 ### Corporate Device Identifier Management
-The `AddCorporateDeviceIdentifier` function enables marking devices as corporate-owned in Microsoft Intune, which is essential for Autopilot V2 device enrollment. This addresses the common issue where devices cannot be enrolled until they are recognized as corporate assets.
+The application provides comprehensive management of Windows Corporate Device Identifiers in Microsoft Intune through two key functions: `AddCorporateDeviceIdentifier` and `DeleteCorporateDeviceIdentifier`. This functionality is essential for Autopilot V2 device enrollment, addressing the common issue where devices cannot be enrolled until they are recognized as corporate assets.
 
 #### Supported Identifier Types
 1. **SerialNumber**: Device serial number only
@@ -171,7 +171,10 @@ The `AddCorporateDeviceIdentifier` function enables marking devices as corporate
 
 #### Key Features
 - **Automatic Device Detection**: `GetCorpDeviceIdentifier()` function retrieves local device information using WMI
-- **Overwrite Protection**: Optional `-OverwriteImportedDeviceIdentities` switch for handling existing entries
+- **Add Device Identifiers**: `AddCorporateDeviceIdentifier()` marks devices as corporate-owned in Intune
+- **Delete Device Identifiers**: `DeleteCorporateDeviceIdentifier()` removes devices from corporate identifier list
+- **Overwrite Protection**: Optional `-OverwriteImportedDeviceIdentities` switch for handling existing entries (Add function only)
+- **Safety Features**: Interactive confirmation prompts and verification for deletion operations
 - **Comprehensive Error Handling**: Detailed logging and validation for troubleshooting
 - **Menu Integration**: Direct integration with main application menu system
 
@@ -187,6 +190,14 @@ AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789
 
 # Add mobile device by IMEI with overwrite enabled
 AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI" -OverwriteImportedDeviceIdentities
+
+# Delete device by serial number
+DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
+
+# Delete current device using manufacturerModelSerial
+$deviceInfo = GetCorpDeviceIdentifier
+$identifier = "$($deviceInfo.Manufacturer),$($deviceInfo.Model),$($deviceInfo.SerialNumber)"
+DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial"
 ```
 
 ## Testing Approach
@@ -197,7 +208,12 @@ Tests are located in `/TestScripts/` and follow this pattern:
 3. Execute test scenarios with validation
 4. Cleanup test environment
 
-Current test coverage focuses on configuration system and device selection functions.
+Current test coverage includes:
+- Configuration system functions (`test-settings-functions.ps1`)
+- Device selection functions (`test-device-selection.ps1`)
+- Corporate device identifier functions (`test-corporate-device-identifier.ps1`)
+- Syntax validation (`test-syntax.ps1`)
+- Comprehensive integration testing (`test-comprehensive.ps1`)
 
 ## Security Considerations
 

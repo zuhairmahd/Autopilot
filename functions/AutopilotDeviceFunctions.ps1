@@ -1307,3 +1307,271 @@ function AddCorporateDeviceIdentifier()
         return $null
     }
 }
+
+function DeleteCorporateDeviceIdentifier()
+{
+    <#
+    .SYNOPSIS
+    Deletes a device identifier from Windows Corporate Device Identifiers in Intune.
+    
+    .DESCRIPTION
+    This function removes a device identifier from the corporate device identifiers list in Microsoft Intune. 
+    This is useful when devices are no longer corporate-owned or need to be removed from the managed device list.
+    
+    Supports three types of identifiers:
+    - SerialNumber: Just the device serial number
+    - IMEI: Device IMEI number (for mobile devices)
+    - manufacturerModelSerial: Comma-separated string "Manufacturer,Model,SerialNumber" (Windows-specific)
+    
+    .PARAMETER AccessToken
+    Valid Microsoft Graph API access token with deviceManagement permissions.
+    
+    .PARAMETER DeviceIdentifier
+    The device identifier to delete. Format depends on IdentifierType:
+    - For SerialNumber: Just the serial number (e.g., "ABC123456789")
+    - For IMEI: Just the IMEI number (e.g., "123456789012345")
+    - For manufacturerModelSerial: "Manufacturer,Model,SerialNumber" (e.g., "Microsoft Corporation,Virtual Machine,ABC123456789")
+    
+    .PARAMETER IdentifierType
+    Type of identifier being provided. Valid values are:
+    - 'SerialNumber': Device serial number only
+    - 'IMEI': Device IMEI number only  
+    - 'manufacturerModelSerial': Windows-specific format with manufacturer, model, and serial
+    Default is 'manufacturerModelSerial'.
+    
+    .PARAMETER MaxRetries
+    Maximum number of retries to verify the deletion was successful. Default is 10.
+    
+    .PARAMETER RetryDelaySeconds
+    Number of seconds to wait between verification attempts. Default is 5.
+    
+    .EXAMPLE
+    DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
+    
+    .EXAMPLE
+    DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI"
+    
+    .EXAMPLE
+    DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "Microsoft Corporation,Virtual Machine,ABC123456789" -IdentifierType "manufacturerModelSerial"
+    
+    .NOTES
+    This function was created to provide cleanup capabilities for corporate device identifiers
+    that are no longer needed or were added incorrectly.
+    
+    Requires Microsoft Graph API permissions:
+    - DeviceManagementManagedDevices.ReadWrite.All
+    - DeviceManagementConfiguration.ReadWrite.All
+    
+    API Endpoint: https://graph.microsoft.com/beta/deviceManagement/importedDeviceIdentities
+    #>
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$AccessToken,
+        [Parameter(Mandatory = $true)]
+        [string]$DeviceIdentifier,
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('SerialNumber', 'IMEI', 'manufacturerModelSerial')]
+        [string]$IdentifierType = 'manufacturerModelSerial',
+        [int]$MaxRetries = 10,
+        [int]$RetryDelaySeconds = 5
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType'"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting DeleteCorporateDeviceIdentifier. DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType'" -LogLevel "Information"
+
+    if ($AccessToken -eq '' -or $null -eq $AccessToken)
+    {
+        Write-Verbose "[$functionName] No AccessToken provided. Aborting."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No AccessToken provided. Aborting." -LogLevel "Error"
+        return $false
+    }
+    else
+    {
+        Write-Verbose "[$functionName] AccessToken provided."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken provided." -LogLevel "Debug"
+    }
+
+    # Microsoft Graph API endpoint for Windows Corporate Device Identifiers
+    $uri = "deviceManagement/importedDeviceIdentities"
+    Write-Verbose "[$functionName] Using Graph API endpoint: $uri"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Using Graph API endpoint: $uri" -LogLevel "Debug"
+
+    # Handle different identifier types with proper formatting for filtering
+    $formattedIdentifier = $DeviceIdentifier
+    $formattedType = $IdentifierType.ToLower()
+    Write-Verbose "[$functionName] Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType" -LogLevel "Debug"
+
+    # For manufacturerModelSerial, ensure proper comma-separated format
+    if ($IdentifierType -eq 'manufacturerModelSerial')
+    {
+        Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Validating format."
+        $parts = $DeviceIdentifier -split ','
+        if ($parts.Count -eq 3)
+        {
+            $manufacturer = $parts[0].Trim()
+            $model = $parts[1].Trim()
+            $serial = $parts[2].Trim()
+            $formattedIdentifier = "$manufacturer,$model,$serial"
+            $formattedType = "manufacturerModelSerial"
+            Write-Verbose "[$functionName] manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'" -LogLevel "Debug"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Invalid manufacturerModelSerial format. Throwing error."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid manufacturerModelSerial format: $DeviceIdentifier" -LogLevel "Error"
+            throw "Invalid manufacturerModelSerial format. Expected 'Manufacturer,Model,SerialNumber' but got: $DeviceIdentifier"
+        }
+    }
+    elseif ($IdentifierType -eq 'SerialNumber')
+    {
+        $formattedType = "serialNumber"
+        Write-Verbose "[$functionName] IdentifierType is SerialNumber. formattedType set to 'serialNumber'."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is SerialNumber. formattedType set to 'serialNumber'." -LogLevel "Debug"
+    }
+    elseif ($IdentifierType -eq 'IMEI')
+    {
+        $formattedType = "imei"
+        Write-Verbose "[$functionName] IdentifierType is IMEI. formattedType set to 'imei'."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is IMEI. formattedType set to 'imei'." -LogLevel "Debug"
+    }
+
+    try
+    {
+        # First, find the device identifier in the imported device identities
+        Write-Host "Searching for device identifier in corporate identifiers..." -ForegroundColor Yellow
+        Write-Verbose "[$functionName] Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'" -LogLevel "Information"
+        
+        # Create filter based on identifier type
+        $filter = "importedDeviceIdentityType eq '$formattedType' and importedDeviceIdentifier eq '$formattedIdentifier'"
+        Write-Verbose "[$functionName] Using filter: $filter"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using filter: $filter" -LogLevel "Debug"
+        
+        $existingDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Filter $filter).value
+        Write-Verbose "[$functionName] Found $($existingDevices.Count) matching device(s)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($existingDevices.Count) matching device(s)" -LogLevel "Debug"
+        
+        if ($existingDevices -and $existingDevices.Count -gt 0)
+        {
+            # Get the first matching device (there should typically only be one)
+            $deviceToDelete = $existingDevices[0]
+            $deviceId = $deviceToDelete.id
+            Write-Host "Found device identifier with ID: $deviceId" -ForegroundColor Green
+            Write-Verbose "[$functionName] Device to delete: $($deviceToDelete | ConvertTo-Json -Depth 3)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Found device identifier to delete with ID: $deviceId" -LogLevel "Information"
+            
+            # Delete the device identifier
+            $deleteUri = "$uri/$deviceId"
+            Write-Verbose "[$functionName] Delete URI: $deleteUri"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Delete URI: $deleteUri" -LogLevel "Debug"
+            
+            Write-Host "Deleting corporate device identifier..." -ForegroundColor Yellow
+            Write-Verbose "[$functionName] Calling CallGraphAPI with DELETE to $deleteUri"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Calling CallGraphAPI with DELETE to $deleteUri" -LogLevel "Information"
+            
+            $deleteResponse = CallGraphAPI -AccessToken $AccessToken -ResourcePath $deleteUri -Method DELETE
+            Write-Verbose "[$functionName] Delete response: $($deleteResponse | Out-String)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Delete response: $($deleteResponse | Out-String)" -LogLevel "Debug"
+            
+            # Verify deletion (Graph API DELETE typically returns null/empty on success)
+            if ($null -eq $deleteResponse -or $deleteResponse -eq '')
+            {
+                Write-Verbose "[$functionName] Delete request initiated successfully. Beginning verification of device deletion..."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Delete request initiated successfully. Beginning verification." -LogLevel "Information"
+                
+                # Monitor the deletion process
+                $retryCount = 0
+                $isDeleted = $false
+                
+                while (-not $isDeleted -and $retryCount -lt $MaxRetries)
+                {
+                    $retryCount++
+                    Write-Host "Verifying device deletion, attempt $retryCount of $MaxRetries..." -ForegroundColor Yellow
+                    Write-Verbose "[$functionName] Checking if device is still present after delete request (Attempt $retryCount of $MaxRetries)"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Verification attempt $retryCount of $MaxRetries" -LogLevel "Debug"
+                    
+                    # Sleep before checking
+                    Start-Sleep -Seconds $RetryDelaySeconds
+                    
+                    # Check if the device still exists
+                    try
+                    {
+                        $verifyResponse = CallGraphAPI -AccessToken $AccessToken -ResourcePath $deleteUri -Method GET
+                        Write-Verbose "[$functionName] Verification response: $($verifyResponse | Out-String)"
+                        
+                        if ($null -eq $verifyResponse -or $verifyResponse -eq '')
+                        {
+                            $isDeleted = $true
+                            Write-Host "Device deletion confirmed!" -ForegroundColor Green
+                            Write-Verbose "[$functionName] Device deletion confirmed at attempt $retryCount."
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Device deletion confirmed at attempt $retryCount" -LogLevel "Information"
+                        }
+                        else
+                        {
+                            Write-Verbose "[$functionName] Device still exists after attempt $retryCount. Waiting for $RetryDelaySeconds seconds before next check."
+                        }
+                    }
+                    catch
+                    {
+                        # If the call fails with 404 (not found), the device is deleted
+                        Write-Verbose "[$functionName] Error checking device: $_"
+                        if ($_.Exception.Response.StatusCode -eq 404)
+                        {
+                            $isDeleted = $true
+                            Write-Host "Device deletion confirmed!" -ForegroundColor Green
+                            Write-Verbose "[$functionName] Device deletion confirmed (404 response) at attempt $retryCount."
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Device deletion confirmed (404 response) at attempt $retryCount" -LogLevel "Information"
+                        }
+                        else
+                        {
+                            Write-Verbose "[$functionName] Unexpected error during verification: $_"
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Unexpected error during verification: $($_.Exception.Message)" -LogLevel "Warning"
+                        }
+                    }
+                }
+                
+                if ($isDeleted)
+                {
+                    Write-Host "Successfully deleted corporate device identifier." -ForegroundColor Green
+                    Write-Verbose "[$functionName] Corporate device identifier deleted successfully."
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Corporate device identifier deleted successfully" -LogLevel "Information"
+                    return $true
+                }
+                else
+                {
+                    Write-Host "Device deletion verification timed out after $MaxRetries attempts." -ForegroundColor Red
+                    Write-Verbose "[$functionName] Delete operation may have been queued but not completed within the monitoring period."
+                    Write-Warning "Device may still be in the process of being deleted. Please check again later."
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Device deletion verification timed out after $MaxRetries attempts" -LogLevel "Warning"
+                    return $false
+                }
+            }
+            else
+            {
+                Write-Host "Failed to delete corporate device identifier." -ForegroundColor Red
+                Write-Verbose "[$functionName] API call returned unexpected result: $($deleteResponse | ConvertTo-Json -Depth 3)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to delete corporate device identifier - unexpected API response: $($deleteResponse | ConvertTo-Json -Depth 5)" -LogLevel "Error"
+                return $false
+            }
+        }
+        else
+        {
+            Write-Host "No corporate device identifier found matching the specified criteria." -ForegroundColor Yellow
+            Write-Verbose "[$functionName] No device found with identifier '$formattedIdentifier' and type '$formattedType'"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No device found with identifier '$formattedIdentifier' and type '$formattedType'" -LogLevel "Warning"
+            return $false
+        }
+    }
+    catch
+    {
+        Write-Host "Error deleting corporate device identifier: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Verbose "[$functionName] Error details: $($_.Exception | Format-List * | Out-String)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error deleting corporate device identifier: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Exception details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
+        return $false
+    }
+}

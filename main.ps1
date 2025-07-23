@@ -1374,6 +1374,55 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
         Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
     }
 }
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -Action {
+    Write-Verbose "[$scriptName] Deleting Corporate Device Identifier from Device Preparation."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+        Write-Verbose "[$scriptName] Preparing to delete Corporate Device Identifier from Device Preparation."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    $deviceIdentifier = GetCorpDeviceIdentifier
+    if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
+    {
+        # For manufacturerModelSerial type, format as comma-separated string
+        $identifier = "$($deviceIdentifier.Manufacturer),$($deviceIdentifier.Model),$($deviceIdentifier.SerialNumber)"
+        Write-Host "This will delete the corporate device identifier for:"
+        Write-Host "  Manufacturer: $($deviceIdentifier.Manufacturer)"
+        Write-Host "  Model: $($deviceIdentifier.Model)"
+        Write-Host "  Serial Number: $($deviceIdentifier.SerialNumber)"
+        $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
+        while ($choice -notin @('yes', 'no'))
+        {
+            Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+            [console]::beep(1000, 500)
+            $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
+        }
+        if ($choice -eq 'no')
+        {
+            Write-Host "Operation cancelled." -ForegroundColor Yellow
+            return $null
+        }
+        $result = DeleteCorporateDeviceIdentifier -AccessToken $accessToken -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial"
+        if ($result)
+        {
+            Write-Host "Device successfully removed from corporate identifiers." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "Failed to remove device from corporate identifiers." -ForegroundColor Red
+        }
+    }
+    else
+    {
+        Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
+    }
+}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -action {
     Write-Verbose "[$scriptName] Exporting Corporate Device Identifier for manual upload to Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
