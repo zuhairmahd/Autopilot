@@ -1364,8 +1364,8 @@ function DeleteCorporateDeviceIdentifier()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType'"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting DeleteCorporateDeviceIdentifier. DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType'" -LogLevel "Information"
+    Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceInfo='$($DeviceInfo | ConvertTo-Json -Compress)', IdentifierType='$IdentifierType'"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting DeleteCorporateDeviceIdentifier. DeviceInfo='$($DeviceInfo | ConvertTo-Json -Compress)', IdentifierType='$IdentifierType'" -LogLevel "Information"
 
     if ($AccessToken -eq '' -or $null -eq $AccessToken)
     {
@@ -1418,14 +1418,48 @@ function DeleteCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'" -LogLevel "Information"
         
-        # Create filter based on identifier type
-        $filter = "importedDeviceIdentityType eq '$formattedType' and importedDeviceIdentifier eq '$formattedIdentifier'"
-        Write-Verbose "[$functionName] Using filter: $filter"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Using filter: $filter" -LogLevel "Debug"
+        # Based on Microsoft documentation, filters on importedDeviceIdentities may not work properly
+        # Get all devices and filter client-side as recommended when API filters fail
+        Write-Verbose "[$functionName] Getting all imported device identities to filter client-side"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Getting all imported device identities to filter client-side" -LogLevel "Debug"
         
-        $existingDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Filter $filter -verbose).value
-        Write-Verbose "[$functionName] Found $($existingDevices.Count) matching device(s)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($existingDevices.Count) matching device(s)" -LogLevel "Debug"
+        $allDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -verbose).value
+        Write-Verbose "[$functionName] Retrieved $($allDevices.Count) total imported device identities"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($allDevices.Count) total imported device identities" -LogLevel "Debug"
+        
+        # Filter client-side based on identifier type and value
+        $existingDevices = @()
+        foreach ($device in $allDevices) {
+            # Check if this device matches our search criteria
+            $deviceMatches = $false
+            
+            if ($IdentifierType -eq 'SerialNumber') {
+                # For serial number, check if the importedDeviceIdentifier matches the device serial
+                if ($device.importedDeviceIdentifier -eq $formattedIdentifier) {
+                    $deviceMatches = $true
+                }
+            }
+            elseif ($IdentifierType -eq 'IMEI') {
+                # For IMEI, check if the importedDeviceIdentifier matches the IMEI
+                if ($device.importedDeviceIdentifier -eq $formattedIdentifier) {
+                    $deviceMatches = $true
+                }
+            }
+            elseif ($IdentifierType -eq 'manufacturerModelSerial') {
+                # For manufacturerModelSerial, check if the importedDeviceIdentifier matches the formatted string
+                if ($device.importedDeviceIdentifier -eq $formattedIdentifier) {
+                    $deviceMatches = $true
+                }
+            }
+            
+            if ($deviceMatches) {
+                $existingDevices += $device
+                Write-Verbose "[$functionName] Found matching device: ID=$($device.id), Identifier=$($device.importedDeviceIdentifier), Type=$($device.importedDeviceIdentityType)"
+            }
+        }
+        
+        Write-Verbose "[$functionName] Found $($existingDevices.Count) matching device(s) after client-side filtering"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($existingDevices.Count) matching device(s) after client-side filtering" -LogLevel "Debug"
         
         if ($existingDevices -and $existingDevices.Count -gt 0)
         {
