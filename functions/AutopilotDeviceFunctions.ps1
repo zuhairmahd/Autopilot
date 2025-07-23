@@ -1268,7 +1268,7 @@ function AddCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 10)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 10)" -LogLevel "Debug"
         Start-Sleep -Seconds 5 # Allow time for the API to process
-        if ($result -and $result.importedDeviceIdentities -is [array] -and $result.importedDeviceIdentities.Count -gt 0)
+        if ($result -and $result.id)
         {
             Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
             Write-Host "Number of imported device identities: $($result.importedDeviceIdentities.Count)" -ForegroundColor Green
@@ -1423,7 +1423,7 @@ function DeleteCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Using filter: $filter"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using filter: $filter" -LogLevel "Debug"
         
-        $existingDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Filter $filter).value
+        $existingDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Filter $filter -verbose).value
         Write-Verbose "[$functionName] Found $($existingDevices.Count) matching device(s)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($existingDevices.Count) matching device(s)" -LogLevel "Debug"
         
