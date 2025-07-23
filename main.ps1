@@ -1358,8 +1358,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
     {
         # For manufacturerModelSerial type, format as comma-separated string
-        $identifier = "$($deviceIdentifier.Manufacturer),$($deviceIdentifier.Model),$($deviceIdentifier.SerialNumber)"
-        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
+        # $identifier = "$($deviceIdentifier.Manufacturer),$($deviceIdentifier.Model),$($deviceIdentifier.SerialNumber)"
+        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities -verbose 
         if ($result)
         {
             Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green
@@ -1408,7 +1408,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device
             Write-Host "Operation cancelled." -ForegroundColor Yellow
             return $null
         }
-        $result = DeleteCorporateDeviceIdentifier -AccessToken $accessToken -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial"
+        $result = DeleteCorporateDeviceIdentifier -AccessToken $accessToken -deviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial"
         if ($result)
         {
             Write-Host "Device successfully removed from corporate identifiers." -ForegroundColor Green

@@ -1177,7 +1177,7 @@ function AddCorporateDeviceIdentifier()
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
         [Parameter(Mandatory = $true)]
-        [string]$DeviceIdentifier,
+        [PSCustomObject]$DeviceInfo, # Output from GetCorpDeviceIdentifier
         [Parameter(Mandatory = $false)]
         [ValidateSet('SerialNumber', 'IMEI', 'manufacturerModelSerial')]
         [string]$IdentifierType = 'manufacturerModelSerial',
@@ -1219,41 +1219,27 @@ function AddCorporateDeviceIdentifier()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Using Graph API endpoint: $uri" -LogLevel "Debug"
 
     # Handle different identifier types with proper formatting
-    $formattedIdentifier = $DeviceIdentifier
     $formattedType = $IdentifierType.ToLower()
-    Write-Verbose "[$functionName] Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType" -LogLevel "Debug"
-
-    # For manufacturerModelSerial, ensure proper comma-separated format
     if ($IdentifierType -eq 'manufacturerModelSerial')
     {
-        Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Validating format."
-        $parts = $DeviceIdentifier -split ','
-        if ($parts.Count -eq 3)
-        {
-            $manufacturer = $parts[0].Trim()
-            $model = $parts[1].Trim()
-            $serial = $parts[2].Trim()
-            $formattedIdentifier = "$manufacturer,$model,$serial"
-            $formattedType = "manufacturerModelSerial"
-            Write-Verbose "[$functionName] manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'" -LogLevel "Debug"
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Invalid manufacturerModelSerial format. Throwing error."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid manufacturerModelSerial format: $DeviceIdentifier" -LogLevel "Error"
-            throw "Invalid manufacturerModelSerial format. Expected 'Manufacturer,Model,SerialNumber' but got: $DeviceIdentifier"
-        }
+        Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Building identifier from DeviceInfo object."
+        $manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
+        $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
+        $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
+        $formattedIdentifier = "$manufacturerEscaped,$modelEscaped,$serialEscaped"
+        Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'SerialNumber')
     {
+        $formattedIdentifier = $DeviceInfo.SerialNumber
         $formattedType = "serialNumber"
         Write-Verbose "[$functionName] IdentifierType is SerialNumber. formattedType set to 'serialNumber'."
         Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is SerialNumber. formattedType set to 'serialNumber'." -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'IMEI')
     {
+        $formattedIdentifier = $DeviceInfo.IMEI
         $formattedType = "imei"
         Write-Verbose "[$functionName] IdentifierType is IMEI. formattedType set to 'imei'."
         Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is IMEI. formattedType set to 'imei'." -LogLevel "Debug"
@@ -1279,8 +1265,8 @@ function AddCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Calling CallGraphAPI with POST to $uri."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Calling CallGraphAPI with POST to $uri." -LogLevel "Information"
         $result = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body).value
-        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 5)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 10)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 10)" -LogLevel "Debug"
         Start-Sleep -Seconds 5 # Allow time for the API to process
         if ($result -and $result.importedDeviceIdentities -is [array] -and $result.importedDeviceIdentities.Count -gt 0)
         {
@@ -1369,7 +1355,7 @@ function DeleteCorporateDeviceIdentifier()
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
         [Parameter(Mandatory = $true)]
-        [string]$DeviceIdentifier,
+        [PSCustomObject]$DeviceInfo, # Output from GetCorpDeviceIdentifier
         [Parameter(Mandatory = $false)]
         [ValidateSet('SerialNumber', 'IMEI', 'manufacturerModelSerial')]
         [string]$IdentifierType = 'manufacturerModelSerial',
@@ -1399,41 +1385,27 @@ function DeleteCorporateDeviceIdentifier()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Using Graph API endpoint: $uri" -LogLevel "Debug"
 
     # Handle different identifier types with proper formatting for filtering
-    $formattedIdentifier = $DeviceIdentifier
     $formattedType = $IdentifierType.ToLower()
-    Write-Verbose "[$functionName] Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Initial formattedIdentifier: $formattedIdentifier, formattedType: $formattedType" -LogLevel "Debug"
-
-    # For manufacturerModelSerial, ensure proper comma-separated format
     if ($IdentifierType -eq 'manufacturerModelSerial')
     {
-        Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Validating format."
-        $parts = $DeviceIdentifier -split ','
-        if ($parts.Count -eq 3)
-        {
-            $manufacturer = $parts[0].Trim()
-            $model = $parts[1].Trim()
-            $serial = $parts[2].Trim()
-            $formattedIdentifier = "$manufacturer,$model,$serial"
-            $formattedType = "manufacturerModelSerial"
-            Write-Verbose "[$functionName] manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial parsed: Manufacturer='$manufacturer', Model='$model', Serial='$serial'" -LogLevel "Debug"
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Invalid manufacturerModelSerial format. Throwing error."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid manufacturerModelSerial format: $DeviceIdentifier" -LogLevel "Error"
-            throw "Invalid manufacturerModelSerial format. Expected 'Manufacturer,Model,SerialNumber' but got: $DeviceIdentifier"
-        }
+        Write-Verbose "[$functionName] IdentifierType is manufacturerModelSerial. Building identifier from DeviceInfo object."
+        $manufacturerEscaped = $DeviceInfo.Manufacturer -replace ',', '\,'
+        $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
+        $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
+        $formattedIdentifier = "$manufacturerEscaped,$modelEscaped,$serialEscaped"
+        Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'SerialNumber')
     {
+        $formattedIdentifier = $DeviceInfo.SerialNumber
         $formattedType = "serialNumber"
         Write-Verbose "[$functionName] IdentifierType is SerialNumber. formattedType set to 'serialNumber'."
         Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is SerialNumber. formattedType set to 'serialNumber'." -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'IMEI')
     {
+        $formattedIdentifier = $DeviceInfo.IMEI
         $formattedType = "imei"
         Write-Verbose "[$functionName] IdentifierType is IMEI. formattedType set to 'imei'."
         Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is IMEI. formattedType set to 'imei'." -LogLevel "Debug"
