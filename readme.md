@@ -29,6 +29,7 @@ The script now supports comprehensive management of Windows Corporate Device Ide
   - `IMEI`: Device IMEI number (e.g., `"123456789012345"`)
   - `manufacturerModelSerial`: Composite string in the format `"Manufacturer,Model,SerialNumber"` (e.g., `"Microsoft Corporation,Virtual Machine,ABC123456789"`)
   - The `-OverwriteImportedDeviceIdentities` switch allows you to overwrite existing entries if needed.
+- **DeleteCorporateDeviceIdentifier**: Removes a device identifier from the corporate device identifiers list in Intune via Microsoft Graph API. Supports the same three identifier types as the Add function. Includes confirmation prompts and verification of successful deletion.
 
 #### Usage Examples
 
@@ -43,11 +44,27 @@ AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789
 
 # Add mobile device by IMEI with overwrite enabled
 AddCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "123456789012345" -IdentifierType "IMEI" -OverwriteImportedDeviceIdentities
+
+# Delete device by serial number
+DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
+
+# Delete current device using manufacturerModelSerial
+$deviceInfo = GetCorpDeviceIdentifier
+$identifier = "$($deviceInfo.Manufacturer),$($deviceInfo.Model),$($deviceInfo.SerialNumber)"
+DeleteCorporateDeviceIdentifier -AccessToken $token -DeviceIdentifier $identifier -IdentifierType "manufacturerModelSerial"
 ```
 
 #### Overwrite Protection
 
-By default, the script will not overwrite existing device identifiers. Use the `-OverwriteImportedDeviceIdentities` switch to force an update if a device is already present in Intune.
+By default, the script will not overwrite existing device identifiers when adding. Use the `-OverwriteImportedDeviceIdentities` switch to force an update if a device is already present in Intune.
+
+#### Safety Features
+
+The Delete function includes several safety features:
+- Interactive confirmation prompts before deletion
+- Automatic verification that the device identifier exists before attempting deletion
+- Post-deletion verification to confirm successful removal
+- Detailed logging and error handling for troubleshooting
 
 #### Logging and Error Handling
 
