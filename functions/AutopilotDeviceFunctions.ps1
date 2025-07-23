@@ -747,7 +747,7 @@ function CheckDeviceAssignment()
             if ($assignment.deploymentProfileAssignmentStatus -eq 'assignedUnkownSyncState' -or $assignment.deploymentProfileAssignmentStatus -eq 'assignedInSync')
             {
                 Write-Verbose "[$functionName] Device details: $($assignment | ConvertTo-Json -Depth 100)"
-                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentP1078rofile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
+                Write-Verbose "[$functionName] The device was assigned to the $($assignment.deploymentProfile.displayName) deployment profile on $($assignment.deploymentProfileAssignedDateTime |FormatDateWithTimeZone)."
                 Write-Verbose "[$functionName] The device is ready for enrollment."
                 Write-Verbose "[$functionName] Returning $($returnValues.deviceAssignedMessage)"
             }
