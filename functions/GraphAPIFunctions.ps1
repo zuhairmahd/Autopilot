@@ -1011,7 +1011,7 @@ function Save-RefreshTokenToConfig()
             Write-Verbose "[$functionName] Config file is encrypted. Prompting for password to decrypt for modification."
             Write-Log -LogFile $LogFile -Module $functionName -Message "Config file is encrypted - prompting for password to decrypt for modification" -LogLevel "Debug"
             # Need to get the user's password to decrypt the config file
-            $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password to update the refresh token"
+            $userPasswordSecure = Get-SecurePassword -Message "Enter your password to update the refresh token"
             $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
             
             # Decrypt the config file
@@ -1079,7 +1079,7 @@ function Save-RefreshTokenToConfig()
             {
                 Write-Verbose "[$functionName] Need user password for disk encryption"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Prompting for password to encrypt updated config to disk" -LogLevel "Debug"
-                $userPasswordSecure = Get-SecurePassword -Message "Enter your encryption password to save the updated configuration"
+                $userPasswordSecure = Get-SecurePassword -Message "Enter your password to save the updated configuration"
                 $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
             }
         }

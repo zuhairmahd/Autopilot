@@ -34,7 +34,7 @@ function Load-EncryptedConfigFile()
         
         [switch]$UseStoredPassword,
         
-        [string]$PasswordPrompt = "Enter your encryption password"
+        [string]$PasswordPrompt = "Enter your password"
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -69,7 +69,7 @@ function Load-EncryptedConfigFile()
         
         if ($encryptionStatus.IsEncrypted)
         {
-            Write-Host "Please enter your password to continue." -ForegroundColor Cyan
+            # Write-Host "Please enter your password to continue." -ForegroundColor Cyan
             Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file is encrypted, prompting for password" -LogLevel "Information"
             
             $retryCount = 0
@@ -345,7 +345,7 @@ function Get-SecurePassword()
     Returns the password as a SecureString.
     
     .EXAMPLE
-    $password = Get-SecurePassword -Message "Enter your encryption password" -RequireConfirmation
+    $password = Get-SecurePassword -Message "Enter your password" -RequireConfirmation
     #>
     [CmdletBinding()]
     param(
@@ -751,7 +751,7 @@ function Initialize-ConfigurationSession()
         
         [switch]$UseStoredPassword,
         
-        [string]$PasswordPrompt = "Enter your encryption password"
+        [string]$PasswordPrompt = "Enter your password"
     )
     
     $functionName = $MyInvocation.MyCommand.Name

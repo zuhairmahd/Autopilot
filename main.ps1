@@ -111,7 +111,7 @@ $userPassword = $null
 if (Test-Path $configFile)
 {
     # Initialize configuration session
-    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your encryption password"
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your password"
     
     if (-not $sessionResult.Success)
     {
@@ -200,7 +200,7 @@ else
         if (Test-Path $configFile)
         {
             # Initialize configuration session after wizard
-            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your encryption password"
+            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your password"
             
             if (-not $sessionResult.Success)
             {
