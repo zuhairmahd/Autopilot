@@ -1008,7 +1008,6 @@ function Invoke-PasswordChangeProcess()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Password change failed: $($_.Exception.Message)" -LogLevel "Error"
         
         # Restore backup if it exists
-        $backupPath = "$ConfigFile.backup-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         if (Test-Path $backupPath)
         {
             Copy-Item -Path $backupPath -Destination $ConfigFile -Force
