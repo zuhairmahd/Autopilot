@@ -3,6 +3,7 @@
   "version": "1.1.0.0",
   "auth": {
     "Delegated": true,
+    "changePWOnNextStart": false,
     "authType": "PublicAuthFlow",
     "renewalLeadTime": 5,
     "NoSaveRefreshToken": false,
