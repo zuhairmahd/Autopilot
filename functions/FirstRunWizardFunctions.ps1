@@ -759,14 +759,15 @@ function Test-SettingsJsonExists()
             description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
             version        = "1.1.0.0"
             auth           = [ordered]@{
-                Delegated          = $IsDelegated
-                authType           = "PublicAuthFlow"
-                renewalLeadTime    = 5
-                NoSaveRefreshToken = $false
-                SecureString       = $false
-                ForceNewToken      = $false
-                CacheType          = "Memory"
-                scope              = @(
+                Delegated           = $IsDelegated
+                authType            = "PublicAuthFlow"
+                changePWOnNextStart = $false
+                renewalLeadTime     = 5
+                NoSaveRefreshToken  = $false
+                SecureString        = $false
+                ForceNewToken       = $false
+                CacheType           = "Memory"
+                scope               = @(
                     "offline_access",
                     "openid",
                     "Device.ReadWrite.All",
