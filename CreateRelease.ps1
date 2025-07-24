@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$Version,
     [string]$outputFile = '',
+    [string]$SettingsFile = "$pwd\settings.json",
     [string]$CompanyName = 'Zuhair Mahmoud',
     [switch]$CreateModule,
     [switch]$Overwrite,
@@ -506,6 +507,12 @@ function UpdateSettingsFile()
             {
                 Write-Verbose "[$functionName] changePWOnNextStart setting found. Setting it to true."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting found. Setting it to true." -LogLevel "Information"
+                if ($settings.auth.changePWOnNextStart -eq $true)
+                {
+                    Write-Host "changePWOnNextStart is already set to true. No changes made."
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart is already set to true. No changes made." -LogLevel "Information"
+                    return $true
+                }
                 $settings.auth.changePWOnNextStart = $true
                 # Write updated settings back to file
                 Write-Verbose "[$functionName] Writing updated settings back to file."
@@ -540,6 +547,7 @@ function UpdateSettingsFile()
 $initFile = "init.json"
 $lastRunFile = "$pwd\lastrun.json"
 $maintainCurrentVersion = $false
+$SettingsFile = "$pwd\settings.json"
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.json', 'strings.json', 'init.json') 
 $settingsVersion = (Get-Content -Path "$pwd\settings.json" | ConvertFrom-Json).version
@@ -898,6 +906,7 @@ else
 {
     $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder
 }
+
 if ($secretsCopied)
 {
     Write-Host "Secrets copied successfully to $parentFolder\.secrets"
@@ -905,6 +914,15 @@ if ($secretsCopied)
 else
 {
     Write-Host "No secrets were copied."
+}
+Write-Host "Updating settings file to force password change."
+if (UpdateSettingsFile -SettingsFilePath $SettingsFile)
+{
+    Write-Host "Settings file updated successfully."
+}
+else
+{
+    Write-Host "Failed to update settings file."
 }
 
 Write-Host "Cleaning up..."
