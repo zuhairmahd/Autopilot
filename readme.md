@@ -88,8 +88,27 @@ This feature helps with support, compliance, and user education.
 - **In-Memory Security**: Configuration decryption happens in memory only - never stored as plaintext on disk
 - **Automatic Encryption Setup**: First-run encryption setup with password confirmation
 - **Secure Password Handling**: PowerShell SecureString objects for sensitive data protection
+- **Administrative Password Change**: Forced password change functionality for enhanced security
 - **Principle of Least Privilege**: Minimal required permissions for operations
 - **Enhanced Token Management**: Improved token validation and refresh mechanisms
+
+#### Administrative Password Change Feature
+
+Administrators can now force users to change their configuration decryption password on next login by setting the `auth.changePWOnNextStart` flag to `true` in `settings.json`. This security feature is useful for:
+
+- **Regular password rotation policies**: Enforce periodic password changes
+- **Security incident response**: Force password changes after potential compromises
+- **New employee onboarding**: Ensure users change default passwords
+- **Compliance requirements**: Meet organizational password policies
+
+When enabled, the script will:
+1. Detect the `changePWOnNextStart` flag after successful configuration decryption
+2. Prompt the user to enter a new password (with confirmation)
+3. Re-encrypt the configuration file with the new password
+4. Automatically update `settings.json` to set `changePWOnNextStart` to `false`
+5. Continue normal operation with the new password
+
+The process includes automatic backup creation and rollback capabilities to ensure configuration safety.
 
 ### Operational Modes
 
@@ -346,6 +365,7 @@ The `settings.json` file contains the primary configuration for the script with 
 The `auth` object at the root level of `settings.json` contains all authentication-related settings:
 
 - `Deligated`: Whether to use delegated authentication (boolean)
+- `changePWOnNextStart`: Force password change on next application start (boolean)
 - `authType`: Type of authentication flow ("PublicAuthFlow", "Interactive", "Private")
 - `renewalLeadTime`: Time in minutes before token expiration to renew
 - `NoSaveRefreshToken`: Whether to save refresh tokens (boolean)
@@ -353,6 +373,31 @@ The `auth` object at the root level of `settings.json` contains all authenticati
 - `ForceNewToken`: Whether to force generation of new tokens (boolean)
 - `CacheType`: Token cache type ("Memory", "File")
 - `scope`: Array of required Microsoft Graph API scopes
+
+#### Password Change Control
+
+The `changePWOnNextStart` setting provides administrators with control over configuration password security:
+
+```json
+{
+  "auth": {
+    "changePWOnNextStart": true,
+    "authType": "PublicAuthFlow"
+  }
+}
+```
+
+When set to `true`, the application will:
+- Prompt the user to change their encryption password after successful login
+- Re-encrypt the configuration file with the new password
+- Automatically reset the flag to `false` to prevent repeated prompts
+- Provide backup and rollback capabilities for safety
+
+This feature is particularly useful for:
+- Enforcing password rotation policies
+- Responding to security incidents
+- Onboarding new users with temporary passwords
+- Meeting compliance requirements
 
 ### Global Settings
 
