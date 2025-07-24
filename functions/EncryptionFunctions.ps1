@@ -798,12 +798,12 @@ function Invoke-PasswordChangeProcess()
                 $encryptedContent = Get-Content -Path $tempFile -Raw -Encoding UTF8
                 Set-Content -Path $ConfigFile -Value $encryptedContent -Encoding UTF8 -NoNewline
                 
-                Write-Host "✓ Configuration file re-encrypted successfully" -ForegroundColor Green
+                Write-Host "Configuration file re-encrypted successfully" -ForegroundColor Green
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file re-encrypted successfully" -LogLevel "Information"
             }
             else
             {
-                Write-Host "✗ Failed to re-encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
+                Write-Host "Failed to re-encrypt configuration file: $($encryptResult.ErrorMessage)" -ForegroundColor Red
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to re-encrypt configuration file: $($encryptResult.ErrorMessage)" -LogLevel "Error"
                 
                 # Restore backup
@@ -837,10 +837,10 @@ function Invoke-PasswordChangeProcess()
                     $settings.auth.changePWOnNextStart = $false
                     
                     # Write updated settings back to file
-                    $updatedSettingsJson = ConvertTo-Json $settings -Depth 10
+                    $updatedSettingsJson = ConvertTo-Json $settings -Depth 100
                     Set-Content -Path $SettingsFile -Value $updatedSettingsJson -Encoding UTF8
                     
-                    Write-Host "✓ Settings updated successfully" -ForegroundColor Green
+                    Write-Host "Settings updated successfully" -ForegroundColor Green
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
                 }
                 else
@@ -851,7 +851,7 @@ function Invoke-PasswordChangeProcess()
             }
             catch
             {
-                Write-Host "✗ Failed to update settings file: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Host "Failed to update settings file: $($_.Exception.Message)" -ForegroundColor Red
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to update settings file: $($_.Exception.Message)" -LogLevel "Error"
                 return $false
             }
@@ -877,7 +877,7 @@ function Invoke-PasswordChangeProcess()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Backup file cleaned up" -LogLevel "Debug"
         }
         
-        Write-Host "`n✓ Password change completed successfully!" -ForegroundColor Green
+        Write-Host "Password change completed successfully!" -ForegroundColor Green
         Write-Host "Your configuration file is now secured with your new password." -ForegroundColor Cyan
         Write-Host ""
         Write-Log -LogFile $LogFile -Module $functionName -Message "Password change process completed successfully" -LogLevel "Information"
@@ -886,7 +886,7 @@ function Invoke-PasswordChangeProcess()
     }
     catch
     {
-        Write-Host "✗ Password change failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "Password change failed: $($_.Exception.Message)" -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module $functionName -Message "Password change failed: $($_.Exception.Message)" -LogLevel "Error"
         
         # Restore backup if it exists
