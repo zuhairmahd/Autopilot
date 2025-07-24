@@ -1702,10 +1702,10 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
         Write-Verbose "[$scriptName] User name selected: $possibleUserName"
         # Handle navigation options returned from DisplayUserList
-        if ($null -eq $possibleUserName)
+        if ($possibleUserName -in $returnValues.Values)
         {
-            Write-Verbose "[$scriptName] DisplayUserList returned null (exit signal)."
-            return "EXIT_APPLICATION"
+            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
+            return $possibleUserName
         }
         elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
         {
@@ -1823,10 +1823,10 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
             Write-Verbose "[$scriptName] User name selected: $possibleUserName"
             # Handle navigation options returned from DisplayUserList
-            if ($null -eq $possibleUserName)
+            if ($possibleUserName -in $returnValues.Values)
             {
-                Write-Verbose "[$scriptName] DisplayUserList returned null (exit signal)."
-                return "EXIT_APPLICATION"
+                Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
+                return $possibleUserName
             }
             elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
             {

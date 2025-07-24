@@ -524,11 +524,32 @@ function DisplayUserList()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Displaying user list"
-
     if ($UserList.Count -eq 0)
     {
         Write-Host "No users found." -ForegroundColor Yellow
         return $returnValues.noUserFoundInDirectoryMessage
+    }
+    if ($UserList.Count -eq 1)
+    {
+        Write-Verbose "[$functionName] Only one user found, returning userPrincipalName."
+        Write-Host "$($UserList[0].displayName): ($($UserList[0].userPrincipalName))"
+        $choice = Read-Host "(Y/N)"
+        while ($choice -notin @('Y', 'N', 'y', 'n'))
+        {
+            Write-Host "Please enter Y or N." -ForegroundColor Red
+            [console]::beep(1000, 500)
+            $choice = Read-Host "(Y/N)"
+        }
+        if ($choice -in @('Y', 'y'))
+        {
+            Write-Verbose "[$functionName] User confirmed: $($UserList[0].userPrincipalName)"
+            return $UserList[0].userPrincipalName
+        }
+        else
+        {
+            Write-Verbose "[$functionName] User not confirmed, returning $($returnValues.userCanceledMessage)."
+            return $returnValues.userCanceledMessage
+        }
     }
     if ($userList.count -gt $maxDisplay)
     {
