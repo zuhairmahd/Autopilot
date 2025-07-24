@@ -112,7 +112,14 @@ Menu state is maintained in global variables `$global:History` and `$global:Menu
 - **GraphAPIFunctions.ps1**: Authentication, token management, JWT handling
 - **MenuFunctions.ps1**: Interactive UI navigation system
 - **SettingsHelperFunctions.ps1**: Configuration management and merging
-- **EncryptionFunctions.ps1**: Secure configuration file handling
+- **EncryptionFunctions.ps1**: Secure configuration file handling and password management
+
+#### Key Security Functions in EncryptionFunctions.ps1
+- `Load-EncryptedConfigFile`: Loads and decrypts configuration files with retry logic
+- `Invoke-JsonFileEncryption`: Core AES-256 encryption/decryption functionality
+- `Invoke-PasswordChangeProcess`: Administrative password change workflow (NEW)
+- `Get-SecurePassword`: Secure password input with confirmation
+- `Clear-SecureMemory`: Memory cleanup for sensitive data
 
 ### Configuration Files
 
@@ -222,6 +229,37 @@ Current test coverage includes:
 - Authentication tokens are cached securely with automatic refresh
 - Domain-specific settings allow environment isolation
 - All Microsoft Graph API calls use least-privilege scopes
+- **Administrative password change control**: `auth.changePWOnNextStart` setting enables forced password rotation
+
+### Password Change Security Feature
+
+The application includes administrative control over configuration password security through the `changePWOnNextStart` setting in `settings.json`:
+
+```json
+{
+  "auth": {
+    "changePWOnNextStart": true
+  }
+}
+```
+
+When enabled, this feature:
+- Forces users to change their encryption password on next application start
+- Automatically re-encrypts the configuration file with the new password
+- Updates the setting to `false` to prevent repeated prompts
+- Creates automatic backups during the re-encryption process
+- Provides rollback capabilities if the process fails
+
+**Implementation Location**: The password change logic is implemented in:
+- `functions/EncryptionFunctions.ps1` - `Invoke-PasswordChangeProcess` function
+- `main.ps1` - Password change detection and execution after config loading
+- `TestScripts/test-password-change.ps1` - Comprehensive test coverage
+
+**Use Cases**:
+- Enforcing regular password rotation policies
+- Responding to security incidents
+- Onboarding new users with temporary passwords
+- Meeting organizational compliance requirements
 
 ## Domain Configuration
 

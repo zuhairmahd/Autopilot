@@ -1,209 +1,221 @@
-{
-  "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
-  "version": "1.1.0.0",
-  "auth": {
-    "Delegated": true,
-    "changePWOnNextStart": false,
-    "authType": "PublicAuthFlow",
-    "renewalLeadTime": 5,
-    "NoSaveRefreshToken": false,
-    "SecureString": false,
-    "ForceNewToken": false,
-    "CacheType": "Memory",
-    "scope": [
-      "offline_access",
-      "openid",
-      "Device.ReadWrite.All",
-      "DeviceManagementApps.Read.All",
-      "DeviceManagementConfiguration.ReadWrite.All",
-      "DeviceManagementManagedDevices.PrivilegedOperations.All",
-      "DeviceManagementManagedDevices.ReadWrite.All",
-      "DeviceManagementServiceConfig.ReadWrite.All"
-    ]
-  },
-  "requiredScopes": [
-    {
-      "Scope": "User.Read.All",
-      "Reason": "Required to read user profiles, group memberships, and registered devices.",
-      "Endpoints": [
-        "/users",
-        "users/{id}",
-        "users/{id}/memberOf",
-        "users/{id}/registeredDevices"
-      ]
-    },
-    {
-      "Scope": "Device.Read.All",
-      "Reason": "Required to read Microsoft Entra ID device objects.",
-      "Endpoints": [
-        "devices"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementApps.ReadWrite.All",
-      "Reason": "Required to read application information and manage app assignments.",
-      "Endpoints": [
-        "deviceAppManagement/mobileApps",
-        "deviceAppManagement/mobileApps/{id}/assignments"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementConfiguration.Read.All",
-      "Reason": "Required to read Intune device configuration policies.",
-      "Endpoints": [
-        "deviceManagement/deviceConfigurations"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementManagedDevices.Read.All",
-      "Reason": "Required to read Intune managed device properties.",
-      "Endpoints": [
-        "/deviceManagement/managedDevices",
-        "deviceManagement/managedDevices/{id}"
-      ]
-    },
-    {
-      "Scope": "BitlockerKey.Read.All",
-      "Reason": "Required to read BitLocker recovery keys for all devices.",
-      "Endpoints": [
-        "informationProtection/bitlocker/recoveryKeys"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-      "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
-      "Endpoints": [
-        "directory/deviceLocalCredentials"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementServiceConfig.ReadWrite.All",
-      "Reason": "Required to read Autopilot events and to read and manage Autopilot device identities.",
-      "Endpoints": [
-        "deviceManagement/autopilotEvents",
-        "deviceManagement/importedWindowsAutopilotDeviceIdentities",
-        "deviceManagement/windowsAutopilotDeviceIdentities"
-      ]
-    },
-    {
-      "Scope": "openid",
-      "Reason": "Standard scope required for user sign-in with OpenID Connect.",
-      "Endpoints": []
-    },
-    {
-      "Scope": "profile",
-      "Reason": "Standard scope to get basic user profile information during sign-in.",
-      "Endpoints": []
-    },
-    {
-      "Scope": "offline_access",
-      "Reason": "Standard scope that provides refresh tokens to maintain access when the user is not active.",
-      "Endpoints": []
-    },
-    {
-      "Scope": "DeviceManagementConfiguration.ReadWrite.All",
-      "Reason": "Required to create, update, and delete Intune device configuration policies.",
-      "Endpoints": [
-        "deviceManagement/deviceConfigurations"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementApps.Read.All",
-      "Reason": "Required to read application information in Intune.",
-      "Endpoints": [
-        "deviceAppManagement/mobileApps"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
-      "Reason": "Required to create, update, and delete Intune managed device properties.",
-      "Endpoints": [
-        "deviceManagement/managedDevices"
-      ]
-    },
-    {
-      "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-      "Reason": "Required for privileged operations on managed devices, such as reading LAPS passwords.",
-      "Endpoints": [
-        "deviceManagement/managedDevices"
-      ]
-    },
-    {
-      "Scope": "BitlockerKey.Read.All",
-      "Reason": "Required to read BitLocker recovery keys for all devices.",
-      "Endpoints": [
-        "informationProtection/bitlocker/recoveryKeys"
-      ]
-    }
-  ],
-  "globalSettings": {
-    "operatingSystem": "Windows",
-    "showLicenseBanner": true,
-    "testMode": false,
-    "configFile": ".\\\\.secrets\\\\config.json",
-    "maxWaitTime": "30",
-    "maxUserMatchDisplay": "10",
-    "timeInSeconds": "60",
-    "Release": "master",
-    "Repo": "Github",
-    "appMode": "full"
-  },
-  "domains": {
-    "gao.gov": {
-      "groupsToInclude": [
-        "sg_Office_365_License_G5_wth_windows_pilot",
-        "sg_passwrd_hash_stage",
-        "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
-        "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
-      ],
-      "groupsToExclude": [],
-      "settings": {
-        "domain": "gao.gov",
-        "showLicenseBanner": false,
-        "appMode": "test",
-        "deviceNamePrefix": "w11-",
-        "maxNumberOfDevicesAllowed": 20,
-        "MaxUserNameLength": 50,
-        "MaxSerialNumberLength": 100,
-        "MinSerialNumberLength": 7,
-        "preferredBrowser": "Chrome",
-        "privateSession": true,
-        "MinimumDevicePhysicalMemoryInGB": 16,
-        "MinUsernameLength": 3,
-        "GroupTag": "MSB01",
-        "userPatternsToExclude": [
-          "-cma",
-          "-test",
-          "onmicrosoft.com",
-          "-sup",
-          "-a"
-        ],
-        "DesiredAutopilotProfiles": [
-          "msb"
-        ]
-      }
-    },
-    "arabictutor.com": {
-      "groupsToInclude": [],
-      "groupsToExclude": [],
-      "settings": {
-        "domain": "arabictutor.com",
-        "deviceNamePrefix": "vmware",
-        "operatingSystem": "Windows",
-        "MaxUserNameLength": 50,
-        "MinUsernameLength": 3,
-        "MaxSerialNumberLength": 100,
-        "MinSerialNumberLength": 7,
-        "MinimumDevicePhysicalMemoryInGB": 8,
-        "preferredBrowser": "Chrome",
-        "privateSession": false,
-        "GroupTag": "ENTRA",
-        "maxNumberOfDevicesAllowed": 15,
-        "DesiredAutopilotProfiles": [
-          "windowsCloudConfig Autopilot profile",
-          "Hybrid join profile"
-        ]
-      }
-    }
-  }
+﻿{
+    "description":  "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
+    "version":  "1.1.0.0",
+    "auth":  {
+                 "Delegated":  true,
+                 "changePWOnNextStart":  false,
+                 "authType":  "PublicAuthFlow",
+                 "renewalLeadTime":  5,
+                 "NoSaveRefreshToken":  false,
+                 "SecureString":  false,
+                 "ForceNewToken":  false,
+                 "CacheType":  "Memory",
+                 "scope":  [
+                               "offline_access",
+                               "openid",
+                               "Device.ReadWrite.All",
+                               "DeviceManagementApps.Read.All",
+                               "DeviceManagementConfiguration.ReadWrite.All",
+                               "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                               "DeviceManagementManagedDevices.ReadWrite.All",
+                               "DeviceManagementServiceConfig.ReadWrite.All"
+                           ]
+             },
+    "requiredScopes":  [
+                           {
+                               "Scope":  "User.Read.All",
+                               "Reason":  "Required to read user profiles, group memberships, and registered devices.",
+                               "Endpoints":  [
+                                                 "/users",
+                                                 "users/{id}",
+                                                 "users/{id}/memberOf",
+                                                 "users/{id}/registeredDevices"
+                                             ]
+                           },
+                           {
+                               "Scope":  "Device.Read.All",
+                               "Reason":  "Required to read Microsoft Entra ID device objects.",
+                               "Endpoints":  [
+                                                 "devices"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementApps.ReadWrite.All",
+                               "Reason":  "Required to read application information and manage app assignments.",
+                               "Endpoints":  [
+                                                 "deviceAppManagement/mobileApps",
+                                                 "deviceAppManagement/mobileApps/{id}/assignments"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementConfiguration.Read.All",
+                               "Reason":  "Required to read Intune device configuration policies.",
+                               "Endpoints":  [
+                                                 "deviceManagement/deviceConfigurations"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementManagedDevices.Read.All",
+                               "Reason":  "Required to read Intune managed device properties.",
+                               "Endpoints":  [
+                                                 "/deviceManagement/managedDevices",
+                                                 "deviceManagement/managedDevices/{id}"
+                                             ]
+                           },
+                           {
+                               "Scope":  "BitlockerKey.Read.All",
+                               "Reason":  "Required to read BitLocker recovery keys for all devices.",
+                               "Endpoints":  [
+                                                 "informationProtection/bitlocker/recoveryKeys"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                               "Reason":  "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
+                               "Endpoints":  [
+                                                 "directory/deviceLocalCredentials"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementServiceConfig.ReadWrite.All",
+                               "Reason":  "Required to read Autopilot events and to read and manage Autopilot device identities.",
+                               "Endpoints":  [
+                                                 "deviceManagement/autopilotEvents",
+                                                 "deviceManagement/importedWindowsAutopilotDeviceIdentities",
+                                                 "deviceManagement/windowsAutopilotDeviceIdentities"
+                                             ]
+                           },
+                           {
+                               "Scope":  "openid",
+                               "Reason":  "Standard scope required for user sign-in with OpenID Connect.",
+                               "Endpoints":  [
+
+                                             ]
+                           },
+                           {
+                               "Scope":  "profile",
+                               "Reason":  "Standard scope to get basic user profile information during sign-in.",
+                               "Endpoints":  [
+
+                                             ]
+                           },
+                           {
+                               "Scope":  "offline_access",
+                               "Reason":  "Standard scope that provides refresh tokens to maintain access when the user is not active.",
+                               "Endpoints":  [
+
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementConfiguration.ReadWrite.All",
+                               "Reason":  "Required to create, update, and delete Intune device configuration policies.",
+                               "Endpoints":  [
+                                                 "deviceManagement/deviceConfigurations"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementApps.Read.All",
+                               "Reason":  "Required to read application information in Intune.",
+                               "Endpoints":  [
+                                                 "deviceAppManagement/mobileApps"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementManagedDevices.ReadWrite.All",
+                               "Reason":  "Required to create, update, and delete Intune managed device properties.",
+                               "Endpoints":  [
+                                                 "deviceManagement/managedDevices"
+                                             ]
+                           },
+                           {
+                               "Scope":  "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                               "Reason":  "Required for privileged operations on managed devices, such as reading LAPS passwords.",
+                               "Endpoints":  [
+                                                 "deviceManagement/managedDevices"
+                                             ]
+                           },
+                           {
+                               "Scope":  "BitlockerKey.Read.All",
+                               "Reason":  "Required to read BitLocker recovery keys for all devices.",
+                               "Endpoints":  [
+                                                 "informationProtection/bitlocker/recoveryKeys"
+                                             ]
+                           }
+                       ],
+    "globalSettings":  {
+                           "operatingSystem":  "Windows",
+                           "showLicenseBanner":  true,
+                           "testMode":  false,
+                           "configFile":  ".\\\\.secrets\\\\config.json",
+                           "maxWaitTime":  "30",
+                           "maxUserMatchDisplay":  "10",
+                           "timeInSeconds":  "60",
+                           "Release":  "master",
+                           "Repo":  "Github",
+                           "appMode":  "full"
+                       },
+    "domains":  {
+                    "gao.gov":  {
+                                    "groupsToInclude":  [
+                                                            "sg_Office_365_License_G5_wth_windows_pilot",
+                                                            "sg_passwrd_hash_stage",
+                                                            "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
+                                                            "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
+                                                        ],
+                                    "groupsToExclude":  [
+
+                                                        ],
+                                    "settings":  {
+                                                     "domain":  "gao.gov",
+                                                     "showLicenseBanner":  false,
+                                                     "appMode":  "test",
+                                                     "deviceNamePrefix":  "w11-",
+                                                     "maxNumberOfDevicesAllowed":  20,
+                                                     "MaxUserNameLength":  50,
+                                                     "MaxSerialNumberLength":  100,
+                                                     "MinSerialNumberLength":  7,
+                                                     "preferredBrowser":  "Chrome",
+                                                     "privateSession":  true,
+                                                     "MinimumDevicePhysicalMemoryInGB":  16,
+                                                     "MinUsernameLength":  3,
+                                                     "GroupTag":  "MSB01",
+                                                     "userPatternsToExclude":  [
+                                                                                   "-cma",
+                                                                                   "-test",
+                                                                                   "onmicrosoft.com",
+                                                                                   "-sup",
+                                                                                   "-a"
+                                                                               ],
+                                                     "DesiredAutopilotProfiles":  [
+                                                                                      "msb"
+                                                                                  ]
+                                                 }
+                                },
+                    "arabictutor.com":  {
+                                            "groupsToInclude":  [
+
+                                                                ],
+                                            "groupsToExclude":  [
+
+                                                                ],
+                                            "settings":  {
+                                                             "domain":  "arabictutor.com",
+                                                             "deviceNamePrefix":  "vmware",
+                                                             "operatingSystem":  "Windows",
+                                                             "MaxUserNameLength":  50,
+                                                             "MinUsernameLength":  3,
+                                                             "MaxSerialNumberLength":  100,
+                                                             "MinSerialNumberLength":  7,
+                                                             "MinimumDevicePhysicalMemoryInGB":  8,
+                                                             "preferredBrowser":  "Chrome",
+                                                             "privateSession":  false,
+                                                             "GroupTag":  "ENTRA",
+                                                             "maxNumberOfDevicesAllowed":  15,
+                                                             "DesiredAutopilotProfiles":  [
+                                                                                              "windowsCloudConfig Autopilot profile",
+                                                                                              "Hybrid join profile"
+                                                                                          ]
+                                                         }
+                                        }
+                }
 }

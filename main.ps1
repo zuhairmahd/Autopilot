@@ -110,32 +110,68 @@ $userPassword = $null
 
 if (Test-Path $configFile)
 {
-    # Load the encrypted configuration file
-    $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your encryption password"
+    # Initialize configuration session
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your password"
     
-    if (-not $loadResult.Success)
+    if (-not $sessionResult.Success)
     {
-        Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
+        Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
         Write-Host "Please check file permissions and try again." -ForegroundColor Red
         exit 1
     }
     
-    $configContent = $loadResult.Content
+    $configContent = $sessionResult.ConfigContent
+    $domain = $sessionResult.Domain
+    $appId = $sessionResult.AppId
+    $tenantId = $sessionResult.TenantId
+    $name = $sessionResult.Name
     
-    # Setup temporary encryption for in-memory access
-    $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
-    if (-not $tempEncryptionResult)
+    # Check if password change is required
+    if (Test-Path $InitFile)
     {
-        Write-Warning "Temporary encryption setup failed, some features may not work properly"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
+        try 
+        {
+            $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+            if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
+            {
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+                
+                # Invoke password change process
+                $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+                
+                if ($passwordChangeResult)
+                {
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+                    
+                    # Reload the configuration with new password
+                    Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
+                    $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword
+                    
+                    if ($reloadResult.Success)
+                    {
+                        # Update configContent for this session
+                        $configContent = $reloadResult.ConfigContent
+                    }
+                    else
+                    {
+                        Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                        exit 1
+                    }
+                }
+                else
+                {
+                    Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+                }
+            }
+        }
+        catch
+        {
+            Write-Warning "Failed to check password change requirement: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement: $($_.Exception.Message)" -LogLevel "Warning"
+        }
     }
-    
-    # Parse the configuration content
-    $configJson = ConvertFrom-Json $configContent
-    $domain = $configJson.domain
-    $appId = $configJson.appId
-    $tenantId = $configJson.tenantId
-    $name = $configJson.name
     
     # Clear the config content from memory
     $configContent = $null
@@ -163,31 +199,67 @@ else
         # Re-run the configuration loading logic
         if (Test-Path $configFile)
         {
-            # Load the encrypted configuration file
-            $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your encryption password"
+            # Initialize configuration session after wizard
+            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your password"
             
-            if (-not $loadResult.Success)
+            if (-not $sessionResult.Success)
             {
-                Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
+                Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($loadResult.ErrorMessage)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Error"
                 exit 1
             }
             
-            $configContent = $loadResult.Content
-            
-            # Setup temporary encryption for in-memory access
-            $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
-            if (-not $tempEncryptionResult)
-            {
-                Write-Warning "Temporary encryption setup failed, some features may not work properly"
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
-            }
-            
-            # Parse the configuration content
-            $configJson = ConvertFrom-Json $configContent
-            $domain = $configJson.domain
+            $configContent = $sessionResult.ConfigContent
+            $domain = $sessionResult.Domain
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+            
+            # Check if password change is required (wizard path)
+            if (Test-Path $InitFile)
+            {
+                try 
+                {
+                    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+                    if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
+                    {
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required after wizard (changePWOnNextStart=true)" -LogLevel "Information"
+                        
+                        # Invoke password change process
+                        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+                        
+                        if ($passwordChangeResult)
+                        {
+                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully after wizard" -LogLevel "Information"
+                            
+                            # Reload the configuration with new password
+                            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
+                            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword
+                            
+                            if ($reloadResult.Success)
+                            {
+                                # Update configContent for this session
+                                $configContent = $reloadResult.ConfigContent
+                            }
+                            else
+                            {
+                                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                                exit 1
+                            }
+                        }
+                        else
+                        {
+                            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed after wizard. Continuing with current password." -LogLevel "Warning"
+                        }
+                    }
+                }
+                catch
+                {
+                    Write-Warning "Failed to check password change requirement after wizard: $($_.Exception.Message)"
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement after wizard: $($_.Exception.Message)" -LogLevel "Warning"
+                }
+            }
             
             # Clear the config content from memory
             $configContent = $null

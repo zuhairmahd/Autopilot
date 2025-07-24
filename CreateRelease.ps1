@@ -480,6 +480,60 @@ function CopySecrets()
     }
     return $true
 }
+
+function UpdateSettingsFile()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SettingsFilePath
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating settings file at: $SettingsFilePath"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Updating settings file at: $SettingsFilePath" -LogLevel "Information"
+    if (Test-Path $SettingsFile)
+    {
+        try
+        {
+            Write-Verbose "[$functionName] Reading settings file content."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Reading settings file content." -LogLevel "Information"
+            $settingsContent = Get-Content -Path $SettingsFile -Raw -Encoding UTF8
+            $settings = ConvertFrom-Json $settingsContent
+            # Update the changePWOnNextStart setting
+            Write-Verbose "[$functionName] Checking for changePWOnNextStart setting."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Checking for changePWOnNextStart setting." -LogLevel "Information"
+            if ($settings.auth -and $settings.auth.PSObject.Properties.Name -contains 'changePWOnNextStart')
+            {
+                Write-Verbose "[$functionName] changePWOnNextStart setting found. Setting it to true."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting found. Setting it to true." -LogLevel "Information"
+                $settings.auth.changePWOnNextStart = $true
+                # Write updated settings back to file
+                Write-Verbose "[$functionName] Writing updated settings back to file."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
+                $updatedSettingsJson = ConvertTo-Json $settings -Depth 100
+                Set-Content -Path $SettingsFile -Value $updatedSettingsJson -Encoding UTF8
+                Write-Host "Settings updated successfully" -ForegroundColor Green
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
+            }
+            else
+            {
+                Write-Warning "changePWOnNextStart setting not found in auth section"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting not found in auth section" -LogLevel "Warning"
+            }
+        }
+        catch
+        {
+            Write-Host "Failed to update settings file: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to update settings file: $($_.Exception.Message)" -LogLevel "Error"
+            return $false
+        }
+    }
+    else
+    {
+        Write-Warning "Settings file not found: $SettingsFile"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
+    }
+}
 #endregion
 
 #region Define variables

@@ -86,7 +86,7 @@ $userPassword = $null
 if (Test-Path $configFile)
 {
     # Load the encrypted configuration file
-    $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your encryption password"
+    $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your password"
     
     if (-not $loadResult.Success)
     {
@@ -139,7 +139,7 @@ else
         if (Test-Path $configFile)
         {
             # Load the encrypted configuration file
-            $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your encryption password"
+            $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your password"
             
             if (-not $loadResult.Success)
             {
