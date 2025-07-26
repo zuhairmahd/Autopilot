@@ -9,7 +9,11 @@ param(
     [string]$CompanyName = 'Zuhair Mahmoud',
     [switch]$CreateModule,
     [switch]$Overwrite,
-    [switch]$NoVersionUpdate
+    [switch]$NoVersionUpdate,
+    [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
+    [switch]$SecretsOnly,
+    [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
+    [switch]$UpdateSettings
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
@@ -167,32 +171,123 @@ function CopyFiles()
     return $success
 }
 
-function IncrementRevision()
+function IncrementLastrunVersion()
 {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
+    param (
         [string]$Version,
-        [Parameter(Mandatory = $false)]
-        [int]$IncrementBy = 1
+        [string]$LastRunFile
     )
 
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Incrementing revision for version: $Version by $IncrementBy"
+    function IncrementRevision()
+    {
+        [CmdletBinding()]
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Version,
+            [Parameter(Mandatory = $false)]
+            [int]$IncrementBy = 1
+        )
+
+        $functionName = $MyInvocation.MyCommand.Name
+        Write-Verbose "[$functionName] Incrementing revision for version: $Version by $IncrementBy"
     
-    try
-    {
-        $versionObj = [System.Version]::Parse($Version)
-        $newRevision = $versionObj.Revision + $IncrementBy
-        $newVersion = New-Object System.Version($versionObj.Major, $versionObj.Minor, $versionObj.Build, $newRevision)
-        Write-Verbose "[$functionName] New version: $newVersion"
-        return $newVersion.ToString()
+        try
+        {
+            $versionObj = [System.Version]::Parse($Version)
+            $newRevision = $versionObj.Revision + $IncrementBy
+            $newVersion = New-Object System.Version($versionObj.Major, $versionObj.Minor, $versionObj.Build, $newRevision)
+            Write-Verbose "[$functionName] New version: $newVersion"
+            return $newVersion.ToString()
+        }
+        catch
+        {
+            Write-Error "Failed to increment revision: $_"
+            return $null
+        }
     }
-    catch
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $updatedVersion = $Version
+    if (Test-Path -Path $LastRunFile)
     {
-        Write-Error "Failed to increment revision: $_"
-        return $null
+        Write-Verbose "[$functionName] Last run file found: $lastRunFile"
+        $lastRun = Get-Content -Path $lastRunFile -Raw | ConvertFrom-Json
     }
+    else
+    {
+        Write-Verbose "[$functionName] Last run file not found: $lastRunFile"
+        $lastRun = @{}
+    }
+    Write-Host "Last run date: $($lastRun.date)"
+    Write-Host "Last run version: $($lastRun.version)"
+    if ([string]::IsNullOrWhiteSpace($updatedVersion) -and [string]::IsNullOrWhiteSpace($lastRun.Version))
+    {
+        Write-Host "What version number would you like to use for this build?"
+        Write-Host "Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)"
+        $updatedVersion = Read-Host "Enter version number"
+        while ($updatedVersion -notmatch '^\d+\.\d+\.\d+\.\d+$')
+        {
+            Write-Host "Invalid version format. Please use the format xx.yy.zz"
+            [console]::beep(1000, 500)
+            $updatedVersion = Read-Host "Enter a valid version number"
+        }
+        $maintainCurrentVersion = $true
+    }
+    elseif (-not ([string]::IsNullOrWhiteSpace($updatedVersion)) -and -not ([string]::IsNullOrWhiteSpace($lastRun.Version)))
+    {
+        Write-Host "Supplied version: $updatedVersion"
+        Write-Host "Last run version: $($lastRun.version)"
+        Write-Host "Which version would you like to use? (S for supplied, L for last run)"
+        $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
+        while ($response -notin 'S', 'L', 'E')
+        {
+            Write-Host "Invalid response. Please enter S, L, or E."
+            [console]::beep(1000, 500)
+            $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
+        }   
+        switch ($response)
+        {
+            S
+            {
+                Write-Host "Using supplied version: $updatedVersion"
+                $maintainCurrentVersion = $true
+            }
+            L
+            {
+                Write-Host "Using last run version: $($lastRun.version)"
+                $updatedVersion = $lastRun.version
+            }
+            E
+            {
+                Write-Host "Exiting script."
+                exit 0
+            }
+        }
+    }
+    elseif (-not ([string]::IsNullOrWhiteSpace($lastRun.Version)) -and [string]::IsNullOrWhiteSpace($updatedVersion))
+    {
+        Write-Host "No version supplied. Using last run version: $($lastRun.version)"
+        $updatedVersion = $lastRun.version
+    }
+    else
+    {
+        Write-Host "Using supplied version: $updatedVersion"
+        $maintainCurrentVersion = $true
+    } 
+    Write-Host "Current version: $updatedVersion"
+    Write-Host "Maintain current version: $maintainCurrentVersion"
+    Write-Verbose "[$functionName] No version update: $NoVersionUpdate"
+    if ($maintainCurrentVersion -or $NoVersionUpdate)
+    {
+        Write-Host "Maintaining current version: $updatedVersion"
+    }
+    else
+    {
+        Write-Host "Incrementing revision number for version: $updatedVersion"
+        $updatedVersion = IncrementRevision -Version ([System.Version]::Parse($updatedVersion))
+        Write-Host "New version: $updatedVersion"
+    }
+    return $updatedVersion
 }
 
 function MergeFunctions()
@@ -321,6 +416,38 @@ function MergeFunctions()
     return $success
 }
 
+function EncryptSecretsFile()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [string]$EncryptionKey
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Encrypting secrets file: $FilePath"
+    #if the encryption key is a null or a whitespace, create a random key using guid
+    if ([string]::IsNullOrWhiteSpace($EncryptionKey))
+    {
+        Write-Verbose "[$functionName] No encryption key provided. Generating a random key."
+        write-log -logFile $logFile -Message "No encryption key provided. Generating a random key." -module $functionName
+        $EncryptionKey = [guid]::NewGuid().ToString()
+    }
+    if ((Invoke-JsonFileEncryption -FilePath $FilePath -Key $EncryptionKey).success)  
+    {
+        Write-Host "Secrets file encrypted successfully."
+        Write-Log -logFile $logFile -Message "Secrets file encrypted successfully." -module $functionName
+        return $true
+    }
+    else
+    {
+        Write-Error "Failed to encrypt secrets file."
+        Write-Log -logFile $logFile -Message "Failed to encrypt secrets file." -module $functionName -LogLevel 'Error'
+        return $false
+    }
+}
+
 function CopySecrets()
 {
     [CmdletBinding()]
@@ -354,7 +481,7 @@ function CopySecrets()
         {
             Write-Host 'Removing .secrets folder...'
             Write-log -logFile $logFile -Message "Overwrite is set to true. Removing .secrets folder." -module $functionName
-            Remove-Item -Path "$DestinationFolder\.secrets" -Force | Out-Null
+            Remove-Item -Path "$DestinationFolder\.secrets" -Recurse -Force | Out-Null
         }
         else 
         {
@@ -362,7 +489,7 @@ function CopySecrets()
             $response = Read-Host 'Overwrite? (Y/N)'
             Write-Verbose "[$functionName] User response: $response"
             write-log -logFile $logFile -Message "User response: $response" -module $functionName
-            while ($response -notin 'Y', 'N')
+            while ($response -notin 'Y', 'N', 'yes', 'no')
             {
                 $response = Read-Host 'Invalid input. Please enter Y or N: '
                 
@@ -370,11 +497,11 @@ function CopySecrets()
                 write-log -logFile $logFile -Message "User response: $response" -module $functionName
                 [console]::beep(500, 300)
             }
-            if ($response -eq 'Y')
+            if ($response -eq 'Y' -or $response -eq 'yes')
             {
                 Write-Host 'Removing .secrets folder...'
                 Write-log -logFile $logFile -Message "User chose to overwrite. Removing .secrets folder." -module $functionName
-                Remove-Item -Path "$DestinationFolder\.secrets" -Force | Out-Null
+                Remove-Item -Path "$DestinationFolder\.secrets" -Recurse -Force | Out-Null
             }
             else
             {
@@ -409,29 +536,37 @@ function CopySecrets()
         {
             $fileName = $secrets[$i].Name
             Write-log -logFile $logFile -Message "Found secret: $fileName" -module $functionName
-            $encrypted = (Test-FileEncryptionStatus -filePath $fileName).isEncrypted
-            Write-log -logFile $logFile -Message "Secret $fileName is encrypted: $encrypted" -module $functionName
+            $encrypted = Test-FileEncryptionStatus -filePath $secrets[$i].FullName
+            Write-Verbose "[$functionName] $fileName is encrypted: $($encrypted.IsEncrypted)"
+            write-log -logFile $logFile -Message "Secret $fileName is encrypted: $($encrypted.IsEncrypted)" -module $functionName
+            Write-Verbose "[$functionName] $fileName is valid: $($encrypted.IsValid)"
+            write-log -logFile $logFile -Message "Secret $fileName is valid: $($encrypted.IsValid)" -module $functionName
+            Write-Verbose "[$functionName] error message: $($encrypted.ErrorMessage)"
+            write-log -logFile $logFile -Message "Secret $fileName error message: $($encrypted.ErrorMessage)" -module $functionName
             $index = $i + 1
-            if ($encrypted)
+            if ($encrypted.IsEncrypted)
             {
-                Write-Log -logFile $logFile -message "$index. $($name): $domain (Encrypted) ($fileName)" -module $functionName
-                break
+                Write-Host "$index. Encrypted file: ($fileName)"
+                Write-Log -logFile $logFile -Message "Secret $fileName is encrypted." -module $functionName
+                Write-Verbose "[$functionName] Secret $fileName is encrypted."
             }
-            
-            $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
-            $name = $data.name
-            $domain = $data.domain
-            if (-not $domain)
+            else 
             {
-                $domain = 'Unknown'
-                Write-log -logFile $logFile -Message "Secret $fileName has unknown domain." -module $functionName
+                $data = Get-Content -Path $secrets[$i].FullName | ConvertFrom-Json
+                $name = $data.name
+                $domain = $data.domain
+                if (-not $domain)
+                {
+                    $domain = 'Unknown'
+                    Write-log -logFile $logFile -Message "Secret $fileName has unknown domain." -module $functionName
+                }
+                if (-not $name)
+                {
+                    $name = 'Unknown'
+                    Write-log -logFile $logFile -Message "Secret $fileName has unknown name." -module $functionName
+                }
+                Write-Host "$index. $($name): $domain ($fileName)"
             }
-            if (-not $name)
-            {
-                $name = 'Unknown'
-                Write-log -logFile $logFile -Message "Secret $fileName has unknown name." -module $functionName
-            }
-            Write-Host "$index. $($name): $domain ($fileName)"
         }
         [int32]$choice = (Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)')
         Write-Verbose "[$functionName] User selected: $choice"
@@ -461,16 +596,45 @@ function CopySecrets()
         Write-Host "Using default secrets file: $($secret.Name)"
         Write-log -logFile $logFile -Message "Using default secrets file: $($secret.Name)" -module $functionName    
     }
-    
+    Write-Verbose "[$functionName] Selected secret: $($secret.Name)"
+    write-log -logFile $logFile -Message "Selected secret: $($secret.Name)" -module $functionName
     Write-Host "Copying $($secret.FullName) to $DestinationFolder"
     Write-log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName 
     try
     {
         Write-Host "Copying $($secret.FullName) to $DestinationFolder\.secrets"
         Write-log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName
+        if (-not (Test-Path -Path "$DestinationFolder\.secrets"))
+        {
+            Write-Host "Creating .secrets folder in: $DestinationFolder"
+            Write-log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
+            New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
+        }
         Copy-Item -Path $secret.FullName -Destination "$DestinationFolder\.secrets\config.json" -Force
+        Write-Host "Secrets copied successfully to $DestinationFolder\.secrets\config.json"
         Write-Verbose "[$functionName] Secrets copied successfully."
         Write-log -logFile $logFile -Message "Secrets copied successfully to $DestinationFolder\.secrets\config.json" -module $functionName
+        Write-Verbose "[$functionName] Checking file encryption status."
+        write-log -logFile $logFile -Message "Checking file encryption status for $DestinationFolder\.secrets\config.json" -module $functionName
+        if ((Test-FileEncryptionStatus -FilePath "$DestinationFolder\.secrets\config.json").IsEncrypted -and (Test-FileEncryptionStatus -FilePath $secret.FullName).IsValidFile)
+        {
+            Write-Host "File is already encrypted"
+            Write-log -logFile $logFile -Message "File is already encrypted: $($secret.Name)" -module $functionName
+        }
+        else
+        {
+            if (EncryptSecretsFile -FilePath "$DestinationFolder\.secrets\config.json" -EncryptionKey 'P@ssw0rd')
+            {
+                Write-Host "File encryption successful"
+                Write-log -logFile $logFile -Message "File encryption successful: $($secret.Name)" -module $functionName
+            }
+            else
+            {
+                Write-Host "File encryption failed"
+                Write-log -logFile $logFile -Message "File encryption failed: $($secret.Name)" -module $functionName -LogLevel 'Error'
+                return $false
+            }
+        }
     }
     catch
     {
@@ -558,16 +722,17 @@ $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
 if ($outputFile -eq '')
 {
-    Write-Verbose "[$scriptName] [$scriptName] No output file specified. Using default output file name."
+    Write-Verbose "[$scriptName] No output file specified. Using default output file name."
     $leafName = Split-Path -Leaf $InputFile
-    Write-Verbose "[$scriptName] [$scriptName] Leaf name is: $leafName"
+    Write-Verbose "[$scriptName] Leaf name is: $leafName"
     $exeName = $leafName.Replace('.ps1', '.exe')
-    Write-Verbose "[$scriptName] [$scriptName] Executable name is: $exeName"
+    Write-Verbose "[$scriptName] Executable name is: $exeName"
     $outputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
-    Write-Verbose "[$scriptName] [$scriptName] Output file set to: $outputFile"
+    Write-Verbose "[$scriptName] Output file set to: $outputFile"
     Write-Host "No output file specified. Output file set to: $outputFile"
 }
 $parentFolder = Split-Path -Parent $outputFile
+$destSettingsFile = "$parentFolder\settings.json"
 #endregion
 
 #region initial checks
@@ -584,6 +749,74 @@ if ($CreateModule)
         Write-Host "Failed to create module: $helperModuleName."
         exit 1
     }
+}
+
+if ($SecretsOnly)
+{
+    Write-Host "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets"
+    if ($UpdateSettings)
+    {
+        Write-Verbose "[$scriptName] Updating settings file to force password change."
+        Write-Log -logFile $logFile -Message "Updating settings file to force password  change." -module $scriptName
+        $settingsUpdate = $true
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Skipping settings file update."
+        Write-Log -logFile $logFile -Message "Skipping settings file update." -module $scriptName
+        $settingsUpdate = $false
+    }
+    Write-Log -logFile $logFile -Message "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets" -module $scriptName
+    if ($Overwrite)
+    {
+        $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder -Overwrite
+    }
+    else
+    {
+        $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder
+    }
+    if ($secretsCopied)
+    {
+        Write-Host "Secrets copied successfully to $parentFolder\.secrets"
+        Write-Log -logFile $logFile -Message "Secrets copied successfully to $parentFolder\.secrets" -module $scriptName
+    }
+    else
+    {
+        Write-Host "No secrets were copied."
+    }
+    Write-Host "Checking whether to update settings file to force password change."
+    if ($settingsUpdate -eq $true)
+    {
+        Write-Log -logFile $logFile -Message "Updating settings file to force password change." -module $scriptName
+        Write-Verbose "[$scriptName] Updating settings file to force password change."
+        if (-not (Test-Path -Path $destSettingsFile))
+        {
+            Write-Host "Settings file not found at $destSettingsFile. Copying from $SettingsFile."
+            Write-Log -logFile $logFile -Message "Settings file not found at $destSettingsFile. Copying from $SettingsFile." -module $scriptName
+            Copy-Item -Path $SettingsFile -Destination $destSettingsFile -Force
+        }
+        else
+        {
+            Write-Host "Found settings file at $destSettingsFile."
+            Write-Log -logFile $logFile -Message "Found settings file at $destSettingsFile." -module $scriptName
+        }
+        if (UpdateSettingsFile -SettingsFilePath $destSettingsFile)
+        {
+            Write-Host "Settings file $destSettingsFile updated successfully."
+            Write-Log -logFile $logFile -Message "Settings file $destSettingsFile updated successfully." -module $scriptName
+        }
+        else
+        {
+            Write-Host "Failed to update settings file $destSettingsFile."
+            Write-Log -logFile $logFile -Message "Failed to update settings file $destSettingsFile." -module $scriptName -LogLevel 'Error'
+        }
+    }
+    else
+    {
+        Write-Host "Skipping settings file update."
+        Write-Log -logFile $logFile -Message "Skipping settings file update." -module $scriptName
+    }
+    exit 0
 }
 
 #Check if the initialization file exists.  If not, create it.
@@ -606,88 +839,18 @@ else
     Write-Host "Found initialization file $($initFile)..."
 }
 
-#region Determine version number and increment if necessary
-if (Test-Path -Path $lastRunFile)
+$version = IncrementLastrunVersion -version $version -LastRunFile $lastRunFile
+Write-Host "Incrementing Last run version to: $version"
+if ($null -ne $version)
 {
-    Write-Verbose "[$scriptName] Last run file found: $lastRunFile"
-    $lastRun = Get-Content -Path $lastRunFile -Raw | ConvertFrom-Json
+    Write-Host "Incremented last run version..."
+    Write-Log -logFile $logFile -Message "Incremented last run version to $version" -module $scriptName
 }
 else
 {
-    Write-Verbose "[$scriptName] Last run file not found: $lastRunFile"
-    $lastRun = @{}
+    Write-Host "No last run version incremented."
+    Write-Log -logFile $logFile -Message "No last run version incremented." -module $scriptName
 }
-Write-Host "Last run date: $($lastRun.date)"
-Write-Host "Last run version: $($lastRun.version)"
-
-if ([string]::IsNullOrWhiteSpace($Version) -and [string]::IsNullOrWhiteSpace($lastRun.Version))
-{
-    Write-Host "What version number would you like to use for this build?"
-    Write-Host "Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)"
-    $version = Read-Host "Enter version number"
-    while ($version -notmatch '^\d+\.\d+\.\d+\.\d+$')
-    {
-        Write-Host "Invalid version format. Please use the format xx.yy.zz"
-        [console]::beep(1000, 500)
-        $version = Read-Host "Enter a valid version number"
-    }
-    $maintainCurrentVersion = $true
-}
-elseif (-not ([string]::IsNullOrWhiteSpace($Version)) -and -not ([string]::IsNullOrWhiteSpace($lastRun.Version)))
-{
-    Write-Host "Supplied version: $version"
-    Write-Host "Last run version: $($lastRun.version)"
-    Write-Host "Which version would you like to use? (S for supplied, L for last run)"
-    $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
-    while ($response -notin 'S', 'L', 'E')
-    {
-        Write-Host "Invalid response. Please enter S, L, or E."
-        [console]::beep(1000, 500)
-        $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
-    }   
-    switch ($response)
-    {
-        S
-        {
-            Write-Host "Using supplied version: $version"
-            $maintainCurrentVersion = $true
-        }
-        L
-        {
-            Write-Host "Using last run version: $($lastRun.version)"
-            $version = $lastRun.version
-        }
-        E
-        {
-            Write-Host "Exiting script."
-            exit 0
-        }
-    }
-}
-elseif (-not ([string]::IsNullOrWhiteSpace($lastRun.Version)) -and [string]::IsNullOrWhiteSpace($Version))
-{
-    Write-Host "No version supplied. Using last run version: $($lastRun.version)"
-    $version = $lastRun.version
-}
-else
-{
-    Write-Host "Using supplied version: $version"
-    $maintainCurrentVersion = $true
-} 
-Write-Host "Current version: $version"
-Write-Host "Maintain current version: $maintainCurrentVersion"
-Write-Verbose "[$scriptName] No version update: $NoVersionUpdate"
-if ($maintainCurrentVersion -or $NoVersionUpdate)
-{
-    Write-Host "Maintaining current version: $version"
-}
-else
-{
-    Write-Host "Incrementing revision number for version: $version"
-    $Version = IncrementRevision -Version ([System.Version]::Parse($Version))
-    Write-Host "New version: $Version"
-}
-#endregion
 
 if (-not $Overwrite)
 {
@@ -750,57 +913,57 @@ if (-not $CreateModule)
     # Ensure destination directory exists
     if (-not (Test-Path -Path $mergeParentFolder))
     {
-        Write-Verbose "[$scriptName] [$scriptName] Creating parent folder: $mergeParentFolder"
+        Write-Verbose "[$scriptName] Creating parent folder: $mergeParentFolder"
         New-Item -ItemType Directory -Path $mergeParentFolder -Force | Out-Null
     }
     if ($InputFile -ne $outputFile)
     {
-        Write-Verbose "[$scriptName] [$scriptName] Copying input file to parent folder: $mergeParentFolder"
+        Write-Verbose "[$scriptName] Copying input file to parent folder: $mergeParentFolder"
         $newscriptFile = "$mergeParentFolder\$($InputFile.Split('\')[-1])"
-        Write-Verbose "[$scriptName] [$scriptName] New script file path: $newscriptFile"
+        Write-Verbose "[$scriptName] New script file path: $newscriptFile"
         Copy-Item -Path $InputFile -Destination $mergeParentFolder -Force
     }
-    Write-Verbose "[$scriptName] [$scriptName] Calling MergeFunctions with destination: $mergeOutputFile"
+    Write-Verbose "[$scriptName] Calling MergeFunctions with destination: $mergeOutputFile"
     Write-Host "Merging sourced functions in $inputFile to $mergeOutputFile"
     $mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $mergeOutputFile
-    Write-Verbose "[$scriptName] [$scriptName] MergeFunctions returned: $mergeResult"
+    Write-Verbose "[$scriptName] MergeFunctions returned: $mergeResult"
     if ($mergeResult -eq $true)
     {
         Write-Host "Functions merged successfully to $mergeOutputFile"
         Write-Host "Creating master script at $newscriptFile"
         #read the newscript into a variable.
-        Write-Verbose "[$scriptName] [$scriptName] Reading new script content into variable."
+        Write-Verbose "[$scriptName] Reading new script content into variable."
         $newscriptContent = Get-Content -Path $newscriptFile -Raw
-        Write-Verbose "[$scriptName] [$scriptName] New script content read successfully."        #read the merged script into a variable.
-        Write-Verbose "[$scriptName] [$scriptName] Reading merged script content into variable."
+        Write-Verbose "[$scriptName] New script content read successfully."        #read the merged script into a variable.
+        Write-Verbose "[$scriptName] Reading merged script content into variable."
         $mergedContent = Get-Content -Path $mergeOutputFile -Raw
-        Write-Verbose "[$scriptName] [$scriptName] Merged script content read from: $mergeOutputFile"
+        Write-Verbose "[$scriptName] Merged script content read from: $mergeOutputFile"
         # Find the positions of the region markers
-        Write-Verbose "[$scriptName] [$scriptName] Finding region markers in the script."
+        Write-Verbose "[$scriptName] Finding region markers in the script."
         $startMarker = "#region import functions."
         $endMarker = "#endregion import functions."
         $startPosition = $newscriptContent.IndexOf($startMarker)
         $endPosition = $newscriptContent.IndexOf($endMarker, $startPosition)
         if ($startPosition -ge 0 -and $endPosition -gt $startPosition)
         {
-            Write-Verbose "[$scriptName] [$scriptName] Found start marker at position $startPosition and end marker at position $endPosition."
+            Write-Verbose "[$scriptName] Found start marker at position $startPosition and end marker at position $endPosition."
             # Extract portions before, between, and after markers
             $beforeRegion = $newscriptContent.Substring(0, $startPosition + $startMarker.Length)
             $afterRegion = $newscriptContent.Substring($endPosition)
             # Construct the new content by concatenating the parts with the merged content
             $newscriptContent = $beforeRegion + "`r`n" + $mergedContent + "`r`n" + $afterRegion
-            Write-Verbose "[$scriptName] [$scriptName] Replaced content between import functions markers."
+            Write-Verbose "[$scriptName] Replaced content between import functions markers."
         }
         else
         {
             Write-Warning "[$scriptName] Could not find region markers in the script. Script will not be modified."
         }
         #write the newscriptContent to the newscriptFile
-        Write-Verbose "[$scriptName] [$scriptName] Writing new script content to: $newscriptFile"
+        Write-Verbose "[$scriptName] Writing new script content to: $newscriptFile"
         try
         {
             $newscriptContent | Set-Content -Path $newscriptFile -Force
-            Write-Verbose "[$scriptName] [$scriptName] New script content written successfully."
+            Write-Verbose "[$scriptName] New script content written successfully."
             Write-Host "New script content written to $newscriptFile"
         }
         catch
@@ -916,19 +1079,21 @@ else
     Write-Host "No secrets were copied."
 }
 Write-Host "Updating settings file to force password change."
-if (UpdateSettingsFile -SettingsFilePath $SettingsFile)
+if (UpdateSettingsFile -SettingsFilePath $destSettingsFile)
 {
-    Write-Host "Settings file updated successfully."
+    Write-Host "Settings file $destSettingsFile updated successfully."
+    write-log -logFile $logFile -Message "Settings file $destSettingsFile updated successfully." -module $scriptName
 }
 else
 {
-    Write-Host "Failed to update settings file."
+    Write-Host "Failed to update settings file $destSettingsFile."
+    Write-Log -logFile $logFile -Message "Failed to update settings file $destSettingsFile." -module $scriptName -LogLevel 'Error'
 }
 
 Write-Host "Cleaning up..."
 if ($null -ne $mergeOutputFile)
 {
-    Write-Verbose "[$scriptName] [$scriptName] Cleaning up merge output file: $mergeOutputFile"
+    Write-Verbose "[$scriptName] Cleaning up merge output file: $mergeOutputFile"
     if (Test-Path -Path $mergeOutputFile)
     {
         Write-Host "Removing $mergeOutputFile"
@@ -938,7 +1103,7 @@ if ($null -ne $mergeOutputFile)
     {
         Write-Host "No merge operation was performed so no merge files to clean."
     }
-    Write-Verbose "[$scriptName] [$scriptName] Cleaning up new script file: $newscriptFile"
+    Write-Verbose "[$scriptName] Cleaning up new script file: $newscriptFile"
     if (Test-Path -Path $newscriptFile)
     {
         Write-Host "Removing $newscriptFile"
