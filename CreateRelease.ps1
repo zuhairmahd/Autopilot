@@ -55,7 +55,7 @@ function SignScripts()
     $filesToSign = @()
     foreach ($folder in $Path)
     {
-        $files = Get-ChildItem -Path $path -Filter *.exe
+        $files = Get-ChildItem -Path $folder -Filter *.exe
         Write-Verbose "[$functionName] Signing $($files.count) files in $folder and excluding $($exclusions.Count) files."
         if ($files.Count -gt 0)
         {
@@ -85,7 +85,7 @@ function SignScripts()
         }
         else
         {
-            Write-Host "No PowerShell scripts found in $Path"
+            Write-Host "No executable files found in $Path"
         }
     }
     if ($filesToSign.Count -gt 0)
@@ -149,21 +149,22 @@ function CopyFiles()
                 Write-Host "Creating folder: $destinationFolder"
                 New-Item -ItemType Directory -Path $destinationFolder -Force | Out-Null
             }
-            $Destination = Join-Path -Path $Destination -ChildPath $subfolder
+            $currentDestination = Join-Path -Path $Destination -ChildPath $subfolder
         }
         else
         {
             Write-Host "No subfolder found for file: $file"
+            $currentDestination = $Destination
         }
         Write-Verbose "[$functionName] Processing file: $file"
         try
         {
-            Copy-Item -Path $file -Destination $Destination -Force
-            Write-Host "Copied $file to $Destination"
+            Copy-Item -Path $file -Destination $currentDestination -Force
+            Write-Host "Copied $file to $currentDestination"
         }
         catch
         {
-            Write-Host "Failed to copy $file to $Destination"
+            Write-Host "Failed to copy $file to $currentDestination"
             Write-Error $_
         }
     }
@@ -284,7 +285,7 @@ function IncrementLastrunVersion()
     else
     {
         Write-Host "Incrementing revision number for version: $updatedVersion"
-        $updatedVersion = IncrementRevision -Version ([System.Version]::Parse($updatedVersion))
+        $updatedVersion = IncrementRevision -Version $updatedVersion
         Write-Host "New version: $updatedVersion"
     }
     return $updatedVersion
@@ -380,7 +381,7 @@ function MergeFunctions()
     }
     
     #Check if we are given a destination file with a path
-    if ($DestinationFile -contains '\')
+    if ([System.IO.Path]::IsPathRooted($DestinationFile))
     {
         Write-Verbose "[$functionName] Destination file contains a path: $DestinationFile"
         $destinationDir = Split-Path -Parent $DestinationFile    
@@ -615,24 +616,28 @@ function CopySecrets()
         Write-Verbose "[$functionName] Secrets copied successfully."
         Write-log -logFile $logFile -Message "Secrets copied successfully to $DestinationFolder\.secrets\config.json" -module $functionName
         Write-Verbose "[$functionName] Checking file encryption status."
-        write-log -logFile $logFile -Message "Checking file encryption status for $DestinationFolder\.secrets\config.json" -module $functionName
-        if ((Test-FileEncryptionStatus -FilePath "$DestinationFolder\.secrets\config.json").IsEncrypted -and (Test-FileEncryptionStatus -FilePath $secret.FullName).IsValidFile)
+        $destStatus = Test-FileEncryptionStatus -FilePath "$DestinationFolder\.secrets\config.json"
+        $srcStatus = Test-FileEncryptionStatus -FilePath $secret.FullName
+        if (($null -ne $destStatus -and $destStatus.IsEncrypted) -and ($null -ne $srcStatus -and $srcStatus.IsValidFile))
         {
-            Write-Host "File is already encrypted"
-            Write-log -logFile $logFile -Message "File is already encrypted: $($secret.Name)" -module $functionName
-        }
-        else
-        {
-            if (EncryptSecretsFile -FilePath "$DestinationFolder\.secrets\config.json" -EncryptionKey 'P@ssw0rd')
+            if ((Test-FileEncryptionStatus -FilePath "$DestinationFolder\.secrets\config.json").IsEncrypted -and (Test-FileEncryptionStatus -FilePath $secret.FullName).IsValidFile)
             {
-                Write-Host "File encryption successful"
-                Write-log -logFile $logFile -Message "File encryption successful: $($secret.Name)" -module $functionName
+                Write-Host "File is already encrypted"
+                Write-log -logFile $logFile -Message "File is already encrypted: $($secret.Name)" -module $functionName
             }
             else
             {
-                Write-Host "File encryption failed"
-                Write-log -logFile $logFile -Message "File encryption failed: $($secret.Name)" -module $functionName -LogLevel 'Error'
-                return $false
+                if (EncryptSecretsFile -FilePath "$DestinationFolder\.secrets\config.json" -EncryptionKey 'P@ssw0rd')
+                {
+                    Write-Host "File encryption successful"
+                    Write-log -logFile $logFile -Message "File encryption successful: $($secret.Name)" -module $functionName
+                }
+                else
+                {
+                    Write-Host "File encryption failed"
+                    Write-log -logFile $logFile -Message "File encryption failed: $($secret.Name)" -module $functionName -LogLevel 'Error'
+                    return $false
+                }
             }
         }
     }
@@ -656,7 +661,7 @@ function UpdateSettingsFile()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating settings file at: $SettingsFilePath"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Updating settings file at: $SettingsFilePath" -LogLevel "Information"
-    if (Test-Path $SettingsFile)
+    if (Test-Path $SettingsFilePath)
     {
         try
         {
@@ -682,9 +687,9 @@ function UpdateSettingsFile()
                 Write-Verbose "[$functionName] Writing updated settings back to file."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
                 $updatedSettingsJson = ConvertTo-Json $settings -Depth 100
-                Set-Content -Path $SettingsFile -Value $updatedSettingsJson -Encoding UTF8
+                Set-Content -Path $SettingsFilePath -Value $updatedSettingsJson -Encoding UTF8
                 Write-Host "Settings updated successfully" -ForegroundColor Green
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
             }
             else
             {
@@ -706,6 +711,7 @@ function UpdateSettingsFile()
     }
 }
 #endregion
+#endregion helper functions
 
 #region Define variables
 $initFile = "init.json"
@@ -742,7 +748,7 @@ if ($CreateModule)
     $mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $helperModuleName
     if ($mergeResult -eq $true)
     {
-        Write-Host "Module $helperModuleName. created successfully."
+        Write-Host "Module $helperModuleName created successfully."
     }
     else
     {
