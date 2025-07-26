@@ -7,6 +7,7 @@ param(
     [string]$outputFile = '',
     [string]$SettingsFile = "$pwd\settings.json",
     [string]$CompanyName = 'Zuhair Mahmoud',
+    [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
@@ -221,6 +222,7 @@ function IncrementLastrunVersion()
     }
     Write-Host "Last run date: $($lastRun.date)"
     Write-Host "Last run version: $($lastRun.version)"
+    Write-Host "GUID: $($lastRun.guid)"
     if ([string]::IsNullOrWhiteSpace($updatedVersion) -and [string]::IsNullOrWhiteSpace($lastRun.Version))
     {
         Write-Host "What version number would you like to use for this build?"
@@ -569,25 +571,42 @@ function CopySecrets()
                 Write-Host "$index. $($name): $domain ($fileName)"
             }
         }
-        [int32]$choice = (Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)')
+        $choice = $null
+        while ($true)
+        {
+            $inputValue = Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)'
+            if ([int]::TryParse($inputValue, [ref]$null))
+            {
+                $choiceInt = 0
+                [void][int]::TryParse($inputValue, [ref]$choiceInt)
+                if ($choiceInt -ge 0 -and $choiceInt -le $secrets.Count)
+                {
+                    $choice = $choiceInt
+                    break
+                }
+                else
+                {
+                    Write-Host "Sorry: $inputValue is an invalid choice."
+                    Write-log -logFile $logFile -Message "User entered an invalid choice: $inputValue" -module $functionName
+                    [console]::beep(500, 300)
+                    Write-Host "Please choose a number between 1 and $($secrets.Count), or 0 to exit."
+                }
+            }
+            else
+            {
+                Write-Host "Invalid input. Please enter a number between 1 and $($secrets.Count), or 0 to exit."
+                Write-log -logFile $logFile -Message "User entered a non-integer input: $inputValue" -module $functionName
+                [console]::beep(1000, 300)
+            }
+        }
         Write-Verbose "[$functionName] User selected: $choice"
         write-log -logFile $logFile -Message "User selected: $choice" -module $functionName
-        while ([int32]$choice -lt 0 -or [int32]$choice -gt $secrets.Count)
-        {
-            Write-Host "Sorry: $choice is an invalid choice."
-            Write-log -logFile $logFile -Message "User entered an invalid choice: $choice" -module $functionName
-            #beep
-            [console]::beep(500, 300)
-            Write-Host "Please choose a number between 1 and $($secrets.Count), or 0 to exit."
-            [int32]$choice = (Read-Host 'Enter the number of the secret you would like to copy. (0 to quit)')
-            Write-Verbose "[$functionName] User selected: $choice"
-        }
         if ($choice -eq 0)
         {
             Write-log -logFile $logFile -Message "User chose to cancel. Exiting without copying secrets." -module $functionName
             return $false
         }
-        $secret = $secrets[$choice - 1]        
+        $secret = $secrets[$choice - 1]
         write-log -logFile $logFile -Message "User selected secret: $($secret.Name)" -module $functionName
     }
     else
@@ -687,10 +706,20 @@ function UpdateSettingsFile()
                 Write-Verbose "[$functionName] Writing updated settings back to file."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
                 $updatedSettingsJson = ConvertTo-Json $settings -Depth 100
-                Set-Content -Path $SettingsFilePath -Value $updatedSettingsJson -Encoding UTF8
-                Write-Host "Settings updated successfully" -ForegroundColor Green
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
-            }
+                try
+                {
+                    Set-Content -Path $SettingsFilePath -Value $updatedSettingsJson -Encoding UTF8    
+                    Write-Host "Settings updated successfully" -ForegroundColor Green
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
+                }
+                catch
+                {
+                    Write-Error "Failed to write updated settings to $SettingsFilePath"
+                    Write-Error $_.Exception.Message
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to write updated settings to $SettingsFilePath" -LogLevel 'Error'
+                    return $false
+                }
+            }                
             else
             {
                 Write-Warning "changePWOnNextStart setting not found in auth section"
@@ -710,12 +739,12 @@ function UpdateSettingsFile()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
     }
 }
-#endregion
 #endregion helper functions
 
 #region Define variables
 $initFile = "init.json"
 $lastRunFile = "$pwd\lastrun.json"
+$lastRun = Get-Content -Path $lastRunFile | ConvertFrom-Json
 $maintainCurrentVersion = $false
 $SettingsFile = "$pwd\settings.json"
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
@@ -959,6 +988,55 @@ if (-not $CreateModule)
             # Construct the new content by concatenating the parts with the merged content
             $newscriptContent = $beforeRegion + "`r`n" + $mergedContent + "`r`n" + $afterRegion
             Write-Verbose "[$scriptName] Replaced content between import functions markers."
+            # Replace the region markers in the output content
+            $newscriptContent = $newscriptContent.Replace("#region import functions.", "#region Helper functions.")
+            $newscriptContent = $newscriptContent.Replace("#endregion import functions.", "#endregion Helper functions.")
+            Write-Verbose "[$scriptName] Updated region markers to 'Helper functions'."
+            Write-Log -Message "Updated region markers from 'import functions' to 'Helper functions'" -Module $scriptName -LogLevel "Debug" -LogFile $logFile
+
+            # Create informational header block
+            Write-Log -Message "Creating informational header block for output script" -Module $scriptName -LogLevel "Information" -LogFile $logFile
+            # If the lastRunFile contains a GUID, use it, otherwise create a new GUID.
+            Write-Host "Lastrun GUID: $($lastRun.GUID)"
+            if ($lastRun.GUID -and $lastRun.GUID -ne '')
+            {
+                Write-Verbose "[$scriptName] Using GUID from last run: $($lastRun.GUID)"
+                Write-Host "Using GUID from last run: $($lastRun.GUID)"
+                Write-Log -Message "Using existing GUID from last run: $($lastRun.GUID)" -Module $scriptName -LogLevel "Information" -LogFile $logFile
+                $guid = $lastRun.GUID
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] No GUID found in last run, generating a new GUID."
+                Write-Host "No GUID found in last run, generating a new GUID."
+                $guid = [guid]::NewGuid().ToString()
+                Write-Verbose "[$scriptName] Generated new GUID: $guid"
+                Write-Host "Generated new GUID: $guid"
+                Write-Log -Message "Generated new GUID for script: $guid" -Module $scriptName -LogLevel "Information" -LogFile $logFile
+            }
+            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            Write-Log -Message "Header timestamp set to: $timestamp" -Module $scriptName -LogLevel "Debug" -LogFile $logFile
+        
+            $headerBlock = @"
+<#
+================================================================================
+Script Name:    $outputScriptName.ps1
+Version:        $Version
+Company:        $Company
+Author:         $Author
+Generated:      $timestamp
+GUID:           $guid
+Description:    Auto-generated release build with inlined functions
+================================================================================
+#>
+
+"@
+        
+            Write-Log -Message "Created header block for output script" -Module $scriptName -LogLevel "Debug" -LogFile $logFile
+        
+            #add the header block and version string to the top of the script
+            $newscriptContent = $headerBlock + $newscriptContent
+            Write-Log -Message "Added header block to script content" -Module $scriptName -LogLevel "Information" -LogFile $logFile
         }
         else
         {
@@ -1043,6 +1121,7 @@ Write-Host "Writing last run information to $lastRunFile"
 $lastRun = @{
     date            = $todaysDate
     version         = $Version
+    GUID            = $guid
     settingsVersion = $settingsVersion
     stringsVersion  = $stringsVersion
 }
@@ -1084,17 +1163,9 @@ else
 {
     Write-Host "No secrets were copied."
 }
+
 Write-Host "Updating settings file to force password change."
-if (UpdateSettingsFile -SettingsFilePath $destSettingsFile)
-{
-    Write-Host "Settings file $destSettingsFile updated successfully."
-    write-log -logFile $logFile -Message "Settings file $destSettingsFile updated successfully." -module $scriptName
-}
-else
-{
-    Write-Host "Failed to update settings file $destSettingsFile."
-    Write-Log -logFile $logFile -Message "Failed to update settings file $destSettingsFile." -module $scriptName -LogLevel 'Error'
-}
+$null = UpdateSettingsFile -SettingsFilePath $destSettingsFile
 
 Write-Host "Cleaning up..."
 if ($null -ne $mergeOutputFile)
