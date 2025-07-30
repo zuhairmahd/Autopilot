@@ -434,7 +434,7 @@ function EncryptSecretsFile()
     if ([string]::IsNullOrWhiteSpace($EncryptionKey))
     {
         Write-Verbose "[$functionName] No encryption key provided. Generating a random key."
-        write-log -logFile $logFile -Message "No encryption key provided. Generating a random key." -module $functionName
+        Write-Log -logFile $logFile -Message "No encryption key provided. Generating a random key." -module $functionName
         $EncryptionKey = [guid]::NewGuid().ToString()
     }
     if ((Invoke-JsonFileEncryption -FilePath $FilePath -Key $EncryptionKey).success)  
@@ -464,26 +464,26 @@ function CopySecrets()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] [$functionName] Starting to copy secrets from $SourceFolder to $DestinationFolder"
-    write-log -logFile $logFile -Message "Starting to copy secrets from $SourceFolder to $DestinationFolder" -module $functionName
+    Write-Log -logFile $logFile -Message "Starting to copy secrets from $SourceFolder to $DestinationFolder" -module $functionName
     #region Print logs
     Write-Verbose "[$functionName] Received the following parameters:"
-    write-log -logFile $logFile -Message "Received the following parameters:" -module $functionName
+    Write-Log -logFile $logFile -Message "Received the following parameters:" -module $functionName
     Write-Verbose "[$functionName] SourceFolder: $SourceFolder"
-    write-log -logFile $logFile -Message "SourceFolder: $SourceFolder" -module $functionName
+    Write-Log -logFile $logFile -Message "SourceFolder: $SourceFolder" -module $functionName
     Write-Verbose "[$functionName] DestinationFolder: $DestinationFolder"
-    write-log -logFile $logFile -Message "DestinationFolder: $DestinationFolder" -module $functionName
+    Write-Log -logFile $logFile -Message "DestinationFolder: $DestinationFolder" -module $functionName
     Write-Verbose "[$functionName] Overwrite: $Overwrite"
-    write-log -logFile $logFile -Message "Overwrite: $Overwrite" -module $functionName
+    Write-Log -logFile $logFile -Message "Overwrite: $Overwrite" -module $functionName
     #endregion
     
     if (Test-Path -Path "$DestinationFolder\.secrets")
     {
         Write-Host "the folder $DestinationFolder\.secrets already exists."
-        Write-log -logFile $logFile -Message "The folder $DestinationFolder\.secrets already exists." -module $functionName
+        Write-Log -logFile $logFile -Message "The folder $DestinationFolder\.secrets already exists." -module $functionName
         if ($Overwrite)
         {
             Write-Host 'Removing .secrets folder...'
-            Write-log -logFile $logFile -Message "Overwrite is set to true. Removing .secrets folder." -module $functionName
+            Write-Log -logFile $logFile -Message "Overwrite is set to true. Removing .secrets folder." -module $functionName
             Remove-Item -Path "$DestinationFolder\.secrets" -Recurse -Force | Out-Null
         }
         else 
@@ -491,25 +491,25 @@ function CopySecrets()
             Write-Log -logFile $logFile -Message "The folder $DestinationFolder\.secrets already exists. Getting user input." -module $functionName
             $response = Read-Host 'Overwrite? (Y/N)'
             Write-Verbose "[$functionName] User response: $response"
-            write-log -logFile $logFile -Message "User response: $response" -module $functionName
+            Write-Log -logFile $logFile -Message "User response: $response" -module $functionName
             while ($response -notin 'Y', 'N', 'yes', 'no')
             {
                 $response = Read-Host 'Invalid input. Please enter Y or N: '
                 
                 Write-Verbose "[$functionName] User response: $response"
-                write-log -logFile $logFile -Message "User response: $response" -module $functionName
+                Write-Log -logFile $logFile -Message "User response: $response" -module $functionName
                 [console]::beep(500, 300)
             }
             if ($response -eq 'Y' -or $response -eq 'yes')
             {
                 Write-Host 'Removing .secrets folder...'
-                Write-log -logFile $logFile -Message "User chose to overwrite. Removing .secrets folder." -module $functionName
+                Write-Log -logFile $logFile -Message "User chose to overwrite. Removing .secrets folder." -module $functionName
                 Remove-Item -Path "$DestinationFolder\.secrets" -Recurse -Force | Out-Null
             }
             else
             {
                 Write-Host 'Exiting without copying secrets.'
-                Write-log -logFile $logFile -Message "User chose not to overwrite. Exiting without copying secrets." -module $functionName
+                Write-Log -logFile $logFile -Message "User chose not to overwrite. Exiting without copying secrets." -module $functionName
                 return $false
             }   
         }
@@ -517,35 +517,35 @@ function CopySecrets()
     else
     {
         Write-Host "Creating .secrets folder in: $DestinationFolder"
-        Write-log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
+        Write-Log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
         New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
     }
     
     Write-Host 'Looking for secrets...'
-    Write-log -logFile $logFile -Message "Looking for secrets in $SourceFolder\.secrets" -module $functionName  
+    Write-Log -logFile $logFile -Message "Looking for secrets in $SourceFolder\.secrets" -module $functionName  
     $secrets = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse
     if ($secrets.Count -eq 0)
     {
         Write-Host 'No secrets found.'
-        Write-log -logFile $logFile -Message "No secrets found in $SourceFolder\.secrets" -module $functionName
+        Write-Log -logFile $logFile -Message "No secrets found in $SourceFolder\.secrets" -module $functionName
         return $false
     }
     
     if (-not $Overwrite)
     {
         Write-Host 'Please choose the secret you would like to copy to the release folder.'
-        Write-log -logFile $logFile -Message "User is prompted to choose a secret to copy." -module $functionName
+        Write-Log -logFile $logFile -Message "User is prompted to choose a secret to copy." -module $functionName
         for ($i = 0; $i -lt $secrets.Count; $i++)
         {
             $fileName = $secrets[$i].Name
-            Write-log -logFile $logFile -Message "Found secret: $fileName" -module $functionName
+            Write-Log -logFile $logFile -Message "Found secret: $fileName" -module $functionName
             $encrypted = Test-FileEncryptionStatus -filePath $secrets[$i].FullName
             Write-Verbose "[$functionName] $fileName is encrypted: $($encrypted.IsEncrypted)"
-            write-log -logFile $logFile -Message "Secret $fileName is encrypted: $($encrypted.IsEncrypted)" -module $functionName
+            Write-Log -logFile $logFile -Message "Secret $fileName is encrypted: $($encrypted.IsEncrypted)" -module $functionName
             Write-Verbose "[$functionName] $fileName is valid: $($encrypted.IsValid)"
-            write-log -logFile $logFile -Message "Secret $fileName is valid: $($encrypted.IsValid)" -module $functionName
+            Write-Log -logFile $logFile -Message "Secret $fileName is valid: $($encrypted.IsValid)" -module $functionName
             Write-Verbose "[$functionName] error message: $($encrypted.ErrorMessage)"
-            write-log -logFile $logFile -Message "Secret $fileName error message: $($encrypted.ErrorMessage)" -module $functionName
+            Write-Log -logFile $logFile -Message "Secret $fileName error message: $($encrypted.ErrorMessage)" -module $functionName
             $index = $i + 1
             if ($encrypted.IsEncrypted)
             {
@@ -561,12 +561,12 @@ function CopySecrets()
                 if (-not $domain)
                 {
                     $domain = 'Unknown'
-                    Write-log -logFile $logFile -Message "Secret $fileName has unknown domain." -module $functionName
+                    Write-Log -logFile $logFile -Message "Secret $fileName has unknown domain." -module $functionName
                 }
                 if (-not $name)
                 {
                     $name = 'Unknown'
-                    Write-log -logFile $logFile -Message "Secret $fileName has unknown name." -module $functionName
+                    Write-Log -logFile $logFile -Message "Secret $fileName has unknown name." -module $functionName
                 }
                 Write-Host "$index. $($name): $domain ($fileName)"
             }
@@ -587,7 +587,7 @@ function CopySecrets()
                 else
                 {
                     Write-Host "Sorry: $inputValue is an invalid choice."
-                    Write-log -logFile $logFile -Message "User entered an invalid choice: $inputValue" -module $functionName
+                    Write-Log -logFile $logFile -Message "User entered an invalid choice: $inputValue" -module $functionName
                     [console]::beep(500, 300)
                     Write-Host "Please choose a number between 1 and $($secrets.Count), or 0 to exit."
                 }
@@ -595,68 +595,66 @@ function CopySecrets()
             else
             {
                 Write-Host "Invalid input. Please enter a number between 1 and $($secrets.Count), or 0 to exit."
-                Write-log -logFile $logFile -Message "User entered a non-integer input: $inputValue" -module $functionName
+                Write-Log -logFile $logFile -Message "User entered a non-integer input: $inputValue" -module $functionName
                 [console]::beep(1000, 300)
             }
         }
         Write-Verbose "[$functionName] User selected: $choice"
-        write-log -logFile $logFile -Message "User selected: $choice" -module $functionName
+        Write-Log -logFile $logFile -Message "User selected: $choice" -module $functionName
         if ($choice -eq 0)
         {
-            Write-log -logFile $logFile -Message "User chose to cancel. Exiting without copying secrets." -module $functionName
+            Write-Log -logFile $logFile -Message "User chose to cancel. Exiting without copying secrets." -module $functionName
             return $false
         }
         $secret = $secrets[$choice - 1]
-        write-log -logFile $logFile -Message "User selected secret: $($secret.Name)" -module $functionName
+        Write-Log -logFile $logFile -Message "User selected secret: $($secret.Name)" -module $functionName
     }
     else
     {
-        Write-log -logFile $logFile -Message "Copying default secret in $SourceFolder\.secrets" -module $functionName
+        Write-Log -logFile $logFile -Message "Copying default secret in $SourceFolder\.secrets" -module $functionName
         $secret = Get-ChildItem -Path "$SourceFolder\.secrets" -Filter config*.json -Recurse | Where-Object { $_.Name -eq 'config.json' }
         Write-Host "Using default secrets file: $($secret.Name)"
-        Write-log -logFile $logFile -Message "Using default secrets file: $($secret.Name)" -module $functionName    
+        Write-Log -logFile $logFile -Message "Using default secrets file: $($secret.Name)" -module $functionName    
     }
     Write-Verbose "[$functionName] Selected secret: $($secret.Name)"
-    write-log -logFile $logFile -Message "Selected secret: $($secret.Name)" -module $functionName
+    Write-Log -logFile $logFile -Message "Selected secret: $($secret.Name)" -module $functionName
     Write-Host "Copying $($secret.FullName) to $DestinationFolder"
-    Write-log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName 
+    Write-Log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName 
     try
     {
         Write-Host "Copying $($secret.FullName) to $DestinationFolder\.secrets"
-        Write-log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName
+        Write-Log -logFile $logFile -Message "Copying $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName
         if (-not (Test-Path -Path "$DestinationFolder\.secrets"))
         {
             Write-Host "Creating .secrets folder in: $DestinationFolder"
-            Write-log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
+            Write-Log -logFile $logFile -Message "Creating .secrets folder in: $DestinationFolder" -module $functionName
             New-Item -ItemType Directory -Path "$DestinationFolder\.secrets" -Force | Out-Null
         }
         Copy-Item -Path $secret.FullName -Destination "$DestinationFolder\.secrets\config.json" -Force
         Write-Host "Secrets copied successfully to $DestinationFolder\.secrets\config.json"
         Write-Verbose "[$functionName] Secrets copied successfully."
-        Write-log -logFile $logFile -Message "Secrets copied successfully to $DestinationFolder\.secrets\config.json" -module $functionName
+        Write-Log -logFile $logFile -Message "Secrets copied successfully to $DestinationFolder\.secrets\config.json" -module $functionName
         Write-Verbose "[$functionName] Checking file encryption status."
         $destStatus = Test-FileEncryptionStatus -FilePath "$DestinationFolder\.secrets\config.json"
-        $srcStatus = Test-FileEncryptionStatus -FilePath $secret.FullName
-        if (($null -ne $destStatus -and $destStatus.IsEncrypted) -and ($null -ne $srcStatus -and $srcStatus.IsValidFile))
+        if ($destStatus.IsEncrypted)
         {
-            if ((Test-FileEncryptionStatus -FilePath "$DestinationFolder\.secrets\config.json").IsEncrypted -and (Test-FileEncryptionStatus -FilePath $secret.FullName).IsValidFile)
+            Write-Host "File is already encrypted"
+            Write-Log -logFile $logFile -Message "File is already encrypted: $($secret.Name)" -module $functionName
+        }
+        else
+        {
+            $tempEncryptionKey = 'P@ssw0rd'
+            if (EncryptSecretsFile -FilePath "$DestinationFolder\.secrets\config.json" -EncryptionKey $tempEncryptionKey)
             {
-                Write-Host "File is already encrypted"
-                Write-log -logFile $logFile -Message "File is already encrypted: $($secret.Name)" -module $functionName
+                Write-Host "File encryption successful"
+                Write-Host "File encrypted with temporary key: $tempEncryptionKey"
+                Write-Log -logFile $logFile -Message "File encryption successful: $($secret.Name)" -module $functionName
             }
             else
             {
-                if (EncryptSecretsFile -FilePath "$DestinationFolder\.secrets\config.json" -EncryptionKey 'P@ssw0rd')
-                {
-                    Write-Host "File encryption successful"
-                    Write-log -logFile $logFile -Message "File encryption successful: $($secret.Name)" -module $functionName
-                }
-                else
-                {
-                    Write-Host "File encryption failed"
-                    Write-log -logFile $logFile -Message "File encryption failed: $($secret.Name)" -module $functionName -LogLevel 'Error'
-                    return $false
-                }
+                Write-Host "File encryption failed"
+                Write-Log -logFile $logFile -Message "File encryption failed: $($secret.Name)" -module $functionName -LogLevel 'Error'
+                return $false
             }
         }
     }
@@ -664,7 +662,7 @@ function CopySecrets()
     {
         Write-Error "Failed to copy $($secret.FullName) to $DestinationFolder\.secrets"
         Write-Error $_.Exception.Message
-        Write-log -logFile $logFile -Message "Failed to copy $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName -LogLevel 'Error'
+        Write-Log -logFile $logFile -Message "Failed to copy $($secret.FullName) to $DestinationFolder\.secrets" -module $functionName -LogLevel 'Error'
         return $false
     }
     return $true
@@ -1232,6 +1230,6 @@ else
     Write-Host "Executable not copied."
 }
 Write-Host "Script completed successfully."
-write-log -logFile $logFile -finishLogging
+Write-Log -logFile $logFile -finishLogging
 exit 0
 #endregion Main code

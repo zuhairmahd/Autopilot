@@ -1222,12 +1222,12 @@ else
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
 $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
-$deviceExportMenu = newMenu -Title "Export Devices" -Description "Choose which devices you want to export."
+$exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would like to export."
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
 
 #region export menu
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot Devices" -Action {
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
     {
@@ -1238,7 +1238,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Autopilot 
         Write-Host "Failed to export Autopilot devices." -ForegroundColor Red
     }
 }
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported Autopilot Devices" -Action {
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
     if ($exported)
     {
@@ -1249,7 +1249,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Imported A
         Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
     }
 }
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Windows Devices" -Action {
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
     if ($exported)
     {
@@ -1260,7 +1260,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Managed Wi
         Write-Host "Failed to export Managed devices." -ForegroundColor Red
     }
 }
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged Windows Devices" -Action {
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
     if ($exported)
     {
@@ -1271,7 +1271,7 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export Unmanaged 
         Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
     }
 }
-$deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export device storage report" -Action {
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
     if (ExportDeviceStorage -AccessToken $accessToken -OutputFile $storageOutputFileName -IncludeStorageInfo)
@@ -1281,6 +1281,26 @@ $deviceExportMenu = AddMenuItem -menu $deviceExportMenu -name "Export device sto
     else
     {
         Write-Host "Failed to export device storage report." -ForegroundColor Red
+    }
+}
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignments" -Action {
+    $exported, $appsProcessed = GetAppAssignmentTypes -AccessToken $accessToken -Export -outputPath $ScriptPath -fileMode 'Overwrite'
+    if ($exported)
+    {
+        Write-Host "App assignment types exported successfully."
+    }
+    else
+    {
+        if ($appsProcessed.AllApps.Count -eq 0)
+        {
+            Write-Host "No apps found to export." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Warning"
+        }
+        else
+        {
+            Write-Host "Failed to export app assignment types." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to export app assignment types." -LogLevel "Error"
+        }
     }
 }
 #endregion export menu
@@ -1933,6 +1953,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+
 if ($settings.appMode -ne 'test')
 {
     Write-Verbose "[$scriptName] App mode is not test. Adding settings menu to main menu."
@@ -1977,7 +1998,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export devices" -Submenu $deviceExportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $uri = "applications(appId='$appId')"
     $extraParameters = "select=displayName"
