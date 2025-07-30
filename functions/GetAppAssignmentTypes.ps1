@@ -11,7 +11,7 @@ function GetAppAssignmentTypes()
         [string]$outputPath,
         [Parameter(ParameterSetName = 'Export')]
         [ValidateSet('Append', 'Overwrite')]
-        [string]$fileMode = 'overwrite'
+        [string]$fileMode = 'Overwrite'
     )
     $functionName = $MyInvocation.MyCommand.Name    
     #write a verbose log of received parameters
@@ -214,13 +214,13 @@ function GetAppAssignmentTypes()
     Write-Log -logFile $logFile -Module $functionName -Message "Output stats displayed." -LogLevel "Debug"
     
     # Export if requested
-    if ($export)
+    if ($Export)
     {
         Write-Verbose "[$functionName] Export requested."
         Write-Log -logFile $logFile -Module $functionName -Message "Export requested." -LogLevel "Information"
         $date = (Get-Date -Format "yyyyMMdd-HHmmss")
         $exportSuccessful = $false
-        $csvPath = "$outputPath\$appReport-$date.csv"
+        $csvPath = "$outputPath"
         Write-Verbose "[$functionName] Preparing export data."
         Write-Log -logFile $logFile -Module $functionName -Message "Preparing export data for required, available, and unassigned apps." -LogLevel "Debug"
 
@@ -316,5 +316,5 @@ function GetAppAssignmentTypes()
     
     Write-Verbose "[$functionName] Returning result object."
     Write-Log -logFile $logFile -Module $functionName -Message "Returning result object from GetAppAssignmentTypes." -LogLevel "Debug"
-    return $exportSuccessful, $returnedApps
+    return $returnedApps
 }
