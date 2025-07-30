@@ -7,6 +7,84 @@ This PowerShell script provides a comprehensive solution for managing Windows Au
 The script leverages the Microsoft Graph API to communicate with Intune and provides a secure, efficient way to manage device lifecycles in enterprise environments.
 
 ## Key Features
+### App Assignment Reporting & Export
+
+The script now includes advanced reporting and export functionality for Intune app assignments via the `GetAppAssignmentTypes` function. This enhanced feature provides robust app assignment reporting with comprehensive logging and export capabilities.
+
+#### Key Features
+
+- **Comprehensive Reporting**: Retrieve all Intune app assignments, automatically categorized by intent (Required, Available, Unassigned)
+- **Robust CSV Export**: Export all app assignments to a single CSV file with intent/category column for easy analysis
+- **PSCustomObject Structure**: Uses [PSCustomObject] for robust CSV output, eliminating hashtable property issues
+- **Advanced Logging**: Extensive `Write-Verbose` and `Write-Log` (CMTrace-compatible) logging throughout for troubleshooting and audit trails
+- **Programmatic Access**: Returns structured objects for automation and scripting workflows
+- **Flexible Output**: Support for both append and overwrite modes when exporting to CSV
+
+#### Usage Examples
+
+```powershell
+# Export all app assignments to CSV (overwrite mode)
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath "app-assignments.csv" -fileMode Overwrite
+
+# Append to an existing CSV file
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath "app-assignments.csv" -fileMode Append
+
+# Retrieve assignment data as an object (no export)
+$result = GetAppAssignmentTypes -AccessToken $token
+Write-Host "Total apps found: $($result.AllApps.Count)"
+Write-Host "Required apps: $($result.RequiredApps.Count)"
+Write-Host "Available apps: $($result.AvailableApps.Count)" 
+Write-Host "Unassigned apps: $($result.UnassignedApps.Count)"
+
+# Access specific app categories
+$result.RequiredApps   # All required apps with group assignments
+$result.AvailableApps  # All available apps with group assignments
+$result.UnassignedApps # All unassigned apps
+$result.AllApps        # Complete list of all apps with metadata
+```
+
+#### Parameters
+
+- **`-AccessToken`** (required): Microsoft Graph API access token
+- **`-Export`** (optional): Switch to enable CSV export functionality
+- **`-outputPath`** (required when `-Export` used): Path to the output CSV file
+- **`-fileMode`** (optional): Export mode - 'Append' or 'Overwrite' (default: 'Overwrite')
+
+#### CSV Output Format
+
+The exported CSV includes the following columns for comprehensive analysis:
+- **Intent**: Assignment category (Required, Available, Unassigned)
+- **id**: Unique app identifier in Intune
+- **type**: App type (e.g., win32LobApp, mobileApp, webApp)
+- **displayName**: App display name as shown in Intune console
+- **applicableDeviceType**: Target device platforms (iPad, iPhone, etc.)
+- **AssignedGroups**: Resolved group names (human-readable) 
+- **assignedGroupCount**: Number of groups the app is assigned to
+
+#### Advanced Logging & Troubleshooting
+
+All operations include comprehensive logging with both `Write-Verbose` and `Write-Log` (CMTrace-compatible format):
+
+```powershell
+# Enable verbose logging for detailed troubleshooting
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath "apps.csv" -Verbose
+
+# Check logs for troubleshooting
+# Logs are written to the standard log file location with CMTrace-compatible format
+```
+
+**Log Categories:**
+- **Information**: High-level operation status and results
+- **Debug**: Detailed API calls, group caching, and data processing
+- **Warning**: Missing group information or unclear assignment intents
+- **Error**: API failures or export issues
+
+#### Why This Enhancement?
+
+- **Fixes Export Bugs**: Eliminates previous CSV export issues (no more Count/IsReadOnly/Keys/Values in output)
+- **Enables Compliance Reporting**: Robust reporting for compliance, audit, and automation workflows  
+- **Improves Troubleshooting**: Detailed logs provide full traceability for issue resolution
+- **Supports Automation**: Structured object returns enable programmatic use in larger workflows
 
 ### Core Functionality
 
