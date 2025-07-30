@@ -220,7 +220,7 @@ function GetAppAssignmentTypes()
         Write-Log -logFile $logFile -Module $functionName -Message "Export requested." -LogLevel "Information"
         $date = (Get-Date -Format "yyyyMMdd-HHmmss")
         $exportSuccessful = $false
-        $csvPath = "$outputPath"
+        $csvPath = "$outputPath\app-assignments-$date.csv"
         Write-Verbose "[$functionName] Preparing export data."
         Write-Log -logFile $logFile -Module $functionName -Message "Preparing export data for required, available, and unassigned apps." -LogLevel "Debug"
 
@@ -316,5 +316,5 @@ function GetAppAssignmentTypes()
     
     Write-Verbose "[$functionName] Returning result object."
     Write-Log -logFile $logFile -Module $functionName -Message "Returning result object from GetAppAssignmentTypes." -LogLevel "Debug"
-    return $returnedApps
+    return $exportSuccessful, $returnedApps
 }
