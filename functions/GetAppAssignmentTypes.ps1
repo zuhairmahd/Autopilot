@@ -160,7 +160,7 @@ function GetAppAssignmentTypes()
             displayName            = $app.displayName
             AssignedGroups         = $assignedGroups | Out-String
             assignedGroupCount     = $assignedGroups.Count
-            assignmentResultObject = if ($app.assignments) { $app.assignments | Out-String } else { "No assignments" }
+            # assignmentResultObject property removed as it is unused
             applicableDeviceType   = if ($app.applicableDeviceType.iPhoneAndIPod -and $app.applicableDeviceType.iPad) { 'iPad and iPhone' } elseif ($app.applicableDeviceType.iPad) { 'iPad' } elseif ($app.applicableDeviceType.iPhoneAndIPod) { 'iPhone' } else { "" }
         }
         Write-Verbose "[$functionName] App object created: $($appObject | Out-String)"
