@@ -7,6 +7,50 @@ This PowerShell script provides a comprehensive solution for managing Windows Au
 The script leverages the Microsoft Graph API to communicate with Intune and provides a secure, efficient way to manage device lifecycles in enterprise environments.
 
 ## Key Features
+### App Assignment Reporting & Export
+
+The script now includes advanced reporting and export functionality for Intune app assignments via the `GetAppAssignmentTypes` function. This feature allows you to:
+
+- Retrieve all Intune app assignments, grouped by intent (Required, Available, Unassigned)
+- Export app assignment data to CSV with detailed group membership and assignment metadata
+- Use advanced logging for troubleshooting and auditing
+
+#### Usage Example
+
+```powershell
+# Export all app assignments to CSV (overwrite mode)
+$token = Get-IntuneAuthToken # (your authentication method)
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath "app-assignments.csv" -fileMode Overwrite
+
+# Append to an existing CSV file
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath "app-assignments.csv" -fileMode Append
+
+# Retrieve assignment data as an object (no export)
+$result = GetAppAssignmentTypes -AccessToken $token
+$result.RequiredApps   # All required apps
+$result.AvailableApps  # All available apps
+$result.UnassignedApps # All unassigned apps
+```
+
+#### Parameters
+
+- `-AccessToken` (required): Microsoft Graph API access token
+- `-Export`: Switch to enable CSV export
+- `-outputPath`: Path to the output CSV file (required if `-Export` is used)
+- `-fileMode`: 'Append' or 'Overwrite' (default: 'Overwrite')
+
+#### CSV Output
+
+The exported CSV includes columns for:
+- Intent (Required, Available, Unassigned)
+- App ID, Type, Display Name
+- Assigned Groups (resolved names)
+- Assignment group count
+- Assignment metadata
+
+#### Logging
+
+All operations are logged with both `Write-Verbose` and `Write-Log` (CMTrace-compatible) for full traceability. Verbose logging can be enabled for troubleshooting.
 
 ### Core Functionality
 
