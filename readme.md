@@ -229,9 +229,10 @@ The application includes an interactive setup wizard that automatically launches
 The First Run Wizard will guide you through:
 1. **Azure AD Configuration**: App ID, Tenant ID, Domain Name, and Application Name
 2. **Authentication Setup**: Choose between delegated (interactive) or application (service) authentication
-3. **Credential Collection**: App secrets or certificate details for application authentication
-4. **File Creation**: Automatic creation and encryption of configuration files
-5. **Default Settings**: Generation of comprehensive `settings.json` and `strings.json` with sensible defaults
+3. **Auto Update Configuration**: Choose whether to enable automatic updates for the latest features and security improvements
+4. **Credential Collection**: App secrets or certificate details for application authentication
+5. **File Creation**: Automatic creation and encryption of configuration files
+6. **Default Settings**: Generation of comprehensive `settings.json` and `strings.json` with sensible defaults
 
 **Required Information**: Have your Azure AD App ID, Tenant ID, domain name, and authentication credentials ready.
 
@@ -480,6 +481,7 @@ This feature is particularly useful for:
 ### Global Settings
 
 - `operatingSystem`: Target operating system (default: "Windows")
+- `autoUpdate`: Enable automatic script updates (boolean, configurable during first-run wizard)
 - `testMode`: Enable test mode operations (boolean, only needed for unit tests)
 - `configFile`: Path to authentication configuration file
 - `maxWaitTime`: Default maximum wait time for operations
@@ -502,6 +504,17 @@ This feature is particularly useful for:
 - `GroupTag`: The default Group Tag to use for Autopilot registration
 - `userPatternsToExclude`: An array of user pattern names to exclude from reporting. This is especially helpful if administrators authenticate with separate identities, as we are only interested in the primary identity.
 - `DesiredAutopilotProfiles`: An array of Autopilot profiles that the device has to be assigned to in order to pass user readiness
+
+#### Auto Update Setting
+
+The `autoUpdate` setting controls whether the script automatically checks for and installs updates:
+
+- **Default Value**: `true` (enabled)
+- **Configuration**: Set during first-run wizard or manually in `settings.json`
+- **Purpose**: Ensures users have the latest features and security improvements
+- **User Control**: Users can disable this during setup or modify it later in the settings file
+
+When enabled, the script will periodically check for updates and apply them automatically. When disabled, users must manually check for updates when needed.
 
 ### Domain Settings
 
