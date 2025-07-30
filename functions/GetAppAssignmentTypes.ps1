@@ -158,7 +158,7 @@ function GetAppAssignmentTypes()
             id                     = $app.id
             type                   = ($app."@odata.type" -replace '#Microsoft.Graph.', '')
             displayName            = $app.displayName
-            AssignedGroups         = $assignedGroups | Out-String
+            AssignedGroups         = $assignedGroups -join '; '
             assignedGroupCount     = $assignedGroups.Count
             # assignmentResultObject property removed as it is unused
             applicableDeviceType   = if ($app.applicableDeviceType.iPhoneAndIPod -and $app.applicableDeviceType.iPad) { 'iPad and iPhone' } elseif ($app.applicableDeviceType.iPad) { 'iPad' } elseif ($app.applicableDeviceType.iPhoneAndIPod) { 'iPhone' } else { "" }
