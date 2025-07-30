@@ -782,6 +782,7 @@ function Test-SettingsJsonExists()
             }
             globalSettings = [ordered]@{
                 operatingSystem     = "Windows"
+                autoUpdate          = $true
                 showLicenseBanner   = $true
                 testMode            = $false
                 configFile          = ".\.secrets\config.json"
