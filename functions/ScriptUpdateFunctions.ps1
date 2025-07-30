@@ -138,7 +138,8 @@ function GetUpdates()
         [Parameter(Mandatory = $false)]
         [string]$executableFileName = "$pwd\main.exe",
         [Parameter(Mandatory = $true)]
-        [string]$updateURL
+        [string]$updateURL,
+        [switch]$noConfirmation
     )
 
     #region define variables and write logs 
@@ -189,19 +190,26 @@ function GetUpdates()
         Write-Host "An update is available."
         Write-Host "Current version: $localVersion"
         Write-Host "New version: $remoteVersion"
-        Write-Host "Would you like to download the update?"
-        $userInput = Read-Host "Type 'yes' to proceed with the update, or 'no' to cancel"
-        while ($userInput -notin @('yes', 'no'))
+        if ($noConfirmation)
         {
-            Write-Host "Invalid input. Please type 'yes' to proceed with the update, or 'no' to cancel."
-            #beep
-            [console]::beep(1000, 500)
-            $userInput = Read-Host
+            Write-Host "No confirmation required. Proceeding with the update..."
         }
-        if ($userInput -eq 'no')
+        else
         {
-            Write-Host "Update cancelled by user."
-            return $returnValues.UpdateCancelledMessage
+            Write-Host "Would you like to download the update?"
+            $userInput = Read-Host "Type 'yes' to proceed with the update, or 'no' to cancel"
+            while ($userInput -notin @('yes', 'no'))
+            {
+                Write-Host "Invalid input. Please type 'yes' to proceed with the update, or 'no' to cancel."
+                #beep
+                [console]::beep(1000, 500)
+                $userInput = Read-Host
+            }
+            if ($userInput -eq 'no')
+            {
+                Write-Host "Update cancelled by user."
+                return $returnValues.UpdateCancelledMessage
+            }
         }
         Write-Host "Proceeding with the update..."
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
@@ -283,5 +291,3 @@ function GetUpdates()
     #endregion
     return $returnValues.UpdateSuccessMessage
 }
-
-

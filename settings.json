@@ -137,6 +137,7 @@
         }
     ],
     "globalSettings": {
+        "autoUpdate": true,
         "operatingSystem": "Windows",
         "showLicenseBanner": true,
         "testMode": false,

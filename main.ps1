@@ -1107,6 +1107,77 @@ function ProcessSerialNumber()
 }
 #endregion helper functions
 
+#region banner
+Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
+Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+
+if ($settings.showLicenseBanner)
+{
+    Write-Host "==========================================================`n"     
+    Write-Host "This script is licensed under the MIT License." 
+    Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
+    Write-Host ""
+    Write-Host "Report issues at $baseURL/$repoPath/$repoName/issues"
+    Write-Host "For the changeLog, go to $baseURL/$repoPath/$repoName/releases"
+    Write-Host "==========================================================`n"
+    Write-Host " DISCLAIMER: This script is provided AS IS without warranty of any kind." -ForegroundColor Red
+    Write-Host "The author makes no guarantees about the script's functionality or suitability for any purpose." -ForegroundColor Red
+    Write-Host "It is your responsibility to test and validate the script in your environment before using it." -ForegroundColor Red
+    Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
+    Write-Host "==========================================================`n"
+}
+if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
+{
+    Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "==========================================================`n"    
+    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    if ($settings.autoUpdate)
+    {
+        Write-Host "Automatic updates are enabled." -ForegroundColor Green
+        Write-Host "The script will now attempt to update itself." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Automatic updates are enabled. The script will now attempt to update itself." -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The script will now attempt to update itself." -LogLevel "Information"
+        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -noConfirmation
+        Write-Verbose "[$scriptName] Update result: $updateResult"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
+        switch ($updateResult)
+        {
+            $returnValues.UpdateSuccessMessage
+            {
+                Write-Host 'The script has been updated.' -ForegroundColor Green
+                Write-Host 'Please restart the script.' -ForegroundColor Green
+                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The script has been updated. Please restart the script." -LogLevel "Information"
+                Write-Log -LogFile $LogFile -finishLogging
+                exit 0
+            }
+            $returnValues.UpdateFailedMessage
+            {
+                Write-Host 'The script update failed.' -ForegroundColor Red
+            }
+            $returnValues.UpdateNotNeededMessage
+            {
+                Write-Host 'The script is up to date.' -ForegroundColor Green
+            }
+            default
+            {
+                $updateResult
+            }
+        }
+    }
+    else 
+    {
+        Write-Host "Please run the update command to get the latest version." -ForegroundColor Yellow
+        Write-Host "==========================================================`n"
+    }
+}
+else
+{
+    Write-Verbose "[$scriptName] No updates available or current script is up to date."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
+}
+#endregion banner
+
 #region initialization block with access token
 if ($ResetAuth)
 {
@@ -1182,41 +1253,6 @@ else
     }
 }
 #endregion initialization block with access token
-
-#region banner
-Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
-Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
-
-if ($settings.showLicenseBanner)
-{
-    Write-Host "==========================================================`n"     
-    Write-Host "This script is licensed under the MIT License." 
-    Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
-    Write-Host ""
-    Write-Host "Report issues at $baseURL/$repoPath/$repoName/issues"
-    Write-Host "For the changeLog, go to $baseURL/$repoPath/$repoName/releases"
-    Write-Host "==========================================================`n"
-    Write-Host " DISCLAIMER: This script is provided AS IS without warranty of any kind." -ForegroundColor Red
-    Write-Host "The author makes no guarantees about the script's functionality or suitability for any purpose." -ForegroundColor Red
-    Write-Host "It is your responsibility to test and validate the script in your environment before using it." -ForegroundColor Red
-    Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
-    Write-Host "==========================================================`n"
-}
-if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
-{
-    Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
-    Write-Host "==========================================================`n"    
-    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
-    Write-Host "Please run the update command to get the latest version." -ForegroundColor Yellow
-    Write-Host "==========================================================`n"
-}
-else
-{
-    Write-Verbose "[$scriptName] No updates available or current script is up to date."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
-}
-#endregion banner
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
