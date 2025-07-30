@@ -7,12 +7,12 @@ This document describes how to use the advanced app assignment reporting and exp
 ### Export All App Assignments to CSV (Overwrite Mode)
 ```powershell
 $token = Get-IntuneAuthToken # (your authentication method)
-GetAppAssignmentTypes -AccessToken $token -Export -outputPath "app-assignments.csv" -fileMode Overwrite
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath $pwd -fileMode Overwrite
 ```
 
 ### Append to an Existing CSV File
 ```powershell
-GetAppAssignmentTypes -AccessToken $token -Export -outputPath "app-assignments.csv" -fileMode Append
+GetAppAssignmentTypes -AccessToken $token -Export -outputPath $pwd -fileMode Append
 ```
 
 ### Retrieve Assignment Data as an Object (No Export)
@@ -27,7 +27,7 @@ $result.UnassignedApps # All unassigned apps
 
 - `-AccessToken` (required): Microsoft Graph API access token
 - `-Export`: Switch to enable CSV export
-- `-outputPath`: Path to the output CSV file (required if `-Export` is used)
+- `-outputPath`: Path to the folder where the output CSV file will be created (required if `-Export` is used)
 - `-fileMode`: 'Append' or 'Overwrite' (default: 'Overwrite')
 
 ## CSV Output
