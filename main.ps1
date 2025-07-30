@@ -1137,7 +1137,6 @@ if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
         Write-Host "The script will now attempt to update itself." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Automatic updates are enabled. The script will now attempt to update itself." -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The script will now attempt to update itself." -LogLevel "Information"
         $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -noConfirmation
         Write-Verbose "[$scriptName] Update result: $updateResult"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
