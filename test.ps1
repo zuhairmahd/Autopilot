@@ -35,6 +35,29 @@ param(
     [string]$LogLevel = 'Information'
 )
 
+$scriptName = $MyInvocation.MyCommand.Name
+if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    $ScriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    Write-Verbose "[$scriptName] Running as an external script."
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+}
+else
+{
+    Write-Verbose "[$scriptName] Running as a script block."
+    $ScriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    Write-Verbose "[$scriptName] Script path: $ScriptPath"
+    if (!$ScriptPath)
+    {
+        $scriptName = 'main.exe'
+        Write-Verbose "[$scriptName] Script path is not set. Defaulting to current directory: $pwd"
+        $ScriptPath = "$PWD"
+        Write-Verbose "[$scriptName] Default script path: $ScriptPath"
+        $fullScriptPath = "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Full script path: $fullScriptPath"
+    }
+}
+
 #region import functions.
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
@@ -332,9 +355,9 @@ else
 }
 #endregion Load parameters from the configuration file if it exists
 
-#region variables
-# $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-# $scope = $auth.scope
+#region Define variables
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$scope = $auth.scope
 # $logfile = "mylog.log"
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
@@ -356,7 +379,7 @@ else
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
-$accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
+$accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'Interactive'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -367,12 +390,28 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # "imported"  = $importedDevices
 # "unmanaged" = $unmanagedDevices
 # }
-#endregion variables
+#endregion Define variables
 
-$uri = "applications(appId='$appId')"
-$extraParameters = "select=displayName"
-$registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
+$exported, $appsProcessed = GetAppAssignmentTypes -AccessToken $accessToken -Export -outputPath $ScriptPath -fileMode 'Overwrite'
+if ($exported)
+{
+    Write-Host "App assignment types exported successfully."
+}
+else
+{
+    if ($appsProcessed.AllApps.Count -eq 0)
+    {
+        Write-Host "No apps found to export." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Warning"
+    }
+    else
+    {
+        Write-Host "Failed to export app assignment types." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to export app assignment types." -LogLevel "Error"
+    }
+}
 
+Write-Log -LogFile $LogFile -FinishLogging
 
 exit 0 
 $inputFile = Read-Host "Enter the path to the input file"
