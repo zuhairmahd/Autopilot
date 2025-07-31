@@ -1222,7 +1222,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         write-log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles -verbose 
+        $filesCleaned = cleanupTempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Verbose "[$scriptName] All temporary files were cleaned."
@@ -1632,7 +1632,7 @@ else
 Clear-SecureMemory -ClearScriptVariables
 
 # Cleanup temporary files 
-$filesCleaned = cleanupTempFiles -verbose
+$filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Verbose "[$scriptName] All temporary files were cleaned."
