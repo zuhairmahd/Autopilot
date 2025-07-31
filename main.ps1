@@ -1222,14 +1222,27 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change autoupdate setting
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         write-log -LogFile $LogFile -Module "$scriptName" -Message $messageString -LogLevel "Information"
-        $backupFiles = Get-ChildItem -Path "$scriptPath\$initFile.bakup.*" -ErrorAction SilentlyContinue
+        $backupFiles = Get-ChildItem "*.backup.*" -ErrorAction SilentlyContinue
         Write-Verbose "[$scriptName] Backup files found: $($backupFiles.Count)"
         write-log -logFile $LogFile -Module "$scriptName" -Message "Backup files found: $($backupFiles.Count)" -LogLevel "Information"
         if ($backupFiles.Count -gt 0)
         {
             Write-Verbose "[$scriptName] Removing old backup files."
             write-log -logFile $LogFile -Module "$scriptName" -Message "Removing old backup files." -LogLevel "Information"
-            Remove-Item $backupFiles -Force -ErrorAction SilentlyContinue
+            foreach ($backupFile in $backupFiles)
+            {
+                Write-Verbose "[$scriptName] Moving backup file $($backupFile.FullName) to TEMP."
+                write-log -logFile $LogFile -Module "$scriptName" -Message "Moving backup file $($backupFile.FullName) to TEMP." -LogLevel "Information"
+                if (Test-Path "$env:TEMP\$($backupFile.Name)")
+                {
+                    Write-Verbose "[$scriptName] Removing existing file in TEMP: $($backupFile.Name)"
+                    write-log -logFile $LogFile -Module "$scriptName" -Message "Removing existing file in TEMP: $($backupFile.Name)" -LogLevel "Information"
+                    Remove-Item -Path "$env:TEMP\$($backupFile.Name)" -Force 
+                }
+                Move-Item -Path $backupFile -Destination $env:TEMP -Force 
+                Write-Verbose "[$scriptName] Backup file $($backupFile.Name) moved to TEMP."
+                write-log -logFile $LogFile -Module "$scriptName" -Message "Backup file $($backupFile.Name) moved to TEMP." -LogLevel "Information"
+            }
         }
         else
         {
@@ -1242,7 +1255,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change autoupdate setting
         Write-Host "Failed to update autoUpdate setting" -ForegroundColor Red
         write-log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
-}   
+}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
     Write-Host 'Restoring the script to its default settings...'
     if (InitializeConfiguration -RootFolder $pwd -overwrite)
