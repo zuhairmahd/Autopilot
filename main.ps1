@@ -1221,34 +1221,17 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     if (Update-GlobalSetting -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
-        write-log -LogFile $LogFile -Module "$scriptName" -Message $messageString -LogLevel "Information"
-        $backupFiles = Get-ChildItem "*.backup.*" -ErrorAction SilentlyContinue
-        Write-Verbose "[$scriptName] Backup files found: $($backupFiles.Count)"
-        write-log -logFile $LogFile -Module "$scriptName" -Message "Backup files found: $($backupFiles.Count)" -LogLevel "Information"
-        if ($backupFiles.Count -gt 0)
+        write-log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
+        $filesCleaned = cleanupTempFiles -verbose 
+        if ($filesCleaned.AllRemoved)
         {
-            Write-Verbose "[$scriptName] Removing old backup files."
-            write-log -logFile $LogFile -Module "$scriptName" -Message "Removing old backup files." -LogLevel "Information"
-            foreach ($backupFile in $backupFiles)
-            {
-                Write-Verbose "[$scriptName] Moving backup file $($backupFile.FullName) to TEMP."
-                write-log -logFile $LogFile -Module "$scriptName" -Message "Moving backup file $($backupFile.FullName) to TEMP." -LogLevel "Information"
-                if (Test-Path "$env:TEMP\$($backupFile.Name)")
-                {
-                    Write-Verbose "[$scriptName] Removing existing file in TEMP: $($backupFile.Name)"
-                    write-log -logFile $LogFile -Module "$scriptName" -Message "Removing existing file in TEMP: $($backupFile.Name)" -LogLevel "Information"
-                    Remove-Item -Path "$env:TEMP\$($backupFile.Name)" -Force 
-                }
-                Move-Item -Path $backupFile -Destination $env:TEMP -Force 
-                Write-Verbose "[$scriptName] Backup file $($backupFile.Name) moved to TEMP."
-                write-log -logFile $LogFile -Module "$scriptName" -Message "Backup file $($backupFile.Name) moved to TEMP." -LogLevel "Information"
-            }
+            Write-Verbose "[$scriptName] All temporary files were cleaned."
+            write-log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
-        else
-        {
-            Write-Verbose "[$scriptName] No backup files found."
-            write-log -logFile $LogFile -Module "$scriptName" -Message "No backup files found." -LogLevel "Information"
-        }
+        Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+        write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+        Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)"
+        write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)" -LogLevel "Information"
     }
     else
     {
@@ -1644,10 +1627,22 @@ else
 }
 #endregion Show Menu
 
-# Finish logging
-Write-Log -LogFile $LogFile -FinishLogging
-
+#region Cleanup
 # Clear sensitive data from memory before exiting
 Clear-SecureMemory -ClearScriptVariables
 
+# Cleanup temporary files 
+$filesCleaned = cleanupTempFiles -verbose
+if ($filesCleaned.AllRemoved)
+{
+    Write-Verbose "[$scriptName] All temporary files were cleaned."
+    write-log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+}
+Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)"
+write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)" -LogLevel "Information"
 
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+#endregion Cleanup
