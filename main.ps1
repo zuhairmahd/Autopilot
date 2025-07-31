@@ -1213,7 +1213,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     }
     if ($choice -in @('no', 'n'))
     {
-        Write-Host "Exiting..."
+        Write-Verbose "[$scriptName] User chose not to change Auto Update setting."
+        write-log -logFile $LogFile -Module "$scriptName" -Message "User chose not to change Auto Update setting." -LogLevel "Information"
         return $returnValues.backoutText
     }
     $settings.autoUpdate = -not $settings.autoUpdate
