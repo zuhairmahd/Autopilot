@@ -616,6 +616,7 @@ if ($settings.showLicenseBanner)
     Write-Host "It is your responsibility to test and validate the script in your environment before using it." -ForegroundColor Red
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
+}
 if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
