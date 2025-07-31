@@ -5,7 +5,7 @@ param(
     [string]$TestFolder = "$PWD\test-autoupdate-temp"
 )
 
-Write-Host "Testing autoUpdate First Run Wizard Integration" -ForegroundColor Green
+Write-Host "Testing Auto Update First Run Wizard Integration" -ForegroundColor Green
 Write-Host "Test folder: $TestFolder" -ForegroundColor Yellow
 
 # Clean up any existing test folder

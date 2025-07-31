@@ -415,7 +415,7 @@ if (Test-Path -Path $InitFile)
 }
 else
 {
-    Write-Host "Configuration file $initFile not found. Using default values."
+    Write-Host "Configuration file $initFile not found. Using default values." -ForegroundColor Yellow
     
     $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
     if (-not $settingsCreated)
@@ -452,12 +452,12 @@ if ($settings.Repo -eq 'github')
         if ($latestRelease)
         {
             Write-Verbose "[$scriptName] Successfully retrieved the latest release information from GitHub."
-            Write-Host "Latest release: $latestRelease"
+            Write-Host "Latest release: $latestRelease" -ForegroundColor Cyan
         }
         else
         {
             Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
-            Write-Host "Defaulting to $defaultBranch branch."
+            Write-Host "Defaulting to $defaultBranch branch." -ForegroundColor Yellow
             $latestRelease = $defaultBranch
         }
     }
@@ -480,8 +480,8 @@ elseif ($settings.Repo -eq 'gitlab')
 }
 else
 {
-    Write-Host 'Invalid repository specified.'
-    Write-Host 'Defaulting to the main branch from GitHub.'
+    Write-Host 'Invalid repository specified.' -ForegroundColor Red
+    Write-Host 'Defaulting to the main branch from GitHub.' -ForegroundColor Yellow
     $latestRelease = $defaultBranch
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
@@ -506,7 +506,7 @@ foreach ($key in $settings.Keys)
     Write-Verbose "[$scriptName] $($key): $($settings[$key])"
     if ($showSettings)
     {
-        Write-Host "Setting $($key): $($settings[$key])"
+        Write-Host "Setting $($key): $($settings[$key])" -ForegroundColor Cyan
     }
 }
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
@@ -516,7 +516,7 @@ foreach ($key in $getTokenParams.Keys)
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
     if ($showAuth)
     {
-        Write-Host "$($key): $($getTokenParams[$key])"
+        Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
     }
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
@@ -599,30 +599,29 @@ Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: 
 #endregion logging
 
 #region banner
-Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
+Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
 Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
 
 if ($settings.showLicenseBanner)
 {
-    Write-Host "==========================================================`n"     
-    Write-Host "This script is licensed under the MIT License." 
-    Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT"
-    Write-Host ""
-    Write-Host "Report issues at $baseURL/$repoPath/$repoName/issues"
-    Write-Host "For the changeLog, go to $baseURL/$repoPath/$repoName/releases"
-    Write-Host "==========================================================`n"
+    Write-Host "==========================================================`n" -ForegroundColor White     
+    Write-Host "This script is licensed under the MIT License." -ForegroundColor White
+    Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT" -ForegroundColor White
+    Write-Host "" -ForegroundColor White
+    Write-Host "Report issues at $baseURL/$repoPath/$repoName/issues" -ForegroundColor White
+    Write-Host "For the changeLog, go to $baseURL/$repoPath/$repoName/releases" -ForegroundColor White
+    Write-Host "==========================================================`n" -ForegroundColor White
     Write-Host " DISCLAIMER: This script is provided AS IS without warranty of any kind." -ForegroundColor Red
     Write-Host "The author makes no guarantees about the script's functionality or suitability for any purpose." -ForegroundColor Red
     Write-Host "It is your responsibility to test and validate the script in your environment before using it." -ForegroundColor Red
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
-    Write-Host "==========================================================`n"
-}
+    Write-Host "==========================================================`n" -ForegroundColor White
 if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
-    Write-Host "==========================================================`n"    
-    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
+    Write-Host "==========================================================`n" -ForegroundColor Yellow    
+    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))" -ForegroundColor Yellow
     if ($settings.autoUpdate)
     {
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
@@ -658,7 +657,7 @@ if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
     else 
     {
         Write-Host "Please run the update command to get the latest version." -ForegroundColor Yellow
-        Write-Host "==========================================================`n"
+        Write-Host "==========================================================`n" -ForegroundColor Yellow
     }
 }
 else
@@ -701,7 +700,7 @@ if ($accessToken)
     Write-Verbose "[$scriptName] Access token retrieved successfully."
     if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
     {
-        Write-Host "Forced new token retrieval due to parameters." 
+        Write-Host "Forced new token retrieval due to parameters." -ForegroundColor Cyan 
         Write-Host "The script will now exit."
         Write-Host "You can run the script again without these parameters to use the new token." 
         exit 0    
@@ -1188,20 +1187,20 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authe
         Write-Host "Please check the logs for more information." -ForegroundColor Red
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change autoupdate setting" -Action {
-    Write-Verbose "[$scriptName] Autoupdate: $($settings.autoUpdate)"
-    write-log -LogFile $LogFile -Module "$scriptName" -Message "Autoupdate setting: $($settings.autoUpdate)" -LogLevel "Information"
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update setting" -Action {
+    Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
+    write-log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
     if ($settings.autoUpdate)
     {
-        Write-Verbose "[$scriptName] Autoupdate is currently enabled."
-        write-log -logFile $LogFile -Module "$scriptName" -Message "Autoupdate is currently enabled." -LogLevel "Information"
-        $messageString = "Autoupdate is currently enabled.  Would you like to disable it?"
+        Write-Verbose "[$scriptName] Auto Update is currently enabled."
+        write-log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently enabled." -LogLevel "Information"
+        $messageString = "Auto Update is currently enabled. Would you like to disable it?"
     }
     else
     {
-        Write-Verbose "[$scriptName] Autoupdate is currently disabled."
-        write-log -logFile $LogFile -Module "$scriptName" -Message "Autoupdate is currently disabled." -LogLevel "Information"
-        $messageString = "Autoupdate is currently disabled.  Would you like to enable it?"
+        Write-Verbose "[$scriptName] Auto Update is currently disabled."
+        write-log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently disabled." -LogLevel "Information"
+        $messageString = "Auto Update is currently disabled. Would you like to enable it?"
     }
     $choice = Read-Host "$messageString (yes/no)"
     while ($choice -notin @('yes', 'no', 'y', 'n'))
@@ -1607,7 +1606,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     Write-Host "Tenant id: $tenantId"
     Write-Host "Delegated authentication: $($auth.delegated)."
     Write-Host "Authentication type: $($auth.AuthType)"
-    Write-Host "Autoupdate enabled: $($settings.autoUpdate)"
+    Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
 }
 #endregion Menu Definitions
 

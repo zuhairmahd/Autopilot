@@ -21,11 +21,11 @@ function CreateSecretsFile()
         Write-Log -LogFile $LogFile -Module "MiscFunctions" -Message "Creating secrets file at $SecretsFile" -LogLevel "Information"
         $secrets = @{}
         $secrets | ConvertTo-Json -Depth 10 | Set-Content -Path $SecretsFile -Force
-        Write-Host "Secrets file created successfully at $SecretsFile."
+        Write-Host "Secrets file created successfully at $SecretsFile." -ForegroundColor Green
     }
     else
     {
-        Write-Host "Secrets file already exists at $SecretsFile."
+        Write-Host "Secrets file already exists at $SecretsFile." -ForegroundColor Yellow
     }
 }
 
@@ -472,7 +472,7 @@ function GetUserInput()
     Write-Verbose "[$functionName] Message: $Message"
     Write-Verbose "[$functionName] Prompt: $Prompt"
     Write-Verbose "[$functionName] InputType: $InputType"
-    Write-Host $Message
+    Write-Host $Message -ForegroundColor White
     # Updated instruction
     Write-Host "Press Enter without typing anything to return to the previous menu." 
 

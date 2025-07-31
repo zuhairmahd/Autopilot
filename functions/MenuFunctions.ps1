@@ -22,9 +22,9 @@ function DisplayNumericMenu()
     Write-Host $banner -ForegroundColor Green
     for ($i = 0; $i -lt $choices.Count; $i++)
     {
-        Write-Host "$($i + 1). $($choices[$i])"
+        Write-Host "$($i + 1). $($choices[$i])" -ForegroundColor White
     }
-    Write-Host "0. Exit"
+    Write-Host "0. Exit" -ForegroundColor White
     
     # Prepare valid key options
     $validKeys = @()
@@ -85,7 +85,7 @@ function DisplayNumericMenu()
         } until ($validKeys -contains $selection)
         
         # Echo the selection so user can see what was chosen
-        Write-Host $selection
+        Write-Host $selection -ForegroundColor Green
         Write-Verbose "[$functionName] Valid key pressed: '$selection'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
     }

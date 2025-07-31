@@ -95,6 +95,7 @@ GetAppAssignmentTypes -AccessToken $token -Export -outputPath "apps.csv" -Verbos
 - **User Verification**: Validate user readiness for device assignment based on group memberships and other criteria
 - **Bulk Operations**: Export device lists and perform batch operations
 - **Settings Management**: Configure application settings through interactive menus
+  - **Auto Update Control**: Change automatic update preferences during runtime through the settings menu
 ### Device Identifier Management
 
 The script now supports comprehensive management of Windows Corporate Device Identifiers in Intune, enabling you to mark devices as corporate-owned for Autopilot V2 and Intune enrollment scenarios. This is essential for environments where devices must be recognized as corporate assets before enrollment.
@@ -357,6 +358,21 @@ The authentication settings are configured in the `settings.json` file at the ro
 2. Enter user email address
 3. Review group membership and readiness status
 4. If the user is in the correct group, you will be prompted to enter the serial number of the device you want to provide to the user. The script will then check to make sure the device is not registered to someone else and that it has downloaded the required apps and policies.
+
+#### Settings Management
+
+1. Select "Settings" from the main menu to access configuration options
+2. Available settings options include:
+   - **Change application settings**: Reconfigure the entire application
+   - **Change password and authentication information**: Update credentials and set new passwords
+   - **Change autoupdate setting**: Toggle automatic update functionality on/off
+   - **Restore defaults**: Reset application to default configuration
+
+The **Change autoupdate setting** option allows you to:
+- View current automatic update status (enabled/disabled)
+- Toggle the setting with a simple yes/no prompt
+- Automatically save changes to your configuration file
+- Clean up temporary backup files created during the process
 
 ## Command Line Parameters
 
