@@ -56,7 +56,7 @@ function GetLatestGithubRelease()
     Write-Verbose "[$functionName] Got response: $($response.tag_name)"
     if (($null -eq $response) -or ($null -eq $response.tag_name ))
     {
-        Write-Host "Failed to retrieve the latest release information from GitHub."
+        Write-Host "Failed to retrieve the latest release information from GitHub." -ForegroundColor Red
         return $null
     }
     return $response.tag_name
@@ -187,31 +187,31 @@ function GetUpdates()
     if ($remoteVersion -gt $localVersion)
     {
         Write-Verbose "[$functionName] Remote version $remoteVersion is greater than local version $localVersion. Proceeding with update."
-        Write-Host "An update is available."
-        Write-Host "Current version: $localVersion"
-        Write-Host "New version: $remoteVersion"
+        Write-Host "An update is available." -ForegroundColor Yellow
+        Write-Host "Current version: $localVersion" -ForegroundColor Cyan
+        Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
         if ($noConfirmation)
         {
-            Write-Host "No confirmation required. Proceeding with the update..."
+            Write-Host "No confirmation required. Proceeding with the update..." -ForegroundColor Green
         }
         else
         {
-            Write-Host "Would you like to download the update?"
+            Write-Host "Would you like to download the update?" -ForegroundColor Yellow
             $userInput = Read-Host "Type 'yes' to proceed with the update, or 'no' to cancel"
             while ($userInput -notin @('yes', 'no'))
             {
-                Write-Host "Invalid input. Please type 'yes' to proceed with the update, or 'no' to cancel."
+                Write-Host "Invalid input. Please type 'yes' to proceed with the update, or 'no' to cancel." -ForegroundColor Red
                 #beep
                 [console]::beep(1000, 500)
                 $userInput = Read-Host
             }
             if ($userInput -eq 'no')
             {
-                Write-Host "Update cancelled by user."
+                Write-Host "Update cancelled by user." -ForegroundColor Yellow
                 return $returnValues.UpdateCancelledMessage
             }
         }
-        Write-Host "Proceeding with the update..."
+        Write-Host "Proceeding with the update..." -ForegroundColor Green
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
         Write-Verbose "[$functionName] Backing up current $executableFileName to $backupFile."
         try
@@ -245,7 +245,7 @@ function GetUpdates()
             {
                 $backupFileName = Split-Path -Path $backupFile -Leaf
                 $executableFileParrentFolder = Split-Path -Path $executableFileName -Parent
-                Write-Host "Restoring backup from $backupFile to $executableFileName"
+                Write-Host "Restoring backup from $backupFile to $executableFileName" -ForegroundColor Yellow
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Restoring backup from $backupFile to $executableFileName" -LogLevel "Error"
                 Copy-Item -Path $backupFile -Destination $executableFileParrentFolder -Force
                 Write-Verbose "[$functionName] copied backup file $backupFile to $executableFileParrentFolder directory."
@@ -258,11 +258,11 @@ function GetUpdates()
                 Rename-Item -Path $backupFileName -NewName $executableFileName -Force
                 Write-Verbose "[$functionName] Renamed $backupFileName to $executableFileName"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $backupFileName to $executableFileName" -LogLevel "Error"
-                Write-Host "The update has been rolled back to the previous version."
+                Write-Host "The update has been rolled back to the previous version." -ForegroundColor Green
                 Remove-Item -Path "$executableFileName.tmp" -Force
                 Write-Verbose "[$functionName] Removed temporary file $executableFileName.tmp"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed temporary file $executableFileName.tmp" -LogLevel "Error"
-                Write-Host "Please try the update again later."
+                Write-Host "Please try the update again later." -ForegroundColor Yellow
             }
             #cleanup temp files if they exist.
             if (Test-Path $tempUpdateFile)
@@ -284,8 +284,8 @@ function GetUpdates()
     else
     {
         Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
-        Write-Host "Current version: $localVersion"
-        Write-Host "Remote version: $remoteVersion"
+        Write-Host "Current version: $localVersion" -ForegroundColor Cyan
+        Write-Host "Remote version: $remoteVersion" -ForegroundColor Cyan
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
