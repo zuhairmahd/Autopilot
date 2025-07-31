@@ -1640,8 +1640,8 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
 write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)"
-write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)" -LogLevel "Information"
+Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
 # Finish logging
 Write-Log -LogFile $LogFile -FinishLogging
