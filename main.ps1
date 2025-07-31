@@ -1230,8 +1230,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         }
         Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
         write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-        Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)"
-        write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount - $filesCleaned.tempFilesCount)" -LogLevel "Information"
+        Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+        write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
     }
     else
     {
