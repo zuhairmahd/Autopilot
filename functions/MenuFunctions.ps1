@@ -10,14 +10,19 @@ function Test-MenuItemExcluded()
     Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be excluded"
     
     # Check if the global settings variable exists and has menuItemsToExclude
-    if ($Global:settings -and $Global:settings.menuItemsToExclude)
+    Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
+    Write-Log -LogFile $LogFile -Module $functionName -Message "App mode: $($settings.appMode)" -LogLevel "Debug"
+    Write-Verbose "[$functionName] Menu items to exclude count: $($Global:settings.menuItemsToExclude.Count)"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Menu items to exclude count: $($Global:settings.menuItemsToExclude.Count)" -LogLevel "Debug"
+    if ($Global:settings -and $Global:settings.menuItemsToExclude -and $global:settings.appMode -ne 'full')
     {
         $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
         Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' exclusion check: $excluded" -LogLevel "Debug"
         $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
         Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
-        if ($excluded) {
+        if ($excluded)
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' was excluded" -LogLevel "Debug"
         }
         return $excluded
@@ -65,11 +70,13 @@ function DisplayNumericMenu()
     
     # Add mnemonic keys based on available choices (easter egg functionality)
     $mnemonicKeys = @()
-    if ($choices -contains "Back") {
+    if ($choices -contains "Back")
+    {
         $mnemonicKeys += "b"
         Write-Verbose "[$functionName] Added mnemonic key 'b' for Back navigation"
     }
-    if ($choices -contains "Main Menu") {
+    if ($choices -contains "Main Menu")
+    {
         $mnemonicKeys += "m"
         Write-Verbose "[$functionName] Added mnemonic key 'm' for Main Menu navigation"
     }
