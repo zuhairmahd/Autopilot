@@ -15,6 +15,11 @@ function Test-MenuItemExcluded()
         $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
         Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' exclusion check: $excluded" -LogLevel "Debug"
+        $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
+        Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
+        if ($excluded) {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' was excluded" -LogLevel "Debug"
+        }
         return $excluded
     }
     
