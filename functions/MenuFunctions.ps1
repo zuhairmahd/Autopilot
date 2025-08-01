@@ -1,4 +1,4 @@
-function Test-MenuItemExcluded()
+function Test-MenuItemIncluded()
 {
     [CmdletBinding()]
     param(
@@ -7,30 +7,29 @@ function Test-MenuItemExcluded()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be excluded"
-    
-    # Check if the global settings variable exists and has menuItemsToExclude
+    Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be included"
+
+    # Check if the global settings variable exists and has menuItemsToInclude
     Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
     Write-Log -LogFile $LogFile -Module $functionName -Message "App mode: $($settings.appMode)" -LogLevel "Debug"
-    Write-Verbose "[$functionName] Menu items to exclude count: $($Global:settings.menuItemsToExclude.Count)"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Menu items to exclude count: $($Global:settings.menuItemsToExclude.Count)" -LogLevel "Debug"
-    if ($Global:settings -and $Global:settings.menuItemsToExclude -and $global:settings.appMode -ne 'full')
+    Write-Verbose "[$functionName] Menu items to include count: $($Global:settings.menuItemsToInclude.Count)"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Menu items to include count: $($Global:settings.menuItemsToInclude.Count)" -LogLevel "Debug"
+    if ($Global:settings -and $Global:settings.menuItemsToInclude -and $global:settings.appMode -ne 'full')
     {
-        $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
-        Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' exclusion check: $excluded" -LogLevel "Debug"
-        $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
-        Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
-        if ($excluded)
+        $included = $Global:settings.menuItemsToInclude -icontains $MenuItemName
+        Write-Verbose "[$functionName] Menu item '$MenuItemName' inclusion check: $included"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' inclusion check: $included" -LogLevel "Debug"
+        if ($included)
         {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' was excluded" -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' was included" -LogLevel "Debug"
         }
-        return $excluded
+        return $included
     }
-    
-    # If no exclusion list is found, don't exclude anything
-    Write-Verbose "[$functionName] No exclusion list found, allowing menu item '$MenuItemName'"
-    return $false
+
+    # If no inclusion list is found, include everything by default
+    Write-Verbose "[$functionName] No inclusion list found, allowing menu item '$MenuItemName'"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "No inclusion list found, allowing menu item '$MenuItemName'" -LogLevel "Debug"
+    return $true
 }
 
 function DisplayNumericMenu()
@@ -1112,7 +1111,7 @@ function ShowMenu()
     # Loop through menu items and add to choices (excluding items in exclusion list)
     foreach ($item in $Menu.Items)
     {
-        if (-not (Test-MenuItemExcluded -MenuItemName $item.Name))
+        if (Test-MenuItemIncluded -MenuItemName $item.Name)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
             $choices += $item.Name

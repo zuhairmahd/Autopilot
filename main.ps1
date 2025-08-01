@@ -436,15 +436,15 @@ else
 #region Define variables
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 
-# Add top-level menuItemsToExclude array to settings if it exists
-if ($initFileContent.menuItemsToExclude)
+# Add top-level menuItemsToInclude array to settings if it exists
+if ($initFileContent.menuItemsToInclude)
 {
-    Write-Verbose "[$scriptName] Adding menuItemsToExclude array from configuration file"
-    $settings.menuItemsToExclude = $initFileContent.menuItemsToExclude
-    Write-Verbose "[$scriptName] Added $($settings.menuItemsToExclude.Count) items to exclude list"
+    Write-Verbose "[$scriptName] Adding menuItemsToInclude array from configuration file"
+    $settings.menuItemsToInclude = $initFileContent.menuItemsToInclude
+    Write-Verbose "[$scriptName] Added $($settings.menuItemsToInclude.Count) items to include list"
 }
 
-# Make settings globally available for menu exclusion functionality
+# Make settings globally available for menu inclusion functionality
 $Global:settings = $settings
 
 if ($settings.Repo -eq 'github')
@@ -1206,17 +1206,17 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authe
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update setting" -Action {
     Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
-    write-log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
     if ($settings.autoUpdate)
     {
         Write-Verbose "[$scriptName] Auto Update is currently enabled."
-        write-log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently enabled." -LogLevel "Information"
+        Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently enabled." -LogLevel "Information"
         $messageString = "Auto Update is currently enabled. Would you like to disable it?"
     }
     else
     {
         Write-Verbose "[$scriptName] Auto Update is currently disabled."
-        write-log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently disabled." -LogLevel "Information"
+        Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently disabled." -LogLevel "Information"
         $messageString = "Auto Update is currently disabled. Would you like to enable it?"
     }
     $choice = Read-Host "$messageString (yes/no)"
@@ -1230,7 +1230,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     if ($choice -in @('no', 'n'))
     {
         Write-Verbose "[$scriptName] User chose not to change Auto Update setting."
-        write-log -logFile $LogFile -Module "$scriptName" -Message "User chose not to change Auto Update setting." -LogLevel "Information"
+        Write-Log -logFile $LogFile -Module "$scriptName" -Message "User chose not to change Auto Update setting." -LogLevel "Information"
         return $returnValues.backoutText
     }
     $settings.autoUpdate = -not $settings.autoUpdate
@@ -1238,22 +1238,22 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     if (Update-GlobalSetting -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
-        write-log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
         $filesCleaned = cleanupTempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Verbose "[$scriptName] All temporary files were cleaned."
-            write-log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
         Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-        write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
         Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
-        write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
     }
     else
     {
         Write-Host "Failed to update autoUpdate setting" -ForegroundColor Red
-        write-log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
@@ -1643,12 +1643,12 @@ $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Verbose "[$scriptName] All temporary files were cleaned."
-    write-log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
 Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
-write-log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
 # Finish logging
 Write-Log -LogFile $LogFile -FinishLogging

@@ -1,6 +1,6 @@
 {
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
-    "version": "1.2.0.0",
+    "version": "1.3.0.0",
     "auth": {
         "Delegated": true,
         "changePWOnNextStart": false,
@@ -136,7 +136,7 @@
             ]
         }
     ],
-    "menuItemsToExclude": [
+    "menuItemsToInclude": [
         "Autopilot menu",
         "Restart the device",
         "Export Menu",
@@ -168,7 +168,7 @@
         "maxWaitTime": "30",
         "showLicenseBanner": true,
         "timeInSeconds": "60",
-        "appMode": "full",
+        "appMode": "test",
         "maxUserMatchDisplay": "10",
         "Repo": "Github",
         "testMode": false,
