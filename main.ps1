@@ -106,17 +106,21 @@ if (-not (Test-Path $secretsDir))
 
 # Initialize variables for encryption handling
 $configContent = $null
-$userPassword = $null
+# $userPassword = $null
+$script:maxRetries = 6
 
 if (Test-Path $configFile)
 {
     # Initialize configuration session
-    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your password"
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password"
     
     if (-not $sessionResult.Success)
     {
-        Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
-        Write-Host "Please check file permissions and try again." -ForegroundColor Red
+        Write-Host "Error: $($sessionResult.ErrorMessage)" -ForegroundColor Red
+        Write-Verbose "[$scriptName] Failed to initialize configuration session: $($sessionResult.ErrorMessage)"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to initialize configuration session: $($sessionResult.ErrorMessage)" -LogLevel "Error"
+        Write-Host "Exitting script due to configuration session failure." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -FinishLogging
         exit 1
     }
     
@@ -145,7 +149,7 @@ if (Test-Path $configFile)
                     
                     # Reload the configuration with new password
                     Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-                    $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword
+                    $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
                     
                     if ($reloadResult.Success)
                     {
@@ -200,7 +204,7 @@ else
         if (Test-Path $configFile)
         {
             # Initialize configuration session after wizard
-            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your password"
+            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
             
             if (-not $sessionResult.Success)
             {
@@ -233,7 +237,7 @@ else
                             
                             # Reload the configuration with new password
                             Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-                            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword
+                            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
                             
                             if ($reloadResult.Success)
                             {

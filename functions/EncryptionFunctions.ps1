@@ -31,9 +31,7 @@ function Load-EncryptedConfigFile()
         [string]$ConfigFile,
         
         [int]$MaxRetries = 3,
-        
         [switch]$UseStoredPassword,
-        
         [string]$PasswordPrompt = "Enter your password"
     )
     
@@ -112,26 +110,41 @@ function Load-EncryptedConfigFile()
                 }
                 else
                 {
-                    $errorMsg = "Decryption failed: $($decryptResult.ErrorMessage)"
+                    $errorMsg = "Incorrect password"
                     Write-Host $errorMsg -ForegroundColor Red
                     Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
                     
                     if ($retryCount -lt $MaxRetries)
                     {
                         Write-Host "Please try again." -ForegroundColor Yellow
+                        if ($MaxRetries - $retryCount -le 2)
+                        {
+                            Write-Host "Warning: Only $($MaxRetries - $retryCount) attempts left." -ForegroundColor Red
+                            Write-Host "If you exceed the maximum number of attempts, the authentication information will be erased." -ForegroundColor Red
+                            Write-Log -LogFile $LogFile -Module $functionName -Message "Warning: Only $($MaxRetries - $retryCount) attempts left." -LogLevel "Warning"
+                        }
                     }
                 }
                 
                 # Clear the password from memory
                 Clear-SecureMemory -Variables @("userPassword")
-                
             } while ($retryCount -lt $MaxRetries -and -not $decryptResult.Success)
             
             if (-not $decryptResult.Success)
             {
-                $result.ErrorMessage = "Failed to decrypt configuration file after $MaxRetries attempts"
+                $result.ErrorMessage = "Incorrect password after $MaxRetries attempts"
                 Write-Log -LogFile $LogFile -Module $functionName -Message $result.ErrorMessage -LogLevel "Error"
                 Clear-SecureMemory -ClearScriptVariables
+                try 
+                {
+                    Remove-Item -Path $ConfigFile -Force -ErrorAction SilentlyContinue
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Removed configuration file after decryption failure" -LogLevel "Warning"
+                    $result.ErrorMessage += "`n Removed configuration file due to invalid password attempts. `n Contact your administrator for assistance."
+                }
+                catch
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to remove configuration file after decryption failure: $($_.Exception.Message)" -LogLevel "Error"
+                }                
                 return $result
             }
         }
@@ -736,7 +749,7 @@ function Initialize-ConfigurationSession()
     Domain (string), AppId (string), TenantId (string), Name (string), and ErrorMessage (string) properties.
     
     .EXAMPLE
-    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
     if ($sessionResult.Success) {
         $domain = $sessionResult.Domain
         $configContent = $sessionResult.ConfigContent
@@ -1291,8 +1304,8 @@ function Invoke-JsonFileEncryption()
             }
             catch [System.Security.Cryptography.CryptographicException]
             {
-                Write-Host "`n`nThe decryption key you provided does not match the key used to encrypt this file."
                 Write-Verbose "[$functionName] Decryption failed with CryptographicException (likely wrong key): $($_.Exception.Message)"
+                write-log -LogFile $LogFile -Module $functionName -Message "Decryption failed with CryptographicException: $($_.Exception.Message)" -LogLevel "Error"
                 return @{
                     Success      = $false
                     Content      = $null
