@@ -832,7 +832,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
 #endregion export menu
 
 #region serial number menu
-$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number." -Action {
+$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number" -Action {
     Write-Host 'Please enter the serial number of the device.'
     Write-Host 'The serial number is typically a combination of letters and numbers.'
     $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
@@ -873,7 +873,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         return $returnValues.backoutText
     }
 }
-$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number." -Action {
+$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number" -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
     Write-Verbose "[$scriptName] Device object: $($deviceObject)"
@@ -1531,16 +1531,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-
-if ($settings.appMode -ne 'test')
-{
-    Write-Verbose "[$scriptName] App mode is not test. Adding settings menu to main menu."
-    # Add the settings menu to the main menu
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-}
-else
-{
-    Write-Verbose "[$scriptName] App mode is test. Skipping Settings menu."
+$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 }
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
