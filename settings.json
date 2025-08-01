@@ -136,7 +136,7 @@
             ]
         }
     ],
-    "menusToExclude": [
+    "menuItemsToExclude": [
         "Autopilot menu",
         "Check for script updates",
         "Restart the device",
