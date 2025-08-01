@@ -431,6 +431,18 @@ else
 
 #region Define variables
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+
+# Add top-level menuItemsToExclude array to settings if it exists
+if ($initFileContent.menuItemsToExclude)
+{
+    Write-Verbose "[$scriptName] Adding menuItemsToExclude array from configuration file"
+    $settings.menuItemsToExclude = $initFileContent.menuItemsToExclude
+    Write-Verbose "[$scriptName] Added $($settings.menuItemsToExclude.Count) items to exclude list"
+}
+
+# Make settings globally available for menu exclusion functionality
+$Global:settings = $settings
+
 if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
@@ -1532,7 +1544,6 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-}
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL

@@ -160,6 +160,65 @@ To access the About menu:
 
 This feature helps with support, compliance, and user education.
 
+### Menu Exclusions
+
+The script now supports menu item exclusions through the `menuItemsToExclude` array in `settings.json`. This powerful feature allows administrators to customize the menu interface by hiding specific menu items from users, enabling better control over available functionality based on organizational policies or user roles.
+
+#### How It Works
+
+The menu exclusion system filters menu items before they are displayed to users. Menu items listed in the `menuItemsToExclude` array will be completely hidden from the interface, making them inaccessible to users while maintaining full functionality for non-excluded items.
+
+#### Configuration
+
+Menu exclusions are configured in the `settings.json` file at the root level:
+
+```json
+{
+  "menuItemsToExclude": [
+    "Autopilot menu",
+    "Check for script updates", 
+    "Export Menu",
+    "Change application settings"
+  ]
+}
+```
+
+#### Features
+
+- **Case-Insensitive Matching**: Menu item names are matched case-insensitively for flexibility
+- **Real-Time Filtering**: Exclusions are applied dynamically when menus are displayed
+- **Comprehensive Coverage**: Works with all menu types (main menu, submenus, action menus)
+- **No Breaking Changes**: Excluded functionality remains available programmatically
+- **Detailed Logging**: All exclusion activities are logged for audit and troubleshooting
+
+#### Default Exclusions
+
+The default `settings.json` includes a comprehensive list of 25+ menu items that are excluded by default, including:
+
+- Administrative functions (Wipe Device, Clean Device, Restart Device)
+- Autopilot management operations (Import, Export, Custom configuration)
+- System settings and updates (Change application settings, Check for script updates)
+- Advanced features (LAPS passwords, BitLocker keys, Device health status)
+
+#### Customization
+
+To customize menu exclusions:
+
+1. Edit the `menuItemsToExclude` array in `settings.json`
+2. Add or remove menu item names exactly as they appear in the interface
+3. Save the file - changes take effect immediately on next script run
+4. Use case-insensitive names for flexibility
+
+#### Use Cases
+
+- **Role-Based Access**: Hide advanced features from help desk users
+- **Compliance Requirements**: Remove access to sensitive operations
+- **Simplified Interface**: Create focused menus for specific tasks
+- **Training Environments**: Limit available options during user training
+- **Security Policies**: Restrict access to device management functions
+
+This feature provides a clean, administrative way to customize the user experience without modifying the core script functionality.
+
 ### Security Features
 
 - **Azure App Registration Authentication**: Uses application credentials for secure API access
