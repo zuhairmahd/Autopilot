@@ -12,7 +12,7 @@ function Test-MenuItemExcluded()
     # Check if the global settings variable exists and has menuItemsToExclude
     if ($Global:settings -and $Global:settings.menuItemsToExclude)
     {
-        $excluded = $Global:settings.menuItemsToExclude -contains $MenuItemName
+        $excluded = $Global:settings.menuItemsToExclude -icontains $MenuItemName
         Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' exclusion check: $excluded" -LogLevel "Debug"
         return $excluded
