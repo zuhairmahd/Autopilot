@@ -56,14 +56,31 @@ function DisplayNumericMenu()
     }
     Write-Host "0. Exit" -ForegroundColor White
     
-    # Prepare valid key options
+    # Prepare valid key options (numeric keys)
     $validKeys = @()
     for ($i = 0; $i -le $choices.Count; $i++)
     {
         $validKeys += $i.ToString()
     }
+    
+    # Add mnemonic keys based on available choices (easter egg functionality)
+    $mnemonicKeys = @()
+    if ($choices -contains "Back") {
+        $mnemonicKeys += "b"
+        Write-Verbose "[$functionName] Added mnemonic key 'b' for Back navigation"
+    }
+    if ($choices -contains "Main Menu") {
+        $mnemonicKeys += "m"
+        Write-Verbose "[$functionName] Added mnemonic key 'm' for Main Menu navigation"
+    }
+    # Always allow q and e for exit
+    $mnemonicKeys += @("q", "e")
+    Write-Verbose "[$functionName] Added mnemonic keys 'q' and 'e' for Exit"
+    
+    $allValidKeys = $validKeys + $mnemonicKeys
     Write-Verbose "[$functionName] Valid keys: $($validKeys -join ', ')"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', ')" -LogLevel "Debug"
+    Write-Verbose "[$functionName] Mnemonic keys: $($mnemonicKeys -join ', ')"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', '), Mnemonic keys: $($mnemonicKeys -join ', ')" -LogLevel "Debug"
     
     if ($RequireEnter)
     {
@@ -75,7 +92,7 @@ function DisplayNumericMenu()
         Write-Verbose "[$functionName] User input received: '$selection'"
         Start-Sleep -Milliseconds 600
         # Clean input
-        $selection = $selection.Trim()
+        $selection = $selection.Trim().ToLower()
         Write-Verbose "[$functionName] Raw user input received after cleanup: '$selection'"
     }
     else
@@ -93,7 +110,7 @@ function DisplayNumericMenu()
             try
             {
                 $keyInfo = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-                $selection = $keyInfo.Character.ToString()
+                $selection = $keyInfo.Character.ToString().ToLower()
                 Write-Verbose "[$functionName] Key pressed: '$selection' (Character code: $([int]$keyInfo.Character))"
                 $keyCode = [int]$keyInfo.VirtualKeyCode
                 Write-Verbose "[$functionName] Key pressed virtual code: '$selection' (Character code: $([int]$keyInfo.Character), VK: $keyCode)"
@@ -112,7 +129,7 @@ function DisplayNumericMenu()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Error"
                 $selection = $null
             }
-        } until ($validKeys -contains $selection)
+        } until ($allValidKeys -contains $selection)
         
         # Echo the selection so user can see what was chosen
         Write-Host $selection -ForegroundColor Green
@@ -120,9 +137,15 @@ function DisplayNumericMenu()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
     }
     
-    # Validate the selection
-    while ($selection -notmatch '^\d+$' -or [int]$selection -lt 0 -or [int]$selection -gt $choices.Count)
+    # Validate the selection and handle mnemonic keys
+    while ($selection -notin $allValidKeys)
     {
+        # Check if it's a valid numeric selection
+        if ($selection -match '^\d+$' -and [int]$selection -ge 0 -and [int]$selection -le $choices.Count)
+        {
+            break
+        }
+        
         Write-Host $errorMessage -ForegroundColor Red
         Write-Verbose "[$functionName] Invalid selection: '$selection'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid selection: '$selection'" -LogLevel "Warning"
@@ -132,17 +155,43 @@ function DisplayNumericMenu()
         {
             # Re-prompt with ReadLine
             $selection = Read-Host -Prompt $Prompt
-            $selection = $selection.Trim()
+            $selection = $selection.Trim().ToLower()
         }
         else
         {
             # Re-prompt
             $selection = $null
             $keyInfo = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-            $selection = [string]$keyInfo.Character.ToString()
+            $selection = [string]$keyInfo.Character.ToString().ToLower()
         }
     }
-    if ($selection -ne "0")
+    # Handle mnemonic keys first
+    if ($selection -eq "b" -and $choices -contains "Back")
+    {
+        Write-Verbose "[$functionName] Mnemonic key 'b' pressed, returning 'Back'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User pressed mnemonic key 'b' for Back navigation" -LogLevel "Information"
+        return "Back"
+    }
+    elseif ($selection -eq "m" -and $choices -contains "Main Menu")
+    {
+        Write-Verbose "[$functionName] Mnemonic key 'm' pressed, returning 'Main Menu'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User pressed mnemonic key 'm' for Main Menu navigation" -LogLevel "Information"
+        return "Main Menu"
+    }
+    elseif ($selection -in @("q", "e"))
+    {
+        Write-Verbose "[$functionName] Mnemonic key '$selection' pressed for exit"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User pressed mnemonic key '$selection' for exit" -LogLevel "Information"
+        return [int]0
+    }
+    elseif ($selection -eq "0")
+    {
+        Write-Verbose "[$functionName] Exiting script with selection: $selection"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected exit option" -LogLevel "Information"
+        # Return integer 0 for exit option to ensure proper type matching
+        return [int]$selection
+    }
+    elseif ($selection -match '^\d+$' -and [int]$selection -ge 1 -and [int]$selection -le $choices.Count)
     {
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
@@ -153,10 +202,10 @@ function DisplayNumericMenu()
     }
     else
     {
-        Write-Verbose "[$functionName] Exiting script with selection: $selection"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected exit option" -LogLevel "Information"
-        # Return integer 0 for exit option to ensure proper type matching
-        return [int]$selection
+        # This should not happen due to validation, but handle as fallback
+        Write-Verbose "[$functionName] Unexpected selection: $selection, defaulting to exit"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Unexpected selection: $selection, defaulting to exit" -LogLevel "Warning"
+        return [int]0
     }
 }
 
