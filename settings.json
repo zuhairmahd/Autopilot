@@ -168,7 +168,7 @@
         "maxWaitTime": "30",
         "showLicenseBanner": true,
         "timeInSeconds": "60",
-        "appMode": "test",
+        "appMode": "full",
         "maxUserMatchDisplay": "10",
         "Repo": "Github",
         "testMode": false,
