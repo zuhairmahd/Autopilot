@@ -78,7 +78,7 @@ function DisplayNumericMenu()
     Write-Verbose "[$functionName] Added mnemonic keys 'q' and 'e' for Exit"
     
     $allValidKeys = $validKeys + $mnemonicKeys
-    Write-Verbose "[$functionName] Valid keys: $($validKeys -join ', ')"
+    Write-Verbose "[$functionName] Valid keys: $($allValidKeys -join ', ')"
     Write-Verbose "[$functionName] Mnemonic keys: $($mnemonicKeys -join ', ')"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', '), Mnemonic keys: $($mnemonicKeys -join ', ')" -LogLevel "Debug"
     
