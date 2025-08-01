@@ -4,7 +4,7 @@
     "auth": {
         "Delegated": true,
         "changePWOnNextStart": false,
-        "authType": "Interactive",
+        "authType": "PublicAuthFlow",
         "renewalLeadTime": 5,
         "NoSaveRefreshToken": false,
         "SecureString": false,
@@ -138,7 +138,6 @@
     ],
     "menuItemsToExclude": [
         "Autopilot menu",
-        "Check for script updates",
         "Restart the device",
         "Export Menu",
         "Quick Import device into Autopilot (requires admin rights)",
