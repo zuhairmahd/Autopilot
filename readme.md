@@ -53,7 +53,7 @@ The application includes an interactive First Run Wizard that automatically laun
 1. **Download** the script files to a local directory
 2. **Run the application** for the first time:
    ```powershell
-   .\main.ps1
+   .\main.exe
    ```
 3. **Follow the First Run Wizard** which will guide you through:
    - Azure AD Configuration (App ID, Tenant ID, Domain Name)
@@ -76,15 +76,7 @@ For advanced scenarios where custom configuration is needed:
 
 ### Environment-Specific Configurations
 
-The tool supports domain-specific configurations:
-
-```powershell
-# Switch to GAO configuration
-.\gao.bat
-
-# Switch to ZM configuration  
-.\zmc.bat
-```
+The tool supports domain-specific configurations.  Refer to Advanced Settings in the technical documentation for more information.
 
 ## Menu Options
 
