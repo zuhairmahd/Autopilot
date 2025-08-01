@@ -431,6 +431,18 @@ else
 
 #region Define variables
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+
+# Add top-level menuItemsToExclude array to settings if it exists
+if ($initFileContent.menuItemsToExclude)
+{
+    Write-Verbose "[$scriptName] Adding menuItemsToExclude array from configuration file"
+    $settings.menuItemsToExclude = $initFileContent.menuItemsToExclude
+    Write-Verbose "[$scriptName] Added $($settings.menuItemsToExclude.Count) items to exclude list"
+}
+
+# Make settings globally available for menu exclusion functionality
+$Global:settings = $settings
+
 if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."

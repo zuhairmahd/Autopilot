@@ -1,3 +1,28 @@
+function Test-MenuItemExcluded()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$MenuItemName
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be excluded"
+    
+    # Check if the global settings variable exists and has menuItemsToExclude
+    if ($Global:settings -and $Global:settings.menuItemsToExclude)
+    {
+        $excluded = $Global:settings.menuItemsToExclude -contains $MenuItemName
+        Write-Verbose "[$functionName] Menu item '$MenuItemName' exclusion check: $excluded"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' exclusion check: $excluded" -LogLevel "Debug"
+        return $excluded
+    }
+    
+    # If no exclusion list is found, don't exclude anything
+    Write-Verbose "[$functionName] No exclusion list found, allowing menu item '$MenuItemName'"
+    return $false
+}
+
 function DisplayNumericMenu()
 {
     [CmdletBinding()]
@@ -1023,12 +1048,20 @@ function ShowMenu()
     $menuItems = @()
     Write-Verbose "[$functionName] Initializing choices and menu items."
     
-    # Loop through menu items and add to choices
+    # Loop through menu items and add to choices (excluding items in exclusion list)
     foreach ($item in $Menu.Items)
     {
-        Write-Verbose "[$functionName] Adding item: $($item.Name)"
-        $choices += $item.Name
-        $menuItems += $item
+        if (-not (Test-MenuItemExcluded -MenuItemName $item.Name))
+        {
+            Write-Verbose "[$functionName] Adding item: $($item.Name)"
+            $choices += $item.Name
+            $menuItems += $item
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Excluding item: $($item.Name)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Excluding menu item from display: $($item.Name)" -LogLevel "Information"
+        }
     }
     
     # Clear screen for better readability
