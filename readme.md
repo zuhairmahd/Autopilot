@@ -289,7 +289,7 @@ For technical support or feature requests:
 - Review the documentation in the `docs/` folder
 - Check the troubleshooting section above
 - Contact your system administrator
-- Submit issues through your organization's support channels
+- [File an issue](https://github.com/zuhairmahd/autopilot/issues)
 
 ---
 
