@@ -26,6 +26,8 @@
         ],
         "SecureString": false,
         "renewalLeadTime": 5
+        "authType": "PublicAuthFlow",
+        "SecureString": false
     },
     "requiredScopes": [
         {
