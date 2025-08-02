@@ -1270,7 +1270,6 @@ function Update-GlobalSetting()
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
         return $false
     }
-<<<<<<< HEAD
 }
 
 <#
@@ -1387,11 +1386,6 @@ function Update-AuthSetting()
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
         return $false
     }
-}
-
-<#
-.SYNOPSIS
-=======
 }
 
 function Update-DomainSettings()
