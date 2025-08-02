@@ -169,7 +169,7 @@
         "appMode": "full",
         "timeInSeconds": "60",
         "maxUserMatchDisplay": "10",
-        "release": "master",
+        "release": "auto",
         "repo": "Github",
         "testMode": false,
         "operatingSystem": "Windows",
