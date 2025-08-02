@@ -50,7 +50,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 
 The application includes an interactive First Run Wizard that automatically launches when configuration files are missing:
 
-1. **Download** the executable files from the releases page to a local directory
+1. **Download** the main.exe executable file from the [GitHub Releases page](https://github.com/zuhairmahd/autopilot/releases) to a local directory
 2. **Run the application** for the first time:
    ```powershell
    .\main.exe
@@ -68,15 +68,15 @@ The application includes an interactive First Run Wizard that automatically laun
 
 For advanced scenarios where custom configuration is needed:
 
-1. **Clone or download** the script files to a local directory
-2. **Create the secrets folder**: `New-Item -Path ".secrets" -ItemType Directory -Force`
-3. **Configure authentication**: Place your `config.json` file in the `.secrets` folder
-4. **Configure application settings**: Ensure `settings.json` is configured for your environment
+1. **Clone or download** the script files from the [repository](https://github.com/zuhairmahd/autopilot) to a local directory
+2. **Create the secrets folder**: `New-Item -Path ".secrets" -ItemType Directory -Force` ([see .secrets/](./.secrets))
+3. **Configure authentication**: Place your `config.json` file in the [`.secrets` folder](./.secrets)
+4. **Configure application settings**: Ensure [`settings.json`](./settings.json) is configured for your environment
 5. **Set up encryption**: On first run, the script will prompt you to encrypt your configuration file
 
 ### Environment-Specific Configurations
 
-The tool supports domain-specific configurations.  Refer to Advanced Settings in the technical documentation for more information.
+The tool supports domain-specific configurations. Refer to [Advanced Settings](./docs/Consolidated-Configuration-System.md) in the technical documentation for more information.
 
 ## Menu Options
 
@@ -143,7 +143,7 @@ When you launch the application, you'll see the main menu with the following opt
 
 The application supports menu customization through the `menuItemsToInclude` array in `settings.json`. This feature allows administrators to control which menu items are visible to users based on their roles or organizational policies.
 
-**Important**: The menu system uses an INCLUSION model - only items listed in `menuItemsToInclude` will be shown when `appMode` is not set to 'full'.
+**Important**: The menu system uses an INCLUSION model - only items listed in `menuItemsToInclude` will be shown when `appMode` is not set to 'full'. See [`settings.json`](./settings.json).
 
 Example configuration:
 ```json
@@ -219,7 +219,7 @@ If you exceed the maximum password attempts and your configuration file is delet
 
 ### Administrative Password Management
 
-Administrators can force users to change their encryption password by setting the `changePWOnNextStart` flag to `true` in `settings.json`. This is useful for:
+Administrators can force users to change their encryption password by setting the `changePWOnNextStart` flag to `true` in [`settings.json`](./settings.json). This is useful for:
 
 - Regular password rotation policies
 - Security incident response
@@ -273,9 +273,9 @@ The script includes comprehensive error handling:
 
 ### Documentation Resources
 
-- **Technical Documentation**: See `docs/` folder for detailed technical information
-- **Function Reference**: Individual function documentation in `docs/` folder
-- **Configuration Guide**: `docs/Consolidated-Configuration-System.md`
+- **Technical Documentation**: See the [`docs/` folder](./docs/) for detailed technical information
+- **Function Reference**: Individual function documentation in the [`docs/` folder](./docs/)
+- **Configuration Guide**: [`docs/Consolidated-Configuration-System.md`](./docs/Consolidated-Configuration-System.md)
 
 ### Microsoft Resources
 
@@ -285,8 +285,9 @@ The script includes comprehensive error handling:
 
 ### Support Options
 
+
 For technical support or feature requests:
-- Review the documentation in the `docs/` folder
+- Review the documentation in the [`docs/` folder](./docs/)
 - Check the troubleshooting section above
 - Contact your system administrator
 - [File an issue](https://github.com/zuhairmahd/autopilot/issues)
