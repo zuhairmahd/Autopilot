@@ -50,7 +50,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 
 The application includes an interactive First Run Wizard that automatically launches when configuration files are missing:
 
-1. **Download** the script files to a local directory
+1. **Download** the executable files from the releases page to a local directory
 2. **Run the application** for the first time:
    ```powershell
    .\main.exe
