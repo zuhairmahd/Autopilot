@@ -1,3 +1,4 @@
+function Get-StringsFromJson
 <#
 .SYNOPSIS
     Loads localized strings and messages from strings.json with comprehensive fallback support.
@@ -33,7 +34,6 @@
     - Maintains backward compatibility with existing code
     - Includes detailed logging for troubleshooting
 #>
-function Get-StringsFromJson
 {
     [CmdletBinding()]
     param(
@@ -112,6 +112,7 @@ function Get-StringsFromJson
     }
 }
 
+function Get-JsonConfiguration
 <#
 .SYNOPSIS
     Universal JSON configuration loader with fallback support and validation.
@@ -164,7 +165,6 @@ function Get-StringsFromJson
     - Adds comprehensive logging for troubleshooting
     - Gracefully handles missing files, invalid JSON, and missing keys
 #>
-function Get-JsonConfiguration
 {
     [CmdletBinding()]
     param(
@@ -332,6 +332,7 @@ function Get-JsonConfiguration
     }
 }
 
+function Get-InitConfiguration()
 <#
 .SYNOPSIS
     Loads initialization configuration from init.json with environment-specific value selection.
@@ -368,7 +369,6 @@ function Get-JsonConfiguration
     - Handles missing files gracefully by returning default values
     - Includes comprehensive logging for troubleshooting
 #>
-function Get-InitConfiguration()
 {
     [CmdletBinding()]
     param(
@@ -406,6 +406,7 @@ function Get-InitConfiguration()
     }
 }
 
+function MergeSettings()
 <#
 .SYNOPSIS
     Merges two hashtables (local and global settings) into a single flat hashtable with conflict resolution.
@@ -443,7 +444,6 @@ function Get-InitConfiguration()
     - Provides verbose logging for troubleshooting and auditing
     - Compatible with PowerShell 5.1 and later
 #>
-function MergeSettings()
 {
     [CmdletBinding()]
     param(
@@ -625,6 +625,7 @@ function MergeSettings()
     return $merged
 }
 
+function InitializeConfiguration()
 <#
 .SYNOPSIS
     Creates or overwrites the initialization configuration file (init.json).
@@ -663,7 +664,6 @@ function MergeSettings()
     - Prompts for user confirmation before overwriting existing files
     - Provides detailed verbose logging throughout the process
 #>
-function InitializeConfiguration()
 {
     [CmdletBinding()]
     param
@@ -742,6 +742,7 @@ function InitializeConfiguration()
     return $success
 }
 
+function CreateConfiguration()
 <#
 .SYNOPSIS
     Creates a configuration file (settings.json) from initialization settings with environment-specific values.
@@ -787,7 +788,6 @@ function InitializeConfiguration()
     - Provides comprehensive error handling and logging
     - Validates successful file creation before returning
 #>
-function CreateConfiguration()
 {
     [CmdletBinding()]
     param
@@ -868,6 +868,7 @@ function CreateConfiguration()
     return $success
 }
 
+function CreateFullConfiguration()
 <#
 .SYNOPSIS
     Creates a comprehensive configuration file through interactive user prompts.
@@ -910,7 +911,6 @@ function CreateConfiguration()
     - Improved array handling with better user experience
     - Enhanced error reporting and user feedback
 #>
-function CreateFullConfiguration()
 {
     [CmdletBinding()]
     param
@@ -1156,6 +1156,7 @@ function CreateFullConfiguration()
     return $success
 }
 
+function Update-GlobalSetting()
 <#
 .SYNOPSIS
     Updates a specific setting in the globalSettings section of settings.json.
@@ -1192,7 +1193,6 @@ function CreateFullConfiguration()
     - Creates backup before modification for safety
     - Validates JSON structure before and after update
 #>
-function Update-GlobalSetting()
 {
     [CmdletBinding()]
     param(
@@ -1272,6 +1272,7 @@ function Update-GlobalSetting()
     }
 }
 
+function Update-DomainSettings()
 <#
 .SYNOPSIS
     Updates settings for a specific domain in the settings.json file.
@@ -1314,7 +1315,6 @@ function Update-GlobalSetting()
     - Creates backup before modification for safety
     - Can either merge or replace domain settings
 #>
-function Update-DomainSettings()
 {
     [CmdletBinding()]
     param(
@@ -1454,6 +1454,7 @@ function Update-DomainSettings()
     }
 }
 
+function Set-SettingsJsonStructure()
 <#
 .SYNOPSIS
     Creates or updates the entire settings.json structure with new configuration data.
@@ -1498,7 +1499,6 @@ function Update-DomainSettings()
     - Can preserve existing domain configurations when updating
     - Creates backup before modification for safety
 #>
-function Set-SettingsJsonStructure()
 {
     [CmdletBinding()]
     param(
