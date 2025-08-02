@@ -106,7 +106,7 @@ if (-not (Test-Path $secretsDir))
 
 # Initialize variables for encryption handling
 $configContent = $null
-# $userPassword = $null
+$userPassword = $null
 $script:maxRetries = 6
 
 if (Test-Path $configFile)
@@ -177,6 +177,26 @@ if (Test-Path $configFile)
         }
     }
     
+    if (-not ($sessionResult.encrypted))
+    {
+        Write-Host "You need to set a new password to use this application."
+        if (Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $initFile -setInitialPassword)
+        {
+            Write-Host "You can now use the application." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password set successfully after initialization" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "Failed to set password. Exiting script." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to set password after initialization" -LogLevel "Error"
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+        Write-Host "Configuration loaded successfully for domain: $domain" -ForegroundColor Green
+    }
     # Clear the config content from memory
     $configContent = $null
 }
@@ -435,7 +455,6 @@ else
 
 #region Define variables
 $settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-
 # Add top-level menuItemsToInclude array to settings if it exists
 if ($initFileContent.menuItemsToInclude)
 {
@@ -443,10 +462,8 @@ if ($initFileContent.menuItemsToInclude)
     $settings.menuItemsToInclude = $initFileContent.menuItemsToInclude
     Write-Verbose "[$scriptName] Added $($settings.menuItemsToInclude.Count) items to include list"
 }
-
 # Make settings globally available for menu inclusion functionality
 $Global:settings = $settings
-
 if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."

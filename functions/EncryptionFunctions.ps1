@@ -29,7 +29,6 @@ function Load-EncryptedConfigFile()
     param(
         [Parameter(Mandatory = $true)]
         [string]$ConfigFile,
-        
         [int]$MaxRetries = 3,
         [switch]$UseStoredPassword,
         [string]$PasswordPrompt = "Enter your password"
@@ -43,6 +42,7 @@ function Load-EncryptedConfigFile()
         Success      = $false
         Content      = ""
         ErrorMessage = ""
+        encrypted    = $false
     }
     
     try
@@ -69,7 +69,7 @@ function Load-EncryptedConfigFile()
         {
             # Write-Host "Please enter your password to continue." -ForegroundColor Cyan
             Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file is encrypted, prompting for password" -LogLevel "Information"
-            
+            $result.encrypted = $true
             $retryCount = 0
             $decryptResult = $null
             
@@ -759,11 +759,8 @@ function Initialize-ConfigurationSession()
     param(
         [Parameter(Mandatory = $true)]
         [string]$ConfigFile,
-        
         [int]$MaxRetries = 3,
-        
         [switch]$UseStoredPassword,
-        
         [string]$PasswordPrompt = "Enter your password"
     )
     
@@ -773,6 +770,7 @@ function Initialize-ConfigurationSession()
     
     $result = @{
         Success       = $false
+        encrypted     = $true
         ConfigContent = ""
         ParsedConfig  = $null
         Domain        = ""
@@ -817,6 +815,7 @@ function Initialize-ConfigurationSession()
             
             Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration session initialized successfully for domain: $($result.Domain)" -LogLevel "Information"
             $result.Success = $true
+            $result.encrypted = $loadResult.encrypted
         }
         catch
         {
@@ -860,6 +859,8 @@ function Invoke-PasswordChangeProcess()
     
     .PARAMETER NewPassword
     Optional parameter for testing - if provided, skips interactive password prompt.
+    .PARAMETER setInitialPassword
+    If specified, skips the change password prompts
     
     .OUTPUTS
     System.Boolean
@@ -869,22 +870,23 @@ function Invoke-PasswordChangeProcess()
     param(
         [Parameter(Mandatory = $true)]
         [string]$ConfigFile,
-        
         [Parameter(Mandatory = $true)]
         [string]$ConfigContent,
-        
         [Parameter(Mandatory = $true)]
         [string]$SettingsFile,
-        
         [Parameter(Mandatory = $false)]
-        [string]$NewPassword
+        [string]$NewPassword,
+        [switch]$setInitialPassword
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password change process" -LogLevel "Information"
-    Write-Host "`nPassword Change Required" -ForegroundColor Yellow
-    Write-Host "=" * 50 -ForegroundColor Yellow
-    Write-Host "Your administrator has requested that you change your decryption password." -ForegroundColor Cyan
+    if (-not ($setInitialPassword))
+    {
+        Write-Host "`nPassword Change Required" -ForegroundColor Yellow
+        Write-Host "=" * 50 -ForegroundColor Yellow
+        Write-Host "Your administrator has requested that you change your decryption password." -ForegroundColor Cyan
+    }    
     Write-Host "Please enter a new password to secure your configuration file." -ForegroundColor Cyan
     Write-Host ""
     
@@ -1007,12 +1009,15 @@ function Invoke-PasswordChangeProcess()
             Remove-Item $backupPath -Force -ErrorAction SilentlyContinue
             Write-Log -LogFile $LogFile -Module $functionName -Message "Backup file cleaned up" -LogLevel "Debug"
         }
-        
-        Write-Host "Password change completed successfully!" -ForegroundColor Green
+
+        if (-not ($setInitialPassword))
+        {
+            Write-Host "Password change completed successfully!" -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Password change completed successfully" -LogLevel "Information"
+        }
         Write-Host "Your configuration file is now secured with your new password." -ForegroundColor Cyan
         Write-Host ""
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Password change process completed successfully" -LogLevel "Information"
-        
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file secured with new password" -LogLevel "Information"
         return $true
     }
     catch
@@ -1305,7 +1310,7 @@ function Invoke-JsonFileEncryption()
             catch [System.Security.Cryptography.CryptographicException]
             {
                 Write-Verbose "[$functionName] Decryption failed with CryptographicException (likely wrong key): $($_.Exception.Message)"
-                write-log -LogFile $LogFile -Module $functionName -Message "Decryption failed with CryptographicException: $($_.Exception.Message)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Decryption failed with CryptographicException: $($_.Exception.Message)" -LogLevel "Error"
                 return @{
                     Success      = $false
                     Content      = $null
