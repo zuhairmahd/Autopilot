@@ -176,46 +176,19 @@
         "autoUpdate": true
     },
     "domains": {
-        "gao.gov": {
+        "contoso.com": {
             "groupsToInclude": [
-                "sg_Office_365_License_G5_wth_windows_pilot",
-                "sg_passwrd_hash_stage",
-                "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
-                "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
+                "Digital Sales",
+                "Digital Sales - EMEA",
+                "Digital Sales - APAC"
             ],
-            "groupsToExclude": [],
-            "settings": {
-                "domain": "gao.gov",
-                "showLicenseBanner": false,
-                "appMode": "full",
-                "deviceNamePrefix": "w11-",
-                "maxNumberOfDevicesAllowed": 20,
-                "MaxUserNameLength": 50,
-                "MaxSerialNumberLength": 100,
-                "MinSerialNumberLength": 7,
-                "preferredBrowser": "Chrome",
-                "privateSession": true,
-                "MinimumDevicePhysicalMemoryInGB": 16,
-                "MinUsernameLength": 3,
-                "GroupTag": "MSB01",
-                "userPatternsToExclude": [
-                    "-cma",
-                    "-test",
-                    "onmicrosoft.com",
-                    "-sup",
-                    "-a"
-                ],
-                "DesiredAutopilotProfiles": [
-                    "msb"
-                ]
-            }
-        },
-        "arabictutor.com": {
-            "groupsToInclude": [],
-            "groupsToExclude": [],
+            "groupsToExclude": [
+                "administrators",
+                "IT Support"
+            ],
             "settings": {
                 "domain": "arabictutor.com",
-                "deviceNamePrefix": "vmware",
+                "deviceNamePrefix": "win11-",
                 "operatingSystem": "Windows",
                 "MaxUserNameLength": 50,
                 "MinUsernameLength": 3,
