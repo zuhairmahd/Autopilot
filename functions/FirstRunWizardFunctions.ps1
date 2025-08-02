@@ -168,6 +168,19 @@ function Start-FirstRunWizard()
         }
         else
         {
+            # Step 5.1: Update authentication setting in settings.json
+            Write-SafeLog "Updating authentication setting in settings.json" "Information"
+            $authUpdateSuccess = Update-AuthSetting -SettingsFile $SettingsFile -SettingName "Delegated" -SettingValue $authConfig.IsDelegated
+            
+            if ($authUpdateSuccess)
+            {
+                Write-SafeLog "Successfully updated Delegated setting to: $($authConfig.IsDelegated)" "Information"
+            }
+            else
+            {
+                Write-SafeLog "Failed to update Delegated setting" "Warning"
+            }
+            
             # Step 5.5: Update autoUpdate setting in settings.json
             Write-SafeLog "Updating autoUpdate setting in settings.json" "Information"
             $autoUpdateSuccess = Update-GlobalSetting -SettingsFile $SettingsFile -SettingName "autoUpdate" -SettingValue $autoUpdateConfig.autoUpdate
