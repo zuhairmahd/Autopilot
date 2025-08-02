@@ -8,8 +8,6 @@
         "renewalLeadTime": 5,
         "NoSaveRefreshToken": false,
         "CacheType": "Memory",
-        "changePWOnNextStart": false,
-        "Delegated": true,
         "ForceNewToken": false,
         "scope": [
             "offline_access",
@@ -21,12 +19,6 @@
             "DeviceManagementManagedDevices.ReadWrite.All",
             "DeviceManagementServiceConfig.ReadWrite.All"
         ],
-        "authType": "PublicAuthFlow",
-        "SecureString": false,
-        ],
-        "SecureString": false,
-        "renewalLeadTime": 5
-        "authType": "PublicAuthFlow",
         "SecureString": false
     },
     "requiredScopes": [
