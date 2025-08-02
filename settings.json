@@ -1,4 +1,4 @@
-﻿{
+{
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.3.0.0",
     "auth": {
@@ -7,9 +7,8 @@
         "authType": "PublicAuthFlow",
         "renewalLeadTime": 5,
         "NoSaveRefreshToken": false,
-        "SecureString": false,
-        "ForceNewToken": false,
         "CacheType": "Memory",
+        "ForceNewToken": false,
         "scope": [
             "offline_access",
             "openid",
@@ -19,7 +18,8 @@
             "DeviceManagementManagedDevices.PrivilegedOperations.All",
             "DeviceManagementManagedDevices.ReadWrite.All",
             "DeviceManagementServiceConfig.ReadWrite.All"
-        ]
+        ],
+        "SecureString": false
     },
     "requiredScopes": [
         {
@@ -164,16 +164,16 @@
     ],
     "globalSettings": {
         "configFile": ".\\\\.secrets\\\\config.json",
-        "autoUpdate": true,
         "maxWaitTime": "30",
         "showLicenseBanner": true,
-        "timeInSeconds": "60",
         "appMode": "full",
+        "timeInSeconds": "60",
         "maxUserMatchDisplay": "10",
+        "Release": "master",
         "Repo": "Github",
         "testMode": false,
         "operatingSystem": "Windows",
-        "Release": "master"
+        "autoUpdate": true
     },
     "domains": {
         "gao.gov": {
