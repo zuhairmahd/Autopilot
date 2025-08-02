@@ -1272,6 +1272,7 @@ function Update-GlobalSetting()
     }
 }
 
+function Update-AuthSetting()
 <#
 .SYNOPSIS
     Updates a setting in the auth section of the settings.json file.
@@ -1308,7 +1309,6 @@ function Update-GlobalSetting()
     - Creates backup before modification for safety
     - Validates settings file structure before updating
 #>
-function Update-AuthSetting()
 {
     [CmdletBinding()]
     param(
