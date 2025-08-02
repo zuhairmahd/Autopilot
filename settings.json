@@ -23,6 +23,8 @@
         ],
         "authType": "PublicAuthFlow",
         "SecureString": false,
+        ],
+        "SecureString": false,
         "renewalLeadTime": 5
     },
     "requiredScopes": [
