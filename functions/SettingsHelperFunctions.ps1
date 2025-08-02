@@ -1392,6 +1392,7 @@ function Update-DomainSettings()
 <#
 .SYNOPSIS
 >>>>>>> master
+.SYNOPSIS
     Updates settings for a specific domain in the settings.json file.
 
 .DESCRIPTION
