@@ -55,6 +55,7 @@
         "none": "No action",
         "contactAdmin": "Contact an Intune administrator",
         "contactHelpdesk": "Contact the helpdesk",
+        "connectToNetwork": "Connect the device to the network for at least 24 hours to update",
         "WipeOrClean": "Wipe or clean the device"
     }
 }
