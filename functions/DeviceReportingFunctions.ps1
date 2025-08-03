@@ -1097,7 +1097,7 @@ function AssessDeviceState()
                         $action = $deviceActions.WipeOrClean
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    if ($deviceLastContactDate.withinThreshhold -eq $false)
+                    if ($deviceLastContactDate.withinThreshold -eq $false)
                     {
                         Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
                         Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
