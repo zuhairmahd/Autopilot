@@ -1009,9 +1009,22 @@ function AssessDeviceState()
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device enrollment state is 'notContacted', skipping managed device readiness check." -LogLevel "Information"
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
+                $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
+                if ($deviceLastContactDate.withinThreshold)
+                {
+                    Write-Host "The device last contacted Intune on $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone), $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
+                    Write-Verbose "[$functionName] Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+                }
+                else
+                {
+                    Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days. Last contact date: $($deviceLastContactDate.lastContactDate | FormatDateWithTimeZone)."
+                    Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
+                }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
-                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false))
+                Write-Host "Within threshold: $($deviceLastContactDate.withinThreshold)"
+                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false) -and $deviceLastContactDate.withinThreshold)
                 {
                     Write-Host "The device is ready for the next user."
                     Write-Host $memoryMessage
@@ -1031,35 +1044,35 @@ function AssessDeviceState()
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($autopilotReadiness.ProfileAssigned -eq $false)
+                    if ($autopilotReadiness.ProfileAssigned -eq $false)
                     {
                         Write-Host "The device is not assigned to an autopilot profile."
                         $readinessState = $deviceStates.notReady
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($autopilotReadiness.RemediationStateGood -eq $false)
+                    if ($autopilotReadiness.RemediationStateGood -eq $false)
                     {
                         Write-Host "The device has a remediation state that is not valid."
                         $readinessState = $deviceStates.notReady
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($autopilotReadiness.EnrollmentStateGood -eq $false)
+                    if ($autopilotReadiness.EnrollmentStateGood -eq $false)
                     {
                         Write-Host "The device failed enrollment."
                         $readinessState = $deviceStates.notReady
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($managedDeviceReadiness.OrphanDevice -eq $true)
+                    if ($managedDeviceReadiness.OrphanDevice -eq $true)
                     {
                         Write-Host "The device is an orphan device."
                         $readinessState = $deviceStates.notReady
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($managedDeviceReadiness.CorrectRam -eq $false)
+                    if ($managedDeviceReadiness.CorrectRam -eq $false)
                     {
                         Write-Host "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
                         Write-Host "Contact Hardware and Logistics."
@@ -1067,7 +1080,7 @@ function AssessDeviceState()
                         $action = $deviceActions.contactAdmin
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($managedDeviceReadiness.HasUser)
+                    if ($managedDeviceReadiness.HasUser)
                     {
                         Write-Host "The managed device is associated with a user."
                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
@@ -1075,7 +1088,7 @@ function AssessDeviceState()
                         $action = $deviceActions.WipeOrClean
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    elseif ($managedDeviceReadiness.ValidUser -eq $false)
+                    if ($managedDeviceReadiness.ValidUser -eq $false)
                     {
                         Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
@@ -1083,11 +1096,12 @@ function AssessDeviceState()
                         $action = $deviceActions.WipeOrClean
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    else
+                    if ($deviceLastContactDate.withinThreshold -eq $false)
                     {
-                        Write-Host "The device is not ready for the next user."
+                        Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
+                        Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
                         $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
+                        $action = $deviceActions.connectToNetwork
                         $device = $enrollmentState.managedDevice.device.id
                     }
                 }
@@ -1539,4 +1553,90 @@ function getDevicePendingActions()
         return $returnObject
     }
 }
+
+function GetLastDeviceContactDate()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$accessToken,
+        [Parameter(Mandatory = $true)]
+        $enrollmentState
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $goodContactthreshold = $settings.deviceContactthresholdInDays
+    $goodContactThreshold = $settings.deviceContactThresholdInDays
+    $withinThreshold = $false
+    Write-Verbose "[$functionName] Getting last device contact date."
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting last device contact date." -LogLevel "Verbose"
+    $contactDates = @{}
+    if ($enrollmentState.managed)
+    {
+        Write-Verbose "[$functionName] Device is managed, retrieving contact dates."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is managed, retrieving contact dates." -LogLevel "Information"
+        $contactDates.add('managedDeviceLastSyncDateTime', $enrollmentState.managedDevice.lastSyncDateTime)
+        $contactDates.add('managedDeviceUsersLastLogOnDateTime', $enrollmentState.managedDevice.Users.lastLogOnDateTime)
+    }
+    if ($enrollmentState.inAutopilot)
+    {
+        Write-Verbose "[$functionName] Device is in Autopilot, retrieving contact dates."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is in Autopilot, retrieving contact dates." -LogLevel "Information"
+        $contactDates.add('autopilotDeviceDeploymentProfileAssignedDateTime', $enrollmentState.autopilot.device.deploymentProfileAssignedDateTime)
+        $contactDates.add('autopilotDeviceLastContactedDateTime', $enrollmentState.autopilot.device.lastContactedDateTime)
+        $contactDates.add('autopilotDeviceRemediationStateLastModifiedDateTime', $enrollmentState.autopilot.device.remediationStateLastModifiedDateTime)
+    }
+    if ($enrollmentState.hasDeviceObject)
+    {
+        Write-Verbose "[$functionName] Device has device object, retrieving additional contact dates."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device has device object, retrieving additional contact dates." -LogLevel "Information"
+        $contactDates.add('deviceApproximateLastSignInDateTime', $enrollmentState.device.approximateLastSignInDateTime)
+        $contactDates.add('deviceCreatedDateTime', $enrollmentState.device.createdDateTime)
+        $contactDates.add('deviceRegistrationDateTime', $enrollmentState.device.registrationDateTime)
+    }
+    #Figure out the latest contact date
+    
+    $latestContactDate = $contactDates.Values | Sort-Object -Descending | Select-Object -First 1
+    Write-Verbose "[$functionName] Latest contact date: $latestContactDate"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Latest contact date: $latestContactDate" -LogLevel "Information"
+    $contactDates.add('latestContactDate', $latestContactDate)
+    $numberOfDaysSinceLastContact = (New-TimeSpan -Start $latestContactDate -End (Get-Date)).Days
+    Write-Verbose "[$functionName] Number of days since last contact: $numberOfDaysSinceLastContact"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $numberOfDaysSinceLastContact" -LogLevel "Information"
+    $contactDates.add('numberOfDaysSinceLastContact', $numberOfDaysSinceLastContact)
+    if ($numberOfDaysSinceLastContact -lt $goodContactthreshold)
+    {
+        Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactthreshold days."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactthreshold days." -LogLevel "Information"
+        $withinThreshold = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
+        if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
+        {
+            Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshold days."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshold days." -LogLevel "Information"
+            $withinThreshold = $true
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshold days." -LogLevel "Information"
+        }
+        if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
+        {
+            Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshold days."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshold days." -LogLevel "Information"
+            $withinThreshold = $true
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshold days." -LogLevel "Information"
+        }
+        $contactDates.add('withinThreshold', $withinThreshold)
+        Write-Verbose "[$functionName] Contact dates retrieved successfully."
+        return $contactDates
+    }
 
