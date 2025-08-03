@@ -167,6 +167,7 @@
         "maxWaitTime": "30",
         "showLicenseBanner": true,
         "deviceContactThreshholdInDays": 30,
+        "deviceContactThresholdInDays": 30,
         "appMode": "full",
         "timeInSeconds": "60",
         "maxUserMatchDisplay": "10",
