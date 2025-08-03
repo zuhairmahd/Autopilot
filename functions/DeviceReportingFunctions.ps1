@@ -1023,7 +1023,7 @@ function AssessDeviceState()
                 }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
-                Write-Host "Within threshhold: $($deviceLastContactDate.withinThreshhold)"
+                Write-Host "Within threshold: $($deviceLastContactDate.withinThreshold)"
                 Write-Host "Within threshold: $($deviceLastContactDate.withinThreshold)"
                 if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false) -and $deviceLastContactDate.withinThreshold)
                 {
@@ -1566,7 +1566,7 @@ function GetLastDeviceContactDate()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $goodContactThreshhold = $settings.deviceContactThreshholdInDays
+    $goodContactthreshold = $settings.deviceContactthresholdInDays
     $goodContactThreshold = $settings.deviceContactThresholdInDays
     $withinThreshold = $false
     Write-Verbose "[$functionName] Getting last device contact date."
@@ -1605,16 +1605,16 @@ function GetLastDeviceContactDate()
     Write-Verbose "[$functionName] Number of days since last contact: $numberOfDaysSinceLastContact"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $numberOfDaysSinceLastContact" -LogLevel "Information"
     $contactDates.add('numberOfDaysSinceLastContact', $numberOfDaysSinceLastContact)
-    if ($numberOfDaysSinceLastContact -lt $goodContactThreshhold)
+    if ($numberOfDaysSinceLastContact -lt $goodContactthreshold)
     {
-        Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshhold days."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshhold days." -LogLevel "Information"
-        $withinThreshhold = $true
+        Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactthreshold days."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactthreshold days." -LogLevel "Information"
+        $withinThreshold = $true
     }
     else
     {
-        Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshhold days."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshhold days." -LogLevel "Information"
+        Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactthreshold days."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactthreshold days." -LogLevel "Information"
     }
     if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
     {
