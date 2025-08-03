@@ -1010,7 +1010,7 @@ function AssessDeviceState()
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
                 $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
-                if ($deviceLastContactDate.withinThreshhold)
+                if ($deviceLastContactDate.withinThreshold)
                 {
                     Write-Host "The device last contacted Intune on $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone), $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
                     Write-Verbose "[$functionName] Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
