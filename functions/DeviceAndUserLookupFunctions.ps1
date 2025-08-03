@@ -47,7 +47,9 @@ function ProcessSerialNumber()
         $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
         if (-not ($deviceLastContactDate.withinThreshhold))
         {
-            Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThreshholdInDays) days." -ForegroundColor Red
+        if (-not ($deviceLastContactDate.withinThreshold))
+        {
+            Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
             Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
             Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
             Write-Verbose "[$functionName] Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)"
