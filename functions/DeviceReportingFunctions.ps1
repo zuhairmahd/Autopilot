@@ -1566,7 +1566,8 @@ function GetLastDeviceContactDate()
     
     $functionName = $MyInvocation.MyCommand.Name
     $goodContactThreshhold = $settings.deviceContactThreshholdInDays
-    $withinThreshhold = $false
+    $goodContactThreshold = $settings.deviceContactThresholdInDays
+    $withinThreshold = $false
     Write-Verbose "[$functionName] Getting last device contact date."
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting last device contact date." -LogLevel "Verbose"
     $contactDates = @{}
