@@ -39,6 +39,9 @@ function Load-AllFunctions {
             catch {
                 $errorCount++
                 Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
+                if ($VerbosePreference -eq 'Continue') {
+                    Write-Verbose $_.ScriptStackTrace
+                }
             }
         }
         

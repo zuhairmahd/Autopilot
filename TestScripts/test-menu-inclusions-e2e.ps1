@@ -48,11 +48,11 @@ try
     
     if ($Global:settings.menuItemsToInclude -and $Global:settings.menuItemsToInclude.Count -gt 0)
     {
-        Write-Host "✓ PASS: Loaded $($Global:settings.menuItemsToInclude.Count) inclusion items" -ForegroundColor Green
+        Write-Host "[PASS] PASS: Loaded $($Global:settings.menuItemsToInclude.Count) inclusion items" -ForegroundColor Green
     }
     else
     {
-        Write-Host "✗ FAIL: No inclusion items loaded" -ForegroundColor Red
+        Write-Host "[FAIL] FAIL: No inclusion items loaded" -ForegroundColor Red
         exit 1
     }
     
@@ -69,7 +69,7 @@ try
     $testMenu = AddMenuItem -Menu $testMenu -Name "Not Included 1" -Action { Write-Host "Should be excluded" }
     $testMenu = AddMenuItem -Menu $testMenu -Name "Not Included 2" -Action { Write-Host "Should be excluded" }
     
-    Write-Host "✓ Created test menu with $($testMenu.Items.Count) total items" -ForegroundColor Green
+    Write-Host "[PASS] Created test menu with $($testMenu.Items.Count) total items" -ForegroundColor Green
     
     Write-Host "Test 3: Simulate menu filtering (as done in ShowMenu function)" -ForegroundColor Cyan
     
@@ -92,7 +92,7 @@ try
         }
     }
     
-    Write-Host "✓ Filtered menu: $notIncludedCount not included, $($choices.Count) remaining" -ForegroundColor Green
+    Write-Host "[PASS] Filtered menu: $notIncludedCount not included, $($choices.Count) remaining" -ForegroundColor Green
     
     Write-Host "Test 4: Verify expected results" -ForegroundColor Cyan
     
@@ -105,14 +105,14 @@ try
     {
         if ($choices -notcontains $included)
         {
-            Write-Host "✗ FAIL: '$included' should be included but is not in choices" -ForegroundColor Red
+            Write-Host "[FAIL] FAIL: '$included' should be included but is not in choices" -ForegroundColor Red
             $allIncluded = $false
         }
     }
     
     if ($allIncluded)
     {
-        Write-Host "✓ PASS: All expected items are included" -ForegroundColor Green
+        Write-Host "[PASS] PASS: All expected items are included" -ForegroundColor Green
     }
     
     # Check that not-included items are not in choices
@@ -121,14 +121,14 @@ try
     {
         if ($choices -contains $notIncluded)
         {
-            Write-Host "✗ FAIL: '$notIncluded' should not be included but is in choices" -ForegroundColor Red
+            Write-Host "[FAIL] FAIL: '$notIncluded' should not be included but is in choices" -ForegroundColor Red
             $allNotIncluded = $false
         }
     }
     
     if ($allNotIncluded)
     {
-        Write-Host "✓ PASS: All expected items are not included" -ForegroundColor Green
+        Write-Host "[PASS] PASS: All expected items are not included" -ForegroundColor Green
     }
     
     Write-Host "Test 5: Display final menu state" -ForegroundColor Cyan
@@ -153,7 +153,7 @@ try
 }
 catch
 {
-    Write-Host "✗ ERROR during end-to-end test: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] ERROR during end-to-end test: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
     exit 1
 }

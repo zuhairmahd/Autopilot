@@ -23,7 +23,7 @@ $stringsFile = "$TestFolder\strings.json"
 
 try {
     # Load the functions
-    Write-Host "`n1. Loading functions..." -ForegroundColor Cyan
+    Write-TestSection "`n1. Loading functions..."
     
     # Load all functions from the functions directory
     $functionsFolder = "$PWD\functions"
@@ -32,9 +32,9 @@ try {
         foreach ($function in $functions) {
             . $function.FullName
         }
-        Write-Host "✓ Functions loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Functions loaded successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Functions folder not found: $functionsFolder" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found: $functionsFolder" -ForegroundColor Red
         exit 1
     }
 
@@ -56,7 +56,7 @@ try {
     }
     
     $existingSettings | ConvertTo-Json -Depth 5 | Set-Content -Path $settingsFile -Force
-    Write-Host "✓ Created existing settings.json with autoUpdate = false" -ForegroundColor Green
+    Write-Host "[PASS] Created existing settings.json with autoUpdate = false" -ForegroundColor Green
     
     # Verify the existing setting
     $loadedSettings = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json
@@ -68,27 +68,27 @@ try {
     $updateSuccess = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "autoUpdate" -SettingValue $true
     
     if ($updateSuccess) {
-        Write-Host "✓ Update-GlobalSetting function works with existing settings" -ForegroundColor Green
+        Write-Host "[PASS] Update-GlobalSetting function works with existing settings" -ForegroundColor Green
         
         # Verify the update
         $updatedSettings = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json
         if ($updatedSettings.globalSettings.autoUpdate -eq $true) {
-            Write-Host "✓ autoUpdate setting was successfully updated from false to true" -ForegroundColor Green
+            Write-Host "[PASS] autoUpdate setting was successfully updated from false to true" -ForegroundColor Green
             Write-Host "  - Updated autoUpdate value: $($updatedSettings.globalSettings.autoUpdate)" -ForegroundColor White
         } else {
-            Write-Host "✗ autoUpdate setting was not updated correctly" -ForegroundColor Red
+            Write-Host "[FAIL] autoUpdate setting was not updated correctly" -ForegroundColor Red
             throw "autoUpdate setting update validation failed"
         }
         
         # Check that other settings were preserved
         if ($updatedSettings.globalSettings.operatingSystem -eq "Windows") {
-            Write-Host "✓ Other settings were preserved during update" -ForegroundColor Green
+            Write-Host "[PASS] Other settings were preserved during update" -ForegroundColor Green
         } else {
-            Write-Host "✗ Other settings were not preserved" -ForegroundColor Red
+            Write-Host "[FAIL] Other settings were not preserved" -ForegroundColor Red
             throw "Settings preservation failed"
         }
     } else {
-        Write-Host "✗ Update-GlobalSetting function failed" -ForegroundColor Red
+        Write-Host "[FAIL] Update-GlobalSetting function failed" -ForegroundColor Red
         throw "Update-GlobalSetting test failed"
     }
 
@@ -98,28 +98,28 @@ try {
     $testResult = Test-SettingsJsonExists -SettingsFile $settingsFile -Silent
     
     if ($testResult) {
-        Write-Host "✓ Test-SettingsJsonExists correctly detects existing file" -ForegroundColor Green
+        Write-Host "[PASS] Test-SettingsJsonExists correctly detects existing file" -ForegroundColor Green
         
         # Verify the file wasn't overwritten
         $finalSettings = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json
         if ($finalSettings.globalSettings.autoUpdate -eq $true -and $finalSettings.globalSettings.operatingSystem -eq "Windows") {
-            Write-Host "✓ Existing settings were preserved (not overwritten)" -ForegroundColor Green
+            Write-Host "[PASS] Existing settings were preserved (not overwritten)" -ForegroundColor Green
         } else {
-            Write-Host "✗ Existing settings were modified unexpectedly" -ForegroundColor Red
+            Write-Host "[FAIL] Existing settings were modified unexpectedly" -ForegroundColor Red
             throw "Existing settings were overwritten"
         }
     } else {
-        Write-Host "✗ Test-SettingsJsonExists failed" -ForegroundColor Red
+        Write-Host "[FAIL] Test-SettingsJsonExists failed" -ForegroundColor Red
         throw "Settings existence test failed"
     }
 
-    Write-Host "`n✓ All backward compatibility tests passed!" -ForegroundColor Green
+    Write-Host "`n[PASS] All backward compatibility tests passed!" -ForegroundColor Green
     Write-Host "  - Existing autoUpdate settings are preserved" -ForegroundColor White
     Write-Host "  - Settings can be updated without losing other values" -ForegroundColor White
     Write-Host "  - Wizard respects existing settings.json files" -ForegroundColor White
 
 } catch {
-    Write-Host "`n✗ Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "`n[FAIL] Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Error details: $($_.Exception.StackTrace)" -ForegroundColor Red
     exit 1
 } finally {
@@ -127,7 +127,7 @@ try {
     Write-Host "`nCleaning up test folder..." -ForegroundColor Yellow
     if (Test-Path $TestFolder) {
         Remove-Item -Path $TestFolder -Recurse -Force
-        Write-Host "✓ Test folder cleaned up" -ForegroundColor Green
+        Write-Host "[PASS] Test folder cleaned up" -ForegroundColor Green
     }
 }
 

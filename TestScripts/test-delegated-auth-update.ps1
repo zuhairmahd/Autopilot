@@ -22,7 +22,7 @@ $settingsFile = "$TestFolder\settings.json"
 
 try {
     # Load the functions
-    Write-Host "`n1. Loading functions..." -ForegroundColor Cyan
+    Write-TestSection "`n1. Loading functions..."
     
     # Load all functions from the functions directory
     $functionsFolder = "$PWD\functions"
@@ -31,9 +31,9 @@ try {
         foreach ($function in $functions) {
             . $function.FullName
         }
-        Write-Host "✓ Functions loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Functions loaded successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Functions folder not found: $functionsFolder" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found: $functionsFolder" -ForegroundColor Red
         exit 1
     }
 
@@ -59,9 +59,9 @@ try {
     
     if (Test-Path $settingsFile) {
         $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
-        Write-Host "✓ Initial settings.json created with Delegated = $($settings.auth.Delegated)" -ForegroundColor Green
+        Write-Host "[PASS] Initial settings.json created with Delegated = $($settings.auth.Delegated)" -ForegroundColor Green
     } else {
-        Write-Host "✗ Failed to create initial settings.json" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to create initial settings.json" -ForegroundColor Red
         exit 1
     }
 
@@ -71,31 +71,31 @@ try {
     $success = Update-AuthSetting -SettingsFile $settingsFile -SettingName "Delegated" -SettingValue $true
     
     if ($success) {
-        Write-Host "✓ Update-AuthSetting function completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] Update-AuthSetting function completed successfully" -ForegroundColor Green
         
         # Verify the setting was updated
         $updatedSettings = Get-Content $settingsFile -Raw | ConvertFrom-Json
         if ($updatedSettings.auth.Delegated -eq $true) {
-            Write-Host "✓ Delegated property updated correctly to: $($updatedSettings.auth.Delegated)" -ForegroundColor Green
+            Write-Host "[PASS] Delegated property updated correctly to: $($updatedSettings.auth.Delegated)" -ForegroundColor Green
         } else {
-            Write-Host "✗ Delegated property was not updated correctly. Current value: $($updatedSettings.auth.Delegated)" -ForegroundColor Red
+            Write-Host "[FAIL] Delegated property was not updated correctly. Current value: $($updatedSettings.auth.Delegated)" -ForegroundColor Red
         }
         
         # Verify other auth properties are preserved
         if ($updatedSettings.auth.authType -eq "PublicAuthFlow" -and $updatedSettings.auth.renewalLeadTime -eq 5) {
-            Write-Host "✓ Other auth properties preserved" -ForegroundColor Green
+            Write-Host "[PASS] Other auth properties preserved" -ForegroundColor Green
         } else {
-            Write-Host "✗ Other auth properties were modified unexpectedly" -ForegroundColor Red
+            Write-Host "[FAIL] Other auth properties were modified unexpectedly" -ForegroundColor Red
         }
         
         # Verify other sections are preserved
         if ($updatedSettings.globalSettings.autoUpdate -eq $true) {
-            Write-Host "✓ Other settings sections preserved" -ForegroundColor Green
+            Write-Host "[PASS] Other settings sections preserved" -ForegroundColor Green
         } else {
-            Write-Host "✗ Other settings sections were modified unexpectedly" -ForegroundColor Red
+            Write-Host "[FAIL] Other settings sections were modified unexpectedly" -ForegroundColor Red
         }
     } else {
-        Write-Host "✗ Update-AuthSetting function failed" -ForegroundColor Red
+        Write-Host "[FAIL] Update-AuthSetting function failed" -ForegroundColor Red
     }
 
     Write-Host "`n4. Testing First Run Wizard integration..." -ForegroundColor Cyan
@@ -113,17 +113,17 @@ try {
     $wizardSuccess = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $settingsFile -StringsFile $stringsFile -Silent
     
     if ($wizardSuccess) {
-        Write-Host "✓ First Run Wizard completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] First Run Wizard completed successfully" -ForegroundColor Green
         
         # Check if Delegated property was updated to true
         $finalSettings = Get-Content $settingsFile -Raw | ConvertFrom-Json
         if ($finalSettings.auth.Delegated -eq $true) {
-            Write-Host "✓ First Run Wizard correctly updated Delegated property to: $($finalSettings.auth.Delegated)" -ForegroundColor Green
+            Write-Host "[PASS] First Run Wizard correctly updated Delegated property to: $($finalSettings.auth.Delegated)" -ForegroundColor Green
         } else {
-            Write-Host "✗ First Run Wizard did not update Delegated property. Current value: $($finalSettings.auth.Delegated)" -ForegroundColor Red
+            Write-Host "[FAIL] First Run Wizard did not update Delegated property. Current value: $($finalSettings.auth.Delegated)" -ForegroundColor Red
         }
     } else {
-        Write-Host "✗ First Run Wizard failed" -ForegroundColor Red
+        Write-Host "[FAIL] First Run Wizard failed" -ForegroundColor Red
     }
 
     Write-Host "`n5. Testing edge cases..." -ForegroundColor Cyan
@@ -132,9 +132,9 @@ try {
     $nonExistentFile = "$TestFolder\nonexistent.json"
     $edgeTestSuccess = Update-AuthSetting -SettingsFile $nonExistentFile -SettingName "Delegated" -SettingValue $true
     if (-not $edgeTestSuccess) {
-        Write-Host "✓ Function correctly handles non-existent file" -ForegroundColor Green
+        Write-Host "[PASS] Function correctly handles non-existent file" -ForegroundColor Green
     } else {
-        Write-Host "✗ Function should fail with non-existent file" -ForegroundColor Red
+        Write-Host "[FAIL] Function should fail with non-existent file" -ForegroundColor Red
     }
     
     # Test with invalid JSON file
@@ -142,22 +142,22 @@ try {
     "{ invalid json }" | Set-Content -Path $invalidJsonFile -Force
     $invalidJsonTestSuccess = Update-AuthSetting -SettingsFile $invalidJsonFile -SettingName "Delegated" -SettingValue $true
     if (-not $invalidJsonTestSuccess) {
-        Write-Host "✓ Function correctly handles invalid JSON" -ForegroundColor Green
+        Write-Host "[PASS] Function correctly handles invalid JSON" -ForegroundColor Green
     } else {
-        Write-Host "✗ Function should fail with invalid JSON" -ForegroundColor Red
+        Write-Host "[FAIL] Function should fail with invalid JSON" -ForegroundColor Red
     }
 
-    Write-Host "`n✓ All tests completed successfully!" -ForegroundColor Green
+    Write-Host "`n[PASS] All tests completed successfully!" -ForegroundColor Green
 
 } catch {
-    Write-Host "`n✗ Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "`n[FAIL] Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack trace: $($_.Exception.StackTrace)" -ForegroundColor Red
 } finally {
     # Clean up test folder
     if (Test-Path $TestFolder) {
         try {
             Remove-Item -Path $TestFolder -Recurse -Force
-            Write-Host "`n✓ Test folder cleaned up" -ForegroundColor Green
+            Write-Host "`n[PASS] Test folder cleaned up" -ForegroundColor Green
         } catch {
             Write-Host "`n⚠ Could not clean up test folder: $($_.Exception.Message)" -ForegroundColor Yellow
         }

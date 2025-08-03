@@ -32,7 +32,7 @@ if (Test-Path $originalConfigFile) {
 }
 
 try {
-    Write-Host "1. Loading functions..." -ForegroundColor Cyan
+    Write-TestSection "1. Loading functions..."
     
     # Load functions
     $functionsFolder = "$PWD\functions"
@@ -41,9 +41,9 @@ try {
         foreach ($function in $functions) {
             . $function.FullName
         }
-        Write-Host "✓ Functions loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Functions loaded successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Functions folder not found" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found" -ForegroundColor Red
         exit 1
     }
 
@@ -58,17 +58,17 @@ try {
     $wizardResult = Start-FirstRunWizard -ConfigFile $testConfigFile -SettingsFile $testSettingsFile -StringsFile $testStringsFile -Silent
     
     if ($wizardResult) {
-        Write-Host "✓ Wizard completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] Wizard completed successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Wizard failed" -ForegroundColor Red
+        Write-Host "[FAIL] Wizard failed" -ForegroundColor Red
         exit 1
     }
     
     # Check that config file was created
     if (Test-Path $testConfigFile) {
-        Write-Host "✓ Config file created" -ForegroundColor Green
+        Write-Host "[PASS] Config file created" -ForegroundColor Green
     } else {
-        Write-Host "✗ Config file not created" -ForegroundColor Red
+        Write-Host "[FAIL] Config file not created" -ForegroundColor Red
         exit 1
     }
 
@@ -78,28 +78,28 @@ try {
     $loadResult = Load-EncryptedConfigFile -ConfigFile $testConfigFile -MaxRetries 3 -UseStoredPassword
     
     if ($loadResult.Success) {
-        Write-Host "✓ Configuration loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Configuration loaded successfully" -ForegroundColor Green
         
         # Setup temporary encryption
         $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $loadResult.Content
         
         if ($tempEncryptionResult) {
-            Write-Host "✓ Temporary encryption setup successful" -ForegroundColor Green
+            Write-Host "[PASS] Temporary encryption setup successful" -ForegroundColor Green
         } else {
-            Write-Host "✗ Temporary encryption setup failed" -ForegroundColor Red
+            Write-Host "[FAIL] Temporary encryption setup failed" -ForegroundColor Red
             exit 1
         }
         
         # Verify that script variables are set
         if ($script:TempEncryptedConfig -and $script:TempEncryptionKey) {
-            Write-Host "✓ Temporary encryption variables set correctly" -ForegroundColor Green
+            Write-Host "[PASS] Temporary encryption variables set correctly" -ForegroundColor Green
         } else {
-            Write-Host "✗ Temporary encryption variables not set" -ForegroundColor Red
+            Write-Host "[FAIL] Temporary encryption variables not set" -ForegroundColor Red
             exit 1
         }
         
     } else {
-        Write-Host "✗ Configuration load failed: $($loadResult.ErrorMessage)" -ForegroundColor Red
+        Write-Host "[FAIL] Configuration load failed: $($loadResult.ErrorMessage)" -ForegroundColor Red
         exit 1
     }
 
@@ -109,30 +109,30 @@ try {
     try {
         $tenantId = Get-DecryptedConfigValue -PropertyPath "tenantId"
         if ($tenantId) {
-            Write-Host "✓ Successfully retrieved tenantId: $tenantId" -ForegroundColor Green
+            Write-Host "[PASS] Successfully retrieved tenantId: $tenantId" -ForegroundColor Green
         } else {
-            Write-Host "✗ Failed to retrieve tenantId" -ForegroundColor Red
+            Write-Host "[FAIL] Failed to retrieve tenantId" -ForegroundColor Red
             exit 1
         }
         
         $appId = Get-DecryptedConfigValue -PropertyPath "appId"
         if ($appId) {
-            Write-Host "✓ Successfully retrieved appId: $appId" -ForegroundColor Green
+            Write-Host "[PASS] Successfully retrieved appId: $appId" -ForegroundColor Green
         } else {
-            Write-Host "✗ Failed to retrieve appId" -ForegroundColor Red
+            Write-Host "[FAIL] Failed to retrieve appId" -ForegroundColor Red
             exit 1
         }
         
         $domain = Get-DecryptedConfigValue -PropertyPath "domain"
         if ($domain) {
-            Write-Host "✓ Successfully retrieved domain: $domain" -ForegroundColor Green
+            Write-Host "[PASS] Successfully retrieved domain: $domain" -ForegroundColor Green
         } else {
-            Write-Host "✗ Failed to retrieve domain" -ForegroundColor Red
+            Write-Host "[FAIL] Failed to retrieve domain" -ForegroundColor Red
             exit 1
         }
         
     } catch {
-        Write-Host "✗ Error accessing configuration values: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[FAIL] Error accessing configuration values: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
 
@@ -142,27 +142,27 @@ try {
     try {
         $delegatedCreds = Get-DecryptedConfigValue -PropertyPath "delegatedCredentials"
         if ($delegatedCreds) {
-            Write-Host "✓ Successfully retrieved delegatedCredentials structure" -ForegroundColor Green
+            Write-Host "[PASS] Successfully retrieved delegatedCredentials structure" -ForegroundColor Green
         } else {
             Write-Host "⚠ delegatedCredentials not found (expected for application auth)" -ForegroundColor Yellow
         }
         
         $appCreds = Get-DecryptedConfigValue -PropertyPath "appCredentials"
         if ($appCreds) {
-            Write-Host "✓ Successfully retrieved appCredentials structure" -ForegroundColor Green
+            Write-Host "[PASS] Successfully retrieved appCredentials structure" -ForegroundColor Green
         } else {
             Write-Host "⚠ appCredentials not found (expected for delegated auth)" -ForegroundColor Yellow
         }
         
         # Test legacy fields
         $appSecret = Get-DecryptedConfigValue -PropertyPath "AppSecret"
-        Write-Host "✓ Successfully accessed AppSecret (legacy field)" -ForegroundColor Green
+        Write-Host "[PASS] Successfully accessed AppSecret (legacy field)" -ForegroundColor Green
         
         $thumbprint = Get-DecryptedConfigValue -PropertyPath "Thumbprint"
-        Write-Host "✓ Successfully accessed Thumbprint (legacy field)" -ForegroundColor Green
+        Write-Host "[PASS] Successfully accessed Thumbprint (legacy field)" -ForegroundColor Green
         
     } catch {
-        Write-Host "✗ Error accessing authentication configuration: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[FAIL] Error accessing authentication configuration: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
 
@@ -170,17 +170,17 @@ try {
     Write-Host "                        Test Results                         " -ForegroundColor Green
     Write-Host "=" * 70 -ForegroundColor Green
     
-    Write-Host "✓ Wizard execution: PASS" -ForegroundColor Green
-    Write-Host "✓ Configuration loading: PASS" -ForegroundColor Green
-    Write-Host "✓ Temporary encryption setup: PASS" -ForegroundColor Green
-    Write-Host "✓ Config value retrieval: PASS" -ForegroundColor Green
-    Write-Host "✓ Authentication config access: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Wizard execution: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Configuration loading: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Temporary encryption setup: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Config value retrieval: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Authentication config access: PASS" -ForegroundColor Green
     
     Write-Host "`n🎉 All temporary encryption tests passed!" -ForegroundColor Green
     Write-Host "The temporary encryption issue has been resolved!" -ForegroundColor Green
 
 } catch {
-    Write-Host "✗ Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 } finally {
     # Cleanup
@@ -189,14 +189,14 @@ try {
     # Remove test folder
     if (Test-Path $testFolder) {
         Remove-Item -Path $testFolder -Recurse -Force
-        Write-Host "✓ Test folder cleaned up" -ForegroundColor Green
+        Write-Host "[PASS] Test folder cleaned up" -ForegroundColor Green
     }
     
     # Restore original files if they were backed up
     foreach ($backupFile in $backupFiles) {
         if (Test-Path $backupFile.Backup) {
             Copy-Item -Path $backupFile.Backup -Destination $backupFile.Original
-            Write-Host "✓ Restored $($backupFile.Original)" -ForegroundColor Green
+            Write-Host "[PASS] Restored $($backupFile.Original)" -ForegroundColor Green
         }
     }
 }

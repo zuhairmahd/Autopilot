@@ -22,7 +22,7 @@ $settingsFile = "$TestFolder\settings.json"
 
 try {
     # Load the functions
-    Write-Host "`n1. Loading functions..." -ForegroundColor Cyan
+    Write-TestSection "`n1. Loading functions..."
     
     # Load all functions from the functions directory
     $functionsFolder = "$PWD\functions"
@@ -31,9 +31,9 @@ try {
         foreach ($function in $functions) {
             . $function.FullName
         }
-        Write-Host "✓ Functions loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Functions loaded successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Functions folder not found: $functionsFolder" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found: $functionsFolder" -ForegroundColor Red
         exit 1
     }
 
@@ -54,7 +54,7 @@ try {
     }
     
     $testSettings | ConvertTo-Json -Depth 10 | Set-Content -Path $settingsFile -Encoding UTF8
-    Write-Host "✓ Test settings file created" -ForegroundColor Green
+    Write-Host "[PASS] Test settings file created" -ForegroundColor Green
     
     Write-Host "`n3. Testing Update-GlobalSetting function..." -ForegroundColor Cyan
     
@@ -62,18 +62,18 @@ try {
     $result = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "autoUpdate" -SettingValue $false
     
     if ($result) {
-        Write-Host "✓ Update-GlobalSetting works for autoUpdate = false" -ForegroundColor Green
+        Write-Host "[PASS] Update-GlobalSetting works for autoUpdate = false" -ForegroundColor Green
         
         # Verify the setting was actually changed
         $updatedSettings = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json
         if ($updatedSettings.globalSettings.autoUpdate -eq $false) {
-            Write-Host "✓ Settings file correctly updated with autoUpdate = false" -ForegroundColor Green
+            Write-Host "[PASS] Settings file correctly updated with autoUpdate = false" -ForegroundColor Green
         } else {
-            Write-Host "✗ Settings file not correctly updated" -ForegroundColor Red
+            Write-Host "[FAIL] Settings file not correctly updated" -ForegroundColor Red
             throw "Settings verification failed"
         }
     } else {
-        Write-Host "✗ Update-GlobalSetting failed for autoUpdate = false" -ForegroundColor Red
+        Write-Host "[FAIL] Update-GlobalSetting failed for autoUpdate = false" -ForegroundColor Red
         throw "Update-GlobalSetting test failed"
     }
     
@@ -83,18 +83,18 @@ try {
     $result = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "autoUpdate" -SettingValue $true
     
     if ($result) {
-        Write-Host "✓ Update-GlobalSetting works for autoUpdate = true" -ForegroundColor Green
+        Write-Host "[PASS] Update-GlobalSetting works for autoUpdate = true" -ForegroundColor Green
         
         # Verify the setting was actually changed back
         $updatedSettings = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json
         if ($updatedSettings.globalSettings.autoUpdate -eq $true) {
-            Write-Host "✓ Settings file correctly updated with autoUpdate = true" -ForegroundColor Green
+            Write-Host "[PASS] Settings file correctly updated with autoUpdate = true" -ForegroundColor Green
         } else {
-            Write-Host "✗ Settings file not correctly updated back to true" -ForegroundColor Red
+            Write-Host "[FAIL] Settings file not correctly updated back to true" -ForegroundColor Red
             throw "Settings verification failed"
         }
     } else {
-        Write-Host "✗ Update-GlobalSetting failed for autoUpdate = true" -ForegroundColor Red
+        Write-Host "[FAIL] Update-GlobalSetting failed for autoUpdate = true" -ForegroundColor Red
         throw "Update-GlobalSetting test failed"
     }
     
@@ -113,18 +113,18 @@ try {
     $updateResult = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "autoUpdate" -SettingValue $newValue
     
     if ($updateResult) {
-        Write-Host "✓ Settings toggle logic works correctly" -ForegroundColor Green
+        Write-Host "[PASS] Settings toggle logic works correctly" -ForegroundColor Green
         
         # Verify the final state
         $finalSettings = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json
         if ($finalSettings.globalSettings.autoUpdate -eq $newValue) {
-            Write-Host "✓ Final settings verification passed" -ForegroundColor Green
+            Write-Host "[PASS] Final settings verification passed" -ForegroundColor Green
         } else {
-            Write-Host "✗ Final settings verification failed" -ForegroundColor Red
+            Write-Host "[FAIL] Final settings verification failed" -ForegroundColor Red
             throw "Final verification failed"
         }
     } else {
-        Write-Host "✗ Settings toggle logic failed" -ForegroundColor Red
+        Write-Host "[FAIL] Settings toggle logic failed" -ForegroundColor Red
         throw "Toggle logic test failed"
     }
     
@@ -146,7 +146,7 @@ try {
     # Test the backup cleanup logic (simulate what's in main.ps1)
     $foundBackups = Get-ChildItem "$TestFolder\*.backup.*" -ErrorAction SilentlyContinue
     if ($foundBackups.Count -eq $backupFiles.Count) {
-        Write-Host "✓ Backup files detected correctly ($($foundBackups.Count) files)" -ForegroundColor Green
+        Write-Host "[PASS] Backup files detected correctly ($($foundBackups.Count) files)" -ForegroundColor Green
         
         # Clean up the backup files
         foreach ($backup in $foundBackups) {
@@ -156,12 +156,12 @@ try {
         # Verify cleanup
         $remainingBackups = Get-ChildItem "$TestFolder\*.backup.*" -ErrorAction SilentlyContinue
         if ($remainingBackups.Count -eq 0) {
-            Write-Host "✓ Backup file cleanup works correctly" -ForegroundColor Green
+            Write-Host "[PASS] Backup file cleanup works correctly" -ForegroundColor Green
         } else {
-            Write-Host "✗ Backup file cleanup failed - $($remainingBackups.Count) files remaining" -ForegroundColor Red
+            Write-Host "[FAIL] Backup file cleanup failed - $($remainingBackups.Count) files remaining" -ForegroundColor Red
         }
     } else {
-        Write-Host "✗ Backup file detection failed" -ForegroundColor Red
+        Write-Host "[FAIL] Backup file detection failed" -ForegroundColor Red
     }
     
     Write-Host "`n✅ All Settings Menu AutoUpdate tests passed!" -ForegroundColor Green

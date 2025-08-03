@@ -31,13 +31,13 @@ try
         
         if ($settingsContent.menuItemsToInclude)
         {
-            Write-Host "✓ PASS: menuItemsToInclude found in settings.json" -ForegroundColor Green
+            Write-Host "[PASS] PASS: menuItemsToInclude found in settings.json" -ForegroundColor Green
             Write-Host "  Found $($settingsContent.menuItemsToInclude.Count) items to include:" -ForegroundColor Yellow
             $settingsContent.menuItemsToInclude | ForEach-Object { Write-Host "    - $_" -ForegroundColor White }
         }
         else
         {
-            Write-Host "✗ FAIL: menuItemsToInclude not found in settings.json" -ForegroundColor Red
+            Write-Host "[FAIL] FAIL: menuItemsToInclude not found in settings.json" -ForegroundColor Red
             exit 1
         }
         
@@ -66,11 +66,11 @@ try
             $result = Test-MenuItemIncluded -MenuItemName $testItem.Name
             if ($result -eq $testItem.ShouldBeIncluded)
             {
-                Write-Host "✓ PASS: '$($testItem.Name)' correctly handled (included: $result)" -ForegroundColor Green
+                Write-Host "[PASS] PASS: '$($testItem.Name)' correctly handled (included: $result)" -ForegroundColor Green
             }
             else
             {
-                Write-Host "✗ FAIL: '$($testItem.Name)' expected included: $($testItem.ShouldBeIncluded), got: $result" -ForegroundColor Red
+                Write-Host "[FAIL] FAIL: '$($testItem.Name)' expected included: $($testItem.ShouldBeIncluded), got: $result" -ForegroundColor Red
             }
         }
         
@@ -84,11 +84,11 @@ try
         
         if ($result1 -eq $true -and $result2 -eq $true -and $result3 -eq $true)
         {
-            Write-Host "✓ PASS: Case insensitivity works correctly (all variants included)" -ForegroundColor Green
+            Write-Host "[PASS] PASS: Case insensitivity works correctly (all variants included)" -ForegroundColor Green
         }
         else
         {
-            Write-Host "✗ FAIL: Case insensitivity issue - lowercase: $result1, proper: $result2, upper: $result3" -ForegroundColor Red
+            Write-Host "[FAIL] FAIL: Case insensitivity issue - lowercase: $result1, proper: $result2, upper: $result3" -ForegroundColor Red
         }
         
         Write-Host "`nMenu Inclusions Integration Test Completed Successfully!" -ForegroundColor Green
@@ -96,12 +96,12 @@ try
     }
     else
     {
-        Write-Host "✗ FAIL: settings.json not found at $settingsPath" -ForegroundColor Red
+        Write-Host "[FAIL] FAIL: settings.json not found at $settingsPath" -ForegroundColor Red
         exit 1
     }
 }
 catch
 {
-    Write-Host "✗ ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] ERROR: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }

@@ -25,7 +25,7 @@ $originalPassword = "TestPassword123"
 $newPassword = "NewPassword456"
 
 try {
-    Write-Host "1. Loading functions..." -ForegroundColor Cyan
+    Write-TestSection "1. Loading functions..."
     
     # Load functions
     $functionsFolder = "$PWD\functions"
@@ -34,9 +34,9 @@ try {
         foreach ($function in $functions) {
             . $function.FullName
         }
-        Write-Host "✓ Functions loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Functions loaded successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Functions folder not found" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found" -ForegroundColor Red
         exit 1
     }
 
@@ -62,7 +62,7 @@ try {
     
     $testSettingsJson = ConvertTo-Json $testSettings -Depth 10
     Set-Content -Path $testSettingsFile -Value $testSettingsJson -Encoding UTF8
-    Write-Host "✓ Test settings.json created with changePWOnNextStart=true" -ForegroundColor Green
+    Write-Host "[PASS] Test settings.json created with changePWOnNextStart=true" -ForegroundColor Green
     
     # Create test config content
     $testConfig = @{
@@ -85,9 +85,9 @@ try {
         # Copy encrypted content to test config file
         $encryptedContent = Get-Content -Path $tempConfigFile -Raw -Encoding UTF8
         Set-Content -Path $testConfigFile -Value $encryptedContent -Encoding UTF8 -NoNewline
-        Write-Host "✓ Test config.json created and encrypted with original password" -ForegroundColor Green
+        Write-Host "[PASS] Test config.json created and encrypted with original password" -ForegroundColor Green
     } else {
-        Write-Host "✗ Failed to create encrypted test config" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to create encrypted test config" -ForegroundColor Red
         exit 1
     }
     
@@ -101,9 +101,9 @@ try {
     $settings = ConvertFrom-Json $settingsContent
     
     if ($settings.auth.changePWOnNextStart -eq $true) {
-        Write-Host "✓ changePWOnNextStart correctly set to true" -ForegroundColor Green
+        Write-Host "[PASS] changePWOnNextStart correctly set to true" -ForegroundColor Green
     } else {
-        Write-Host "✗ changePWOnNextStart not set correctly" -ForegroundColor Red
+        Write-Host "[FAIL] changePWOnNextStart not set correctly" -ForegroundColor Red
         exit 1
     }
 
@@ -116,10 +116,10 @@ try {
     $loadResult = Load-EncryptedConfigFile -ConfigFile $testConfigFile -UseStoredPassword
     
     if ($loadResult.Success) {
-        Write-Host "✓ Configuration loaded successfully with original password" -ForegroundColor Green
+        Write-Host "[PASS] Configuration loaded successfully with original password" -ForegroundColor Green
         $configContent = $loadResult.Content
     } else {
-        Write-Host "✗ Failed to load configuration: $($loadResult.ErrorMessage)" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to load configuration: $($loadResult.ErrorMessage)" -ForegroundColor Red
         exit 1
     }
 
@@ -129,9 +129,9 @@ try {
     $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $testConfigFile -ConfigContent $configContent -SettingsFile $testSettingsFile -NewPassword $newPassword
     
     if ($passwordChangeResult) {
-        Write-Host "✓ Password change process completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] Password change process completed successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ Password change process failed" -ForegroundColor Red
+        Write-Host "[FAIL] Password change process failed" -ForegroundColor Red
         exit 1
     }
 
@@ -142,9 +142,9 @@ try {
     $updatedSettings = ConvertFrom-Json $updatedSettingsContent
     
     if ($updatedSettings.auth.changePWOnNextStart -eq $false) {
-        Write-Host "✓ changePWOnNextStart correctly set to false after password change" -ForegroundColor Green
+        Write-Host "[PASS] changePWOnNextStart correctly set to false after password change" -ForegroundColor Green
     } else {
-        Write-Host "✗ changePWOnNextStart not updated correctly" -ForegroundColor Red
+        Write-Host "[FAIL] changePWOnNextStart not updated correctly" -ForegroundColor Red
         exit 1
     }
 
@@ -157,18 +157,18 @@ try {
     $reloadResult = Load-EncryptedConfigFile -ConfigFile $testConfigFile -UseStoredPassword
     
     if ($reloadResult.Success) {
-        Write-Host "✓ Configuration reloaded successfully with new password" -ForegroundColor Green
+        Write-Host "[PASS] Configuration reloaded successfully with new password" -ForegroundColor Green
         
         # Verify content is still correct
         $reloadedConfig = ConvertFrom-Json $reloadResult.Content
         if ($reloadedConfig.domain -eq "test.com" -and $reloadedConfig.appId -eq "12345678-1234-1234-1234-123456789012") {
-            Write-Host "✓ Configuration content verified after password change" -ForegroundColor Green
+            Write-Host "[PASS] Configuration content verified after password change" -ForegroundColor Green
         } else {
-            Write-Host "✗ Configuration content corrupted after password change" -ForegroundColor Red
+            Write-Host "[FAIL] Configuration content corrupted after password change" -ForegroundColor Red
             exit 1
         }
     } else {
-        Write-Host "✗ Failed to reload configuration with new password: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to reload configuration with new password: $($reloadResult.ErrorMessage)" -ForegroundColor Red
         exit 1
     }
 
@@ -181,9 +181,9 @@ try {
     $oldPasswordResult = Load-EncryptedConfigFile -ConfigFile $testConfigFile -UseStoredPassword
     
     if (-not $oldPasswordResult.Success) {
-        Write-Host "✓ Old password correctly rejected" -ForegroundColor Green
+        Write-Host "[PASS] Old password correctly rejected" -ForegroundColor Green
     } else {
-        Write-Host "✗ Old password still works (encryption may have failed)" -ForegroundColor Red
+        Write-Host "[FAIL] Old password still works (encryption may have failed)" -ForegroundColor Red
         exit 1
     }
 
@@ -205,9 +205,9 @@ try {
     $finalSettings = ConvertFrom-Json $finalSettingsContent
     
     if ($finalSettings.auth.changePWOnNextStart -eq $false) {
-        Write-Host "✓ changePWOnNextStart remains false when already false" -ForegroundColor Green
+        Write-Host "[PASS] changePWOnNextStart remains false when already false" -ForegroundColor Green
     } else {
-        Write-Host "✗ Unexpected changePWOnNextStart value" -ForegroundColor Red
+        Write-Host "[FAIL] Unexpected changePWOnNextStart value" -ForegroundColor Red
         exit 1
     }
 
@@ -215,21 +215,21 @@ try {
     Write-Host "                        Test Results                         " -ForegroundColor Green
     Write-Host "=" * 70 -ForegroundColor Green
     
-    Write-Host "✓ Function loading: PASS" -ForegroundColor Green
-    Write-Host "✓ Test setup: PASS" -ForegroundColor Green
-    Write-Host "✓ Password change detection: PASS" -ForegroundColor Green
-    Write-Host "✓ Original password loading: PASS" -ForegroundColor Green
-    Write-Host "✓ Password change process: PASS" -ForegroundColor Green
-    Write-Host "✓ Settings update: PASS" -ForegroundColor Green
-    Write-Host "✓ New password verification: PASS" -ForegroundColor Green
-    Write-Host "✓ Old password rejection: PASS" -ForegroundColor Green
-    Write-Host "✓ Edge case handling: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Function loading: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Test setup: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Password change detection: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Original password loading: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Password change process: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Settings update: PASS" -ForegroundColor Green
+    Write-Host "[PASS] New password verification: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Old password rejection: PASS" -ForegroundColor Green
+    Write-Host "[PASS] Edge case handling: PASS" -ForegroundColor Green
     
     Write-Host "`n🎉 All password change tests passed!" -ForegroundColor Green
     Write-Host "The password change functionality is working correctly!" -ForegroundColor Green
 
 } catch {
-    Write-Host "✗ Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
     exit 1
 } finally {
@@ -239,7 +239,7 @@ try {
     # Remove test folder
     if (Test-Path $testFolder) {
         Remove-Item -Path $testFolder -Recurse -Force
-        Write-Host "✓ Test folder cleaned up" -ForegroundColor Green
+        Write-Host "[PASS] Test folder cleaned up" -ForegroundColor Green
     }
     
     # Clear test variables

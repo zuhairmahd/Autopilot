@@ -1,4 +1,8 @@
 # Test script for Corporate Device Identifier functions
+
+# Load test helper functions
+. "$PSScriptRoot\test-helper.ps1"
+
 # PowerShell 5.1 compatible
 
 param(
@@ -17,7 +21,8 @@ if (Test-Path $TestFolder) {
 New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
 
 # Load the functions from AutopilotDeviceFunctions.ps1
-. ".\functions\AutopilotDeviceFunctions.ps1"
+$rootPath = Split-Path -Parent $PSScriptRoot
+Load-AllFunctions -RootPath $rootPath | Out-Null
 
 # Mock the CallGraphAPI function for testing
 function CallGraphAPI {
@@ -124,9 +129,9 @@ try {
     $result = DeleteCorporateDeviceIdentifier -AccessToken $testAccessToken -DeviceInfo $deviceInfo -IdentifierType "SerialNumber" -MaxRetries 2 -RetryDelaySeconds 1
     
     if ($result -eq $true) {
-        Write-Host "✓ DeleteCorporateDeviceIdentifier (SerialNumber) completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] DeleteCorporateDeviceIdentifier (SerialNumber) completed successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ DeleteCorporateDeviceIdentifier (SerialNumber) failed" -ForegroundColor Red
+        Write-Host "[FAIL] DeleteCorporateDeviceIdentifier (SerialNumber) failed" -ForegroundColor Red
     }
 
     Write-Host "`n2. Testing DeleteCorporateDeviceIdentifier with manufacturerModelSerial..." -ForegroundColor Cyan
@@ -142,9 +147,9 @@ try {
     $result = DeleteCorporateDeviceIdentifier -AccessToken $testAccessToken -DeviceInfo $deviceInfo -IdentifierType "manufacturerModelSerial" -MaxRetries 2 -RetryDelaySeconds 1
     
     if ($result -eq $true) {
-        Write-Host "✓ DeleteCorporateDeviceIdentifier (manufacturerModelSerial) completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] DeleteCorporateDeviceIdentifier (manufacturerModelSerial) completed successfully" -ForegroundColor Green
     } else {
-        Write-Host "✗ DeleteCorporateDeviceIdentifier (manufacturerModelSerial) failed" -ForegroundColor Red
+        Write-Host "[FAIL] DeleteCorporateDeviceIdentifier (manufacturerModelSerial) failed" -ForegroundColor Red
     }
 
     Write-Host "`n3. Testing DeleteCorporateDeviceIdentifier with non-existent device..." -ForegroundColor Cyan
@@ -160,9 +165,9 @@ try {
     $result = DeleteCorporateDeviceIdentifier -AccessToken $testAccessToken -DeviceInfo $deviceInfo -IdentifierType "SerialNumber" -MaxRetries 2 -RetryDelaySeconds 1
     
     if ($result -eq $false) {
-        Write-Host "✓ DeleteCorporateDeviceIdentifier correctly handled non-existent device" -ForegroundColor Green
+        Write-Host "[PASS] DeleteCorporateDeviceIdentifier correctly handled non-existent device" -ForegroundColor Green
     } else {
-        Write-Host "✗ DeleteCorporateDeviceIdentifier should have returned false for non-existent device" -ForegroundColor Red
+        Write-Host "[FAIL] DeleteCorporateDeviceIdentifier should have returned false for non-existent device" -ForegroundColor Red
     }
 
     Write-Host "`n4. Testing DeleteCorporateDeviceIdentifier parameter validation..." -ForegroundColor Cyan
@@ -178,13 +183,13 @@ try {
         }
         
         $result = DeleteCorporateDeviceIdentifier -AccessToken $testAccessToken -DeviceInfo $deviceInfo -IdentifierType "manufacturerModelSerial"
-        Write-Host "✗ DeleteCorporateDeviceIdentifier should have thrown error for invalid format" -ForegroundColor Red
+        Write-Host "[FAIL] DeleteCorporateDeviceIdentifier should have thrown error for invalid format" -ForegroundColor Red
     }
     catch {
         if ($_.Exception.Message -like "*Invalid manufacturerModelSerial format*") {
-            Write-Host "✓ DeleteCorporateDeviceIdentifier correctly validated manufacturerModelSerial format" -ForegroundColor Green
+            Write-Host "[PASS] DeleteCorporateDeviceIdentifier correctly validated manufacturerModelSerial format" -ForegroundColor Green
         } else {
-            Write-Host "✗ DeleteCorporateDeviceIdentifier threw unexpected error: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "[FAIL] DeleteCorporateDeviceIdentifier threw unexpected error: $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 
@@ -200,13 +205,13 @@ try {
         
         $result = DeleteCorporateDeviceIdentifier -AccessToken $null -DeviceInfo $deviceInfo -IdentifierType "SerialNumber"
         if ($result -eq $false) {
-            Write-Host "✓ DeleteCorporateDeviceIdentifier correctly handled missing access token" -ForegroundColor Green
+            Write-Host "[PASS] DeleteCorporateDeviceIdentifier correctly handled missing access token" -ForegroundColor Green
         } else {
-            Write-Host "✗ DeleteCorporateDeviceIdentifier should have returned false for missing access token" -ForegroundColor Red
+            Write-Host "[FAIL] DeleteCorporateDeviceIdentifier should have returned false for missing access token" -ForegroundColor Red
         }
     }
     catch {
-        Write-Host "✓ DeleteCorporateDeviceIdentifier correctly handled missing access token (threw exception)" -ForegroundColor Green
+        Write-Host "[PASS] DeleteCorporateDeviceIdentifier correctly handled missing access token (threw exception)" -ForegroundColor Green
     }
 
     Write-Host "`n5. Testing AddCorporateDeviceIdentifier (for comparison/integration)..." -ForegroundColor Cyan
@@ -215,9 +220,9 @@ try {
     # $result = AddCorporateDeviceIdentifier -AccessToken $testAccessToken -DeviceIdentifier "ABC123456789" -IdentifierType "SerialNumber"
     
     # if ($result -and $result.importedDeviceIdentities -and $result.importedDeviceIdentities.Count -gt 0) {
-    #     Write-Host "✓ AddCorporateDeviceIdentifier completed successfully" -ForegroundColor Green
+    #     Write-Host "[PASS] AddCorporateDeviceIdentifier completed successfully" -ForegroundColor Green
     # } else {
-    #     Write-Host "✗ AddCorporateDeviceIdentifier failed" -ForegroundColor Red
+    #     Write-Host "[FAIL] AddCorporateDeviceIdentifier failed" -ForegroundColor Red
     # }
     Write-Host "⚠ AddCorporateDeviceIdentifier test skipped (parameter mismatch)" -ForegroundColor Yellow
 
@@ -247,12 +252,12 @@ try {
     $deviceInfo = GetCorpDeviceIdentifier
     
     if ($deviceInfo -and $deviceInfo.Manufacturer -and $deviceInfo.Model -and $deviceInfo.SerialNumber) {
-        Write-Host "✓ GetCorpDeviceIdentifier completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] GetCorpDeviceIdentifier completed successfully" -ForegroundColor Green
         Write-Host "  Manufacturer: $($deviceInfo.Manufacturer)" -ForegroundColor Gray
         Write-Host "  Model: $($deviceInfo.Model)" -ForegroundColor Gray
         Write-Host "  SerialNumber: $($deviceInfo.SerialNumber)" -ForegroundColor Gray
     } else {
-        Write-Host "✗ GetCorpDeviceIdentifier failed" -ForegroundColor Red
+        Write-Host "[FAIL] GetCorpDeviceIdentifier failed" -ForegroundColor Red
     }
 
     Write-Host "`nAll Corporate Device Identifier tests completed!" -ForegroundColor Green
