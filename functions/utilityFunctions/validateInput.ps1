@@ -3,47 +3,89 @@ function validateInput()
     [CmdletBinding()]
     param (
         [parameter(Mandatory = $true)]
-        [string]$UserInput
+        [string]$UserInput,
+        [parameter(Mandatory = $true)]
+        [string]$type,
+        $settings = $settings # Use the script-level $settings by default
     )
-
-    #Get the function name
     $functionName = $MyInvocation.MyCommand.Name
-    $MaxSerialNumberLength = '11'
-    $MinSerialNumberLength = '7'
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting serial number validation" -LogLevel "Debug"
+    $domain = $settings.domain
+    $MaxUserNameLength = $settings.MaxUserNameLength
+    $MaxSerialNumberLength = $settings.MaxSerialNumberLength
+    $MinSerialNumberLength = $settings.MinSerialNumberLength
+    $minUsernameLength = $settings.MinUsernameLength
+    $returnValue = @{ valid = $false; value = $null } # Initialize return hash table
+    Write-Verbose "[$functionName] Validating input of type '$type': '$UserInput'"
+    Write-Verbose "[$functionName] Domain: $domain"
+    Write-Verbose "[$functionName] MaxUserNameLength: $MaxUserNameLength"
+    Write-Verbose "[$functionName] MinUserNameLength: $minUsernameLength"
     Write-Verbose "[$functionName] MaxSerialNumberLength: $MaxSerialNumberLength"
     Write-Verbose "[$functionName] MinSerialNumberLength: $MinSerialNumberLength"
-    
     # Trim input to remove any leading or trailing spaces
     $UserInput = $UserInput.Trim()
-    $returnValue = @{}
     Write-Verbose "[$functionName] Trimmed input: '$UserInput'"
-    Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Validating serial number length: $($UserInput.Length)" -LogLevel "Debug"
-    
-    if ($UserInput.Length -gt $MaxSerialNumberLength)
+    switch ($type)
     {
-        Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
-        Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation failed: exceeds maximum length of $MaxSerialNumberLength characters" -LogLevel "Warning"
-    }
-    elseif ($UserInput.Length -lt $MinSerialNumberLength)
-    {
-        Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
-        Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation failed: shorter than minimum length of $MinSerialNumberLength characters" -LogLevel "Warning"
-    }
-    elseif ($UserInput -match '^[a-zA-Z0-9]+$') 
-    {
-        Write-Verbose "[$functionName] Serial number validation passed"
-        $returnValue.valid = $true
-        $returnValue.value = $UserInput
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation passed" -LogLevel "Debug"
-    }
-    else
-    {
-        Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Serial number validation failed: invalid format (non-alphanumeric characters)" -LogLevel "Warning"
+        'serialNumber'
+        {
+            Write-Verbose "[$functionName] Checking serial number length: $($UserInput.Length)"
+            if ($UserInput.Length -gt $MaxSerialNumberLength)
+            {
+                Write-Verbose "[$functionName] Serial number exceeds maximum length of $MaxSerialNumberLength characters"
+                Write-Host "Serial number cannot exceed $MaxSerialNumberLength characters." -ForegroundColor Red
+                return $returnValue
+            }
+            elseif ($UserInput.Length -lt $MinSerialNumberLength)
+            {
+                Write-Verbose "[$functionName] Serial number is shorter than minimum length of $MinSerialNumberLength characters"
+                Write-Host "Serial number must be at least $MinSerialNumberLength characters." -ForegroundColor Red
+                return $returnValue
+            }
+            elseif ($UserInput -match '^[a-zA-Z0-9-\s]+$') 
+            {
+                Write-Verbose "[$functionName] Serial number validation passed"
+                $returnValue.value = $UserInput
+                $returnValue.valid = $true
+                return $returnValue
+            }
+            else
+            {
+                Write-Host 'Invalid serial number format. Only alphanumeric characters are allowed.' -ForegroundColor Red
+                return $returnValue
+            }
+        }
+        'userName'
+        {
+            Write-Verbose "[$functionName] Checking user name length: $($UserInput.Length)"
+            if ($UserInput.Length -gt $MaxUserNameLength -or $UserInput.Length -lt $minUsernameLength -or $UserInput -match '^\d' -and $null -ne $UserInput)
+            {
+                Write-Verbose "[$functionName] Username exceeds maximum length of $MaxUserNameLength characters"
+                Write-Host "Username needs to have a minimum of $minUsernameLength characters and cannot exceed $MaxUserNameLength characters." -ForegroundColor Red
+                Write-Host "The username cannot start with a digit." -ForegroundColor Red
+                return $returnValue
+            }
+            $normalizedUserInput = NormalizeUserName -UserName $UserInput -Settings $settings
+            
+            # Basic email format check
+            if ($normalizedUserInput -match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+            {
+                Write-Verbose "[$functionName] Username validation passed"
+                $returnValue.valid = $true
+                $returnValue.value = $normalizedUserInput
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Username validation failed - must be a valid email format (e.g., user@$domain)"
+                Write-Host "Invalid user name format. Please enter a valid email address (e.g., user@$domain)." -ForegroundColor Red
+                return $returnValue
+            }
+        }
+        default
+        {
+            Write-Verbose "[$functionName] Unknown validation type: '$type'"
+            Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
+            return $returnValue
+        }
     }
     Write-Verbose "[$functionName] Returning validation result: $($returnValue.valid)"
     Write-Verbose "[$functionName] Returning validation value: $($returnValue.value)"
