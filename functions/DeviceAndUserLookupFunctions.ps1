@@ -1566,6 +1566,6 @@ function GetBitLockerRecoveryKey()
         Write-Host "Key ID: $($latestKeyInfo.id)" -ForegroundColor Yellow
     }
     return "`n"
-    return
-}"`n"
 }
+
+
