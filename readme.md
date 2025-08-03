@@ -92,6 +92,11 @@ When you launch the application, you'll see the main menu with the following opt
 2. **Check device status**
    - **Lookup device by Serial Number**: Enter a device serial number to check its status
    - **Lookup device by User**: Find devices associated with a specific user
+   - **Check next user readiness state**: Comprehensive assessment of device readiness for next user assignment
+     - Validates all device requirements and configuration
+     - Identifies multiple issues simultaneously
+     - Provides specific remediation actions for each issue
+     - Checks Autopilot profile assignment, enrollment state, RAM requirements, user associations, and network connectivity
 
 3. **Autopilot menu**
    - **Quick Import device into Autopilot**: Import current device using default settings

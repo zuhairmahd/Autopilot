@@ -1030,79 +1030,112 @@ function AssessDeviceState()
                     Write-Host $memoryMessage
                     $readinessState = $deviceStates.ready 
                     $action = $deviceActions.none
-                    $device = $enrollmentState.managedDevice.device.id
+                    $device = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.id) { 
+                        $enrollmentState.managedDevice.device.id 
+                    } elseif ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.id) { 
+                        $enrollmentState.autopilot.device.id 
+                    } else { 
+                        $null 
+                    }
+                    $allIssues = @()  # No issues when ready
+                    $allActions = @($deviceActions.none)
                 }
                 else
                 {
                     Write-Host "The device is not ready for the next user."
                     Write-Host "See below for more information."
-                    #let us explain to the user what the problem is.
+                    
+                    # Initialize arrays to collect all issues and actions
+                    $allIssues = @()
+                    $allActions = @()
+                    $actionsPriority = @{}  # To track action priorities
+                    
+                    # Set base readiness state and device ID
+                    $readinessState = $deviceStates.notReady
+                    $device = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.id) { 
+                        $enrollmentState.managedDevice.device.id 
+                    } elseif ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.id) { 
+                        $enrollmentState.autopilot.device.id 
+                    } else { 
+                        $null 
+                    }
+                    
+                    # Check all possible issues and collect them
                     if ($autopilotReadiness.CorrectProfile -eq $false)
                     {
-                        Write-Host "The device is not assigned to the correct autopilot profile."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
-                        $device = $enrollmentState.managedDevice.device.id
+                        $issue = "The device is not assigned to the correct autopilot profile."
+                        Write-Host $issue
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
                     if ($autopilotReadiness.ProfileAssigned -eq $false)
                     {
-                        Write-Host "The device is not assigned to an autopilot profile."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
-                        $device = $enrollmentState.managedDevice.device.id
+                        $issue = "The device is not assigned to an autopilot profile."
+                        Write-Host $issue
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
                     if ($autopilotReadiness.RemediationStateGood -eq $false)
                     {
-                        Write-Host "The device has a remediation state that is not valid."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
-                        $device = $enrollmentState.managedDevice.device.id
+                        $issue = "The device has a remediation state that is not valid."
+                        Write-Host $issue
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
                     if ($autopilotReadiness.EnrollmentStateGood -eq $false)
                     {
-                        Write-Host "The device failed enrollment."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
-                        $device = $enrollmentState.managedDevice.device.id
+                        $issue = "The device failed enrollment."
+                        Write-Host $issue
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
                     if ($managedDeviceReadiness.OrphanDevice -eq $true)
                     {
-                        Write-Host "The device is an orphan device."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
-                        $device = $enrollmentState.managedDevice.device.id
+                        $issue = "The device is an orphan device."
+                        Write-Host $issue
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
                     if ($managedDeviceReadiness.CorrectRam -eq $false)
                     {
-                        Write-Host "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                        $issue = "The device has only $($enrollmentState.managedDevice.memory)GB of RAM, which is below the $($settings.MinimumDevicePhysicalMemoryInGB)GB desired requirement."
+                        Write-Host $issue
                         Write-Host "Contact Hardware and Logistics."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.contactAdmin
-                        $device = $enrollmentState.managedDevice.device.id
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.contactAdmin] = 3
                     }
                     if ($managedDeviceReadiness.HasUser)
                     {
-                        Write-Host "The managed device is associated with a user."
+                        $issue = "The managed device is associated with a user."
+                        Write-Host $issue
                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.WipeOrClean
-                        $device = $enrollmentState.managedDevice.device.id
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
                     }
                     if ($managedDeviceReadiness.ValidUser -eq $false)
                     {
-                        Write-Host "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
+                        $issue = "The device appears to be associated with an SPN or a user that no longer exists in Azure AD."
+                        Write-Host $issue
                         Write-Host "It is advisable to remove the managed device from Intune prior to having the user enroll the device."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.WipeOrClean
-                        $device = $enrollmentState.managedDevice.device.id
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
                     }
                     if ($deviceLastContactDate.withinThreshold -eq $false)
                     {
-                        Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
+                        $issue = "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
+                        Write-Host $issue
                         Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
-                        $readinessState = $deviceStates.notReady
-                        $action = $deviceActions.connectToNetwork
-                        $device = $enrollmentState.managedDevice.device.id
+                        $allIssues += $issue
+                        $actionsPriority[$deviceActions.connectToNetwork] = 1  # Highest priority - fix connectivity first
+                    }
+                    
+                    # Determine the primary action based on priority (lower number = higher priority)
+                    if ($actionsPriority.Count -gt 0) {
+                        $action = ($actionsPriority.GetEnumerator() | Sort-Object Value)[0].Key
+                        $allActions = $actionsPriority.Keys
+                    } else {
+                        $action = $deviceActions.none
+                        $allActions = @($deviceActions.none)
                     }
                 }
             }
@@ -1112,7 +1145,13 @@ function AssessDeviceState()
                 Write-Host "You may want to contact an Intune admin."
                 $readinessState = $deviceStates.notReady
                 $action = $deviceActions.contactAdmin
-                $device = $enrollmentState.managedDevice.device.id
+                $device = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.id) { 
+                    $enrollmentState.managedDevice.device.id 
+                } else { 
+                    $null 
+                }
+                $allIssues = @("The device is not registered in Autopilot.")
+                $allActions = @($deviceActions.contactAdmin)
             }
         }
         'TroubleShooting'
@@ -1121,15 +1160,31 @@ function AssessDeviceState()
             Write-Host "Troubleshooting the device..."
         }
     }        
+    # Ensure variables are initialized for all code paths
+    if (-not $allIssues) { $allIssues = @() }
+    if (-not $allActions) { $allActions = @($action) }
+    
+    # Build comprehensive return object (maintains backward compatibility)
     $returnValue.Add('ReadinessState', $readinessState)
-    $returnValue.Add('Action', $action)
+    $returnValue.Add('Action', $action)  # Primary action (backward compatibility)
     $returnValue.Add('Device', $device)
+    
+    # Enhanced information for comprehensive issue reporting
+    $returnValue.Add('AllIssues', $allIssues)  # Array of all issues found
+    $returnValue.Add('AllActions', $allActions)  # Array of all recommended actions
+    $returnValue.Add('IssueCount', $allIssues.Count)  # Number of issues found
+    $returnValue.Add('IsReady', ($readinessState -eq $deviceStates.ready))  # Boolean readiness check
+    
     Write-Verbose "[$functionName] Returning readiness state: $readinessState"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning readiness state: $readinessState" -LogLevel "Information"
-    Write-Verbose "[$functionName] Returning action: $action"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning action: $action" -LogLevel "Information"
+    Write-Verbose "[$functionName] Returning primary action: $action"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning primary action: $action" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning device: $device"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning device: $device" -LogLevel "Information"
+    Write-Verbose "[$functionName] Found $($allIssues.Count) issues: $($allIssues -join '; ')"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($allIssues.Count) issues: $($allIssues -join '; ')" -LogLevel "Information"
+    Write-Verbose "[$functionName] All actions needed: $($allActions -join '; ')"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "All actions needed: $($allActions -join '; ')" -LogLevel "Information"
     return $returnValue
 }
 
@@ -1441,36 +1496,133 @@ function GetNextUserReadinessReport()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
         $enrollmentState
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Host "`nChecking next user readiness state for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-    $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
-    Write-Verbose "[$functionName] Device assessment state: $DeviceAssessmentState"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
+    
+    # Input validation
+    if (-not $enrollmentState) {
+        Write-Host "Error: No enrollment state provided" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No enrollment state provided" -LogLevel "Error"
+        return @{
+            ReadinessState = 'Error'
+            Action = $deviceActions.contactAdmin
+            Device = $null
+            AllIssues = @("No enrollment state provided")
+            AllActions = @($deviceActions.contactAdmin)
+            IssueCount = 1
+            IsReady = $false
+        }
+    }
+    
+    # Extract device information from enrollment state with error handling
+    try {
+        $deviceName = if ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.deviceName) { 
+            $enrollmentState.managedDevice.device.deviceName 
+        } elseif ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.displayName) { 
+            $enrollmentState.autopilot.device.displayName 
+        } else { 
+            "Unknown Device" 
+        }
+        
+        $serialNumber = if ($enrollmentState.autopilot -and $enrollmentState.autopilot.device.serialNumber) { 
+            $enrollmentState.autopilot.device.serialNumber 
+        } elseif ($enrollmentState.managedDevice -and $enrollmentState.managedDevice.device.serialNumber) { 
+            $enrollmentState.managedDevice.device.serialNumber 
+        } else { 
+            "Unknown Serial" 
+        }
+    }
+    catch {
+        Write-Host "Warning: Could not extract device information from enrollment state" -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Could not extract device information: $($_.Exception.Message)" -LogLevel "Warning"
+        $deviceName = "Unknown Device"
+        $serialNumber = "Unknown Serial"
+    }
+    
+    Write-Host "`nChecking next user readiness state for: $deviceName ($serialNumber)" -ForegroundColor Yellow
+    
+    # Call AssessDeviceState with error handling
+    try {
+        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+        if (-not $DeviceAssessmentState) {
+            throw "AssessDeviceState returned null or empty result"
+        }
+    }
+    catch {
+        Write-Host "Error during device assessment: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error during device assessment: $($_.Exception.Message)" -LogLevel "Error"
+        return @{
+            ReadinessState = 'Error'
+            Action = $deviceActions.contactAdmin
+            Device = $null
+            AllIssues = @("Error during device assessment: $($_.Exception.Message)")
+            AllActions = @($deviceActions.contactAdmin)
+            IssueCount = 1
+            IsReady = $false
+        }
+    }
+    
+    Write-Verbose "[$functionName] Device assessment state completed successfully"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assessment state completed" -LogLevel "Information"
+    
+    # Display comprehensive readiness information
     if ($DeviceAssessmentState.ReadinessState -eq $deviceStates.ready)
     {
-        Write-Host $DeviceAssessmentState.ready
-        Write-Host $DeviceAssessmentState.action
+        Write-Host "`n✓ " -ForegroundColor Green -NoNewline
+        Write-Host $deviceStates.ready -ForegroundColor Green
+        Write-Host "Primary Action: " -NoNewline
+        Write-Host $DeviceAssessmentState.Action -ForegroundColor Green
         return $DeviceAssessmentState
     }
     elseif ($DeviceAssessmentState.ReadinessState -eq $deviceStates.notReady)
     {
-        Write-Host $deviceStates.notReady
-        Write-Host $DeviceAssessmentState.action
+        Write-Host "`n✗ " -ForegroundColor Red -NoNewline
+        Write-Host $deviceStates.notReady -ForegroundColor Red
+        
+        # Display all issues found
+        if ($DeviceAssessmentState.AllIssues -and $DeviceAssessmentState.AllIssues.Count -gt 0) {
+            Write-Host "`nIssues Found ($($DeviceAssessmentState.IssueCount)):" -ForegroundColor Yellow
+            for ($i = 0; $i -lt $DeviceAssessmentState.AllIssues.Count; $i++) {
+                Write-Host "  $($i + 1). $($DeviceAssessmentState.AllIssues[$i])" -ForegroundColor Red
+            }
+        }
+        
+        # Display primary recommended action
+        Write-Host "`nPrimary Action Required:" -ForegroundColor Yellow
+        Write-Host "  $($DeviceAssessmentState.Action)" -ForegroundColor Cyan
+        
+        # Display all recommended actions if multiple
+        if ($DeviceAssessmentState.AllActions -and $DeviceAssessmentState.AllActions.Count -gt 1) {
+            Write-Host "`nAll Actions Needed:" -ForegroundColor Yellow
+            $DeviceAssessmentState.AllActions | ForEach-Object {
+                Write-Host "  • $_" -ForegroundColor Cyan
+            }
+        }
+        
+        # Provide specific guidance based on primary action
         switch ($DeviceAssessmentState.Action)
         {
             $deviceActions.contactAdmin
             {
+                Write-Host "`nGuidance: " -ForegroundColor Yellow -NoNewline
                 Write-Host "Please contact your Intune administrator for assistance." -ForegroundColor Red
             }
             $deviceActions.WipeOrClean
             {
+                Write-Host "`nGuidance: " -ForegroundColor Yellow -NoNewline
                 Write-Host "You may need to wipe or clean the device before it can be used by the next user." -ForegroundColor Red
+            }
+            $deviceActions.connectToNetwork
+            {
+                Write-Host "`nGuidance: " -ForegroundColor Yellow -NoNewline
+                Write-Host "Connect the device to the network and allow it to sync with Intune." -ForegroundColor Red
             }
             $deviceActions.none
             {
+                Write-Host "`nGuidance: " -ForegroundColor Yellow -NoNewline
                 Write-Host "No action required at this time." -ForegroundColor Green
             }
         }
@@ -1478,8 +1630,21 @@ function GetNextUserReadinessReport()
     }
     else
     {
+        Write-Host "`n⚠ " -ForegroundColor Yellow -NoNewline
         Write-Host "An unexpected readiness state was encountered: $($DeviceAssessmentState.ReadinessState)" -ForegroundColor Red
-        return $null
+        Write-Verbose "[$functionName] Unexpected readiness state encountered. Assessment state: $($DeviceAssessmentState | ConvertTo-Json -Depth 3)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Unexpected readiness state: $($DeviceAssessmentState.ReadinessState)" -LogLevel "Error"
+        
+        # Return a proper error object instead of null for better error handling
+        return @{
+            ReadinessState = 'Error'
+            Action = $deviceActions.contactAdmin
+            Device = $null
+            AllIssues = @("Unexpected readiness state encountered: $($DeviceAssessmentState.ReadinessState)")
+            AllActions = @($deviceActions.contactAdmin)
+            IssueCount = 1
+            IsReady = $false
+        }
     }
 }
 

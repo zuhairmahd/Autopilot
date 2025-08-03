@@ -47,6 +47,7 @@ Configuration merging is handled by the `MergeSettings` function in `SettingsHel
 |--------|---------|---------------|
 | **AutopilotDeviceFunctions.ps1** | Device management, Autopilot enrollment | `AddCorporateDeviceIdentifier`, `DeleteCorporateDeviceIdentifier` |
 | **DeviceAndUserLookupFunctions.ps1** | User/device queries, credential access | `GetDeviceByUser`, `GetUserInput` |
+| **DeviceReportingFunctions.ps1** | Device assessment and readiness reporting | `GetNextUserReadinessReport`, `AssessDeviceState` |
 | **GraphAPIFunctions.ps1** | Microsoft Graph API integration | `Get-AuthToken`, `Invoke-GraphAPIRequest` |
 | **MenuFunctions.ps1** | Interactive UI navigation system | `NewMenu`, `AddMenuItem`, `ShowMenu` |
 | **SettingsHelperFunctions.ps1** | Configuration management | `MergeSettings`, `Update-GlobalSetting` |
@@ -400,6 +401,48 @@ GetDeviceByUser -AccessToken <String> -userName <String>
 - Retrieves devices associated with a specific user
 - Returns device information object or navigation command
 
+#### DeviceReportingFunctions.ps1
+
+**GetNextUserReadinessReport**
+```powershell
+GetNextUserReadinessReport -enrollmentState <Object>
+```
+- **Enhanced in v2.0**: Comprehensive device readiness assessment for next user assignment
+- Validates device against all requirements simultaneously
+- **Key Improvements**:
+  - **Multi-Issue Detection**: Captures ALL device issues, not just the first one found
+  - **Comprehensive Return Object**: Includes detailed issue lists and recommended actions
+  - **Error Handling**: Robust input validation and error recovery
+  - **Enhanced Display**: User-friendly formatting with visual indicators and priorities
+- **Return Object Properties**:
+  - `ReadinessState`: Overall readiness state (ready/notReady/error)
+  - `Action`: Primary recommended action (backward compatible)
+  - `Device`: Device identifier
+  - `AllIssues`: Array of all issues found
+  - `AllActions`: Array of all recommended actions
+  - `IssueCount`: Number of issues detected
+  - `IsReady`: Boolean readiness indicator
+- **Validation Checks**:
+  - Autopilot profile assignment and correctness
+  - Device enrollment state and remediation status
+  - RAM requirements and hardware specifications  
+  - User associations and validity
+  - Network connectivity and last contact date
+- **Action Prioritization**: Uses intelligent priority system to determine primary action when multiple issues exist
+
+**AssessDeviceState**
+```powershell
+AssessDeviceState -enrollmentState <Object> -AssessmentType <String> [-settings <Object>]
+```
+- Core device assessment engine supporting multiple assessment types
+- **Enhanced Logic**: Collects all issues simultaneously instead of overwriting previous findings
+- **Assessment Types**:
+  - `NextUserReadiness`: Comprehensive readiness validation
+  - `PropperEnrollmentVerification`: Enrollment status verification
+  - `TroubleShooting`: Device troubleshooting assistance
+- **Issue Collection**: Uses priority-based action determination for comprehensive reporting
+- Returns structured assessment object with all findings
+
 #### GraphAPIFunctions.ps1
 
 **Get-AuthToken**
@@ -638,6 +681,7 @@ This allows the same function to behave differently based on how it was accessed
 /functions/
 ├── AutopilotDeviceFunctions.ps1      # Device management
 ├── DeviceAndUserLookupFunctions.ps1  # User/device queries
+├── DeviceReportingFunctions.ps1      # Device assessment and readiness reporting
 ├── GraphAPIFunctions.ps1             # API integration
 ├── MenuFunctions.ps1                 # UI navigation
 ├── SettingsHelperFunctions.ps1       # Configuration
