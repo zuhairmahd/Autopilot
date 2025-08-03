@@ -1010,7 +1010,7 @@ function AssessDeviceState()
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
                 $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
-                if ($deviceLastContactDate.withinThreshhold)
+                if ($deviceLastContactDate.withinThreshold)
                 {
                     Write-Host "The device last contacted Intune on $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone), $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
                     Write-Verbose "[$functionName] Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
@@ -1024,7 +1024,8 @@ function AssessDeviceState()
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 Write-Host "Within threshhold: $($deviceLastContactDate.withinThreshhold)"
-                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false) -and $deviceLastContactDate.withinThreshhold)
+                Write-Host "Within threshold: $($deviceLastContactDate.withinThreshold)"
+                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false) -and $deviceLastContactDate.withinThreshold)
                 {
                     Write-Host "The device is ready for the next user."
                     Write-Host $memoryMessage
@@ -1096,7 +1097,7 @@ function AssessDeviceState()
                         $action = $deviceActions.WipeOrClean
                         $device = $enrollmentState.managedDevice.device.id
                     }
-                    if ($deviceLastContactDate.withinThreshhold -eq $false)
+                    if ($deviceLastContactDate.withinThreshold -eq $false)
                     {
                         Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
                         Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
@@ -1566,7 +1567,8 @@ function GetLastDeviceContactDate()
     
     $functionName = $MyInvocation.MyCommand.Name
     $goodContactThreshhold = $settings.deviceContactThreshholdInDays
-    $withinThreshhold = $false
+    $goodContactThreshold = $settings.deviceContactThresholdInDays
+    $withinThreshold = $false
     Write-Verbose "[$functionName] Getting last device contact date."
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting last device contact date." -LogLevel "Verbose"
     $contactDates = @{}
@@ -1614,7 +1616,18 @@ function GetLastDeviceContactDate()
         Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshhold days."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshhold days." -LogLevel "Information"
     }
-    $contactDates.add('withinThreshhold', $withinThreshhold)
+    if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
+    {
+        Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshold days."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshold days." -LogLevel "Information"
+        $withinThreshold = $true
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshold days." -LogLevel "Information"
+    }
+    $contactDates.add('withinThreshold', $withinThreshold)
     Write-Verbose "[$functionName] Contact dates retrieved successfully."
     return $contactDates
 }

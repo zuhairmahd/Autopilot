@@ -47,7 +47,9 @@ function ProcessSerialNumber()
         $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
         if (-not ($deviceLastContactDate.withinThreshhold))
         {
-            Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThreshholdInDays) days." -ForegroundColor Red
+        if (-not ($deviceLastContactDate.withinThreshold))
+        {
+            Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
             Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
             Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
             Write-Verbose "[$functionName] Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)"
@@ -59,6 +61,24 @@ function ProcessSerialNumber()
         elseif ($deviceLastContactDate.withinThreshhold)
         {
             Write-Host "The device contacted Intune $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago, which is within the last $contactThreshhold days." -ForegroundColor Green
+            Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+            Write-Verbose "[$functionName] Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+        $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
+        if (-not ($deviceLastContactDate.withinThreshold))
+        {
+            Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
+            Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
+            Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+            Write-Verbose "[$functionName] Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)" -LogLevel "Information"
+            Write-Host "Press any key to continue"
+            $null = Read-Host
+        }
+        elseif ($deviceLastContactDate.withinThreshold)
+        {
+            Write-Host "The device contacted Intune $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago, which is within the last $contactThreshold days." -ForegroundColor Green
             Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
             Write-Verbose "[$functionName] Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
