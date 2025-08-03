@@ -218,7 +218,6 @@ function ProcessSerialNumber()
                     Write-Verbose "[$scriptName] Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
                     $global:bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
-                    $bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                     if ($bitlockerKey -ne "`n")
                     {
                         try
@@ -338,31 +337,6 @@ function GetVMAutopilotDeviceIdBySerialNumber()
         Write-Verbose "[$functionName] Filtered device serial number: $filteredDeviceSerialNumber"
         if ($serialNumber -match '\s')
         {
-            $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
-            $numberOfDaysSinceLastContact = (New-TimeSpan -Start $deviceLastContactDate.latestContactDate -End (Get-Date)).Days
-            if ($deviceLastContactDate.latestContactDate -lt (Get-Date).AddDays(-$contactthreshold))
-            {
-                Write-Host "It has been more than $numberOfDaysSinceLastContact days  since the device has contacted Intune, which is more than $contactthreshold days." -ForegroundColor Red
-                Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
-                Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-                Write-Verbose "[$functionName] Number of days since last contact: $numberOfDaysSinceLastContact"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $numberOfDaysSinceLastContact" -LogLevel "Information"
-                Write-Host "Press any key to continue"
-                $null = Read-Host
-            }
-            elseif ($deviceLastContactDate.latestContactDate -ge (Get-Date).AddDays(-$contactthreshold))
-            {
-                Write-Host "The device contacted Intune $numberOfDaysSinceLastContact days ago, which is within the last $contactthreshold days." -ForegroundColor Green
-                Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-                Write-Verbose "[$functionName] Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-            }
-            else
-            {
-                Write-Host "The last contact date could not be determined."
-            }
-            Write-Verbose "[$functionName] Also filtering input serial number $serialNumber since it contains spaces."
             $serialNumber = $serialNumber -replace '\s', ''
             Write-Verbose "[$functionName] Filtered input serial number: $serialNumber"
         }
@@ -1592,4 +1566,6 @@ function GetBitLockerRecoveryKey()
         Write-Host "Key ID: $($latestKeyInfo.id)" -ForegroundColor Yellow
     }
     return "`n"
+    return
+}"`n"
 }
