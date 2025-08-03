@@ -188,7 +188,7 @@ function ProcessSerialNumber()
                     try
                     {
                         Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enrollmentState.managedDevice.LAPS.credentials[0].passwordBase64)))
-                        Write-Host "`LAPS password copied to clipboard." -ForegroundColor Green
+                        Write-Host "`n LAPS password copied to clipboard." -ForegroundColor Green
                     }
                     catch
                     {
@@ -205,12 +205,12 @@ function ProcessSerialNumber()
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
                     Write-Verbose "[$scriptName] Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
-                    $bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
+                    $global:bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                     if ($bitlockerKey -ne "`n")
                     {
                         try
                         {
-                            Set-Clipboard -Value ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($enrollmentState.managedDevice.LAPS.credentials[0].passwordBase64)))
+                            Set-Clipboard -Value $bitlockerKey
                             Write-Host "`nBitlocker key copied to clipboard." -ForegroundColor Green
                         }
                         catch
@@ -218,7 +218,6 @@ function ProcessSerialNumber()
                             Write-Host "`nFailed to copy Bitlocker key to clipboard. Please check your permissions." -ForegroundColor Red
                             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy Bitlocker key to clipboard. Error: $_" -LogLevel "Error"
                         }
-                
                     }
                 }
             }

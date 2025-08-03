@@ -1594,6 +1594,7 @@ function GetLastDeviceContactDate()
         $contactDates.add('deviceRegistrationDateTime', $enrollmentState.device.registrationDateTime)
     }
     #Figure out the latest contact date
+    
     $latestContactDate = $contactDates.Values | Sort-Object -Descending | Select-Object -First 1
     Write-Verbose "[$functionName] Latest contact date: $latestContactDate"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Latest contact date: $latestContactDate" -LogLevel "Information"
