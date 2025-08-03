@@ -1024,7 +1024,6 @@ function AssessDeviceState()
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 Write-Host "Within threshold: $($deviceLastContactDate.withinThreshold)"
-                Write-Host "Within threshold: $($deviceLastContactDate.withinThreshold)"
                 if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false) -and $deviceLastContactDate.withinThreshold)
                 {
                     Write-Host "The device is ready for the next user."
