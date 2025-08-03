@@ -29,8 +29,17 @@ try {
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $rootDir = Split-Path -Parent $scriptDir
     
-    # Load required functions
-    . "$rootDir\functions\DeviceReportingFunctions.ps1"
+    # Load test helper functions
+    . "$scriptDir\test-helper.ps1"
+    
+    # Load all functions using the helper
+    $loadSuccess = Load-AllFunctions -RootPath $rootDir
+    
+    if (-not $loadSuccess) {
+        throw "Failed to load functions"
+    }
+    
+    Write-TestResult "Functions loaded successfully" -Success $true
     
     # Load settings and constants (simulate)
     $loadedStrings = @{
@@ -51,10 +60,10 @@ try {
     $global:deviceActions = $loadedStrings.deviceActions
     $global:LogFile = "$env:TEMP\test-checknextuserreadiness.log"
     
-    Write-Host "✓ Test environment setup complete" -ForegroundColor Green
+    Write-Host "[PASS] Test environment setup complete" -ForegroundColor Green
 }
 catch {
-    Write-Host "✗ Failed to set up test environment: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Failed to set up test environment: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
@@ -213,17 +222,17 @@ try {
         $result.Action -eq $deviceActions.none -and
         $result.IsReady -eq $true -and
         $result.IssueCount -eq 0) {
-        Write-Host "✓ Ready device test passed" -ForegroundColor Green
+        Write-Host "[PASS] Ready device test passed" -ForegroundColor Green
         $testResults += @{ Test = "Ready Device"; Result = "Pass" }
     } else {
-        Write-Host "✗ Ready device test failed" -ForegroundColor Red
+        Write-Host "[FAIL] Ready device test failed" -ForegroundColor Red
         Write-Host "  Expected: Ready=true, Issues=0, Action=none" -ForegroundColor Red
         Write-Host "  Actual: Ready=$($result.IsReady), Issues=$($result.IssueCount), Action=$($result.Action)" -ForegroundColor Red
         $testResults += @{ Test = "Ready Device"; Result = "Fail" }
     }
 }
 catch {
-    Write-Host "✗ Ready device test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Ready device test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{ Test = "Ready Device"; Result = "Error: $($_.Exception.Message)" }
 }
 
@@ -237,18 +246,18 @@ try {
         $result.IssueCount -gt 1 -and
         $result.AllIssues.Count -gt 1 -and
         $result.IsReady -eq $false) {
-        Write-Host "✓ Multiple issues test passed - Found $($result.IssueCount) issues" -ForegroundColor Green
+        Write-Host "[PASS] Multiple issues test passed - Found $($result.IssueCount) issues" -ForegroundColor Green
         Write-Host "  Issues: $($result.AllIssues -join '; ')" -ForegroundColor Gray
         $testResults += @{ Test = "Multiple Issues"; Result = "Pass" }
     } else {
-        Write-Host "✗ Multiple issues test failed" -ForegroundColor Red
+        Write-Host "[FAIL] Multiple issues test failed" -ForegroundColor Red
         Write-Host "  Expected: Multiple issues captured" -ForegroundColor Red
         Write-Host "  Actual: Issues=$($result.IssueCount), Ready=$($result.IsReady)" -ForegroundColor Red
         $testResults += @{ Test = "Multiple Issues"; Result = "Fail" }
     }
 }
 catch {
-    Write-Host "✗ Multiple issues test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Multiple issues test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{ Test = "Multiple Issues"; Result = "Error: $($_.Exception.Message)" }
 }
 
@@ -262,15 +271,15 @@ try {
         $result.Action -eq $deviceActions.contactAdmin -and
         $result.IssueCount -eq 1 -and
         $result.AllIssues[0] -like "*not registered in Autopilot*") {
-        Write-Host "✓ Not in Autopilot test passed" -ForegroundColor Green
+        Write-Host "[PASS] Not in Autopilot test passed" -ForegroundColor Green
         $testResults += @{ Test = "Not in Autopilot"; Result = "Pass" }
     } else {
-        Write-Host "✗ Not in Autopilot test failed" -ForegroundColor Red
+        Write-Host "[FAIL] Not in Autopilot test failed" -ForegroundColor Red
         $testResults += @{ Test = "Not in Autopilot"; Result = "Fail" }
     }
 }
 catch {
-    Write-Host "✗ Not in Autopilot test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Not in Autopilot test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{ Test = "Not in Autopilot"; Result = "Error: $($_.Exception.Message)" }
 }
 
@@ -282,12 +291,12 @@ try {
     if ($result.ReadinessState -eq 'Error' -and 
         $result.IssueCount -eq 1 -and
         $result.IsReady -eq $false) {
-        Write-Host "✗ Null enrollment state test unexpectedly passed - function should have thrown" -ForegroundColor Red
+        Write-Host "[FAIL] Null enrollment state test unexpectedly passed - function should have thrown" -ForegroundColor Red
         $testResults += @{ Test = "Error Handling"; Result = "Fail - Should have thrown" }
     }
 }
 catch {
-    Write-Host "✓ Error handling test passed - function properly validates input" -ForegroundColor Green
+    Write-Host "[PASS] Error handling test passed - function properly validates input" -ForegroundColor Green
     $testResults += @{ Test = "Error Handling"; Result = "Pass" }
 }
 
@@ -307,17 +316,17 @@ try {
                            $result.Contains('IsReady')
     
     if ($hasRequiredProperties -and $hasEnhancedProperties) {
-        Write-Host "✓ Backward compatibility test passed" -ForegroundColor Green
+        Write-Host "[PASS] Backward compatibility test passed" -ForegroundColor Green
         $testResults += @{ Test = "Backward Compatibility"; Result = "Pass" }
     } else {
-        Write-Host "✗ Backward compatibility test failed" -ForegroundColor Red
+        Write-Host "[FAIL] Backward compatibility test failed" -ForegroundColor Red
         Write-Host "  Required properties: $hasRequiredProperties" -ForegroundColor Red
         Write-Host "  Enhanced properties: $hasEnhancedProperties" -ForegroundColor Red
         $testResults += @{ Test = "Backward Compatibility"; Result = "Fail" }
     }
 }
 catch {
-    Write-Host "✗ Backward compatibility test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Backward compatibility test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{ Test = "Backward Compatibility"; Result = "Error: $($_.Exception.Message)" }
 }
 
@@ -334,9 +343,9 @@ foreach ($result in $testResults) {
 Write-Host "`nPassed: $passCount/$totalCount tests" -ForegroundColor $(if ($passCount -eq $totalCount) { "Green" } else { "Yellow" })
 
 if ($passCount -eq $totalCount) {
-    Write-Host "All tests passed! ✓" -ForegroundColor Green
+    Write-Host "All tests passed! [PASS]" -ForegroundColor Green
     exit 0
 } else {
-    Write-Host "Some tests failed. ✗" -ForegroundColor Red
+    Write-Host "Some tests failed. [FAIL]" -ForegroundColor Red
     exit 1
 }
