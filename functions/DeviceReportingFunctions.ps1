@@ -1565,7 +1565,6 @@ function GetLastDeviceContactDate()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $goodContactthreshold = $settings.deviceContactthresholdInDays
     $goodContactThreshold = $settings.deviceContactThresholdInDays
     $withinThreshold = $false
     Write-Verbose "[$functionName] Getting last device contact date."
@@ -1595,7 +1594,6 @@ function GetLastDeviceContactDate()
         $contactDates.add('deviceRegistrationDateTime', $enrollmentState.device.registrationDateTime)
     }
     #Figure out the latest contact date
-    
     $latestContactDate = $contactDates.Values | Sort-Object -Descending | Select-Object -First 1
     Write-Verbose "[$functionName] Latest contact date: $latestContactDate"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Latest contact date: $latestContactDate" -LogLevel "Information"
@@ -1604,39 +1602,19 @@ function GetLastDeviceContactDate()
     Write-Verbose "[$functionName] Number of days since last contact: $numberOfDaysSinceLastContact"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $numberOfDaysSinceLastContact" -LogLevel "Information"
     $contactDates.add('numberOfDaysSinceLastContact', $numberOfDaysSinceLastContact)
-    if ($numberOfDaysSinceLastContact -lt $goodContactthreshold)
+    if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
     {
-        Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactthreshold days."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactthreshold days." -LogLevel "Information"
+        Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshold days."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshold days." -LogLevel "Information"
         $withinThreshold = $true
     }
     else
     {
         Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
-        if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
-        {
-            Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshold days."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshold days." -LogLevel "Information"
-            $withinThreshold = $true
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshold days." -LogLevel "Information"
-        }
-        if ($numberOfDaysSinceLastContact -lt $goodContactThreshold)
-        {
-            Write-Verbose "[$functionName] Device contact date is within the threshold of $goodContactThreshold days."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is within the threshold of $goodContactThreshold days." -LogLevel "Information"
-            $withinThreshold = $true
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Device contact date is outside the threshold of $goodContactThreshold days."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshold days." -LogLevel "Information"
-        }
-        $contactDates.add('withinThreshold', $withinThreshold)
-        Write-Verbose "[$functionName] Contact dates retrieved successfully."
-        return $contactDates
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device contact date is outside the threshold of $goodContactThreshold days." -LogLevel "Information"
     }
+    $contactDates.add('withinThreshold', $withinThreshold)
+    Write-Verbose "[$functionName] Contact dates retrieved successfully."
+    return $contactDates
+}
 
