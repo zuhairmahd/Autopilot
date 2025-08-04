@@ -35,60 +35,31 @@ function Test-SettingsJsonExists()
     Write-Verbose "[$functionName] Ensuring settings.json exists: $SettingsFile"
     try
     {
-        if (Test-Path -Path $SettingsFile)
-        {
-            Write-Verbose "[$functionName] Settings file already exists: $SettingsFile"
-            Write-SafeLog "Settings file already exists: $SettingsFile" "Information"
-            return $true
-        }
-        
-        if (-not $Silent)
-        {
-            Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan
-            Write-Host "Creating default settings.json file..." -ForegroundColor White
-        }
-        
-        # Create comprehensive settings.json using ordered dictionary
-        $settings = [ordered]@{
-            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version        = "1.1.0.0"
-            auth           = [ordered]@{
-                Delegated           = $IsDelegated
+        # Define comprehensive default settings structure with correct property order
+        $defaultSettings = @{
+            description      = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+            version          = "1.3.0.0"
+            auth             = @{
+                delegated           = $IsDelegated
                 authType            = "PublicAuthFlow"
-                changePWOnNextStart = $false
+                changePwOnNextStart = $false
                 renewalLeadTime     = 5
-                NoSaveRefreshToken  = $false
-                SecureString        = $false
-                ForceNewToken       = $false
-                CacheType           = "Memory"
+                noSaveRefreshToken  = $false
+                secureString        = $false
+                forceNewToken       = $false
+                cacheType           = "Memory"
                 scope               = @(
                     "offline_access",
-                    "openid",
+                    "openid", 
                     "Device.ReadWrite.All",
                     "DeviceManagementApps.Read.All",
                     "DeviceManagementConfiguration.ReadWrite.All",
                     "DeviceManagementManagedDevices.PrivilegedOperations.All",
                     "DeviceManagementManagedDevices.ReadWrite.All",
-                    "DeviceManagementServiceConfig.ReadWrite.All",
-                    "BitlockerKey.Read.All",
-                    "User.Read.All"
+                    "DeviceManagementServiceConfig.ReadWrite.All"
                 )
             }
-            globalSettings = [ordered]@{
-                operatingSystem              = "Windows"
-                autoUpdate                   = $true
-                showLicenseBanner            = $true
-                deviceContactThresholdInDays = 30
-                testMode                     = $false
-                configFile                   = ".\.secrets\config.json"
-                maxWaitTime                  = "30"
-                maxUserMatchDisplay          = "10"
-                timeInSeconds                = "60"
-                Release                      = "auto"
-                Repo                         = "Github"
-                appMode                      = "full"
-            }
-            requiredScopes = @(
+            requiredScopes   = @(
                 @{
                     Scope     = "User.Read.All"
                     Reason    = "Required to read user profiles, group memberships, and registered devices."
@@ -163,24 +134,109 @@ function Test-SettingsJsonExists()
                     Endpoints = @()
                 },
                 @{
-                    Scope     = "offline_access"
-                    Reason    = "Standard scope that provides refresh tokens to maintain access when the user is not active."
-                    Endpoints = @()
+                    scope     = "DeviceManagementConfiguration.ReadWrite.All"
+                    reason    = "Required to create, update, and delete Intune device configuration policies."
+                    endpoints = @(
+                        "deviceManagement/deviceConfigurations"
+                    )
+                },
+                @{
+                    scope     = "DeviceManagementApps.Read.All"
+                    reason    = "Required to read application information in Intune."
+                    endpoints = @(
+                        "deviceAppManagement/mobileApps"
+                    )
+                },
+                @{
+                    scope     = "DeviceManagementManagedDevices.ReadWrite.All"
+                    reason    = "Required to create, update, and delete Intune managed device properties."
+                    endpoints = @(
+                        "deviceManagement/managedDevices"
+                    )
+                },
+                @{
+                    scope     = "DeviceManagementManagedDevices.PrivilegedOperations.All"
+                    reason    = "Required for privileged operations on managed devices, such as reading LAPS passwords."
+                    endpoints = @(
+                        "deviceManagement/managedDevices"
+                    )
+                },
+                @{
+                    scope     = "BitlockerKey.Read.All"
+                    reason    = "Required to read BitLocker recovery keys for all devices."
+                    endpoints = @(
+                        "informationProtection/bitlocker/recoveryKeys"
+                    )
+                },
+                @{
+                    scope     = "openid"
+                    reason    = "Standard scope required for user sign-in with OpenID Connect."
+                    endpoints = @()
+                },
+                @{
+                    scope     = "profile"
+                    reason    = "Standard scope to get basic user profile information during sign-in."
+                    endpoints = @()
+                },
+                @{
+                    scope     = "offline_access"
+                    reason    = "Standard scope that provides refresh tokens to maintain access when the user is not active."
+                    endpoints = @()
                 }
             )
-            domains        = [ordered]@{
-                $DomainName = [ordered]@{
+            menuItemsToInclude = @(
+                "Autopilot menu",
+                "Restart the device",
+                "Export Menu",
+                "Quick Import device into Autopilot (requires admin rights)",
+                "Custom import device into Autopilot (requires admin rights)",
+                "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
+                "Delete Corporate Device Identifier from Device Preparation (requires admin rights)",
+                "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)",
+                "Get device hash for manual upload to Autopilot (requires admin rights)",
+                "Download and install latest Windows updates(requires admin rights)",
+                "Check device Autopilot status",
+                "Change application settings",
+                "Change password and authentication information",
+                "Export Autopilot Devices",
+                "Export Imported Autopilot Devices",
+                "Export Managed Windows Devices",
+                "Export Unmanaged Windows Devices",
+                "Export device storage report",
+                "Export Application Assignments",
+                "Wipe Device",
+                "Clean Device",
+                "Restart Device",
+                "Show Device Health Status",
+                "Check next user readiness state"
+            )
+            globalSettings = @{
+                configFile                   = ".\.secrets\config.json"
+                maxWaitTime                  = "30"
+                showLicenseBanner            = $true
+                deviceContactThresholdInDays = 30
+                appMode                      = "full"
+                timeInSeconds                = "60"
+                maxUserMatchDisplay          = "10"
+                release                      = "master"
+                repo                         = "Github"
+                testMode                     = $false
+                operatingSystem              = "Windows"
+                autoUpdate                   = $true
+            }
+            domains        = @{
+                $DomainName = @{
                     groupsToInclude = @()
                     groupsToExclude = @()
-                    settings        = [ordered]@{
+                    settings        = @{
                         domain                          = $DomainName
                         deviceNamePrefix                = ""
                         operatingSystem                 = "Windows"
-                        MinUsernameLength               = 3
-                        MaxUserNameLength               = 50
-                        MaxSerialNumberLength           = 50
-                        MinSerialNumberLength           = 7
-                        MinimumDevicePhysicalMemoryInGB = 8
+                        minUsernameLength               = 3
+                        maxUserNameLength               = 50
+                        maxSerialNumberLength           = 50
+                        minSerialNumberLength           = 7
+                        minimumDevicePhysicalMemoryInGB = 8
                         maxNumberOfDevicesAllowed       = 15
                         preferredBrowser                = "Chrome"
                         privateSession                  = $false
@@ -188,14 +244,82 @@ function Test-SettingsJsonExists()
                             "-test",
                             "onmicrosoft.com"
                         )
-                        DesiredAutopilotProfiles        = @()
+                        desiredAutopilotProfiles        = @()
                     }
                 }
             }
         }
+
+        if (Test-Path -Path $SettingsFile)
+        {
+            Write-Verbose "[$functionName] Settings file exists, checking for missing default values: $SettingsFile"
+            Write-SafeLog "Settings file exists, checking for updates: $SettingsFile" "Information"
+            
+            try
+            {
+                # Load existing settings
+                $existingSettings = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
+                
+                # Convert JSON object to hashtable for merging
+                $existingHashtable = @{}
+                $existingSettings.PSObject.Properties | ForEach-Object {
+                    if ($_.Value -is [PSCustomObject])
+                    {
+                        $existingHashtable[$_.Name] = ConvertFrom-JsonToHashtable -JsonObject $_.Value
+                    }
+                    else
+                    {
+                        $existingHashtable[$_.Name] = $_.Value
+                    }
+                }
+                
+                # Merge defaults into existing configuration
+                $mergedSettings = Merge-ConfigurationDefaults -ExistingConfig $existingHashtable -DefaultConfig $defaultSettings
+                
+                # Convert back to JSON with proper ordering and save if changes were made
+                $mergedJson = ConvertTo-OrderedJson -InputObject $mergedSettings -Depth 10
+                $existingJson = Get-Content -Path $SettingsFile -Raw
+                
+                if ($mergedJson -ne $existingJson)
+                {
+                    Set-Content -Path $SettingsFile -Value $mergedJson -Encoding UTF8 -Force
+                    Write-Verbose "[$functionName] Updated settings.json with missing default values"
+                    Write-SafeLog "Updated settings.json with missing default values" "Information"
+                    
+                    if (-not $Silent)
+                    {
+                        Write-Host "Settings file updated with new default values." -ForegroundColor Green
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Settings file is up-to-date"
+                }
+                
+                return $true
+            }
+            catch
+            {
+                Write-Verbose "[$functionName] Error processing existing settings file: $($_.Exception.Message)"
+                Write-SafeLog "Error processing existing settings file: $($_.Exception.Message)" "Warning"
+                # Continue with creating new file as fallback
+            }
+        }
         
-        # Convert to JSON and write to file
-        $settingsJson = $settings | ConvertTo-Json -Depth 10
+        if (-not $Silent)
+        {
+            Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan
+            Write-Host "Creating default settings.json file..." -ForegroundColor White
+        }
+        
+        # File doesn't exist, create it with default settings
+        if (-not $Silent)
+        {
+            Write-Host "Creating default settings.json file..." -ForegroundColor White
+        }
+        
+        # Convert to JSON with proper ordering and write to file
+        $settingsJson = ConvertTo-OrderedJson -InputObject $defaultSettings -Depth 10
         Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
         Write-Verbose "[$functionName] Created comprehensive settings.json with requiredScopes"
         

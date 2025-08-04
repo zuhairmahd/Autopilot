@@ -303,7 +303,6 @@ function Invoke-JsonFileEncryption()
                 $null = ConvertFrom-Json $decryptedText -ErrorAction Stop
                 Write-Verbose "[$functionName] Decrypted content is valid JSON"
                 Write-Verbose "[$functionName] JSON validation successful"
-                Write-Verbose "[$functionName] Content preview: $($decryptedText.Substring(0, [Math]::Min(200, $decryptedText.Length)))"
             }
             catch
             {
@@ -623,53 +622,57 @@ function Invoke-JsonFileEncryption()
             try
             {
                 $aes.Dispose()
-                Write-Verbose "[$functionName] ✓ AES encryption object disposed successfully"
+                Write-Verbose "[$functionName] AES encryption object disposed successfully"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "AES encryption object disposed successfully" -LogLevel "Debug"
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing AES object: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] Warning: Error disposing AES object: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error disposing AES object: $($_.Exception.Message)" -LogLevel "Warning"
             }
         }
-                
         if ($null -ne $sha256)
         {
             try
             {
                 $sha256.Dispose()
-                Write-Verbose "[$functionName] ✓ SHA256 hash object disposed successfully"
+                Write-Verbose "[$functionName] SHA256 hash object disposed successfully"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "SHA256 hash object disposed successfully" -LogLevel "Debug"
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing SHA256 object: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] Warning: Error disposing SHA256 object: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error disposing SHA256 object: $($_.Exception.Message)" -LogLevel "Warning"
             }
         }
-                
         if ($null -ne $encryptor)
         {
             try
             {
                 $encryptor.Dispose()
-                Write-Verbose "[$functionName] ✓ Encryptor object disposed successfully"
+                Write-Verbose "[$functionName] Encryptor object disposed successfully"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Encryptor object disposed successfully" -LogLevel "Debug"
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing encryptor: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] Warning: Error disposing encryptor: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error disposing encryptor: $($_.Exception.Message)" -LogLevel "Warning"
             }
         }
-                
         if ($null -ne $decryptor)
         {
             try
             {
                 $decryptor.Dispose()
-                Write-Verbose "[$functionName] ✓ Decryptor object disposed successfully"
+                Write-Verbose "[$functionName] Decryptor object disposed successfully"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Decryptor object disposed successfully" -LogLevel "Debug"
             }
             catch
             {
-                Write-Verbose "[$functionName] ⚠️ Warning: Error disposing decryptor: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] Warning: Error disposing decryptor: $($_.Exception.Message)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error disposing decryptor: $($_.Exception.Message)" -LogLevel "Warning"
             }
         }
-                
         # Force garbage collection to clear sensitive data from memory
         Write-Verbose "[$functionName] Forcing garbage collection to clear sensitive data..."
         [System.GC]::Collect()
