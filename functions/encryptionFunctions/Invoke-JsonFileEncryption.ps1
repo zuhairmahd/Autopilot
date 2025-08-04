@@ -303,7 +303,6 @@ function Invoke-JsonFileEncryption()
                 $null = ConvertFrom-Json $decryptedText -ErrorAction Stop
                 Write-Verbose "[$functionName] Decrypted content is valid JSON"
                 Write-Verbose "[$functionName] JSON validation successful"
-                Write-Verbose "[$functionName] Content preview: $($decryptedText.Substring(0, [Math]::Min(200, $decryptedText.Length)))"
             }
             catch
             {
