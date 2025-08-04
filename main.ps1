@@ -306,10 +306,30 @@ else
 if (Test-Path -Path $InitFile)
 {
     Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
+    
+    # Ensure settings.json file has all required default values
+    Write-Verbose "[$scriptName] Checking settings.json for missing default values"
+    # Use domain if available, otherwise default to example.com
+    $domainForDefaults = if ($domain) { $domain } else { "example.com" }
+    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
+    if ($settingsUpdated)
+    {
+        Write-Verbose "[$scriptName] Settings file checked/updated successfully"
+    }
+    
+    # Ensure strings.json file has all required default values  
+    $stringsFile = "$PWD\strings.json"
+    Write-Verbose "[$scriptName] Checking strings.json for missing default values"
+    $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
+    if ($stringsUpdated)
+    {
+        Write-Verbose "[$scriptName] Strings file checked/updated successfully"
+    }
+    
     $global:globalSettings = @{}
     $global:localSettings = @{}
     
-    # Load the init file content
+    # Load the init file content (potentially updated with new defaults)
     $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
     
     # Load auth configuration from init file
