@@ -111,7 +111,7 @@ function AddCorporateDeviceIdentifier()
         $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
         $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
         $formattedIdentifier = ("$manufacturerEscaped,$modelEscaped,$serialEscaped" -replace '[^\w,]', '').ToUpper()
-        Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$manufacturerEscaped', Serial='$serialEscaped' (commas escaped)"
+        Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'SerialNumber')
