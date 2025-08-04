@@ -25,7 +25,7 @@ $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     foreach ($function in $functions)
     {
         Write-Verbose " [$scriptName] Importing function $function"
@@ -745,7 +745,7 @@ $lastRunFile = "$pwd\lastrun.json"
 $lastRun = Get-Content -Path $lastRunFile | ConvertFrom-Json
 $maintainCurrentVersion = $false
 $SettingsFile = "$pwd\settings.json"
-$functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Filter "*.ps1" | ForEach-Object { $_.FullName })
+$functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.json', 'strings.json', 'init.json') 
 $settingsVersion = (Get-Content -Path "$pwd\settings.json" | ConvertFrom-Json).version
 $stringsVersion = (Get-Content -Path "$pwd\strings.json" | ConvertFrom-Json).version
@@ -962,7 +962,7 @@ if (-not $CreateModule)
     Write-Verbose "[$scriptName] MergeFunctions returned: $mergeResult"
     if ($mergeResult -eq $true)
     {
-        Write-Host "Functions merged successfully to $mergeOutputFile"
+        Write-Host "$($functionsToMerge.count)  Functions merged successfully to $mergeOutputFile"
         Write-Host "Creating master script at $newscriptFile"
         #read the newscript into a variable.
         Write-Verbose "[$scriptName] Reading new script content into variable."

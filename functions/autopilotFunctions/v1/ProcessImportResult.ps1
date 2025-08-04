@@ -8,10 +8,8 @@ function ProcessImportResult()
         $returnValues
     )
     
+    $functionName = $MyInvocation.MyCommand.Name    
     Write-Verbose "[$functionName] Processing import result with status: $($device.state.deviceImportStatus)"
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Processing import result with status: $($device.state.deviceImportStatus)"
     if ($device.state.deviceImportStatus -eq 'complete')
     {
@@ -32,4 +30,3 @@ function ProcessImportResult()
         return $returnValues.deviceImportFailedMessage
     }
 }
-
