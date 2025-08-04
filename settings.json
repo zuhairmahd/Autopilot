@@ -166,7 +166,6 @@
         "configFile": ".\\.secrets\\config.json",
         "maxWaitTime": "30",
         "showLicenseBanner": true,
-        "deviceContactThresholdInDays": 30,
         "appMode": "full",
         "timeInSeconds": "60",
         "maxUserMatchDisplay": "10",
