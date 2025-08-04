@@ -311,7 +311,7 @@ if (Test-Path -Path $InitFile)
     Write-Verbose "[$scriptName] Checking settings.json for missing default values"
     # Use domain if available, otherwise default to example.com
     $domainForDefaults = if ($domain) { $domain } else { "contoso.com" }
-    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults -verbose 
+    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
     if ($settingsUpdated)
     {
         Write-Verbose "[$scriptName] Settings file checked/updated successfully"
