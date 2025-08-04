@@ -37,7 +37,7 @@ try {
     # Remove existing config files to simulate first run
     if (Test-Path "$PWD\.secrets\config.json") {
         Remove-Item "$PWD\.secrets\config.json" -Force
-        Write-Host "✓ Removed existing config.json" -ForegroundColor Green
+        Write-Host "[PASS] Removed existing config.json" -ForegroundColor Green
     }
     
     Write-Host "`n2. Testing main.ps1 with wizard in silent mode..." -ForegroundColor Cyan
@@ -127,32 +127,32 @@ if (-not (Test-Path `$configFile)) {
     
     # Check results
     if ($testResult -match "Main\.ps1 integration test completed successfully!") {
-        Write-Host "`n✓ Main.ps1 integration test passed!" -ForegroundColor Green
+        Write-Host "`n[PASS] Main.ps1 integration test passed!" -ForegroundColor Green
         
         # Verify files were created
         if (Test-Path "$PWD\.secrets\config.json") {
-            Write-Host "✓ Config file created and encrypted" -ForegroundColor Green
+            Write-Host "[PASS] Config file created and encrypted" -ForegroundColor Green
         } else {
-            Write-Host "✗ Config file not created" -ForegroundColor Red
+            Write-Host "[FAIL] Config file not created" -ForegroundColor Red
         }
         
         if (Test-Path "$PWD\settings.json") {
-            Write-Host "✓ Settings file created" -ForegroundColor Green
+            Write-Host "[PASS] Settings file created" -ForegroundColor Green
         } else {
-            Write-Host "✗ Settings file not created" -ForegroundColor Red
+            Write-Host "[FAIL] Settings file not created" -ForegroundColor Red
         }
         
         if (Test-Path "$PWD\strings.json") {
-            Write-Host "✓ Strings file created" -ForegroundColor Green
+            Write-Host "[PASS] Strings file created" -ForegroundColor Green
         } else {
-            Write-Host "✗ Strings file not created" -ForegroundColor Red
+            Write-Host "[FAIL] Strings file not created" -ForegroundColor Red
         }
     } else {
-        Write-Host "`n✗ Main.ps1 integration test failed!" -ForegroundColor Red
+        Write-Host "`n[FAIL] Main.ps1 integration test failed!" -ForegroundColor Red
     }
 
 } catch {
-    Write-Host "`n✗ Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "`n[FAIL] Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Full error:" -ForegroundColor Red
     Write-Host $_.Exception.ToString() -ForegroundColor Red
 } finally {
@@ -173,14 +173,14 @@ if (-not (Test-Path `$configFile)) {
     foreach ($file in $backupFiles) {
         if (Test-Path "$TestFolder\$file.backup") {
             Copy-Item "$TestFolder\$file.backup" "$PWD\$file" -Force
-            Write-Host "✓ Restored $file from backup" -ForegroundColor Green
+            Write-Host "[PASS] Restored $file from backup" -ForegroundColor Green
         }
     }
     
     # Clean up test folder
     if (Test-Path $TestFolder) {
         Remove-Item -Path $TestFolder -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "✓ Test folder cleaned up" -ForegroundColor Green
+        Write-Host "[PASS] Test folder cleaned up" -ForegroundColor Green
     }
 }
 

@@ -33,11 +33,11 @@ $Global:settings = $null
 $result1 = Test-MenuItemIncluded -MenuItemName "Test Item"
 if ($result1 -eq $true)
 {
-    Write-Host "✓ PASS: No inclusion list returns true" -ForegroundColor Green
+    Write-Host "[PASS] PASS: No inclusion list returns true" -ForegroundColor Green
 }
 else
 {
-    Write-Host "✗ FAIL: No inclusion list should return true, got: $result1" -ForegroundColor Red
+    Write-Host "[FAIL] FAIL: No inclusion list should return true, got: $result1" -ForegroundColor Red
 }
 
 Write-Host "Test 2: Test-MenuItemIncluded function with inclusion list" -ForegroundColor Cyan
@@ -54,21 +54,21 @@ $Global:settings = @{
 $result2 = Test-MenuItemIncluded -MenuItemName "Allowed Item 1"
 if ($result2 -eq $true)
 {
-    Write-Host "✓ PASS: Included item returns true" -ForegroundColor Green
+    Write-Host "[PASS] PASS: Included item returns true" -ForegroundColor Green
 }
 else
 {
-    Write-Host "✗ FAIL: Included item should return true, got: $result2" -ForegroundColor Red
+    Write-Host "[FAIL] FAIL: Included item should return true, got: $result2" -ForegroundColor Red
 }
 
 $result3 = Test-MenuItemIncluded -MenuItemName "Not Included Item"
 if ($result3 -eq $false)
 {
-    Write-Host "✓ PASS: Non-included item returns false" -ForegroundColor Green
+    Write-Host "[PASS] PASS: Non-included item returns false" -ForegroundColor Green
 }
 else
 {
-    Write-Host "✗ FAIL: Non-included item should return false, got: $result3" -ForegroundColor Red
+    Write-Host "[FAIL] FAIL: Non-included item should return false, got: $result3" -ForegroundColor Red
 }
 
 Write-Host "Test 3: Test menu filtering functionality" -ForegroundColor Cyan
@@ -108,11 +108,11 @@ $expectedCount = 3
 
 if ($choices.Count -eq $expectedCount)
 {
-    Write-Host "✓ PASS: Correct number of items after filtering ($($choices.Count))" -ForegroundColor Green
+    Write-Host "[PASS] PASS: Correct number of items after filtering ($($choices.Count))" -ForegroundColor Green
 }
 else
 {
-    Write-Host "✗ FAIL: Expected $expectedCount items, got $($choices.Count)" -ForegroundColor Red
+    Write-Host "[FAIL] FAIL: Expected $expectedCount items, got $($choices.Count)" -ForegroundColor Red
 }
 
 $allExpectedPresent = $true
@@ -120,14 +120,14 @@ foreach ($expected in $expectedChoices)
 {
     if ($choices -notcontains $expected)
     {
-        Write-Host "✗ FAIL: Expected item '$expected' not found in choices" -ForegroundColor Red
+        Write-Host "[FAIL] FAIL: Expected item '$expected' not found in choices" -ForegroundColor Red
         $allExpectedPresent = $false
     }
 }
 
 if ($allExpectedPresent)
 {
-    Write-Host "✓ PASS: All expected items are present" -ForegroundColor Green
+    Write-Host "[PASS] PASS: All expected items are present" -ForegroundColor Green
 }
 
 $notIncludedItems = @("Not Included Item", "Another Not Included")
@@ -136,14 +136,14 @@ foreach ($notIncluded in $notIncludedItems)
 {
     if ($choices -contains $notIncluded)
     {
-        Write-Host "✗ FAIL: Not included item '$notIncluded' found in choices" -ForegroundColor Red
+        Write-Host "[FAIL] FAIL: Not included item '$notIncluded' found in choices" -ForegroundColor Red
         $noNotIncludedPresent = $false
     }
 }
 
 if ($noNotIncludedPresent)
 {
-    Write-Host "✓ PASS: No not-included items are present" -ForegroundColor Green
+    Write-Host "[PASS] PASS: No not-included items are present" -ForegroundColor Green
 }
 
 Write-Host "`nFinal filtered choices:" -ForegroundColor Yellow

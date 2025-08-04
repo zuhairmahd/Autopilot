@@ -65,7 +65,7 @@ $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     foreach ($function in $functions)
     {
         Write-Verbose "[$scriptName] Importing function $function"

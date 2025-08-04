@@ -8,7 +8,7 @@ Write-Host "══════════════════════�
 $testResults = @()
 
 # Test 1: Function Loading
-Write-Host "`n1. Testing Function Loading..." -ForegroundColor Cyan
+Write-TestSection "`n1. Testing Function Loading..."
 try
 {
     $functionsFolder = "$PWD\functions"
@@ -19,18 +19,18 @@ try
         {
             . $function.FullName
         }
-        Write-Host "✓ Functions loaded successfully" -ForegroundColor Green
+        Write-Host "[PASS] Functions loaded successfully" -ForegroundColor Green
         $testResults += "Function Loading: PASS"
     }
     else
     {
-        Write-Host "✗ Functions folder not found" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found" -ForegroundColor Red
         $testResults += "Function Loading: FAIL"
     }
 }
 catch
 {
-    Write-Host "✗ Error loading functions: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error loading functions: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += "Function Loading: FAIL"
 }
 
@@ -50,23 +50,23 @@ foreach ($func in $requiredFunctions)
 {
     if (Get-Command $func -ErrorAction SilentlyContinue)
     {
-        Write-Host "  ✓ $func" -ForegroundColor Green
+        Write-Host "  [PASS] $func" -ForegroundColor Green
     }
     else
     {
-        Write-Host "  ✗ $func" -ForegroundColor Red
+        Write-Host "  [FAIL] $func" -ForegroundColor Red
         $allFunctionsAvailable = $false
     }
 }
 
 if ($allFunctionsAvailable)
 {
-    Write-Host "✓ All required functions available" -ForegroundColor Green
+    Write-Host "[PASS] All required functions available" -ForegroundColor Green
     $testResults += "Function Availability: PASS"
 }
 else
 {
-    Write-Host "✗ Some required functions missing" -ForegroundColor Red
+    Write-Host "[FAIL] Some required functions missing" -ForegroundColor Red
     $testResults += "Function Availability: FAIL"
 }
 
@@ -77,30 +77,30 @@ try
     $basicConfig = Get-BasicConfigurationFromUser -Silent
     if ($basicConfig -and $basicConfig.AppId -and $basicConfig.TenantId -and $basicConfig.domain)
     {
-        Write-Host "✓ Basic configuration collected in silent mode" -ForegroundColor Green
+        Write-Host "[PASS] Basic configuration collected in silent mode" -ForegroundColor Green
         $testResults += "Silent Basic Config: PASS"
     }
     else
     {
-        Write-Host "✗ Basic configuration failed in silent mode" -ForegroundColor Red
+        Write-Host "[FAIL] Basic configuration failed in silent mode" -ForegroundColor Red
         $testResults += "Silent Basic Config: FAIL"
     }
     
     $authConfig = Get-AuthenticationConfigurationFromUser -Silent
     if ($authConfig -and $authConfig.AppSecret)
     {
-        Write-Host "✓ Authentication configuration collected in silent mode" -ForegroundColor Green
+        Write-Host "[PASS] Authentication configuration collected in silent mode" -ForegroundColor Green
         $testResults += "Silent Auth Config: PASS"
     }
     else
     {
-        Write-Host "✗ Authentication configuration failed in silent mode" -ForegroundColor Red
+        Write-Host "[FAIL] Authentication configuration failed in silent mode" -ForegroundColor Red
         $testResults += "Silent Auth Config: FAIL"
     }
 }
 catch
 {
-    Write-Host "✗ Error in silent mode tests: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error in silent mode tests: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += "Silent Basic Config: FAIL"
     $testResults += "Silent Auth Config: FAIL"
 }
@@ -126,7 +126,7 @@ try
     
     if ($wizardSuccess)
     {
-        Write-Host "✓ Wizard execution successful" -ForegroundColor Green
+        Write-Host "[PASS] Wizard execution successful" -ForegroundColor Green
         $testResults += "Wizard Execution: PASS"
         
         # Test config file encryption
@@ -135,31 +135,31 @@ try
             $encryptionStatus = Test-FileEncryptionStatus -FilePath $configFile
             if ($encryptionStatus.IsEncrypted)
             {
-                Write-Host "✓ Config file encrypted successfully" -ForegroundColor Green
+                Write-Host "[PASS] Config file encrypted successfully" -ForegroundColor Green
                 $testResults += "Config Encryption: PASS"
                 
                 # Test decryption
                 $decryptResult = Invoke-JsonFileEncryption -FilePath $configFile -Key "DefaultPassword123!" -Decrypt -InMemoryOnly
                 if ($decryptResult.Success)
                 {
-                    Write-Host "✓ Config file decryption successful" -ForegroundColor Green
+                    Write-Host "[PASS] Config file decryption successful" -ForegroundColor Green
                     $testResults += "Config Decryption: PASS"
                 }
                 else
                 {
-                    Write-Host "✗ Config file decryption failed" -ForegroundColor Red
+                    Write-Host "[FAIL] Config file decryption failed" -ForegroundColor Red
                     $testResults += "Config Decryption: FAIL"
                 }
             }
             else
             {
-                Write-Host "✗ Config file not encrypted" -ForegroundColor Red
+                Write-Host "[FAIL] Config file not encrypted" -ForegroundColor Red
                 $testResults += "Config Encryption: FAIL"
             }
         }
         else
         {
-            Write-Host "✗ Config file not created" -ForegroundColor Red
+            Write-Host "[FAIL] Config file not created" -ForegroundColor Red
             $testResults += "Config Encryption: FAIL"
         }
         
@@ -171,24 +171,24 @@ try
                 $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
                 if ($settings.version -and $settings.globalSettings)
                 {
-                    Write-Host "✓ Settings file created with valid structure" -ForegroundColor Green
+                    Write-Host "[PASS] Settings file created with valid structure" -ForegroundColor Green
                     $testResults += "Settings Creation: PASS"
                 }
                 else
                 {
-                    Write-Host "✗ Settings file has invalid structure" -ForegroundColor Red
+                    Write-Host "[FAIL] Settings file has invalid structure" -ForegroundColor Red
                     $testResults += "Settings Creation: FAIL"
                 }
             }
             catch
             {
-                Write-Host "✗ Settings file has invalid JSON" -ForegroundColor Red
+                Write-Host "[FAIL] Settings file has invalid JSON" -ForegroundColor Red
                 $testResults += "Settings Creation: FAIL"
             }
         }
         else
         {
-            Write-Host "✗ Settings file not created" -ForegroundColor Red
+            Write-Host "[FAIL] Settings file not created" -ForegroundColor Red
             $testResults += "Settings Creation: FAIL"
         }
         
@@ -200,38 +200,38 @@ try
                 $strings = Get-Content $stringsFile -Raw | ConvertFrom-Json
                 if ($strings.returnValues -and $strings.deviceStates -and $strings.deviceActions)
                 {
-                    Write-Host "✓ Strings file created with valid structure" -ForegroundColor Green
+                    Write-Host "[PASS] Strings file created with valid structure" -ForegroundColor Green
                     $testResults += "Strings Creation: PASS"
                 }
                 else
                 {
-                    Write-Host "✗ Strings file has invalid structure" -ForegroundColor Red
+                    Write-Host "[FAIL] Strings file has invalid structure" -ForegroundColor Red
                     $testResults += "Strings Creation: FAIL"
                 }
             }
             catch
             {
-                Write-Host "✗ Strings file has invalid JSON" -ForegroundColor Red
+                Write-Host "[FAIL] Strings file has invalid JSON" -ForegroundColor Red
                 $testResults += "Strings Creation: FAIL"
             }
         }
         else
         {
-            Write-Host "✗ Strings file not created" -ForegroundColor Red
+            Write-Host "[FAIL] Strings file not created" -ForegroundColor Red
             $testResults += "Strings Creation: FAIL"
         }
         
     }
     else
     {
-        Write-Host "✗ Wizard execution failed" -ForegroundColor Red
+        Write-Host "[FAIL] Wizard execution failed" -ForegroundColor Red
         $testResults += "Wizard Execution: FAIL"
     }
     
 }
 catch
 {
-    Write-Host "✗ Error in file creation tests: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error in file creation tests: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += "Wizard Execution: FAIL"
 }
 finally
@@ -255,18 +255,18 @@ try
     
     if ($testHashtable.GetType().Name -eq "Hashtable")
     {
-        Write-Host "✓ Uses regular hashtables (PS 5.1 compatible)" -ForegroundColor Green
+        Write-Host "[PASS] Uses regular hashtables (PS 5.1 compatible)" -ForegroundColor Green
         $testResults += "PS 5.1 Compatibility: PASS"
     }
     else
     {
-        Write-Host "✗ Uses ordered hashtables (PS 5.1 incompatible)" -ForegroundColor Red
+        Write-Host "[FAIL] Uses ordered hashtables (PS 5.1 incompatible)" -ForegroundColor Red
         $testResults += "PS 5.1 Compatibility: FAIL"
     }
 }
 catch
 {
-    Write-Host "✗ Error in compatibility tests: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error in compatibility tests: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += "PS 5.1 Compatibility: FAIL"
 }
 
@@ -284,11 +284,11 @@ foreach ($result in $testResults)
 {
     if ($result -match "PASS")
     {
-        Write-Host "  ✓ $result" -ForegroundColor Green
+        Write-Host "  [PASS] $result" -ForegroundColor Green
     }
     else
     {
-        Write-Host "  ✗ $result" -ForegroundColor Red
+        Write-Host "  [FAIL] $result" -ForegroundColor Red
     }
 }
 
