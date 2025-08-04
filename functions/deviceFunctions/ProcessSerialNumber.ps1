@@ -45,13 +45,24 @@ function ProcessSerialNumber()
         }
         
         $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
-        if ($deviceLastContactDate.numberOfDaysSinceLastContact -eq 0)
+        
+        # Calculate actual calendar days difference based on midnight boundaries
+        $today = (Get-Date).Date
+        $yesterday = $today.AddDays(-1)
+        $dayBeforeYesterday = $today.AddDays(-2)
+        $lastContactDate = [DateTime]::Parse($deviceLastContactDate.latestContactDate).Date
+        
+        if ($lastContactDate -eq $today)
         {
             $contactMessage = "The device contacted Intune today."
         }
-        elseif ($deviceLastContactDate.numberOfDaysSinceLastContact -eq 1)
+        elseif ($lastContactDate -eq $yesterday)
         {
             $contactMessage = "The device contacted Intune yesterday."
+        }
+        elseif ($lastContactDate -eq $dayBeforeYesterday)
+        {
+            $contactMessage = "The device contacted Intune the day before yesterday."
         }
         else
         {
