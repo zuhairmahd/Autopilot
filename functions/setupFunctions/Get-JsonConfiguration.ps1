@@ -1,4 +1,4 @@
-function Get-JsonConfiguration
+function Get-JsonConfiguration()
 <#
 .SYNOPSIS
     Universal JSON configuration loader with fallback support and validation.
