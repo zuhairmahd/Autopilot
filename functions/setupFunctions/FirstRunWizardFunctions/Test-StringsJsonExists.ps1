@@ -121,14 +121,12 @@ function Test-StringsJsonExists()
                 
                 # Convert back to JSON and save if changes were made
                 $mergedJson = $mergedStrings | ConvertTo-Json -Depth 10
-                $existingJson = Get-Content -Path $StringsFile -Raw
                 
-                if ($mergedJson -ne $existingJson)
+                if ($null -ne $mergedJson)
                 {
                     Set-Content -Path $StringsFile -Value $mergedJson -Encoding UTF8 -Force
                     Write-Verbose "[$functionName] Updated strings.json with missing default values"
                     Write-SafeLog "Updated strings.json with missing default values" "Information"
-                    
                     if (-not $Silent)
                     {
                         Write-Host "Strings file updated with new default values." -ForegroundColor Green
@@ -138,7 +136,6 @@ function Test-StringsJsonExists()
                 {
                     Write-Verbose "[$functionName] Strings file is up-to-date"
                 }
-                
                 return $true
             }
             catch
