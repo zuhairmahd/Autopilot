@@ -22,9 +22,30 @@ This document provides comprehensive technical implementation details, architect
 The Windows Autopilot Management Tool is designed as a modular PowerShell-based application with the following key architectural components:
 
 #### Function Loading System
-- All PowerShell functions are dynamically loaded from the `/functions/` directory at startup using dot-sourcing
+- All PowerShell functions are dynamically loaded from the `/functions/` directory tree at startup using recursive dot-sourcing
+- Functions are organized in logical subdirectories based on functionality
 - Functions are loaded alphabetically with no dependency resolution, so modules must be independent
-- Each `.ps1` file in `/functions/` represents a functional module with related capabilities
+- Each `.ps1` file represents a single function or closely related group of functions
+
+#### Reorganized Function Structure
+The codebase has been reorganized into the following functional categories:
+
+```
+functions/
+├── autopilotFunctions/     # Autopilot device management
+│   ├── v1/                # Legacy Autopilot functions
+│   ├── v2/                # Updated Autopilot functions  
+│   └── GetDeviceInfo.ps1  # Common device information
+├── deviceFunctions/        # Device operations and queries
+├── encryptionFunctions/    # Security and encryption utilities
+├── graphFunctions/         # Microsoft Graph API integration
+├── menuFunctions/          # User interface and navigation
+├── reportingFunctions/     # Device assessment and reporting
+├── setupFunctions/         # Configuration and initialization
+│   └── FirstRunWizardFunctions/  # First-time setup workflow
+├── updateFunctions/        # Auto-update functionality
+└── utilityFunctions/       # General-purpose utilities
+```
 
 #### Hierarchical Configuration System
 The application uses a three-tier configuration hierarchy for maximum flexibility:
@@ -33,7 +54,7 @@ The application uses a three-tier configuration hierarchy for maximum flexibilit
 2. **Domain-Specific Settings** (`settings.json` → `domains[domain].settings`) - Organization-specific overrides
 3. **Global Settings** (`settings.json` → `globalSettings`) - Default application configuration
 
-Configuration merging is handled by the `MergeSettings` function in `SettingsHelperFunctions.ps1`.
+Configuration merging is handled by the `MergeSettings` function in `setupFunctions/MergeSettings.ps1`.
 
 #### Menu System Architecture
 - Hierarchical menu navigation with stack-based history tracking
@@ -41,12 +62,18 @@ Configuration merging is handled by the `MergeSettings` function in `SettingsHel
 - Menu inclusion system allows role-based access control
 - Context-aware navigation with back/main menu functionality
 
-### Key Modules Overview
+### Function Categories Overview
 
-| Module | Purpose | Key Functions |
-|--------|---------|---------------|
-| **AutopilotDeviceFunctions.ps1** | Device management, Autopilot enrollment | `AddCorporateDeviceIdentifier`, `DeleteCorporateDeviceIdentifier` |
-| **DeviceAndUserLookupFunctions.ps1** | User/device queries, credential access | `GetDeviceByUser`, `GetUserInput` |
+| Category | Purpose | Key Functions | Location |
+|----------|---------|---------------|----------|
+| **autopilotFunctions** | Autopilot device enrollment and management | `ImportAutopilotDevice`, `DeleteAutopilotDevice`, `AddCorporateDeviceIdentifier` | `autopilotFunctions/v1/`, `autopilotFunctions/v2/` |
+| **deviceFunctions** | Device queries, operations, and lifecycle | `GetDeviceByUser`, `RestartDevice`, `GetBitLockerRecoveryKey` | `deviceFunctions/` |
+| **reportingFunctions** | Device assessment and readiness analysis | `GetNextUserReadinessReport`, `GetDeviceEnrollmentStatus` | `reportingFunctions/` |
+| **graphFunctions** | Microsoft Graph API integration and authentication | `GetGraphAccessToken`, `CallGraphAPI`, `Get-DelegatedToken` | `graphFunctions/` |
+| **menuFunctions** | User interface and navigation system | `ShowMenu`, `AddMenuItem`, `Handle-MenuItemSelection` | `menuFunctions/` |
+| **encryptionFunctions** | Security, encryption, and credential management | `Load-EncryptedConfigFile`, `Get-SecurePassword` | `encryptionFunctions/` |
+| **setupFunctions** | Configuration management and initialization | `InitializeConfiguration`, `CreateConfiguration`, `MergeSettings` | `setupFunctions/` |
+| **utilityFunctions** | General-purpose helper functions | Logging, formatting, and utility operations | `utilityFunctions/` |
 | **GraphAPIFunctions.ps1** | Microsoft Graph API integration | `Get-AuthToken`, `Invoke-GraphAPIRequest` |
 | **MenuFunctions.ps1** | Interactive UI navigation system | `NewMenu`, `AddMenuItem`, `ShowMenu` |
 | **SettingsHelperFunctions.ps1** | Configuration management | `MergeSettings`, `Update-GlobalSetting` |
@@ -400,6 +427,48 @@ GetDeviceByUser -AccessToken <String> -userName <String>
 - Retrieves devices associated with a specific user
 - Returns device information object or navigation command
 
+#### DeviceReportingFunctions.ps1
+
+**GetNextUserReadinessReport**
+```powershell
+GetNextUserReadinessReport -enrollmentState <Object>
+```
+- **Enhanced in v2.0**: Comprehensive device readiness assessment for next user assignment
+- Validates device against all requirements simultaneously
+- **Key Improvements**:
+  - **Multi-Issue Detection**: Captures ALL device issues, not just the first one found
+  - **Comprehensive Return Object**: Includes detailed issue lists and recommended actions
+  - **Error Handling**: Robust input validation and error recovery
+  - **Enhanced Display**: User-friendly formatting with visual indicators and priorities
+- **Return Object Properties**:
+  - `ReadinessState`: Overall readiness state (ready/notReady/error)
+  - `Action`: Primary recommended action (backward compatible)
+  - `Device`: Device identifier
+  - `AllIssues`: Array of all issues found
+  - `AllActions`: Array of all recommended actions
+  - `IssueCount`: Number of issues detected
+  - `IsReady`: Boolean readiness indicator
+- **Validation Checks**:
+  - Autopilot profile assignment and correctness
+  - Device enrollment state and remediation status
+  - RAM requirements and hardware specifications  
+  - User associations and validity
+  - Network connectivity and last contact date
+- **Action Prioritization**: Uses intelligent priority system to determine primary action when multiple issues exist
+
+**AssessDeviceState**
+```powershell
+AssessDeviceState -enrollmentState <Object> -AssessmentType <String> [-settings <Object>]
+```
+- Core device assessment engine supporting multiple assessment types
+- **Enhanced Logic**: Collects all issues simultaneously instead of overwriting previous findings
+- **Assessment Types**:
+  - `NextUserReadiness`: Comprehensive readiness validation
+  - `PropperEnrollmentVerification`: Enrollment status verification
+  - `TroubleShooting`: Device troubleshooting assistance
+- **Issue Collection**: Uses priority-based action determination for comprehensive reporting
+- Returns structured assessment object with all findings
+
 #### GraphAPIFunctions.ps1
 
 **Get-AuthToken**
@@ -638,6 +707,7 @@ This allows the same function to behave differently based on how it was accessed
 /functions/
 ├── AutopilotDeviceFunctions.ps1      # Device management
 ├── DeviceAndUserLookupFunctions.ps1  # User/device queries
+├── DeviceReportingFunctions.ps1      # Device assessment and readiness reporting
 ├── GraphAPIFunctions.ps1             # API integration
 ├── MenuFunctions.ps1                 # UI navigation
 ├── SettingsHelperFunctions.ps1       # Configuration
@@ -647,39 +717,111 @@ This allows the same function to behave differently based on how it was accessed
 
 ## Testing Framework
 
+### Test Architecture
+
+The testing framework has been completely reorganized to support the new modular function structure:
+
+#### Test Helper System
+- **test-helper.ps1**: Common utilities for all tests
+  - `Load-AllFunctions`: Recursively loads all functions from the reorganized structure
+  - `Test-PowerShellVersion`: Detects PowerShell 5.1 vs 7+ for compatibility
+  - `Write-TestResult`: Version-aware test result display (Unicode vs ASCII)
+  - `Write-TestSection`: Formatted test section headers
+
+#### Master Test Runner
+- **run-all-tests.ps1**: Comprehensive test execution system
+  - Runs all tests in isolated PowerShell sessions
+  - Provides detailed timing and results reporting
+  - PowerShell 5.1 compatible output formatting
+  - Supports test filtering and error handling
+  - Generates comprehensive test reports
+
+### PowerShell 5.1 Compatibility
+
+The testing framework ensures full compatibility with PowerShell 5.1:
+- Automatic detection of PowerShell version
+- Unicode character fallbacks for older versions
+- Compatible cmdlet usage patterns
+- Version-specific feature handling
+
 ### Test Structure
 Tests are located in `/TestScripts/` and follow this pattern:
-1. Create isolated test environment
-2. Load specific function modules
-3. Execute test scenarios with validation
-4. Cleanup test environment
+1. Load test-helper.ps1 for common utilities
+2. Use Load-AllFunctions to import reorganized function modules
+3. Create isolated test environment with version-aware output
+4. Execute test scenarios with validation
+5. Cleanup test environment
 
 ### Current Test Coverage
-- **Configuration system functions**: `test-settings-functions.ps1`
-- **Device selection functions**: `test-device-selection.ps1`
-- **Corporate device identifier functions**: `test-corporate-device-identifier.ps1`
-- **Syntax validation**: `test-syntax.ps1`
-- **Comprehensive integration testing**: `test-comprehensive.ps1`
-- **Password change functionality**: `test-password-change.ps1`
+- **Next User Readiness**: `test-checknextuserreadiness.ps1` - Enhanced device readiness assessment
+- **Configuration system**: `test-settings-functions.ps1` - Settings management functions
+- **Device selection**: `test-device-selection.ps1` - Device lookup and selection
+- **Corporate device identifiers**: `test-corporate-device-identifier.ps1` - Corporate device management
+- **Syntax validation**: `test-syntax.ps1` - PowerShell syntax checking for all function files
+- **Authentication types**: `test-authentication-types.ps1` - OAuth flow testing
+- **Comprehensive integration**: `test-comprehensive.ps1` - End-to-end functionality
+- **Password change**: `test-password-change.ps1` - Credential management
+- **First-run wizard**: `test-firstrun-wizard.ps1` - Initial setup workflow
+- **Menu system**: `test-menu-inclusions.ps1` - Navigation and menu functionality
 
 ### Testing Commands
+
+#### Master Test Runner (Recommended)
 ```powershell
+# Run all tests with detailed reporting
+.\TestScripts\run-all-tests.ps1
+
+# Run specific test pattern
+.\TestScripts\run-all-tests.ps1 -TestPattern "test-settings*.ps1"
+
+# Continue on errors with verbose output
+.\TestScripts\run-all-tests.ps1 -ContinueOnError -ShowVerbose
+
+# Exclude specific tests
+.\TestScripts\run-all-tests.ps1 -ExcludePattern "test-comprehensive.ps1"
+```
+
+#### Individual Tests
+```powershell
+# Run specific test
+.\TestScripts\test-checknextuserreadiness.ps1
+
 # Run configuration system tests
 .\TestScripts\test-settings-functions.ps1
 
-# Run device selection tests
-.\TestScripts\test-device-selection.ps1
+# Run syntax validation
+.\TestScripts\test-syntax.ps1
+```
 
-# Run all tests in test folder
-Get-ChildItem .\TestScripts\test-*.ps1 | ForEach-Object { & $_.FullName }
+#### Legacy Batch Execution
+```powershell
+# Run all tests (legacy method)
+Get-ChildItem .\TestScripts\test-*.ps1 | Where-Object { $_.Name -ne 'test-helper.ps1' } | ForEach-Object { & $_.FullName }
 ```
 
 ### Test Development Guidelines
+
+#### Function Loading
+- Always use `Load-AllFunctions` from test-helper.ps1 for consistent function loading
+- Test in isolation using separate PowerShell sessions when possible
+- Verify function availability before testing
+
+#### Version Compatibility
+- Use `Test-PowerShellVersion` to detect PowerShell capabilities
+- Use `Write-TestResult` instead of direct Unicode characters
+- Test with both PowerShell 5.1 and 7+ when possible
+
+#### Test Structure
 - Create isolated test environments to avoid side effects
 - Include both positive and negative test cases
 - Validate expected outcomes with appropriate assertions
 - Clean up test artifacts after execution
 - Use comprehensive logging for test debugging
+
+#### Output Formatting
+- Use `Write-TestSection` for consistent section headers
+- Use `Write-TestResult` for pass/fail indicators
+- Provide meaningful error messages with context
 
 ## Build and Deployment
 

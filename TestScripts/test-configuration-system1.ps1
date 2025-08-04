@@ -1,4 +1,8 @@
 # Test script to validate the consolidated configuration system
+
+# Load test helper functions
+. "$PSScriptRoot\test-helper.ps1"
+
 # This script tests the Get-JsonConfiguration function and related components
 # PowerShell 5.1 Compatible
 
@@ -14,7 +18,8 @@ if ($Verbose)
 Write-Host "=== Testing Consolidated Configuration System (PowerShell 5.1 Compatible) ===" -ForegroundColor Green
 
 # Import the functions
-. ".\functions\MiscFunctions.ps1"
+$rootPath = Split-Path -Parent $PSScriptRoot
+Load-AllFunctions -RootPath $rootPath | Out-Null
 
 Write-Host "`n1. Testing strings.json loading..." -ForegroundColor Yellow
 
@@ -64,7 +69,7 @@ try
     
     if ($stringsConfig -and $stringsConfig.returnValues)
     {
-        Write-Host "✓ Successfully loaded strings.json with sections:" -ForegroundColor Green
+        Write-Host "[PASS] Successfully loaded strings.json with sections:" -ForegroundColor Green
         Write-Host "  - returnValues: $($stringsConfig.returnValues.Count) items" -ForegroundColor Cyan
         Write-Host "  - deviceStates: $($stringsConfig.deviceStates.Count) items" -ForegroundColor Cyan  
         Write-Host "  - deviceActions: $($stringsConfig.deviceActions.Count) items" -ForegroundColor Cyan
@@ -74,12 +79,12 @@ try
     }
     else
     {
-        Write-Host "✗ Failed to load strings.json properly" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to load strings.json properly" -ForegroundColor Red
     }
 }
 catch
 {
-    Write-Host "✗ Error testing strings.json: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error testing strings.json: $($_.Exception.Message)" -ForegroundColor Red
 }
 
 Write-Host "`n2. Testing init.json loading..." -ForegroundColor Yellow
@@ -102,7 +107,7 @@ try
     
     if ($initConfig)
     {
-        Write-Host "✓ Successfully loaded init.json with default configuration:" -ForegroundColor Green
+        Write-Host "[PASS] Successfully loaded init.json with default configuration:" -ForegroundColor Green
         foreach ($key in $initConfig.Keys)
         {
             Write-Host "  - $key = '$($initConfig[$key])'" -ForegroundColor Cyan
@@ -110,12 +115,12 @@ try
     }
     else
     {
-        Write-Host "✗ Failed to load init.json properly" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to load init.json properly" -ForegroundColor Red
     }
 }
 catch
 {
-    Write-Host "✗ Error testing init.json: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error testing init.json: $($_.Exception.Message)" -ForegroundColor Red
 }
 
 Write-Host "`n3. Testing with non-existent file (fallback behavior)..." -ForegroundColor Yellow
@@ -133,18 +138,18 @@ try
     
     if ($fallbackConfig -and $fallbackConfig.testSection)
     {
-        Write-Host "✓ Successfully fell back to defaults for non-existent file" -ForegroundColor Green
+        Write-Host "[PASS] Successfully fell back to defaults for non-existent file" -ForegroundColor Green
         Write-Host "  - testSection.key1 = '$($fallbackConfig.testSection.key1)'" -ForegroundColor Cyan
         Write-Host "  - testSection.key2 = '$($fallbackConfig.testSection.key2)'" -ForegroundColor Cyan
     }
     else
     {
-        Write-Host "✗ Failed to fallback to defaults properly" -ForegroundColor Red
+        Write-Host "[FAIL] Failed to fallback to defaults properly" -ForegroundColor Red
     }
 }
 catch
 {
-    Write-Host "✗ Error testing fallback behavior: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error testing fallback behavior: $($_.Exception.Message)" -ForegroundColor Red
 }
 
 Write-Host "`n4. Testing PowerShell 5.1 compatibility (OrderedDictionary fix)..." -ForegroundColor Yellow
@@ -178,13 +183,13 @@ try
     
     if ($testConfig -and $testConfig.returnValues.additionalKey)
     {
-        Write-Host "✓ PowerShell 5.1 compatibility successful - collection handling works properly" -ForegroundColor Green
+        Write-Host "[PASS] PowerShell 5.1 compatibility successful - collection handling works properly" -ForegroundColor Green
         Write-Host "  - existingKey = '$($testConfig.returnValues.existingKey)'" -ForegroundColor Cyan
         Write-Host "  - additionalKey = '$($testConfig.returnValues.additionalKey)'" -ForegroundColor Cyan
     }
     else
     {
-        Write-Host "✗ PowerShell 5.1 compatibility test failed" -ForegroundColor Red
+        Write-Host "[FAIL] PowerShell 5.1 compatibility test failed" -ForegroundColor Red
     }
     
     # Clean up
@@ -195,7 +200,7 @@ try
 }
 catch
 {
-    Write-Host "✗ Error testing PowerShell 5.1 compatibility: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[FAIL] Error testing PowerShell 5.1 compatibility: $($_.Exception.Message)" -ForegroundColor Red
     # Clean up on error
     if (Test-Path "temp-test.json")
     {
@@ -206,3 +211,4 @@ catch
 Write-Host "`n=== Configuration System Testing Complete ===" -ForegroundColor Green
 Write-Host "All tests verify that the consolidated configuration system is working properly" -ForegroundColor White
 Write-Host "with full PowerShell 5.1 compatibility and no collection-related errors." -ForegroundColor White
+

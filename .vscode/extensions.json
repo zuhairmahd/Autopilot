@@ -1,7 +1,0 @@
-{
-    "recommendations": [
-        "ms-vscode.powershell",
-        "pspester.pester-test",
-        "eliostruyf.vscode-msgraph-autocomplete"
-    ]
-}

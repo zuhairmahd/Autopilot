@@ -10,7 +10,6 @@ Desktop.ini
 
 .mcp.json
 .secrets/
-.vs/
 release/
 build/
 TestReports/
@@ -42,3 +41,4 @@ TestResults/
 *.csv
 *.cmd
 *.backup.*
+config.json
