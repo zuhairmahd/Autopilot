@@ -28,10 +28,13 @@ param(
 )
 
 # Load test helper functions
-try {
+try
+{
     . "$PSScriptRoot\test-helper.ps1"
     $psInfo = Test-PowerShellVersion
-} catch {
+}
+catch
+{
     Write-Host "Failed to load test helper functions: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
@@ -43,7 +46,8 @@ Write-Host "=" * 80 -ForegroundColor Cyan
 Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor White
 Write-Host "Unicode Support: $($psInfo.SupportsUnicode)" -ForegroundColor White
 Write-Host "Test Pattern: $TestPattern" -ForegroundColor White
-if ($ExcludePattern) {
+if ($ExcludePattern)
+{
     Write-Host "Exclude Pattern: $ExcludePattern" -ForegroundColor White
 }
 Write-Host ""
@@ -53,17 +57,18 @@ $testFiles = Get-ChildItem -Path $PSScriptRoot -Filter $TestPattern | Where-Obje
     $_.Name -notlike $ExcludePattern -and $_.Length -gt 0
 } | Sort-Object Name
 
-if ($testFiles.Count -eq 0) {
+if ($testFiles.Count -eq 0)
+{
     Write-Host "No test files found matching pattern: $TestPattern" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "Found $($testFiles.Count) test files:" -ForegroundColor Yellow
-foreach ($file in $testFiles) {
+foreach ($file in $testFiles)
+{
     $sizeKB = [math]::Round($file.Length / 1024, 1)
-    Write-Host "  - $($file.Name) ($sizeKB KB)" -ForegroundColor Gray
+    Write-Verbose "  - $($file.Name) ($sizeKB KB)"
 }
-Write-Host ""
 
 # Test execution tracking
 $testResults = @()
@@ -75,7 +80,8 @@ $skippedTests = 0
 # Execute tests
 Write-TestSection "Running Tests"
 
-foreach ($testFile in $testFiles) {
+foreach ($testFile in $testFiles)
+{
     $testName = $testFile.BaseName
     $testPath = $testFile.FullName
     
@@ -83,16 +89,17 @@ foreach ($testFile in $testFiles) {
     Write-Host "Path: $testPath" -ForegroundColor Gray
     
     $testResult = @{
-        Name = $testName
-        Path = $testPath
-        Status = "Unknown"
-        Duration = $null
-        Output = ""
-        Error = $null
+        Name      = $testName
+        Path      = $testPath
+        Status    = "Unknown"
+        Duration  = $null
+        Output    = ""
+        Error     = $null
         StartTime = Get-Date
     }
     
-    try {
+    try
+    {
         $startTime = Get-Date
         
         # Create a new PowerShell session for each test to ensure isolation
@@ -102,7 +109,8 @@ foreach ($testFile in $testFiles) {
             '-File', $testPath
         )
         
-        if ($ShowVerbose) {
+        if ($ShowVerbose)
+        {
             $testArgs += '-Verbose'
         }
         
@@ -116,23 +124,28 @@ foreach ($testFile in $testFiles) {
         $testResult.Duration = $duration
         $testResult.Output = $output -join "`n"
         
-        if ($exitCode -eq 0) {
+        if ($exitCode -eq 0)
+        {
             $testResult.Status = "Passed"
             Write-TestResult "$testName completed successfully ($($duration.TotalSeconds.ToString('F2'))s)" -Success $true
             $passedTests++
-        } else {
+        }
+        else
+        {
             $testResult.Status = "Failed"
             $testResult.Error = "Exit code: $exitCode"
             Write-TestResult "$testName failed with exit code $exitCode ($($duration.TotalSeconds.ToString('F2'))s)" -Success $false
             $failedTests++
             
-            if ($output) {
+            if ($output)
+            {
                 Write-Host "Output:" -ForegroundColor Yellow
                 Write-Host $testResult.Output -ForegroundColor Gray
             }
         }
     }
-    catch {
+    catch
+    {
         $testResult.Status = "Error"
         $testResult.Error = $_.Exception.Message
         $testResult.Duration = (Get-Date) - $testResult.StartTime
@@ -140,7 +153,8 @@ foreach ($testFile in $testFiles) {
         Write-TestResult "$testName failed with error: $($_.Exception.Message)" -Success $false
         $failedTests++
         
-        if (-not $ContinueOnError) {
+        if (-not $ContinueOnError)
+        {
             Write-Host "Stopping test execution due to error. Use -ContinueOnError to continue." -ForegroundColor Red
             break
         }
@@ -154,9 +168,12 @@ foreach ($testFile in $testFiles) {
 Write-TestSection "Test Results Summary"
 
 $totalDuration = ($testResults | Where-Object { $_.Duration } | ForEach-Object { $_.Duration.TotalSeconds } | Measure-Object -Sum).Sum
-if ($totalDuration) {
+if ($totalDuration)
+{
     $totalSeconds = $totalDuration
-} else {
+}
+else
+{
     $totalSeconds = 0
 }
 
@@ -166,39 +183,47 @@ Write-Host "Failed: $failedTests" -ForegroundColor Red
 Write-Host "Skipped: $skippedTests" -ForegroundColor Yellow
 Write-Host "Total Duration: $($totalSeconds.ToString('F2')) seconds" -ForegroundColor White
 
-if ($passedTests -eq $totalTests) {
+if ($passedTests -eq $totalTests)
+{
     Write-Host ""
     Write-TestResult "ALL TESTS PASSED!" -Success $true
     $exitCode = 0
-} else {
+}
+else
+{
     Write-Host ""
     Write-TestResult "$failedTests tests failed" -Success $false
     $exitCode = 1
 }
 
 # Detailed results table
-if ($testResults.Count -gt 0) {
+if ($testResults.Count -gt 0)
+{
     Write-TestSection "Detailed Results"
     
     $tableData = $testResults | ForEach-Object {
-        $statusSymbol = switch ($_.Status) {
+        $statusSymbol = switch ($_.Status)
+        {
             "Passed" { if ($psInfo.SupportsUnicode) { "✓" } else { "[PASS]" } }
             "Failed" { if ($psInfo.SupportsUnicode) { "✗" } else { "[FAIL]" } }
             "Error" { if ($psInfo.SupportsUnicode) { "⚠" } else { "[ERR]" } }
             default { "?" }
         }
         
-        $durationStr = if ($_.Duration) { 
+        $durationStr = if ($_.Duration)
+        { 
             "$($_.Duration.TotalSeconds.ToString('F2'))s" 
-        } else { 
+        }
+        else
+        { 
             "N/A" 
         }
         
         [PSCustomObject]@{
-            Status = $statusSymbol
-            Test = $_.Name
+            Status   = $statusSymbol
+            Test     = $_.Name
             Duration = $durationStr
-            Error = if ($_.Error) { $_.Error.Substring(0, [Math]::Min(50, $_.Error.Length)) } else { "" }
+            Error    = if ($_.Error) { $_.Error.Substring(0, [Math]::Min(50, $_.Error.Length)) } else { "" }
         }
     }
     
@@ -207,18 +232,23 @@ if ($testResults.Count -gt 0) {
 
 # Failed tests details
 $failedTestsList = $testResults | Where-Object { $_.Status -ne "Passed" }
-if ($failedTestsList.Count -gt 0) {
+if ($failedTestsList.Count -gt 0)
+{
     Write-TestSection "Failed Tests Details"
     
-    foreach ($failedTest in $failedTestsList) {
+    foreach ($failedTest in $failedTestsList)
+    {
         Write-Host "Test: $($failedTest.Name)" -ForegroundColor Red
-        if ($failedTest.Error) {
+        if ($failedTest.Error)
+        {
             Write-Host "Error: $($failedTest.Error)" -ForegroundColor Yellow
         }
-        if ($failedTest.Output -and $failedTest.Output.Trim()) {
+        if ($failedTest.Output -and $failedTest.Output.Trim())
+        {
             Write-Host "Output:" -ForegroundColor Yellow
             $lines = $failedTest.Output -split "`n" | Select-Object -Last 10
-            foreach ($line in $lines) {
+            foreach ($line in $lines)
+            {
                 Write-Host "  $line" -ForegroundColor Gray
             }
         }

@@ -67,9 +67,6 @@ function AddCorporateDeviceIdentifier()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting AddCorporateDeviceIdentifier. DeviceIdentifier='$DeviceIdentifier', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'" -LogLevel "Information"
-    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceInfo='$DeviceInfo', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting AddCorporateDeviceIdentifier. DeviceInfo='$DeviceInfo', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'" -LogLevel "Information"
     if ($AccessToken -eq '' -or $null -eq $AccessToken)
