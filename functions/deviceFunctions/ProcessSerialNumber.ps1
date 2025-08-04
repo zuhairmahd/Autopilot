@@ -10,7 +10,6 @@ function ProcessSerialNumber()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $contactthreshold = $Settings.deviceContactthresholdInDays
     Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing device lookup for serial number: $SerialNumber" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Validating serial number: $SerialNumber"

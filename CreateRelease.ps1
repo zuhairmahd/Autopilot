@@ -9,6 +9,7 @@ param(
     [string]$CompanyName = 'Zuhair Mahmoud',
     [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
+    [switch]$noCleanup,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
@@ -1165,33 +1166,40 @@ else
 Write-Host "Updating settings file to force password change."
 $null = UpdateSettingsFile -SettingsFilePath $destSettingsFile
 
-Write-Host "Cleaning up..."
-if ($null -ne $mergeOutputFile)
+if (-not $noCleanup)
 {
-    Write-Verbose "[$scriptName] Cleaning up merge output file: $mergeOutputFile"
-    if (Test-Path -Path $mergeOutputFile)
+    Write-Host "Cleaning up..."
+    if ($null -ne $mergeOutputFile)
     {
-        Write-Host "Removing $mergeOutputFile"
-        Remove-Item -Path $mergeOutputFile -Force | Out-Null
+        Write-Verbose "[$scriptName] Cleaning up merge output file: $mergeOutputFile"
+        if (Test-Path -Path $mergeOutputFile)
+        {
+            Write-Host "Removing $mergeOutputFile"
+            Remove-Item -Path $mergeOutputFile -Force | Out-Null
+        }
+        else
+        {
+            Write-Host "No merge operation was performed so no merge files to clean."
+        }
+        Write-Verbose "[$scriptName] Cleaning up new script file: $newscriptFile"
+        if (Test-Path -Path $newscriptFile)
+        {
+            Write-Host "Removing $newscriptFile"
+            Remove-Item -Path $newscriptFile -Force | Out-Null
+        }
+        else
+        {
+            Write-Host "No new script file was created so no new script files to clean."
+        }
     }
     else
     {
-        Write-Host "No merge operation was performed so no merge files to clean."
-    }
-    Write-Verbose "[$scriptName] Cleaning up new script file: $newscriptFile"
-    if (Test-Path -Path $newscriptFile)
-    {
-        Write-Host "Removing $newscriptFile"
-        Remove-Item -Path $newscriptFile -Force | Out-Null
-    }
-    else
-    {
-        Write-Host "No new script file was created so no new script files to clean."
+        Write-Host "No merge output file to clean up."
     }
 }
-else
+else 
 {
-    Write-Host "No merge output file to clean up."
+    Write-Host "Skipping cleanup as per -noCleanup flag."
 }
 Write-Host "Build process completed successfully."
 Write-Host "Executable and files are located in $parentFolder"

@@ -60,4 +60,3 @@ function Get-RefreshToken()
         return $null
     }
 }
-
