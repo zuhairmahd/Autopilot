@@ -35,24 +35,11 @@ function Test-SettingsJsonExists()
     Write-Verbose "[$functionName] Ensuring settings.json exists: $SettingsFile"
     try
     {
-        if (Test-Path -Path $SettingsFile)
-        {
-            Write-Verbose "[$functionName] Settings file already exists: $SettingsFile"
-            Write-SafeLog "Settings file already exists: $SettingsFile" "Information"
-            return $true
-        }
-        
-        if (-not $Silent)
-        {
-            Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan
-            Write-Host "Creating default settings.json file..." -ForegroundColor White
-        }
-        
-        # Create comprehensive settings.json using ordered dictionary
-        $settings = [ordered]@{
+        # Define comprehensive default settings structure
+        $defaultSettings = @{
             description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
             version        = "1.1.0.0"
-            auth           = [ordered]@{
+            auth           = @{
                 Delegated           = $IsDelegated
                 authType            = "PublicAuthFlow"
                 changePWOnNextStart = $false
@@ -74,7 +61,7 @@ function Test-SettingsJsonExists()
                     "User.Read.All"
                 )
             }
-            globalSettings = [ordered]@{
+            globalSettings = @{
                 operatingSystem              = "Windows"
                 autoUpdate                   = $true
                 showLicenseBanner            = $true
@@ -168,11 +155,11 @@ function Test-SettingsJsonExists()
                     Endpoints = @()
                 }
             )
-            domains        = [ordered]@{
-                $DomainName = [ordered]@{
+            domains        = @{
+                $DomainName = @{
                     groupsToInclude = @()
                     groupsToExclude = @()
-                    settings        = [ordered]@{
+                    settings        = @{
                         domain                          = $DomainName
                         deviceNamePrefix                = ""
                         operatingSystem                 = "Windows"
@@ -193,9 +180,77 @@ function Test-SettingsJsonExists()
                 }
             }
         }
+
+        if (Test-Path -Path $SettingsFile)
+        {
+            Write-Verbose "[$functionName] Settings file exists, checking for missing default values: $SettingsFile"
+            Write-SafeLog "Settings file exists, checking for updates: $SettingsFile" "Information"
+            
+            try
+            {
+                # Load existing settings
+                $existingSettings = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
+                
+                # Convert JSON object to hashtable for merging
+                $existingHashtable = @{}
+                $existingSettings.PSObject.Properties | ForEach-Object {
+                    if ($_.Value -is [PSCustomObject])
+                    {
+                        $existingHashtable[$_.Name] = ConvertFrom-JsonToHashtable -JsonObject $_.Value
+                    }
+                    else
+                    {
+                        $existingHashtable[$_.Name] = $_.Value
+                    }
+                }
+                
+                # Merge defaults into existing configuration
+                $mergedSettings = Merge-ConfigurationDefaults -ExistingConfig $existingHashtable -DefaultConfig $defaultSettings
+                
+                # Convert back to JSON and save if changes were made
+                $mergedJson = $mergedSettings | ConvertTo-Json -Depth 10
+                $existingJson = Get-Content -Path $SettingsFile -Raw
+                
+                if ($mergedJson -ne $existingJson)
+                {
+                    Set-Content -Path $SettingsFile -Value $mergedJson -Encoding UTF8 -Force
+                    Write-Verbose "[$functionName] Updated settings.json with missing default values"
+                    Write-SafeLog "Updated settings.json with missing default values" "Information"
+                    
+                    if (-not $Silent)
+                    {
+                        Write-Host "Settings file updated with new default values." -ForegroundColor Green
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Settings file is up-to-date"
+                }
+                
+                return $true
+            }
+            catch
+            {
+                Write-Verbose "[$functionName] Error processing existing settings file: $($_.Exception.Message)"
+                Write-SafeLog "Error processing existing settings file: $($_.Exception.Message)" "Warning"
+                # Continue with creating new file as fallback
+            }
+        }
+        
+        if (-not $Silent)
+        {
+            Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan
+            Write-Host "Creating default settings.json file..." -ForegroundColor White
+        }
+        
+        # File doesn't exist, create it with default settings
+        if (-not $Silent)
+        {
+            Write-Host "Creating default settings.json file..." -ForegroundColor White
+        }
         
         # Convert to JSON and write to file
-        $settingsJson = $settings | ConvertTo-Json -Depth 10
+        $settingsJson = $defaultSettings | ConvertTo-Json -Depth 10
         Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
         Write-Verbose "[$functionName] Created comprehensive settings.json with requiredScopes"
         
