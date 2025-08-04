@@ -75,17 +75,18 @@ function Test-SettingsJsonExists()
                 )
             }
             globalSettings = [ordered]@{
-                operatingSystem     = "Windows"
-                autoUpdate          = $true
-                showLicenseBanner   = $true
-                testMode            = $false
-                configFile          = ".\.secrets\config.json"
-                maxWaitTime         = "30"
-                maxUserMatchDisplay = "10"
-                timeInSeconds       = "60"
-                Release             = "main"
-                Repo                = "Github"
-                appMode             = "helpdesk"
+                operatingSystem              = "Windows"
+                autoUpdate                   = $true
+                showLicenseBanner            = $true
+                deviceContactThresholdInDays = 30
+                testMode                     = $false
+                configFile                   = ".\.secrets\config.json"
+                maxWaitTime                  = "30"
+                maxUserMatchDisplay          = "10"
+                timeInSeconds                = "60"
+                Release                      = "auto"
+                Repo                         = "Github"
+                appMode                      = "full"
             }
             requiredScopes = @(
                 @{
@@ -167,7 +168,6 @@ function Test-SettingsJsonExists()
                     Endpoints = @()
                 }
             )
-
             domains        = [ordered]@{
                 $DomainName = [ordered]@{
                     groupsToInclude = @()
