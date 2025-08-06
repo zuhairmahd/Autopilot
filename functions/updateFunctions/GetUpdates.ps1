@@ -5,6 +5,7 @@ function GetUpdates()
         [string]$executableFileName = "$pwd\main.exe",
         [Parameter(Mandatory = $true)]
         [string]$updateURL,
+        [string]$metaDataURL = "$updateURL/lastrun.json",
         [switch]$noConfirmation
     )
 
@@ -45,6 +46,7 @@ function GetUpdates()
         return $null
     }    
     $remoteVersion = GetFileVersion -executableFileName $tempUpdateFile
+    $fileMetaData = Invoke-WebRequest -Uri $metaDataURL -UseBasicParsing
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
     
@@ -78,9 +80,34 @@ function GetUpdates()
             }
         }
         Write-Host "Proceeding with the update..." -ForegroundColor Green
+        Write-Verbose "[$functionName] Proceeding with the update."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Proceeding with the update..."
+        Write-Host "Checking file signature..."
         if (Invoke-FileCertVerification -FilePath $tempUpdateFile)
         {
             Write-Host "File signature is valid"
+            Write-Verbose "[$functionName] File signature is valid."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File signature is valid." -LogLevel "Information"
+            Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
+            $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256
+            Write-Verbose "[$functionName] File hash for $tempUpdateFile: $($fileHash.Hash)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile: $($fileHash.Hash)" -LogLevel "Information"
+            Write-Host "Checking file hash..."
+            if ($fileMetaData.Hash -eq $fileHash.Hash)
+            {
+                Write-Host "File hash matches the expected hash." -NoNewline
+                Write-Host " - Proceeding with update..." -ForegroundColor Green
+                Write-Verbose "[$functionName] File hash matches the expected hash."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash matches the expected hash." -LogLevel "Information"
+            }
+            else
+            {
+                Write-Host "File hash does not match the expected hash. Aborting update." -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash. Aborting update." -LogLevel "Error"
+                return $returnValues.InvalidFileHash
+            }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile: $($fileHash.Hash)" -LogLevel "Information"
         }
         else
         {
