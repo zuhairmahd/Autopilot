@@ -126,6 +126,14 @@
                     ]
                 },
                 {
+                    "name": "Download and install latest Windows updates (requires admin rights)",
+                    "description": "Download and install the latest Windows updates",
+                    "type": "action",
+                    "includeInDisplayModes": [
+                        "helpdesk"
+                    ]
+                },
+                {
                     "name": "Check device Autopilot status",
                     "description": "Check if a device is registered in Autopilot",
                     "type": "action",
