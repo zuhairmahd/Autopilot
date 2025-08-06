@@ -58,6 +58,8 @@ function GetUpdates()
         Write-Host "An update is available." -ForegroundColor Yellow
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
+        Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
         if ($noConfirmation)
         {
             Write-Host "No confirmation required. Proceeding with the update..." -ForegroundColor Green
@@ -194,6 +196,7 @@ function GetUpdates()
         Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "Remote version: $remoteVersion" -ForegroundColor Cyan
+        Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
