@@ -103,8 +103,14 @@ function GetUpdates()
             }
             else
             {
-                Write-Host "File hash does not match the expected hash. Aborting update." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash. Aborting update." -LogLevel "Error"
+                Write-Host "File hash does not match the expected hash." -ForegroundColor Red
+                Write-Host "Expected hash: $($fileMetaData.Hash)" -ForegroundColor Yellow
+                Write-Host "Actual hash: $($fileHash.Hash)" -ForegroundColor Yellow
+                Write-Verbose "[$functionName] File hash does not match the expected hash."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash." -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Expected hash: $($fileMetaData.Hash)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Actual hash: $($fileHash.Hash)" -LogLevel "Error"
+                Write-Host "Aborting update." -ForegroundColor Red
                 return $returnValues.InvalidFileHash
             }
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
