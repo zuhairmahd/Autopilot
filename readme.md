@@ -232,23 +232,27 @@ The tool supports several operational modes that control which features and menu
 
 ### Selecting App Mode
 
+App mode selection provides a consistent, user-friendly experience across different contexts with enhanced interface features:
+
 #### During First-Run Setup
 When running the application for the first time, the First Run Wizard will prompt you to select an app mode:
 
 1. Run the application: `.\main.ps1`
 2. Follow the wizard prompts for Azure AD configuration
-3. When prompted, select your preferred app mode from the menu
+3. When prompted, select your preferred app mode from the menu with clear descriptions for each option
 4. Complete the remaining setup steps
 
 #### Changing App Mode Later
-You can change the app mode at any time through the settings menu:
+You can change the app mode at any time through the settings menu with an improved interface:
 
 1. Navigate to **Change application settings** → **Change App Mode setting**
-2. Select your new app mode from the available options
-3. Confirm the change when prompted
-4. Restart the application when prompted to apply the new mode
+2. The menu will display your current app mode highlighted in green
+3. Select your new app mode from the available options with detailed descriptions
+4. Choose to cancel if you want to keep your current setting
+5. Confirm the change when prompted
+6. Restart the application when prompted to apply the new mode
 
-**Note**: Changing the app mode affects which menu items and features are available, so the application must restart to apply the changes.
+**Note**: The app mode selection interface has been enhanced to provide consistent user experience whether you're in the first-run wizard or changing settings later. The system now shows your current mode, provides detailed descriptions for each option, and includes a cancel option to keep your current setting.
 
 ### Custom App Mode Configuration
 

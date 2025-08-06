@@ -682,6 +682,35 @@ The application supports multiple predefined app modes with user-friendly config
 - Settings updated using `Update-GlobalSetting` function
 - User prompted for restart confirmation after mode change
 
+**Recent Architecture Improvements (v1.3.0+):**
+The app mode selection system has been significantly refactored to eliminate code duplication and improve maintainability:
+
+- **Centralized Logic**: `Get-AppModeConfigurationFromUser.ps1` now handles all app mode selection logic, supporting multiple contexts (wizard vs settings)
+- **Code Reduction**: Eliminated 110+ lines of duplicate code from `main.ps1`
+- **Enhanced UI**: Consistent user experience with current mode highlighting, detailed descriptions, and cancel options
+- **Improved Testing**: Comprehensive test coverage with 25+ assertions verifying backward compatibility and new features
+- **Flexible Parameters**: Support for different display contexts, current mode awareness, and menu system integration
+- **Robust Error Handling**: Enhanced validation and graceful error recovery across all contexts
+
+**Function Signature Evolution:**
+```powershell
+# Original (backward compatible)
+Get-AppModeConfigurationFromUser -Silent
+
+# Enhanced (new capabilities)
+Get-AppModeConfigurationFromUser -CurrentMode "helpDesk" -ShowCancel -Context "settings" -UseMenuSystem
+```
+
+**Return Structure (Enhanced):**
+```powershell
+@{
+    appMode = 'full'                    # Selected app mode
+    selectedChoice = '1'                # User's menu choice
+    cancelled = $false                  # Whether user cancelled
+    currentModeUnchanged = $false       # Whether selected mode equals current mode
+}
+```
+
 ### Context-Aware Navigation
 
 The `Get-CallingContext` function provides enhanced context detection:
