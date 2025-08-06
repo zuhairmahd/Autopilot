@@ -1,4 +1,4 @@
-﻿{
+{
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.3.0.0",
     "auth": {
@@ -147,17 +147,17 @@
         }
     ],
     "globalSettings": {
-        "configFile": ".\\.secrets\\config.json",
-        "autoUpdate": true,
-        "maxWaitTime": "30",
-        "showLicenseBanner": true,
-        "timeInSeconds": "60",
-        "appMode": "full",
-        "maxUserMatchDisplay": "10",
+        "operatingSystem": "Windows",
         "release": "master",
         "repo": "Github",
+        "timeInSeconds": "60",
+        "maxUserMatchDisplay": "10",
+        "maxWaitTime": "30",
+        "autoUpdate": true,
+        "appMode": "full",
         "testMode": false,
-        "operatingSystem": "Windows",
+        "configFile": ".\\.secrets\\config.json",
+        "showLicenseBanner": true,
         "deviceContactThresholdInDays": 30
     },
     "domains": {
@@ -167,6 +167,7 @@
             "settings": {
                 "minUsernameLength": 3,
                 "preferredBrowser": "Chrome",
+                "showLicenseBanner": false,
                 "minSerialNumberLength": 7,
                 "privateSession": false,
                 "operatingSystem": "Windows",
@@ -324,6 +325,12 @@
                 {
                     "description": "Change the Auto Update setting",
                     "name": "Change Auto Update setting",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
+                    "description": "Change the application mode",
+                    "name": "Change application mode",
                     "type": "action",
                     "includeInDisplayModes": []
                 },

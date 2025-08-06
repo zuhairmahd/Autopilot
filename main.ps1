@@ -810,7 +810,6 @@ else
 }
 #endregion initialization block with access token
 
-
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
@@ -1305,6 +1304,86 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     {
         Write-Host "Failed to update autoUpdate setting" -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
+    }
+}
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" -Action {
+    Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
+    
+    # Use the refactored function for consistent app mode selection
+    $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -Context "settings"
+    
+    # Handle cancellation
+    if ($result.cancelled)
+    {
+        Write-Verbose "[$scriptName] User chose to cancel app mode change."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
+        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+        return $returnValues.backoutText
+    }
+    
+    # Handle unchanged selection
+    if ($result.currentModeUnchanged)
+    {
+        Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
+        Write-Verbose "[$scriptName] User selected the same app mode that is already set."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+    
+    $newAppMode = $result.appMode
+    
+    # Confirm the change
+    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
+    Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
+    Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
+    Write-Host ""
+    
+    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+    while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+        [console]::beep(1000, 500)
+        $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+    }
+    
+    if ($confirmChoice -in @('no', 'n'))
+    {
+        Write-Verbose "[$scriptName] User chose not to change app mode setting."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
+        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+        return $returnValues.backoutText
+    }
+    
+    # Save the updated app mode setting
+    Write-Verbose "[$scriptName] Updating app mode setting from '$($settings.appMode)' to '$newAppMode'"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
+    
+    if (Update-GlobalSetting -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
+    {
+        Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
+        
+        # Clean up temporary files
+        $filesCleaned = cleanupTempFiles
+        if ($filesCleaned.AllRemoved)
+        {
+            Write-Verbose "[$scriptName] All temporary files were cleaned."
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+        }
+        Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+        
+        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
+        Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
+        Write-Host ""
+        write-log -logFile $logFile -finishLogging
+        exit  0
+    }
+    else
+    {
+        Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {

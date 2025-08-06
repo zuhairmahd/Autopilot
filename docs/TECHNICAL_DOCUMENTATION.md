@@ -659,6 +659,58 @@ The application uses an inclusion-based menu system for role-based access contro
 
 When `appMode` is set to "full", all menu items are shown. For other modes, only items listed in `menuItemsToInclude` are displayed.
 
+#### App Mode Configuration
+The application supports multiple predefined app modes with user-friendly configuration:
+
+**Available App Modes:**
+- `full` - Complete feature set (default)
+- `helpDesk` - Streamlined help desk operations
+- `advanced` - Advanced features for technical staff
+- `advancedRegistration` - Advanced device registration
+- `registration` - Device registration focused
+- `admin` - Administrative functions
+- `custom` - Custom configuration
+
+**Configuration Methods:**
+1. **First-Run Wizard**: Guided selection during initial setup via `Get-AppModeConfigurationFromUser`
+2. **Settings Menu**: Runtime changes through "Change App Mode setting" menu item
+3. **Manual**: Direct editing of `settings.json`
+
+**Implementation Details:**
+- App mode changes require application restart to take effect
+- Mode validation occurs at startup (line 443 in main.ps1)
+- Settings updated using `Update-GlobalSetting` function
+- User prompted for restart confirmation after mode change
+
+**Recent Architecture Improvements (v1.3.0+):**
+The app mode selection system has been significantly refactored to eliminate code duplication and improve maintainability:
+
+- **Centralized Logic**: `Get-AppModeConfigurationFromUser.ps1` now handles all app mode selection logic, supporting multiple contexts (wizard vs settings)
+- **Code Reduction**: Eliminated 110+ lines of duplicate code from `main.ps1`
+- **Enhanced UI**: Consistent user experience with current mode highlighting, detailed descriptions, and cancel options
+- **Improved Testing**: Comprehensive test coverage with 25+ assertions verifying backward compatibility and new features
+- **Flexible Parameters**: Support for different display contexts, current mode awareness, and menu system integration
+- **Robust Error Handling**: Enhanced validation and graceful error recovery across all contexts
+
+**Function Signature Evolution:**
+```powershell
+# Original (backward compatible)
+Get-AppModeConfigurationFromUser -Silent
+
+# Enhanced (new capabilities)
+Get-AppModeConfigurationFromUser -CurrentMode "helpDesk" -Context "settings"
+```
+
+**Return Structure (Enhanced):**
+```powershell
+@{
+    appMode = 'full'                    # Selected app mode
+    selectedChoice = '1'                # User's menu choice
+    cancelled = $false                  # Whether user cancelled
+    currentModeUnchanged = $false       # Whether selected mode equals current mode
+}
+```
+
 ### Context-Aware Navigation
 
 The `Get-CallingContext` function provides enhanced context detection:
