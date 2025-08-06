@@ -2,6 +2,8 @@
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
+    [string]$stringsFile = "$pwd\strings.json",
+    [string]$menusFile = "$pwd\menus.json",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -95,7 +97,6 @@ if (Test-Path $oldExecutableFileName)
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
-
 # Check if the .secrets directory exists, create it if it doesn't
 $secretsDir = Split-Path $configFile -Parent
 if (-not (Test-Path $secretsDir))
@@ -106,7 +107,6 @@ if (-not (Test-Path $secretsDir))
 
 # Initialize variables for encryption handling
 $configContent = $null
-$userPassword = $null
 $script:maxRetries = 6
 
 if (Test-Path $configFile)
@@ -310,7 +310,14 @@ if (Test-Path -Path $InitFile)
     # Ensure settings.json file has all required default values
     Write-Verbose "[$scriptName] Checking settings.json for missing default values"
     # Use domain if available, otherwise default to example.com
-    $domainForDefaults = if ($domain) { $domain } else { "contoso.com" }
+    $domainForDefaults = if ($domain)
+    {
+        $domain 
+    }
+    else
+    {
+        "contoso.com" 
+    }
     $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
     if ($settingsUpdated)
     {
@@ -318,7 +325,6 @@ if (Test-Path -Path $InitFile)
     }
     
     # Ensure strings.json file has all required default values  
-    $stringsFile = "$PWD\strings.json"
     Write-Verbose "[$scriptName] Checking strings.json for missing default values"
     $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
     if ($stringsUpdated)
@@ -326,8 +332,8 @@ if (Test-Path -Path $InitFile)
         Write-Verbose "[$scriptName] Strings file checked/updated successfully"
     }
     
-    $global:globalSettings = @{}
-    $global:localSettings = @{}
+    $globalSettings = @{}
+    $localSettings = @{}
     
     # Load the init file content (potentially updated with new defaults)
     $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
@@ -471,10 +477,23 @@ else
     # Set auth as a script variable so it can be accessed by functions
     $script:Auth = $auth
 }
+if (Test-Path $menusFile)
+{
+    Write-Verbose "[$scriptName] Loading menu configuration from $menusFile"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Loading menu configuration from $menusFile" -LogLevel "Information"
+    $menus = (Get-Content -Path $menusFile -Raw -Force -ErrorAction SilentlyContinue | ConvertFrom-Json).menus
+    Write-Verbose "[$scriptName] Loaded $($menus.Count) menu items in the configuration file."
+    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($menus.Count) menu items in the configuration file." -LogLevel "Information"
+}
+else
+{
+    Write-Verbose "[$scriptName] Menu configuration file $menusFile not found. Using default menus."
+    Write-Log -logFile $LogFile -module $scriptName -Message "Menu configuration file $menusFile not found. Using default menus." -LogLevel "Warning"
+}
 #endregion Load parameters from the configuration file if it exists
 
 #region Define variables
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 # Add top-level menuItemsToInclude array to settings if it exists
 if ($initFileContent.menuItemsToInclude)
 {
@@ -482,8 +501,6 @@ if ($initFileContent.menuItemsToInclude)
     $settings.menuItemsToInclude = $initFileContent.menuItemsToInclude
     Write-Verbose "[$scriptName] Added $($settings.menuItemsToInclude.Count) items to include list"
 }
-# Make settings globally available for menu inclusion functionality
-$Global:settings = $settings
 if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
@@ -575,7 +592,6 @@ foreach ($key in $getTokenParams.Keys)
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
-$stringsFile = "$PWD\strings.json"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
 $loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
 $returnValues = $loadedStrings.returnValues
@@ -796,6 +812,7 @@ else
     }
 }
 #endregion initialization block with access token
+
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
