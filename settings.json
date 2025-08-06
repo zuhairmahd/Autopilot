@@ -2,11 +2,11 @@
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.3.0.0",
     "auth": {
-        "noSaveRefreshToken": false,
+        "cacheType": "Memory",
         "changePwOnNextStart": false,
-        "authType": "PublicAuthFlow",
-        "delegated": true,
+        "noSaveRefreshToken": false,
         "forceNewToken": false,
+        "renewalLeadTime": 5,
         "scope": [
             "offline_access",
             "openid",
@@ -17,9 +17,9 @@
             "DeviceManagementManagedDevices.ReadWrite.All",
             "DeviceManagementServiceConfig.ReadWrite.All"
         ],
-        "cacheType": "Memory",
+        "authType": "PublicAuthFlow",
         "secureString": false,
-        "renewalLeadTime": 5
+        "delegated": true
     },
     "requiredScopes": [
         {
@@ -164,19 +164,53 @@
     ],
     "globalSettings": {
         "configFile": ".\\.secrets\\config.json",
-        "deviceContactThresholdInDays": 30,
+        "autoUpdate": true,
         "maxWaitTime": "30",
         "showLicenseBanner": false,
-        "appMode": "full",
         "timeInSeconds": "60",
+        "appMode": "full",
         "maxUserMatchDisplay": "10",
         "release": "master",
         "repo": "Github",
         "testMode": false,
         "operatingSystem": "Windows",
-        "autoUpdate": true
+        "deviceContactThresholdInDays": 30
     },
     "domains": {
+        "gao.gov": {
+            "groupsToExclude": [],
+            "groupsToInclude": [
+                "sg_Office_365_License_G5_wth_windows_pilot",
+                "sg_passwrd_hash_stage",
+                "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
+                "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
+            ],
+            "settings": {
+                "maxNumberOfDevicesAllowed": 20,
+                "desiredAutopilotProfiles": [
+                    "msb"
+                ],
+                "maxSerialNumberLength": 100,
+                "groupTag": "MSB01",
+                "showLicenseBanner": false,
+                "minimumDevicePhysicalMemoryInGB": 16,
+                "maxUserNameLength": 50,
+                "domain": "gao.gov",
+                "preferredBrowser": "Chrome",
+                "appMode": "full",
+                "deviceNamePrefix": "w11-",
+                "privateSession": true,
+                "minUsernameLength": 3,
+                "userPatternsToExclude": [
+                    "-cma",
+                    "-test",
+                    "onmicrosoft.com",
+                    "-sup",
+                    "-a"
+                ],
+                "minSerialNumberLength": 7
+            }
+        },
         "arabictutor.com": {
             "groupsToExclude": [],
             "groupsToInclude": [],
@@ -201,40 +235,6 @@
                     "onmicrosoft.com"
                 ],
                 "minSerialNumberLength": 7
-            }
-        },
-        "gao.gov": {
-            "groupsToExclude": [],
-            "groupsToInclude": [
-                "sg_Office_365_License_G5_wth_windows_pilot",
-                "sg_passwrd_hash_stage",
-                "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
-                "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
-            ],
-            "settings": {
-                "minSerialNumberLength": 7,
-                "minUsernameLength": 3,
-                "desiredAutopilotProfiles": [
-                    "msb"
-                ],
-                "maxSerialNumberLength": 100,
-                "groupTag": "MSB01",
-                "minimumDevicePhysicalMemoryInGB": 16,
-                "maxUserNameLength": 50,
-                "domain": "gao.gov",
-                "preferredBrowser": "Chrome",
-                "appMode": "full",
-                "deviceNamePrefix": "w11-",
-                "privateSession": true,
-                "maxNumberOfDevicesAllowed": 20,
-                "userPatternsToExclude": [
-                    "-cma",
-                    "-test",
-                    "onmicrosoft.com",
-                    "-sup",
-                    "-a"
-                ],
-                "showLicenseBanner": false
             }
         }
     }

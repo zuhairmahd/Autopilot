@@ -38,9 +38,9 @@ function Test-SettingsJsonExists()
     {
         # Define comprehensive default settings structure with correct property order
         $defaultSettings = @{
-            description        = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version            = "1.3.0.0"
-            auth               = @{
+            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+            version        = "1.3.0.0"
+            auth           = @{
                 delegated           = $IsDelegated
                 authType            = "PublicAuthFlow"
                 changePwOnNextStart = $false
@@ -60,7 +60,7 @@ function Test-SettingsJsonExists()
                     "DeviceManagementServiceConfig.ReadWrite.All"
                 )
             }
-            requiredScopes     = @(
+            requiredScopes = @(
                 @{
                     Scope     = "User.Read.All"
                     Reason    = "Required to read user profiles, group memberships, and registered devices."
@@ -185,33 +185,7 @@ function Test-SettingsJsonExists()
                     endpoints = @()
                 }
             )
-            menuItemsToInclude = @(
-                "Autopilot menu",
-                "Restart the device",
-                "Export Menu",
-                "Quick Import device into Autopilot (requires admin rights)",
-                "Custom import device into Autopilot (requires admin rights)",
-                "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
-                "Delete Corporate Device Identifier from Device Preparation (requires admin rights)",
-                "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)",
-                "Get device hash for manual upload to Autopilot (requires admin rights)",
-                "Download and install latest Windows updates(requires admin rights)",
-                "Check device Autopilot status",
-                "Change application settings",
-                "Change password and authentication information",
-                "Export Autopilot Devices",
-                "Export Imported Autopilot Devices",
-                "Export Managed Windows Devices",
-                "Export Unmanaged Windows Devices",
-                "Export device storage report",
-                "Export Application Assignments",
-                "Wipe Device",
-                "Clean Device",
-                "Restart Device",
-                "Show Device Health Status",
-                "Check next user readiness state"
-            )
-            globalSettings     = @{
+            globalSettings = @{
                 configFile                   = ".\.secrets\config.json"
                 maxWaitTime                  = "30"
                 showLicenseBanner            = $true
@@ -225,7 +199,7 @@ function Test-SettingsJsonExists()
                 operatingSystem              = "Windows"
                 autoUpdate                   = $true
             }
-            domains            = @{
+            domains        = @{
                 $DomainName = @{
                     groupsToInclude = @()
                     groupsToExclude = @()

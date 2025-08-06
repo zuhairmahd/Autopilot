@@ -80,7 +80,7 @@ function Test-MenuItemIncluded()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$MenuItemName' in menus configuration" -LogLevel "Debug"
 
     # Check if the menu item has includeInDisplayModes array
-    if ($foundMenuItem.includeInDisplayModes -and $foundMenuItem.includeInDisplayModes.Count -gt 0)
+    if ($foundMenuItem.includeInDisplayModes -and $foundMenuItem.includeInDisplayModes.Count -gt 0 -and -not ($settings.appMode -ne 'Full'))
     {
         $appModeMatches = $foundMenuItem.includeInDisplayModes -contains $settings.appMode
         Write-Verbose "[$functionName] Menu item '$MenuItemName' includeInDisplayModes check: $appModeMatches (looking for '$($settings.appMode)' in [$($foundMenuItem.includeInDisplayModes -join ', ')])"

@@ -160,7 +160,9 @@ function ShowMenu()
     # Loop through menu items and add to choices (excluding items in exclusion list)
     foreach ($item in $Menu.Items)
     {
-        if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:menus)
+        # Pass the menus configuration if available, otherwise null (which will allow all items)
+        $menusToPass = if ($script:menus) { $script:menus } else { $null }
+        if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -verbose)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
             $choices += $item.Name
