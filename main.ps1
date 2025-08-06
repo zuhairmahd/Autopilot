@@ -1310,51 +1310,11 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
     Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
     
-    # Define available app modes with descriptions
-    $appModes = @{
-        '1' = @{ Mode = 'full'; Name = 'Full Mode'; Description = 'Complete feature set with all available functionality' }
-        '2' = @{ Mode = 'helpDesk'; Name = 'Help Desk Mode'; Description = 'Streamlined interface for help desk operations' }
-        '3' = @{ Mode = 'advanced'; Name = 'Advanced Mode'; Description = 'Advanced features for experienced users' }
-        '4' = @{ Mode = 'advancedRegistration'; Name = 'Advanced Registration Mode'; Description = 'Advanced device registration capabilities' }
-        '5' = @{ Mode = 'registration'; Name = 'Registration Mode'; Description = 'Device registration and enrollment focused interface' }
-        '6' = @{ Mode = 'admin'; Name = 'Administrator Mode'; Description = 'Administrative functions and system configuration' }
-        '7' = @{ Mode = 'custom'; Name = 'Custom Mode'; Description = 'Custom configuration for specialized deployments' }
-    }
+    # Use the refactored function for consistent app mode selection
+    $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -ShowCancel -Context "settings" -UseMenuSystem
     
-    Write-Host "`n══════════════════════════════════════════════════════════════════" -ForegroundColor Green
-    Write-Host "                          App Mode Selection                          " -ForegroundColor Green
-    Write-Host "══════════════════════════════════════════════════════════════════" -ForegroundColor Green
-    Write-Host "`nCurrent App Mode: $($settings.appMode)" -ForegroundColor Yellow
-    Write-Host "`nAvailable App Modes:" -ForegroundColor White
-    Write-Host ""
-    
-    # Display all available app modes
-    foreach ($key in $appModes.Keys | Sort-Object)
-    {
-        $mode = $appModes[$key]
-        $marker = if ($mode.Mode -eq $settings.appMode) { " (Current)" } else { "" }
-        Write-Host "$key. $($mode.Name)$marker" -ForegroundColor $(if ($mode.Mode -eq $settings.appMode) { "Green" } else { "White" })
-        Write-Host "   $($mode.Description)" -ForegroundColor Gray
-        Write-Host ""
-    }
-    
-    Write-Host "8. Cancel (keep current setting)" -ForegroundColor Yellow
-    Write-Host ""
-    
-    # Get user choice
-    do
-    {
-        $choice = Read-Host "Enter your choice (1-8)"
-        if ($choice -in @("1", "2", "3", "4", "5", "6", "7", "8"))
-        {
-            break
-        }
-        Write-Host "Invalid choice. Please enter a number between 1 and 8." -ForegroundColor Red
-        [console]::beep(1000, 500)
-    } while ($true)
-    
-    # Handle the user's choice
-    if ($choice -eq "8")
+    # Handle cancellation
+    if ($result.cancelled)
     {
         Write-Verbose "[$scriptName] User chose to cancel app mode change."
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
@@ -1362,10 +1322,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
         return $returnValues.backoutText
     }
     
-    $selectedMode = $appModes[$choice]
-    $newAppMode = $selectedMode.Mode
-    
-    if ($newAppMode -eq $settings.appMode)
+    # Handle unchanged selection
+    if ($result.currentModeUnchanged)
     {
         Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
         Write-Verbose "[$scriptName] User selected the same app mode that is already set."
@@ -1373,9 +1331,10 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
         return $returnValues.backoutText
     }
     
+    $newAppMode = $result.appMode
+    
     # Confirm the change
-    Write-Host "`nYou selected: $($selectedMode.Name)" -ForegroundColor Green
-    Write-Host "$($selectedMode.Description)" -ForegroundColor Gray
+    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
     Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
     Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
     Write-Host ""
@@ -1415,7 +1374,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
         Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
         
-        Write-Host "`nThe app mode has been changed to: $($selectedMode.Name)" -ForegroundColor Green
+        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
         Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
         Write-Host ""
         write-log -logFile $logFile -finishLogging

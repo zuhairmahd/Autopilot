@@ -110,13 +110,16 @@ function Start-FirstRunWizard()
         
         # Step 2.6: Collect app mode configuration
         Write-SafeLog "Collecting app mode configuration" "Information"
-        $appModeConfig = Get-AppModeConfigurationFromUser -Silent:$Silent
+        $appModeResult = Get-AppModeConfigurationFromUser -Silent:$Silent
         
-        if ($null -eq $appModeConfig)
+        if ($null -eq $appModeResult -or $appModeResult.cancelled)
         {
-            Write-SafeLog "Failed to collect app mode configuration" "Error"
+            Write-SafeLog "Failed to collect app mode configuration or cancelled by user" "Error"
             return $false
         }
+        
+        # Extract app mode from result for backward compatibility
+        $appModeConfig = @{ appMode = $appModeResult.appMode }
         
         # Step 3: Merge configurations
         $finalConfig = @{
