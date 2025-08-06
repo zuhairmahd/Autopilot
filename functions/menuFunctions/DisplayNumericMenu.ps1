@@ -3,6 +3,7 @@ function DisplayNumericMenu()
     [CmdletBinding()]
     param (
         [string[]]$choices,
+        [Parameter(Mandatory = $true)][string[]]$choices,
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
