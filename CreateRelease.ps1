@@ -1114,12 +1114,15 @@ else
     Write-Host "Failed to sign executable: $OutputFile"
     exit 1
 }
-
+#get the hash for the executable
+$hash = Get-FileHash -Path $OutputFile -Algorithm SHA256
+Write-Host "Executable hash: $($hash.Hash)"
 #write the new version to the lastrun file.
 Write-Host "Writing last run information to $lastRunFile"
 $lastRun = @{
     date            = $todaysDate
     version         = $Version
+    hash            = $hash.Hash
     GUID            = $guid
     settingsVersion = $settingsVersion
     stringsVersion  = $stringsVersion
