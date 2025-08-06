@@ -698,7 +698,7 @@ The app mode selection system has been significantly refactored to eliminate cod
 Get-AppModeConfigurationFromUser -Silent
 
 # Enhanced (new capabilities)
-Get-AppModeConfigurationFromUser -CurrentMode "helpDesk" -ShowCancel -Context "settings" -UseMenuSystem
+Get-AppModeConfigurationFromUser -CurrentMode "helpDesk" -Context "settings"
 ```
 
 **Return Structure (Enhanced):**
