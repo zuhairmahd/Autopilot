@@ -810,7 +810,6 @@ else
 }
 #endregion initialization block with access token
 
-
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
@@ -1419,47 +1418,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
         Write-Host "`nThe app mode has been changed to: $($selectedMode.Name)" -ForegroundColor Green
         Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
         Write-Host ""
-        
-        $restartChoice = Read-Host "Would you like to restart the application now? (yes/no)"
-        while ($restartChoice -notin @('yes', 'no', 'y', 'n'))
-        {
-            Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-            [console]::beep(1000, 500)
-            $restartChoice = Read-Host "Would you like to restart the application now? (yes/no)"
-        }
-        
-        if ($restartChoice -in @('yes', 'y'))
-        {
-            Write-Host "`nRestarting application..." -ForegroundColor Green
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to restart application after app mode change." -LogLevel "Information"
-            Write-Log -LogFile $LogFile -finishLogging
-            
-            # Get the current script path and parameters
-            $scriptPath = $MyInvocation.PSCommandPath
-            if (-not $scriptPath) {
-                $scriptPath = "$PWD\main.ps1"
-            }
-            
-            # Restart the script with the same parameters (excluding appMode as it's now saved)
-            $restartArgs = @()
-            foreach ($param in $PSBoundParameters.GetEnumerator()) {
-                if ($param.Key -ne 'appMode') {
-                    if ($param.Value -is [switch] -and $param.Value) {
-                        $restartArgs += "-$($param.Key)"
-                    } elseif ($param.Value -isnot [switch]) {
-                        $restartArgs += "-$($param.Key)", $param.Value
-                    }
-                }
-            }
-            
-            Start-Process -FilePath "pwsh" -ArgumentList @("-File", $scriptPath) + $restartArgs
-            exit 0
-        }
-        else
-        {
-            Write-Host "`nPlease restart the application manually to apply the new app mode." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to manually restart application after app mode change." -LogLevel "Information"
-        }
+        write-log -logFile $logFile -finishLogging
+        exit  0
     }
     else
     {
