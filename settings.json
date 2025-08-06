@@ -1,13 +1,11 @@
-{
+﻿{
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.3.0.0",
     "auth": {
-        "delegated": true,
-        "changePwOnNextStart": false,
-        "authType": "PublicAuthFlow",
-        "renewalLeadTime": 5,
         "noSaveRefreshToken": false,
         "cacheType": "Memory",
+        "changePwOnNextStart": false,
+        "delegated": true,
         "forceNewToken": false,
         "scope": [
             "offline_access",
@@ -19,7 +17,9 @@
             "DeviceManagementManagedDevices.ReadWrite.All",
             "DeviceManagementServiceConfig.ReadWrite.All"
         ],
-        "secureString": false
+        "authType": "PublicAuthFlow",
+        "secureString": false,
+        "renewalLeadTime": 5
     },
     "requiredScopes": [
         {
@@ -148,76 +148,99 @@
     ],
     "globalSettings": {
         "configFile": ".\\.secrets\\config.json",
+        "deviceContactThresholdInDays": 30,
+        "autoUpdate": true,
         "maxWaitTime": "30",
         "showLicenseBanner": false,
-        "deviceContactThresholdInDays": 30,
-        "appMode": "full",
         "timeInSeconds": "60",
+        "appMode": "full",
         "maxUserMatchDisplay": "10",
-        "release": "auto",
         "repo": "Github",
         "testMode": false,
-        "operatingSystem": "Windows"
+        "operatingSystem": "Windows",
+        "release": "auto"
     },
     "domains": {
         "contoso.com": {
+            "groupsToExclude": [
+                "administrators",
+                "IT Support"
+            ],
             "groupsToInclude": [
                 "Digital Sales",
                 "Digital Sales - EMEA",
                 "Digital Sales - APAC"
             ],
-            "groupsToExclude": [
-                "administrators",
-                "IT Support"
-            ],
             "settings": {
-                "domain": "contoso.com",
-                "deviceNamePrefix": "win11-",
                 "operatingSystem": "Windows",
-                "maxUserNameLength": 50,
                 "minUsernameLength": 3,
                 "maxSerialNumberLength": 100,
-                "minSerialNumberLength": 7,
-                "minimumDevicePhysicalMemoryInGB": 8,
-                "preferredBrowser": "Chrome",
-                "privateSession": false,
-                "groupTag": "ENTRA",
-                "maxNumberOfDevicesAllowed": 15,
                 "desiredAutopilotProfiles": [
                     "windowsCloudConfig Autopilot profile",
                     "Hybrid join profile"
-                ]
+                ],
+                "groupTag": "ENTRA",
+                "minimumDevicePhysicalMemoryInGB": 8,
+                "maxUserNameLength": 50,
+                "domain": "contoso.com",
+                "preferredBrowser": "Chrome",
+                "deviceNamePrefix": "win11-",
+                "privateSession": false,
+                "maxNumberOfDevicesAllowed": 15,
+                "minSerialNumberLength": 7
             }
         },
         "contoso.de": {
-            "groupsToInclude": [
-                "DE-SA-AFD",
-                "Executive team",
-                "Digital Sales - APAC"
-            ],
             "groupsToExclude": [
                 "external users",
                 "Marketting",
                 "IT Support"
             ],
+            "groupsToInclude": [
+                "DE-SA-AFD",
+                "Executive team",
+                "Digital Sales - APAC"
+            ],
             "settings": {
-                "domain": "contoso.de",
-                "deviceNamePrefix": "contoso-",
                 "operatingSystem": "Windows",
-                "maxUserNameLength": 30,
                 "minUsernameLength": 5,
                 "maxSerialNumberLength": 10,
-                "minSerialNumberLength": 9,
-                "minimumDevicePhysicalMemoryInGB": 16,
-                "preferredBrowser": "Default",
-                "privateSession": true,
-                "groupTag": "Autopilot",
-                "maxNumberOfDevicesAllowed": 5,
                 "desiredAutopilotProfiles": [
                     "Dell devices",
                     "HP devices",
                     "Lenovo devices"
-                ]
+                ],
+                "groupTag": "Autopilot",
+                "minimumDevicePhysicalMemoryInGB": 16,
+                "maxUserNameLength": 30,
+                "domain": "contoso.de",
+                "preferredBrowser": "Default",
+                "deviceNamePrefix": "contoso-",
+                "privateSession": true,
+                "maxNumberOfDevicesAllowed": 5,
+                "minSerialNumberLength": 9
+            }
+        },
+        "arabictutor.com": {
+            "groupsToExclude": [],
+            "groupsToInclude": [],
+            "settings": {
+                "minUsernameLength": 3,
+                "preferredBrowser": "Chrome",
+                "minSerialNumberLength": 7,
+                "privateSession": false,
+                "operatingSystem": "Windows",
+                "userPatternsToExclude": [
+                    "-test",
+                    "onmicrosoft.com"
+                ],
+                "desiredAutopilotProfiles": [],
+                "maxNumberOfDevicesAllowed": 15,
+                "maxUserNameLength": 50,
+                "maxSerialNumberLength": 50,
+                "minimumDevicePhysicalMemoryInGB": 8,
+                "domain": "arabictutor.com",
+                "deviceNamePrefix": ""
             }
         }
     },
