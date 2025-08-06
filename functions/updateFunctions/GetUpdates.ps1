@@ -23,7 +23,7 @@ function GetUpdates()
         return $returnValues.invalidFileType
     }
     
-    $localVersion = getFileVersion -executableFileName $executableFileName
+    $localVersion = (getFileVersion -executableFileName $executableFileName).version
     
     #region get the remote version.
     Write-Verbose "[$functionName] Checking whether the temp update file $tempUpdateFile exists."

@@ -12,6 +12,7 @@ param(
     [switch]$Update,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
+    [switch]$showVersion,
     [switch]$showSettings,
     [switch]$SecureString,
     [switch]$ResetAuth,
@@ -82,6 +83,27 @@ else
 #endregion import functions.
 
 #region Initialize script
+$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+Write-Verbose "[$scriptName] Version: $($version | Out-String)"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
+    $version = @{
+        version     = [System.Version]::Parse('1.0.0.0')
+        companyName = 'Zuhair Mahmoud'
+        major       = 1
+        minor       = 0
+        build       = 0
+        revision    = 0
+    }
+}
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    exit 0  
+}
 $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $Global:MinimumLogLevel = $LogLevel
@@ -556,13 +578,6 @@ Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
-$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
-Write-Verbose "[$scriptName] Version: $version"
-if (-not $version)
-{
-    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
-    $version = [System.Version]::Parse('1.0.0.0')
-}
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -666,8 +681,7 @@ Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: 
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-Write-Host "Copyright (c) $((Get-Date).Year)" -ForegroundColor Cyan
-
+Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
 if ($settings.showLicenseBanner)
 {
     Write-Host "==========================================================`n" -ForegroundColor White     
@@ -683,7 +697,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
+if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version.version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
@@ -1075,9 +1089,9 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device
     {
         # For manufacturerModelSerial type, format as comma-separated string
         Write-Host "This will delete the corporate device identifier for:"
-        Write-Host "  Manufacturer: $($deviceIdentifier.Manufacturer)"
-        Write-Host "  Model: $($deviceIdentifier.Model)"
-        Write-Host "  Serial Number: $($deviceIdentifier.SerialNumber)"
+        Write-Host " Manufacturer: $($deviceIdentifier.Manufacturer)"
+        Write-Host " Model: $($deviceIdentifier.Model)"
+        Write-Host " Serial Number: $($deviceIdentifier.SerialNumber)"
         $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
         while ($choice -notin @('yes', 'no'))
         {
@@ -1377,7 +1391,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
         Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
         Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
         Write-Host ""
-        write-log -logFile $logFile -finishLogging
+        Write-Log -logFile $logFile -finishLogging
         exit  0
     }
     else
@@ -1401,7 +1415,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
-    $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+    $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     if ($null -eq $userName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
@@ -1518,7 +1532,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
-    $username = GetUserInput -Message "Enter the username (email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+    $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
     if ($null -eq $username)
     {

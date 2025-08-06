@@ -534,8 +534,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$global:sig = Invoke-FileCertVerification -FilePath 'main.exe'
-
+$global:version = GetFileVersion -executableFileName "$pwd\main.exe"
+Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
 exit 0 
 $inputFile = Read-Host "Enter the path to the input file"
 if (-not (Test-Path $inputFile))
