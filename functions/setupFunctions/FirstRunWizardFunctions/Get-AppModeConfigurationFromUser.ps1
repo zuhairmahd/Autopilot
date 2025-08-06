@@ -44,7 +44,7 @@ function Get-AppModeConfigurationFromUser()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    
+    Write-Verbose "[$functionName] Starting app mode configuration collection"    
     # Validate context parameter
     if ($Context -notin @('wizard', 'settings'))
     {
@@ -202,7 +202,7 @@ function Get-AppModeConfigurationFromUser()
             selectedChoice       = $result.selectedChoice
             cancelled            = $result.cancelled
             currentModeUnchanged = $result.currentModeUnchanged
-        return $result
+        }
         
     }
     catch
