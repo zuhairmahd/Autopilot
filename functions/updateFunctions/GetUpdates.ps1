@@ -78,6 +78,15 @@ function GetUpdates()
             }
         }
         Write-Host "Proceeding with the update..." -ForegroundColor Green
+        if (Invoke-FileCertVerification -FilePath $tempUpdateFile)
+        {
+            Write-Host "File signature is valid"
+        }
+        else
+        {
+            Write-Host "File signature is invalid. Aborting update." -ForegroundColor Red
+            return $returnValues.InvalidSignatureMessage
+        }   
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
         Write-Verbose "[$functionName] Backing up current $executableFileName to $backupFile."
         try

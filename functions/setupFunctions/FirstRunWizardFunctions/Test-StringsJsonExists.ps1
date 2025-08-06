@@ -38,6 +38,8 @@ function Test-StringsJsonExists()
             returnValues  = @{
                 unknownErrorMessage            = "An unknown error occurred."
                 deviceActionPendingMessage     = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."
+                InvalidSignatureMessage        = "The signature is invalid. The update will be aborted."
+                InvalidFileHash                = "The file hash is invalid. The update will be aborted."
                 NoMenusConfigured              = "No menus are configured. Check the app configuration."
                 backoutText                    = "Returning to previous menu"
                 invalidFileType                = "Invalid file type."
