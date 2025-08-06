@@ -1311,7 +1311,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
     
     # Use the refactored function for consistent app mode selection
-    $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -ShowCancel -Context "settings" -UseMenuSystem
+    $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -Context "settings"
     
     # Handle cancellation
     if ($result.cancelled)

@@ -2,13 +2,12 @@ function Get-AppModeConfigurationFromUser()
 {
     <#
     .SYNOPSIS
-        Collects app mode configuration parameter from the user.
+        Collects app mode configuration parameter from the user using the menu system.
     
     .DESCRIPTION
         Prompts the user to select from available app modes that control which features
-        and menu items are displayed in the Autopilot application. This setting determines
-        the user interface complexity and available functionality. Supports both first-run
-        wizard context and settings menu context with different display options.
+        and menu items are displayed in the Autopilot application. Uses the existing
+        menu system for consistent user experience across the application.
     
     .PARAMETER Silent
         If specified, uses default value ('full' mode).
@@ -16,14 +15,8 @@ function Get-AppModeConfigurationFromUser()
     .PARAMETER CurrentMode
         The current app mode to highlight in the selection. Used in settings menu context.
         
-    .PARAMETER ShowCancel
-        If specified, includes a cancel option in the menu.
-        
     .PARAMETER Context
         Specifies the context for display customization ('wizard' or 'settings').
-        
-    .PARAMETER UseMenuSystem
-        If specified, uses the existing DisplayNumericMenu system for consistent UI.
     
     .OUTPUTS
         System.Collections.Hashtable
@@ -36,22 +29,18 @@ function Get-AppModeConfigurationFromUser()
         $appModeConfig = Get-AppModeConfigurationFromUser -Silent
         
     .EXAMPLE
-        $result = Get-AppModeConfigurationFromUser -CurrentMode "helpDesk" -ShowCancel -Context "settings" -UseMenuSystem
+        $result = Get-AppModeConfigurationFromUser -CurrentMode "helpDesk" -Context "settings"
     
     .NOTES
         - Maintains PowerShell 5.1 compatibility
-        - Provides user-friendly descriptions for each app mode
-        - Validates user input and provides feedback
-        - Integrates with existing menu system for consistent UI
+        - Uses existing menu system for consistent UI navigation
         - Available modes: full, helpDesk, advanced, advancedRegistration, registration, admin, custom
     #>
     [CmdletBinding()]
     param(
         [switch]$Silent,
         [string]$CurrentMode,
-        [switch]$ShowCancel,
-        [string]$Context = 'wizard',
-        [switch]$UseMenuSystem
+        [string]$Context = 'wizard'
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -69,46 +58,18 @@ function Get-AppModeConfigurationFromUser()
         Write-Verbose "[$functionName] Collecting app mode configuration (Context: $Context)"
     }
     Write-Verbose "[$functionName] Starting app mode configuration collection"
-    Write-Verbose "[$functionName] Parameters - Silent: $Silent, CurrentMode: $CurrentMode, ShowCancel: $ShowCancel, Context: $Context, UseMenuSystem: $UseMenuSystem"
+    Write-Verbose "[$functionName] Parameters - Silent: $Silent, CurrentMode: $CurrentMode, Context: $Context"
     
     # Define available app modes with descriptions
-    $appModes = @{
-        '1' = @{
-            Mode = 'full'
-            Name = 'Full Mode'
-            Description = 'Complete feature set with all available functionality (recommended for administrators)'
-        }
-        '2' = @{
-            Mode = 'helpDesk'
-            Name = 'Help Desk Mode'
-            Description = 'Streamlined interface for help desk operations and device troubleshooting'
-        }
-        '3' = @{
-            Mode = 'advanced'
-            Name = 'Advanced Mode'
-            Description = 'Advanced features for experienced users and technical staff'
-        }
-        '4' = @{
-            Mode = 'advancedRegistration'
-            Name = 'Advanced Registration Mode'
-            Description = 'Advanced device registration capabilities with extended options'
-        }
-        '5' = @{
-            Mode = 'registration'
-            Name = 'Registration Mode'
-            Description = 'Device registration and enrollment focused interface'
-        }
-        '6' = @{
-            Mode = 'admin'
-            Name = 'Administrator Mode'
-            Description = 'Administrative functions and system configuration options'
-        }
-        '7' = @{
-            Mode = 'custom'
-            Name = 'Custom Mode'
-            Description = 'Custom configuration for specialized deployments'
-        }
-    }
+    $appModes = @(
+        @{ Mode = 'full'; Name = 'Full Mode'; Description = 'Complete feature set with all available functionality (recommended for administrators)' }
+        @{ Mode = 'helpDesk'; Name = 'Help Desk Mode'; Description = 'Streamlined interface for help desk operations and device troubleshooting' }
+        @{ Mode = 'advanced'; Name = 'Advanced Mode'; Description = 'Advanced features for experienced users and technical staff' }
+        @{ Mode = 'advancedRegistration'; Name = 'Advanced Registration Mode'; Description = 'Advanced device registration capabilities with extended options' }
+        @{ Mode = 'registration'; Name = 'Registration Mode'; Description = 'Device registration and enrollment focused interface' }
+        @{ Mode = 'admin'; Name = 'Administrator Mode'; Description = 'Administrative functions and system configuration options' }
+        @{ Mode = 'custom'; Name = 'Custom Mode'; Description = 'Custom configuration for specialized deployments' }
+    )
     
     # Initialize result object with default values and metadata
     $result = @{
@@ -122,160 +83,76 @@ function Get-AppModeConfigurationFromUser()
     {
         if (-not $Silent)
         {
-            if ($UseMenuSystem -and (Get-Command DisplayNumericMenu -ErrorAction SilentlyContinue))
-            {
-                # Use existing menu system for consistent UI
-                Write-Verbose "[$functionName] Using DisplayNumericMenu for app mode selection"
-                
-                # Prepare menu choices with descriptions
-                $menuChoices = @()
-                foreach ($key in $appModes.Keys | Sort-Object)
-                {
-                    $mode = $appModes[$key]
-                    $marker = ""
-                    if ($CurrentMode -and $mode.Mode -eq $CurrentMode) 
-                    {
-                        $marker = " (Current)"
-                    }
-                    $menuChoices += "$($mode.Name)$marker - $($mode.Description)"
+            # Create menu title and description based on context
+            $menuTitle = switch ($Context) {
+                'settings' { 
+                    $currentModeText = if ($CurrentMode) { " (Current: $CurrentMode)" } else { "" }
+                    "App Mode Selection$currentModeText"
                 }
-                
-                # Add cancel option if requested
-                if ($ShowCancel)
-                {
-                    $menuChoices += "Cancel (keep current setting)"
+                'wizard' { "App Mode Configuration" }
+                default { "Select App Mode" }
+            }
+            
+            $menuDescription = switch ($Context) {
+                'settings' { "Select your preferred app mode. Back and Main options will return you to the previous menu." }
+                'wizard' { "Choose the app mode that best fits your role and requirements." }
+                default { "Select an app mode to configure the application interface." }
+            }
+            
+            # Create the app mode selection menu
+            $appModeMenu = NewMenu -Title $menuTitle -Description $menuDescription
+            
+            # Add menu items for each app mode
+            foreach ($appMode in $appModes) {
+                $itemName = "$($appMode.Name)"
+                if ($CurrentMode -and $appMode.Mode -eq $CurrentMode) {
+                    $itemName += " (Current)"
                 }
+                $itemName += " - $($appMode.Description)"
                 
-                # Display banner based on context
-                $banner = switch ($Context) {
-                    'settings' { 
-                        $currentModeText = if ($CurrentMode) { " (Current: $CurrentMode)" } else { "" }
-                        "══════════════════════════════════════════════════════════════════`n                          App Mode Selection$currentModeText                          `n══════════════════════════════════════════════════════════════════`n`nSelect your preferred app mode:"
-                    }
-                    'wizard' { 
-                        "── App Mode Configuration ──`nThe app mode determines which features and menu items are available.`nChoose the mode that best fits your role and requirements:"
-                    }
-                    default { "Select an app mode:" }
-                }
-                
-                # Use DisplayNumericMenu for selection
-                $menuResult = DisplayNumericMenu -choices $menuChoices -banner $banner -Prompt "Enter your choice"
-                
-                # Process menu result
-                if ($menuResult -eq 0) # Exit selected
-                {
-                    $result.cancelled = $true
-                    return $result
-                }
-                
-                # Calculate choice index (menuResult is 1-based for menu items)
-                $choiceIndex = $menuResult
-                
-                # Handle cancel option
-                if ($ShowCancel -and $choiceIndex -eq ($menuChoices.Count))
-                {
-                    $result.cancelled = $true
-                    return $result
-                }
-                
-                # Get selected mode
-                $selectedModeKey = $choiceIndex.ToString()
-                $selectedMode = $appModes[$selectedModeKey]
-                $result.selectedChoice = $selectedModeKey
-                $result.appMode = $selectedMode.Mode
-                
-                # Check if same as current mode
-                if ($CurrentMode -and $selectedMode.Mode -eq $CurrentMode)
-                {
-                    $result.currentModeUnchanged = $true
+                # Create action that returns the selected mode
+                $selectedMode = $appMode.Mode
+                $appModeMenu = AddMenuItem -Menu $appModeMenu -Name $itemName -Action {
+                    return $selectedMode
+                }.GetNewClosure() -ReturnsValue
+            }
+            
+            # Show the menu and get user selection
+            $menuResult = ShowMenu -Menu $appModeMenu -CalledBy 'Action'
+            
+            # Handle menu navigation results
+            if ($menuResult -eq "Back" -or $menuResult -eq "Main Menu" -or $menuResult -eq "EXIT_APPLICATION") {
+                $result.cancelled = $true
+                return $result
+            }
+            
+            # Check if we got a valid app mode
+            $selectedAppMode = $null
+            foreach ($mode in $appModes) {
+                if ($mode.Mode -eq $menuResult) {
+                    $selectedAppMode = $mode
+                    break
                 }
             }
-            else
-            {
-                # Fallback to original display method
-                Write-Verbose "[$functionName] Using original display method for app mode selection"
-                
-                # Display header based on context
-                switch ($Context) {
-                    'settings' {
-                        Write-Host "`n══════════════════════════════════════════════════════════════════" -ForegroundColor Green
-                        Write-Host "                          App Mode Selection                          " -ForegroundColor Green
-                        Write-Host "══════════════════════════════════════════════════════════════════" -ForegroundColor Green
-                        if ($CurrentMode) {
-                            Write-Host "`nCurrent App Mode: $CurrentMode" -ForegroundColor Yellow
-                        }
-                        Write-Host "`nAvailable App Modes:" -ForegroundColor White
-                    }
-                    'wizard' {
-                        Write-Host "`n── App Mode Configuration ──" -ForegroundColor Cyan
-                        Write-Host "The app mode determines which features and menu items are available." -ForegroundColor White
-                        Write-Host "Choose the mode that best fits your role and requirements:" -ForegroundColor White
-                    }
-                }
-                Write-Host ""
-                
-                # Display all available app modes
-                foreach ($key in $appModes.Keys | Sort-Object)
-                {
-                    $mode = $appModes[$key]
-                    $marker = ""
-                    $color = "White"
-                    if ($CurrentMode -and $mode.Mode -eq $CurrentMode) 
-                    {
-                        $marker = " (Current)"
-                        $color = "Green"
-                    }
-                    Write-Host "$key. $($mode.Name)$marker" -ForegroundColor $color
-                    Write-Host "   $($mode.Description)" -ForegroundColor Gray
-                    Write-Host ""
-                }
-                
-                # Add cancel option if requested
-                if ($ShowCancel)
-                {
-                    $cancelOption = ($appModes.Keys.Count + 1).ToString()
-                    Write-Host "$cancelOption. Cancel (keep current setting)" -ForegroundColor Yellow
-                    Write-Host ""
-                }
-                
-                # Get app mode selection
-                $maxChoice = if ($ShowCancel) { [int]($appModes.Keys.Count) + 1 } else { [int]($appModes.Keys.Count) }
-                $validChoices = 1..$maxChoice | ForEach-Object { $_.ToString() }
-                
-                do
-                {
-                    $appModeChoice = Read-Host "Enter your choice (1-$maxChoice)"
-                    if ($appModeChoice -in $validChoices)
-                    {
-                        break
-                    }
-                    Write-Host "Invalid choice. Please enter a number between 1 and $maxChoice." -ForegroundColor Red
-                } while ($true)
-                
-                # Handle cancel choice
-                if ($ShowCancel -and $appModeChoice -eq $cancelOption)
-                {
-                    $result.cancelled = $true
-                    return $result
-                }
-                
-                # Set selected mode
-                $selectedMode = $appModes[$appModeChoice]
-                $result.selectedChoice = $appModeChoice
-                $result.appMode = $selectedMode.Mode
+            
+            if ($selectedAppMode) {
+                $result.appMode = $selectedAppMode.Mode
+                $result.selectedChoice = ($appModes.IndexOf($selectedAppMode) + 1).ToString()
                 
                 # Check if same as current mode
-                if ($CurrentMode -and $selectedMode.Mode -eq $CurrentMode)
-                {
+                if ($CurrentMode -and $selectedAppMode.Mode -eq $CurrentMode) {
                     $result.currentModeUnchanged = $true
                 }
                 
-                # Display selection confirmation
-                Write-Host "`nApp Mode Selected: $($selectedMode.Name)" -ForegroundColor Green
-                Write-Host "$($selectedMode.Description)" -ForegroundColor Yellow
+                # Display selection confirmation for wizard context
                 if ($Context -eq 'wizard') {
+                    Write-Host "`nApp Mode Selected: $($selectedAppMode.Name)" -ForegroundColor Green
+                    Write-Host "$($selectedAppMode.Description)" -ForegroundColor Yellow
                     Write-Host "`nThis setting controls which menu items and features will be available." -ForegroundColor White
                 }
+            } else {
+                # No valid selection, mark as cancelled
+                $result.cancelled = $true
             }
         }
         else

@@ -65,21 +65,11 @@ try {
     Write-TestResult "Wizard context works" ($null -ne $result3)
     Write-TestResult "Wizard context returns correct default" ($result3.appMode -eq 'full')
     
-    # Test 4: ShowCancel parameter doesn't affect silent mode
-    $result4 = Get-AppModeConfigurationFromUser -Silent -ShowCancel
-    Write-TestResult "ShowCancel in silent mode works" ($null -ne $result4)
-    Write-TestResult "ShowCancel doesn't cancel silent mode" (-not $result4.cancelled)
-    
-    # Test 5: UseMenuSystem parameter doesn't affect silent mode
-    $result5 = Get-AppModeConfigurationFromUser -Silent -UseMenuSystem
-    Write-TestResult "UseMenuSystem in silent mode works" ($null -ne $result5)
-    Write-TestResult "UseMenuSystem doesn't affect silent mode result" ($result5.appMode -eq 'full')
-    
     Write-TestSection "Testing Result Structure Consistency"
     
     # Verify all results have the expected structure
     $expectedProperties = @('appMode', 'selectedChoice', 'cancelled', 'currentModeUnchanged')
-    $results = @($result1, $result2, $result3, $result4, $result5)
+    $results = @($result1, $result2, $result3)
     
     $allHaveCorrectStructure = $true
     foreach ($result in $results) {
@@ -189,10 +179,8 @@ try {
     $paramCombos = @(
         @{Silent=$true},
         @{Silent=$true; CurrentMode="helpDesk"},
-        @{Silent=$true; ShowCancel=$true},
         @{Silent=$true; Context="settings"},
-        @{Silent=$true; UseMenuSystem=$true},
-        @{Silent=$true; CurrentMode="admin"; ShowCancel=$true; Context="settings"; UseMenuSystem=$true}
+        @{Silent=$true; CurrentMode="admin"; Context="settings"}
     )
     
     $comboTestsPassed = 0
