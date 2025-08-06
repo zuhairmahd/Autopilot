@@ -32,7 +32,7 @@ param(
     [ValidateSet('github', 'gitlab')]
     [string]$Repo,  
     [string]$Release,
-    [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'custom')]
+    [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
@@ -498,14 +498,6 @@ else
 #endregion Load parameters from the configuration file if it exists
 
 #region Define variables
-
-# Add top-level menuItemsToInclude array to settings if it exists
-if ($initFileContent.menuItemsToInclude)
-{
-    Write-Verbose "[$scriptName] Adding menuItemsToInclude array from configuration file"
-    $settings.menuItemsToInclude = $initFileContent.menuItemsToInclude
-    Write-Verbose "[$scriptName] Added $($settings.menuItemsToInclude.Count) items to include list"
-}
 if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."

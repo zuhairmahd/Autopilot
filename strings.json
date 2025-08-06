@@ -6,7 +6,6 @@
         "connectToNetwork": "Connect the device to the network for at least 24 hours to update",
         "contactAdmin": "Contact an Intune administrator",
         "contactHelpdesk": "Contact the helpdesk",
-        "NoMenusConfigured": "No menus are configured. Check the app configuration",
         "none": "No action"
     },
     "returnValues": {
