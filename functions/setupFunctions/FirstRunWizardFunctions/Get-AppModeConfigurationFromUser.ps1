@@ -46,15 +46,19 @@ function Get-AppModeConfigurationFromUser()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Validate context parameter
-    if ($Context -notin @('wizard', 'settings')) {
+    if ($Context -notin @('wizard', 'settings'))
+    {
         Write-Verbose "[$functionName] Invalid context '$Context', defaulting to 'wizard'"
         $Context = 'wizard'
     }
     
     # Use Write-SafeLog if available, otherwise fall back to Write-Verbose
-    if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+    if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue)
+    {
         Write-SafeLog "Collecting app mode configuration (Context: $Context)" "Information"
-    } else {
+    }
+    else
+    {
         Write-Verbose "[$functionName] Collecting app mode configuration (Context: $Context)"
     }
     Write-Verbose "[$functionName] Starting app mode configuration collection"
@@ -73,9 +77,9 @@ function Get-AppModeConfigurationFromUser()
     
     # Initialize result object with default values and metadata
     $result = @{
-        appMode = 'full'
-        selectedChoice = '1'
-        cancelled = $false
+        appMode              = 'full'
+        selectedChoice       = '1'
+        cancelled            = $false
         currentModeUnchanged = $false
     }
     
@@ -84,8 +88,10 @@ function Get-AppModeConfigurationFromUser()
         if (-not $Silent)
         {
             # Create menu title and description based on context
-            $menuTitle = switch ($Context) {
-                'settings' { 
+            $menuTitle = switch ($Context)
+            {
+                'settings'
+                { 
                     $currentModeText = if ($CurrentMode) { " (Current: $CurrentMode)" } else { "" }
                     "App Mode Selection$currentModeText"
                 }
@@ -93,7 +99,8 @@ function Get-AppModeConfigurationFromUser()
                 default { "Select App Mode" }
             }
             
-            $menuDescription = switch ($Context) {
+            $menuDescription = switch ($Context)
+            {
                 'settings' { "Select your preferred app mode. Back and Main options will return you to the previous menu." }
                 'wizard' { "Choose the app mode that best fits your role and requirements." }
                 default { "Select an app mode to configure the application interface." }
@@ -103,9 +110,11 @@ function Get-AppModeConfigurationFromUser()
             $appModeMenu = NewMenu -Title $menuTitle -Description $menuDescription
             
             # Add menu items for each app mode
-            foreach ($appMode in $appModes) {
+            foreach ($appMode in $appModes)
+            {
                 $itemName = "$($appMode.Name)"
-                if ($CurrentMode -and $appMode.Mode -eq $CurrentMode) {
+                if ($CurrentMode -and $appMode.Mode -eq $CurrentMode)
+                {
                     $itemName += " (Current)"
                 }
                 $itemName += " - $($appMode.Description)"
@@ -121,36 +130,44 @@ function Get-AppModeConfigurationFromUser()
             $menuResult = ShowMenu -Menu $appModeMenu -CalledBy 'Action'
             
             # Handle menu navigation results
-            if ($menuResult -eq "Back" -or $menuResult -eq "Main Menu" -or $menuResult -eq "EXIT_APPLICATION") {
+            if ($menuResult -eq "Back" -or $menuResult -eq "Main Menu" -or $menuResult -eq "EXIT_APPLICATION")
+            {
                 $result.cancelled = $true
                 return $result
             }
             
             # Check if we got a valid app mode
             $selectedAppMode = $null
-            foreach ($mode in $appModes) {
-                if ($mode.Mode -eq $menuResult) {
+            foreach ($mode in $appModes)
+            {
+                if ($mode.Mode -eq $menuResult)
+                {
                     $selectedAppMode = $mode
                     break
                 }
             }
             
-            if ($selectedAppMode) {
+            if ($selectedAppMode)
+            {
                 $result.appMode = $selectedAppMode.Mode
                 $result.selectedChoice = ($appModes.IndexOf($selectedAppMode) + 1).ToString()
                 
                 # Check if same as current mode
-                if ($CurrentMode -and $selectedAppMode.Mode -eq $CurrentMode) {
+                if ($CurrentMode -and $selectedAppMode.Mode -eq $CurrentMode)
+                {
                     $result.currentModeUnchanged = $true
                 }
                 
                 # Display selection confirmation for wizard context
-                if ($Context -eq 'wizard') {
+                if ($Context -eq 'wizard')
+                {
                     Write-Host "`nApp Mode Selected: $($selectedAppMode.Name)" -ForegroundColor Green
                     Write-Host "$($selectedAppMode.Description)" -ForegroundColor Yellow
                     Write-Host "`nThis setting controls which menu items and features will be available." -ForegroundColor White
                 }
-            } else {
+            }
+            else
+            {
                 # No valid selection, mark as cancelled
                 $result.cancelled = $true
             }
@@ -160,43 +177,47 @@ function Get-AppModeConfigurationFromUser()
             # Silent mode - use defaults
             $result.selectedChoice = "1"
             $result.appMode = "full"
-            if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+            if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue)
+            {
                 Write-SafeLog "Using default app mode (full) in silent mode" "Information"
             }
             Write-Verbose "[$functionName] Using default app mode in silent mode"
         }
         
-        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue)
+        {
             Write-SafeLog "App mode choice selected: $($result.selectedChoice), Mode: $($result.appMode)" "Debug"
         }
         Write-Verbose "[$functionName] User selected app mode choice: $($result.selectedChoice), Mode: $($result.appMode)"
         
-        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue)
+        {
             Write-SafeLog "App mode configuration completed successfully: $($result.appMode)" "Information"
         }
         Write-Verbose "[$functionName] App mode configuration collected successfully: $($result.appMode)"
         
         # Ensure we return a proper hashtable
         return @{
-            appMode = $result.appMode
-            selectedChoice = $result.selectedChoice
-            cancelled = $result.cancelled
+            appMode              = $result.appMode
+            selectedChoice       = $result.selectedChoice
+            cancelled            = $result.cancelled
             currentModeUnchanged = $result.currentModeUnchanged
         }
         
     }
     catch
     {
-        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue)
+        {
             Write-SafeLog "Error collecting app mode configuration: $($_.Exception.Message)" "Error"
         }
         Write-Verbose "[$functionName] Error: $($_.Exception.Message)"
         
         # Return cancelled result on error
         return @{
-            appMode = 'full'
-            selectedChoice = '1'  
-            cancelled = $true
+            appMode              = 'full'
+            selectedChoice       = '1'  
+            cancelled            = $true
             currentModeUnchanged = $false
         }
     }
