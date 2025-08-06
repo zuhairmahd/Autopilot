@@ -522,11 +522,13 @@ Get-CallingContext [-Menu <Object>] [-PreferredContext <String>] [-IncludeNaviga
 
 **Test-MenuItemIncluded**
 ```powershell
-Test-MenuItemIncluded -MenuItemName <String>
+Test-MenuItemIncluded -MenuItemName <String> [-Menus <PSCustomObject[]>]
 ```
-- Tests whether a menu item should be included based on current settings
-- Implements menu inclusion system for role-based access control
-- Returns boolean indicating whether item should be included
+- Tests whether a menu item should be included based on menu configuration
+- Searches through menu structure to find item by name and checks includeInDisplayModes array
+- Returns true if menu item matches current appMode, if item not found, or if Menus parameter is null
+- Returns false only if menu item is found but includeInDisplayModes doesn't match current appMode
+- Implements hierarchical menu inclusion system for role-based access control
 
 #### SettingsHelperFunctions.ps1
 

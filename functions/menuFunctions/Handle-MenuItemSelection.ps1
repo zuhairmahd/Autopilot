@@ -3,12 +3,16 @@ function Handle-MenuItemSelection()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        $SelectedOption,
+        [ValidateNotNullOrEmpty()]
+        [string]$SelectedOption,
         [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
         [array]$Choices,
         [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
         [array]$MenuItems,
         [Parameter(Mandatory = $true)]
+        [ValidateNotNull()]
         [hashtable]$CurrentMenu
     )
     

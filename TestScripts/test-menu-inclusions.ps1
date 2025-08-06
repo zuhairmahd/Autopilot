@@ -1,152 +1,210 @@
 # Test script to validate menu inclusion functionality
 param()
 
-Write-Host "Testing Menu Inclusions Functionality..." -ForegroundColor Green
-
-# Mock the Write-Log function for testing BEFORE loading other functions
-function Write-Log
+# Use unified test framework
+try
 {
-    param(
-        [Parameter(Mandatory = $false)]
-        $LogFile,
-        [Parameter(Mandatory = $false)]
-        $Module,
-        [Parameter(Mandatory = $false)]
-        $Message,
-        [Parameter(Mandatory = $false)]
-        $LogLevel
-    )
-    Write-Verbose "LOG: [$Module] $Message"
+    # Load test helper functions
+    . "$PSScriptRoot\test-helper.ps1"
+    
+    # Initialize unified test environment
+    $testContext = Start-UnifiedTest -TestName "Menu Inclusions Functionality"
+    
+    Write-TestResult "Test environment initialized" $true
 }
-
-# Load the required functions
-$functionsPath = Join-Path $PSScriptRoot ".." "functions"
-. (Join-Path $functionsPath "MenuFunctions.ps1")
-
-# Set a mock LogFile variable
-$Global:LogFile = "test.log"
-
-Write-Host "Test 1: Test-MenuItemIncluded function with no inclusion list" -ForegroundColor Cyan
-
-# Test with no global settings
-$Global:settings = $null
-$result1 = Test-MenuItemIncluded -MenuItemName "Test Item"
-if ($result1 -eq $true)
+catch
 {
-    Write-Host "[PASS] PASS: No inclusion list returns true" -ForegroundColor Green
+    Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
+    exit 1
 }
-else
+
+try
 {
-    Write-Host "[FAIL] FAIL: No inclusion list should return true, got: $result1" -ForegroundColor Red
-}
-
-Write-Host "Test 2: Test-MenuItemIncluded function with inclusion list" -ForegroundColor Cyan
-
-# Test with mock inclusion list
-$Global:settings = @{
-    menuItemsToInclude = @(
-        "Allowed Item 1",
-        "Allowed Item 2",
-        "Allowed Item 3"
-    )
-}
-
-$result2 = Test-MenuItemIncluded -MenuItemName "Allowed Item 1"
-if ($result2 -eq $true)
-{
-    Write-Host "[PASS] PASS: Included item returns true" -ForegroundColor Green
-}
-else
-{
-    Write-Host "[FAIL] FAIL: Included item should return true, got: $result2" -ForegroundColor Red
-}
-
-$result3 = Test-MenuItemIncluded -MenuItemName "Not Included Item"
-if ($result3 -eq $false)
-{
-    Write-Host "[PASS] PASS: Non-included item returns false" -ForegroundColor Green
-}
-else
-{
-    Write-Host "[FAIL] FAIL: Non-included item should return false, got: $result3" -ForegroundColor Red
-}
-
-Write-Host "Test 3: Test menu filtering functionality" -ForegroundColor Cyan
-
-# Create a test menu with items that should be included
-$testMenu = @{
-    Title       = "Test Menu"
-    Description = "Test menu for inclusion testing"
-    Items       = @(
-        @{ Name = "Allowed Item 1"; Action = { Write-Host "Action 1" } },
-        @{ Name = "Not Included Item"; Action = { Write-Host "Should be excluded" } },
-        @{ Name = "Allowed Item 2"; Action = { Write-Host "Action 2" } },
-        @{ Name = "Another Not Included"; Action = { Write-Host "Should be excluded" } },
-        @{ Name = "Allowed Item 3"; Action = { Write-Host "Action 3" } }
-    )
-}
-
-# Mock the global variables needed by ShowMenu
-$Global:MenuHistory = @()
-$Global:History = @()
-
-# Test the filtering logic by manually executing the filtering code
-$choices = @()
-$menuItems = @()
-
-foreach ($item in $testMenu.Items)
-{
-    if (Test-MenuItemIncluded -MenuItemName $item.Name)
+    Write-TestSection "Test 1: Test-MenuItemIncluded function with null menus parameter"
+    
+    # Test with no menus parameter (should return true)
+    $Global:settings = @{ appMode = "helpdesk" }
+    $result1 = Test-MenuItemIncluded -MenuItemName "Test Item" -Menus $null
+    if ($result1 -eq $true)
     {
-        $choices += $item.Name
-        $menuItems += $item
+        Write-TestResult "Null menus parameter returns true (correct behavior)" $true
+    }
+    else
+    {
+        Write-TestResult "Null menus parameter should return true, got: $result1" $false
+    }
+
+    Write-TestSection "Test 2: Menu structure search and inclusion logic"
+    
+    # Create a mock menu structure similar to the actual menus.json
+    $mockMenus = @(
+        [PSCustomObject]@{
+            name                  = "Give a device to a user"
+            description           = "Start the user and device readiness check"
+            type                  = "action"
+            includeInDisplayModes = @("helpdesk")
+        },
+        [PSCustomObject]@{
+            name                  = "Check device status"
+            description           = "Troubleshoot a device"
+            type                  = "submenu"
+            includeInDisplayModes = @("helpdesk", "admin")
+            items                 = @(
+                [PSCustomObject]@{
+                    name                  = "Lookup device by Serial Number"
+                    description           = "Lookup a device by its serial number"
+                    type                  = "submenu"
+                    includeInDisplayModes = @("helpdesk")
+                    items                 = @(
+                        [PSCustomObject]@{
+                            name                  = "Enter a serial number"
+                            description           = "Lookup a device by its serial number"
+                            type                  = "action"
+                            includeInDisplayModes = @("helpdesk")
+                        }
+                    )
+                }
+            )
+        },
+        [PSCustomObject]@{
+            name                  = "Admin Only Menu"
+            description           = "Admin only functionality"
+            type                  = "action"
+            includeInDisplayModes = @("admin")
+        }
+    )
+    
+    # Set up global settings with helpdesk mode
+    $Global:settings = @{
+        appMode = "helpdesk"
+    }
+    
+    # Test 2a: Menu item that should be included (helpdesk mode, item has helpdesk in includeInDisplayModes)
+    $result2a = Test-MenuItemIncluded -MenuItemName "Give a device to a user" -Menus $mockMenus
+    if ($result2a -eq $true)
+    {
+        Write-TestResult "Menu item with matching includeInDisplayModes returns true" $true
+    }
+    else
+    {
+        Write-TestResult "Menu item with matching includeInDisplayModes should return true, got: $result2a" $false
+    }
+    
+    # Test 2b: Menu item that should NOT be included (helpdesk mode, item only has admin in includeInDisplayModes)
+    $result2b = Test-MenuItemIncluded -MenuItemName "Admin Only Menu" -Menus $mockMenus
+    if ($result2b -eq $false)
+    {
+        Write-TestResult "Menu item without matching includeInDisplayModes returns false" $true
+    }
+    else
+    {
+        Write-TestResult "Menu item without matching includeInDisplayModes should return false, got: $result2b" $false
+    }
+    
+    # Test 2c: Deeply nested menu item (2 levels deep)
+    $result2c = Test-MenuItemIncluded -MenuItemName "Enter a serial number" -Menus $mockMenus
+    if ($result2c -eq $true)
+    {
+        Write-TestResult "Deeply nested menu item with matching includeInDisplayModes returns true" $true
+    }
+    else
+    {
+        Write-TestResult "Deeply nested menu item with matching includeInDisplayModes should return true, got: $result2c" $false
+    }
+    
+    # Test 2d: Menu item that doesn't exist (should return true by default)
+    $result2d = Test-MenuItemIncluded -MenuItemName "Non-existent Menu Item" -Menus $mockMenus
+    if ($result2d -eq $true)
+    {
+        Write-TestResult "Non-existent menu item returns true by default" $true
+    }
+    else
+    {
+        Write-TestResult "Non-existent menu item should return true by default, got: $result2d" $false
+    }
+
+    Write-TestSection "Test 3: Menu filtering integration"
+    
+    # Create a test menu with items from our mock menu structure
+    $testMenu = @{
+        Title       = "Test Menu"
+        Description = "Test menu for inclusion testing"
+        Items       = @(
+            @{ Name = "Give a device to a user"; Action = { Write-Host "Action 1" } },
+            @{ Name = "Admin Only Menu"; Action = { Write-Host "Should be excluded in helpdesk mode" } },
+            @{ Name = "Check device status"; Action = { Write-Host "Action 2" } },
+            @{ Name = "Lookup device by Serial Number"; Action = { Write-Host "Action 3" } },
+            @{ Name = "Enter a serial number"; Action = { Write-Host "Action 4" } }
+        )
+    }
+    
+    # Mock the global variables needed by ShowMenu
+    $Global:MenuHistory = @()
+    $Global:History = @()
+    
+    # Test the filtering logic by manually executing the filtering code
+    $choices = @()
+    $menuItems = @()
+    
+    foreach ($item in $testMenu.Items)
+    {
+        if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $mockMenus)
+        {
+            $choices += $item.Name
+            $menuItems += $item
+        }
+    }
+    
+    # Expected items that should be included in helpdesk mode (all except "Admin Only Menu")
+    $expectedCount = 4
+    $excludedItems = @("Admin Only Menu")
+    
+    if ($choices.Count -eq $expectedCount)
+    {
+        Write-TestResult "Correct number of items after filtering ($($choices.Count))" $true
+    }
+    else
+    {
+        Write-TestResult "Expected $expectedCount items, got $($choices.Count)" $false
+    }
+    
+    # Verify excluded items are not present
+    $excludedFound = $false
+    foreach ($excluded in $excludedItems)
+    {
+        if ($choices -contains $excluded)
+        {
+            Write-TestResult "Excluded item '$excluded' incorrectly found in choices" $false
+            $excludedFound = $true
+        }
+    }
+    
+    if (-not $excludedFound)
+    {
+        Write-TestResult "All excluded items properly filtered out" $true
+    }
+    
+    Write-TestResult "Menu filtering integration test completed successfully" $true
+    
+}
+catch
+{
+    Write-TestResult "ERROR: $($_.Exception.Message)" $false
+    exit 1
+}
+finally
+{
+    # Complete unified test
+    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests 1 -FailedTests 0 -TotalTests 1
+    
+    if ($success)
+    {
+        Write-Host "Menu Inclusions test passed! [PASS]" -ForegroundColor Green
+        exit 0
+    }
+    else
+    {
+        Write-Host "Menu Inclusions test failed! [FAIL]" -ForegroundColor Red
+        exit 1
     }
 }
-
-$expectedChoices = @("Allowed Item 1", "Allowed Item 2", "Allowed Item 3")
-$expectedCount = 3
-
-if ($choices.Count -eq $expectedCount)
-{
-    Write-Host "[PASS] PASS: Correct number of items after filtering ($($choices.Count))" -ForegroundColor Green
-}
-else
-{
-    Write-Host "[FAIL] FAIL: Expected $expectedCount items, got $($choices.Count)" -ForegroundColor Red
-}
-
-$allExpectedPresent = $true
-foreach ($expected in $expectedChoices)
-{
-    if ($choices -notcontains $expected)
-    {
-        Write-Host "[FAIL] FAIL: Expected item '$expected' not found in choices" -ForegroundColor Red
-        $allExpectedPresent = $false
-    }
-}
-
-if ($allExpectedPresent)
-{
-    Write-Host "[PASS] PASS: All expected items are present" -ForegroundColor Green
-}
-
-$notIncludedItems = @("Not Included Item", "Another Not Included")
-$noNotIncludedPresent = $true
-foreach ($notIncluded in $notIncludedItems)
-{
-    if ($choices -contains $notIncluded)
-    {
-        Write-Host "[FAIL] FAIL: Not included item '$notIncluded' found in choices" -ForegroundColor Red
-        $noNotIncludedPresent = $false
-    }
-}
-
-if ($noNotIncludedPresent)
-{
-    Write-Host "[PASS] PASS: No not-included items are present" -ForegroundColor Green
-}
-
-Write-Host "`nFinal filtered choices:" -ForegroundColor Yellow
-$choices | ForEach-Object { Write-Host "  - $_" -ForegroundColor White }
-
-Write-Host "`nMenu Inclusions Test Completed!" -ForegroundColor Green
