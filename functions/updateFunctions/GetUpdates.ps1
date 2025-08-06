@@ -46,8 +46,23 @@ function GetUpdates()
         return $null
     }    
     $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
-    Write-Host "Getting file metadata from $metaDataURL"
-    $fileMetaData = Invoke-WebRequest -Uri $metaDataURL -UseBasicParsing
+    Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
+    try 
+    {
+        $fileMetaData = Invoke-WebRequest -Uri $metaDataURL -UseBasicParsing
+        Write-Verbose "[$functionName] Metadata retrieved successfully."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Metadata retrieved successfully." -LogLevel "Information"
+        Write-Verbose "Response: $fileMetaData"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $fileMetaData" -LogLevel "Information"
+        Write-Verbose "[$functionName] Metadata content: $($fileMetaData.Content)"
+    }
+    catch 
+    {
+        Write-Error "[$functionName] Failed to retrieve metadata from $metaDataURL. Please check the URL and try again."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve metadata from $metaDataURL. Please check the URL and try again." -LogLevel "Error"
+        return $false
+    }
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
     
