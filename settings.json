@@ -328,6 +328,12 @@
                     "includeInDisplayModes": []
                 },
                 {
+                    "description": "Change the application mode",
+                    "name": "Change application mode",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
                     "description": "Restore the application to its default settings",
                     "name": "Restore defaults",
                     "type": "action",

@@ -345,6 +345,12 @@ function Test-SettingsJsonExists()
                             includeInDisplayModes = @()
                         },
                         @{
+                            name                  = "Change App Mode setting"
+                            description           = "Change the application mode"
+                            type                  = "action"
+                            includeInDisplayModes = @("full", "helpDesk", "advanced", "advancedRegistration", "registration", "admin", "custom")
+                        },  
+                        @{
                             name                  = "Restore defaults"
                             description           = "Restore the application to its default settings"
                             type                  = "action"
