@@ -243,16 +243,15 @@ When running the application for the first time, the First Run Wizard will promp
 4. Complete the remaining setup steps
 
 #### Changing App Mode Later
-You can change the app mode at any time through the settings menu with an improved interface:
+You can change the app mode at any time through the settings menu:
 
 1. Navigate to **Change application settings** → **Change App Mode setting**
-2. The menu will display your current app mode highlighted in green
-3. Select your new app mode from the available options with detailed descriptions
-4. Choose to cancel if you want to keep your current setting
-5. Confirm the change when prompted
-6. Restart the application when prompted to apply the new mode
+2. Use the interactive menu to select from available app modes with detailed descriptions
+3. The system displays your current mode and provides navigation options (Back/Main)
+4. Confirm the change when prompted
+5. Restart the application when prompted to apply the new mode
 
-**Note**: The app mode selection interface has been enhanced to provide consistent user experience whether you're in the first-run wizard or changing settings later. The system now shows your current mode, provides detailed descriptions for each option, and includes a cancel option to keep your current setting.
+**Note**: The app mode selection uses the application's standard menu system for consistent navigation and user experience across all contexts.
 
 ### Custom App Mode Configuration
 
