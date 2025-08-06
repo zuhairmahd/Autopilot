@@ -45,7 +45,7 @@ function GetUpdates()
         Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
         return $null
     }    
-    $remoteVersion = GetFileVersion -executableFileName $tempUpdateFile
+    $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
     $fileMetaData = Invoke-WebRequest -Uri $metaDataURL -UseBasicParsing
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
