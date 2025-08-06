@@ -659,6 +659,29 @@ The application uses an inclusion-based menu system for role-based access contro
 
 When `appMode` is set to "full", all menu items are shown. For other modes, only items listed in `menuItemsToInclude` are displayed.
 
+#### App Mode Configuration
+The application supports multiple predefined app modes with user-friendly configuration:
+
+**Available App Modes:**
+- `full` - Complete feature set (default)
+- `helpDesk` - Streamlined help desk operations
+- `advanced` - Advanced features for technical staff
+- `advancedRegistration` - Advanced device registration
+- `registration` - Device registration focused
+- `admin` - Administrative functions
+- `custom` - Custom configuration
+
+**Configuration Methods:**
+1. **First-Run Wizard**: Guided selection during initial setup via `Get-AppModeConfigurationFromUser`
+2. **Settings Menu**: Runtime changes through "Change App Mode setting" menu item
+3. **Manual**: Direct editing of `settings.json`
+
+**Implementation Details:**
+- App mode changes require application restart to take effect
+- Mode validation occurs at startup (line 443 in main.ps1)
+- Settings updated using `Update-GlobalSetting` function
+- User prompted for restart confirmation after mode change
+
 ### Context-Aware Navigation
 
 The `Get-CallingContext` function provides enhanced context detection:
