@@ -2,6 +2,8 @@
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
+    [string]$stringsFile = "$pwd\strings.json",
+    [string]$menusFile = "$pwd\menus.json",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -30,7 +32,7 @@ param(
     [ValidateSet('github', 'gitlab')]
     [string]$Repo,  
     [string]$Release,
-    [ValidateSet('full', 'helpDesk', 'registration')]
+    [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
@@ -95,7 +97,6 @@ if (Test-Path $oldExecutableFileName)
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
-
 # Check if the .secrets directory exists, create it if it doesn't
 $secretsDir = Split-Path $configFile -Parent
 if (-not (Test-Path $secretsDir))
@@ -106,7 +107,6 @@ if (-not (Test-Path $secretsDir))
 
 # Initialize variables for encryption handling
 $configContent = $null
-$userPassword = $null
 $script:maxRetries = 6
 
 if (Test-Path $configFile)
@@ -310,7 +310,14 @@ if (Test-Path -Path $InitFile)
     # Ensure settings.json file has all required default values
     Write-Verbose "[$scriptName] Checking settings.json for missing default values"
     # Use domain if available, otherwise default to example.com
-    $domainForDefaults = if ($domain) { $domain } else { "contoso.com" }
+    $domainForDefaults = if ($domain)
+    {
+        $domain 
+    }
+    else
+    {
+        "contoso.com" 
+    }
     $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
     if ($settingsUpdated)
     {
@@ -318,7 +325,6 @@ if (Test-Path -Path $InitFile)
     }
     
     # Ensure strings.json file has all required default values  
-    $stringsFile = "$PWD\strings.json"
     Write-Verbose "[$scriptName] Checking strings.json for missing default values"
     $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
     if ($stringsUpdated)
@@ -326,12 +332,11 @@ if (Test-Path -Path $InitFile)
         Write-Verbose "[$scriptName] Strings file checked/updated successfully"
     }
     
-    $global:globalSettings = @{}
-    $global:localSettings = @{}
+    $globalSettings = @{}
+    $localSettings = @{}
     
     # Load the init file content (potentially updated with new defaults)
     $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-    
     # Load auth configuration from init file
     $authConfiguration = $initFileContent.auth
     $auth = @{}
@@ -427,6 +432,25 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    #merge the local and global settings.
+    $script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+    #if the appMode is not set, default to 'full', otherwise make sure it is avalid appMode.
+    if (-not $script:settings.appMode)
+    {
+        Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
+        $script:settings.appMode = 'full'
+    }
+    elseif ($script:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
+    {
+        Write-Host "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
+        Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
+        exit 1
+    }
+    #load menus configuration from initFile
+    $menus = $initFileContent.menus
+    Write-Verbose "[$scriptName] Loaded $($($menus.Count)) menus from $InitFile"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($($menus.Count)) menus from $InitFile" -logLevel "Information"
     #region handle scopes
     $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
     $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
@@ -474,16 +498,6 @@ else
 #endregion Load parameters from the configuration file if it exists
 
 #region Define variables
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-# Add top-level menuItemsToInclude array to settings if it exists
-if ($initFileContent.menuItemsToInclude)
-{
-    Write-Verbose "[$scriptName] Adding menuItemsToInclude array from configuration file"
-    $settings.menuItemsToInclude = $initFileContent.menuItemsToInclude
-    Write-Verbose "[$scriptName] Added $($settings.menuItemsToInclude.Count) items to include list"
-}
-# Make settings globally available for menu inclusion functionality
-$Global:settings = $settings
 if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
@@ -575,10 +589,9 @@ foreach ($key in $getTokenParams.Keys)
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
-$stringsFile = "$PWD\strings.json"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
 $loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
-$returnValues = $loadedStrings.returnValues
+$global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
 Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
@@ -653,7 +666,7 @@ Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: 
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+Write-Host "Copyright (c) $((Get-Date).Year)" -ForegroundColor Cyan
 
 if ($settings.showLicenseBanner)
 {
@@ -796,6 +809,7 @@ else
     }
 }
 #endregion initialization block with access token
+
 
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
@@ -1582,7 +1596,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
     }
 }
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status " -Submenu $CheckMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
@@ -1658,7 +1672,17 @@ catch
 if ($settings.testMode -eq $false)
 {
     Write-Verbose "Test mode: $($settings.testMode)" 
-    $result = ShowMenu -Menu $mainMenu
+    if ($null -ne $mainMenu)
+    {
+        Write-Verbose "[$scriptName] Showing main menu."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
+        $result = ShowMenu -Menu $mainMenu
+    }
+    else
+    {
+        Write-Host "Main menu is not defined. Please check the script configuration." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Main menu is not defined. Please check the script configuration." -LogLevel "Error"
+    }
     if ($null -eq $result)
     {
         Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green

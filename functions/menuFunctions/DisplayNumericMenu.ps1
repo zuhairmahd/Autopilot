@@ -2,8 +2,8 @@ function DisplayNumericMenu()
 {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
         [string[]]$choices,
+        [Parameter(Mandatory = $true)][string[]]$choices,
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
@@ -17,7 +17,13 @@ function DisplayNumericMenu()
     Write-Verbose "[$functionName] ErrorMessage: $errorMessage"
     Write-Verbose "[$functionName] Banner: $banner"
     #endregion
-
+    #Check if we are passed a blank array and return gracefully
+    if (-not $choices -or $choices.Count -eq 0)
+    {
+        Write-Verbose "[$functionName] No choices provided, returning no menus configured message."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No menu items available to display." -LogLevel "Warning"
+        return $returnValues.NoMenusConfigured
+    }
     # Display the menu options
     Write-Host $banner -ForegroundColor Green
     for ($i = 0; $i -lt $choices.Count; $i++)
@@ -81,7 +87,7 @@ function DisplayNumericMenu()
             Write-Verbose "[$functionName] Waiting for key press..."
             try
             {
-                $keyInfo = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+                $keyInfo = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
                 $selection = $keyInfo.Character.ToString().ToLower()
                 Write-Verbose "[$functionName] Key pressed: '$selection' (Character code: $([int]$keyInfo.Character))"
                 $keyCode = [int]$keyInfo.VirtualKeyCode
@@ -133,7 +139,7 @@ function DisplayNumericMenu()
         {
             # Re-prompt
             $selection = $null
-            $keyInfo = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+            $keyInfo = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
             $selection = [string]$keyInfo.Character.ToString().ToLower()
         }
     }

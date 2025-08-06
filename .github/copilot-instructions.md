@@ -31,6 +31,10 @@ This repository is a PowerShell-based Windows Autopilot device enrollment and ma
 - **Domain-Specific Behavior:**  
   - Domains like `gao.gov` and `arabictutor.com` have custom settings for device naming, group membership, and security.
 
+## Documentation
+
+README.md is the user facing documentation.  It should always be written from an end user's perspective and should focus on the features of the script, what they do, and when and how to use them.  Developer documentation is in the `/docs/` directory, including detailed API integration, configuration management, and development patterns.
+
 ## Key Files & Directories
 
 - `/functions/`: All core logic modules (see `CLAUDE.md` for descriptions)
