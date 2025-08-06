@@ -91,8 +91,8 @@ function GetUpdates()
             Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
             $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256
-            Write-Verbose "[$functionName] File hash for $tempUpdateFile: $($fileHash.Hash)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile: $($fileHash.Hash)" -LogLevel "Information"
+            Write-Verbose "[$functionName] File hash for $($tempUpdateFile) is $($fileHash.Hash)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
             Write-Host "Checking file hash..."
             if ($fileMetaData.Hash -eq $fileHash.Hash)
             {
@@ -107,7 +107,7 @@ function GetUpdates()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash. Aborting update." -LogLevel "Error"
                 return $returnValues.InvalidFileHash
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile: $($fileHash.Hash)" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
         }
         else
         {
