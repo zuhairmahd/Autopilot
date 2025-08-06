@@ -108,6 +108,7 @@
                         "helpdesk"
                     ]
                 },
+                },
                 {
                     "name": "Download and install latest Windows updates(requires admin rights)",
                     "description": "Download and install the latest Windows updates",
