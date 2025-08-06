@@ -202,7 +202,7 @@ function Get-AppModeConfigurationFromUser()
             selectedChoice       = $result.selectedChoice
             cancelled            = $result.cancelled
             currentModeUnchanged = $result.currentModeUnchanged
-        }
+        return $result
         
     }
     catch
