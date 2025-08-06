@@ -162,29 +162,68 @@ Example configuration:
 }
 ```
 
-### Application Modes
+### Custom App Mode
 
-The tool supports different operational modes:
+### What is Custom App Mode?
 
-- **Full Mode** (`appMode: "full"`): Complete feature set for administrators
-- **Help Desk Mode** (`appMode: "helpDesk"`): Limited features appropriate for help desk personnel  
-- **Registration Mode** (`appMode: "registration"`): Focused on device registration tasks
+Custom App Mode allows administrators to define a tailored set of menu options for specific user roles or operational scenarios. When enabled, only the menu items explicitly listed in the `menuItemsToInclude` array in `settings.json` will be shown to the user. This provides granular control over the application's interface, ensuring users only see the features relevant to their responsibilities.
 
-### Authentication Types
+### How to Enable Custom App Mode
 
-The application supports multiple authentication flows:
+1. Open your `settings.json` file.
+2. Set the `appMode` property to a custom value (e.g., `"custom"`, `"helpDesk"`, or any string other than `"full"`).
+3. Add a `menuItemsToInclude` array listing the menu item names you want visible:
 
-- **PublicAuthFlow** (Recommended): Public client authentication without app secrets
-- **Interactive**: Browser-based user authentication
-- **Private**: Confidential client with app secrets or certificates
+```json
+{
+  "appMode": "custom",
+  "menuItemsToInclude": [
+    "Give a device to a user",
+    "Check device status",
+    "Export Menu",
+    "About"
+  ]
+}
+```
 
-### Auto Update Configuration
+### How It Works
+- When `appMode` is set to `"full"`, all menu items are displayed.
+- When set to any other value, only the items listed in `menuItemsToInclude` are shown.
+- This applies to all users, making it easy to restrict access to advanced or administrative features.
+- The menu system will automatically hide any items not included in the array, including submenus and actions.
 
-Control automatic updates through the settings:
+### Use Cases
+- Limit help desk users to basic device assignment and status checks
+- Provide a simplified interface for onboarding or registration scenarios
+- Restrict access to sensitive operations (e.g., device wipe, advanced settings)
 
-- **Enable**: Script automatically checks for and installs updates
-- **Disable**: Manual update checking only
-- **Configuration**: Set during First Run Wizard or in `settings.json`
+### Example
+If you want help desk users to only see device assignment, status checks, and the About page, configure your settings as follows:
+
+```json
+{
+  "appMode": "helpDesk",
+  "menuItemsToInclude": [
+    "Give a device to a user",
+    "Check device status",
+    "About"
+  ]
+}
+```
+
+The application will display only those menu options, hiding all others.
+
+---
+
+## Application Modes
+
+The tool supports several operational modes:
+
+- **Full Mode** (`appMode: "full"`): All features and menu items are available.
+- **Custom/Help Desk Mode** (`appMode: "custom"` or `"helpDesk"`): Only menu items listed in `menuItemsToInclude` are shown.
+- **Registration Mode** (`appMode: "registration"`): Focused on device registration tasks.
+
+---
 
 ## Security and Password Management
 
