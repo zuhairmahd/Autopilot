@@ -223,6 +223,254 @@ function Test-SettingsJsonExists()
                     }
                 }
             }
+            menus          = @(
+                @{
+                    name                  = "Give a device to a user"
+                    description           = "Start the user and device readiness check"
+                    type                  = "action"
+                    includeInDisplayModes = @("helpdesk", "registration")
+                },
+                @{
+                    name                  = "Check device status"
+                    description           = "Troubleshoot a device"
+                    type                  = "submenu"
+                    includeInDisplayModes = @("helpdesk", "registration")
+                    items                 = @(
+                        @{
+                            name                  = "Lookup device by Serial Number"
+                            description           = "Lookup a device by its serial number"
+                            type                  = "submenu"
+                            includeInDisplayModes = @()
+                            items                 = @(
+                                @{
+                                    name                  = "Enter a serial number"
+                                    description           = "Lookup a device by its serial number"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                },
+                                @{
+                                    name                  = "Use this device's serial number"
+                                    description           = "Lookup the device the application is running on"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                            )
+                        },
+                        @{
+                            name                  = "Lookup device by User"
+                            description           = "Lookup a device by the user id or email address"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        }
+                    )
+                },
+                @{
+                    name                  = "Autopilot menu"
+                    description           = "Import a device into Autopilot and perform related actions"
+                    type                  = "submenu"
+                    includeInDisplayModes = @("registration")
+                    items                 = @(
+                        @{
+                            name                  = "Import device into Autopilot"
+                            description           = "Import a device into Autopilot"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Custom import device into Autopilot (requires admin rights)"
+                            description           = "Custom import a device into Autopilot"
+                            type                  = "action"
+                            includeInDisplayModes = @("advancedRegistration")
+                        },
+                        @{
+                            name                  = "Import Corporate Device Identifier for Device Preparation (requires admin rights)"
+                            description           = "Import a Corporate Device Identifier for Device Preparation"
+                            type                  = "action"
+                            includeInDisplayModes = @("advancedRegistration")
+                        },
+                        @{
+                            name                  = "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)"
+                            description           = "Export a Corporate Device Identifier for manual upload to Device Preparation"
+                            type                  = "action"
+                            includeInDisplayModes = @("advancedRegistration")
+                        },
+                        @{
+                            name                  = "Get device hash for manual upload to Autopilot (requires admin rights)"
+                            description           = "Get the device hash for manual upload to Autopilot"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Download and install latest Windows updates(requires admin rights)"
+                            description           = "Download and install the latest Windows updates"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Check device Autopilot status"
+                            description           = "Check if a device is registered in Autopilot"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Delete device from Autopilot"
+                            description           = "Delete a device from Autopilot"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        }
+                    )
+                },
+                @{
+                    name                  = "Change application settings"
+                    description           = "Change the application settings"
+                    type                  = "submenu"
+                    includeInDisplayModes = @("advanced")
+                    items                 = @(
+                        @{
+                            name                  = "Change application settings"
+                            description           = "Change the application settings"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        },
+                        @{
+                            name                  = "Change password and authentication information"
+                            description           = "Change the password and authentication information"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        },
+                        @{
+                            name                  = "Change Auto Update setting"
+                            description           = "Change the Auto Update setting"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        },
+                        @{
+                            name                  = "Restore defaults"
+                            description           = "Restore the application to its default settings"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        }
+                    )
+                },
+                @{
+                    name                  = "Check for script updates"
+                    description           = "Check for updates to the scripts used by the application"
+                    type                  = "action"
+                    includeInDisplayModes = @()
+                },
+                @{
+                    name                  = "Restart the device"
+                    description           = "Restart the device"
+                    type                  = "action"
+                    includeInDisplayModes = @()
+                },
+                @{
+                    name                  = "Export Menu"
+                    description           = "Export various device configuration"
+                    type                  = "submenu"
+                    includeInDisplayModes = @("registration")
+                    items                 = @(
+                        @{
+                            name                  = "Export Autopilot Devices"
+                            description           = "Export Autopilot devices to a CSV file"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Export Imported Autopilot Devices"
+                            description           = "Export imported Autopilot devices to a CSV file"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Export Managed Windows Devices"
+                            description           = "Export managed Windows devices to a CSV file"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Export Unmanaged Windows Devices"
+                            description           = "Export unmanaged Windows devices to a CSV file"
+                            type                  = "action"
+                            includeInDisplayModes = @("advanced")
+                        },
+                        @{
+                            name                  = "Export device storage report"
+                            description           = "Export a report of device storage to a CSV file"
+                            type                  = "action"
+                            includeInDisplayModes = @("registration")
+                        },
+                        @{
+                            name                  = "Export Application Assignments"
+                            description           = "Export application assignments to a CSV file"
+                            type                  = "action"
+                            includeInDisplayModes = @("advanced")
+                        }
+                    )
+                },
+                @{
+                    name                  = "About"
+                    description           = "Learn more about the application"
+                    type                  = "action"
+                    includeInDisplayModes = @()
+                },
+                @{
+                    name                  = "Device Actions"
+                    description           = "Perform various device actions"
+                    type                  = "submenu"
+                    includeInDisplayModes = @()
+                    items                 = @(
+                        @{
+                            name                  = "Wipe Device"
+                            description           = "Wipe the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @("helpdesk", "registration")
+                        },
+                        @{
+                            name                  = "Clean Device"
+                            description           = "Clean the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @("advanced")
+                        },
+                        @{
+                            name                  = "Sync Device"
+                            description           = "Sync the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @("helpdesk", "registration")
+                        },
+                        @{
+                            name                  = "Get LAPS Password"
+                            description           = "Retrieve the LAPS password for the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @("helpdesk", "registration")
+                        },
+                        @{
+                            name                  = "Get BitLocker Recovery Key"
+                            description           = "Retrieve the BitLocker recovery key for the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @("helpdesk", "registration")
+                        },
+                        @{
+                            name                  = "Restart Device"
+                            description           = "Restart the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        },
+                        @{
+                            name                  = "Show Device Health Status"
+                            description           = "Show the health status of the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        },
+                        @{
+                            name                  = "Check next user readiness state"
+                            description           = "Check the next user readiness state for the selected device"
+                            type                  = "action"
+                            includeInDisplayModes = @()
+                        }
+                    )
+                }
+            )
         }
         if (Test-Path -Path $SettingsFile)
         {
@@ -272,7 +520,6 @@ function Test-SettingsJsonExists()
                 # Continue with creating new file as fallback
             }
         }
-        
         if (-not $Silent)
         {
             Write-Host "`n── Settings Configuration ──" -ForegroundColor Cyan

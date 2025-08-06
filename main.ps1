@@ -32,7 +32,7 @@ param(
     [ValidateSet('github', 'gitlab')]
     [string]$Repo,  
     [string]$Release,
-    [ValidateSet('full', 'helpDesk', 'registration')]
+    [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'custom')]
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
@@ -337,7 +337,6 @@ if (Test-Path -Path $InitFile)
     
     # Load the init file content (potentially updated with new defaults)
     $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-    
     # Load auth configuration from init file
     $authConfiguration = $initFileContent.auth
     $auth = @{}
@@ -433,6 +432,25 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    #merge the local and global settings.
+    $script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+    #if the appMode is not set, default to 'full', otherwise make sure it is avalid appMode.
+    if (-not $script:settings.appMode)
+    {
+        Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
+        $script:settings.appMode = 'full'
+    }
+    elseif ($script:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
+    {
+        Write-Host "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
+        Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
+        exit 1
+    }
+    #load menus configuration from initFile
+    $menus = $initFileContent.menus
+    Write-Verbose "[$scriptName] Loaded $($($menus.Count)) menus from $InitFile"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($($menus.Count)) menus from $InitFile" -logLevel "Information"
     #region handle scopes
     $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
     $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
@@ -477,23 +495,10 @@ else
     # Set auth as a script variable so it can be accessed by functions
     $script:Auth = $auth
 }
-if (Test-Path $menusFile)
-{
-    Write-Verbose "[$scriptName] Loading menu configuration from $menusFile"
-    Write-Log -logFile $LogFile -module $scriptName -Message "Loading menu configuration from $menusFile" -LogLevel "Information"
-    $menus = (Get-Content -Path $menusFile -Raw -Force -ErrorAction SilentlyContinue | ConvertFrom-Json).menus
-    Write-Verbose "[$scriptName] Loaded $($menus.Count) menu items in the configuration file."
-    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($menus.Count) menu items in the configuration file." -LogLevel "Information"
-}
-else
-{
-    Write-Verbose "[$scriptName] Menu configuration file $menusFile not found. Using default menus."
-    Write-Log -logFile $LogFile -module $scriptName -Message "Menu configuration file $menusFile not found. Using default menus." -LogLevel "Warning"
-}
 #endregion Load parameters from the configuration file if it exists
 
 #region Define variables
-$script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+
 # Add top-level menuItemsToInclude array to settings if it exists
 if ($initFileContent.menuItemsToInclude)
 {
@@ -594,7 +599,7 @@ Write-Verbose "[$scriptName] Update URL: $updateURL"
 Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
 $loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
-$returnValues = $loadedStrings.returnValues
+$global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
 Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
@@ -669,7 +674,7 @@ Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: 
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+Write-Host "Copyright (c) $((Get-Date).Year)" -ForegroundColor Cyan
 
 if ($settings.showLicenseBanner)
 {
@@ -1675,7 +1680,17 @@ catch
 if ($settings.testMode -eq $false)
 {
     Write-Verbose "Test mode: $($settings.testMode)" 
-    $result = ShowMenu -Menu $mainMenu
+    if ($null -ne $mainMenu)
+    {
+        Write-Verbose "[$scriptName] Showing main menu."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
+        $result = ShowMenu -Menu $mainMenu
+    }
+    else
+    {
+        Write-Host "Main menu is not defined. Please check the script configuration." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Main menu is not defined. Please check the script configuration." -LogLevel "Error"
+    }
     if ($null -eq $result)
     {
         Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green

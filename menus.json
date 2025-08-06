@@ -12,6 +12,9 @@
             "name": "Check device status",
             "description": "Troubleshoot a device",
             "type": "submenu",
+            "includeInDisplayModes": [
+                "helpdesk"
+            ],
             "items": [
                 {
                     "name": "Lookup device by Serial Number",
@@ -253,6 +256,14 @@
                         "helpdesk"
                     ]
                 }
+            ]
+        },
+        {
+            "name": "About",
+            "description": "Learn more about the application",
+            "type": "action",
+            "includeInDisplayModes": [
+                "helpdesk"
             ]
         },
         {

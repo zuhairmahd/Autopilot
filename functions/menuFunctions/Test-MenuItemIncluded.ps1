@@ -20,6 +20,13 @@ function Test-MenuItemIncluded()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Menus parameter is null, allowing menu item '$MenuItemName'" -LogLevel "Debug"
         return $true
     }
+    # If the $settings.appMode is 'full', assume the menu needs to be displayed.
+    elseif ($settings.appMode -eq 'full')
+    {
+        Write-Verbose "[$functionName] App mode is 'full', allowing menu item '$MenuItemName'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "App mode is 'full', allowing menu item '$MenuItemName'" -LogLevel "Debug"
+        return $true
+    }
 
     # Helper function to recursively search for menu item
     function Find-MenuItemRecursive()
@@ -80,7 +87,7 @@ function Test-MenuItemIncluded()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$MenuItemName' in menus configuration" -LogLevel "Debug"
 
     # Check if the menu item has includeInDisplayModes array
-    if ($foundMenuItem.includeInDisplayModes -and $foundMenuItem.includeInDisplayModes.Count -gt 0 -and -not ($settings.appMode -ne 'Full'))
+    if ($foundMenuItem.includeInDisplayModes -and $foundMenuItem.includeInDisplayModes.Count -gt 0)
     {
         $appModeMatches = $foundMenuItem.includeInDisplayModes -contains $settings.appMode
         Write-Verbose "[$functionName] Menu item '$MenuItemName' includeInDisplayModes check: $appModeMatches (looking for '$($settings.appMode)' in [$($foundMenuItem.includeInDisplayModes -join ', ')])"

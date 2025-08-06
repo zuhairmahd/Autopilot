@@ -38,6 +38,7 @@ function Test-StringsJsonExists()
             returnValues  = @{
                 unknownErrorMessage            = "An unknown error occurred."
                 deviceActionPendingMessage     = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."
+                NoMenusConfigured              = "No menus are configured. Check the app configuration."
                 backoutText                    = "Returning to previous menu"
                 invalidFileType                = "Invalid file type."
                 UpdateCancelledMessage         = "The update was cancelled."
@@ -124,6 +125,9 @@ function Test-StringsJsonExists()
                 
                 if ($null -ne $mergedJson)
                 {
+                    Write-Verbose "[$functionName] Merging default strings with existing configuration"
+                    Write-SafeLog "Merging default strings with existing configuration" "Information"
+                    $mergedJson = ConvertTo-OrderedJson -InputObject $mergedStrings -Depth 10
                     Set-Content -Path $StringsFile -Value $mergedJson -Encoding UTF8 -Force
                     Write-Verbose "[$functionName] Updated strings.json with missing default values"
                     Write-SafeLog "Updated strings.json with missing default values" "Information"

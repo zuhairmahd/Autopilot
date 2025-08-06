@@ -162,7 +162,7 @@ function ShowMenu()
     {
         # Pass the menus configuration if available, otherwise null (which will allow all items)
         $menusToPass = if ($script:menus) { $script:menus } else { $null }
-        if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -verbose)
+        if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
             $choices += $item.Name
@@ -200,6 +200,41 @@ function ShowMenu()
     $selectedOption = DisplayNumericMenu -choices $choices -banner $banner -Prompt "Please select an option" -RequireEnter
     Write-Verbose "[$functionName] Selected option: $selectedOption"
     
+    # Check if the selected option is a return value from global return values
+    if ($returnValues -and $selectedOption -in $returnValues.Values)
+    {
+        Write-Verbose "[$functionName] Selected option is a return value: $selectedOption"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Displaying return value to user: $selectedOption" -LogLevel "Information"
+        
+        # Display the return value message to the user
+        Write-Host "`n$selectedOption" -ForegroundColor Yellow
+        Write-Host "`nPress any key to continue..." -ForegroundColor Green
+        
+        # Wait for user input
+        try 
+        {
+            $null = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
+        }
+        catch 
+        {
+            Write-Verbose "[$functionName] Error reading key input: $_"
+            # Fallback to Read-Host if RawUI fails
+            Read-Host "Press Enter to continue"
+        }
+        
+        # Check if we should exit or go back to previous menu
+        if ($Global:MenuHistory.Count -gt 1)
+        {
+            Write-Verbose "[$functionName] Returning to previous menu after displaying return value"
+            return Handle-BackNavigation
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No previous menu available, exiting application"
+            return $null
+        }
+    }
+    
     # Handle navigation options
     if ($selectedOption -eq "Back" -or $selectedOption -eq "back")
     {
@@ -216,6 +251,22 @@ function ShowMenu()
     }
     else
     {
+        # Validate that we have items to pass to Handle-MenuItemSelection
+        if ($choices.Count -eq 0 -or $menuItems.Count -eq 0)
+        {
+            Write-Verbose "[$functionName] No menu items available for selection, returning to previous menu or exiting"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No menu items available for selection" -LogLevel "Warning"
+            
+            if ($Global:MenuHistory.Count -gt 1)
+            {
+                return Handle-BackNavigation
+            }
+            else
+            {
+                return $null
+            }
+        }
+        
         # Handle menu item selection
         return Handle-MenuItemSelection -SelectedOption $selectedOption -Choices $choices -MenuItems $menuItems -CurrentMenu $Menu
     }
