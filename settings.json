@@ -154,7 +154,7 @@
         "maxUserMatchDisplay": "10",
         "maxWaitTime": "30",
         "autoUpdate": true,
-        "appMode": "advanced",
+        "appMode": "full",
         "testMode": false,
         "configFile": ".\\.secrets\\config.json",
         "showLicenseBanner": true,

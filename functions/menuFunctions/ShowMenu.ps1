@@ -194,11 +194,11 @@ function ShowMenu()
 
     #region Create banner text and breadcrumb
     $banner = Create-MenuBanner -Menu $Menu -History $Global:History
-    if ($settings.appMode -ne "full")
+    if ($null -ne $settings.appMode -and $settings.appMode -ne "full" -and $settings.appMode -ne '')
     {
         Write-Verbose "[$functionName] App mode is not 'full', adding app mode to banner"
         write-log -LogFile $LogFile -Module $functionName -Message "App mode is not 'full', adding app mode to banner" -LogLevel "Information"
-        $banner = "(App Mode: $($settings.appMode |Out-String)`n $banner"
+        $banner = "(App Mode: $($settings.appMode))`n$banner"
     }
     #endregion
 
