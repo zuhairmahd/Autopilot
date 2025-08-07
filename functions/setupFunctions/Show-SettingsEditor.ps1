@@ -11,7 +11,7 @@ function Show-SettingsEditor()
         boolean, string, array, and enumerated values with proper validation.
     
     .PARAMETER SettingsType
-        Specifies whether to edit 'Global' or 'Domain' settings.
+        Specifies whether to edit 'Global', 'Domain', or 'Auth' settings.
     
     .PARAMETER SettingsFile
         Path to the settings.json file. Defaults to "settings.json".
@@ -32,15 +32,19 @@ function Show-SettingsEditor()
     .EXAMPLE
         Show-SettingsEditor -SettingsType "Domain" -DomainName "contoso.com"
     
+    .EXAMPLE
+        Show-SettingsEditor -SettingsType "Auth"
+    
     .NOTES
         - Maintains PowerShell 5.1 compatibility
-        - Uses existing Update-GlobalSetting and Update-DomainSettings functions
+        - Uses existing Update-GlobalSetting, Update-DomainSettings, and Update-AuthSetting functions
         - Leverages Test-SettingsJsonExists for default settings structure
+        - Supports auth settings editing with Test-AuthDefaults for validation
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Global', 'Domain')]
+        [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingsType,
         
         [string]$SettingsFile = "settings.json",
@@ -74,6 +78,20 @@ function Show-SettingsEditor()
         
         Write-Log -LogFile $logFile -Module $functionName -Message "Parameter validation passed. SettingsType: $SettingsType, SettingsFile: $SettingsFile" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Parameter validation passed. SettingsType: $SettingsType, SettingsFile: $SettingsFile"
+        
+        # For auth settings, ensure auth defaults are in place
+        if ($SettingsType -eq 'Auth')
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Ensuring auth defaults are present" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Ensuring auth defaults are present"
+            $authDefaultsSuccess = Test-AuthDefaults -SettingsFile $SettingsFile -Silent
+            if (-not $authDefaultsSuccess)
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to ensure auth defaults" -LogLevel "Error"
+                Write-Warning "[$functionName] Failed to ensure auth defaults"
+                return $false
+            }
+        }
         
         # Get default settings structure from Test-SettingsJsonExists
         Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
@@ -114,6 +132,19 @@ function Show-SettingsEditor()
                 Write-Host "Modify global application settings that apply to all domains." -ForegroundColor White
             }
         }
+        elseif ($SettingsType -eq 'Auth')
+        {
+            $settingsTemplate = Get-AuthDefaults
+            $currentValues = $currentSettings.auth
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing auth settings" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing auth settings"
+            if (-not $Silent)
+            {
+                Write-Host "`n── Authentication Settings Editor ──" -ForegroundColor Cyan
+                Write-Host "Modify authentication and authorization settings." -ForegroundColor White
+                Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
+            }
+        }
         else
         {
             $settingsTemplate = $defaultSettings.domains.PSObject.Properties | Select-Object -First 1 | ForEach-Object { $_.Value.settings }
@@ -143,60 +174,123 @@ function Show-SettingsEditor()
         $hasChanges = $false
         
         # Process each setting in the template
-        foreach ($setting in $settingsTemplate.PSObject.Properties)
+        if ($settingsTemplate -is [hashtable])
         {
-            $settingName = $setting.Name
-            $defaultValue = $setting.Value
-            $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName) { $currentValues.$settingName } else { $defaultValue }
-            
-            Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
-            
-            if (-not $Silent)
+            # Handle hashtable (auth settings)
+            foreach ($settingName in $settingsTemplate.Keys)
             {
-                Write-Host "Setting: $settingName" -ForegroundColor Yellow
-                Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
-                Write-Host "Current value: $currentValue" -ForegroundColor Cyan
-            }
-            
-            # Determine setting type and get input
-            $newValue = if ($PresetValues -and $PresetValues.ContainsKey($settingName))
-            {
-                $PresetValues[$settingName]
-            }
-            elseif ($Silent)
-            {
-                $currentValue  # Keep current value in silent mode
-            }
-            else
-            {
-                Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
-            }
-            
-            if ($newValue -ne $currentValue)
-            {
-                $updatedSettings[$settingName] = $newValue
-                $hasChanges = $true
-                Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
-                Write-Verbose "[$functionName] Setting '$settingName' changed from '$currentValue' to '$newValue'"
+                $defaultValue = $settingsTemplate[$settingName]
+                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName) { $currentValues.$settingName } else { $defaultValue }
+                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
+                
                 if (-not $Silent)
                 {
-                    Write-Host "Updated to: $newValue" -ForegroundColor Green
+                    Write-Host "Setting: $settingName" -ForegroundColor Yellow
+                    Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
+                    Write-Host "Current value: $currentValue" -ForegroundColor Cyan
                 }
-            }
-            else
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' unchanged (value: '$currentValue')" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Setting '$settingName' unchanged (value: '$currentValue')"
+                
+                # Determine setting type and get input
+                $newValue = if ($PresetValues -and $PresetValues.ContainsKey($settingName))
+                {
+                    $PresetValues[$settingName]
+                }
+                elseif ($Silent)
+                {
+                    $currentValue  # Keep current value in silent mode
+                }
+                else
+                {
+                    Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
+                }
+                
+                if ($newValue -ne $currentValue)
+                {
+                    $updatedSettings[$settingName] = $newValue
+                    $hasChanges = $true
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Setting '$settingName' changed from '$currentValue' to '$newValue'"
+                    if (-not $Silent)
+                    {
+                        Write-Host "Updated to: $newValue" -ForegroundColor Green
+                    }
+                }
+                else
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' unchanged (value: '$currentValue')" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Setting '$settingName' unchanged (value: '$currentValue')"
+                    if (-not $Silent)
+                    {
+                        Write-Host "No change" -ForegroundColor Gray
+                    }
+                }
+                
                 if (-not $Silent)
                 {
-                    Write-Host "No change" -ForegroundColor Gray
+                    Write-Host ""
                 }
             }
-            
-            if (-not $Silent)
+        }
+        else
+        {
+            # Handle PSCustomObject (global and domain settings)
+            foreach ($setting in $settingsTemplate.PSObject.Properties)
             {
-                Write-Host ""
+                $settingName = $setting.Name
+                $defaultValue = $setting.Value
+                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName) { $currentValues.$settingName } else { $defaultValue }
+                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
+                
+                if (-not $Silent)
+                {
+                    Write-Host "Setting: $settingName" -ForegroundColor Yellow
+                    Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
+                    Write-Host "Current value: $currentValue" -ForegroundColor Cyan
+                }
+                
+                # Determine setting type and get input
+                $newValue = if ($PresetValues -and $PresetValues.ContainsKey($settingName))
+                {
+                    $PresetValues[$settingName]
+                }
+                elseif ($Silent)
+                {
+                    $currentValue  # Keep current value in silent mode
+                }
+                else
+                {
+                    Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
+                }
+                
+                if ($newValue -ne $currentValue)
+                {
+                    $updatedSettings[$settingName] = $newValue
+                    $hasChanges = $true
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Setting '$settingName' changed from '$currentValue' to '$newValue'"
+                    if (-not $Silent)
+                    {
+                        Write-Host "Updated to: $newValue" -ForegroundColor Green
+                    }
+                }
+                else
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' unchanged (value: '$currentValue')" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] Setting '$settingName' unchanged (value: '$currentValue')"
+                    if (-not $Silent)
+                    {
+                        Write-Host "No change" -ForegroundColor Gray
+                    }
+                }
+                
+                if (-not $Silent)
+                {
+                    Write-Host ""
+                }
             }
         }
         
@@ -214,6 +308,11 @@ function Show-SettingsEditor()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "Saving global settings" -LogLevel "Verbose"
                 Save-GlobalSettings -Settings $updatedSettings -SettingsFile $SettingsFile
+            }
+            elseif ($SettingsType -eq 'Auth')
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Saving auth settings" -LogLevel "Verbose"
+                Save-AuthSettings -Settings $updatedSettings -SettingsFile $SettingsFile
             }
             else
             {
@@ -393,6 +492,15 @@ function Get-SettingDescription()
         'privateSession'                  = 'Use private/incognito browsing sessions'
         'userPatternsToExclude'           = 'Username patterns to exclude from operations'
         'desiredAutopilotProfiles'        = 'Autopilot profiles to assign to devices'
+        'changePwOnNextStart'             = 'Force password change on next application start'
+        'authType'                        = 'Authentication method (PublicAuthFlow, PrivateAuthFlow, etc.)'
+        'noSaveRefreshToken'              = 'Prevent saving refresh tokens to disk'
+        'forceNewToken'                   = 'Force acquisition of new authentication token'
+        'renewalLeadTime'                 = 'Minutes before token expires to attempt renewal'
+        'scope'                           = 'Microsoft Graph API permissions required by the application'
+        'cacheType'                       = 'Token cache storage method (Memory, File)'
+        'secureString'                    = 'Use secure string for password storage'
+        'delegated'                       = 'Use delegated permissions (user context) vs application permissions'
     }
     
     if ($descriptions.ContainsKey($SettingName))
@@ -446,6 +554,10 @@ function Get-SettingInput()
         {
             return Get-BrowserInput -CurrentValue $CurrentValue
         }
+        'AuthType'
+        {
+            return Get-AuthTypeInput -CurrentValue $CurrentValue
+        }
         'Array'
         {
             return Get-ArrayInput -CurrentValue $CurrentValue
@@ -478,6 +590,7 @@ function Get-SettingInputType()
     if ($SettingName -eq 'repo') { return 'Repo' }
     if ($SettingName -eq 'operatingSystem') { return 'OperatingSystem' }
     if ($SettingName -eq 'preferredBrowser') { return 'Browser' }
+    if ($SettingName -eq 'authType') { return 'AuthType' }
     
     # Check by value type
     if ($Value -is [bool]) { return 'Boolean' }
@@ -657,6 +770,10 @@ function Get-ArrayInput()
     #>
     param($CurrentValue)
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting array input. Current value count: $($CurrentValue.Count)" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Getting array input. Current value count: $($CurrentValue.Count)"
+    
     Write-Host "Current array values:" -ForegroundColor Cyan
     if ($CurrentValue -and $CurrentValue.Count -gt 0)
     {
@@ -686,10 +803,14 @@ function Get-ArrayInput()
             # If first input is empty, return current values
             if ([string]::IsNullOrWhiteSpace($input))
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current array values" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] User chose to keep current array values"
                 return $CurrentValue
             }
             
             $newValues += $input
+            Write-Log -LogFile $logFile -Module $functionName -Message "Added first array value: '$input'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Added first array value: '$input'"
         }
         else
         {
@@ -699,10 +820,26 @@ function Get-ArrayInput()
                 break
             }
             $newValues += $input
+            Write-Log -LogFile $logFile -Module $functionName -Message "Added array value: '$input'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Added array value: '$input'"
         }
     } while ($true)
     
-    return $newValues
+    # Ensure single values are still treated as arrays
+    if ($newValues.Count -eq 1)
+    {
+        $result = @($newValues[0])
+        Write-Log -LogFile $logFile -Module $functionName -Message "Single value converted to array to maintain type consistency" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Single value converted to array to maintain type consistency"
+    }
+    else
+    {
+        $result = $newValues
+    }
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values" -LogLevel "Information"
+    Write-Verbose "[$functionName] Returning array with $($result.Count) values"
+    return $result
 }
 
 function Get-NumberInput()
@@ -801,7 +938,48 @@ function Save-GlobalSettings()
     }
 }
 
-function Save-DomainSettings()
+function Get-AuthTypeInput()
+{
+    param($CurrentValue)
+    
+    $authTypes = @('PublicAuthFlow', 'PrivateAuthFlow', 'Interactive', 'Device')
+    return Get-EnumeratedInput -Options $authTypes -CurrentValue $CurrentValue -PromptText "authentication type"
+}
+
+function Save-AuthSettings()
+{
+    <#
+    .SYNOPSIS
+        Saves auth settings using existing Update-AuthSetting function.
+    #>
+    param(
+        [hashtable]$Settings,
+        [string]$SettingsFile
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Saving auth settings to: $SettingsFile"
+    
+    try
+    {
+        foreach ($key in $Settings.Keys)
+        {
+            $success = Update-AuthSetting -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            if (-not $success)
+            {
+                Write-Warning "[$functionName] Failed to update auth setting: $key"
+                return $false
+            }
+            Write-Verbose "[$functionName] Updated auth setting: $key = $($Settings[$key])"
+        }
+        return $true
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error saving auth settings: $($_.Exception.Message)"
+        return $false
+    }
+}
 {
     <#
     .SYNOPSIS

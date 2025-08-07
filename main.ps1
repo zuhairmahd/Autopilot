@@ -1311,6 +1311,20 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain speci
         Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
     }
 }
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
+    Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
+    Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
+    
+    $success = Show-SettingsEditor -SettingsType "Auth" -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nAuthentication settings updated successfully. Changes may require application restart." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authentication information" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
