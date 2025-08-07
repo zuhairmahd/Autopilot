@@ -1483,17 +1483,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
-    Write-Host 'Restoring the script to its default settings...'
-    if (InitializeConfiguration -RootFolder $pwd -overwrite)
-    {
-        Write-Host 'The script defaults have been restored.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'Failed to restore script defaults..' -ForegroundColor Red
-    }
-}
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
