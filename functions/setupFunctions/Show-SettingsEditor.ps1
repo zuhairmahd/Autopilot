@@ -405,18 +405,18 @@ function Get-DefaultSettingsStructure()
                 )
             }
             globalSettings = @{
-                configFile                       = ".\\.secrets\\config.json"
-                maxWaitTime                      = "30"
-                showLicenseBanner                = $true
-                deviceContactThresholdInDays     = 30
-                appMode                          = "full"
-                timeInSeconds                    = "60"
-                maxUserMatchDisplay              = "10"
-                release                          = "master"
-                repo                             = "Github"
-                testMode                         = $false
-                operatingSystem                  = "Windows"
-                autoUpdate                       = $true
+                configFile                   = ".\\.secrets\\config.json"
+                maxWaitTime                  = "30"
+                showLicenseBanner            = $true
+                deviceContactThresholdInDays = 30
+                appMode                      = "full"
+                timeInSeconds                = "60"
+                maxUserMatchDisplay          = "10"
+                release                      = "master"
+                repo                         = "Github"
+                testMode                     = $false
+                operatingSystem              = "Windows"
+                autoUpdate                   = $true
             }
             domains        = @{
                 "example.com" = @{
@@ -690,41 +690,50 @@ function Get-SettingInputType()
     Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
     
     # Check for specific known enumerated types
-    if ($SettingName -eq 'appMode') { 
+    if ($SettingName -eq 'appMode')
+    { 
         Write-Verbose "[$functionName] Detected AppMode setting"
         return 'AppMode' 
     }
-    if ($SettingName -eq 'cacheType') { 
+    if ($SettingName -eq 'cacheType')
+    { 
         Write-Verbose "[$functionName] Detected CacheType setting"
         return 'CacheType' 
     }
-    if ($SettingName -eq 'repo') { 
+    if ($SettingName -eq 'repo')
+    { 
         Write-Verbose "[$functionName] Detected Repo setting"
         return 'Repo' 
     }
-    if ($SettingName -eq 'operatingSystem') { 
+    if ($SettingName -eq 'operatingSystem')
+    { 
         Write-Verbose "[$functionName] Detected OperatingSystem setting"
         return 'OperatingSystem' 
     }
-    if ($SettingName -eq 'preferredBrowser') { 
+    if ($SettingName -eq 'preferredBrowser')
+    { 
         Write-Verbose "[$functionName] Detected Browser setting"
         return 'Browser' 
     }
-    if ($SettingName -eq 'authType') { 
+    if ($SettingName -eq 'authType')
+    { 
         Write-Verbose "[$functionName] Detected AuthType setting"
         return 'AuthType' 
     }
     
     # Check by value type
-    if ($Value -is [bool]) { 
+    if ($Value -is [bool])
+    { 
         Write-Verbose "[$functionName] Detected Boolean value type"
         return 'Boolean' 
     }
-    if ($Value -is [array]) { 
+    if ($Value -is [array])
+    { 
         Write-Verbose "[$functionName] Detected Array value type"
         return 'Array' 
     }
-    if ($Value -match '^\d+$') { 
+    if ($Value -match '^\d+$')
+    { 
         Write-Verbose "[$functionName] Detected Number value type"
         return 'Number' 
     }
@@ -771,12 +780,14 @@ function Get-BooleanInput()
         
         switch ($choice)
         {
-            '1' { 
+            '1'
+            { 
                 Write-Verbose "[$functionName] User selected: True"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected: True" -LogLevel "Information"
                 return $true 
             }
-            '2' { 
+            '2'
+            { 
                 Write-Verbose "[$functionName] User selected: False"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected: False" -LogLevel "Information"
                 return $false 
@@ -938,8 +949,8 @@ function Get-EnumeratedInput()
         if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $Options.Count)
         {
             $selectedValue = $Options[[int]$choice - 1]
-            Write-Verbose "[$functionName] User selected option $choice: '$selectedValue'"
-            Write-Log -LogFile $logFile -Module $functionName -Message "User selected option $choice: '$selectedValue'" -LogLevel "Information"
+            Write-Verbose "[$functionName] User selected option $($choice): '$selectedValue'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User selected option $($choice): '$selectedValue'" -LogLevel "Information"
             return $selectedValue
         }
         
