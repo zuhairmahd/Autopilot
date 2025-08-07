@@ -1326,7 +1326,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authentication information" -Action {
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
     while ($choice -notin @('yes', 'no'))

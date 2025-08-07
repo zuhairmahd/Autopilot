@@ -540,11 +540,11 @@ function Get-SettingDescription()
     
     $descriptions = @{
         'configFile'                      = 'Path to the configuration file storing encrypted authentication data'
-        'maxWaitTime'                     = 'Maximum time in seconds to wait for operations to complete'
+        'maxWaitTime'                     = 'How long, in minutes, to wait before stopping retries.'
         'showLicenseBanner'               = 'Whether to display the license banner on startup'
         'deviceContactThresholdInDays'    = 'Number of days before a device is considered stale'
         'appMode'                         = 'Application mode controlling which features are available'
-        'timeInSeconds'                   = 'Default timeout for operations in seconds'
+        'timeInSeconds'                   = 'Default timeout to wait between retries in seconds'
         'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'
         'release'                         = 'Release branch or version to track for updates'
         'repo'                            = 'Repository source for updates (Github/Gitlab)'

@@ -1,10 +1,10 @@
-﻿{
+{
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.1",
     "auth": {
+        "CacheType": "Memory",
         "changePwOnNextStart": false,
-        "renewalLeadTime": 5,
-        "authType": "PublicAuthFlow",
+        "Delegated": true,
         "NoSaveRefreshToken": false,
         "ForceNewToken": false,
         "scope": [
@@ -17,9 +17,9 @@
             "DeviceManagementManagedDevices.ReadWrite.All",
             "DeviceManagementServiceConfig.ReadWrite.All"
         ],
-        "CacheType": "Memory",
+        "authType": "PublicAuthFlow",
         "SecureString": false,
-        "Delegated": true
+        "renewalLeadTime": 5
     },
     "requiredScopes": [
         {
@@ -137,31 +137,73 @@
         }
     ],
     "globalSettings": {
-        "configFile": ".\\\\.secrets\\\\config.json",
-        "deviceContactThresholdInDays": 30,
-        "autoUpdate": true,
-        "maxWaitTime": "30",
-        "showLicenseBanner": true,
-        "timeInSeconds": "60",
-        "appMode": "full",
-        "maxUserMatchDisplay": "10",
-        "Repo": "Github",
-        "testMode": false,
         "operatingSystem": "Windows",
-        "Release": "dev"
+        "Release": "master",
+        "Repo": "Github",
+        "timeInSeconds": "60",
+        "maxUserMatchDisplay": 24,
+        "maxWaitTime": "30",
+        "autoUpdate": false,
+        "appMode": "full",
+        "testMode": false,
+        "configFile": ".\\\\.secrets\\\\config.json",
+        "showLicenseBanner": false,
+        "deviceContactThresholdInDays": 30
     },
     "domains": {
-        "arabictutor.com": {
+        "gao.gov": {
+            "groupsToInclude": [
+                "sg_Office_365_License_G5_wth_windows_pilot",
+                "sg_passwrd_hash_stage",
+                "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
+                "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
+            ],
             "groupsToExclude": [],
+            "settings": {
+                "operatingSystem": "Windows",
+                "repo": "Github",
+                "MinSerialNumberLength": 7,
+                "MinUsernameLength": 3,
+                "timeInSeconds": "60",
+                "DesiredAutopilotProfiles": [
+                    "msb"
+                ],
+                "MaxSerialNumberLength": 10,
+                "maxUserMatchDisplay": 24,
+                "GroupTag": "MSB01",
+                "maxWaitTime": "30",
+                "autoUpdate": false,
+                "MinimumDevicePhysicalMemoryInGB": 16,
+                "MaxUserNameLength": 25,
+                "domain": "gao.gov",
+                "preferredBrowser": "Chrome",
+                "appMode": "full",
+                "deviceNamePrefix": "w11-",
+                "privateSession": true,
+                "maxNumberOfDevicesAllowed": 20,
+                "userPatternsToExclude": [
+                    "-cma",
+                    "-test",
+                    "onmicrosoft.com",
+                    "-sup",
+                    "-a"
+                ],
+                "release": "master",
+                "showLicenseBanner": false,
+                "deviceContactThresholdInDays": 30
+            }
+        },
+        "arabictutor.com": {
             "groupsToInclude": [],
+            "groupsToExclude": [],
             "settings": {
                 "operatingSystem": "Windows",
                 "MinUsernameLength": 3,
-                "MaxSerialNumberLength": 100,
                 "DesiredAutopilotProfiles": [
                     "windowsCloudConfig Autopilot profile",
                     "Hybrid join profile"
                 ],
+                "MaxSerialNumberLength": 100,
                 "GroupTag": "ENTRA",
                 "MinimumDevicePhysicalMemoryInGB": 8,
                 "MaxUserNameLength": 50,
@@ -171,48 +213,6 @@
                 "privateSession": false,
                 "maxNumberOfDevicesAllowed": 15,
                 "MinSerialNumberLength": 7
-            }
-        },
-        "gao.gov": {
-            "groupsToExclude": [],
-            "groupsToInclude": [
-                "sg_Office_365_License_G5_wth_windows_pilot",
-                "sg_passwrd_hash_stage",
-                "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
-                "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
-            ],
-            "settings": {
-                "operatingSystem": "Windows",
-                "maxNumberOfDevicesAllowed": 20,
-                "repo": "Github",
-                "timeInSeconds": "60",
-                "DesiredAutopilotProfiles": [
-                    "msb"
-                ],
-                "MaxSerialNumberLength": 100,
-                "deviceContactThresholdInDays": 30,
-                "GroupTag": "MSB01",
-                "maxWaitTime": "30",
-                "showLicenseBanner": false,
-                "autoUpdate": true,
-                "MinimumDevicePhysicalMemoryInGB": 16,
-                "MaxUserNameLength": 50,
-                "domain": "gao.gov",
-                "preferredBrowser": "Chrome",
-                "appMode": "full",
-                "deviceNamePrefix": "w11-",
-                "privateSession": true,
-                "MinUsernameLength": 3,
-                "userPatternsToExclude": [
-                    "-cma",
-                    "-test",
-                    "onmicrosoft.com",
-                    "-sup",
-                    "-a"
-                ],
-                "release": "master",
-                "MinSerialNumberLength": 7,
-                "maxUserMatchDisplay": "10"
             }
         }
     },
