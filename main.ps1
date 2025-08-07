@@ -1234,10 +1234,87 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 
 #region Settings menu
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
-    Write-Host "This will change the global environment settings used by the script."
+    Write-Host "Launching global settings editor..." -ForegroundColor Cyan
+    $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGlobal settings updated successfully. Changes will take effect on next restart." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
+    }
 }
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
-    Write-Host "This will change the domain specific settings used by the script."
+    Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
+    
+    # Get the current domain from settings
+    $currentDomain = $null
+    if ($settings -and $settings.PSObject.Properties.Name -contains 'domain')
+    {
+        $currentDomain = $settings.domain
+    }
+    
+    # If no current domain, try to get it from domains section or prompt user
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        try
+        {
+            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
+            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
+            {
+                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
+                if ($availableDomains.Count -eq 1)
+                {
+                    $currentDomain = $availableDomains[0]
+                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                }
+                else
+                {
+                    Write-Host "Available domains:" -ForegroundColor White
+                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                    {
+                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
+                    }
+                    
+                    do
+                    {
+                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
+                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                        {
+                            $currentDomain = $availableDomains[[int]$choice - 1]
+                            break
+                        }
+                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
+                    } while ($true)
+                }
+            }
+            else
+            {
+                $currentDomain = Read-Host "Enter domain name to configure"
+            }
+        }
+        catch
+        {
+            $currentDomain = Read-Host "Enter domain name to configure"
+        }
+    }
+    
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        Write-Host "No domain specified. Cannot edit domain-specific settings." -ForegroundColor Red
+        return $returnValues.backoutText
+    }
+    
+    $success = Show-SettingsEditor -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nDomain settings for '$currentDomain' updated successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
+    }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authentication information" -Action {
