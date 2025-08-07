@@ -114,7 +114,7 @@ function GetUpdates()
             Write-Host "Checking file hash..."
             if ($fileMetaData.Hash -eq $fileHash.Hash)
             {
-                Write-Host "File hash matches the expected hash." -NoNewline
+                Write-Host "File hash matches." -NoNewline
                 Write-Host " - Proceeding with update..." -ForegroundColor Green
                 Write-Verbose "[$functionName] File hash matches the expected hash."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash matches the expected hash." -LogLevel "Information"
