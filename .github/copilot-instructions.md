@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions for Windows Autopilot Management Tool
 
-**ALWAYS reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.**
+**ALWAYS reference these instructions first and fallback to web search or bash commands only when you encounter unexpected information that does not match the info here.**
 
 ## Project Overview
 
