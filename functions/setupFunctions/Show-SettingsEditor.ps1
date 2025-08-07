@@ -980,11 +980,14 @@ function Save-AuthSettings()
         return $false
     }
 }
+
+function Save-DomainSettings
 {
     <#
     .SYNOPSIS
         Saves domain settings using existing Update-DomainSettings function.
     #>
+    [CmdletBinding()]
     param(
         [string]$DomainName,
         [hashtable]$Settings,
