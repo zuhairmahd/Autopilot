@@ -831,6 +831,7 @@ $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How w
 $exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would like to export."
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
+$environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage your environment settings and configurations"
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
@@ -1232,17 +1233,13 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #endregion Autopilot menu
 
 #region Settings menu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
-    Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -RootFolder $pwd)
-    {
-        Write-Host 'The script has been reconfigured.' -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
-    }
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
+    Write-Host "This will change the global environment settings used by the script."
 }
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
+    Write-Host "This will change the domain specific settings used by the script."
+}
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authentication information" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
