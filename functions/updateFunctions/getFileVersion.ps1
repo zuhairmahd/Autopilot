@@ -20,7 +20,10 @@ function getFileVersion()
         Write-Verbose "[$functionName] Getting the file version."
         $LocalVersion = (Get-Item $executableFileName).VersionInfo.ProductVersion
         $companyName = (Get-Item $executableFileName).VersionInfo.CompanyName
+        $hash = (Get-FileHash -Path $executableFileName -Algorithm SHA256).Hash
         Write-Verbose "[$functionName] Local version extracted: $LocalVersion"
+        Write-Verbose "[$functionName] Company Name: $companyName"
+        Write-Verbose "[$functionName] File Hash: $hash"
         Write-Verbose "[$functionName] Parsing the local version string to System.Version object."
         $localVersion = [System.Version]::Parse($LocalVersion)
         Write-Verbose "[$functionName] Parsed local version: $localVersion"
@@ -32,6 +35,7 @@ function getFileVersion()
             'revision'    = $localVersion.Revision
             'version'     = $localVersion
             'companyName' = $companyName
+            'hash'        = $hash
         }
         return $returnObject
     }

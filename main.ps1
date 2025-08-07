@@ -697,7 +697,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version.version)
+if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version.version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
@@ -1732,7 +1732,26 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $extraParameters = "select=displayName"
     $registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
-    Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    if ($updateAvailable.success -eq $true)
+    {
+        Write-Host "Last updated on $($updateAvailable.ReleaseDate)" 
+        Write-Host "File checksum: $($updateAvailable.Hash)"
+        if ($version.hash -eq $updateAvailable.hash)
+        {
+            Write-Host "Checksums match: You are running a genuine copy of the script." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "Checksums do not match: The script may have been tampered with.  We recommend you stop using the script immediately." -ForegroundColor Yellow
+        }
+        if ($updateAvailable.version -gt $version.version)
+        {
+            Write-Host "An update is available: $($updateAvailable.version)" -ForegroundColor Yellow
+            Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
+            Write-Host "Go to 'Check For Script Updates' to download the latest version." -ForegroundColor Yellow
+        }
+    }
     Write-Host "==========================================================`n"    
     Write-Host "Domain: $domain"
     Write-Host "Application name from config: $name"
