@@ -51,6 +51,7 @@
     - Requires modules: Invoke-TrustedSigning, ps2exe
     - All function modules are loaded from the /functions directory.
     - Logging is written to logs/createRelease.log.
+    - Running the script requires an active Azure Trusted Signing account.  For testing, this functionality should be mocked.
     - See project documentation for full release workflow.
 #>
 #requires -module Invoke-TrustedSigning
