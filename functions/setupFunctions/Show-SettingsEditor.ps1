@@ -53,60 +53,91 @@ function Show-SettingsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    $logFile = "$PWD\Logs\Autopilot.log"
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Information"
     Write-Verbose "[$functionName] Starting settings editor for $SettingsType settings"
+    
+    if ($SettingsType -eq 'Domain') {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Domain name provided: '$DomainName'" -LogLevel "Information"
+        Write-Verbose "[$functionName] Domain name provided: '$DomainName'"
+    }
     
     try
     {
         # Validate parameters
         if ($SettingsType -eq 'Domain' -and [string]::IsNullOrWhiteSpace($DomainName))
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "DomainName is required when editing Domain settings" -LogLevel "Error"
             Write-Warning "[$functionName] DomainName is required when editing Domain settings"
             return $false
         }
         
+        Write-Log -LogFile $logFile -Module $functionName -Message "Parameter validation passed. SettingsType: $SettingsType, SettingsFile: $SettingsFile" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Parameter validation passed. SettingsType: $SettingsType, SettingsFile: $SettingsFile"
+        
         # Get default settings structure from Test-SettingsJsonExists
+        Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Retrieving default settings structure"
         $defaultSettings = Get-DefaultSettingsStructure
         if (-not $defaultSettings)
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings structure" -LogLevel "Error"
             Write-Warning "[$functionName] Failed to get default settings structure"
             return $false
         }
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Successfully retrieved default settings structure"
         
         # Load current settings
+        Write-Log -LogFile $logFile -Module $functionName -Message "Loading current settings from: $SettingsFile" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Loading current settings from: $SettingsFile"
         $currentSettings = Get-CurrentSettings -SettingsFile $SettingsFile -SettingsType $SettingsType -DomainName $DomainName
         if (-not $currentSettings)
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load current settings" -LogLevel "Error"
             Write-Warning "[$functionName] Failed to load current settings"
             return $false
         }
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Successfully loaded current settings"
         
         # Get settings template to edit
         if ($SettingsType -eq 'Global')
         {
             $settingsTemplate = $defaultSettings.globalSettings
             $currentValues = $currentSettings.globalSettings
-        if (-not $Silent)
-        {
-            Write-Host "`n── Global Settings Editor ──" -ForegroundColor Cyan
-            Write-Host "Modify global application settings that apply to all domains." -ForegroundColor White
-        }
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing global settings" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing global settings"
+            if (-not $Silent)
+            {
+                Write-Host "`n── Global Settings Editor ──" -ForegroundColor Cyan
+                Write-Host "Modify global application settings that apply to all domains." -ForegroundColor White
+            }
         }
         else
         {
             $settingsTemplate = $defaultSettings.domains.PSObject.Properties | Select-Object -First 1 | ForEach-Object { $_.Value.settings }
             $currentValues = $currentSettings.domains.$DomainName.settings
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing domain settings for domain: '$DomainName'" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing domain settings for domain: '$DomainName'"
             if (-not $Silent)
             {
                 Write-Host "`n── Domain Settings Editor ──" -ForegroundColor Cyan
-                Write-Host "Modify settings specific to domain: $DomainName" -ForegroundColor White
+                Write-Host "Modify settings specific to domain: $DomainName" -ForegroundColor Yellow -BackgroundColor DarkMagenta
+                Write-Host "Selected domain: $DomainName" -ForegroundColor Green
             }
         }
         
         if (-not $settingsTemplate)
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Error"
             Write-Warning "[$functionName] No settings template found for $SettingsType"
             return $false
         }
+        
+        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process" -LogLevel "Information"
+        Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process"
         
         Write-Host ""
         $updatedSettings = @{}
@@ -118,6 +149,9 @@ function Show-SettingsEditor()
             $settingName = $setting.Name
             $defaultValue = $setting.Value
             $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName) { $currentValues.$settingName } else { $defaultValue }
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
             
             if (-not $Silent)
             {
@@ -144,6 +178,8 @@ function Show-SettingsEditor()
             {
                 $updatedSettings[$settingName] = $newValue
                 $hasChanges = $true
+                Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
+                Write-Verbose "[$functionName] Setting '$settingName' changed from '$currentValue' to '$newValue'"
                 if (-not $Silent)
                 {
                     Write-Host "Updated to: $newValue" -ForegroundColor Green
@@ -151,6 +187,8 @@ function Show-SettingsEditor()
             }
             else
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' unchanged (value: '$currentValue')" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Setting '$settingName' unchanged (value: '$currentValue')"
                 if (-not $Silent)
                 {
                     Write-Host "No change" -ForegroundColor Gray
@@ -166,6 +204,8 @@ function Show-SettingsEditor()
         # Save changes if any were made
         if ($hasChanges)
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Changes detected. Saving $($updatedSettings.Count) updated settings" -LogLevel "Information"
+            Write-Verbose "[$functionName] Changes detected. Saving $($updatedSettings.Count) updated settings"
             if (-not $Silent)
             {
                 Write-Host "Saving changes..." -ForegroundColor Yellow
@@ -173,15 +213,19 @@ function Show-SettingsEditor()
             
             $success = if ($SettingsType -eq 'Global')
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Saving global settings" -LogLevel "Verbose"
                 Save-GlobalSettings -Settings $updatedSettings -SettingsFile $SettingsFile
             }
             else
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Saving domain settings for: '$DomainName'" -LogLevel "Verbose"
                 Save-DomainSettings -DomainName $DomainName -Settings $updatedSettings -SettingsFile $SettingsFile
             }
             
             if ($success)
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Settings saved successfully" -LogLevel "Information"
+                Write-Verbose "[$functionName] Settings saved successfully"
                 if (-not $Silent)
                 {
                     Write-Host "Settings saved successfully!" -ForegroundColor Green
@@ -190,6 +234,8 @@ function Show-SettingsEditor()
             }
             else
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save settings" -LogLevel "Error"
+                Write-Verbose "[$functionName] Failed to save settings"
                 if (-not $Silent)
                 {
                     Write-Host "Failed to save settings!" -ForegroundColor Red
@@ -199,6 +245,8 @@ function Show-SettingsEditor()
         }
         else
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "No changes were made" -LogLevel "Information"
+            Write-Verbose "[$functionName] No changes were made"
             if (-not $Silent)
             {
                 Write-Host "No changes were made." -ForegroundColor Yellow
@@ -208,6 +256,8 @@ function Show-SettingsEditor()
     }
     catch
     {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error in settings editor: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Full error details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
         Write-Warning "[$functionName] Error in settings editor: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
         return $false
@@ -220,24 +270,39 @@ function Get-DefaultSettingsStructure()
     .SYNOPSIS
         Retrieves the default settings structure from Test-SettingsJsonExists.
     #>
+    $functionName = $MyInvocation.MyCommand.Name
+    $logFile = "$PWD\Logs\Autopilot.log"
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Retrieving default settings structure"
+    
     try
     {
         # Call Test-SettingsJsonExists to get the default structure
         # We'll extract the $defaultSettings variable from that function
         $tempFile = [System.IO.Path]::GetTempFileName()
+        Write-Log -LogFile $logFile -Module $functionName -Message "Created temporary file: $tempFile" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Created temporary file: $tempFile"
         
         # Create a temporary settings file to trigger the default creation
         if (Test-SettingsJsonExists -SettingsFile $tempFile -Silent)
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully created default settings in temp file" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Successfully created default settings in temp file"
             $content = Get-Content -Path $tempFile -Raw | ConvertFrom-Json
             Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
+            Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure retrieved successfully" -LogLevel "Information"
+            Write-Verbose "[$functionName] Default settings structure retrieved successfully"
             return $content
         }
         
+        Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings" -LogLevel "Warning"
+        Write-Verbose "[$functionName] Failed to create default settings"
         return $null
     }
     catch
     {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error getting default settings structure: $($_.Exception.Message)" -LogLevel "Error"
         Write-Verbose "Error getting default settings structure: $($_.Exception.Message)"
         return $null
     }
@@ -255,22 +320,41 @@ function Get-CurrentSettings()
         [string]$DomainName
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    $logFile = "$PWD\Logs\Autopilot.log"
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Loading current settings from: $SettingsFile for type: $SettingsType" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Loading current settings from: $SettingsFile for type: $SettingsType"
+    
+    if ($SettingsType -eq 'Domain') {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Domain name: '$DomainName'" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Domain name: '$DomainName'"
+    }
+    
     try
     {
         if (-not (Test-Path -Path $SettingsFile))
         {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Information"
             Write-Verbose "Settings file not found, creating with defaults"
             if (-not (Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent))
             {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings file" -LogLevel "Error"
+                Write-Verbose "[$functionName] Failed to create default settings file"
                 return $null
             }
+            Write-Log -LogFile $logFile -Module $functionName -Message "Default settings file created" -LogLevel "Information"
+            Write-Verbose "[$functionName] Default settings file created"
         }
         
         $content = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
+        Write-Log -LogFile $logFile -Module $functionName -Message "Settings file loaded successfully" -LogLevel "Information"
+        Write-Verbose "[$functionName] Settings file loaded successfully"
         return $content
     }
     catch
     {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error loading current settings: $($_.Exception.Message)" -LogLevel "Error"
         Write-Verbose "Error loading current settings: $($_.Exception.Message)"
         return $null
     }
