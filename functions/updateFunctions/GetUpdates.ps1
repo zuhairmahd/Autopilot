@@ -50,7 +50,7 @@ function GetUpdates()
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
     try 
     {
-        $fileMetaData = Invoke-WebRequest -Uri $metaDataURL -UseBasicParsing
+        $fileMetaData = Invoke-RestMethod -Uri $metaDataURL -UseBasicParsing
         Write-Verbose "[$functionName] Metadata retrieved successfully."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Metadata retrieved successfully." -LogLevel "Information"
         Write-Verbose "Response: $fileMetaData"
