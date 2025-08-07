@@ -600,49 +600,75 @@ function Get-SettingInput()
         $DefaultValue
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting input for setting '$SettingName'. Current: '$CurrentValue', Default: '$DefaultValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting input for setting '$SettingName'. Current: '$CurrentValue', Default: '$DefaultValue'" -LogLevel "Verbose"
+    
     # Determine the type of input needed
     $inputType = Get-SettingInputType -SettingName $SettingName -Value $DefaultValue
+    Write-Verbose "[$functionName] Determined input type: '$inputType' for setting '$SettingName'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Determined input type: '$inputType' for setting '$SettingName'" -LogLevel "Verbose"
     
     switch ($inputType)
     {
         'Boolean'
         {
+            Write-Verbose "[$functionName] Using boolean input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using boolean input for '$SettingName'" -LogLevel "Verbose"
             return Get-BooleanInput -CurrentValue $CurrentValue
         }
         'AppMode'
         {
+            Write-Verbose "[$functionName] Using app mode input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using app mode input for '$SettingName'" -LogLevel "Verbose"
             return Get-AppModeInput -CurrentValue $CurrentValue
         }
         'CacheType'
         {
+            Write-Verbose "[$functionName] Using cache type input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using cache type input for '$SettingName'" -LogLevel "Verbose"
             return Get-CacheTypeInput -CurrentValue $CurrentValue
         }
         'Repo'
         {
+            Write-Verbose "[$functionName] Using repository input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using repository input for '$SettingName'" -LogLevel "Verbose"
             return Get-RepoInput -CurrentValue $CurrentValue
         }
         'OperatingSystem'
         {
+            Write-Verbose "[$functionName] Using operating system input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using operating system input for '$SettingName'" -LogLevel "Verbose"
             return Get-OperatingSystemInput -CurrentValue $CurrentValue
         }
         'Browser'
         {
+            Write-Verbose "[$functionName] Using browser input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using browser input for '$SettingName'" -LogLevel "Verbose"
             return Get-BrowserInput -CurrentValue $CurrentValue
         }
         'AuthType'
         {
+            Write-Verbose "[$functionName] Using auth type input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using auth type input for '$SettingName'" -LogLevel "Verbose"
             return Get-AuthTypeInput -CurrentValue $CurrentValue
         }
         'Array'
         {
+            Write-Verbose "[$functionName] Using array input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using array input for '$SettingName'" -LogLevel "Verbose"
             return Get-ArrayInput -CurrentValue $CurrentValue
         }
         'Number'
         {
+            Write-Verbose "[$functionName] Using number input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using number input for '$SettingName'" -LogLevel "Verbose"
             return Get-NumberInput -SettingName $SettingName -CurrentValue $CurrentValue
         }
         default
         {
+            Write-Verbose "[$functionName] Using string input for '$SettingName'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using string input for '$SettingName'" -LogLevel "Verbose"
             return Get-StringInput -SettingName $SettingName -CurrentValue $CurrentValue
         }
     }
@@ -659,19 +685,51 @@ function Get-SettingInputType()
         $Value
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
+    
     # Check for specific known enumerated types
-    if ($SettingName -eq 'appMode') { return 'AppMode' }
-    if ($SettingName -eq 'cacheType') { return 'CacheType' }
-    if ($SettingName -eq 'repo') { return 'Repo' }
-    if ($SettingName -eq 'operatingSystem') { return 'OperatingSystem' }
-    if ($SettingName -eq 'preferredBrowser') { return 'Browser' }
-    if ($SettingName -eq 'authType') { return 'AuthType' }
+    if ($SettingName -eq 'appMode') { 
+        Write-Verbose "[$functionName] Detected AppMode setting"
+        return 'AppMode' 
+    }
+    if ($SettingName -eq 'cacheType') { 
+        Write-Verbose "[$functionName] Detected CacheType setting"
+        return 'CacheType' 
+    }
+    if ($SettingName -eq 'repo') { 
+        Write-Verbose "[$functionName] Detected Repo setting"
+        return 'Repo' 
+    }
+    if ($SettingName -eq 'operatingSystem') { 
+        Write-Verbose "[$functionName] Detected OperatingSystem setting"
+        return 'OperatingSystem' 
+    }
+    if ($SettingName -eq 'preferredBrowser') { 
+        Write-Verbose "[$functionName] Detected Browser setting"
+        return 'Browser' 
+    }
+    if ($SettingName -eq 'authType') { 
+        Write-Verbose "[$functionName] Detected AuthType setting"
+        return 'AuthType' 
+    }
     
     # Check by value type
-    if ($Value -is [bool]) { return 'Boolean' }
-    if ($Value -is [array]) { return 'Array' }
-    if ($Value -match '^\d+$') { return 'Number' }
+    if ($Value -is [bool]) { 
+        Write-Verbose "[$functionName] Detected Boolean value type"
+        return 'Boolean' 
+    }
+    if ($Value -is [array]) { 
+        Write-Verbose "[$functionName] Detected Array value type"
+        return 'Array' 
+    }
+    if ($Value -match '^\d+$') { 
+        Write-Verbose "[$functionName] Detected Number value type"
+        return 'Number' 
+    }
     
+    Write-Verbose "[$functionName] Defaulting to String value type"
     return 'String'
 }
 
@@ -1071,22 +1129,35 @@ function Save-GlobalSettings()
         [string]$SettingsFile
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Saving global settings to file: '$SettingsFile'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Saving global settings to file: '$SettingsFile'" -LogLevel "Information"
+    
     try
     {
         foreach ($key in $Settings.Keys)
         {
+            Write-Verbose "[$functionName] Updating global setting: $key = $($Settings[$key])"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $($Settings[$key])" -LogLevel "Verbose"
+            
             $success = Update-GlobalSetting -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
             if (-not $success)
             {
-                Write-Warning "Failed to update global setting: $key"
+                Write-Warning "[$functionName] Failed to update global setting: $key"
+                Write-Verbose "[$functionName] Failed to update global setting: $key"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update global setting: $key" -LogLevel "Error"
                 return $false
             }
         }
+        Write-Verbose "[$functionName] All global settings saved successfully"
+        Write-Log -LogFile $logFile -Module $functionName -Message "All global settings saved successfully" -LogLevel "Information"
         return $true
     }
     catch
     {
-        Write-Warning "Error saving global settings: $($_.Exception.Message)"
+        Write-Warning "[$functionName] Error saving global settings: $($_.Exception.Message)"
+        Write-Verbose "[$functionName] Error saving global settings: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error saving global settings: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
 }
@@ -1116,24 +1187,35 @@ function Save-AuthSettings()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Saving auth settings to: $SettingsFile"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Saving auth settings to: $SettingsFile" -LogLevel "Information"
     
     try
     {
         foreach ($key in $Settings.Keys)
         {
+            Write-Verbose "[$functionName] Updating auth setting: $key = $($Settings[$key])"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Updating auth setting: $key = $($Settings[$key])" -LogLevel "Verbose"
+            
             $success = Update-AuthSetting -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update auth setting: $key"
+                Write-Verbose "[$functionName] Failed to update auth setting: $key"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update auth setting: $key" -LogLevel "Error"
                 return $false
             }
-            Write-Verbose "[$functionName] Updated auth setting: $key = $($Settings[$key])"
+            Write-Verbose "[$functionName] Successfully updated auth setting: $key = $($Settings[$key])"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated auth setting: $key = $($Settings[$key])" -LogLevel "Verbose"
         }
+        Write-Verbose "[$functionName] All auth settings saved successfully"
+        Write-Log -LogFile $logFile -Module $functionName -Message "All auth settings saved successfully" -LogLevel "Information"
         return $true
     }
     catch
     {
         Write-Warning "[$functionName] Error saving auth settings: $($_.Exception.Message)"
+        Write-Verbose "[$functionName] Error saving auth settings: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error saving auth settings: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
 }
@@ -1151,14 +1233,30 @@ function Save-DomainSettings()
         [string]$SettingsFile
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Saving domain settings for domain: '$DomainName' to file: '$SettingsFile'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Saving domain settings for domain: '$DomainName' to file: '$SettingsFile'" -LogLevel "Information"
+    
     try
     {
         $success = Update-DomainSettings -SettingsFile $SettingsFile -DomainName $DomainName -Settings $Settings -MergeSettings
+        if ($success)
+        {
+            Write-Verbose "[$functionName] Domain settings saved successfully"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Domain settings saved successfully" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Failed to save domain settings"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save domain settings" -LogLevel "Error"
+        }
         return $success
     }
     catch
     {
-        Write-Warning "Error saving domain settings: $($_.Exception.Message)"
+        Write-Warning "[$functionName] Error saving domain settings: $($_.Exception.Message)"
+        Write-Verbose "[$functionName] Error saving domain settings: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error saving domain settings: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
 }
