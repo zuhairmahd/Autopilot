@@ -981,7 +981,7 @@ function Save-AuthSettings()
     }
 }
 
-function Save-DomainSettings
+function Save-DomainSettings()
 {
     <#
     .SYNOPSIS
