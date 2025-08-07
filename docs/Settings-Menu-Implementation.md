@@ -10,6 +10,7 @@ The Settings Menu functionality provides users with an interactive interface to 
 
 1. **Global Settings**: Application-wide settings that affect all domains
 2. **Domain-Specific Settings**: Settings that are specific to individual domains
+3. **Authentication Settings**: Microsoft Graph API authentication configuration
 
 ### Data Types Handled
 
@@ -22,6 +23,7 @@ The Settings Menu functionality provides users with an interactive interface to 
 ### Supported Enumerated Settings
 
 - `appMode`: full, helpDesk, advanced, advancedRegistration, registration, admin, custom
+- `authType`: PublicAuthFlow, PrivateAuthFlow, Interactive, Device
 - `cacheType`: Memory, File
 - `repo`: Github, Gitlab
 - `operatingSystem`: Windows, macOS, Linux
@@ -34,9 +36,10 @@ The Settings Menu functionality provides users with an interactive interface to 
 1. Launch the main application
 2. Navigate to "Change application settings" 
 3. Select "Change environment settings"
-4. Choose either:
+4. Choose from:
    - "Change global environment settings"
    - "Change domain specific settings"
+   - "Change authentication settings"
 
 ### Interactive Settings Editor
 
@@ -57,6 +60,9 @@ Show-SettingsEditor -SettingsType "Global"
 # Edit domain-specific settings
 Show-SettingsEditor -SettingsType "Domain" -DomainName "contoso.com"
 
+# Edit authentication settings
+Show-SettingsEditor -SettingsType "Auth"
+
 # Silent mode with preset values (for automation)
 $presetValues = @{ 'autoUpdate' = $true; 'timeInSeconds' = '120' }
 Show-SettingsEditor -SettingsType "Global" -Silent -PresetValues $presetValues
@@ -70,7 +76,7 @@ Show-SettingsEditor -SettingsType "Global" -Silent -PresetValues $presetValues
 Main function that provides the interactive settings editing interface.
 
 **Parameters:**
-- `SettingsType`: 'Global' or 'Domain'
+- `SettingsType`: 'Global', 'Domain', or 'Auth'
 - `SettingsFile`: Path to settings.json (defaults to "settings.json")
 - `DomainName`: Required for Domain settings
 - `Silent`: Non-interactive mode
@@ -93,7 +99,9 @@ The settings editor integrates with existing infrastructure:
 
 - **Update-GlobalSetting**: For saving global settings changes
 - **Update-DomainSettings**: For saving domain-specific changes
+- **Update-AuthSetting**: For saving authentication settings changes
 - **Test-SettingsJsonExists**: Source of default settings structure
+- **Test-AuthDefaults**: Ensures authentication defaults are present
 - **Menu system**: Integrated with existing menu navigation
 
 ### Validation
@@ -135,9 +143,54 @@ The implementation works with the standard settings.json structure:
         // ... other domain settings
       }
     }
+  },
+  "auth": {
+    "changePwOnNextStart": false,
+    "authType": "PublicAuthFlow",
+    "noSaveRefreshToken": false,
+    "forceNewToken": false,
+    "renewalLeadTime": 5,
+    "scope": [
+      "offline_access",
+      "openid",
+      "Device.ReadWrite.All",
+      "DeviceManagementApps.Read.All",
+      "DeviceManagementConfiguration.ReadWrite.All",
+      "DeviceManagementManagedDevices.PrivilegedOperations.All",
+      "DeviceManagementManagedDevices.ReadWrite.All",
+      "DeviceManagementServiceConfig.ReadWrite.All"
+    ],
+    "cacheType": "Memory",
+    "secureString": false,
+    "delegated": true
   }
 }
 ```
+
+### Authentication Settings
+
+The authentication settings section manages Microsoft Graph API authentication configuration:
+
+#### Key Authentication Settings
+
+- **authType**: Authentication method (PublicAuthFlow, PrivateAuthFlow, Interactive, Device)
+- **delegated**: Use delegated permissions (user context) vs application permissions
+- **scope**: Array of Microsoft Graph API permission scopes
+- **cacheType**: Token cache storage method (Memory, File)
+- **renewalLeadTime**: Token renewal time in minutes before expiry
+- **changePwOnNextStart**: Force password change on next application startup
+- **noSaveRefreshToken**: Disable refresh token caching for security
+- **forceNewToken**: Force new token acquisition
+- **secureString**: Use secure string for token storage
+
+#### Advanced Configuration Warnings
+
+When editing authentication settings, the system provides warnings for configurations that require additional setup:
+
+- **Setting `delegated` to `false`**: Requires application permissions and client secret configuration
+- **Using `authType` other than `PublicAuthFlow`**: Requires client credentials
+
+These warnings help prevent configuration issues that could prevent authentication from working properly.
 
 ### Default Settings Source
 

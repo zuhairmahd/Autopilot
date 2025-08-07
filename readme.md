@@ -112,6 +112,10 @@ When you launch the application, you'll see the main menu with the following opt
 
 4. **Change application settings**
    - **Change application settings**: Reconfigure the entire application
+   - **Change environment settings**: Configure global and domain-specific settings
+     - **Change global settings**: Update application-wide configuration options
+     - **Change domain settings**: Configure settings for specific domains 
+     - **Change authentication settings**: Configure Microsoft Graph API authentication
    - **Change password and authentication information**: Update credentials and passwords
    - **Change Auto Update setting**: Toggle automatic updates on/off
    - **Restore defaults**: Reset application to default configuration
@@ -274,6 +278,67 @@ Example configuration:
 - Other modes display predefined sets of menu items appropriate for that role
 - Custom mode can be further restricted using `menuItemsToInclude`
 - The menu system automatically shows/hides items based on the selected mode
+
+---
+
+### Authentication Settings Management
+
+The application provides comprehensive management of Microsoft Graph API authentication settings through an interactive settings editor.
+
+#### Accessing Authentication Settings
+
+**Navigation Path**: Main Menu → Change application settings → Change environment settings → Change authentication settings
+
+#### Available Authentication Settings
+
+| Setting | Description | Default Value |
+|---------|-------------|---------------|
+| **authType** | Authentication method | `PublicAuthFlow` |
+| **delegated** | Use delegated permissions (user context) | `true` |
+| **scope** | Microsoft Graph API permissions | Standard set of device management scopes |
+| **changePwOnNextStart** | Force password change on next startup | `false` |
+| **noSaveRefreshToken** | Disable refresh token caching | `false` |
+| **forceNewToken** | Force new token acquisition | `false` |
+| **renewalLeadTime** | Token renewal time (minutes before expiry) | `5` |
+| **cacheType** | Token cache storage method | `Memory` |
+| **secureString** | Use secure string for token storage | `false` |
+
+#### Authentication Types
+
+- **PublicAuthFlow** (Recommended): Uses public client authentication suitable for most scenarios
+- **PrivateAuthFlow**: Uses confidential client with app secrets (requires additional configuration)
+- **Interactive**: Browser-based interactive authentication
+- **Device**: Device code flow authentication
+
+#### Advanced Configuration Requirements
+
+⚠️ **Important**: Certain authentication settings require additional configuration:
+
+- **Setting `delegated` to `false`**: Requires application permissions and client secret configuration
+- **Using `authType` other than `PublicAuthFlow`**: Requires client credentials to be configured
+
+When these advanced settings are modified, the application will display a warning and remind you to ensure proper client secret configuration in your settings files.
+
+#### Managing Authentication Scopes
+
+The `scope` setting allows you to configure which Microsoft Graph API permissions the application requests. The default scopes provide comprehensive device management capabilities:
+
+- `offline_access` - Offline access for refresh tokens
+- `openid` - OpenID Connect authentication  
+- `Device.ReadWrite.All` - Device management permissions
+- `DeviceManagementApps.Read.All` - App management read permissions
+- `DeviceManagementConfiguration.ReadWrite.All` - Configuration management
+- `DeviceManagementManagedDevices.PrivilegedOperations.All` - Device operations
+- `DeviceManagementManagedDevices.ReadWrite.All` - Managed device access
+- `DeviceManagementServiceConfig.ReadWrite.All` - Service configuration
+
+#### Settings Editor Features
+
+- **Current Value Display**: Shows existing values with visual highlighting
+- **Type-Aware Input**: Specialized input handlers for different data types (boolean, array, enumerated values)
+- **Input Validation**: Real-time validation with error messages
+- **Array Management**: Interactive array editor for scope permissions
+- **Automatic Backup**: Creates backups before making changes
 
 ---
 

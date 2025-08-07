@@ -37,9 +37,19 @@ function Test-AuthDefaults()
         [switch]$Silent
     )
     
+    # Helper function to safely log messages
+    function Write-SafeLogFallback {
+        param($Message, $Level)
+        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+            Write-SafeLog $Message $Level
+        } else {
+            Write-Verbose "[$functionName] $Message"
+        }
+    }
+    
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Ensuring auth defaults in: $SettingsFile"
-    Write-SafeLog "Ensuring auth defaults in: $SettingsFile" "Information"
+    Write-SafeLogFallback "Ensuring auth defaults in: $SettingsFile" "Information"
     
     try
     {
@@ -66,13 +76,13 @@ function Test-AuthDefaults()
         }
         
         Write-Verbose "[$functionName] Default auth structure defined with $($defaultAuth.Keys.Count) properties"
-        Write-SafeLog "Default auth structure defined with $($defaultAuth.Keys.Count) properties" "Verbose"
+        Write-SafeLogFallback "Default auth structure defined with $($defaultAuth.Keys.Count) properties" "Verbose"
         
         # Check if settings file exists
         if (-not (Test-Path -Path $SettingsFile))
         {
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
-            Write-SafeLog "Settings file not found: $SettingsFile" "Warning"
+            Write-SafeLogFallback "Settings file not found: $SettingsFile" "Warning"
             return $false
         }
         
@@ -81,7 +91,7 @@ function Test-AuthDefaults()
         $settings = $jsonContent | ConvertFrom-Json
         
         Write-Verbose "[$functionName] Loaded existing settings from file"
-        Write-SafeLog "Loaded existing settings from file" "Verbose"
+        Write-SafeLogFallback "Loaded existing settings from file" "Verbose"
         
         # Convert to hashtable for easier manipulation
         $settingsHash = @{}
@@ -108,14 +118,14 @@ function Test-AuthDefaults()
         if (-not $settingsHash.ContainsKey('auth'))
         {
             Write-Verbose "[$functionName] Auth section not found, creating new one"
-            Write-SafeLog "Auth section not found, creating new one" "Information"
+            Write-SafeLogFallback "Auth section not found, creating new one" "Information"
             $settingsHash['auth'] = $defaultAuth
             $authUpdated = $true
         }
         else
         {
             Write-Verbose "[$functionName] Auth section exists, checking for missing defaults"
-            Write-SafeLog "Auth section exists, checking for missing defaults" "Verbose"
+            Write-SafeLogFallback "Auth section exists, checking for missing defaults" "Verbose"
             
             $currentAuth = $settingsHash['auth']
             
@@ -127,7 +137,7 @@ function Test-AuthDefaults()
                     $currentAuth[$key] = $defaultAuth[$key]
                     $authUpdated = $true
                     Write-Verbose "[$functionName] Added missing auth property: $key = $($defaultAuth[$key])"
-                    Write-SafeLog "Added missing auth property: $key = $($defaultAuth[$key])" "Information"
+                    Write-SafeLogFallback "Added missing auth property: $key = $($defaultAuth[$key])" "Information"
                 }
                 else
                 {
@@ -143,7 +153,7 @@ function Test-AuthDefaults()
             $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
             Copy-Item -Path $SettingsFile -Destination $backupFile -Force
             Write-Verbose "[$functionName] Created backup: $backupFile"
-            Write-SafeLog "Created backup: $backupFile" "Information"
+            Write-SafeLogFallback "Created backup: $backupFile" "Information"
             
             # Convert hashtable back to PSCustomObject for JSON output
             $outputSettings = [PSCustomObject]@{}
@@ -164,7 +174,7 @@ function Test-AuthDefaults()
             Set-Content -Path $SettingsFile -Value $jsonOutput -Force
             
             Write-Verbose "[$functionName] Auth defaults updated successfully"
-            Write-SafeLog "Auth defaults updated successfully" "Information"
+            Write-SafeLogFallback "Auth defaults updated successfully" "Information"
             
             if (-not $Silent)
             {
@@ -174,7 +184,7 @@ function Test-AuthDefaults()
         else
         {
             Write-Verbose "[$functionName] Auth section already has all required defaults"
-            Write-SafeLog "Auth section already has all required defaults" "Information"
+            Write-SafeLogFallback "Auth section already has all required defaults" "Information"
             
             if (-not $Silent)
             {
@@ -186,7 +196,7 @@ function Test-AuthDefaults()
     }
     catch
     {
-        Write-SafeLog "Error ensuring auth defaults: $($_.Exception.Message)" "Error"
+        Write-SafeLogFallback "Error ensuring auth defaults: $($_.Exception.Message)" "Error"
         Write-Warning "[$functionName] Error ensuring auth defaults: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Full error: $($_.Exception | Format-List * | Out-String)"
         return $false

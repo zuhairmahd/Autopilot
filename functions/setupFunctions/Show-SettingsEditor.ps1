@@ -1202,6 +1202,37 @@ function Save-AuthSettings()
     
     try
     {
+        # Check for settings that require client secret and warn user
+        $requiresClientSecret = $false
+        $warningMessages = @()
+        
+        if ($Settings.ContainsKey('delegated') -and $Settings['delegated'] -eq $false)
+        {
+            $requiresClientSecret = $true
+            $warningMessages += "Setting 'delegated' to false requires application permissions"
+        }
+        
+        if ($Settings.ContainsKey('authType') -and $Settings['authType'] -ne 'PublicAuthFlow')
+        {
+            $requiresClientSecret = $true
+            $warningMessages += "Authentication type '$($Settings['authType'])' requires client credentials"
+        }
+        
+        if ($requiresClientSecret)
+        {
+            Write-Host "`nWARNING: Advanced Authentication Configuration" -ForegroundColor Yellow
+            Write-Host "=========================================" -ForegroundColor Yellow
+            foreach ($msg in $warningMessages)
+            {
+                Write-Host "• $msg" -ForegroundColor Yellow
+            }
+            Write-Host "`nThese settings require a client secret to be stored in your configuration file." -ForegroundColor Red
+            Write-Host "Please ensure you have properly configured client credentials before using these settings." -ForegroundColor Red
+            Write-Host "This is an advanced configuration - proceed only if you understand the implications.`n" -ForegroundColor Yellow
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Warning displayed for advanced auth configuration requiring client secret" -LogLevel "Warning"
+        }
+        
         foreach ($key in $Settings.Keys)
         {
             Write-Verbose "[$functionName] Updating auth setting: $key = $($Settings[$key])"
