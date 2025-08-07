@@ -366,42 +366,109 @@ function Get-DefaultSettingsStructure()
 {
     <#
     .SYNOPSIS
-        Retrieves the default settings structure from Test-SettingsJsonExists.
+        Retrieves the default settings structure efficiently without file operations.
     #>
     $functionName = $MyInvocation.MyCommand.Name
     $logFile = "$PWD\Logs\Autopilot.log"
     
-    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Retrieving default settings structure"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure using cached defaults" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Retrieving default settings structure using cached defaults"
     
     try
     {
-        # Call Test-SettingsJsonExists to get the default structure
-        # We'll extract the $defaultSettings variable from that function
-        $tempFile = [System.IO.Path]::GetTempFileName()
-        Write-Log -LogFile $logFile -Module $functionName -Message "Created temporary file: $tempFile" -LogLevel "Debug"
-        Write-Verbose "[$functionName] Created temporary file: $tempFile"
+        # Instead of creating a temporary file and calling Test-SettingsJsonExists,
+        # directly create the default structure here to avoid unnecessary file operations
+        Write-Log -LogFile $logFile -Module $functionName -Message "Creating default structure without file operations" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Creating default structure without file operations"
         
-        # Create a temporary settings file to trigger the default creation
-        if (Test-SettingsJsonExists -SettingsFile $tempFile -Silent)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully created default settings in temp file" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Successfully created default settings in temp file"
-            $content = Get-Content -Path $tempFile -Raw | ConvertFrom-Json
-            Remove-Item -Path $tempFile -Force -ErrorAction SilentlyContinue
-            Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure retrieved successfully" -LogLevel "Information"
-            Write-Verbose "[$functionName] Default settings structure retrieved successfully"
-            return $content
+        $defaultSettings = @{
+            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+            version        = "1.3.0.0"
+            auth           = @{
+                delegated           = $true
+                authType            = "PublicAuthFlow"
+                changePwOnNextStart = $false
+                renewalLeadTime     = 5
+                noSaveRefreshToken  = $false
+                secureString        = $false
+                forceNewToken       = $false
+                cacheType           = "Memory"
+                scope               = @(
+                    "offline_access",
+                    "openid", 
+                    "Device.ReadWrite.All",
+                    "DeviceManagementApps.Read.All",
+                    "DeviceManagementConfiguration.ReadWrite.All",
+                    "DeviceManagementManagedDevices.PrivilegedOperations.All",
+                    "DeviceManagementManagedDevices.ReadWrite.All",
+                    "DeviceManagementServiceConfig.ReadWrite.All"
+                )
+            }
+            globalSettings = @{
+                configFile                       = ".\\.secrets\\config.json"
+                maxWaitTime                      = "30"
+                showLicenseBanner                = $true
+                deviceContactThresholdInDays     = 30
+                appMode                          = "full"
+                timeInSeconds                    = "60"
+                maxUserMatchDisplay              = "10"
+                release                          = "master"
+                repo                             = "Github"
+                testMode                         = $false
+                operatingSystem                  = "Windows"
+                autoUpdate                       = $true
+            }
+            domains        = @{
+                "example.com" = @{
+                    groupsToInclude = @()
+                    groupsToExclude = @()
+                    settings        = @{
+                        domain                          = "example.com"
+                        maxWaitTime                     = "30"
+                        showLicenseBanner               = $true
+                        deviceContactThresholdInDays    = 30
+                        appMode                         = "full"
+                        timeInSeconds                   = "60"
+                        maxUserMatchDisplay             = "10"
+                        release                         = "master"
+                        repo                            = "Github"
+                        autoUpdate                      = $true
+                        deviceNamePrefix                = ""
+                        operatingSystem                 = "Windows"
+                        minUsernameLength               = 3
+                        maxUserNameLength               = 50
+                        maxSerialNumberLength           = 50
+                        minSerialNumberLength           = 7
+                        minimumDevicePhysicalMemoryInGB = 8
+                        maxNumberOfDevicesAllowed       = 15
+                        preferredBrowser                = "Chrome"
+                        privateSession                  = $false
+                        userPatternsToExclude           = @( 
+                            "-test",
+                            "onmicrosoft.com"
+                        )
+                        desiredAutopilotProfiles        = @()
+                    }
+                }
+            }
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings" -LogLevel "Warning"
-        Write-Verbose "[$functionName] Failed to create default settings"
-        return $null
+        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure created successfully" -LogLevel "Information"
+        Write-Verbose "[$functionName] Default settings structure created successfully"
+        
+        # Convert to PSCustomObject to match the JSON structure behavior
+        $jsonString = $defaultSettings | ConvertTo-Json -Depth 10
+        $defaultStructure = $jsonString | ConvertFrom-Json
+        
+        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure converted to PSCustomObject format" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Default settings structure converted to PSCustomObject format"
+        
+        return $defaultStructure
     }
     catch
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error getting default settings structure: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Verbose "Error getting default settings structure: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error creating default settings structure: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Verbose "[$functionName] Error creating default settings structure: $($_.Exception.Message)"
         return $null
     }
 }
@@ -467,6 +534,10 @@ function Get-SettingDescription()
     #>
     param([string]$SettingName)
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting description for setting: '$SettingName'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting description for setting: '$SettingName'" -LogLevel "Verbose"
+    
     $descriptions = @{
         'configFile'                      = 'Path to the configuration file storing encrypted authentication data'
         'maxWaitTime'                     = 'Maximum time in seconds to wait for operations to complete'
@@ -505,10 +576,14 @@ function Get-SettingDescription()
     
     if ($descriptions.ContainsKey($SettingName))
     {
+        Write-Verbose "[$functionName] Found description for '$SettingName'"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Found description for '$SettingName'" -LogLevel "Debug"
         return $descriptions[$SettingName]
     }
     else
     {
+        Write-Verbose "[$functionName] No specific description found for '$SettingName', using generic description"
+        Write-Log -LogFile $logFile -Module $functionName -Message "No specific description found for '$SettingName', using generic description" -LogLevel "Debug"
         return "Configuration setting: $SettingName"
     }
 }
@@ -608,6 +683,10 @@ function Get-BooleanInput()
     #>
     param($CurrentValue)
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting boolean input. Current value: $CurrentValue"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting boolean input. Current value: $CurrentValue" -LogLevel "Verbose"
+    
     Write-Host "Choose option:" -ForegroundColor White
     if ($CurrentValue -eq $true)
     {
@@ -627,16 +706,28 @@ function Get-BooleanInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
+            Write-Verbose "[$functionName] User chose to keep current boolean value: $CurrentValue"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current boolean value: $CurrentValue" -LogLevel "Verbose"
             return $CurrentValue
         }
         
         switch ($choice)
         {
-            '1' { return $true }
-            '2' { return $false }
+            '1' { 
+                Write-Verbose "[$functionName] User selected: True"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User selected: True" -LogLevel "Information"
+                return $true 
+            }
+            '2' { 
+                Write-Verbose "[$functionName] User selected: False"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User selected: False" -LogLevel "Information"
+                return $false 
+            }
             default
             {
                 Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
+                Write-Verbose "[$functionName] Invalid choice entered: '$choice'"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
             }
         }
     } while ($true)
@@ -649,6 +740,10 @@ function Get-AppModeInput()
         Gets app mode input from user.
     #>
     param($CurrentValue)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting app mode input. Current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $modes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
     
@@ -673,21 +768,32 @@ function Get-AppModeInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
+            Write-Verbose "[$functionName] User chose to keep current app mode: '$CurrentValue'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode: '$CurrentValue'" -LogLevel "Verbose"
             return $CurrentValue
         }
         
         if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $modes.Count)
         {
-            return $modes[[int]$choice - 1]
+            $selectedMode = $modes[[int]$choice - 1]
+            Write-Verbose "[$functionName] User selected app mode: '$selectedMode'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User selected app mode: '$selectedMode'" -LogLevel "Information"
+            return $selectedMode
         }
         
         Write-Host "Invalid choice. Please enter a number between 1 and $($modes.Count)." -ForegroundColor Red
+        Write-Verbose "[$functionName] Invalid choice entered: '$choice'"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
     } while ($true)
 }
 
 function Get-CacheTypeInput()
 {
     param($CurrentValue)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting cache type input for current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting cache type input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $types = @('Memory', 'File')
     return Get-EnumeratedInput -Options $types -CurrentValue $CurrentValue -PromptText "cache type"
@@ -697,6 +803,10 @@ function Get-RepoInput()
 {
     param($CurrentValue)
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting repository input for current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting repository input for current value: '$CurrentValue'" -LogLevel "Verbose"
+    
     $repos = @('Github', 'Gitlab')
     return Get-EnumeratedInput -Options $repos -CurrentValue $CurrentValue -PromptText "repository"
 }
@@ -705,6 +815,10 @@ function Get-OperatingSystemInput()
 {
     param($CurrentValue)
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting operating system input for current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting operating system input for current value: '$CurrentValue'" -LogLevel "Verbose"
+    
     $systems = @('Windows', 'macOS', 'Linux')
     return Get-EnumeratedInput -Options $systems -CurrentValue $CurrentValue -PromptText "operating system"
 }
@@ -712,6 +826,10 @@ function Get-OperatingSystemInput()
 function Get-BrowserInput()
 {
     param($CurrentValue)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting browser input for current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting browser input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $browsers = @('Chrome', 'Edge', 'Firefox', 'Safari')
     return Get-EnumeratedInput -Options $browsers -CurrentValue $CurrentValue -PromptText "browser"
@@ -728,6 +846,10 @@ function Get-EnumeratedInput()
         $CurrentValue,
         [string]$PromptText
     )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting enumerated input for '$PromptText'. Current value: '$CurrentValue'. Available options: $($Options.Count)"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting enumerated input for '$PromptText'. Current value: '$CurrentValue'. Options count: $($Options.Count)" -LogLevel "Verbose"
     
     Write-Host "Available $PromptText options:" -ForegroundColor White
     for ($i = 0; $i -lt $Options.Count; $i++)
@@ -750,15 +872,22 @@ function Get-EnumeratedInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
+            Write-Verbose "[$functionName] User chose to keep current value: '$CurrentValue'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current value: '$CurrentValue'" -LogLevel "Verbose"
             return $CurrentValue
         }
         
         if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $Options.Count)
         {
-            return $Options[[int]$choice - 1]
+            $selectedValue = $Options[[int]$choice - 1]
+            Write-Verbose "[$functionName] User selected option $choice: '$selectedValue'"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User selected option $choice: '$selectedValue'" -LogLevel "Information"
+            return $selectedValue
         }
         
         Write-Host "Invalid choice. Please enter a number between 1 and $($Options.Count)." -ForegroundColor Red
+        Write-Verbose "[$functionName] Invalid choice entered: '$choice'"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
     } while ($true)
 }
 
@@ -853,36 +982,52 @@ function Get-NumberInput()
         $CurrentValue
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting numeric input for '$SettingName'. Current value: $CurrentValue"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting numeric input for '$SettingName'. Current value: $CurrentValue" -LogLevel "Verbose"
+    
     do
     {
         $input = Read-Host "Enter number (current: $CurrentValue, press Enter to keep)"
         
         if ([string]::IsNullOrWhiteSpace($input))
         {
+            Write-Verbose "[$functionName] User chose to keep current numeric value: $CurrentValue"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current numeric value: $CurrentValue" -LogLevel "Verbose"
             return $CurrentValue
         }
         
         if ($input -match '^\d+$')
         {
             $number = [int]$input
+            Write-Verbose "[$functionName] Valid numeric input received: $number"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Valid numeric input received: $number" -LogLevel "Verbose"
             
             # Add specific validation for certain settings
             if ($SettingName -eq 'minUsernameLength' -and $number -lt 1)
             {
                 Write-Host "Minimum username length must be at least 1." -ForegroundColor Red
+                Write-Verbose "[$functionName] Validation failed: minimum username length must be at least 1"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Validation failed: minimum username length must be at least 1" -LogLevel "Warning"
                 continue
             }
             
             if ($SettingName -eq 'maxWaitTime' -and $number -lt 1)
             {
                 Write-Host "Maximum wait time must be at least 1 second." -ForegroundColor Red
+                Write-Verbose "[$functionName] Validation failed: maximum wait time must be at least 1 second"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Validation failed: maximum wait time must be at least 1 second" -LogLevel "Warning"
                 continue
             }
             
+            Write-Verbose "[$functionName] Numeric validation passed, returning: $number"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Numeric validation passed, returning: $number" -LogLevel "Information"
             return $number
         }
         
         Write-Host "Please enter a valid number." -ForegroundColor Red
+        Write-Verbose "[$functionName] Invalid numeric input: '$input'"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Invalid numeric input: '$input'" -LogLevel "Warning"
     } while ($true)
 }
 
@@ -897,13 +1042,21 @@ function Get-StringInput()
         $CurrentValue
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting string input for '$SettingName'. Current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting string input for '$SettingName'. Current value: '$CurrentValue'" -LogLevel "Verbose"
+    
     $input = Read-Host "Enter value (current: '$CurrentValue', press Enter to keep)"
     
     if ([string]::IsNullOrWhiteSpace($input))
     {
+        Write-Verbose "[$functionName] User chose to keep current string value: '$CurrentValue'"
+        Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current string value: '$CurrentValue'" -LogLevel "Verbose"
         return $CurrentValue
     }
     
+    Write-Verbose "[$functionName] User entered new string value: '$input'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "User entered new string value: '$input'" -LogLevel "Information"
     return $input
 }
 
@@ -941,6 +1094,10 @@ function Save-GlobalSettings()
 function Get-AuthTypeInput()
 {
     param($CurrentValue)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Getting authentication type input for current value: '$CurrentValue'"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Getting authentication type input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $authTypes = @('PublicAuthFlow', 'PrivateAuthFlow', 'Interactive', 'Device')
     return Get-EnumeratedInput -Options $authTypes -CurrentValue $CurrentValue -PromptText "authentication type"
