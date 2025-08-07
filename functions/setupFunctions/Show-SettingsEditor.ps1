@@ -53,12 +53,11 @@ function Show-SettingsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $logFile = "$PWD\Logs\Autopilot.log"
-    
     Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Information"
     Write-Verbose "[$functionName] Starting settings editor for $SettingsType settings"
     
-    if ($SettingsType -eq 'Domain') {
+    if ($SettingsType -eq 'Domain')
+    {
         Write-Log -LogFile $logFile -Module $functionName -Message "Domain name provided: '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Domain name provided: '$DomainName'"
     }
@@ -326,7 +325,8 @@ function Get-CurrentSettings()
     Write-Log -LogFile $logFile -Module $functionName -Message "Loading current settings from: $SettingsFile for type: $SettingsType" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Loading current settings from: $SettingsFile for type: $SettingsType"
     
-    if ($SettingsType -eq 'Domain') {
+    if ($SettingsType -eq 'Domain')
+    {
         Write-Log -LogFile $logFile -Module $functionName -Message "Domain name: '$DomainName'" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Domain name: '$DomainName'"
     }
@@ -369,30 +369,30 @@ function Get-SettingDescription()
     param([string]$SettingName)
     
     $descriptions = @{
-        'configFile' = 'Path to the configuration file storing encrypted authentication data'
-        'maxWaitTime' = 'Maximum time in seconds to wait for operations to complete'
-        'showLicenseBanner' = 'Whether to display the license banner on startup'
-        'deviceContactThresholdInDays' = 'Number of days before a device is considered stale'
-        'appMode' = 'Application mode controlling which features are available'
-        'timeInSeconds' = 'Default timeout for operations in seconds'
-        'maxUserMatchDisplay' = 'Maximum number of user matches to display in search results'
-        'release' = 'Release branch or version to track for updates'
-        'repo' = 'Repository source for updates (Github/Gitlab)'
-        'testMode' = 'Enable test mode with additional debugging features'
-        'operatingSystem' = 'Target operating system (Windows/macOS/Linux)'
-        'autoUpdate' = 'Automatically check for and install updates'
-        'domain' = 'Domain name for this configuration'
-        'deviceNamePrefix' = 'Prefix to add to device names during enrollment'
-        'minUsernameLength' = 'Minimum allowed username length'
-        'maxUserNameLength' = 'Maximum allowed username length'
-        'maxSerialNumberLength' = 'Maximum allowed serial number length'
-        'minSerialNumberLength' = 'Minimum allowed serial number length'
+        'configFile'                      = 'Path to the configuration file storing encrypted authentication data'
+        'maxWaitTime'                     = 'Maximum time in seconds to wait for operations to complete'
+        'showLicenseBanner'               = 'Whether to display the license banner on startup'
+        'deviceContactThresholdInDays'    = 'Number of days before a device is considered stale'
+        'appMode'                         = 'Application mode controlling which features are available'
+        'timeInSeconds'                   = 'Default timeout for operations in seconds'
+        'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'
+        'release'                         = 'Release branch or version to track for updates'
+        'repo'                            = 'Repository source for updates (Github/Gitlab)'
+        'testMode'                        = 'Enable test mode with additional debugging features'
+        'operatingSystem'                 = 'Target operating system (Windows/macOS/Linux)'
+        'autoUpdate'                      = 'Automatically check for and install updates'
+        'domain'                          = 'Domain name for this configuration'
+        'deviceNamePrefix'                = 'Prefix to add to device names during enrollment'
+        'minUsernameLength'               = 'Minimum allowed username length'
+        'maxUserNameLength'               = 'Maximum allowed username length'
+        'maxSerialNumberLength'           = 'Maximum allowed serial number length'
+        'minSerialNumberLength'           = 'Minimum allowed serial number length'
         'minimumDevicePhysicalMemoryInGB' = 'Minimum required device memory in GB'
-        'maxNumberOfDevicesAllowed' = 'Maximum devices a user can have enrolled'
-        'preferredBrowser' = 'Default browser for web-based operations'
-        'privateSession' = 'Use private/incognito browsing sessions'
-        'userPatternsToExclude' = 'Username patterns to exclude from operations'
-        'desiredAutopilotProfiles' = 'Autopilot profiles to assign to devices'
+        'maxNumberOfDevicesAllowed'       = 'Maximum devices a user can have enrolled'
+        'preferredBrowser'                = 'Default browser for web-based operations'
+        'privateSession'                  = 'Use private/incognito browsing sessions'
+        'userPatternsToExclude'           = 'Username patterns to exclude from operations'
+        'desiredAutopilotProfiles'        = 'Autopilot profiles to assign to devices'
     }
     
     if ($descriptions.ContainsKey($SettingName))
@@ -422,31 +422,40 @@ function Get-SettingInput()
     
     switch ($inputType)
     {
-        'Boolean' {
+        'Boolean'
+        {
             return Get-BooleanInput -CurrentValue $CurrentValue
         }
-        'AppMode' {
+        'AppMode'
+        {
             return Get-AppModeInput -CurrentValue $CurrentValue
         }
-        'CacheType' {
+        'CacheType'
+        {
             return Get-CacheTypeInput -CurrentValue $CurrentValue
         }
-        'Repo' {
+        'Repo'
+        {
             return Get-RepoInput -CurrentValue $CurrentValue
         }
-        'OperatingSystem' {
+        'OperatingSystem'
+        {
             return Get-OperatingSystemInput -CurrentValue $CurrentValue
         }
-        'Browser' {
+        'Browser'
+        {
             return Get-BrowserInput -CurrentValue $CurrentValue
         }
-        'Array' {
+        'Array'
+        {
             return Get-ArrayInput -CurrentValue $CurrentValue
         }
-        'Number' {
+        'Number'
+        {
             return Get-NumberInput -SettingName $SettingName -CurrentValue $CurrentValue
         }
-        default {
+        default
+        {
             return Get-StringInput -SettingName $SettingName -CurrentValue $CurrentValue
         }
     }
@@ -512,7 +521,8 @@ function Get-BooleanInput()
         {
             '1' { return $true }
             '2' { return $false }
-            default {
+            default
+            {
                 Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
             }
         }

@@ -1249,12 +1249,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain speci
     Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
     
     # Get the current domain from settings
-    $currentDomain = $null
-    if ($settings -and $settings.PSObject.Properties.Name -contains 'domain')
-    {
-        $currentDomain = $settings.domain
-    }
-    
+    $currentDomain = $domain
     # If no current domain, try to get it from domains section or prompt user
     if ([string]::IsNullOrWhiteSpace($currentDomain))
     {
