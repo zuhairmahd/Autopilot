@@ -62,7 +62,12 @@ function Show-SettingsEditor()
     
     if ($SettingsType -eq 'Domain')
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Domain name provided: '$DomainName'" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Information"
+    Write-Verbose "[$functionName] Starting settings editor for $SettingsType settings"
+    
+    if ($SettingsType -eq 'Domain')
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Domain name provided: '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Domain name provided: '$DomainName'"
     }
     
