@@ -1,3 +1,62 @@
+<#
+.SYNOPSIS
+    Build and release automation script for the Windows Autopilot device enrollment tool.
+
+.DESCRIPTION
+    This script automates the process of creating a signed executable release from the main PowerShell entry point.
+    It merges all function modules, handles configuration and secrets, updates versioning, and signs the output using Azure Trusted Signing.
+    Supports module creation, secrets-only mode, and settings update for password change enforcement.
+    Compatible with PowerShell 5.1 and leverages project-standard logging and error handling.
+
+.PARAMETER InputFile
+    The main PowerShell script to build into an executable.
+
+.PARAMETER Version
+    Optional. The version string to use for the build (major.minor.build.revision).
+
+.PARAMETER outputFile
+    Optional. The output path for the generated executable.
+
+.PARAMETER SettingsFile
+    Optional. Path to the settings.json file.
+
+.PARAMETER CompanyName
+    Optional. Company name for the executable metadata.
+
+.PARAMETER Author
+    Optional. Author name for the executable metadata.
+
+.PARAMETER CreateModule
+    Switch. If set, merges all functions into a PowerShell module instead of building an executable.
+
+.PARAMETER noCleanup
+    Switch. If set, skips cleanup of temporary build files.
+
+.PARAMETER Overwrite
+    Switch. If set, overwrites existing output files and folders without prompting.
+
+.PARAMETER NoVersionUpdate
+    Switch. If set, disables automatic version incrementing.
+
+.PARAMETER SecretsOnly
+    Switch. If set, only copies secrets to the output folder.
+
+.PARAMETER UpdateSettings
+    Switch. If set (with SecretsOnly), updates settings to force password change on next start.
+
+.EXAMPLE
+    ./CreateRelease.ps1 -InputFile "main.ps1" -Version "1.2.3.4"
+
+.NOTES
+    - Requires modules: Invoke-TrustedSigning, ps2exe
+    - All function modules are loaded from the /functions directory.
+    - Logging is written to logs/createRelease.log.
+    - Running the script requires an active Azure Trusted Signing account.  For testing, this functionality should be mocked.
+    - See project documentation for full release workflow.
+#>
+#requires -module Invoke-TrustedSigning
+#requires -module ps2exe
+
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
@@ -1114,12 +1173,15 @@ else
     Write-Host "Failed to sign executable: $OutputFile"
     exit 1
 }
-
+#get the hash for the executable
+$hash = Get-FileHash -Path $OutputFile -Algorithm SHA256
+Write-Host "Executable hash: $($hash.Hash)"
 #write the new version to the lastrun file.
 Write-Host "Writing last run information to $lastRunFile"
 $lastRun = @{
     date            = $todaysDate
     version         = $Version
+    hash            = $hash.Hash
     GUID            = $guid
     settingsVersion = $settingsVersion
     stringsVersion  = $stringsVersion

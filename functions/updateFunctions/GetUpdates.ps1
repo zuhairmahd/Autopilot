@@ -5,6 +5,7 @@ function GetUpdates()
         [string]$executableFileName = "$pwd\main.exe",
         [Parameter(Mandatory = $true)]
         [string]$updateURL,
+        [string]$metaDataURL = "$updateURL/lastrun.json",
         [switch]$noConfirmation
     )
 
@@ -22,7 +23,7 @@ function GetUpdates()
         return $returnValues.invalidFileType
     }
     
-    $localVersion = getFileVersion -executableFileName $executableFileName
+    $localVersion = (getFileVersion -executableFileName $executableFileName).version
     
     #region get the remote version.
     Write-Verbose "[$functionName] Checking whether the temp update file $tempUpdateFile exists."
@@ -44,7 +45,24 @@ function GetUpdates()
         Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
         return $null
     }    
-    $remoteVersion = GetFileVersion -executableFileName $tempUpdateFile
+    $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
+    Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
+    try 
+    {
+        $fileMetaData = Invoke-RestMethod -Uri $metaDataURL -UseBasicParsing
+        Write-Verbose "[$functionName] Metadata retrieved successfully."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Metadata retrieved successfully." -LogLevel "Information"
+        Write-Verbose "Response: $fileMetaData"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $fileMetaData" -LogLevel "Information"
+        Write-Verbose "[$functionName] Metadata content: $($fileMetaData.Content)"
+    }
+    catch 
+    {
+        Write-Error "[$functionName] Failed to retrieve metadata from $metaDataURL. Please check the URL and try again."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve metadata from $metaDataURL. Please check the URL and try again." -LogLevel "Error"
+        return $false
+    }
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
     
@@ -56,6 +74,8 @@ function GetUpdates()
         Write-Host "An update is available." -ForegroundColor Yellow
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
+        Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
         if ($noConfirmation)
         {
             Write-Host "No confirmation required. Proceeding with the update..." -ForegroundColor Green
@@ -78,6 +98,46 @@ function GetUpdates()
             }
         }
         Write-Host "Proceeding with the update..." -ForegroundColor Green
+        Write-Verbose "[$functionName] Proceeding with the update."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Proceeding with the update..."
+        Write-Host "Checking file signature..."
+        if (Invoke-FileCertVerification -FilePath $tempUpdateFile)
+        {
+            Write-Host "File signature is valid"
+            Write-Verbose "[$functionName] File signature is valid."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File signature is valid." -LogLevel "Information"
+            Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
+            $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256
+            Write-Verbose "[$functionName] File hash for $($tempUpdateFile) is $($fileHash.Hash)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
+            Write-Host "Checking file hash..."
+            if ($fileMetaData.Hash -eq $fileHash.Hash)
+            {
+                Write-Host "File hash matches." -NoNewline
+                Write-Host " - Proceeding with update..." -ForegroundColor Green
+                Write-Verbose "[$functionName] File hash matches the expected hash."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash matches the expected hash." -LogLevel "Information"
+            }
+            else
+            {
+                Write-Host "File hash does not match the expected hash." -ForegroundColor Red
+                Write-Host "Expected hash: $($fileMetaData.Hash)" -ForegroundColor Yellow
+                Write-Host "Actual hash: $($fileHash.Hash)" -ForegroundColor Yellow
+                Write-Verbose "[$functionName] File hash does not match the expected hash."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash." -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Expected hash: $($fileMetaData.Hash)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Actual hash: $($fileHash.Hash)" -LogLevel "Error"
+                Write-Host "Aborting update." -ForegroundColor Red
+                return $returnValues.InvalidFileHash
+            }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "File signature is invalid. Aborting update." -ForegroundColor Red
+            return $returnValues.InvalidSignatureMessage
+        }   
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
         Write-Verbose "[$functionName] Backing up current $executableFileName to $backupFile."
         try
@@ -152,6 +212,7 @@ function GetUpdates()
         Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "Remote version: $remoteVersion" -ForegroundColor Cyan
+        Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion

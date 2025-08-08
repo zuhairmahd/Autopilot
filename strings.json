@@ -10,6 +10,8 @@
     },
     "returnValues": {
         "noDeviceFound": "No device found",
+        "InvalidSignatureMessage": "The signature is invalid. The update will be aborted.",
+        "InvalidFileHash": "The file hash is invalid. The update will be aborted.",
         "deviceAssignedMessage": "The device is assigned to a deployment profile.",
         "NoMenusConfigured": "No menus are configured. Check the app configuration.",
         "UpdateNotNeededMessage": "The script is already up to date.",

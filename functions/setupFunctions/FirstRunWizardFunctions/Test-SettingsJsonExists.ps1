@@ -205,6 +205,15 @@ function Test-SettingsJsonExists()
                     groupsToExclude = @()
                     settings        = @{
                         domain                          = $DomainName
+                        maxWaitTime                     = "30"
+                        showLicenseBanner               = $true
+                        deviceContactThresholdInDays    = 30
+                        appMode                         = "full"
+                        timeInSeconds                   = "60"
+                        maxUserMatchDisplay             = "10"
+                        release                         = "master"
+                        repo                            = "Github"
+                        autoUpdate                      = $true
                         deviceNamePrefix                = ""
                         operatingSystem                 = "Windows"
                         minUsernameLength               = 3
@@ -344,6 +353,12 @@ function Test-SettingsJsonExists()
                             type                  = "action"
                             includeInDisplayModes = @()
                         },
+                        @{
+                            name                  = "Change App Mode setting"
+                            description           = "Change the application mode"
+                            type                  = "action"
+                            includeInDisplayModes = @("full", "helpDesk", "advanced", "advancedRegistration", "registration", "admin", "custom")
+                        },  
                         @{
                             name                  = "Restore defaults"
                             description           = "Restore the application to its default settings"

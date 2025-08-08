@@ -2,6 +2,8 @@
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
+    [string]$stringsFile = "$pwd\strings.json",
+    [string]$menusFile = "$pwd\menus.json",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -12,23 +14,25 @@ param(
     [switch]$showAuth,
     [switch]$showSettings,
     [switch]$SecureString,
+    [switch]$ResetAuth,
     [switch]$ForceNewToken,
-    [parameter(parameterSetName = 'Deligated')]
-    [switch]$Deligated,
-    [parameter(parameterSetName = 'Deligated')]
+    [parameter(parameterSetName = 'delegated')]
+    [switch]$delegated,
+    [parameter(parameterSetName = 'delegated')]
     [switch]$ForceNewRefreshToken,
-    [parameter(parameterSetName = 'Deligated')]
+    [parameter(parameterSetName = 'delegated')]
     [switch]$NoSaveRefreshToken,
-    [parameter(parameterSetName = 'Deligated')]
+    [parameter(parameterSetName = 'delegated')]
     [string]$Scope,
-    [parameter(parameterSetName = 'Deligated')]
+    [parameter(parameterSetName = 'delegated')]
     [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
     [string]$AuthType,
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
-    [string]$Repo = 'github',
-    [string]$Release = 'main',
-    [ValidateSet('full', 'helpDesk', 'registration')]
+    [ValidateSet('github', 'gitlab')]
+    [string]$Repo,  
+    [string]$Release,
+    [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
@@ -63,7 +67,7 @@ $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     foreach ($function in $functions)
     {
         Write-Verbose "[$scriptName] Importing function $function"
@@ -93,7 +97,6 @@ if (Test-Path $oldExecutableFileName)
 
 #region Load parameters from the configuration file if it exists
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
-
 # Check if the .secrets directory exists, create it if it doesn't
 $secretsDir = Split-Path $configFile -Parent
 if (-not (Test-Path $secretsDir))
@@ -104,37 +107,96 @@ if (-not (Test-Path $secretsDir))
 
 # Initialize variables for encryption handling
 $configContent = $null
-$userPassword = $null
+$script:maxRetries = 6
 
 if (Test-Path $configFile)
 {
-    # Load the encrypted configuration file
-    $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -PasswordPrompt "Enter your password"
+    # Initialize configuration session
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password"
     
-    if (-not $loadResult.Success)
+    if (-not $sessionResult.Success)
     {
-        Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
-        Write-Host "Please check file permissions and try again." -ForegroundColor Red
+        Write-Host "Error: $($sessionResult.ErrorMessage)" -ForegroundColor Red
+        Write-Verbose "[$scriptName] Failed to initialize configuration session: $($sessionResult.ErrorMessage)"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to initialize configuration session: $($sessionResult.ErrorMessage)" -LogLevel "Error"
+        Write-Host "Exitting script due to configuration session failure." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -FinishLogging
         exit 1
     }
     
-    $configContent = $loadResult.Content
+    $configContent = $sessionResult.ConfigContent
+    $domain = $sessionResult.Domain
+    $appId = $sessionResult.AppId
+    $tenantId = $sessionResult.TenantId
+    $name = $sessionResult.Name
     
-    # Setup temporary encryption for in-memory access
-    $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
-    if (-not $tempEncryptionResult)
+    # Check if password change is required
+    if (Test-Path $InitFile)
     {
-        Write-Warning "Temporary encryption setup failed, some features may not work properly"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
+        try 
+        {
+            $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+            if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
+            {
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+                
+                # Invoke password change process
+                $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+                
+                if ($passwordChangeResult)
+                {
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+                    
+                    # Reload the configuration with new password
+                    Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
+                    $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
+                    
+                    if ($reloadResult.Success)
+                    {
+                        # Update configContent for this session
+                        $configContent = $reloadResult.ConfigContent
+                    }
+                    else
+                    {
+                        Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                        exit 1
+                    }
+                }
+                else
+                {
+                    Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+                }
+            }
+        }
+        catch
+        {
+            Write-Warning "Failed to check password change requirement: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement: $($_.Exception.Message)" -LogLevel "Warning"
+        }
     }
     
-    # Parse the configuration content
-    $configJson = ConvertFrom-Json $configContent
-    $domain = $configJson.domain
-    $appId = $configJson.appId
-    $tenantId = $configJson.tenantId
-    $name = $configJson.name
-    
+    if (-not ($sessionResult.encrypted))
+    {
+        Write-Host "You need to set a new password to use this application."
+        if (Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $initFile -setInitialPassword)
+        {
+            Write-Host "You can now use the application." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password set successfully after initialization" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "Failed to set password. Exiting script." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to set password after initialization" -LogLevel "Error"
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+        Write-Host "Configuration loaded successfully for domain: $domain" -ForegroundColor Green
+    }
     # Clear the config content from memory
     $configContent = $null
 }
@@ -161,31 +223,67 @@ else
         # Re-run the configuration loading logic
         if (Test-Path $configFile)
         {
-            # Load the encrypted configuration file
-            $loadResult = Load-EncryptedConfigFile -ConfigFile $configFile -MaxRetries 3 -UseStoredPassword -PasswordPrompt "Enter your password"
+            # Initialize configuration session after wizard
+            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
             
-            if (-not $loadResult.Success)
+            if (-not $sessionResult.Success)
             {
-                Write-Host "Configuration file exists but cannot be read: $($loadResult.ErrorMessage)" -ForegroundColor Red
+                Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($loadResult.ErrorMessage)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Error"
                 exit 1
             }
             
-            $configContent = $loadResult.Content
-            
-            # Setup temporary encryption for in-memory access
-            $tempEncryptionResult = Setup-TemporaryEncryption -ConfigContent $configContent
-            if (-not $tempEncryptionResult)
-            {
-                Write-Warning "Temporary encryption setup failed, some features may not work properly"
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Temporary encryption setup failed" -LogLevel "Warning"
-            }
-            
-            # Parse the configuration content
-            $configJson = ConvertFrom-Json $configContent
-            $domain = $configJson.domain
+            $configContent = $sessionResult.ConfigContent
+            $domain = $sessionResult.Domain
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+            
+            # Check if password change is required (wizard path)
+            if (Test-Path $InitFile)
+            {
+                try 
+                {
+                    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+                    if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
+                    {
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required after wizard (changePWOnNextStart=true)" -LogLevel "Information"
+                        
+                        # Invoke password change process
+                        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+                        
+                        if ($passwordChangeResult)
+                        {
+                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully after wizard" -LogLevel "Information"
+                            
+                            # Reload the configuration with new password
+                            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
+                            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
+                            
+                            if ($reloadResult.Success)
+                            {
+                                # Update configContent for this session
+                                $configContent = $reloadResult.ConfigContent
+                            }
+                            else
+                            {
+                                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                                exit 1
+                            }
+                        }
+                        else
+                        {
+                            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed after wizard. Continuing with current password." -LogLevel "Warning"
+                        }
+                    }
+                }
+                catch
+                {
+                    Write-Warning "Failed to check password change requirement after wizard: $($_.Exception.Message)"
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement after wizard: $($_.Exception.Message)" -LogLevel "Warning"
+                }
+            }
             
             # Clear the config content from memory
             $configContent = $null
@@ -208,12 +306,37 @@ else
 if (Test-Path -Path $InitFile)
 {
     Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    $global:globalSettings = @{}
-    $global:localSettings = @{}
     
-    # Load the init file content
+    # Ensure settings.json file has all required default values
+    Write-Verbose "[$scriptName] Checking settings.json for missing default values"
+    # Use domain if available, otherwise default to example.com
+    $domainForDefaults = if ($domain)
+    {
+        $domain 
+    }
+    else
+    {
+        "contoso.com" 
+    }
+    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
+    if ($settingsUpdated)
+    {
+        Write-Verbose "[$scriptName] Settings file checked/updated successfully"
+    }
+    
+    # Ensure strings.json file has all required default values  
+    Write-Verbose "[$scriptName] Checking strings.json for missing default values"
+    $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
+    if ($stringsUpdated)
+    {
+        Write-Verbose "[$scriptName] Strings file checked/updated successfully"
+    }
+    
+    $globalSettings = @{}
+    $localSettings = @{}
+    
+    # Load the init file content (potentially updated with new defaults)
     $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-    
     # Load auth configuration from init file
     $authConfiguration = $initFileContent.auth
     $auth = @{}
@@ -309,6 +432,25 @@ if (Test-Path -Path $InitFile)
             $localSettings.add($key, $PSBoundParameters[$key])
         }
     }   
+    #merge the local and global settings.
+    $script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+    #if the appMode is not set, default to 'full', otherwise make sure it is avalid appMode.
+    if (-not $script:settings.appMode)
+    {
+        Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
+        $script:settings.appMode = 'full'
+    }
+    elseif ($script:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
+    {
+        Write-Host "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
+        Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
+        exit 1
+    }
+    #load menus configuration from initFile
+    $menus = $initFileContent.menus
+    Write-Verbose "[$scriptName] Loaded $($($menus.Count)) menus from $InitFile"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($($menus.Count)) menus from $InitFile" -logLevel "Information"
     #region handle scopes
     $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
     $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
@@ -341,7 +483,7 @@ if (Test-Path -Path $InitFile)
 }
 else
 {
-    Write-Host "Configuration file $initFile not found. Using default values."
+    Write-Host "Configuration file $initFile not found. Using default values." -ForegroundColor Yellow
     
     $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
     if (-not $settingsCreated)
@@ -392,27 +534,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$exported, $appsProcessed = GetAppAssignmentTypes -AccessToken $accessToken -Export -outputPath $ScriptPath -fileMode 'Overwrite'
-if ($exported)
-{
-    Write-Host "App assignment types exported successfully."
-}
-else
-{
-    if ($appsProcessed.AllApps.Count -eq 0)
-    {
-        Write-Host "No apps found to export." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Warning"
-    }
-    else
-    {
-        Write-Host "Failed to export app assignment types." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to export app assignment types." -LogLevel "Error"
-    }
-}
-
-Write-Log -LogFile $LogFile -FinishLogging
-
+$global:version = GetFileVersion -executableFileName "$pwd\main.exe"
+Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
 exit 0 
 $inputFile = Read-Host "Enter the path to the input file"
 if (-not (Test-Path $inputFile))

@@ -108,6 +108,19 @@ function Start-FirstRunWizard()
             return $false
         }
         
+        # Step 2.6: Collect app mode configuration
+        Write-SafeLog "Collecting app mode configuration" "Information"
+        $appModeResult = Get-AppModeConfigurationFromUser -Silent:$Silent
+        
+        if ($null -eq $appModeResult -or $appModeResult.cancelled)
+        {
+            Write-SafeLog "Failed to collect app mode configuration or cancelled by user" "Error"
+            return $false
+        }
+        
+        # Extract app mode from result for backward compatibility
+        $appModeConfig = @{ appMode = $appModeResult.appMode }
+        
         # Step 3: Merge configurations
         $finalConfig = @{
             domain   = $config.domain
@@ -182,6 +195,19 @@ function Start-FirstRunWizard()
             {
                 Write-SafeLog "Failed to update autoUpdate setting" "Warning"
             }
+            
+            # Step 5.6: Update app mode setting in settings.json
+            Write-SafeLog "Updating app mode setting in settings.json" "Information"
+            $appModeSuccess = Update-GlobalSetting -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $appModeConfig.appMode
+            
+            if ($appModeSuccess)
+            {
+                Write-SafeLog "Successfully updated app mode setting to: $($appModeConfig.appMode)" "Information"
+            }
+            else
+            {
+                Write-SafeLog "Failed to update app mode setting" "Warning"
+            }
         }
         
         # Step 6: Ensure strings.json exists with defaults
@@ -209,6 +235,7 @@ function Start-FirstRunWizard()
             Write-Host "• Domain: $($config.domain)" -ForegroundColor Cyan
             Write-Host "• Authentication: $($authConfig.AuthType)" -ForegroundColor Cyan
             Write-Host "• Auto Updates: $(if ($autoUpdateConfig.autoUpdate) { 'Enabled' } else { 'Disabled' })" -ForegroundColor Cyan
+            Write-Host "• App Mode: $($appModeConfig.appMode)" -ForegroundColor Cyan
             Write-Host "`nYou can now run the application normally." -ForegroundColor White
         }
         

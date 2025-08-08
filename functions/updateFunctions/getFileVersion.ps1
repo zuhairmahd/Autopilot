@@ -6,6 +6,7 @@ function getFileVersion()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $returnObject = @{}
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     if (-not $executableFileName -or -not (Test-Path $executableFileName) -or $executableFileName -match '.ps1')
     {
@@ -18,12 +19,25 @@ function getFileVersion()
         Write-Verbose "[$functionName] Found the executable file '$executableFileName'."
         Write-Verbose "[$functionName] Getting the file version."
         $LocalVersion = (Get-Item $executableFileName).VersionInfo.ProductVersion
+        $companyName = (Get-Item $executableFileName).VersionInfo.CompanyName
+        $hash = (Get-FileHash -Path $executableFileName -Algorithm SHA256).Hash
         Write-Verbose "[$functionName] Local version extracted: $LocalVersion"
+        Write-Verbose "[$functionName] Company Name: $companyName"
+        Write-Verbose "[$functionName] File Hash: $hash"
         Write-Verbose "[$functionName] Parsing the local version string to System.Version object."
         $localVersion = [System.Version]::Parse($LocalVersion)
         Write-Verbose "[$functionName] Parsed local version: $localVersion"
         Write-Verbose "[$functionName] Returning local version: $localVersion"
-        return $localVersion
+        $returnObject = @{
+            'major'       = $localVersion.Major
+            'minor'       = $localVersion.Minor
+            'build'       = $localVersion.Build
+            'revision'    = $localVersion.Revision
+            'version'     = $localVersion
+            'companyName' = $companyName
+            'hash'        = $hash
+        }
+        return $returnObject
     }
     else
     {

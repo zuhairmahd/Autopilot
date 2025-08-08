@@ -59,6 +59,7 @@ The application includes an interactive First Run Wizard that automatically laun
    - Azure AD Configuration (App ID, Tenant ID, Domain Name)
    - Authentication Setup (delegated or application authentication)
    - Auto Update Configuration
+   - **App Mode Selection** (choose the interface that fits your role)
    - Credential Collection
    - Automatic file creation and encryption
 
@@ -111,6 +112,10 @@ When you launch the application, you'll see the main menu with the following opt
 
 4. **Change application settings**
    - **Change application settings**: Reconfigure the entire application
+   - **Change environment settings**: Configure global and domain-specific settings
+     - **Change global settings**: Update application-wide configuration options
+     - **Change domain settings**: Configure settings for specific domains 
+     - **Change authentication settings**: Configure Microsoft Graph API authentication
    - **Change password and authentication information**: Update credentials and passwords
    - **Change Auto Update setting**: Toggle automatic updates on/off
    - **Restore defaults**: Reset application to default configuration
@@ -217,11 +222,123 @@ The application will display only those menu options, hiding all others.
 
 ## Application Modes
 
-The tool supports several operational modes:
+The tool supports several operational modes that control which features and menu items are available to users. App modes can be configured during the first-run wizard or changed later through the settings menu.
 
-- **Full Mode** (`appMode: "full"`): All features and menu items are available.
-- **Custom/Help Desk Mode** (`appMode: "custom"` or `"helpDesk"`): Only menu items listed in `menuItemsToInclude` are shown.
-- **Registration Mode** (`appMode: "registration"`): Focused on device registration tasks.
+### Available App Modes
+
+- **Full Mode** (`appMode: "full"`): Complete feature set with all available functionality (recommended for administrators)
+- **Help Desk Mode** (`appMode: "helpDesk"`): Streamlined interface for help desk operations and device troubleshooting
+- **Advanced Mode** (`appMode: "advanced"`): Advanced features for experienced users and technical staff
+- **Advanced Registration Mode** (`appMode: "advancedRegistration"`): Advanced device registration capabilities with extended options
+- **Registration Mode** (`appMode: "registration"`): Device registration and enrollment focused interface
+- **Administrator Mode** (`appMode: "admin"`): Administrative functions and system configuration options
+- **Custom Mode** (`appMode: "custom"`): Custom configuration for specialized deployments
+
+### Selecting App Mode
+
+App mode selection provides a consistent, user-friendly experience across different contexts with enhanced interface features:
+
+#### During First-Run Setup
+When running the application for the first time, the First Run Wizard will prompt you to select an app mode:
+
+1. Run the application: `.\main.ps1`
+2. Follow the wizard prompts for Azure AD configuration
+3. When prompted, select your preferred app mode from the menu with clear descriptions for each option
+4. Complete the remaining setup steps
+
+#### Changing App Mode Later
+You can change the app mode at any time through the settings menu:
+
+1. Navigate to **Change application settings** → **Change App Mode setting**
+2. Use the interactive menu to select from available app modes with detailed descriptions
+3. The system displays your current mode and provides navigation options (Back/Main)
+4. Confirm the change when prompted
+5. Restart the application when prompted to apply the new mode
+
+**Note**: The app mode selection uses the application's standard menu system for consistent navigation and user experience across all contexts.
+
+### Custom App Mode Configuration
+
+Custom App Mode allows administrators to define a tailored set of menu options for specific user roles or operational scenarios. When using custom mode, you can further restrict menu items through the `menuItemsToInclude` array in `settings.json`.
+
+Example configuration:
+```json
+{
+  "appMode": "custom",
+  "menuItemsToInclude": [
+    "Give a device to a user",
+    "Check device status",
+    "Autopilot menu"
+  ]
+}
+```
+
+### How It Works
+- When `appMode` is set to `"full"`, all menu items are displayed
+- Other modes display predefined sets of menu items appropriate for that role
+- Custom mode can be further restricted using `menuItemsToInclude`
+- The menu system automatically shows/hides items based on the selected mode
+
+---
+
+### Authentication Settings Management
+
+The application provides comprehensive management of Microsoft Graph API authentication settings through an interactive settings editor.
+
+#### Accessing Authentication Settings
+
+**Navigation Path**: Main Menu → Change application settings → Change environment settings → Change authentication settings
+
+#### Available Authentication Settings
+
+| Setting | Description | Default Value |
+|---------|-------------|---------------|
+| **authType** | Authentication method | `PublicAuthFlow` |
+| **delegated** | Use delegated permissions (user context) | `true` |
+| **scope** | Microsoft Graph API permissions | Standard set of device management scopes |
+| **changePwOnNextStart** | Force password change on next startup | `false` |
+| **noSaveRefreshToken** | Disable refresh token caching | `false` |
+| **forceNewToken** | Force new token acquisition | `false` |
+| **renewalLeadTime** | Token renewal time (minutes before expiry) | `5` |
+| **cacheType** | Token cache storage method | `Memory` |
+| **secureString** | Use secure string for token storage | `false` |
+
+#### Authentication Types
+
+- **PublicAuthFlow** (Recommended): Uses public client authentication suitable for most scenarios
+- **PrivateAuthFlow**: Uses confidential client with app secrets (requires additional configuration)
+- **Interactive**: Browser-based interactive authentication
+- **Device**: Device code flow authentication
+
+#### Advanced Configuration Requirements
+
+⚠️ **Important**: Certain authentication settings require additional configuration:
+
+- **Setting `delegated` to `false`**: Requires application permissions and client secret configuration
+- **Using `authType` other than `PublicAuthFlow`**: Requires client credentials to be configured
+
+When these advanced settings are modified, the application will display a warning and remind you to ensure proper client secret configuration in your settings files.
+
+#### Managing Authentication Scopes
+
+The `scope` setting allows you to configure which Microsoft Graph API permissions the application requests. The default scopes provide comprehensive device management capabilities:
+
+- `offline_access` - Offline access for refresh tokens
+- `openid` - OpenID Connect authentication  
+- `Device.ReadWrite.All` - Device management permissions
+- `DeviceManagementApps.Read.All` - App management read permissions
+- `DeviceManagementConfiguration.ReadWrite.All` - Configuration management
+- `DeviceManagementManagedDevices.PrivilegedOperations.All` - Device operations
+- `DeviceManagementManagedDevices.ReadWrite.All` - Managed device access
+- `DeviceManagementServiceConfig.ReadWrite.All` - Service configuration
+
+#### Settings Editor Features
+
+- **Current Value Display**: Shows existing values with visual highlighting
+- **Type-Aware Input**: Specialized input handlers for different data types (boolean, array, enumerated values)
+- **Input Validation**: Real-time validation with error messages
+- **Array Management**: Interactive array editor for scope permissions
+- **Automatic Backup**: Creates backups before making changes
 
 ---
 

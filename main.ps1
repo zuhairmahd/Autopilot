@@ -12,6 +12,7 @@ param(
     [switch]$Update,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
+    [switch]$showVersion,
     [switch]$showSettings,
     [switch]$SecureString,
     [switch]$ResetAuth,
@@ -82,6 +83,27 @@ else
 #endregion import functions.
 
 #region Initialize script
+$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+Write-Verbose "[$scriptName] Version: $($version | Out-String)"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
+    $version = @{
+        version     = [System.Version]::Parse('1.0.0.0')
+        companyName = 'Zuhair Mahmoud'
+        major       = 1
+        minor       = 0
+        build       = 0
+        revision    = 0
+    }
+}
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    exit 0  
+}
 $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $Global:MinimumLogLevel = $LogLevel
@@ -556,13 +578,6 @@ Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 Write-Verbose "[$scriptName] Update URL: $updateURL"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
-$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
-Write-Verbose "[$scriptName] Version: $version"
-if (-not $version)
-{
-    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
-    $version = [System.Version]::Parse('1.0.0.0')
-}
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
 $groupsToExclude = $settings.groupsToExclude
@@ -666,8 +681,7 @@ Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: 
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-Write-Host "Copyright (c) $((Get-Date).Year)" -ForegroundColor Cyan
-
+Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
 if ($settings.showLicenseBanner)
 {
     Write-Host "==========================================================`n" -ForegroundColor White     
@@ -683,7 +697,7 @@ if ($settings.showLicenseBanner)
     Write-Host "Use at your own risk. The author is not responsible for any damage or data loss." -ForegroundColor Red
     Write-Host "==========================================================`n" -ForegroundColor White
 }
-if ($updateAvailable[1] -eq $true -and $updateAvailable[0] -gt $version)
+if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version.version)
 {
     Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
@@ -810,7 +824,6 @@ else
 }
 #endregion initialization block with access token
 
-
 #region Menu Definitions
 $mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
 $CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
@@ -818,6 +831,7 @@ $serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How w
 $exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would like to export."
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
+$environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage your environment settings and configurations"
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
@@ -1076,9 +1090,9 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device
     {
         # For manufacturerModelSerial type, format as comma-separated string
         Write-Host "This will delete the corporate device identifier for:"
-        Write-Host "  Manufacturer: $($deviceIdentifier.Manufacturer)"
-        Write-Host "  Model: $($deviceIdentifier.Model)"
-        Write-Host "  Serial Number: $($deviceIdentifier.SerialNumber)"
+        Write-Host " Manufacturer: $($deviceIdentifier.Manufacturer)"
+        Write-Host " Model: $($deviceIdentifier.Model)"
+        Write-Host " Serial Number: $($deviceIdentifier.SerialNumber)"
         $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
         while ($choice -notin @('yes', 'no'))
         {
@@ -1219,18 +1233,100 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #endregion Autopilot menu
 
 #region Settings menu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change application settings" -Action {
-    Write-Host 'Reconfiguring the script...'
-    if (CreateFullConfiguration -RootFolder $pwd)
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
+    Write-Host "Launching global settings editor..." -ForegroundColor Cyan
+    $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
+    if ($success)
     {
-        Write-Host 'The script has been reconfigured.' -ForegroundColor Green
+        Write-Host "`nGlobal settings updated successfully. Changes will take effect on next restart." -ForegroundColor Green
     }
     else
     {
-        Write-Host 'Failed to reconfigure the script.' -ForegroundColor Red
+        Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change password and authentication information" -Action {
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
+    Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
+    
+    # Get the current domain from settings
+    $currentDomain = $domain
+    # If no current domain, try to get it from domains section or prompt user
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        try
+        {
+            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
+            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
+            {
+                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
+                if ($availableDomains.Count -eq 1)
+                {
+                    $currentDomain = $availableDomains[0]
+                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                }
+                else
+                {
+                    Write-Host "Available domains:" -ForegroundColor White
+                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                    {
+                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
+                    }
+                    
+                    do
+                    {
+                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
+                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                        {
+                            $currentDomain = $availableDomains[[int]$choice - 1]
+                            break
+                        }
+                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
+                    } while ($true)
+                }
+            }
+            else
+            {
+                $currentDomain = Read-Host "Enter domain name to configure"
+            }
+        }
+        catch
+        {
+            $currentDomain = Read-Host "Enter domain name to configure"
+        }
+    }
+    
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        Write-Host "No domain specified. Cannot edit domain-specific settings." -ForegroundColor Red
+        return $returnValues.backoutText
+    }
+    
+    $success = Show-SettingsEditor -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nDomain settings for '$currentDomain' updated successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
+    Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
+    Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
+    
+    $success = Show-SettingsEditor -SettingsType "Auth" -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nAuthentication settings updated successfully. Changes may require application restart." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
     while ($choice -notin @('yes', 'no'))
@@ -1307,22 +1403,91 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Restore defaults" -Action {
-    Write-Host 'Restoring the script to its default settings...'
-    if (InitializeConfiguration -RootFolder $pwd -overwrite)
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" -Action {
+    Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
+    
+    # Use the refactored function for consistent app mode selection
+    $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -Context "settings"
+    
+    # Handle cancellation
+    if ($result.cancelled)
     {
-        Write-Host 'The script defaults have been restored.' -ForegroundColor Green
+        Write-Verbose "[$scriptName] User chose to cancel app mode change."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
+        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+        return $returnValues.backoutText
+    }
+    
+    # Handle unchanged selection
+    if ($result.currentModeUnchanged)
+    {
+        Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
+        Write-Verbose "[$scriptName] User selected the same app mode that is already set."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
+        return $returnValues.backoutText
+    }
+    
+    $newAppMode = $result.appMode
+    
+    # Confirm the change
+    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
+    Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
+    Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
+    Write-Host ""
+    
+    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+    while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+        [console]::beep(1000, 500)
+        $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+    }
+    
+    if ($confirmChoice -in @('no', 'n'))
+    {
+        Write-Verbose "[$scriptName] User chose not to change app mode setting."
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
+        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+        return $returnValues.backoutText
+    }
+    
+    # Save the updated app mode setting
+    Write-Verbose "[$scriptName] Updating app mode setting from '$($settings.appMode)' to '$newAppMode'"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
+    
+    if (Update-GlobalSetting -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
+    {
+        Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
+        
+        # Clean up temporary files
+        $filesCleaned = cleanupTempFiles
+        if ($filesCleaned.AllRemoved)
+        {
+            Write-Verbose "[$scriptName] All temporary files were cleaned."
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+        }
+        Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+        
+        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
+        Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Log -logFile $logFile -finishLogging
+        exit  0
     }
     else
     {
-        Write-Host 'Failed to restore script defaults..' -ForegroundColor Red
+        Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
 }
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
-    $userName = GetUserInput -Message "Enter the username (email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+    $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     if ($null -eq $userName)
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
@@ -1439,7 +1604,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
-    $username = GetUserInput -Message "Enter the username (email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+    $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
     if ($null -eq $username)
     {
@@ -1639,7 +1804,26 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $extraParameters = "select=displayName"
     $registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
-    Write-Host "Copyright (c) $((Get-Date).Year) Zuhair Mahmoud" -ForegroundColor Cyan
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    if ($updateAvailable.success -eq $true)
+    {
+        Write-Host "Last updated on $($updateAvailable.ReleaseDate)" 
+        Write-Host "File checksum: $($updateAvailable.Hash)"
+        if ($version.hash -eq $updateAvailable.hash)
+        {
+            Write-Host "Checksums match: You are running a genuine copy of the script." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "Checksums do not match: The script may have been tampered with.  We recommend you stop using the script immediately." -ForegroundColor Yellow
+        }
+        if ($updateAvailable.version -gt $version.version)
+        {
+            Write-Host "An update is available: $($updateAvailable.version)" -ForegroundColor Yellow
+            Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
+            Write-Host "Go to 'Check For Script Updates' to download the latest version." -ForegroundColor Yellow
+        }
+    }
     Write-Host "==========================================================`n"    
     Write-Host "Domain: $domain"
     Write-Host "Application name from config: $name"
