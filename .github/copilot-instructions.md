@@ -17,13 +17,13 @@ pwsh -version
 
 # Install required modules for building (required for CreateRelease.ps1)
 pwsh -Command "Install-Module -Name ps2exe -Force -Scope CurrentUser"
-pwsh -Command "Install-Module -Name Invoke-TrustedSigning -Force -Scope CurrentUser"
+pwsh -Command "Install-Module -Name TrustedSigning -Force -Scope CurrentUser"
 
 # Verify modules are installed
-pwsh -Command "Get-Module -ListAvailable ps2exe, Invoke-TrustedSigning"
+pwsh -Command "Get-Module -ListAvailable ps2exe, TrustedSigning"
 ```
 
-**Note**: The `Invoke-TrustedSigning` module requires an Azure Trusted Signing account for production builds. For testing and development, mock this functionality by using test builds only.
+**Note**: The `TrustedSigning` module requires an Azure Trusted Signing account for production builds. For testing and development, mock this functionality by using test builds only.
 
 ### Bootstrap and Validate the Repository
 **CRITICAL TIMING**: ALL builds and tests take significant time. **NEVER CANCEL** long-running operations.
@@ -34,9 +34,6 @@ pwsh -File "./TestScripts/test-syntax.ps1"
 
 # Run comprehensive test suite - NEVER CANCEL: takes 6 minutes. Set timeout to 10+ minutes.
 pwsh -File "./TestScripts/run-all-tests.ps1"
-
-# Build the application (requires modules above) - NEVER CANCEL: takes 10 minutes. Set timeout to 15+ minutes.
-pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "test.0.0.1" -NoVersionUpdate
 
 # Test basic application functionality
 pwsh -File "./main.ps1" -appMode "full" -Verbose
@@ -105,6 +102,9 @@ functions/
 
 **Function Loading**: All functions are dot-sourced from `/functions/` at startup, loaded recursively. Each module must be independent—avoid inter-module dependencies.
 
+**Menu Definitions**: All functions are dot-sourced from `/functions/` 
+Menu definitions are contained in settings.json in the menus object.  If any changes are made to the menu structure or functionality, the settings.json file must be updated accordingly.
+
 ### Main Application Flow
 - **Entry Point**: `main.ps1` - handles initialization and menu navigation
 - **Menu System**: Hierarchical, stack-based navigation using `MenuFunctions.ps1`
@@ -155,19 +155,19 @@ pwsh -File "./TestScripts/test-syntax.ps1"
 ```powershell
 # Create release build with signing - NEVER CANCEL: 10 minutes. Set timeout to 15+ minutes.
 # Requires Azure Trusted Signing account for production
-pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "X.Y.Z"
+pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "X.Y.Z" -Overwrite
 
 # Create test build without version update (recommended for development)
-pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "test.0.0.1" -NoVersionUpdate
+pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "test.0.0.1" -NoVersionUpdate -Overwrite
 
 # Build with specific output location
-pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "X.Y.Z" -outputFile "./build/autopilot.exe"
+pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "X.Y.Z" -outputFile "./build/autopilot.exe" -Overwrite
 
 # Secrets-only mode (copies secrets without building)
 pwsh -File "./CreateRelease.ps1" -SecretsOnly -Overwrite
 
 # Module creation mode (creates PowerShell module instead of executable)
-pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1"
+pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrite
 ```
 
 **Build Process Features:**
@@ -283,7 +283,7 @@ pwsh -Command "Install-Module -Name ps2exe -Force -Scope CurrentUser"
 pwsh -Command "Install-Module -Name Invoke-TrustedSigning -Force -Scope CurrentUser"
 
 # Test build without signing (for development)
-pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "test.0.0.1" -NoVersionUpdate
+pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "test.0.0.1" -NoVersionUpdate -Overwrite
 ```
 
 ### Function Loading Errors
@@ -322,9 +322,9 @@ pwsh -File "./TestScripts/test-settings-editor.ps1"
 
 ### Azure Trusted Signing Issues
 For development and testing environments where Azure Trusted Signing is not available:
-- Use test builds only: `CreateRelease.ps1 -NoVersionUpdate`
+- Use test builds only: `CreateRelease.ps1 -NoVersionUpdate -Overwrite`
 - The signing process will fail gracefully in testing environments
 - Focus on functionality validation rather than signed executables
-- Use module creation mode for testing: `CreateRelease.ps1 -CreateModule`
+- Use module creation mode for testing: `CreateRelease.ps1 -CreateModule -Overwrite`
 
 Remember: This tool integrates with Microsoft Graph API for Windows Autopilot device management. When making changes, always validate both the PowerShell functionality AND the logical device management workflows.

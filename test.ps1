@@ -2,7 +2,7 @@
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
-    [string]$stringsFile = "$pwd\strings.json",
+    [string]$stringsFile = "$pwd\menus.json",
     [string]$menusFile = "$pwd\menus.json",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
@@ -500,11 +500,13 @@ else
 #region Define variables
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 $scope = $auth.scope
+# $DellDeviceHardwareDetailsURI = "deviceManagement/hardwarePasswordDetails. "
 # $logfile = "mylog.log"
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
 # $serialNumber = '5R3SBZ3'
 # $userUri = "users"
+$groupUri = "groups"
 # $managedAppUri = "deviceAppManagement/mobileApps"
 # $appAssignmentURI = "deviceAppManagement/mobileApps/$($app.id)/assignments"
 # $importedAutopilotDeviceURI = "deviceManagement/importedWindowsAutopilotDeviceIdentities"
@@ -534,9 +536,186 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$global:version = GetFileVersion -executableFileName "$pwd\main.exe"
-Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-exit 0 
+$groupsToInclude = $settings.groupsToInclude
+# Helper: Get IDs or Names for Entra ID groups with a single Graph call and caching
+function Get-GroupIdsByNames()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string] $AccessToken,
+        [Parameter(Mandatory = $false)]
+        [string[]] $GroupNames = $groupsToInclude,
+        [switch] $DisplayNames
+    )
+
+    if (-not $GroupNames -or $GroupNames.Count -eq 0)
+    {
+        Write-Verbose "[Get-GroupIdsByNames] No group identifiers provided. Returning empty array."
+        return @()
+    }
+
+    # Normalize inputs
+    $inputs = @($GroupNames | Where-Object { $_ } | ForEach-Object { ("$_").Trim() } | Where-Object { $_ -ne '' })
+    if ($inputs.Count -eq 0) { return @() }
+
+    # Partition into IDs vs names
+    $guidRegex = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    $inputIds = @()
+    $inputNames = @()
+    foreach ($v in $inputs)
+    {
+        if ($v -match $guidRegex) { $inputIds += $v.ToLower() } else { $inputNames += $v }
+    }
+
+    # Determine mode (default behavior): IDs in -> names out, Names in -> IDs out
+    $mode = if ($inputNames.Count -eq 0 -and $inputIds.Count -gt 0) { 'ids-input' } else { 'names-input' }
+
+    # Initialize caches/indexes
+    if (-not $script:GroupResponseCache) { $script:GroupResponseCache = @{} }
+    if (-not $script:GroupNameIdIndex) { $script:GroupNameIdIndex = @{} }  # key: lower(displayName) -> id
+    if (-not $script:GroupIdNameIndex) { $script:GroupIdNameIndex = @{} }  # key: lower(id) -> displayName
+
+    # Helper: try satisfy from indexes
+    function Resolve-FromIndex
+    {
+        param(
+            [string[]] $Names,
+            [string[]] $Ids
+        )
+        $resolvedIds = @()
+        $missingNames = @()
+        foreach ($n in @($Names))
+        {
+            $key = $n.ToLower()
+            if ($script:GroupNameIdIndex.ContainsKey($key)) { $resolvedIds += $script:GroupNameIdIndex[$key] } else { $missingNames += $n }
+        }
+
+        $resolvedNames = @()
+        $missingIds = @()
+        foreach ($i in @($Ids))
+        {
+            $key = $i.ToLower()
+            if ($script:GroupIdNameIndex.ContainsKey($key)) { $resolvedNames += $script:GroupIdNameIndex[$key] } else { $missingIds += $i }
+        }
+
+        return @{ ResolvedIds = $resolvedIds; MissingNames = $missingNames; ResolvedNames = $resolvedNames; MissingIds = $missingIds }
+    }
+
+    $ix = Resolve-FromIndex -Names $inputNames -Ids $inputIds
+
+    # Attempt to use cached API response for identical input sets
+    $resp = $null
+    $namesCacheKey = if ($inputNames.Count -gt 0) { "groups|names|" + (($inputNames | ForEach-Object { ("$_").ToLower() } | Sort-Object) -join '|') } else { $null }
+    $idsCacheKey = if ($inputIds.Count -gt 0) { "groups|ids|" + (($inputIds | ForEach-Object { ("$_").ToLower() } | Sort-Object) -join '|') } else { $null }
+
+    if ($mode -eq 'ids-input' -and $idsCacheKey -and $script:GroupResponseCache.ContainsKey($idsCacheKey))
+    {
+        Write-Verbose "[Get-GroupIdsByNames] Using cached API response for IDs key: $idsCacheKey"
+        $resp = $script:GroupResponseCache[$idsCacheKey]
+    }
+    elseif ($mode -eq 'names-input' -and $namesCacheKey -and $script:GroupResponseCache.ContainsKey($namesCacheKey))
+    {
+        Write-Verbose "[Get-GroupIdsByNames] Using cached API response for names key: $namesCacheKey"
+        $resp = $script:GroupResponseCache[$namesCacheKey]
+    }
+
+    # Decide if we need to call the API (only once)
+    $needCall = $false
+    $conditions = @()
+
+    if (-not $resp)
+    {
+        if ($ix.MissingNames.Count -gt 0)
+        {
+            # Escape single quotes for OData
+            $escaped = $ix.MissingNames | ForEach-Object { ("$_").Trim().Replace("'", "''") }
+            $conditions += ($escaped | ForEach-Object { "displayName eq '$_'" })
+        }
+        if ($ix.MissingIds.Count -gt 0)
+        {
+            $conditions += ($ix.MissingIds | ForEach-Object { "id eq '$_'" })
+        }
+        $needCall = ($conditions.Count -gt 0)
+    }
+
+    if ($needCall)
+    {
+        $filter = ($conditions -join ' or ')
+        $extra = 'select=id,displayName'
+        $resp = CallGraphAPI -accessToken $AccessToken -ResourcePath 'groups' -APIVersion 'beta' -method 'get' -Filter $filter -ExtraParameters $extra -consistencyLevel
+        $script:LastGroupResponse = $resp
+
+        # Update caches and indexes
+        $items = if ($resp -and $resp.PSObject.Properties.Match('value').Count -gt 0) { $resp.value } else { $resp }
+        foreach ($it in @($items))
+        {
+            if ($it)
+            {
+                if ($it.displayName) { $script:GroupNameIdIndex[$it.displayName.ToLower()] = $it.id }
+                if ($it.id) { $script:GroupIdNameIndex[$it.id.ToLower()] = $it.displayName }
+            }
+        }
+        if ($namesCacheKey) { $script:GroupResponseCache[$namesCacheKey] = $resp }
+        if ($idsCacheKey) { $script:GroupResponseCache[$idsCacheKey] = $resp }
+    }
+
+    # Produce output
+    if ($DisplayNames.IsPresent)
+    {
+        # Always return display names when requested
+        $result = @()
+        foreach ($i in @($inputIds))
+        {
+            $key = $i.ToLower()
+            if ($script:GroupIdNameIndex.ContainsKey($key)) { $result += $script:GroupIdNameIndex[$key] }
+        }
+        foreach ($n in @($inputNames))
+        {
+            # Prefer canonical name from index if available; otherwise echo input
+            $key = $n.ToLower()
+            if ($script:GroupNameIdIndex.ContainsKey($key))
+            {
+                # If we have an ID, and also have Name in the reverse index, use that; else keep original
+                $id = $script:GroupNameIdIndex[$key]
+                if ($id -and $script:GroupIdNameIndex.ContainsKey($id.ToLower())) { $result += $script:GroupIdNameIndex[$id.ToLower()] } else { $result += $n }
+            }
+            else { $result += $n }
+        }
+        return $result
+    }
+    elseif ($mode -eq 'ids-input')
+    {
+        # Default for ID inputs: return names
+        $result = @()
+        foreach ($i in @($inputIds))
+        {
+            $key = $i.ToLower()
+            if ($script:GroupIdNameIndex.ContainsKey($key)) { $result += $script:GroupIdNameIndex[$key] }
+        }
+        return $result
+    }
+    else
+    {
+        # Default for name inputs: return IDs
+        $result = @()
+        foreach ($n in @($inputNames))
+        {
+            $key = $n.ToLower()
+            if ($script:GroupNameIdIndex.ContainsKey($key)) { $result += $script:GroupNameIdIndex[$key] }
+        }
+        return $result
+    }
+}
+
+$global:myGroups = Get-GroupIdsByNames -AccessToken $accessToken -GroupNames $groupsToInclude -DisplayNames
+
+exit 0
+$userPrincipalName = 'mahmoudz@gao.gov'
+$userRegisteredDeviceURI = "users/$($userPrincipalName)/registeredDevices"
+$global:myDevices = CallGraphAPI -ResourcePath $userRegisteredDeviceURI -AccessToken $accessToken
+
+$global:pw = CallGraphAPI -ResourcePath $DellDeviceHardwareDetailsURI -AccessToken $accessToken
 $inputFile = Read-Host "Enter the path to the input file"
 if (-not (Test-Path $inputFile))
 {
@@ -622,4 +801,3 @@ Write-Host "Sorting and removing duplicates from URIs..."
 $uris = $uris | Sort-Object -Unique
 Write-Host "Found $($uris.count) unique URIs after sorting."
 Set-Content -Path 'uris.txt' -Value $uris -Force
-

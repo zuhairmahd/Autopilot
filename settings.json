@@ -220,28 +220,6 @@
         "maxNumberOfDevicesAllowed": 5,
         "minSerialNumberLength": 9
       }
-    },
-    "arabictutor.com": {
-      "groupsToExclude": [],
-      "groupsToInclude": [],
-      "settings": {
-        "minUsernameLength": 3,
-        "preferredBrowser": "Chrome",
-        "minSerialNumberLength": 7,
-        "privateSession": false,
-        "operatingSystem": "Windows",
-        "userPatternsToExclude": [
-          "-test",
-          "onmicrosoft.com"
-        ],
-        "desiredAutopilotProfiles": [],
-        "maxNumberOfDevicesAllowed": 15,
-        "maxUserNameLength": 50,
-        "maxSerialNumberLength": 50,
-        "minimumDevicePhysicalMemoryInGB": 8,
-        "domain": "arabictutor.com",
-        "deviceNamePrefix": ""
-      }
     }
   },
   "menus": [
@@ -370,28 +348,56 @@
       "name": "Change application settings",
       "items": [
         {
-          "description": "Change the application settings",
-          "name": "Change application settings",
+          "description": "Change the global and local environment settings for the application",
+          "name": "Change global environment settings",
+          "type": "submenu",
+          "items": [
+            {
+              "name": "Change global environment settings",
+              "description": "Change the global environment settings for the application",
+              "type": "action",
+              "includeInDisplayModes": []
+            },
+            {
+              "name": "Change domain specific settings",
+              "description": "Change the domain specific settings for the application",
+              "type": "action",
+              "includeInDisplayModes": []
+            },
+            {
+              "name": "Change authentication settings",
+              "description": "Change the authentication settings (such as authentication type) for the application",
+              "type": "action",
+              "includeInDisplayModes": []
+            }
+          ],
+          "includeInDisplayModes": []
+        },
+        {
+          "description": "Change the password and Azure app information",
+          "name": "Change Entra credentials",
           "type": "action",
           "includeInDisplayModes": []
         },
         {
-          "description": "Change the password and authentication information",
-          "name": "Change password and authentication information",
-          "type": "action",
-          "includeInDisplayModes": []
-        },
-        {
-          "description": "Change the Auto Update setting",
+          "description": "Turn Auto Updates on or off",
           "name": "Change Auto Update setting",
           "type": "action",
           "includeInDisplayModes": []
         },
         {
-          "description": "Restore the application to its default settings",
-          "name": "Restore defaults",
+          "description": "Change the application mode",
+          "name": "Change App Mode setting",
           "type": "action",
-          "includeInDisplayModes": []
+          "includeInDisplayModes": [
+            "full",
+            "helpDesk",
+            "advanced",
+            "advancedRegistration",
+            "registration",
+            "admin",
+            "custom"
+          ]
         }
       ],
       "type": "submenu",
