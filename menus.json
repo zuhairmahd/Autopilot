@@ -1,353 +1,63 @@
-{
-    "menus": [
-        {
-            "name": "Give a device to a user",
-            "description": "Start the user and device readiness check",
-            "type": "action",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ]
-        },
-        {
-            "name": "Check device status",
-            "description": "Troubleshoot a device",
-            "type": "submenu",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ],
-            "items": [
-                {
-                    "name": "Lookup device by Serial Number",
-                    "description": "Lookup a device by its serial number",
-                    "type": "submenu",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ],
-                    "items": [
-                        {
-                            "name": "Enter a serial number",
-                            "description": "Lookup a device by its serial number",
-                            "type": "action",
-                            "includeInDisplayModes": [
-                                "helpdesk"
-                            ]
-                        },
-                        {
-                            "name": "Use this device's serial number",
-                            "description": "Lookup the device the application is running on",
-                            "type": "action",
-                            "includeInDisplayModes": [
-                                "helpdesk"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "name": "Lookup device by User",
-                    "description": "Lookup a device by the user id or email address",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "Autopilot menu",
-            "description": "Import a device into Autopilot and perform related actions",
-            "type": "submenu",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ],
-            "items": [
-                {
-                    "name": "Import device into Autopilot",
-                    "description": "Import a device into Autopilot",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Custom import device into Autopilot (requires admin rights)",
-                    "description": "Custom import a device into Autopilot",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
-                    "description": "Import a Corporate Device Identifier for Device Preparation",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)",
-                    "description": "Export a Corporate Device Identifier for manual upload to Device Preparation",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Get device hash for manual upload to Autopilot (requires admin rights)",
-                    "description": "Get the device hash for manual upload to Autopilot",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Get device hash for manual upload to Autopilot (requires admin rights)",
-                    "description": "Get the device hash for manual upload to Autopilot",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                },
-                {
-                    "name": "Download and install latest Windows updates(requires admin rights)",
-                    "description": "Download and install the latest Windows updates",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Download and install latest Windows updates (requires admin rights)",
-                    "description": "Download and install the latest Windows updates",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Download and install latest Windows updates (requires admin rights)",
-                    "description": "Download and install the latest Windows updates",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Check device Autopilot status",
-                    "description": "Check if a device is registered in Autopilot",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Delete device from Autopilot",
-                    "description": "Delete a device from Autopilot",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "Change application settings",
-            "description": "Change the application settings",
-            "type": "submenu",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ],
-            "items": [
-                {
-                    "name": "Change application settings",
-                    "description": "Change the application settings",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Change password and authentication information",
-                    "description": "Change the password and authentication information",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Change Auto Update setting",
-                    "description": "Change the Auto Update setting",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Restore defaults",
-                    "description": "Restore the application to its default settings",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "Check for script updates",
-            "description": "Check for updates to the scripts used by the application",
-            "type": "action",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ]
-        },
-        {
-            "name": "Restart the device",
-            "description": "Restart the device",
-            "type": "action",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ]
-        },
-        {
-            "name": "Export Menu",
-            "description": "Export various device configuration",
-            "type": "submenu",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ],
-            "items": [
-                {
-                    "name": "Export Autopilot Devices",
-                    "description": "Export Autopilot devices to a CSV file",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Export Imported Autopilot Devices",
-                    "description": "Export imported Autopilot devices to a CSV file",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Export Managed Windows Devices",
-                    "description": "Export managed Windows devices to a CSV file",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Export Unmanaged Windows Devices",
-                    "description": "Export unmanaged Windows devices to a CSV file",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Export device storage report",
-                    "description": "Export a report of device storage to a CSV file",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Export Application Assignments",
-                    "description": "Export application assignments to a CSV file",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "About",
-            "description": "Learn more about the application",
-            "type": "action",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ]
-        },
-        {
-            "name": "Device Actions",
-            "description": "Perform various device actions",
-            "type": "submenu",
-            "includeInDisplayModes": [
-                "helpdesk"
-            ],
-            "items": [
-                {
-                    "name": "Wipe Device",
-                    "description": "Wipe the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Clean Device",
-                    "description": "Clean the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Sync Device",
-                    "description": "Sync the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Get LAPS Password",
-                    "description": "Retrieve the LAPS password for the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Get BitLocker Recovery Key",
-                    "description": "Retrieve the BitLocker recovery key for the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Restart Device",
-                    "description": "Restart the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Show Device Health Status",
-                    "description": "Show the health status of the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                },
-                {
-                    "name": "Check next user readiness state",
-                    "description": "Check the next user readiness state for the selected device",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk"
-                    ]
-                }
-            ]
-        }
-    ]
+﻿{
+    "deviceActions":  {
+                          "contactAdmin":  "Contact an Intune administrator",
+                          "contactHelpdesk":  "Contact the helpdesk",
+                          "WipeOrClean":  "Wipe or clean the device",
+                          "none":  "No action"
+                      },
+    "deviceStates":  {
+                         "Ready":  "The device is ready for the next user",
+                         "NotReady":  "The device is not ready for the next user"
+                     },
+    "Description":  "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script.",
+    "returnValues":  {
+                         "10002":  "Some updates were installed",
+                         "EnrolledMessage":  "The device is enrolled.",
+                         "deviceRestartSuccessMessage":  "The device was restarted successfully.",
+                         "deviceSyncFailedMessage":  "The device sync failed.",
+                         "noRestartMessage":  "Device not restarted.",
+                         "1000":  "All updates were installed",
+                         "deviceCleanFailedMessage":  "The device clean failed.",
+                         "deviceDeleteFailedMessage":  "The device deletion failed.",
+                         "deviceSyncSuccessMessage":  "The device sync was successful.",
+                         "UpdateCancelledMessage":  "The update was cancelled.",
+                         "noUserDeviceFoundMessage":  "No user or device found.",
+                         "NoMenusConfigured":  "No menus are configured. Check the app configuration.",
+                         "InvalidFileHash":  "The file hash is invalid. The update will be aborted.",
+                         "notContactedMessage":  "The device has not contacted the enrollment service.",
+                         "InvalidSignatureMessage":  "The signature is invalid. The update will be aborted.",
+                         "deviceImportSuccessMessage":  "The device was imported successfully.",
+                         "deviceDeleteSuccessMessage":  "The device was deleted successfully.",
+                         "invalidJWTTokenMessage":  "Invalid JWT token format. Expected at least 2 parts.",
+                         "deviceAssignmentPendingMessage":  "The device is pending assignment to a deployment profile.",
+                         "noDeviceFound":  "No device found",
+                         "deviceRestartFailedMessage":  "The device restart failed.",
+                         "EnrollmentFailedMessage":  "The device enrollment failed.",
+                         "deviceCleanSuccessMessage":  "The device was cleaned successfully.",
+                         "PendingResetMessage":  "The device is pending a reset.",
+                         "deviceAssignedMessage":  "The device is assigned to a deployment profile.",
+                         "userCanceledMessage":  "Operation canceled by user",
+                         "UpdateFailedMessage":  "Could not download update.",
+                         "deviceWipeFailedMessage":  "The device wipe failed.",
+                         "999":  "No updates were found",
+                         "deviceImportFailedMessage":  "The device import failed.",
+                         "serialNumberNotFoundMessage":  "The serial number was not found.",
+                         "1001":  "Some updates were installed",
+                         "UpdateSuccessMessage":  "The script was updated successfully.",
+                         "deviceNotAssignedMessage":  "The device is not assigned to a deployment profile.",
+                         "invalidFileType":  "Invalid file type.",
+                         "deviceNotInIntuneMessage":  "The device is not in Intune.",
+                         "noAccessTokenMessage":  "Could not obtain an access token. Please check your credentials.",
+                         "1003":  "Updates failed to install",
+                         "deviceActionPendingMessage":  "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed.",
+                         "unknownErrorMessage":  "An unknown error occurred.",
+                         "noUserFoundInDirectoryMessage":  "This user does not exist",
+                         "backoutText":  "Returning to previous menu",
+                         "UpdateNotNeededMessage":  "The script is already up to date.",
+                         "deviceUnknownActionMessage":  "The action may still be in progress. You can check the device status in the Intune portal.",
+                         "noLAPSFoundMessage":  "No LAPS password found for this device.",
+                         "noBitLockerKeysFoundMessage":  "No BitLocker keys found for this device.",
+                         "deviceWipeSuccessMessage":  "The device was wiped successfully."
+                     },
+    "version":  "1.1.0.0"
 }
