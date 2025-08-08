@@ -17,13 +17,13 @@ pwsh -version
 
 # Install required modules for building (required for CreateRelease.ps1)
 pwsh -Command "Install-Module -Name ps2exe -Force -Scope CurrentUser"
-pwsh -Command "Install-Module -Name Invoke-TrustedSigning -Force -Scope CurrentUser"
+pwsh -Command "Install-Module -Name TrustedSigning -Force -Scope CurrentUser"
 
 # Verify modules are installed
-pwsh -Command "Get-Module -ListAvailable ps2exe, Invoke-TrustedSigning"
+pwsh -Command "Get-Module -ListAvailable ps2exe, TrustedSigning"
 ```
 
-**Note**: The `Invoke-TrustedSigning` module requires an Azure Trusted Signing account for production builds. For testing and development, mock this functionality by using test builds only.
+**Note**: The `TrustedSigning` module requires an Azure Trusted Signing account for production builds. For testing and development, mock this functionality by using test builds only.
 
 ### Bootstrap and Validate the Repository
 **CRITICAL TIMING**: ALL builds and tests take significant time. **NEVER CANCEL** long-running operations.
@@ -34,9 +34,6 @@ pwsh -File "./TestScripts/test-syntax.ps1"
 
 # Run comprehensive test suite - NEVER CANCEL: takes 6 minutes. Set timeout to 10+ minutes.
 pwsh -File "./TestScripts/run-all-tests.ps1"
-
-# Build the application (requires modules above) - NEVER CANCEL: takes 10 minutes. Set timeout to 15+ minutes.
-pwsh -File "./CreateRelease.ps1" -InputFile "./main.ps1" -Version "test.0.0.1" -NoVersionUpdate
 
 # Test basic application functionality
 pwsh -File "./main.ps1" -appMode "full" -Verbose
@@ -104,6 +101,9 @@ functions/
 ```
 
 **Function Loading**: All functions are dot-sourced from `/functions/` at startup, loaded recursively. Each module must be independent—avoid inter-module dependencies.
+
+**Menu Definitions**: All functions are dot-sourced from `/functions/` 
+Menu definitions are contained in settings.json in the menus object.  If any changes are made to the menu structure or functionality, the settings.json file must be updated accordingly.
 
 ### Main Application Flow
 - **Entry Point**: `main.ps1` - handles initialization and menu navigation

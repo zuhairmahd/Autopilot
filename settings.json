@@ -337,19 +337,39 @@
       "name": "Change application settings",
       "items": [
         {
-          "description": "Change the application settings",
-          "name": "Change application settings",
+          "description": "Change the global and local environment settings for the application",
+          "name": "Change global environment settings",
+          "type": "submenu",
+          "items": [
+            {
+              "name": "Change global environment settings",
+              "description": "Change the global environment settings for the application",
+              "type": "action",
+              "includeInDisplayModes": []
+            },
+            {
+              "name": "Change domain specific settings",
+              "description": "Change the domain specific settings for the application",
+              "type": "action",
+              "includeInDisplayModes": []
+            },
+            {
+              "name": "Change authentication settings",
+              "description": "Change the authentication settings (such as authentication type) for the application",
+              "type": "action",
+              "includeInDisplayModes": []
+            }
+          ],
+          "includeInDisplayModes": []
+        },
+        {
+          "description": "Change the password and Azure app information",
+          "name": "Change Entra credentials",
           "type": "action",
           "includeInDisplayModes": []
         },
         {
-          "description": "Change the password and authentication information",
-          "name": "Change password and authentication information",
-          "type": "action",
-          "includeInDisplayModes": []
-        },
-        {
-          "description": "Change the Auto Update setting",
+          "description": "Turn Auto Updates on or off",
           "name": "Change Auto Update setting",
           "type": "action",
           "includeInDisplayModes": []
@@ -367,12 +387,6 @@
             "admin",
             "custom"
           ]
-        },
-        {
-          "description": "Restore the application to its default settings",
-          "name": "Restore defaults",
-          "type": "action",
-          "includeInDisplayModes": []
         }
       ],
       "type": "submenu",
