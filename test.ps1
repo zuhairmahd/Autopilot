@@ -501,7 +501,6 @@ else
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 $scope = $auth.scope
 # $DellDeviceHardwareDetailsURI = "deviceManagement/hardwarePasswordDetails. "
-
 # $logfile = "mylog.log"
 # $serialNumber = '0F3CFP724223KV'
 # $serialNumber = 'BTSB25000BCR'
