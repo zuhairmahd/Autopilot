@@ -141,7 +141,7 @@
     "autoUpdate": false,
     "appMode": "full",
     "testMode": false,
-    "configFile": ".\\\\.secrets\\\\config.json",
+    "configFile": ".\\.secrets\\config.json",
     "showLicenseBanner": false,
     "deviceContactThresholdInDays": 30
   },
