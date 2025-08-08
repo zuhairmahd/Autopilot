@@ -94,15 +94,42 @@ function Update-AuthSetting()
         $verifyContent = Get-Content -Path $SettingsFile -Raw -Force
         $verifySettings = $verifyContent | ConvertFrom-Json
         
-        if ($verifySettings.auth.PSObject.Properties.Name -contains $SettingName -and
-            $verifySettings.auth.$SettingName -eq $SettingValue)
+        if ($verifySettings.auth.PSObject.Properties.Name -contains $SettingName)
         {
-            Write-Verbose "[$functionName] Successfully updated and verified auth setting"
-            return $true
+            $actualValue = $verifySettings.auth.$SettingName
+            
+            # Handle array comparison specially
+            if ($SettingValue -is [array] -and $actualValue -is [array])
+            {
+                $comparisonResult = Compare-Object $SettingValue $actualValue
+                if ($null -eq $comparisonResult)
+                {
+                    Write-Verbose "[$functionName] Successfully updated and verified auth setting (array)"
+                    return $true
+                }
+                else
+                {
+                    Write-Warning "[$functionName] Array values do not match after update"
+                    Write-Verbose "[$functionName] Expected: $($SettingValue -join ', ') | Actual: $($actualValue -join ', ')"
+                    return $false
+                }
+            }
+            # Handle scalar comparison
+            elseif ($actualValue -eq $SettingValue)
+            {
+                Write-Verbose "[$functionName] Successfully updated and verified auth setting (scalar)"
+                return $true
+            }
+            else
+            {
+                Write-Warning "[$functionName] Setting value does not match after update"
+                Write-Verbose "[$functionName] Expected: '$SettingValue' | Actual: '$actualValue'"
+                return $false
+            }
         }
         else
         {
-            Write-Warning "[$functionName] Failed to verify auth setting update"
+            Write-Warning "[$functionName] Failed to verify auth setting update - property not found"
             return $false
         }
     }
