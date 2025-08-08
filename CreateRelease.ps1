@@ -54,7 +54,7 @@
     - Running the script requires an active Azure Trusted Signing account.  For testing, this functionality should be mocked.
     - See project documentation for full release workflow.
 #>
-#requires -module Invoke-TrustedSigning
+#requires -module TrustedSigning
 #requires -module ps2exe
 
 [CmdletBinding()]
