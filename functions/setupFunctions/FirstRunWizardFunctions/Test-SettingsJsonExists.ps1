@@ -205,6 +205,15 @@ function Test-SettingsJsonExists()
                     groupsToExclude = @()
                     settings        = @{
                         domain                          = $DomainName
+                        maxWaitTime                     = "30"
+                        showLicenseBanner               = $true
+                        deviceContactThresholdInDays    = 30
+                        appMode                         = "full"
+                        timeInSeconds                   = "60"
+                        maxUserMatchDisplay             = "10"
+                        release                         = "master"
+                        repo                            = "Github"
+                        autoUpdate                      = $true
                         deviceNamePrefix                = ""
                         operatingSystem                 = "Windows"
                         minUsernameLength               = 3
