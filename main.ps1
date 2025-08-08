@@ -699,10 +699,11 @@ if ($settings.showLicenseBanner)
 }
 if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $version.version)
 {
-    Write-Verbose "[$scriptName] An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))"
-    Write-Host "==========================================================`n" -ForegroundColor Yellow    
-    Write-Host "An update is available to version $($updateAvailable[0].major).$($updateAvailable[0].minor).$($updateAvailable[0].build) ($($updateAvailable[0].revision))" -ForegroundColor Yellow
+    Write-Verbose "[$scriptName] An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) ($($updateAvailable.version.revision))"
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
+    Write-Host "==========================================================`n" -ForegroundColor Yellow
+    Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
+    Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
     if ($settings.autoUpdate)
     {
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
@@ -1819,7 +1820,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
         }
         if ($updateAvailable.version -gt $version.version)
         {
-            Write-Host "An update is available: $($updateAvailable.version)" -ForegroundColor Yellow
+            Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
             Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
             Write-Host "Go to 'Check For Script Updates' to download the latest version." -ForegroundColor Yellow
         }
