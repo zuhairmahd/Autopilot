@@ -62,6 +62,18 @@ function Update-Setting()
     - Validates JSON structure before and after update
     - Includes enhanced array comparison logic for auth settings
     - Supports merge capability for domain settings
+    
+    Error Handling:
+    - Returns $false if settings file is not found
+    - Returns $false if required parameters are missing for the specified SettingType
+    - Returns $false if the settings file lacks the required JSON structure section
+    - Returns $false if JSON parsing fails during load or save operations
+    - Returns $false if backup creation fails
+    - Returns $false if post-update verification fails (value mismatch)
+    - Provides detailed verbose logging for troubleshooting all failure scenarios
+    - Creates timestamped backups before any modification attempts
+    - Gracefully handles PSCustomObject to hashtable conversion errors
+    - Validates array comparisons for auth settings with detailed mismatch reporting
 #>
     [CmdletBinding()]
     param(
@@ -84,6 +96,65 @@ function Update-Setting()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating $SettingType setting(s) in file: $SettingsFile"
+    
+    # Private helper function to convert PSCustomObject to hashtable (PowerShell 5.1 compatible)
+    function ConvertTo-HashtableFromPSObject {
+        param(
+            [Parameter(Mandatory = $true)]
+            [PSCustomObject]$PSObject,
+            
+            [string]$Context = "object"
+        )
+        
+        try {
+            $hashtable = @{}
+            foreach ($property in $PSObject.PSObject.Properties) {
+                $hashtable[$property.Name] = $property.Value
+            }
+            Write-Verbose "[$functionName] Successfully converted $Context to hashtable with $($hashtable.Count) properties"
+            return $hashtable
+        }
+        catch {
+            Write-Warning "[$functionName] Failed to convert $Context to hashtable: $($_.Exception.Message)"
+            throw
+        }
+    }
+    
+    # Private helper function to convert hashtable structure to nested PSCustomObjects
+    function ConvertTo-PSObjectFromHashtable {
+        param(
+            [Parameter(Mandatory = $true)]
+            [hashtable]$DomainsHash
+        )
+        
+        try {
+            $newDomainsObj = [PSCustomObject]@{}
+            foreach ($domainKey in $DomainsHash.Keys) {
+                $domainValue = $DomainsHash[$domainKey]
+                
+                # Validate domain structure
+                if (-not $domainValue.ContainsKey('groupsToInclude') -or 
+                    -not $domainValue.ContainsKey('groupsToExclude') -or 
+                    -not $domainValue.ContainsKey('settings')) {
+                    Write-Warning "[$functionName] Domain '$domainKey' missing required properties"
+                    throw "Invalid domain structure for '$domainKey'"
+                }
+                
+                $domainObj = [PSCustomObject]@{
+                    "groupsToInclude" = $domainValue['groupsToInclude']
+                    "groupsToExclude" = $domainValue['groupsToExclude']
+                    "settings"        = [PSCustomObject]$domainValue['settings']
+                }
+                $newDomainsObj | Add-Member -MemberType NoteProperty -Name $domainKey -Value $domainObj
+            }
+            Write-Verbose "[$functionName] Successfully converted domains hashtable to PSCustomObject with $($DomainsHash.Count) domains"
+            return $newDomainsObj
+        }
+        catch {
+            Write-Warning "[$functionName] Failed to convert domains hashtable to PSCustomObject: $($_.Exception.Message)"
+            throw
+        }
+    }
     
     # Validate parameters based on setting type
     switch ($SettingType) {
@@ -139,12 +210,8 @@ function Update-Setting()
         # Process the update based on setting type
         switch ($SettingType) {
             'Global' {
-                # Convert PSCustomObject to hashtable for easier manipulation (PowerShell 5.1 compatible)
-                $globalSettingsHash = @{}
-                foreach ($property in $settingsObj.globalSettings.PSObject.Properties)
-                {
-                    $globalSettingsHash[$property.Name] = $property.Value
-                }
+                # Convert PSCustomObject to hashtable using helper function
+                $globalSettingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj.globalSettings -Context "globalSettings"
                 
                 # Update the specific setting
                 $globalSettingsHash[$SettingName] = $SettingValue
@@ -155,12 +222,8 @@ function Update-Setting()
             }
             
             'Auth' {
-                # Convert PSCustomObject to hashtable for easier manipulation (PowerShell 5.1 compatible)
-                $authSettingsHash = @{}
-                foreach ($property in $settingsObj.auth.PSObject.Properties)
-                {
-                    $authSettingsHash[$property.Name] = $property.Value
-                }
+                # Convert PSCustomObject to hashtable using helper function
+                $authSettingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj.auth -Context "auth"
                 
                 # Update the specific setting
                 $authSettingsHash[$SettingName] = $SettingValue
@@ -182,12 +245,8 @@ function Update-Setting()
                     {
                         if ($property.Name -eq 'settings' -and $property.Value -is [PSCustomObject])
                         {
-                            # Convert settings object to hashtable
-                            $settingsHash = @{}
-                            foreach ($settingProperty in $property.Value.PSObject.Properties)
-                            {
-                                $settingsHash[$settingProperty.Name] = $settingProperty.Value
-                            }
+                            # Convert settings object to hashtable using helper function
+                            $settingsHash = ConvertTo-HashtableFromPSObject -PSObject $property.Value -Context "domain '$($domainProperty.Name)' settings"
                             $domainHash[$property.Name] = $settingsHash
                         }
                         else
@@ -228,21 +287,8 @@ function Update-Setting()
                     $domainsHash[$DomainName]['settings'] = $Settings
                 }
                 
-                # Convert back to nested PSCustomObjects
-                $newDomainsObj = [PSCustomObject]@{}
-                foreach ($domainKey in $domainsHash.Keys)
-                {
-                    $domainValue = $domainsHash[$domainKey]
-                    $domainObj = [PSCustomObject]@{
-                        "groupsToInclude" = $domainValue['groupsToInclude']
-                        "groupsToExclude" = $domainValue['groupsToExclude']
-                        "settings"        = [PSCustomObject]$domainValue['settings']
-                    }
-                    $newDomainsObj | Add-Member -MemberType NoteProperty -Name $domainKey -Value $domainObj
-                }
-                
-                # Update the settings object
-                $settingsObj.domains = $newDomainsObj
+                # Convert back to nested PSCustomObjects using helper function
+                $settingsObj.domains = ConvertTo-PSObjectFromHashtable -DomainsHash $domainsHash
             }
         }
         
