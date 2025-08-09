@@ -120,7 +120,19 @@ function Update-Setting()
         }
     }
     
-    # Private helper function to convert hashtable structure to nested PSCustomObjects
+    <#
+    .SYNOPSIS
+        Converts a hashtable structure to a nested PSCustomObject.
+
+    .DESCRIPTION
+        This helper function takes a hashtable representing domain settings and converts it into
+        a nested PSCustomObject structure. It validates that each domain entry contains the required
+        properties ('groupsToInclude', 'groupsToExclude', and 'settings') and constructs a corresponding
+        PSCustomObject for each domain.
+
+    .PARAMETER DomainsHash
+        The hashtable containing domain settings to convert.
+    #>
     function ConvertTo-PSObjectFromHashtable {
         param(
             [Parameter(Mandatory = $true)]
