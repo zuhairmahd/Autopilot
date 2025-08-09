@@ -179,7 +179,32 @@ function Update-Setting()
         }
         'Auth' {
             if (-not $SettingName -or $null -eq $SettingValue) {
-                Write-Warning "[$functionName] SettingName and SettingValue are required for Auth setting type"
+
+    # Private helper function to validate SettingName and SettingValue for Global/Auth
+    function Test-SettingNameAndValue {
+        param(
+            [string]$SettingName,
+            $SettingValue,
+            [string]$functionName,
+            [string]$settingType
+        )
+        if (-not $SettingName -or $null -eq $SettingValue) {
+            Write-Warning "[$functionName] SettingName and SettingValue are required for $settingType setting type"
+            return $false
+        }
+        return $true
+    }
+    
+    # Validate parameters based on setting type
+    switch ($SettingType) {
+        'Global' {
+            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -functionName $functionName -settingType 'Global')) {
+                return $false
+            }
+            Write-Verbose "[$functionName] Updating global setting '$SettingName' to '$SettingValue'"
+        }
+        'Auth' {
+            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -functionName $functionName -settingType 'Auth')) {
                 return $false
             }
             Write-Verbose "[$functionName] Updating auth setting '$SettingName' to '$SettingValue'"
