@@ -38,7 +38,7 @@ try {
     $coreFiles = @(
         'functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1',
         'functions/setupFunctions/Test-AuthDefaults.ps1',
-        'functions/setupFunctions/Update-AuthSetting.ps1'
+        'functions/setupFunctions/Update-Setting.ps1'
     )
     
     foreach ($file in $coreFiles) {
@@ -84,9 +84,9 @@ try {
 
     Write-Host "`n=== Test 4: Auth Setting Updates ===" -ForegroundColor Cyan
     
-    if (Get-Command 'Update-AuthSetting' -ErrorAction SilentlyContinue) {
-        $updateResult = Update-AuthSetting -SettingsFile $testFile -SettingName "renewalLeadTime" -SettingValue 15
-        Write-Host "✓ Update-AuthSetting executed: $updateResult" -ForegroundColor $(if($updateResult){'Green'}else{'Red'})
+    if (Get-Command 'Update-Setting' -ErrorAction SilentlyContinue) {
+        $updateResult = Update-Setting -SettingType "Auth" -SettingsFile $testFile -SettingName "renewalLeadTime" -SettingValue 15
+        Write-Host "✓ Update-Setting (Auth) executed: $updateResult" -ForegroundColor $(if($updateResult){'Green'}else{'Red'})
         
         if ($updateResult) {
             $content = Get-Content -Path $testFile -Raw | ConvertFrom-Json
@@ -94,7 +94,7 @@ try {
             Write-Host "✓ Setting updated correctly: $correctValue" -ForegroundColor $(if($correctValue){'Green'}else{'Red'})
         }
     } else {
-        Write-Host "✗ Update-AuthSetting not available" -ForegroundColor Red
+        Write-Host "✗ Update-Setting not available" -ForegroundColor Red
     }
 
     Write-Host "`n=== Test 5: Menu Integration Check ===" -ForegroundColor Cyan
@@ -128,7 +128,7 @@ try {
     Write-Host "Core functionality has been implemented and tested:" -ForegroundColor White
     Write-Host "• Array storage preserves single-item arrays correctly" -ForegroundColor White
     Write-Host "• Test-AuthDefaults creates missing auth section with all required properties" -ForegroundColor White
-    Write-Host "• Update-AuthSetting modifies individual auth settings" -ForegroundColor White
+    Write-Host "• Update-Setting modifies individual auth settings" -ForegroundColor White
     Write-Host "• Menu integration added to main.ps1" -ForegroundColor White
     Write-Host "• Get-AuthDefaults provides standard auth configuration" -ForegroundColor White
     
