@@ -1,13 +1,12 @@
 {
   "version": "1.0.0",
+  "description": "Test settings for array verification",
   "auth": {
     "changePwOnNextStart": false,
-    "authType": "PublicAuthFlow",
     "scope": [
-      "offline_access",
-      "openid"
+      "offline_access"
     ],
-    "delegated": true
-  },
-  "description": "Test settings for array verification"
+    "delegated": false,
+    "authType": "PublicAuthFlow"
+  }
 }
