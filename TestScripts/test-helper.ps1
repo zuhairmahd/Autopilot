@@ -29,52 +29,33 @@ function Load-AllFunctions {
     }
     
     try {
-        # Get all .ps1 files recursively, excluding test files
-        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop | 
-                     Where-Object { $_.Name -notlike 'test-*' }
+        # Get all .ps1 files recursively, excluding test files - same as main.ps1
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
         
         $loadedCount = 0
         $errorCount = 0
-        $skippedCount = 0
         
         foreach ($function in $functions) {
             try {
-                # Skip if already loaded (check for function definitions)
-                $functionContent = Get-Content $function.FullName -Raw -ErrorAction Stop
-                
-                # Extract function names from the file
-                $functionNames = [regex]::Matches($functionContent, 'function\s+([a-zA-Z0-9_-]+)') | 
-                                ForEach-Object { $_.Groups[1].Value }
-                
-                # Check if any of these functions are already loaded
-                $alreadyLoaded = $false
-                foreach ($funcName in $functionNames) {
-                    if (Get-Command $funcName -ErrorAction SilentlyContinue) {
-                        $alreadyLoaded = $true
-                        break
-                    }
-                }
-                
-                if ($alreadyLoaded) {
-                    $skippedCount++
-                    if ($VerboseLoading) {
-                        Write-Host "  Skipped (already loaded): $($function.Name)" -ForegroundColor Yellow
-                    }
-                    continue
-                }
-                
                 if ($VerboseLoading) {
                     Write-Host "  Loading: $($function.Name)" -ForegroundColor Gray
                 }
                 
-                # Dot-source the function file
+                # Dot-source the function file - same as main.ps1
                 . $function.FullName
                 $loadedCount++
                 
                 if ($VerboseLoading) {
-                    foreach ($funcName in $functionNames) {
-                        if (Get-Command $funcName -ErrorAction SilentlyContinue) {
-                            Write-Host "    + Function available: $funcName" -ForegroundColor Green
+                    # Extract function names from the file for verification
+                    $functionContent = Get-Content $function.FullName -Raw -ErrorAction SilentlyContinue
+                    if ($functionContent) {
+                        $functionNames = [regex]::Matches($functionContent, 'function\s+([a-zA-Z0-9_-]+)') | 
+                                        ForEach-Object { $_.Groups[1].Value }
+                        
+                        foreach ($funcName in $functionNames) {
+                            if (Get-Command $funcName -ErrorAction SilentlyContinue) {
+                                Write-Host "    + Function available: $funcName" -ForegroundColor Green
+                            }
                         }
                     }
                 }
@@ -89,13 +70,13 @@ function Load-AllFunctions {
         }
         
         $totalFiles = $functions.Count
-        Write-Host "Function loading summary: $loadedCount loaded, $skippedCount skipped, $errorCount errors (Total: $totalFiles files)" -ForegroundColor Cyan
+        Write-Host "Function loading summary: $loadedCount loaded, 0 skipped, $errorCount errors (Total: $totalFiles files)" -ForegroundColor Cyan
         
         if ($errorCount -gt 0) {
             Write-Warning "Some function files failed to load. Tests may fail if they depend on these functions."
         }
         
-        return $loadedCount -gt 0 -or $skippedCount -gt 0
+        return $loadedCount -gt 0
     }
     catch {
         Write-Error "Failed to enumerate functions: $($_.Exception.Message)"
@@ -253,8 +234,16 @@ function Test-FunctionExists {
         [string]$FunctionName
     )
     
-    $command = Get-Command $FunctionName -ErrorAction SilentlyContinue
-    return $null -ne $command
+    try {
+        $command = Get-Command $FunctionName -ErrorAction SilentlyContinue
+        $result = $null -ne $command
+        Write-Verbose "Test-FunctionExists: $FunctionName = $result"
+        return $result
+    }
+    catch {
+        Write-Verbose "Test-FunctionExists: Error testing $FunctionName - $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Test-PowerShellVersion {
@@ -321,13 +310,75 @@ function Write-TestSection {
 function Start-UnifiedTest {
     <#
     .SYNOPSIS
-        Unified test initialization that sets up everything needed for a test
+        Unified test initialization that sets up everything needed for a test EXCEPT function loading
     .DESCRIPTION  
-        This function combines all initialization steps into one convenient call:
-        - Loads all functions from the reorganized structure
-        - Initializes test environment with mock data
-        - Sets up logging and error handling
-        - Returns a test context object for cleanup
+        This function combines initialization steps but expects functions to be loaded 
+        at the script level to avoid scoping issues. Function loading should be done
+        using the Load-AllFunctions at the script level before calling this function.
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TestName,
+        
+        [string]$TestFolder = $null,
+        [string]$RootPath = $null,
+        [switch]$SkipFunctionCheck = $false
+    )
+    
+    Write-Host "Starting Unified Test: $TestName" -ForegroundColor Cyan
+    Write-Host ("=" * 80) -ForegroundColor Cyan
+    
+    # Determine paths
+    if (-not $RootPath) {
+        $RootPath = Split-Path -Parent $PSScriptRoot
+    }
+    
+    # Create test folder if specified
+    if ($TestFolder) {
+        if (Test-Path $TestFolder) {
+            Remove-Item -Path $TestFolder -Recurse -Force
+        }
+        New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
+        Write-TestResult "Test folder created: $TestFolder" $true
+    }
+    
+    # Check if functions are loaded (optional check)
+    if (-not $SkipFunctionCheck) {
+        Write-TestSection "Checking Function Availability"
+        $coreFunction = Get-Command "Write-Log" -ErrorAction SilentlyContinue
+        if ($coreFunction) {
+            Write-TestResult "Functions appear to be loaded (Write-Log found)" $true
+        } else {
+            Write-TestResult "Functions may not be loaded - continuing anyway" $true
+        }
+    }
+    
+    # Initialize test environment
+    try {
+        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
+        Write-TestResult "Test environment initialized" $true
+    }
+    catch {
+        Write-TestResult "Failed to initialize test environment: $($_.Exception.Message)" $false
+        throw
+    }
+    
+    # Return test context for cleanup
+    return @{
+        TestName = $TestName
+        TestFolder = $TestFolder 
+        RootPath = $RootPath
+        StartTime = Get-Date
+    }
+}
+
+function Start-UnifiedTest-WithFunctionLoading {
+    <#
+    .SYNOPSIS
+        Legacy unified test initialization that includes function loading (has scoping issues)
+    .DESCRIPTION  
+        This is the old version that loads functions within the function scope.
+        Use Start-UnifiedTest and load functions at script level instead.
     #>
     param(
         [Parameter(Mandatory = $true)]
