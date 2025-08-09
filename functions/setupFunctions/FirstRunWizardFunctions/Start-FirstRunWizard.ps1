@@ -172,7 +172,7 @@ function Start-FirstRunWizard()
         {
             # Step 5.1: Update authentication setting in settings.json
             Write-SafeLog "Updating authentication setting in settings.json" "Information"
-            $authUpdateSuccess = Update-AuthSetting -SettingsFile $SettingsFile -SettingName "Delegated" -SettingValue $authConfig.IsDelegated
+            $authUpdateSuccess = Update-Setting -SettingType "Auth" -SettingsFile $SettingsFile -SettingName "Delegated" -SettingValue $authConfig.IsDelegated
             
             if ($authUpdateSuccess)
             {
@@ -185,7 +185,7 @@ function Start-FirstRunWizard()
             
             # Step 5.5: Update autoUpdate setting in settings.json
             Write-SafeLog "Updating autoUpdate setting in settings.json" "Information"
-            $autoUpdateSuccess = Update-GlobalSetting -SettingsFile $SettingsFile -SettingName "autoUpdate" -SettingValue $autoUpdateConfig.autoUpdate
+            $autoUpdateSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "autoUpdate" -SettingValue $autoUpdateConfig.autoUpdate
             
             if ($autoUpdateSuccess)
             {
@@ -198,7 +198,7 @@ function Start-FirstRunWizard()
             
             # Step 5.6: Update app mode setting in settings.json
             Write-SafeLog "Updating app mode setting in settings.json" "Information"
-            $appModeSuccess = Update-GlobalSetting -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $appModeConfig.appMode
+            $appModeSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $appModeConfig.appMode
             
             if ($appModeSuccess)
             {

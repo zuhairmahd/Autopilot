@@ -75,10 +75,10 @@ try {
         Write-Host "[FAIL] CreateConfiguration failed" -ForegroundColor Red
     }
 
-    Write-Host "`n3. Testing Update-GlobalSetting..." -ForegroundColor Cyan
-    $success = Update-GlobalSetting -SettingsFile "$TestFolder\settings.json" -SettingName "testSetting" -SettingValue "testValue" -Verbose
+    Write-Host "`n3. Testing Update-Setting (Global)..." -ForegroundColor Cyan
+    $success = Update-Setting -SettingType "Global" -SettingsFile "$TestFolder\settings.json" -SettingName "testSetting" -SettingValue "testValue" -Verbose
     if ($success) {
-        Write-Host "[PASS] Update-GlobalSetting completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] Update-Setting (Global) completed successfully" -ForegroundColor Green
         
         # Verify the setting was added
         $updatedContent = Get-Content "$TestFolder\settings.json" -Raw | ConvertFrom-Json
@@ -89,18 +89,18 @@ try {
             Write-Host "[FAIL] Global setting was not updated correctly" -ForegroundColor Red
         }
     } else {
-        Write-Host "[FAIL] Update-GlobalSetting failed" -ForegroundColor Red
+        Write-Host "[FAIL] Update-Setting (Global) failed" -ForegroundColor Red
     }
 
-    Write-Host "`n4. Testing Update-DomainSettings..." -ForegroundColor Cyan
+    Write-Host "`n4. Testing Update-Setting (Domain)..." -ForegroundColor Cyan
     $domainSettings = @{
         "domain" = "test.com"
         "deviceNamePrefix" = "test-"
         "GroupTag" = "TEST01"
     }
-    $success = Update-DomainSettings -SettingsFile "$TestFolder\settings.json" -DomainName "test.com" -Settings $domainSettings -Verbose
+    $success = Update-Setting -SettingType "Domain" -SettingsFile "$TestFolder\settings.json" -DomainName "test.com" -Settings $domainSettings -Verbose
     if ($success) {
-        Write-Host "[PASS] Update-DomainSettings completed successfully" -ForegroundColor Green
+        Write-Host "[PASS] Update-Setting (Domain) completed successfully" -ForegroundColor Green
         
         # Verify the domain was added
         $updatedContent = Get-Content "$TestFolder\settings.json" -Raw | ConvertFrom-Json
@@ -113,7 +113,7 @@ try {
             Write-Host "[FAIL] Domain settings were not updated correctly" -ForegroundColor Red
         }
     } else {
-        Write-Host "[FAIL] Update-DomainSettings failed" -ForegroundColor Red
+        Write-Host "[FAIL] Update-Setting (Domain) failed" -ForegroundColor Red
     }
 
     Write-Host "`n5. Final structure verification..." -ForegroundColor Cyan
