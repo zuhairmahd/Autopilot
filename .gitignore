@@ -42,3 +42,4 @@ TestResults/
 *.cmd
 *.backup.*
 config.json
+*.zuh
