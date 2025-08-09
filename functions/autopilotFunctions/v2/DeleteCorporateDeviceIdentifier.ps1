@@ -179,7 +179,7 @@ function DeleteCorporateDeviceIdentifier()
             $deviceToDelete = $existingDevices[0]
             $deviceId = $deviceToDelete.id
             Write-Host "Found device identifier with ID: $deviceId" -ForegroundColor Green
-            Write-Verbose "[$functionName] Device to delete: $($deviceToDelete | ConvertTo-Json -Depth 3)"
+            Write-Verbose "[$functionName] Device to delete: $($deviceToDelete | ConvertTo-Json -Depth $maxJSONDepth)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Found device identifier to delete with ID: $deviceId" -LogLevel "Information"
             
             # Delete the device identifier
@@ -205,8 +205,8 @@ function DeleteCorporateDeviceIdentifier()
             else
             {
                 Write-Host "Failed to delete corporate device identifier." -ForegroundColor Red
-                Write-Verbose "[$functionName] API call returned unexpected result: $($deleteResponse | ConvertTo-Json -Depth 3)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to delete corporate device identifier - unexpected API response: $($deleteResponse | ConvertTo-Json -Depth 5)" -LogLevel "Error"
+                Write-Verbose "[$functionName] API call returned unexpected result: $($deleteResponse | ConvertTo-Json -Depth $maxJSONDepth)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to delete corporate device identifier - unexpected API response: $($deleteResponse | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Error"
                 return $returnValues.deviceDeleteFailedMessage
             }
         }

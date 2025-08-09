@@ -567,6 +567,7 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.' -ForegroundColor Yellow
     $latestRelease = $defaultBranch
 }
+$script:maxJSONDepth = 100
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
@@ -593,7 +594,7 @@ foreach ($key in $getTokenParams.Keys)
         Write-Host "$($key): $($getTokenParams[$key])" -ForegroundColor Cyan
     }
 }
-Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
+Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
 $loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
 $global:returnValues = $loadedStrings.returnValues
@@ -1489,7 +1490,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
     Write-Verbose "[$scriptName] Substring search: $($userInfo)"
     Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth 10)"
+    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
     if ($null -ne $userInfo -and $userInfo[1] -eq $false)
     {
         Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
@@ -1610,7 +1611,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
         Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth 10)"
+        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
         if ($null -ne $userInfo -and $userInfo[1] -eq $false)
         {
             Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"

@@ -136,7 +136,7 @@ function AddCorporateDeviceIdentifier()
                 description                = "Added via PowerShell Autopilot Tool"
             }
         )
-    } | ConvertTo-Json -Depth 100
+    } | ConvertTo-Json -Depth $maxJSONDepth
     Write-Verbose "[$functionName] Request body: $body"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Request body prepared for API call: $body" -LogLevel "Debug"
 
@@ -146,21 +146,21 @@ function AddCorporateDeviceIdentifier()
         Write-Verbose "[$functionName] Calling CallGraphAPI with POST to $uri."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Calling CallGraphAPI with POST to $uri." -LogLevel "Information"
         $result = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $body).value
-        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth 100)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth 100)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] CallGraphAPI returned: $($result | ConvertTo-Json -Depth $maxJSONDepth)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "CallGraphAPI returned: $($result | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
         Start-Sleep -Seconds 5 # Allow time for the API to process
         if ($result -and $result.id)
         {
             Write-Host "Successfully added device identifier to corporate identifiers." -ForegroundColor Green
-            Write-Verbose "[$functionName] Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth 5)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Information"
+            Write-Verbose "[$functionName] Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth $maxJSONDepth)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully added corporate device identifiers. Response: $($result | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
             return $result
         }
         else
         {
             Write-Host "Failed to add device identifier to corporate identifiers." -ForegroundColor Red
-            Write-Verbose "[$functionName] API call returned unexpected result: $($result | ConvertTo-Json -Depth 3)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to add corporate device identifier - unexpected API response: $($result | ConvertTo-Json -Depth 5)" -LogLevel "Error"
+            Write-Verbose "[$functionName] API call returned unexpected result: $($result | ConvertTo-Json -Depth $maxJSONDepth)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to add corporate device identifier - unexpected API response: $($result | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Error"
             return $null
         }
     }

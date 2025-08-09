@@ -39,7 +39,7 @@ function GetDeviceInfo()
     {
         Write-Verbose "[$functionName] Checking for hardware hash."
         $devDetail = (Get-CimInstance -CimSession $session -Namespace root/cimv2/mdm/dmmap -Class MDM_DevDetail_Ext01 -Filter "InstanceID='Ext' AND ParentID='./DevDetail'")
-        Write-Verbose "[$functionName] The device details are: $($devDetail | ConvertTo-Json -Depth 100)"
+        Write-Verbose "[$functionName] The device details are: $($devDetail | ConvertTo-Json -Depth $maxJSONDepth)"
         if ($devDetail)
         {
             $hash = $devDetail.DeviceHardwareData
