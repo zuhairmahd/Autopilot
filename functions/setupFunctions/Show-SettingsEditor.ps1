@@ -37,7 +37,7 @@ function Show-SettingsEditor()
     
     .NOTES
         - Maintains PowerShell 5.1 compatibility
-        - Uses existing Update-GlobalSetting, Update-DomainSettings, and Update-AuthSetting functions
+        - Uses unified Update-Setting function for all setting types
         - Leverages Test-SettingsJsonExists for default settings structure
         - Supports auth settings editing with Test-AuthDefaults for validation
     #>
@@ -1127,7 +1127,7 @@ function Save-GlobalSettings()
 {
     <#
     .SYNOPSIS
-        Saves global settings using existing Update-GlobalSetting function.
+        Saves global settings using unified Update-Setting function.
     #>
     param(
         [hashtable]$Settings,
@@ -1145,7 +1145,7 @@ function Save-GlobalSettings()
             Write-Verbose "[$functionName] Updating global setting: $key = $($Settings[$key])"
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $($Settings[$key])" -LogLevel "Verbose"
             
-            $success = Update-GlobalSetting -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            $success = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update global setting: $key"
@@ -1183,7 +1183,7 @@ function Save-AuthSettings()
 {
     <#
     .SYNOPSIS
-        Saves auth settings using existing Update-AuthSetting function.
+        Saves auth settings using unified Update-Setting function.
     #>
     param(
         [hashtable]$Settings,
@@ -1232,7 +1232,7 @@ function Save-AuthSettings()
             Write-Verbose "[$functionName] Updating auth setting: $key = $($Settings[$key])"
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating auth setting: $key = $($Settings[$key])" -LogLevel "Verbose"
             
-            $success = Update-AuthSetting -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            $success = Update-Setting -SettingType "Auth" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update auth setting: $key"
@@ -1260,7 +1260,7 @@ function Save-DomainSettings()
 {
     <#
     .SYNOPSIS
-        Saves domain settings using existing Update-DomainSettings function.
+        Saves domain settings using unified Update-Setting function.
     #>
     [CmdletBinding()]
     param(
@@ -1275,7 +1275,7 @@ function Save-DomainSettings()
     
     try
     {
-        $success = Update-DomainSettings -SettingsFile $SettingsFile -DomainName $DomainName -Settings $Settings -MergeSettings
+        $success = Update-Setting -SettingType "Domain" -SettingsFile $SettingsFile -DomainName $DomainName -Settings $Settings -MergeSettings
         if ($success)
         {
             Write-Verbose "[$functionName] Domain settings saved successfully"

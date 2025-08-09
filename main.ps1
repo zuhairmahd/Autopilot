@@ -3,13 +3,9 @@ param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.json",
     [string]$stringsFile = "$pwd\strings.json",
-    [string]$menusFile = "$pwd\menus.json",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
-    [switch]$Reconfigure,
-    [switch]$ReInitialize,
-    [switch]$Update,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
     [switch]$showVersion,
@@ -1383,7 +1379,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     }
     $settings.autoUpdate = -not $settings.autoUpdate
     # Save the updated settings back to the configuration file
-    if (Update-GlobalSetting -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
+    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
@@ -1457,7 +1453,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" 
     Write-Verbose "[$scriptName] Updating app mode setting from '$($settings.appMode)' to '$newAppMode'"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
     
-    if (Update-GlobalSetting -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
+    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
     {
         Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
