@@ -227,7 +227,7 @@ function ProcessSerialNumber()
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
                     Write-Verbose "[$scriptName] Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
-                    $global:bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
+                    $bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                     if ($bitlockerKey -ne "`n")
                     {
                         try
@@ -240,6 +240,34 @@ function ProcessSerialNumber()
                             Write-Host "`nFailed to copy Bitlocker key to clipboard. Please check your permissions." -ForegroundColor Red
                             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy Bitlocker key to clipboard. Error: $_" -LogLevel "Error"
                         }
+                    }
+                }
+            }
+            Write-Verbose "[$functionName] Checking if device has hardware password details."
+            write-log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
+            if ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0)
+            {
+                Write-Verbose "[$functionName] Device has hardware password details."
+                write-log -logFile $LogFile -Module "$functionName" -Message "Device has hardware password details." -LogLevel "Information"
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get Hardware Password Details" -Action {
+                    Write-Host "`nHardware password details retrieved successfully." -ForegroundColor Green
+                    if ($null -ne $enrollmentState.managedDevice.HardwarePassword.currentPassword)
+                    {
+                        Write-Host "Current hardware password: $($enrollmentState.managedDevice.HardwarePassword.currentPassword)"
+                        Set-Clipboard -Value $enrollmentState.managedDevice.HardwarePassword.currentPassword
+                        Write-Host "Current hardware password copied to clipboard." -ForegroundColor Green
+                    }
+                    elseif ($null -ne $enrollmentState.managedDevice.HardwarePassword.previousPasswords -and $enrollmentState.managedDevice.HardwarePassword.previousPasswords.Count -gt 0)
+                    {
+                        Write-Host "Previous hardware passwords:"
+                        foreach ($password in $enrollmentState.managedDevice.HardwarePassword.previousPasswords)
+                        {
+                            Write-Host " - $password"
+                        }
+                    }   
+                    else 
+                    {
+                        Write-Host "No hardware password details found."
                     }
                 }
             }

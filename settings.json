@@ -530,6 +530,15 @@
           ]
         },
         {
+          "description": "Get the BIOS password for the device if it exists",
+          "name": "Get Hardware Password Details",
+          "type": "action",
+          "includeInDisplayModes": [
+            "helpdesk",
+            "registration"
+          ]
+        },
+        {
           "description": "Restart the selected device",
           "name": "Restart Device",
           "type": "action",
