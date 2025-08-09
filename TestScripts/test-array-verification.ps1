@@ -1,43 +1,47 @@
 #!/usr/bin/env pwsh
 
-# Test script for array verification in Update-AuthSetting
+# Test script for array verification in Update-Setting function
 param(
+    [string]$TestName = "Array Verification Test",
     [string]$TestFolder = "$PWD\test-array-verification-temp"
 )
 
-# Load test helper functions
-. "$PSScriptRoot\test-helper.ps1"
-
-$psInfo = Test-PowerShellVersion
-Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor Cyan
-
-Write-TestSection "Array Verification Test"
-Write-Host "Test folder: $TestFolder" -ForegroundColor Yellow
-
-# Clean up any existing test folder
-if (Test-Path $TestFolder) {
-    Remove-Item -Path $TestFolder -Recurse -Force
-}
-
-# Create test folder
-New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
-
+# Use unified test framework
 try {
-    # Load all functions using the helper
-    $rootPath = Split-Path -Parent $PSScriptRoot
-    $loadSuccess = Load-AllFunctions -RootPath $rootPath
-
-    if (-not $loadSuccess) {
-        Write-TestResult "Failed to load functions" -Success $false
+    # Load test helper functions
+    . "$PSScriptRoot\test-helper.ps1"
+    
+    $psInfo = Test-PowerShellVersion
+    Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor Cyan
+    
+    # Load all functions at script level (same as main.ps1)
+    $functionsFolder = "$PWD\functions"
+    if (Test-Path $functionsFolder) {
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
+        foreach ($function in $functions) {
+            . $function.FullName
+        }
+        Write-TestResult "Functions loaded successfully" $true
+    } else {
+        Write-TestResult "Functions folder not found" $false
         exit 1
     }
+    
+    # Initialize unified test environment  
+    $testContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder
+    
+    Write-TestResult "Test environment initialized" $true
+}
+catch {
+    Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
+    exit 1
+}
 
-    Write-TestResult "Functions loaded successfully" -Success $true
-
+try {
     # Change to test directory
     Push-Location $TestFolder
 
-    Write-TestSection "Testing Array Verification in Update-AuthSetting"
+    Write-TestSection "Testing Array Verification in Update-Setting"
     
     # Create a test settings file with auth section
     $testSettingsFile = "test-settings.json"
@@ -87,21 +91,32 @@ try {
     
     # Test 5: Test scalar value update (for comparison)
     Write-TestSubSection "Test 5: Test scalar value update"
-    $result5 = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "delegated" -SettingValue $false -Verbose
+    $result5 = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "delegated" -SettingValue $false -Verbose
     Write-TestResult "Scalar value update" -Success $result5
     
-    Write-TestSection "Array Verification Test Completed"
+    # Calculate test results
+    $passedTests = ($result1, $result2, $result3, $result5 | Where-Object { $_ }).Count
+    $failedTests = 4 - $passedTests
+    $totalTests = 4
+    
+    # Complete the test using unified framework
+    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests $totalTests
     
 } catch {
     Write-TestResult "Test failed with error: $($_.Exception.Message)" -Success $false
     Write-Host "Full error: $($_.Exception | Format-List * | Out-String)" -ForegroundColor Red
+    
+    # Complete test with failure  
+    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests 0 -FailedTests 1 -TotalTests 1
     exit 1
 } finally {
     # Clean up
     Pop-Location
-    if (Test-Path $TestFolder) {
-        Remove-Item -Path $TestFolder -Recurse -Force
-    }
 }
-
-Write-Host "`nArray verification test completed successfully!" -ForegroundColor Green
+if ($success) {
+    Write-Host "`nArray verification test completed successfully!" -ForegroundColor Green
+    exit 0
+} else {
+    Write-Host "`nArray verification test failed!" -ForegroundColor Red
+    exit 1
+}
