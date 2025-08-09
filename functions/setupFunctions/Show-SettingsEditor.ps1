@@ -46,13 +46,9 @@ function Show-SettingsEditor()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingsType,
-        
         [string]$SettingsFile = "settings.json",
-        
         [string]$DomainName,
-        
         [switch]$Silent,
-        
         [hashtable]$PresetValues
     )
     
@@ -362,8 +358,10 @@ function Get-DefaultSettingsStructure()
     .SYNOPSIS
         Retrieves the default settings structure efficiently without file operations.
     #>
+    [CmdletBinding()]
+    param()
+
     $functionName = $MyInvocation.MyCommand.Name
-    $logFile = "$PWD\Logs\Autopilot.log"
     
     Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure using cached defaults" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Retrieving default settings structure using cached defaults"
@@ -473,6 +471,7 @@ function Get-CurrentSettings()
     .SYNOPSIS
         Loads current settings from the settings file.
     #>
+    [CmdletBinding()]
     param(
         [string]$SettingsFile,
         [string]$SettingsType,
@@ -480,8 +479,6 @@ function Get-CurrentSettings()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $logFile = "$PWD\Logs\Autopilot.log"
-    
     Write-Log -LogFile $logFile -Module $functionName -Message "Loading current settings from: $SettingsFile for type: $SettingsType" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Loading current settings from: $SettingsFile for type: $SettingsType"
     
@@ -526,6 +523,7 @@ function Get-SettingDescription()
     .SYNOPSIS
         Returns a user-friendly description for a setting.
     #>
+    [CmdletBinding()]
     param([string]$SettingName)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -582,12 +580,16 @@ function Get-SettingDescription()
     }
 }
 
+
+
 function Get-SettingInput()
 {
     <#
+    
     .SYNOPSIS
         Gets user input for a setting based on its type and validation rules.
     #>
+    [CmdletBinding()]
     param(
         [string]$SettingName,
         $CurrentValue,
@@ -679,7 +681,6 @@ function Get-SettingInputType()
         $Value
     )
     
-    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)"
     Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
     
@@ -864,6 +865,7 @@ function Get-CacheTypeInput()
 
 function Get-RepoInput()
 {
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -876,6 +878,7 @@ function Get-RepoInput()
 
 function Get-OperatingSystemInput()
 {
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -888,6 +891,7 @@ function Get-OperatingSystemInput()
 
 function Get-BrowserInput()
 {
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -904,6 +908,7 @@ function Get-EnumeratedInput()
     .SYNOPSIS
         Generic function for enumerated input choices.
     #>
+    [CmdletBinding()]
     param(
         [array]$Options,
         $CurrentValue,
@@ -960,6 +965,7 @@ function Get-ArrayInput()
     .SYNOPSIS
         Gets array input from user.
     #>
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -1040,6 +1046,7 @@ function Get-NumberInput()
     .SYNOPSIS
         Gets numeric input with validation.
     #>
+    [CmdletBinding()]
     param(
         [string]$SettingName,
         $CurrentValue
@@ -1100,6 +1107,7 @@ function Get-StringInput()
     .SYNOPSIS
         Gets string input from user.
     #>
+    [CmdletBinding()]
     param(
         [string]$SettingName,
         $CurrentValue
@@ -1129,6 +1137,7 @@ function Save-GlobalSettings()
     .SYNOPSIS
         Saves global settings using unified Update-Setting function.
     #>
+    [CmdletBinding()]
     param(
         [hashtable]$Settings,
         [string]$SettingsFile
@@ -1169,6 +1178,7 @@ function Save-GlobalSettings()
 
 function Get-AuthTypeInput()
 {
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -1185,6 +1195,7 @@ function Save-AuthSettings()
     .SYNOPSIS
         Saves auth settings using unified Update-Setting function.
     #>
+    [CmdletBinding()]
     param(
         [hashtable]$Settings,
         [string]$SettingsFile

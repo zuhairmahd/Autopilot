@@ -520,7 +520,6 @@ if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
     $baseSourceURL = 'https://raw.githubusercontent.com'
-    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
     $baseURL = "https://www.github.com"
     Write-Verbose "[$scriptName] Base URL: $baseURL"
     $repoPath = 'zuhairmahd'
@@ -555,7 +554,6 @@ if ($settings.Repo -eq 'github')
 elseif ($settings.Repo -eq 'gitlab')
 {
     $baseSourceURL = 'https://git.gao.gov'
-    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
     $baseURL = "https://git.gao.gov"
     Write-Verbose "[$scriptName] Base URL: $baseURL"
     $repoPath = 'mahmoudz'
@@ -570,9 +568,7 @@ else
     $latestRelease = $defaultBranch
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
-Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-Write-Verbose "[$scriptName] Update URL: $updateURL"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
@@ -598,8 +594,6 @@ foreach ($key in $getTokenParams.Keys)
     }
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth 5)"
-Write-Verbose "[$scriptName] Update URL: $updateURL"
-Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
 $loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
 $global:returnValues = $loadedStrings.returnValues
@@ -631,8 +625,7 @@ Write-Verbose "[$scriptName] Show auth: $showAuth"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
 Write-Verbose "[$scriptName] Log level: $LogLevel"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
-Write-Verbose "[$scriptName] App mode is $($settings.appMode)."
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode is $($settings.appMode)." -LogLevel "Information"
+ 
 Write-Verbose "[$scriptName] Group tag: $settings.GroupTag"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
 Write-Verbose "[$scriptName] Assigned user: $AssignedUser"

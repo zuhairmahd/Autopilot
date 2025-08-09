@@ -8,6 +8,31 @@ param(
 # Load test helper functions
 . "$PSScriptRoot\test-helper.ps1"
 
+# Load functions at script level (same pattern as main.ps1)
+$functionsFolder = "$PWD\functions"
+if (Test-Path $functionsFolder) {
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
+    $loadedCount = 0
+    foreach ($function in $functions) {
+        try {
+            . $function.FullName
+            $loadedCount++
+        }
+        catch {
+            Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
+        }
+    }
+} else {
+    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    exit 1
+}
+
+# Set up global variables needed by the functions
+$tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+$global:logFile = Join-Path $tempDir "test.log"
+$global:LogFile = Join-Path $tempDir "test.log"
+$global:jsonDepth = 10
+
 $psInfo = Test-PowerShellVersion
 Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor Cyan
 
@@ -23,15 +48,6 @@ if (Test-Path $TestFolder) {
 New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
 
 try {
-    # Load all functions using the helper
-    $rootPath = Split-Path -Parent $PSScriptRoot
-    $loadSuccess = Load-AllFunctions -RootPath $rootPath
-
-    if (-not $loadSuccess) {
-        Write-TestResult "Failed to load functions" -Success $false
-        exit 1
-    }
-
     Write-TestResult "Functions loaded successfully" -Success $true
 
     # Change to test directory

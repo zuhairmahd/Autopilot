@@ -23,16 +23,27 @@ if (Test-Path $TestFolder) {
 New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
 
 try {
-    # Load all functions using the helper
-    $rootPath = Split-Path -Parent $PSScriptRoot
-    $loadSuccess = Load-AllFunctions -RootPath $rootPath
-
-    if (-not $loadSuccess) {
-        Write-TestResult "Failed to load functions" -Success $false
+    # Load all functions at script level (same pattern as main.ps1)
+    $functionsFolder = "$PWD\functions"
+    if (Test-Path $functionsFolder) {
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
+        foreach ($function in $functions) {
+            . $function.FullName
+        }
+        Write-TestResult "Functions loaded successfully" $true
+    } else {
+        Write-TestResult "Functions folder not found" $false
         exit 1
     }
+    
+    # Set up global variables needed by the functions
+    $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+    $global:logFile = Join-Path $tempDir "test.log"
+    $global:LogFile = Join-Path $tempDir "test.log"
+    $global:jsonDepth = 10
 
-    Write-TestResult "Functions loaded successfully" -Success $true
+    # All functions loaded successfully
+    Write-TestResult "Functions loaded successfully" $true
 
     # Change to test directory
     Push-Location $TestFolder
@@ -151,13 +162,13 @@ try {
         Write-TestResult "Show-SettingsEditor Auth type failed" -Success $false
     }
 
-    Write-TestSection "Testing Update-AuthSetting function"
+    Write-TestSection "Testing Update-Setting function for Auth"
     
     # Test individual auth setting update
-    $updateSuccess = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "renewalLeadTime" -SettingValue 10
+    $updateSuccess = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "renewalLeadTime" -SettingValue 10
     
     if ($updateSuccess) {
-        Write-TestResult "Update-AuthSetting executed successfully" -Success $true
+        Write-TestResult "Update-Setting (Auth) executed successfully" -Success $true
         
         # Verify the update
         $settingsContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
@@ -168,14 +179,14 @@ try {
             Write-TestResult "Auth setting update not verified" -Success $false
         }
     } else {
-        Write-TestResult "Update-AuthSetting failed" -Success $false
+        Write-TestResult "Update-Setting (Auth) failed" -Success $false
     }
 
     Write-TestSection "Testing array storage fix"
     
     # Test single-item array preservation
     $singleItemArray = @('single-scope')
-    $updateSuccess = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $singleItemArray
+    $updateSuccess = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $singleItemArray
     
     if ($updateSuccess) {
         $settingsContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
