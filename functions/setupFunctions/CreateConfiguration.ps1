@@ -88,7 +88,7 @@ function CreateConfiguration()
                 return $success
             }
         }
-        Write-Verbose "[$functionName] Config data: $($configData | ConvertTo-Json -Depth 10)"
+        Write-Verbose "[$functionName] Config data: $($configData | ConvertTo-Json -Depth $maxJSONDepth)"
         
         # Create the settings.json structure with globalSettings and domains
         $settingsStructure = @{
@@ -99,8 +99,7 @@ function CreateConfiguration()
         }
         
         # Write the structured data to the configuration file
-        $settingsStructure | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigurationFile -Force
-        
+        $settingsStructure | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $ConfigurationFile -Force
         # Check to make sure it was written
         if (Test-Path -Path $ConfigurationFile)
         {

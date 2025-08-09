@@ -141,7 +141,7 @@ function DecodeJwtToken
         if ($RawJSON)
         {
             Write-Verbose "[$functionName] Returning all decoded JWT claims as raw JSON."
-            return $humanClaims | ConvertTo-Json -Depth 5
+            return $humanClaims | ConvertTo-Json -Depth $maxJSONDepth
         }
         else
         {

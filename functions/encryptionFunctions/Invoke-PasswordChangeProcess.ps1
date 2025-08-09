@@ -131,7 +131,7 @@ function Invoke-PasswordChangeProcess()
                     $settings.auth.changePWOnNextStart = $false
                     
                     # Write updated settings back to file
-                    $updatedSettingsJson = ConvertTo-Json $settings -Depth 100
+                    $updatedSettingsJson = ConvertTo-Json $settings -Depth $maxJSONDepth
                     Set-Content -Path $SettingsFile -Value $updatedSettingsJson -Encoding UTF8
                     
                     Write-Host "Settings updated successfully" -ForegroundColor Green

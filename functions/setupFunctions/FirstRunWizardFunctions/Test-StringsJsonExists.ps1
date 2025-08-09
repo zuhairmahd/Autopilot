@@ -123,13 +123,13 @@ function Test-StringsJsonExists()
                 $mergedStrings = Merge-ConfigurationDefaults -ExistingConfig $existingHashtable -DefaultConfig $defaultStrings
                 
                 # Convert back to JSON and save if changes were made
-                $mergedJson = $mergedStrings | ConvertTo-Json -Depth 10
+                $mergedJson = $mergedStrings | ConvertTo-Json -Depth $maxJSONDepth
                 
                 if ($null -ne $mergedJson)
                 {
                     Write-Verbose "[$functionName] Merging default strings with existing configuration"
                     Write-SafeLog "Merging default strings with existing configuration" "Information"
-                    $mergedJson = ConvertTo-OrderedJson -InputObject $mergedStrings -Depth 10
+                    $mergedJson = ConvertTo-OrderedJson -InputObject $mergedStrings -Depth $maxJSONDepth
                     Set-Content -Path $StringsFile -Value $mergedJson -Encoding UTF8 -Force
                     Write-Verbose "[$functionName] Updated strings.json with missing default values"
                     Write-SafeLog "Updated strings.json with missing default values" "Information"
@@ -165,7 +165,7 @@ function Test-StringsJsonExists()
         }
         
         # Convert to JSON and write to file
-        $stringsJson = $defaultStrings | ConvertTo-Json -Depth 10
+        $stringsJson = $defaultStrings | ConvertTo-Json -Depth $maxJSONDepth
         Set-Content -Path $StringsFile -Value $stringsJson -Encoding UTF8 -Force
         
         Write-Host "Strings file created successfully." -ForegroundColor Green

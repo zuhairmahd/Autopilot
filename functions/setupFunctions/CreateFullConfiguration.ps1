@@ -143,7 +143,7 @@ function CreateFullConfiguration()
             # Find matching init configuration
             Write-Verbose "[$functionName] Searching for init configuration for $($config.Name)."
             $initConfig = $valuesToEdit | Where-Object { $_.name -eq $config.Name }
-            Write-Verbose "[$functionName] Value in init configuration: $($initConfig | ConvertTo-Json -Depth 10)"
+            Write-Verbose "[$functionName] Value in init configuration: $($initConfig | ConvertTo-Json -Depth $maxJSONDepth)"
             if ($initConfig)
             {
                 $configType = $initConfig.type
@@ -259,7 +259,7 @@ function CreateFullConfiguration()
 
         # Save the complete settings.json structure to the configuration file
         Write-Verbose "[$functionName] Saving configuration to $ConfigurationFile."
-        $settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $ConfigurationFile -Force
+        $settingsObj | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $ConfigurationFile -Force
         Write-Verbose "[$functionName] Configuration saved to $ConfigurationFile."
         
         # Verify the file was saved successfully

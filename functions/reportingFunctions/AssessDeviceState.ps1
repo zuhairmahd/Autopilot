@@ -13,12 +13,12 @@ function AssessDeviceState()
     #region Write verbose log of received parameters.
     Write-Verbose "[$functionName] Received parameters:"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received parameters:" -LogLevel "Information"
-    Write-Verbose "[$functionName] Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Enrollment state: $($enrollmentState | ConvertTo-Json -Depth 10)" -LogLevel "Information"
+    Write-Verbose "[$functionName] Enrollment state: $($enrollmentState | ConvertTo-Json -Depth $maxJSONDepth)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Enrollment state: $($enrollmentState | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
     Write-Verbose "[$functionName] Assessment type: $AssessmentType"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Assessment type: $AssessmentType" -LogLevel "Information"
-    Write-Verbose "[$functionName] Settings: $($settings | ConvertTo-Json -Depth 10)"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Settings: $($settings | ConvertTo-Json -Depth 10)" -LogLevel "Information"
+    Write-Verbose "[$functionName] Settings: $($settings | ConvertTo-Json -Depth $maxJSONDepth)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Settings: $($settings | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
     $returnValue = [ordered] @{}
     $readinessState = $null
     $action = $null
@@ -225,8 +225,14 @@ function AssessDeviceState()
         }
     }        
     # Ensure variables are initialized for all code paths
-    if (-not $allIssues) { $allIssues = @() }
-    if (-not $allActions) { $allActions = @($action) }
+    if (-not $allIssues)
+    {
+        $allIssues = @() 
+    }
+    if (-not $allActions)
+    {
+        $allActions = @($action) 
+    }
     
     # Build comprehensive return object (maintains backward compatibility)
     $returnValue.Add('ReadinessState', $readinessState)

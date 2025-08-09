@@ -513,7 +513,7 @@ function Test-SettingsJsonExists()
                 {
                     Write-Verbose "[$functionName] Merging default settings into existing configuration"
                     Write-SafeLog "Merging default settings into existing configuration" "Information"
-                    $mergedJson = ConvertTo-OrderedJson -InputObject $mergedSettings -Depth 10
+                    $mergedJson = ConvertTo-OrderedJson -InputObject $mergedSettings -Depth $maxJSONDepth
                     Set-Content -Path $SettingsFile -Value $mergedJson -Encoding UTF8 -Force
                     Write-Verbose "[$functionName] Updated settings.json with missing default values"
                     Write-SafeLog "Updated settings.json with missing default values" "Information"
@@ -548,7 +548,7 @@ function Test-SettingsJsonExists()
         }
         
         # Convert to JSON with proper ordering and write to file
-        $settingsJson = ConvertTo-OrderedJson -InputObject $defaultSettings -Depth 10
+        $settingsJson = ConvertTo-OrderedJson -InputObject $defaultSettings -Depth $maxJSONDepth
         Set-Content -Path $SettingsFile -Value $settingsJson -Encoding UTF8 -Force
         Write-Verbose "[$functionName] Created comprehensive settings.json with requiredScopes"
         

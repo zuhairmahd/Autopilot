@@ -170,7 +170,14 @@ function Show-SettingsEditor()
             foreach ($settingName in $settingsTemplate.Keys)
             {
                 $defaultValue = $settingsTemplate[$settingName]
-                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName) { $currentValues.$settingName } else { $defaultValue }
+                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName)
+                {
+                    $currentValues.$settingName 
+                }
+                else
+                {
+                    $defaultValue 
+                }
                 
                 Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
@@ -230,7 +237,14 @@ function Show-SettingsEditor()
             {
                 $settingName = $setting.Name
                 $defaultValue = $setting.Value
-                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName) { $currentValues.$settingName } else { $defaultValue }
+                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName)
+                {
+                    $currentValues.$settingName 
+                }
+                else
+                {
+                    $defaultValue 
+                }
                 
                 Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
@@ -449,7 +463,7 @@ function Get-DefaultSettingsStructure()
         Write-Verbose "[$functionName] Default settings structure created successfully"
         
         # Convert to PSCustomObject to match the JSON structure behavior
-        $jsonString = $defaultSettings | ConvertTo-Json -Depth 10
+        $jsonString = $defaultSettings | ConvertTo-Json -Depth $maxJSONDepth
         $defaultStructure = $jsonString | ConvertFrom-Json
         
         Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure converted to PSCustomObject format" -LogLevel "Verbose"

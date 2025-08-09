@@ -158,7 +158,7 @@ function GetNextUserReadinessReport()
     {
         Write-Host "`n⚠ " -ForegroundColor Yellow -NoNewline
         Write-Host ("An unexpected readiness state was encountered: {0}" -f $DeviceAssessmentState.ReadinessState) -ForegroundColor Red
-        Write-Verbose ("[{0}] Unexpected readiness state encountered. Assessment state: {1}" -f $functionName, ($DeviceAssessmentState | ConvertTo-Json -Depth 3))
+        Write-Verbose ("[{0}] Unexpected readiness state encountered. Assessment state: {1}" -f $functionName, ($DeviceAssessmentState | ConvertTo-Json -Depth $maxJSONDepth))
         Write-Log -LogFile $LogFile -Module $functionName -Message ("Unexpected readiness state: {0}" -f $DeviceAssessmentState.ReadinessState) -LogLevel "Error"
 
         # PowerShell 5.1 workaround: avoid string interpolation in variable assignment

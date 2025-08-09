@@ -69,7 +69,7 @@ function Save-TokenToCache()
         
         try
         {
-            $cachedToken | ConvertTo-Json -Depth 10 | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
+            $cachedToken | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $cacheTokenFile -Force -ErrorAction Stop
             Write-Verbose "[$functionName] Access token successfully saved to $cacheTokenFile"
         }
         catch

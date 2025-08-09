@@ -143,7 +143,7 @@ function GetInstalledWindowsUpdates()
 function ApplyWindowsUpdates()
 {
     [CmdletBinding()]
-    Param(
+    param(
         [Parameter(Mandatory = $False)] 
         [ValidateSet('Soft', 'Hard', 'None', 'Delayed')] 
         [String] $Reboot = 'Soft',
@@ -394,7 +394,7 @@ function ApplyWindowsUpdates()
             Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Total operation time: $($operationDuration.TotalMilliseconds) milliseconds" -LogLevel "Information"
             
-            Return 0
+            return 0
         }
         else
         {
@@ -542,7 +542,7 @@ function ApplyWindowsUpdates()
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Operation completed at: $($operationEndTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))" -LogLevel "Information"
                 Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Total operation time: $($operationDuration.TotalMilliseconds) milliseconds" -LogLevel "Information"
-                Return 1641
+                return 1641
             }
             elseif ($Reboot -eq "Soft")
             {
@@ -563,7 +563,7 @@ function ApplyWindowsUpdates()
                 Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Total operation time: $($operationDuration.TotalMilliseconds) milliseconds" -LogLevel "Information"
                 
-                Return 3010
+                return 3010
             }
             elseif ($Reboot -eq "Delayed")
             {
@@ -590,7 +590,7 @@ function ApplyWindowsUpdates()
                 Write-Verbose "[$functionName] System will reboot in $RebootTimeout seconds"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "System will reboot in $RebootTimeout seconds" -LogLevel "Information"
                 
-                Return 0
+                return 0
             }
             elseif ($Reboot -eq "None")
             {
@@ -611,7 +611,7 @@ function ApplyWindowsUpdates()
                 Write-Verbose "[$functionName] Total operation time: $($operationDuration.TotalMilliseconds) milliseconds"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Total operation time: $($operationDuration.TotalMilliseconds) milliseconds" -LogLevel "Information"
                 
-                Return 3010  # Indicate reboot needed but not performed
+                return 3010  # Indicate reboot needed but not performed
             }    
         }
         else
@@ -673,8 +673,8 @@ function ApplyWindowsUpdates()
             FailedInstallations     = $failedInstalls
             RebootRequired          = $needReboot
         }        
-        Write-Verbose "[$functionName] Returning object: $($returnObject | ConvertTo-Json -Depth 3)"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning object: $($returnObject | ConvertTo-Json -Depth 3)" -LogLevel "Information"
+        Write-Verbose "[$functionName] Returning object: $($returnObject | ConvertTo-Json -Depth $maxJSONDepth)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning object: $($returnObject | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
         return $returnObject
     }
     catch

@@ -20,7 +20,7 @@ function CreateSecretsFile()
         Write-Verbose "Creating secrets file at $SecretsFile."
         Write-Log -LogFile $LogFile -Module "MiscFunctions" -Message "Creating secrets file at $SecretsFile" -LogLevel "Information"
         $secrets = @{}
-        $secrets | ConvertTo-Json -Depth 10 | Set-Content -Path $SecretsFile -Force
+        $secrets | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $SecretsFile -Force
         Write-Host "Secrets file created successfully at $SecretsFile." -ForegroundColor Green
     }
     else

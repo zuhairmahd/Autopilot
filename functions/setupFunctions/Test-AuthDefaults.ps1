@@ -38,11 +38,15 @@ function Test-AuthDefaults()
     )
     
     # Helper function to safely log messages
-    function Write-SafeLogFallback {
+    function Write-SafeLogFallback
+    {
         param($Message, $Level)
-        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
+        if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue)
+        {
             Write-SafeLog $Message $Level
-        } else {
+        }
+        else
+        {
             Write-Verbose "[$functionName] $Message"
         }
     }
@@ -170,7 +174,7 @@ function Test-AuthDefaults()
             }
             
             # Save updated settings
-            $jsonOutput = $outputSettings | ConvertTo-Json -Depth 10
+            $jsonOutput = $outputSettings | ConvertTo-Json -Depth $maxJSONDepth
             Set-Content -Path $SettingsFile -Value $jsonOutput -Force
             
             Write-Verbose "[$functionName] Auth defaults updated successfully"

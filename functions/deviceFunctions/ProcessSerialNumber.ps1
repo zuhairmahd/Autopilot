@@ -164,8 +164,8 @@ function ProcessSerialNumber()
             Write-Host "Status: Managed by Intune" -ForegroundColor Green
             Write-Host "=============================`n" -ForegroundColor Green
             $pendingActions = getDevicePendingActions -enrollmentState $enrollmentState
-            Write-Verbose "[$functionName] Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Pending actions: $($pendingActions | ConvertTo-Json -Depth 5)" -LogLevel "Information"
+            Write-Verbose "[$functionName] Pending actions: $($pendingActions | ConvertTo-Json -Depth $maxJSONDepth)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Pending actions: $($pendingActions | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
             if ($pendingActions.isPendingAction)
             {
                 Write-Host "This device has pending actions:"
@@ -244,11 +244,11 @@ function ProcessSerialNumber()
                 }
             }
             Write-Verbose "[$functionName] Checking if device has hardware password details."
-            write-log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
+            Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
             if ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0)
             {
                 Write-Verbose "[$functionName] Device has hardware password details."
-                write-log -logFile $LogFile -Module "$functionName" -Message "Device has hardware password details." -LogLevel "Information"
+                Write-Log -logFile $LogFile -Module "$functionName" -Message "Device has hardware password details." -LogLevel "Information"
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get Hardware Password Details" -Action {
                     Write-Host "`nHardware password details retrieved successfully." -ForegroundColor Green
                     if ($null -ne $enrollmentState.managedDevice.HardwarePassword.currentPassword)

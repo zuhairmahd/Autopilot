@@ -84,7 +84,7 @@ function ExportDeviceStorage()
             
             Write-Verbose "[$functionName] - Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Information"
-            $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth 10)
+            $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
             
             # Process batch responses
             if ($null -ne $batchResponse -and $null -ne $batchResponse.responses)

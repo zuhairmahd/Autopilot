@@ -567,7 +567,7 @@ else
     Write-Host 'Defaulting to the main branch from GitHub.' -ForegroundColor Yellow
     $latestRelease = $defaultBranch
 }
-$script:maxJSONDepth = 100
+$global:maxJSONDepth = 100
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL

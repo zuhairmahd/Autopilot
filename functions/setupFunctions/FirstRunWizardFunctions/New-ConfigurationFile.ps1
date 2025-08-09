@@ -47,7 +47,7 @@ function New-ConfigurationFile()
         }
         
         # Create the configuration JSON
-        $configJson = $ConfigData | ConvertTo-Json -Depth 10
+        $configJson = $ConfigData | ConvertTo-Json -Depth $maxJSONDepth
         
         # Write the configuration to file
         Write-Verbose "[$functionName] Writing configuration to file"

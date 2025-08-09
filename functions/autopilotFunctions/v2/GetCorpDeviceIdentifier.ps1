@@ -14,14 +14,14 @@ function GetCorpDeviceIdentifier()
         Write-Verbose "[$functionName] Attempting to retrieve computer system information via Win32_ComputerSystem."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving Win32_ComputerSystem info..." -LogLevel "Debug"
         $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem 
-        Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth 100)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_ComputerSystem info: $($computerSystem | ConvertTo-Json -Depth 100)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Computer system information retrieved: $($computerSystem | ConvertTo-Json -Depth $maxJSONDepth)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_ComputerSystem info: $($computerSystem | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
 
         Write-Verbose "[$functionName] Attempting to retrieve BIOS information via Win32_BIOS."
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving Win32_BIOS info..." -LogLevel "Debug"
         $bios = Get-CimInstance -ClassName Win32_BIOS
-        Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth 100)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_BIOS info: $($bios | ConvertTo-Json -Depth 100)" -LogLevel "Debug"
+        Write-Verbose "[$functionName] BIOS information retrieved: $($bios | ConvertTo-Json -Depth $maxJSONDepth)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Win32_BIOS info: $($bios | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
     }
     catch
     {
@@ -52,7 +52,7 @@ function GetCorpDeviceIdentifier()
         SerialNumber = $serialNumber
     }
     Write-Verbose "[$functionName] Returning device info object."
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth 10)" -LogLevel "Debug"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
     return $deviceInfo
 }
 

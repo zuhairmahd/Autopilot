@@ -390,7 +390,7 @@ function Update-Setting()
         Write-Log -LogFile $logFile -Message "Created backup: $backupFile" -Module $functionName
         
         # Save updated settings
-        $settingsObj | ConvertTo-Json -Depth $jsonDepth | Set-Content -Path $SettingsFile -Force
+        $settingsObj | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $SettingsFile -Force
         Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
         Write-Log -LogFile $logFile -Message "Saved updated settings to $SettingsFile" -Module $functionName
         

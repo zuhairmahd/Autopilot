@@ -172,7 +172,7 @@ function Save-RefreshTokenToConfig()
         $tempFile = [System.IO.Path]::GetTempFileName()
         try
         {
-            $config | ConvertTo-Json -Depth 10 | Set-Content -Path $tempFile -Encoding UTF8
+            $config | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $tempFile -Encoding UTF8
             
             # Re-encrypt with the user's password
             $encryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $userPassword
@@ -203,7 +203,7 @@ function Save-RefreshTokenToConfig()
     {
         # Save the updated config without encryption
         Write-Verbose "[$functionName] Saving refresh token to config file: $configFilePath"
-        $config | ConvertTo-Json -Depth 10 | Set-Content -Path $configFilePath -Force
+        $config | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $configFilePath -Force
     }
     Write-Verbose "[$functionName] Refresh token saved to config file"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Refresh token operation completed successfully" -LogLevel "Information"
@@ -219,7 +219,7 @@ function Save-RefreshTokenToConfig()
             $tempFile = [System.IO.Path]::GetTempFileName()
             try
             {
-                $config | ConvertTo-Json -Depth 10 | Set-Content -Path $tempFile -Encoding UTF8
+                $config | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $tempFile -Encoding UTF8
                 
                 # Re-encrypt with the temporary key
                 $tempEncryptResult = Invoke-JsonFileEncryption -FilePath $tempFile -Key $script:TempEncryptionKey -InMemoryOnly

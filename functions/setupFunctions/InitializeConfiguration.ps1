@@ -70,14 +70,14 @@ function InitializeConfiguration()
     if (-not(Test-Path $InitFile))
     {
         Write-Verbose "[$functionName] Creating configuration file at $InitFile."
-        $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
+        $initVars | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $InitFile -Force
     }
     else
     {
         if ($overwrite)
         {
             Write-Verbose "[$functionName] Overwriting configuration file at $InitFile."
-            $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
+            $initVars | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $InitFile -Force
         }
         else
         {
@@ -93,7 +93,7 @@ function InitializeConfiguration()
             if ($choice -eq 'y')
             {
                 Write-Verbose "[$functionName] Overwriting initialization file at $InitFile."
-                $initVars | ConvertTo-Json -Depth 10 | Set-Content -Path $InitFile -Force
+                $initVars | ConvertTo-Json -Depth $maxJSONDepth | Set-Content -Path $InitFile -Force
             }
             else
             {

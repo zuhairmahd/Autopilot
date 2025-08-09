@@ -117,7 +117,7 @@ function Set-SettingsJsonStructure()
         }
         
         # Convert to JSON and save
-        $jsonOutput = $settingsStructure | ConvertTo-Json -Depth 10
+        $jsonOutput = $settingsStructure | ConvertTo-Json -Depth $maxJSONDepth
         $jsonOutput | Set-Content -Path $SettingsFile -Force
         
         # Verify the file was created correctly

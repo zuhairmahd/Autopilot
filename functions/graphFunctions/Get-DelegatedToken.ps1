@@ -72,11 +72,11 @@ function Get-DelegatedToken()
             }
             Write-Verbose "[$functionName] Original scopes parameter: '$scopes'"
             Write-Verbose "[$functionName] Formatted scopes: '$scopesFormatted'"
-            Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth 3)"
+            Write-Verbose "[$functionName] Requesting device code with body: $($deviceCodeRequestBody | ConvertTo-Json -Depth $maxJSONDepth)"
             try
             {
                 $deviceCodeResponse = Invoke-RestMethod -Method POST -Uri $deviceCodeRequestUrl -Body $deviceCodeRequestBody
-                Write-Verbose "[$functionName] Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth 3)"
+                Write-Verbose "[$functionName] Device code response: $($deviceCodeResponse | ConvertTo-Json -Depth $maxJSONDepth)"
             }
             catch
             {
@@ -163,7 +163,7 @@ function Get-DelegatedToken()
             $accessToken = $null
             $timeoutSeconds = $deviceCodeResponse.expires_in # Typically 15 minutes
             Write-Verbose "[$functionName] Token request URL: $tokenRequestUrl"
-            Write-Verbose "[$functionName] Token request body: $($tokenRequestBody | ConvertTo-Json -Depth 3)"
+            Write-Verbose "[$functionName] Token request body: $($tokenRequestBody | ConvertTo-Json -Depth $maxJSONDepth)"
             Write-Verbose "Timeout for polling: $timeoutSeconds seconds"
             $intervalSeconds = $deviceCodeResponse.interval # Typically 5 seconds
             Write-Verbose "Polling interval: $intervalSeconds seconds"
@@ -177,7 +177,7 @@ function Get-DelegatedToken()
                 {
                     $tokenResponse = Invoke-RestMethod -Method POST -Uri $tokenRequestUrl -Body $tokenRequestBody -ErrorAction SilentlyContinue
                     Write-Verbose "[$functionName] Polling attempt successful."
-                    Write-Verbose "[$functionName] Token response: $($tokenResponse | ConvertTo-Json -Depth 3)"
+                    Write-Verbose "[$functionName] Token response: $($tokenResponse | ConvertTo-Json -Depth $maxJSONDepth)"
                     if ($tokenResponse.access_token)
                     {
                         $accessToken = $tokenResponse.access_token
@@ -402,7 +402,7 @@ function Get-DelegatedToken()
                     try
                     {
                         $errorJson = $_.ErrorDetails.Message | ConvertFrom-Json
-                        Write-Verbose "[$functionName] Error JSON: $($errorJson | ConvertTo-Json -Depth 3)"
+                        Write-Verbose "[$functionName] Error JSON: $($errorJson | ConvertTo-Json -Depth $maxJSONDepth)"
                         Write-Verbose "[$functionName] Error code: $($errorJson.error)"
                         Write-Verbose "[$functionName] Error description: $($errorJson.error_description)"
                     }
