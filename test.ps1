@@ -536,9 +536,8 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$groupsToInclude = $settings.groupsToInclude
-# Helper:
-$global:myGroups = Get-GroupIdsByNames -AccessToken $accessToken -GroupNames $groupsToInclude -DisplayNames
+$serialNumber = '5R3SBZ3'
+$global:pw = GetBIOSPassword -accessToken $accessToken -serialNumber $serialNumber -verbose 
 
 exit 0
 $userPrincipalName = 'mahmoudz@gao.gov'

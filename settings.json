@@ -1,20 +1,20 @@
-﻿{
+{
     "description":  "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version":  "1.1",
     "auth":  {
-                 "NoSaveRefreshToken":  false,
-                 "CacheType":  "Memory",
                  "changePwOnNextStart":  false,
-                 "Delegated":  true,
+                 "authType":  "PublicAuthFlow",
+                 "NoSaveRefreshToken":  false,
                  "ForceNewToken":  false,
+                 "renewalLeadTime":  5,
                  "scope":  [
                                "offline_access",
                                "openid",
                                "Device.ReadWrite.All"
                            ],
-                 "authType":  "PublicAuthFlow",
+                 "CacheType":  "Memory",
                  "SecureString":  false,
-                 "renewalLeadTime":  5
+                 "Delegated":  true
              },
     "requiredScopes":  [
                            {
@@ -138,18 +138,18 @@
                            }
                        ],
     "globalSettings":  {
-                           "configFile":  ".\\.secrets\\config.json",
-                           "deviceContactThresholdInDays":  30,
+                           "operatingSystem":  "Windows",
                            "Release":  "master",
-                           "showLicenseBanner":  false,
-                           "maxWaitTime":  "30",
-                           "appMode":  "full",
+                           "Repo":  "Github",
                            "timeInSeconds":  "60",
                            "maxUserMatchDisplay":  24,
-                           "Repo":  "Github",
+                           "maxWaitTime":  "30",
+                           "autoUpdate":  true,
+                           "appMode":  "full",
                            "testMode":  false,
-                           "operatingSystem":  "Windows",
-                           "autoUpdate":  false
+                           "configFile":  ".\\.secrets\\config.json",
+                           "showLicenseBanner":  false,
+                           "deviceContactThresholdInDays":  30
                        },
     "domains":  {
                     "arabictutor.com":  {
