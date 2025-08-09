@@ -284,7 +284,17 @@ function GetDeviceEnrollmentStatus()
             Write-Verbose "[$functionName] No LAPS credentials found for device with ID $($managedDevice.azureADDeviceId)"
         }
         #endregion
-
+        #region Check device hardwre password
+        $hwPassword = GetBIOSPassword -accessToken $accessToken -serialNumber $serialNumber
+        if ($hwPassword -and $hwPassword.count -gt 0)
+        {
+            Write-Verbose "[$functionName] Hardware password found for device with ID $($managedDevice.azureADDeviceId)"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No hardware password found for device with ID $($managedDevice.azureADDeviceId)"
+        }
+        #endregion
         #region Get bitlocker recovery objects.
         $bitlockerURI = "informationProtection/bitlocker/recoveryKeys"
         $bitlockerFilter = "deviceId eq '$($managedDevice.azureADDeviceId)'"
@@ -417,6 +427,14 @@ function GetDeviceEnrollmentStatus()
     {
         Write-Verbose "[$functionName] No BitLocker recovery keys found for device with ID $($managedDevice.azureADDeviceId)"
     }
+    if ($hwPassword -and $hwPassword.count -gt 0)
+    {
+        Write-Verbose "[$functionName] Hardware password found for device with ID $($managedDevice.azureADDeviceId)"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No hardware password found for device with ID $($managedDevice.azureADDeviceId)"
+    }
     #endregion
 
     #region return values
@@ -434,6 +452,7 @@ function GetDeviceEnrollmentStatus()
         LAPS               = $laps
         BitLocker          = $bitlockerKeys
         LatestBitLockerKey = $latestBitlockerKey
+        HardwarePassword   = $hwPassword
     }
     $deviceState.add('managedDevice', $managedDeviceData)
     $deviceState.add('imported', $imported)

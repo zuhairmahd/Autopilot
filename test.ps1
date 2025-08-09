@@ -537,7 +537,7 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 #endregion Define variables
 
 $serialNumber = '5R3SBZ3'
-$global:pw = GetBIOSPassword -accessToken $accessToken -serialNumber $serialNumber -verbose 
+$global:pw = GetBIOSPassword -accessToken $accessToken -serialNumber $serialNumber
 
 exit 0
 $userPrincipalName = 'mahmoudz@gao.gov'
