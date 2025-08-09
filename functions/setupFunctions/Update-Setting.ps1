@@ -335,7 +335,7 @@ function Update-Setting()
         Write-Verbose "[$functionName] Created backup: $backupFile"
         
         # Save updated settings
-        $settingsObj | ConvertTo-Json -Depth 10 | Set-Content -Path $SettingsFile -Force
+        $settingsObj | ConvertTo-Json -Depth $jsonDepth | Set-Content -Path $SettingsFile -Force
         
         # Verify the update based on setting type
         $verifyContent = Get-Content -Path $SettingsFile -Raw -Force
