@@ -38,6 +38,12 @@ try {
     
     Write-Host "Loaded $loadedCount functions" -ForegroundColor Green
     
+    # Set up global variables needed by the functions
+    $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+    $global:logFile = Join-Path $tempDir "test.log"
+    $global:LogFile = Join-Path $tempDir "test.log"
+    $global:jsonDepth = 10
+    
     Write-Host "`n2. Testing default settings structure retrieval..." -ForegroundColor Cyan
     
     # Test getting default settings

@@ -43,6 +43,11 @@ try {
     
     Write-Host "Functions loaded: $functionCount, Errors: $functionErrors" -ForegroundColor Green
     
+    # Set up global variables needed by the functions
+    $global:logFile = Join-Path $tempPath "test.log"
+    $global:LogFile = Join-Path $tempPath "test.log"
+    $global:jsonDepth = 10
+    
     # Create test settings file
     $testSettings = @{
         globalSettings = @{

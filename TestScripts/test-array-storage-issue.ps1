@@ -27,6 +27,12 @@ if (Test-Path $functionsFolder) {
     exit 1
 }
 
+# Set up global variables needed by the functions
+$tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+$global:logFile = Join-Path $tempDir "test.log"
+$global:LogFile = Join-Path $tempDir "test.log"
+$global:jsonDepth = 10
+
 $psInfo = Test-PowerShellVersion
 Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor Cyan
 
