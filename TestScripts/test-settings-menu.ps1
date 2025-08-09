@@ -57,7 +57,7 @@ try {
     # Test if settings menu functions are available
     $settingsMenuFunctions = @(
         "Show-SettingsMenu",
-        "Update-GlobalSetting",
+        "Update-Setting",
         "Update-AuthSetting"
     )
     

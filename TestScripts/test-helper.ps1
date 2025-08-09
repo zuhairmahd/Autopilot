@@ -98,12 +98,18 @@ function Initialize-TestEnvironment {
     
     if (-not $RootPath) {
         $RootPath = Split-Path -Parent $PSScriptRoot
+        if (-not $RootPath) {
+            $RootPath = $PWD
+        }
     }
     
     Write-TestSection "Initializing Test Environment: $TestName"
     
     # Set up global variables commonly used by functions
-    $global:LogFile = "test.log"
+    $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+    $global:LogFile = Join-Path $tempDir "test.log"
+    $global:logFile = Join-Path $tempDir "test.log"  # Add lowercase version for compatibility
+    $global:jsonDepth = 10  # Standard JSON depth for settings files
     $global:SettingsFilePath = Join-Path $RootPath "settings.json"
     $global:StringsFilePath = Join-Path $RootPath "strings.json"
     $global:ConfigPath = Join-Path $RootPath ".secrets\config.json"
@@ -305,6 +311,19 @@ function Write-TestSection {
     )
     
     Write-Host "`n=== $Title ===" -ForegroundColor $ForegroundColor
+}
+
+function Write-TestSubSection {
+    <#
+    .SYNOPSIS
+        Writes a test subsection header with PowerShell 5.1 compatibility
+    #>
+    param(
+        [string]$Title,
+        [string]$ForegroundColor = "Cyan"
+    )
+    
+    Write-Host "`n--- $Title ---" -ForegroundColor $ForegroundColor
 }
 
 function Start-UnifiedTest {

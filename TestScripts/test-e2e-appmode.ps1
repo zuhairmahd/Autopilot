@@ -41,7 +41,7 @@ try {
     $functions = @(
         "$wizardPath\Get-AppModeConfigurationFromUser.ps1",
         "$wizardPath\Start-FirstRunWizard.ps1",
-        "$PSScriptRoot\..\functions\setupFunctions\Update-GlobalSetting.ps1"
+        "$PSScriptRoot\..\functions\setupFunctions\Update-Setting.ps1"
     )
     
     $functionsLoaded = 0
@@ -93,8 +93,8 @@ try {
     Write-TestResult "Initial settings file created" $true
     
     # Test updating app mode setting
-    if (Get-Command Update-GlobalSetting -ErrorAction SilentlyContinue) {
-        $updateResult = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "appMode" -SettingValue "helpDesk"
+    if (Get-Command Update-Setting -ErrorAction SilentlyContinue) {
+        $updateResult = Update-Setting -SettingType "Global" -SettingsFile $settingsFile -SettingName "appMode" -SettingValue "helpDesk"
         if ($updateResult) {
             Write-TestResult "App mode setting updated successfully" $true
             
@@ -109,7 +109,7 @@ try {
             Write-TestResult "Failed to update app mode setting" $false
         }
     } else {
-        Write-TestResult "Update-GlobalSetting function not available" $false
+        Write-TestResult "Update-Setting function not available" $false
     }
     
     Write-TestSection "Step 4: Testing App Mode Validation Logic"
@@ -123,8 +123,8 @@ try {
         $validationTests += $isValid
         
         # Also test updating to each mode
-        if (Get-Command Update-GlobalSetting -ErrorAction SilentlyContinue) {
-            $modeUpdateResult = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $mode
+        if (Get-Command Update-Setting -ErrorAction SilentlyContinue) {
+            $modeUpdateResult = Update-Setting -SettingType "Global" -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $mode
             $validationTests += $modeUpdateResult
         }
     }
@@ -144,7 +144,7 @@ try {
         $patterns = @{
             "App mode menu item" = "Change App Mode setting"
             "App mode validation" = "appMode.*notin.*@\("
-            "Update function call" = "Update-GlobalSetting.*appMode"
+            "Update function call" = "Update-Setting.*appMode"
             "Restart prompt" = "restart.*application"
         }
         
@@ -168,8 +168,8 @@ try {
     $persistenceTests = @()
     
     foreach ($mode in $testModes) {
-        if (Get-Command Update-GlobalSetting -ErrorAction SilentlyContinue) {
-            $updateSuccess = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $mode
+        if (Get-Command Update-Setting -ErrorAction SilentlyContinue) {
+            $updateSuccess = Update-Setting -SettingType "Global" -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $mode
             
             if ($updateSuccess) {
                 # Verify the setting was saved

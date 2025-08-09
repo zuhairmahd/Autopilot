@@ -36,6 +36,7 @@ try {
     
     # Load core functions
     $coreFiles = @(
+        'functions/utilityFunctions/Write-Log.ps1',
         'functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1',
         'functions/setupFunctions/Test-AuthDefaults.ps1',
         'functions/setupFunctions/Update-Setting.ps1'
@@ -52,6 +53,12 @@ try {
             }
         }
     }
+    
+    # Set up global variables needed by the functions
+    $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+    $global:logFile = Join-Path $tempDir "test.log"
+    $global:LogFile = Join-Path $tempDir "test.log"
+    $global:jsonDepth = 10
 
     Write-Host "`n=== Test 3: Auth Defaults Functionality ===" -ForegroundColor Cyan
     

@@ -125,16 +125,14 @@ try {
         Write-TestResult "Settings file not found" $false
     }
     
-    Write-TestSection "Testing Update-GlobalSetting Function for App Mode"
+    Write-TestSection "Testing Update-Setting Function for App Mode"
     
-    # Load the Update-GlobalSetting function
-    $updateFunction = "$PSScriptRoot\..\functions\setupFunctions\Update-GlobalSetting.ps1"
-    if (Test-Path $updateFunction) {
-        . $updateFunction
-        Write-TestResult "Update-GlobalSetting function loaded" $true
+    # Test updating app mode setting using Update-Setting
+    if (Get-Command Update-Setting -ErrorAction SilentlyContinue) {
+        Write-TestResult "Update-Setting function available" $true
         
         # Test updating app mode setting
-        $updateResult = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "appMode" -SettingValue "helpDesk"
+        $updateResult = Update-Setting -SettingType "Global" -SettingsFile $settingsFile -SettingName "appMode" -SettingValue "helpDesk"
         if ($updateResult) {
             Write-TestResult "App mode setting updated successfully" $true
             
@@ -149,7 +147,7 @@ try {
             Write-TestResult "Failed to update app mode setting" $false
         }
     } else {
-        Write-TestResult "Update-GlobalSetting function file not found" $false
+        Write-TestResult "Update-Setting function not available" $false
     }
     
     Write-TestSection "Testing First Run Wizard Integration"
@@ -167,7 +165,7 @@ try {
         }
         
         # Check if app mode setting is saved
-        if ($wizardContent -match 'appMode.*Update-GlobalSetting') {
+        if ($wizardContent -match 'appMode.*Update-Setting') {
             Write-TestResult "First Run Wizard saves app mode setting" $true
         } else {
             Write-TestResult "First Run Wizard does not save app mode setting" $false
@@ -190,11 +188,11 @@ try {
             Write-TestResult "Main script does not include app mode menu item" $false
         }
         
-        # Check if menu item uses Update-GlobalSetting
-        if ($mainContent -match "Update-GlobalSetting.*appMode" -or $mainContent -match "appMode.*Update-GlobalSetting") {
-            Write-TestResult "App mode menu item uses Update-GlobalSetting function" $true
+        # Check if menu item uses Update-Setting
+        if ($mainContent -match "Update-Setting.*appMode" -or $mainContent -match "appMode.*Update-Setting") {
+            Write-TestResult "App mode menu item uses Update-Setting function" $true
         } else {
-            Write-TestResult "App mode menu item does not use Update-GlobalSetting function" $false
+            Write-TestResult "App mode menu item does not use Update-Setting function" $false
         }
     } else {
         Write-TestResult "Main script file not found" $false

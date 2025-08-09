@@ -59,19 +59,19 @@ try {
     # Test 1: Update with identical array
     Write-TestSubSection "Test 1: Update with identical array"
     $identicalScope = @("offline_access", "openid")
-    $result1 = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $identicalScope -Verbose
+    $result1 = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $identicalScope -Verbose
     Write-TestResult "Identical array update" -Success $result1
     
     # Test 2: Update with different array
     Write-TestSubSection "Test 2: Update with different array"
     $differentScope = @("offline_access", "openid", "Device.ReadWrite.All")
-    $result2 = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $differentScope -Verbose
+    $result2 = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $differentScope -Verbose
     Write-TestResult "Different array update" -Success $result2
     
     # Test 3: Update with single item array
     Write-TestSubSection "Test 3: Update with single item array"
     $singleScope = @("offline_access")
-    $result3 = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $singleScope -Verbose
+    $result3 = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $singleScope -Verbose
     Write-TestResult "Single item array update" -Success $result3
     
     # Test 4: Verify final state
