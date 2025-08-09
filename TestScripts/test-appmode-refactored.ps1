@@ -10,6 +10,19 @@ try {
     # Load test helper functions
     . "$PSScriptRoot\test-helper.ps1"
     
+    # Load all functions at script level (same as main.ps1)
+    $functionsFolder = "$PWD\functions"
+    if (Test-Path $functionsFolder) {
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
+        foreach ($function in $functions) {
+            . $function.FullName
+        }
+        Write-TestResult "Functions loaded successfully" $true
+    } else {
+        Write-TestResult "Functions folder not found" $false
+        exit 1
+    }
+    
     # Initialize unified test environment
     $testContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder
     
@@ -33,11 +46,9 @@ try {
     
     Write-TestResult "Test directories created" $true
     
-    # Load the refactored function
-    $functionPath = "$PSScriptRoot\..\functions\setupFunctions\FirstRunWizardFunctions\Get-AppModeConfigurationFromUser.ps1"
-    if (Test-Path $functionPath) {
-        . $functionPath
-        Write-TestResult "Get-AppModeConfigurationFromUser function loaded" $true
+    # Check if the function is available (already loaded with all functions)
+    if (Get-Command "Get-AppModeConfigurationFromUser" -ErrorAction SilentlyContinue) {
+        Write-TestResult "Get-AppModeConfigurationFromUser function available" $true
     } else {
         Write-TestResult "Get-AppModeConfigurationFromUser function not found" $false
         Complete-UnifiedTest $testContext
@@ -94,7 +105,7 @@ try {
     Write-TestResult "All results have correct structure" $allHaveCorrectStructure
     Write-TestResult "All results are hashtables" ($results | ForEach-Object { $_ -is [hashtable] } | Where-Object { -not $_ }).Count -eq 0
     
-    Write-TestSection "Testing Integration with Update-GlobalSetting"
+    Write-TestSection "Testing Integration with Update-Setting"
     
     # Create test settings file
     $testSettings = @{
@@ -110,29 +121,18 @@ try {
     $testSettings | ConvertTo-Json -Depth 5 | Out-File -FilePath $settingsFile -Encoding UTF8
     Write-TestResult "Test settings file created" $true
     
-    # Load Update-GlobalSetting function
-    $updateFunctionPath = "$PSScriptRoot\..\functions\setupFunctions\Update-GlobalSetting.ps1"
-    if (Test-Path $updateFunctionPath) {
-        . $updateFunctionPath
-        Write-TestResult "Update-GlobalSetting function loaded" $true
-    } else {
-        Write-TestResult "Update-GlobalSetting function not found" $false
-        Complete-UnifiedTest $testContext
-        exit 1
-    }
-    
     # Test updating with function result
     $configResult = Get-AppModeConfigurationFromUser -Silent
-    $updateSuccess = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $configResult.appMode
-    Write-TestResult "Function result integrates with Update-GlobalSetting" $updateSuccess
+    $updateSuccess = Update-Setting -SettingType "Global" -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $configResult.appMode
+    Write-TestResult "Function result integrates with Update-Setting" $updateSuccess
     
     # Test different app modes
     $testModes = @('helpDesk', 'advanced', 'admin', 'custom')
     $modeTestsPassed = 0
     
     foreach ($mode in $testModes) {
-        # Simulate function returning different modes by testing the Update-GlobalSetting directly
-        $modeUpdateSuccess = Update-GlobalSetting -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $mode
+        # Simulate function returning different modes by testing the Update-Setting directly
+        $modeUpdateSuccess = Update-Setting -SettingType "Global" -SettingsFile $settingsFile -SettingName "appMode" -SettingValue $mode
         if ($modeUpdateSuccess) {
             # Verify the setting was actually saved
             $verifyContent = Get-Content -Path $settingsFile -Raw | ConvertFrom-Json

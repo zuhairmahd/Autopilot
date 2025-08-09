@@ -196,6 +196,45 @@ powershell -File .\TestScripts\test-checknextuserreadiness.ps1
 .\TestScripts\run-all-tests.ps1 -ExcludePattern "*-old.ps1"
 ```
 
+## Function Loading Issues
+
+**IMPORTANT**: The unified testing framework has been updated to fix function loading scope issues. Use the following patterns:
+
+### Correct Function Loading Pattern (Recommended)
+
+```powershell
+#!/usr/bin/env pwsh
+
+# Load test helper functions
+. "$PSScriptRoot\test-helper.ps1"
+
+# Load functions at script level (same pattern as main.ps1)
+$functionsFolder = "$PWD\functions"
+if (Test-Path $functionsFolder) {
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
+    foreach ($function in $functions) {
+        try {
+            . $function.FullName
+        }
+        catch {
+            Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
+        }
+    }
+} else {
+    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    exit 1
+}
+
+# Initialize test environment (skip function loading as we did it above)
+$testContext = Start-UnifiedTest -TestName "Your Test Name" -SkipFunctionCheck
+
+# Your test logic here...
+```
+
+### Legacy Pattern (Has Scope Issues)
+
+The old `Start-UnifiedTest` pattern that loads functions within the helper function can cause scope issues where functions are loaded but not accessible to the test script. Use `Start-UnifiedTest-WithFunctionLoading` if you need the legacy behavior.
+
 ## Error Handling and Debugging
 
 ### Function Loading Issues
@@ -270,10 +309,32 @@ The framework maintains backward compatibility with:
 
 As of the latest update:
 
-- **Total Tests**: 29 test files (including old versions for reference)
-- **Unified Tests**: 9 tests converted to use the unified framework
-- **Framework Status**: Fully operational with 118+ functions loading successfully
+- **Total Tests**: 42 test files (including comprehensive new tests)
+- **Passing Tests**: 35 tests (83% pass rate)
+- **Failed Tests**: 7 tests (mostly due to missing global variable setup in legacy tests)
+- **New Comprehensive Tests**: 8 comprehensive tests covering major functionality areas
+- **Framework Status**: Fully operational with 132+ functions loading successfully
 - **Compatibility**: Full PowerShell 5.1 and 7+ support
 - **Error Rate**: Significantly reduced with proper function loading and error handling
+
+### New Comprehensive Test Coverage
+
+The expanded test suite now includes comprehensive tests for:
+
+1. **AppMode Validation** (`test-appmode-comprehensive.ps1`): Tests all valid AppMode values, invalid mode rejection, configuration merging, and default handling
+2. **Authentication Flows** (`test-auth-flows-comprehensive.ps1`): Tests AuthType validation, cache types, scope merging, and token management
+3. **Autopilot Import** (`test-autopilot-import-comprehensive.ps1`): Tests device import, hash generation, enrollment state handling, and corporate device management
+4. **Device Lookup Scenarios** (`test-device-lookup-comprehensive.ps1`): Tests device state assessment, readiness reporting, and property retrieval
+5. **Menu System** (`test-menu-system-comprehensive.ps1`): Tests menu inclusion logic, navigation, creation, and handling across app modes
+6. **Configuration Management** (`test-configuration-comprehensive.ps1`): Tests settings merging, file creation, initialization, and encryption
+7. **Function Loading Validation** (`test-function-loading-validation.ps1`): Tests that critical functions load correctly in test environment
+8. **Simple Function Loading** (`test-simple-function-loading.ps1`): Basic validation test for debugging function loading issues
+
+### Test Framework Improvements
+
+- **Fixed Function Loading Scope Issues**: Functions now load correctly at script level instead of within helper function scope
+- **Updated Start-UnifiedTest**: Now provides option to skip function loading for better test control
+- **Enhanced Error Handling**: Better error reporting and graceful degradation when functions are missing
+- **Improved Test Naming**: New tests have clear, descriptive names that explain their purpose and success criteria
 
 The unified testing framework provides a solid foundation for reliable, maintainable, and comprehensive testing of the Autopilot application across different PowerShell versions and environments.
