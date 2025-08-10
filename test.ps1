@@ -536,10 +536,12 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+$global:assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName 'autopilot' -IncludeBeta -verbose
+
+
+exit 0 
 $serialNumber = '5R3SBZ3'
 $global:pw = GetBIOSPassword -accessToken $accessToken -serialNumber $serialNumber
-
-exit 0
 $userPrincipalName = 'mahmoudz@gao.gov'
 $userRegisteredDeviceURI = "users/$($userPrincipalName)/registeredDevices"
 $global:myDevices = CallGraphAPI -ResourcePath $userRegisteredDeviceURI -AccessToken $accessToken
