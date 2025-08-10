@@ -2,7 +2,7 @@ name: PowerShell CI/CD
 
 on:
   push:
-    branches: [ master, dev ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -10,7 +10,30 @@ permissions:
   contents: read
 
 jobs:
+  tests:
+    name: Run PowerShell Tests (Windows, pwsh)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: |
+          Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -lt 7) {
+            Write-Error "PowerShell 7+ is required."
+            exit 1
+          }
+
+      - name: Run test suite
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\run-all-tests.ps1 -ShowVerbose
+
   code-analysis:
+    needs: [tests]
     runs-on: windows-latest
     steps:
     - name: Checkout code
