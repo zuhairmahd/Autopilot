@@ -93,7 +93,11 @@ function GetGroupIdsByNames()
                 if ($script:GroupCache.ContainsKey($nameCacheKey)) {
                     # Get the ID from cache, then get the name
                     $cachedId = $script:GroupCache[$nameCacheKey]
-                    $idCacheKey = "id:$cachedId"
+                    if ($cachedId -like "id:*") {
+                        $idCacheKey = $cachedId
+                    } else {
+                        $idCacheKey = "id:$cachedId"
+                    }
                     if ($script:GroupCache.ContainsKey($idCacheKey)) {
                         $result += $script:GroupCache[$idCacheKey]
                     } else {
