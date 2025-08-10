@@ -4,9 +4,7 @@ function ShowGroupAssignments()
     param (
         [Parameter(Mandatory = $true)]
         [string]$GroupName,
-        [string]$accessToken,
-        [ValidateSet('Application', 'Autopilot', 'Compliance', 'Configuration', 'All')]
-        [string]$AssignmentType = 'All'
+        [string]$accessToken
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -36,11 +34,44 @@ function ShowGroupAssignments()
         Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$GroupName'." -logLevel "Warning"
         return $returnValues.noGroupAssignmentsFoundMessage
     }
-    # Filter assignments by type
-    if ($AssignmentType -ne 'All')
+    #Create Assignments menu
+    
+    #region Group Assignments
+    $groupAssignmentsMenu = NewMenu -Title "Group Assignments Menu" -Description "What type of assignments would you like to see?"
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Application Assignments" -Action {
+        Write-Host "Selected Assignment Type: Application"
+        return 'Application'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Configurations" -Action {
+        Write-Host "Selected Assignment Type: Configuration"
+        return 'Configuration'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Compliance Policies" -Action {
+        Write-Host "Selected Assignment Type: Compliance"
+        return 'Compliance'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Autopilot Profiles" -Action {
+        Write-Host "Selected Assignment Type: Autopilot"
+        return 'Autopilot'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments" -Action {
+        Write-Host "Displaying all assignments"
+        return 'All'
+    } -returnsValue
+    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu
+    #endregion Group Assignments
+    # Validate that we got a proper assignment, not a navigation option
+    if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
     {
-        $assignments = $assignments.allAssignments | Where-Object { $_.Type -eq $AssignmentType }
-        Write-Host "Found $($assignments.Count) assignments of type $AssignmentType"
+        Write-Verbose "[$functionName] ShowMenu returned navigation option: '$assignmentType', treating as navigation"
+        return $assignmentType
+    }
+
+    # Filter assignments by type
+    if ($assignmentType -ne 'All')
+    {
+        $assignments = @($assignments.allAssignments | Where-Object { $_.Type -eq $assignmentType })
+        Write-Host "Found $($assignments.Count) assignments of type $assignmentType"
     }
     else
     {
@@ -63,5 +94,4 @@ function ShowGroupAssignments()
             Write-Host "Intent: $($_.Intent)"
         }
     }
-    return $true
 }

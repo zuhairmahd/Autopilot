@@ -823,25 +823,6 @@ $exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would l
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
 $environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage your environment settings and configurations"
-$groupAssignmentsMenu = NewMenu -Title "Group Assignments Menu" -Description "Export Applications, Device Configurations, Compliance Policies and Autopilot Profiles Assigned to a groups"
-
-#region Group Assignments
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show App Assignments" -Action {
-    Write-Host "Place your code here"
-}
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Configurations" -Action {
-    Write-Host "Place your code here"
-}
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Compliance Policies" -Action {
-    Write-Host "Place your code here"
-}
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Autopilot Profiles" -Action {
-    Write-Host "Place your code here"
-}
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments" -Action {
-    Write-Host "Place your code here"
-}
-#endregion Group Assignments
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
@@ -1614,122 +1595,6 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
 }
 
-# Add View group assignments menu item to the Check menu
-$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action {
-    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    if ($null -eq $groupName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
-    
-    #region Check if the group exists first using unified GetEntraUser function
-    $groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar
-    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
-    if ($groupInfo.GetType().Name -eq 'String')
-    {
-        # Handle error messages from GetEntraUser
-        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
-        return $groupInfo
-    }
-    
-    $selectedGroup = $null
-    $substringSearch = $groupInfo[1]
-    $searchResults = $groupInfo[0]
-    
-    if ($null -ne $searchResults -and $substringSearch -eq $false)
-    {
-        # Exact match found
-        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value[0]
-        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
-    }
-    elseif ($null -ne $searchResults -and $substringSearch -eq $true)
-    {
-        # Similar matches found
-        Write-Host "Could not find an exact match for group '$groupName'."
-        if ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Found a group with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($searchResults.value.count) groups with similar names:"
-        }
-        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Is this the correct group?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($searchResults.value.count) matches:"
-        }
-        # Display group selection menu similar to user selection
-        Write-Host ""
-        for ($i = 0; $i -lt [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay); $i++)
-        {
-            $group = $searchResults.value[$i]
-            Write-Host "[$($i + 1)] $($group.displayName)" -ForegroundColor Yellow
-            if ($group.description)
-            {
-                Write-Host "    Description: $($group.description)" -ForegroundColor Gray
-            }
-        }
-        Write-Host "[B] Back to previous menu" -ForegroundColor Cyan
-        Write-Host "[M] Main menu" -ForegroundColor Cyan
-        Write-Host "[0] Exit" -ForegroundColor Red
-        Write-Host ""
-        
-        $choice = Read-Host "Please select a group (1-$([math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay)))"
-        
-        if ($choice -eq "B" -or $choice -eq "b" -or $choice -eq "Back" -or $choice -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($choice -eq "M" -or $choice -eq "m" -or $choice -eq "Main Menu" -or $choice -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($choice -eq 0 -or $choice -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        elseif ([int]$choice -ge 1 -and [int]$choice -le [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay))
-        {
-            $selectedGroup = $searchResults.value[[int]$choice - 1]
-            Write-Verbose "[$scriptName] User selected group: $($selectedGroup.displayName)"
-        }
-        else
-        {
-            Write-Host "Invalid selection. Please try again." -ForegroundColor Red
-            return $returnValues.backoutText
-        }
-    }
-    else
-    {
-        return $returnValues.noGroupFoundMessage
-    }
-    #endregion Check if the group exists first.
-    
-    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
-    
-    # Pause to let user read the information
-    Write-Host ""
-    Write-Host "Press any key to continue..." -ForegroundColor Green
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    
-    return $returnValues.backoutText
-}
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1926,13 +1791,115 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     }
 }
 $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
-    $groupName = GetUserInput -Message "Enter the group for which you would like to show assignments" -Prompt 'Please enter the group name' -InputType 'GroupName' -settings $settings
+    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText # Return to the previous menu
-    } 
-    ShowGroupAssignments -GroupName $groupName -AccessToken $accessToken
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        return $returnValues.backoutText
+    }
+    Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+    #region Check if the group exists first using unified GetEntraUser function
+    $groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar
+    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
+    if ($groupInfo.GetType().Name -eq 'String')
+    {
+        # Handle error messages from GetEntraUser
+        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
+        return $groupInfo
+    }
+    $selectedGroup = $null
+    $substringSearch = $groupInfo[1]
+    $searchResults = $groupInfo[0].value
+    Write-Host "Found $($searchResults.groups.count ) groups"
+
+    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
+    {
+        # Exact match found
+        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
+        $selectedGroup = $searchResults.value[0]
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    }
+    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
+    {
+        # Similar matches found
+        Write-Host "Could not find an exact match for group '$groupName'."
+        if ($searchResults.value.count -eq 1)
+        {
+            Write-Host "Found a group with a similar name."
+        }
+        else
+        {
+            Write-Host "Found $($searchResults.value.count) groups with similar names:"
+        }
+        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
+        {
+            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+        }
+        elseif ($searchResults.value.count -eq 1)
+        {
+            Write-Host "Is this the correct group?"
+        }
+        else
+        {
+            Write-Host "Displaying all $($searchResults.value.count) matches:"
+        }
+        # Display group selection menu similar to user selection
+        Write-Host ""
+        for ($i = 0; $i -lt [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay); $i++)
+        {
+            $group = $searchResults.value[$i]
+            Write-Host "[$($i + 1)] $($group.displayName)" -ForegroundColor Yellow
+            if ($group.description)
+            {
+                Write-Host "    Description: $($group.description)" -ForegroundColor Gray
+            }
+        }
+        Write-Host "[B] Back to previous menu" -ForegroundColor Cyan
+        Write-Host "[M] Main menu" -ForegroundColor Cyan
+        Write-Host "[0] Exit" -ForegroundColor Red
+        Write-Host ""
+        
+        $choice = Read-Host "Please select a group (1-$([math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay)))"
+        
+        if ($choice -eq "B" -or $choice -eq "b" -or $choice -eq "Back" -or $choice -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText
+        }
+        elseif ($choice -eq "M" -or $choice -eq "m" -or $choice -eq "Main Menu" -or $choice -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+            return "Main Menu"
+        }
+        elseif ($choice -eq 0 -or $choice -eq "0")
+        {
+            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+            return "EXIT_APPLICATION"
+        }
+        elseif ([int]$choice -ge 1 -and [int]$choice -le [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay))
+        {
+            $selectedGroup = $searchResults.value[[int]$choice - 1]
+            Write-Verbose "[$scriptName] User selected group: $($selectedGroup.displayName)"
+        }
+        else
+        {
+            Write-Host "Invalid selection. Please try again." -ForegroundColor Red
+            return $returnValues.backoutText
+        }
+    }
+    else
+    {
+        return $returnValues.noGroupFoundMessage
+    }
+    #endregion Check if the group exists first.
+    
+    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
+    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
+    ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
+    
+    # Pause to let user read the information
+    Write-Host ""
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {

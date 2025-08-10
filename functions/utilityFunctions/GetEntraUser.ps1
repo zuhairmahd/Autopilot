@@ -22,17 +22,29 @@ function GetEntraUser()
     {
         Write-Verbose "[$functionName] Attempting exact match for userPrincipalName: $Name"
         $Uri = "users/$Name"
-        $ExtraParameters = "select=givenName,surName,displayName,userPrincipalName,mail,id"
+        $ExtraParameters = "select=givenName,surname,displayName,userPrincipalName,mail,id"
+        $params = @{
+            AccessToken     = $accessToken
+            ResourcePath    = $Uri
+            ExtraParameters = $ExtraParameters
+        }
     }
     elseif ($ObjectType -eq 'Group')
     {
         Write-Verbose "[$functionName] Attempting exact match for group: $Name"
-        $Uri = "groups/$Name"
+        $Uri = "groups"
+        $filter = "displayName eq '$Name'"
         $ExtraParameters = "select=displayName,id"
+        $params = @{
+            AccessToken     = $accessToken
+            ResourcePath    = $Uri
+            Filter          = $filter
+            ExtraParameters = $ExtraParameters
+        }
     }
-    $Info = CallGraphAPI -accessToken $AccessToken -ResourcePath $Uri -extraParameters $ExtraParameters
-    Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
 
+    $Info = CallGraphAPI @params
+    Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
     if ($Info -notin 400, 401, 403, 404)
     {
         Write-Verbose "[$functionName] Exact match found for $($ObjectType): $Name"
@@ -51,7 +63,6 @@ function GetEntraUser()
     {
         Write-Verbose "[$functionName] Exact match failed with error code: $Info"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "$objectType lookup failed with error code: $Info" -LogLevel "Error"
-
         # Display appropriate error message to user based on error code
         switch ($Info)
         {
@@ -96,6 +107,7 @@ function GetEntraUser()
     # Step 2: If no exact match found, perform substring search using $search parameter if the $findSimilar switch is set
     if ($FindSimilar)
     {
+
         Write-Verbose "[$functionName] No exact match found (Error code: $Info). Performing substring search using Graph API search."
         if ($ObjectType -eq 'User') 
         {
@@ -121,6 +133,7 @@ function GetEntraUser()
         $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $filterExpression -extraParameters $ExtraParameters
         if ($fallbackResults -notin 400, 401, 403, 404 -and $fallbackResults.value -and $fallbackResults.value.Count -gt 0)
         {
+            Write-Verbose "[$functionName] Filter approach succeeded with $($fallbackResults.value.Count) results"
             $substringSearch = $true
             Write-Verbose "[$functionName] Filter approach succeeded with $($fallbackResults.value.Count) results"
             # Initialize filtered results array
@@ -128,8 +141,16 @@ function GetEntraUser()
             # Filter out excluded items
             foreach ($item in $fallbackResults.value)
             {
+                Write-Verbose "[$functionName] Processing $($ObjectType): $($item.displayName)"
                 #Check if the object is a duplicate record of a previous record
-                $uniqueKey = if ($ObjectType -eq 'User') { $item.userPrincipalName } else { $item.displayName }
+                $uniqueKey = if ($ObjectType -eq 'User')
+                {
+                    $item.userPrincipalName 
+                }
+                else
+                {
+                    $item.displayName 
+                }
                 Write-Verbose "[$functionName] Processing $($ObjectType): $($item.displayName) (Key: $uniqueKey)"
                 if ($filteredResults -contains $uniqueKey)
                 {
@@ -140,8 +161,10 @@ function GetEntraUser()
                 # Check exclusion patterns based on object type
                 if ($ObjectType -eq 'User')
                 {
+
                     Write-Verbose "Checking against $($settings.userPatternsToExclude.Count) user patterns to exclude."
                     if ($settings.userPatternsToExclude -and $settings.userPatternsToExclude.Count -gt 0)
+                 
                     {
                         foreach ($pattern in $settings.userPatternsToExclude)
                         {
@@ -234,5 +257,8 @@ function GetEntraUser()
             return $returnValues.noGroupFoundMessage
         }
     }
+    else 
+    {
+        Write-Verbose "[$functionName] Match Similar switch was not used."
+    }
 }
-
