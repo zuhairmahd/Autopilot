@@ -1679,7 +1679,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
                 Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
                 return "Main Menu"
             }
-            elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
+            elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0" -or $null -eq $possibleUserName)
             {
                 Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
                 return "EXIT_APPLICATION"

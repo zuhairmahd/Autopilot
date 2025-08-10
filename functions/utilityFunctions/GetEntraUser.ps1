@@ -121,15 +121,15 @@ function GetEntraUser()
             # Filter out excluded users
             foreach ($item in $fallbackResults.value)
             {
-                #Check if the user is a duplicate record of a previous record
-                Write-Verbose "[$functionName] Processing user: $($item.displayName) ($($item.userPrincipalName))"
+                #Check if the object is a duplicate record of a previous record
+                Write-Verbose "[$functionName] Processing $($objectType): $($item.displayName) ($($item.userPrincipalName))"
                 if ($filteredResults -contains $item.userPrincipalName -or $filteredResults -contains $item.displayName)
                 {
                     Write-Verbose "[$functionName] $objectType $($item.displayName) is a duplicate, skipping."
                     continue
                 }
-                $excludeUser = $false
-                # Check if any of the exclusion patterns match this user
+                $excludeItem = $false
+                # Check if any of the exclusion patterns match this item
                 Write-Verbose "Checking against $($settings.userPatternsToExclude.Count) patterns to exclude."
                 if ($settings.userPatternsToExclude -and $settings.userPatternsToExclude.Count -gt 0)
                 {
@@ -138,24 +138,37 @@ function GetEntraUser()
                         Write-Verbose "[$functionName] Checking $($objectType): $($item.displayName) ($($item.userPrincipalName)) against exclusion pattern: $pattern"
                         if ($item.userPrincipalName.Contains($pattern) -or $item.displayName -match $pattern)
                         {
-                            # If the user matches any exclusion pattern, mark them for exclusion
+                            # If the item matches any exclusion pattern, mark them for exclusion
                             Write-Verbose "[$functionName] $($objectType) $($item.displayName) matches exclusion pattern: $pattern"
                             Write-Verbose "[$functionName] Excluding $($objectType): $($item.displayName) ($($item.userPrincipalName)) - Matched exclusion pattern: $pattern"
-                            $excludeUser = $true
+                            $excludeItem = $true
                             break
                         }
                     }
                 }
                 # Add user to filtered results if not excluded
-                if (-not $excludeUser)
+                if (-not $excludeItem)
                 {
                     Write-Verbose "[$functionName] Including $($objectType): $($item.displayName) ($($item.userPrincipalName))"
-                    $filteredUsers += $item
+                    $filteredResults += $item
                 }
-            }            # Create a response object in the same format as the original Graph API response
-            $filteredResponse = [PSCustomObject]@{
-                '@odata.context' = $fallbackResults.'@odata.context'
-                value            = @($filteredResults | Sort-Object -Property userPrincipalName -Unique)  # Force array creation
+            }            
+            # Create a response object in the same format as the original Graph API response
+            if ($ObjectType -eq 'User')
+            {
+                Write-Verbose "[$functionName] Filtering results to unique users based on userPrincipalName"
+                $filteredResponse = [PSCustomObject]@{
+                    '@odata.context' = $fallbackResults.'@odata.context'
+                    value            = @($filteredResults | Sort-Object -Property userPrincipalName -Unique)  
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Filtering results to unique groups based on displayName"
+                $filteredResponse = [PSCustomObject]@{
+                    '@odata.context' = $fallbackResults.'@odata.context'
+                    value            = @($filteredResults | Sort-Object -Property displayName -Unique)
+                }
             }
             Write-Verbose "[$functionName] Filtered results to $($filteredResponse.value.Count) unique objects after exclusions"
             return $filteredResponse, $substringSearch
@@ -175,8 +188,16 @@ function GetEntraUser()
     }
     else
     {
-        Write-Verbose "[$functionName] No matches found for userPrincipalName: $UserName"
-        return $returnValues.noUserFoundInDirectoryMessage
+        if ($objectType -eq 'User')
+        {
+            Write-Verbose "[$functionName] No matches found for userPrincipalName: $UserName"
+            return $returnValues.noUserFoundInDirectoryMessage
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No matches found for groupName: $GroupName"
+            return $returnValues.noGroupFoundMessage
+        }
     }
 }
 
