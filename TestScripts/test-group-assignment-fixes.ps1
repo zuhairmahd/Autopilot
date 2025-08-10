@@ -139,14 +139,14 @@ function Test-CodePatterns {
         $hasArrayWrapping = $directContent -match '\$groupIdArray = @\(\$groupIds\)'
         $hasSafeIndexing = $directContent -match '\$groupId = \$groupIdArray\[0\]'
         
-        # Check GetGroupIdsByNames for PS 5.1 compatible hashtable construction
+        # Check GetGroupIdsByNames for simplified implementation (no complex hashtable construction needed)
         $idsContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupIdsByNames.ps1" -Raw
-        $hasCompatibleConstruction = $idsContent -match '\$result = @\{\}' -and $idsContent -match '\$result\[''ResolvedIds''\]'
+        $hasSimplifiedImplementation = $idsContent -match 'Initialize session cache' -and $idsContent -notmatch 'Resolve-FromIndex'
         
         $patterns = @{
             'Array wrapping in GetGroupDirectAssignments' = $hasArrayWrapping
             'Safe indexing in GetGroupDirectAssignments' = $hasSafeIndexing
-            'PS 5.1 compatible hashtable in GetGroupIdsByNames' = $hasCompatibleConstruction
+            'Simplified implementation in GetGroupIdsByNames' = $hasSimplifiedImplementation
         }
         
         $allPatternsPresent = $true
