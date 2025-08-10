@@ -1594,6 +1594,114 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
+$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action {
+    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        return $returnValues.backoutText
+    }
+    Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+    #region Check if the group exists first.
+    $groupInfo = GetEntraGroup -GroupName $groupName -AccessToken $accessToken -findSimilar
+    Write-Verbose "[$scriptName] Substring search: $($groupInfo)"
+    Write-Verbose "[$scriptName] Group info returned: $($groupInfo[0].value.count) groups."
+    Write-Verbose "[$scriptName] Group info: $($groupInfo | ConvertTo-Json -Depth $maxJSONDepth)"
+    if ($null -ne $groupInfo -and $groupInfo[1] -eq $false)
+    {
+        Write-Host "Found group: $($groupInfo[0].value[0].displayName) ($($groupInfo[0].value[0].id))"
+        $selectedGroup = $groupInfo[0].value[0]
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    }
+    elseif ($null -ne $groupInfo -and $groupInfo[1] -eq $true)
+    {
+        Write-Host "Could not find an exact match for group $($groupName)."
+        if ($groupInfo[0].value.count -eq 1)
+        {
+            Write-Host "Found a group with a similar name."
+        }
+        else
+        {
+            Write-Host "Found $($($groupInfo[0].value.count)) groups with similar names:"
+        }
+        if ($($groupInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+        {
+            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+        }
+        elseif ($($groupInfo[0].value.count) -eq 1)
+        {
+            Write-Host "Is this the correct group?"
+        }
+        else
+        {
+            Write-Host "Displaying all $($groupInfo[0].value.count) matches:"
+        }
+        # Display group selection menu similar to user selection
+        Write-Host ""
+        for ($i = 0; $i -lt [math]::Min($groupInfo[0].value.count, [int]$settings.maxUserMatchDisplay); $i++)
+        {
+            $group = $groupInfo[0].value[$i]
+            Write-Host "[$($i + 1)] $($group.displayName)" -ForegroundColor Yellow
+            if ($group.description)
+            {
+                Write-Host "    Description: $($group.description)" -ForegroundColor Gray
+            }
+        }
+        Write-Host "[B] Back to previous menu" -ForegroundColor Cyan
+        Write-Host "[M] Main menu" -ForegroundColor Cyan
+        Write-Host "[0] Exit" -ForegroundColor Red
+        Write-Host ""
+        
+        $choice = Read-Host "Please select a group (1-$([math]::Min($groupInfo[0].value.count, [int]$settings.maxUserMatchDisplay)))"
+        
+        if ($choice -eq "B" -or $choice -eq "b" -or $choice -eq "Back" -or $choice -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText
+        }
+        elseif ($choice -eq "M" -or $choice -eq "m" -or $choice -eq "Main Menu" -or $choice -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+            return "Main Menu"
+        }
+        elseif ($choice -eq 0 -or $choice -eq "0")
+        {
+            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+            return "EXIT_APPLICATION"
+        }
+        elseif ([int]$choice -ge 1 -and [int]$choice -le [math]::Min($groupInfo[0].value.count, [int]$settings.maxUserMatchDisplay))
+        {
+            $selectedGroup = $groupInfo[0].value[[int]$choice - 1]
+            Write-Verbose "[$scriptName] User selected group: $($selectedGroup.displayName)"
+        }
+        else
+        {
+            Write-Host "Invalid selection. Please try again." -ForegroundColor Red
+            return $returnValues.backoutText
+        }
+    }
+    elseif ($groupInfo -eq $returnValues.noGroupFoundInDirectoryMessage)
+    {
+        return $groupInfo
+    }
+    else
+    {
+        return $returnValues.noGroupFoundInDirectoryMessage
+    }
+    #endregion Check if the group exists first.
+    
+    # Call ShowGroupAssignments to display the group's assignments
+    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
+    ShowGroupAssignments -AccessToken $accessToken -GroupId $selectedGroup.id -GroupName $selectedGroup.displayName
+    
+    # Pause to let user read the information
+    Write-Host ""
+    Write-Host "Press any key to continue..." -ForegroundColor Green
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    
+    return $returnValues.backoutText
+}
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'

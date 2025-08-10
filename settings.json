@@ -263,6 +263,15 @@
                     "name": "Lookup device by User",
                     "type": "action",
                     "includeInDisplayModes": []
+                },
+                {
+                    "description": "View group assignments for Intune policies and applications",
+                    "name": "View group assignments",
+                    "type": "action",
+                    "includeInDisplayModes": [
+                        "helpdesk",
+                        "advanced"
+                    ]
                 }
             ],
             "type": "submenu",

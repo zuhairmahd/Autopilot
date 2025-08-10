@@ -20,6 +20,7 @@
         "invalidFileType": "Invalid file type.",
         "EnrolledMessage": "The device is enrolled.",
         "noUserFoundInDirectoryMessage": "This user does not exist",
+        "noGroupFoundInDirectoryMessage": "This group does not exist",
         "deviceAssignmentPendingMessage": "The device is pending assignment to a deployment profile.",
         "deviceDeleteSuccessMessage": "The device was deleted successfully.",
         "deviceSyncFailedMessage": "The device sync failed.",
