@@ -62,11 +62,6 @@ function ShowGroupAssignments()
     $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
     #endregion Group Assignments
     
-    # Always pop the submenu from the stack when we're done with it, regardless of the result
-    Write-Verbose "[$functionName] Popping group assignments submenu from stack"
-    $poppedMenu = Pop-MenuFromStack
-    Write-Verbose "[$functionName] Popped menu: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })"
-    
     # Validate that we got a proper assignment, not a navigation option
     if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
     {
