@@ -59,31 +59,45 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion" -logLevel "Information"
     
     try {
-        # Get App Assignments
-        Write-Verbose "[$functionName] Getting app assignments for group ID: $groupId"
-        Write-Log -logFile $LogFile -module $functionName -Message "Getting app assignments for group ID: $groupId" -logLevel "Information"
+        # Get App Assignments - First get all mobile apps, then check individual assignments
+        Write-Verbose "[$functionName] Getting mobile apps and their assignments for group ID: $groupId"
+        Write-Log -logFile $LogFile -module $functionName -Message "Getting mobile apps and their assignments for group ID: $groupId" -logLevel "Information"
         
         $appUri = "deviceAppManagement/mobileApps"
-        $appExtraParameters = "expand=assignments&filter=assignments/any(a: a/target/groupId eq '$groupId')"
+        $appExtraParameters = "select=id,displayName"
         
         $appResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $appUri -APIVersion $apiVersion -ExtraParameters $appExtraParameters
         
         if ($appResponse -and $appResponse.value) {
             foreach ($app in $appResponse.value) {
-                if ($app.assignments) {
-                    $relevantAssignments = $app.assignments | Where-Object { $_.target.groupId -eq $groupId }
-                    foreach ($assignment in $relevantAssignments) {
-                        $appAssignment = [PSCustomObject]@{
-                            Type = "Application"
-                            Name = $app.displayName
-                            Id = $app.id
-                            Intent = $assignment.intent
-                            Target = $assignment.target
-                            Settings = $assignment.settings
+                try {
+                    # Get assignments for this specific app
+                    $assignmentUri = "deviceAppManagement/mobileApps/$($app.id)/assignments"
+                    $assignmentResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentUri -APIVersion $apiVersion
+                    
+                    if ($assignmentResponse -and $assignmentResponse.value) {
+                        $relevantAssignments = $assignmentResponse.value | Where-Object { 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
+                            $_.target.groupId -eq $groupId 
                         }
-                        $assignments.AppAssignments += $appAssignment
-                        $assignments.AllAssignments += $appAssignment
+                        
+                        foreach ($assignment in $relevantAssignments) {
+                            $appAssignment = [PSCustomObject]@{
+                                Type = "Application"
+                                Name = $app.displayName
+                                Id = $app.id
+                                Intent = $assignment.intent
+                                Target = $assignment.target
+                                Settings = $assignment.settings
+                            }
+                            $assignments.AppAssignments += $appAssignment
+                            $assignments.AllAssignments += $appAssignment
+                        }
                     }
+                }
+                catch {
+                    Write-Verbose "[$functionName] Error getting assignments for app $($app.displayName): $($_.Exception.Message)"
+                    Write-Log -logFile $LogFile -module $functionName -Message "Error getting assignments for app $($app.displayName): $($_.Exception.Message)" -logLevel "Warning"
                 }
             }
             Write-Verbose "[$functionName] Found $($assignments.AppAssignments.Count) app assignments"
@@ -96,31 +110,45 @@ function GetGroupDirectAssignments()
     }
     
     try {
-        # Get Device Configuration Assignments
-        Write-Verbose "[$functionName] Getting device configuration assignments for group ID: $groupId"
-        Write-Log -logFile $LogFile -module $functionName -Message "Getting device configuration assignments for group ID: $groupId" -logLevel "Information"
+        # Get Device Configuration Assignments - First get all configurations, then check individual assignments
+        Write-Verbose "[$functionName] Getting device configurations and their assignments for group ID: $groupId"
+        Write-Log -logFile $LogFile -module $functionName -Message "Getting device configurations and their assignments for group ID: $groupId" -logLevel "Information"
         
         $configUri = "deviceManagement/deviceConfigurations"
-        $configExtraParameters = "expand=assignments&filter=assignments/any(a: a/target/groupId eq '$groupId')"
+        $configExtraParameters = "select=id,displayName"
         
         $configResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $configUri -APIVersion $apiVersion -ExtraParameters $configExtraParameters
         
         if ($configResponse -and $configResponse.value) {
             foreach ($config in $configResponse.value) {
-                if ($config.assignments) {
-                    $relevantAssignments = $config.assignments | Where-Object { $_.target.groupId -eq $groupId }
-                    foreach ($assignment in $relevantAssignments) {
-                        $configAssignment = [PSCustomObject]@{
-                            Type = "Configuration"
-                            Name = $config.displayName
-                            Id = $config.id
-                            Intent = $assignment.intent
-                            Target = $assignment.target
-                            Settings = $assignment.settings
+                try {
+                    # Get assignments for this specific configuration
+                    $assignmentUri = "deviceManagement/deviceConfigurations/$($config.id)/assignments"
+                    $assignmentResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentUri -APIVersion $apiVersion
+                    
+                    if ($assignmentResponse -and $assignmentResponse.value) {
+                        $relevantAssignments = $assignmentResponse.value | Where-Object { 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
+                            $_.target.groupId -eq $groupId 
                         }
-                        $assignments.ConfigurationAssignments += $configAssignment
-                        $assignments.AllAssignments += $configAssignment
+                        
+                        foreach ($assignment in $relevantAssignments) {
+                            $configAssignment = [PSCustomObject]@{
+                                Type = "Configuration"
+                                Name = $config.displayName
+                                Id = $config.id
+                                Intent = $assignment.intent
+                                Target = $assignment.target
+                                Settings = $assignment.settings
+                            }
+                            $assignments.ConfigurationAssignments += $configAssignment
+                            $assignments.AllAssignments += $configAssignment
+                        }
                     }
+                }
+                catch {
+                    Write-Verbose "[$functionName] Error getting assignments for configuration $($config.displayName): $($_.Exception.Message)"
+                    Write-Log -logFile $LogFile -module $functionName -Message "Error getting assignments for configuration $($config.displayName): $($_.Exception.Message)" -logLevel "Warning"
                 }
             }
             Write-Verbose "[$functionName] Found $($assignments.ConfigurationAssignments.Count) configuration assignments"
@@ -133,31 +161,45 @@ function GetGroupDirectAssignments()
     }
     
     try {
-        # Get Compliance Policy Assignments
-        Write-Verbose "[$functionName] Getting compliance policy assignments for group ID: $groupId"
-        Write-Log -logFile $LogFile -module $functionName -Message "Getting compliance policy assignments for group ID: $groupId" -logLevel "Information"
+        # Get Compliance Policy Assignments - First get all policies, then check individual assignments
+        Write-Verbose "[$functionName] Getting compliance policies and their assignments for group ID: $groupId"
+        Write-Log -logFile $LogFile -module $functionName -Message "Getting compliance policies and their assignments for group ID: $groupId" -logLevel "Information"
         
         $complianceUri = "deviceManagement/deviceCompliancePolicies"
-        $complianceExtraParameters = "expand=assignments&filter=assignments/any(a: a/target/groupId eq '$groupId')"
+        $complianceExtraParameters = "select=id,displayName"
         
         $complianceResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $complianceUri -APIVersion $apiVersion -ExtraParameters $complianceExtraParameters
         
         if ($complianceResponse -and $complianceResponse.value) {
             foreach ($policy in $complianceResponse.value) {
-                if ($policy.assignments) {
-                    $relevantAssignments = $policy.assignments | Where-Object { $_.target.groupId -eq $groupId }
-                    foreach ($assignment in $relevantAssignments) {
-                        $complianceAssignment = [PSCustomObject]@{
-                            Type = "Compliance"
-                            Name = $policy.displayName
-                            Id = $policy.id
-                            Intent = $assignment.intent
-                            Target = $assignment.target
-                            Settings = $assignment.settings
+                try {
+                    # Get assignments for this specific compliance policy
+                    $assignmentUri = "deviceManagement/deviceCompliancePolicies/$($policy.id)/assignments"
+                    $assignmentResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentUri -APIVersion $apiVersion
+                    
+                    if ($assignmentResponse -and $assignmentResponse.value) {
+                        $relevantAssignments = $assignmentResponse.value | Where-Object { 
+                            $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
+                            $_.target.groupId -eq $groupId 
                         }
-                        $assignments.ComplianceAssignments += $complianceAssignment
-                        $assignments.AllAssignments += $complianceAssignment
+                        
+                        foreach ($assignment in $relevantAssignments) {
+                            $complianceAssignment = [PSCustomObject]@{
+                                Type = "Compliance"
+                                Name = $policy.displayName
+                                Id = $policy.id
+                                Intent = $assignment.intent
+                                Target = $assignment.target
+                                Settings = $assignment.settings
+                            }
+                            $assignments.ComplianceAssignments += $complianceAssignment
+                            $assignments.AllAssignments += $complianceAssignment
+                        }
                     }
+                }
+                catch {
+                    Write-Verbose "[$functionName] Error getting assignments for compliance policy $($policy.displayName): $($_.Exception.Message)"
+                    Write-Log -logFile $LogFile -module $functionName -Message "Error getting assignments for compliance policy $($policy.displayName): $($_.Exception.Message)" -logLevel "Warning"
                 }
             }
             Write-Verbose "[$functionName] Found $($assignments.ComplianceAssignments.Count) compliance assignments"
@@ -170,32 +212,46 @@ function GetGroupDirectAssignments()
     }
     
     try {
-        # Get Autopilot Deployment Profile Assignments (if IncludeBeta)
+        # Get Autopilot Deployment Profile Assignments (if IncludeBeta) - First get all profiles, then check individual assignments
         if ($IncludeBeta.IsPresent) {
-            Write-Verbose "[$functionName] Getting Autopilot deployment profile assignments for group ID: $groupId"
-            Write-Log -logFile $LogFile -module $functionName -Message "Getting Autopilot deployment profile assignments for group ID: $groupId" -logLevel "Information"
+            Write-Verbose "[$functionName] Getting Autopilot deployment profiles and their assignments for group ID: $groupId"
+            Write-Log -logFile $LogFile -module $functionName -Message "Getting Autopilot deployment profiles and their assignments for group ID: $groupId" -logLevel "Information"
             
             $autopilotUri = "deviceManagement/windowsAutopilotDeploymentProfiles"
-            $autopilotExtraParameters = "expand=assignments&filter=assignments/any(a: a/target/groupId eq '$groupId')"
+            $autopilotExtraParameters = "select=id,displayName"
             
             $autopilotResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $autopilotUri -APIVersion $apiVersion -ExtraParameters $autopilotExtraParameters
             
             if ($autopilotResponse -and $autopilotResponse.value) {
                 foreach ($profile in $autopilotResponse.value) {
-                    if ($profile.assignments) {
-                        $relevantAssignments = $profile.assignments | Where-Object { $_.target.groupId -eq $groupId }
-                        foreach ($assignment in $relevantAssignments) {
-                            $autopilotAssignment = [PSCustomObject]@{
-                                Type = "AutopilotProfile"
-                                Name = $profile.displayName
-                                Id = $profile.id
-                                Intent = $assignment.intent
-                                Target = $assignment.target
-                                Settings = $assignment.settings
+                    try {
+                        # Get assignments for this specific Autopilot profile
+                        $assignmentUri = "deviceManagement/windowsAutopilotDeploymentProfiles/$($profile.id)/assignments"
+                        $assignmentResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $assignmentUri -APIVersion $apiVersion
+                        
+                        if ($assignmentResponse -and $assignmentResponse.value) {
+                            $relevantAssignments = $assignmentResponse.value | Where-Object { 
+                                $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
+                                $_.target.groupId -eq $groupId 
                             }
-                            $assignments.AutopilotAssignments += $autopilotAssignment
-                            $assignments.AllAssignments += $autopilotAssignment
+                            
+                            foreach ($assignment in $relevantAssignments) {
+                                $autopilotAssignment = [PSCustomObject]@{
+                                    Type = "AutopilotProfile"
+                                    Name = $profile.displayName
+                                    Id = $profile.id
+                                    Intent = $assignment.intent
+                                    Target = $assignment.target
+                                    Settings = $assignment.settings
+                                }
+                                $assignments.AutopilotAssignments += $autopilotAssignment
+                                $assignments.AllAssignments += $autopilotAssignment
+                            }
                         }
+                    }
+                    catch {
+                        Write-Verbose "[$functionName] Error getting assignments for Autopilot profile $($profile.displayName): $($_.Exception.Message)"
+                        Write-Log -logFile $LogFile -module $functionName -Message "Error getting assignments for Autopilot profile $($profile.displayName): $($_.Exception.Message)" -logLevel "Warning"
                     }
                 }
                 Write-Verbose "[$functionName] Found $($assignments.AutopilotAssignments.Count) Autopilot assignments"

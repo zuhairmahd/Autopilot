@@ -294,13 +294,13 @@ function GetGroupIdsByNames()
         {
             $items = @()
         }
-        elseif ($items -isnot [System.Collections.IEnumerable] -or $items -is [string])
+        elseif ($items -is [string] -or ($items.GetType().Name -notmatch 'Object\[\]|ArrayList|List'))
         {
             # Single primitive or string; not a valid object list
             $items = @($items)
         }
         # Filter out primitives (ints, guids without properties) that won't have id/displayName
-        $items = @($items | Where-Object { $_ -is [psobject] })
+        $items = @($items | Where-Object { $_ -and $_.PSObject -and $_.PSObject.Properties.Count -gt 0 })
         $itemCount = @($items).Count
         Write-Verbose "[$functionName] Processing $itemCount group item(s) from API response."
         Write-Log -logFile $LogFile -module $functionName -Message "Processing $itemCount group item(s) from API response." -logLevel "Information"
