@@ -537,8 +537,9 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$groupName = 'autopilot'
-ShowGroupAssignments -accessToken $accessToken -GroupName $groupName -AssignmentType 'All'
+$objectName = GetUserInput -Message "Enter the name of the object" -Prompt "Name?" -InputType 'groupName'
+$global:groupName = GetEntraUser -accessToken $accessToken -objectType 'Group' -Name $objectName -verbose 
+# ShowGroupAssignments -accessToken $accessToken -GroupName $groupName -AssignmentType 'All'
 
 
 exit 0
