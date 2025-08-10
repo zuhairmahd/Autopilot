@@ -823,6 +823,25 @@ $exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would l
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
 $environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage your environment settings and configurations"
+$groupAssignmentsMenu = NewMenu -Title "Group Assignments Menu" -Description "Export Applications, Device Configurations, Compliance Policies and Autopilot Profiles Assigned to a groups"
+
+#region Group Assignments
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show App Assignments" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Configurations" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Compliance Policies" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Autopilot Profiles" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments" -Action {
+    Write-Host "Place your code here"
+}
+#endregion Group Assignments
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
@@ -1594,6 +1613,8 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
+
+# Add View group assignments menu item to the Check menu
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
@@ -1603,45 +1624,56 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action
     }
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
-    #region Check if the group exists first.
-    $groupInfo = GetEntraGroup -GroupName $groupName -AccessToken $accessToken -findSimilar
-    Write-Verbose "[$scriptName] Substring search: $($groupInfo)"
-    Write-Verbose "[$scriptName] Group info returned: $($groupInfo[0].value.count) groups."
-    Write-Verbose "[$scriptName] Group info: $($groupInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-    if ($null -ne $groupInfo -and $groupInfo[1] -eq $false)
+    #region Check if the group exists first using unified GetEntraUser function
+    $groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar
+    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
+    if ($groupInfo.GetType().Name -eq 'String')
     {
-        Write-Host "Found group: $($groupInfo[0].value[0].displayName) ($($groupInfo[0].value[0].id))"
-        $selectedGroup = $groupInfo[0].value[0]
+        # Handle error messages from GetEntraUser
+        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
+        return $groupInfo
+    }
+    
+    $selectedGroup = $null
+    $substringSearch = $groupInfo[1]
+    $searchResults = $groupInfo[0]
+    
+    if ($null -ne $searchResults -and $substringSearch -eq $false)
+    {
+        # Exact match found
+        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
+        $selectedGroup = $searchResults.value[0]
         Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
     }
-    elseif ($null -ne $groupInfo -and $groupInfo[1] -eq $true)
+    elseif ($null -ne $searchResults -and $substringSearch -eq $true)
     {
-        Write-Host "Could not find an exact match for group $($groupName)."
-        if ($groupInfo[0].value.count -eq 1)
+        # Similar matches found
+        Write-Host "Could not find an exact match for group '$groupName'."
+        if ($searchResults.value.count -eq 1)
         {
             Write-Host "Found a group with a similar name."
         }
         else
         {
-            Write-Host "Found $($($groupInfo[0].value.count)) groups with similar names:"
+            Write-Host "Found $($searchResults.value.count) groups with similar names:"
         }
-        if ($($groupInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
         {
             Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
         }
-        elseif ($($groupInfo[0].value.count) -eq 1)
+        elseif ($searchResults.value.count -eq 1)
         {
             Write-Host "Is this the correct group?"
         }
         else
         {
-            Write-Host "Displaying all $($groupInfo[0].value.count) matches:"
+            Write-Host "Displaying all $($searchResults.value.count) matches:"
         }
         # Display group selection menu similar to user selection
         Write-Host ""
-        for ($i = 0; $i -lt [math]::Min($groupInfo[0].value.count, [int]$settings.maxUserMatchDisplay); $i++)
+        for ($i = 0; $i -lt [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay); $i++)
         {
-            $group = $groupInfo[0].value[$i]
+            $group = $searchResults.value[$i]
             Write-Host "[$($i + 1)] $($group.displayName)" -ForegroundColor Yellow
             if ($group.description)
             {
@@ -1653,7 +1685,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action
         Write-Host "[0] Exit" -ForegroundColor Red
         Write-Host ""
         
-        $choice = Read-Host "Please select a group (1-$([math]::Min($groupInfo[0].value.count, [int]$settings.maxUserMatchDisplay)))"
+        $choice = Read-Host "Please select a group (1-$([math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay)))"
         
         if ($choice -eq "B" -or $choice -eq "b" -or $choice -eq "Back" -or $choice -eq "back")
         {
@@ -1670,9 +1702,9 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action
             Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
             return "EXIT_APPLICATION"
         }
-        elseif ([int]$choice -ge 1 -and [int]$choice -le [math]::Min($groupInfo[0].value.count, [int]$settings.maxUserMatchDisplay))
+        elseif ([int]$choice -ge 1 -and [int]$choice -le [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay))
         {
-            $selectedGroup = $groupInfo[0].value[[int]$choice - 1]
+            $selectedGroup = $searchResults.value[[int]$choice - 1]
             Write-Verbose "[$scriptName] User selected group: $($selectedGroup.displayName)"
         }
         else
@@ -1681,19 +1713,15 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "View group assignments" -Action
             return $returnValues.backoutText
         }
     }
-    elseif ($groupInfo -eq $returnValues.noGroupFoundInDirectoryMessage)
-    {
-        return $groupInfo
-    }
     else
     {
-        return $returnValues.noGroupFoundInDirectoryMessage
+        return $returnValues.noGroupFoundMessage
     }
     #endregion Check if the group exists first.
     
-    # Call ShowGroupAssignments to display the group's assignments
+    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    ShowGroupAssignments -AccessToken $accessToken -GroupId $selectedGroup.id -GroupName $selectedGroup.displayName
+    ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
     
     # Pause to let user read the information
     Write-Host ""
@@ -1716,7 +1744,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         $hasCorrectNumberOfDevices = $false
         
         #region Check if the user exists first.
-        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+        $userInfo = GetEntraUser -Name $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
         Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
         Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
@@ -1767,7 +1795,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
                 Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
                 return "Main Menu"
             }
-            elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
+            elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0" -or $null -eq $possibleUserName)
             {
                 Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
                 return "EXIT_APPLICATION"
@@ -1896,6 +1924,15 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         Write-Verbose "[$scriptName] RestartDevice function failed."
         return $returnValues.backoutText
     }
+}
+$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+    $groupName = GetUserInput -Message "Enter the group for which you would like to show assignments" -Prompt 'Please enter the group name' -InputType 'GroupName' -settings $settings
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+        return $returnValues.backoutText # Return to the previous menu
+    } 
+    ShowGroupAssignments -GroupName $groupName -AccessToken $accessToken
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {

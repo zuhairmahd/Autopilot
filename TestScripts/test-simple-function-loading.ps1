@@ -12,6 +12,13 @@ param()
 
 Write-Host "=== Simple Function Loading Test ===" -ForegroundColor Cyan
 
+# Minimal environment initialization for tests that rely on Write-Log
+$logsFolder = Join-Path $PWD "Logs"
+if (-not (Test-Path $logsFolder)) {
+    New-Item -ItemType Directory -Path $logsFolder -Force | Out-Null
+}
+$global:logFile = Join-Path $logsFolder "simple-function-loading.log"
+
 # Load functions using the same pattern as main.ps1
 $functionsFolder = "$PWD\functions"
 if (Test-Path $functionsFolder) {

@@ -109,8 +109,9 @@ function validateInput()
         }
         default
         {
-            Write-Verbose "[$functionName] Unknown validation type: '$type'"
-            Write-Host "Unknown validation type: '$type'" -ForegroundColor Red
+            Write-Verbose "[$functionName] Unknown validation type: '$type'. Returning as is."
+            $returnValue.value = $UserInput
+            $returnValue.valid = $true
             return $returnValue
         }
     }
