@@ -536,7 +536,7 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$global:assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName 'autopilot' -IncludeBeta -verbose
+$global:assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName 'autopilot' -IncludeBeta
 
 
 exit 0 
