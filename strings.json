@@ -24,6 +24,8 @@
     "UpdateCancelledMessage": "The update was cancelled.",
     "deviceRestartFailedMessage": "The device restart failed.",
     "unknownErrorMessage": "An unknown error occurred.",
+    "noGroupFoundMessage": "No group found for the specified group name.",
+    "noGroupAssignmentsFoundMessage": "No assignments found for the specified group.",
     "noAccessTokenMessage": "Could not obtain an access token. Please check your credentials.",
     "noLAPSFoundMessage": "No LAPS password found for this device.",
     "999": "No updates were found",

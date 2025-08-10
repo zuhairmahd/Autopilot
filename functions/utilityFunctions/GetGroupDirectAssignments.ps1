@@ -8,6 +8,7 @@ function GetGroupDirectAssignments()
         [string] $GroupName,
         [Parameter(Mandatory = $false)]
         [switch] $IncludeBeta,
+        [switch]$ShowSummary,
         [Parameter(Mandatory = $false)]
         [int] $BatchSize = 20
     )
@@ -34,7 +35,7 @@ function GetGroupDirectAssignments()
         {
             Write-Verbose "[$functionName] No group ID found for group name: $GroupName"
             Write-Log -logFile $LogFile -module $functionName -Message "No group ID found for group name: $GroupName" -logLevel "Warning"
-            return @()
+            return @('noGroup')
         }
         
         # Ensure $groupIds is treated as an array and properly extract the first (or only) group ID
@@ -282,16 +283,17 @@ function GetGroupDirectAssignments()
     $totalAssignments = $assignments.AllAssignments.Count
     Write-Verbose "[$functionName] Total assignments found for group '$GroupName': $totalAssignments"
     Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$GroupName': $totalAssignments" -logLevel "Information"
-    
-    Write-Host "Group Direct Assignments Summary for '$GroupName':" -ForegroundColor Green
-    Write-Host "  Apps: $($assignments.AppAssignments.Count)" -ForegroundColor Yellow
-    Write-Host "  Configurations: $($assignments.ConfigurationAssignments.Count)" -ForegroundColor Yellow
-    Write-Host "  Compliance Policies: $($assignments.ComplianceAssignments.Count)" -ForegroundColor Yellow
-    if ($IncludeBeta.IsPresent)
+    if ($ShowSummary)
     {
-        Write-Host "  Autopilot Profiles: $($assignments.AutopilotAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "Group Direct Assignments Summary for '$GroupName':" -ForegroundColor Green
+        Write-Host "  Apps: $($assignments.AppAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "  Configurations: $($assignments.ConfigurationAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "  Compliance Policies: $($assignments.ComplianceAssignments.Count)" -ForegroundColor Yellow
+        if ($IncludeBeta.IsPresent)
+        {
+            Write-Host "  Autopilot Profiles: $($assignments.AutopilotAssignments.Count)" -ForegroundColor Yellow
+        }
+        Write-Host "  Total: $totalAssignments" -ForegroundColor Cyan
     }
-    Write-Host "  Total: $totalAssignments" -ForegroundColor Cyan
-    
     return $assignments
 }

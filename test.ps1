@@ -36,7 +36,8 @@ param(
     [string]$appMode,
     [string]$LogFile = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
-    [string]$LogLevel = 'Information'
+    [string]$LogLevel = 'Information',
+    [switch]$SkipInit
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
@@ -536,10 +537,39 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+$groupName = 'autopilot'
+ShowGroupAssignments -accessToken $accessToken -GroupName $groupName -AssignmentType 'All'
+
+
+exit 0
+
+foreach ($appAssignment in $assignments.appAssignments)
+{
+    Write-Host "Assignment Type: $($appAssignment.Type)"
+    Write-Host "Name: $($appAssignment.Name)"
+    Write-Host "Intent: $($appAssignment.Intent)"
+}
+
+foreach ($complianceAssignment in $assignments.ComplianceAssignments)
+{
+    Write-Host "Assignment Type: $($complianceAssignment.Type)"
+    Write-Host "Name: $($complianceAssignment.Name)"
+}
+
+foreach ($configurationAssignment in $assignments.ConfigurationAssignments)
+{
+    Write-Host "Assignment Type: $($configurationAssignment.Type)"
+    Write-Host "Name: $($configurationAssignment.Name)"
+    Write-Host "Intent: $($configurationAssignment.Intent)"
+}
+foreach ($assignment in $assignments.AllAssignments)
+{
+    Write-Host "Assignment Type: $($assignment.Type)"
+    Write-Host "Name: $($assignment.Name)"
+    Write-Host "Intent: $($assignment.Intent)"
+}   
+
 $global:assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName 'autopilot' -IncludeBeta
-
-
-exit 0 
 $serialNumber = '5R3SBZ3'
 $global:pw = GetBIOSPassword -accessToken $accessToken -serialNumber $serialNumber
 $userPrincipalName = 'mahmoudz@gao.gov'

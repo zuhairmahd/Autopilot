@@ -826,16 +826,16 @@ $environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage
 $groupAssignmentsMenu = NewMenu -Title "Group Assignments Menu" -Description "Export Applications, Device Configurations, Compliance Policies and Autopilot Profiles Assigned to a groups"
 
 #region Group Assignments
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export App Assignments" -Action {
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show App Assignments" -Action {
     Write-Host "Place your code here"
 }
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Device Configurations" -Action {
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Configurations" -Action {
     Write-Host "Place your code here"
 }
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Device Compliance Policies" -Action {
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Compliance Policies" -Action {
     Write-Host "Place your code here"
 }
-$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Autopilot Profiles" -Action {
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Autopilot Profiles" -Action {
     Write-Host "Place your code here"
 }
 $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments" -Action {
@@ -844,7 +844,6 @@ $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Al
 #endregion Group Assignments
 
 #region export menu
-$exportMenu = AddMenuItem -menu $exportMenu -name "Export Group Assignments" -Submenu $groupAssignmentsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
@@ -1614,6 +1613,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
+
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1628,7 +1628,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         $hasCorrectNumberOfDevices = $false
         
         #region Check if the user exists first.
-        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+        $userInfo = GetEntraUser -Name $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
         Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
         Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
@@ -1808,6 +1808,15 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         Write-Verbose "[$scriptName] RestartDevice function failed."
         return $returnValues.backoutText
     }
+}
+$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+    $groupName = GetUserInput -Message "Enter the group for which you would like to show assignments" -Prompt 'Please enter the group name' -InputType 'GroupName' -settings $settings
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+        return $returnValues.backoutText # Return to the previous menu
+    } 
+    ShowGroupAssignments -GroupName $groupName -AccessToken $accessToken
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
