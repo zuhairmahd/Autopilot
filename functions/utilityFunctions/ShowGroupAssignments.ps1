@@ -37,7 +37,7 @@ function ShowGroupAssignments()
     #Create Assignments menu
     
     #region Group Assignments
-    $groupAssignmentsMenu = NewMenu -Title "Group Assignments Menu" -Description "What type of assignments would you like to see?"
+    $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $GroupName" -Description "What type of assignments would you like to see?"
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Application Assignments" -Action {
         Write-Host "Selected Assignment Type: Application"
         return 'Application'
@@ -58,13 +58,27 @@ function ShowGroupAssignments()
         Write-Host "Displaying all assignments"
         return 'All'
     } -returnsValue
-    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu
+    # Use proper stack operation to maintain menu navigation integrity
+    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
     #endregion Group Assignments
+    
+    # Always pop the submenu from the stack when we're done with it, regardless of the result
+    Write-Verbose "[$functionName] Popping group assignments submenu from stack"
+    $poppedMenu = Pop-MenuFromStack
+    Write-Verbose "[$functionName] Popped menu: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })"
+    
     # Validate that we got a proper assignment, not a navigation option
     if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
     {
         Write-Verbose "[$functionName] ShowMenu returned navigation option: '$assignmentType', treating as navigation"
         return $assignmentType
+    }
+    
+    # If assignmentType is null, user may have navigated away - don't continue processing
+    if ($null -eq $assignmentType)
+    {
+        Write-Verbose "[$functionName] ShowMenu returned null, user may have navigated away"
+        return $null
     }
 
     # Filter assignments by type
@@ -94,4 +108,20 @@ function ShowGroupAssignments()
             Write-Host "Intent: $($_.Intent)"
         }
     }
+    
+    # Add pause after displaying assignments
+    Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
+    try 
+    {
+        $null = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
+    }
+    catch 
+    {
+        Write-Verbose "[$functionName] Error reading key input: $_"
+        # Fallback to Read-Host if RawUI fails
+        Read-Host "Press Enter to continue"
+    }
+    
+    # Return a special value to indicate successful completion
+    return "AssignmentsDisplayed"
 }

@@ -1896,10 +1896,28 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
+    $result = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
     
-    # Pause to let user read the information
-    Write-Host ""
+    # Handle navigation returns from ShowGroupAssignments
+    if ($result -eq "Back" -or $result -eq "Main Menu" -or $result -eq 0 -or $result -eq "0")
+    {
+        Write-Verbose "[$scriptName] ShowGroupAssignments returned navigation option: '$result'"
+        return $result
+    }
+    
+    # If result is null, user may have navigated away
+    if ($null -eq $result)
+    {
+        Write-Verbose "[$scriptName] ShowGroupAssignments returned null, user may have navigated away"
+        return $null
+    }
+    
+    # If assignments were displayed successfully, no additional pause needed
+    if ($result -eq "AssignmentsDisplayed")
+    {
+        Write-Verbose "[$scriptName] Assignments were displayed successfully"
+        return $null  # This will cause the action to complete and return to the previous menu
+    }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
