@@ -1811,8 +1811,6 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $selectedGroup = $null
     $substringSearch = $groupInfo[1]
     $searchResults = $groupInfo[0].value
-    Write-Host "Found $($searchResults.groups.count ) groups"
-
     if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
     {
         # Exact match found
@@ -1896,28 +1894,10 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $result = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
+    ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
     
-    # Handle navigation returns from ShowGroupAssignments
-    if ($result -eq "Back" -or $result -eq "Main Menu" -or $result -eq 0 -or $result -eq "0")
-    {
-        Write-Verbose "[$scriptName] ShowGroupAssignments returned navigation option: '$result'"
-        return $result
-    }
-    
-    # If result is null, user may have navigated away
-    if ($null -eq $result)
-    {
-        Write-Verbose "[$scriptName] ShowGroupAssignments returned null, user may have navigated away"
-        return $null
-    }
-    
-    # If assignments were displayed successfully, no additional pause needed
-    if ($result -eq "AssignmentsDisplayed")
-    {
-        Write-Verbose "[$scriptName] Assignments were displayed successfully"
-        return $null  # This will cause the action to complete and return to the previous menu
-    }
+    # Pause to let user read the information
+    Write-Host ""
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
@@ -2001,6 +1981,24 @@ else
 #endregion Show Menu
 
 #region Cleanup
+# Clear sensitive data from memory before exiting
+Clear-SecureMemory -ClearScriptVariables
+
+# Cleanup temporary files 
+$filesCleaned = cleanupTempFiles
+if ($filesCleaned.AllRemoved)
+{
+    Write-Verbose "[$scriptName] All temporary files were cleaned."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+}
+Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+#endregion Cleanup
 # Clear sensitive data from memory before exiting
 Clear-SecureMemory -ClearScriptVariables
 
