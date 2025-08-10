@@ -102,7 +102,7 @@ function Test-FunctionSignatures {
         # Test required parameters exist
         $requiredParams = @{
             'GetGroupIdsByNames' = @('GroupNames')
-            'GetGroupDirectAssignments' = @('GroupName')
+            'GetGroupDirectAssignments' = @('GroupName', 'BatchSize')
         }
         
         $allParamsPresent = $true
@@ -114,6 +114,17 @@ function Test-FunctionSignatures {
                     $allParamsPresent = $false
                 } else {
                     Write-Host "  ✓ Parameter '$paramName' found in '$funcName'"
+                    
+                    # Special validation for BatchSize parameter
+                    if ($paramName -eq 'BatchSize') {
+                        $param = $command.Parameters[$paramName]
+                        if ($param.ParameterType -eq [int]) {
+                            Write-Host "  ✓ BatchSize parameter correctly typed as [int]"
+                        } else {
+                            Write-Host "  ✗ BatchSize parameter should be [int] type" -ForegroundColor Red
+                            $allParamsPresent = $false
+                        }
+                    }
                 }
             }
         }
@@ -143,10 +154,18 @@ function Test-CodePatterns {
         $idsContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupIdsByNames.ps1" -Raw
         $hasSimplifiedImplementation = $idsContent -match 'Initialize session cache' -and $idsContent -notmatch 'Resolve-FromIndex'
         
+        # Check for batch API implementation patterns
+        $hasBatchProcessing = $directContent -match 'Process-BatchAssignments'
+        $hasBatchRequestBody = $directContent -match 'batchRequestBody = @{'
+        $hasBatchAPICall = $directContent -match 'ResourcePath.*\$batch'
+        
         $patterns = @{
             'Array wrapping in GetGroupDirectAssignments' = $hasArrayWrapping
             'Safe indexing in GetGroupDirectAssignments' = $hasSafeIndexing
             'Simplified implementation in GetGroupIdsByNames' = $hasSimplifiedImplementation
+            'Batch processing helper function' = $hasBatchProcessing
+            'Batch request body construction' = $hasBatchRequestBody
+            'Batch API endpoint usage' = $hasBatchAPICall
         }
         
         $allPatternsPresent = $true
