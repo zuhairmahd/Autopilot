@@ -62,7 +62,14 @@ function GetGroupIdsByNames()
         }
         Write-Verbose "[$functionName] Resolved IDs: $($resolvedIds -join ', '), Missing Names: $($missingNames -join ', '), Resolved Names: $($resolvedNames -join ', '), Missing IDs: $($missingIds -join ', ')"
         Write-Log -logFile $LogFile -module $functionName -Message "Resolved IDs: $($resolvedIds -join ', '), Missing Names: $($missingNames -join ', '), Resolved Names: $($resolvedNames -join ', '), Missing IDs: $($missingIds -join ', ')" -logLevel "Information"
-        return @{ ResolvedIds = $resolvedIds; MissingNames = $missingNames; ResolvedNames = $resolvedNames; MissingIds = $missingIds }
+        
+        # Use a hashtable construction that's more compatible with PowerShell 5.1
+        $result = @{}
+        $result['ResolvedIds'] = $resolvedIds
+        $result['MissingNames'] = $missingNames  
+        $result['ResolvedNames'] = $resolvedNames
+        $result['MissingIds'] = $missingIds
+        return $result
     }
     
     $functionName = $MyInvocation.MyCommand.Name

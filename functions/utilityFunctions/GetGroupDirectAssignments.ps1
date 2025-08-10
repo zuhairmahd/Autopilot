@@ -32,9 +32,11 @@ function GetGroupDirectAssignments()
             return @()
         }
         
-        $groupId = $groupIds[0]
-        Write-Verbose "[$functionName] Resolved group '$GroupName' to ID: $groupId"
-        Write-Log -logFile $LogFile -module $functionName -Message "Resolved group '$GroupName' to ID: $groupId" -logLevel "Information"
+        # Ensure $groupIds is treated as an array and properly extract the first (or only) group ID
+        $groupIdArray = @($groupIds)
+        $groupId = $groupIdArray[0]
+        Write-Verbose "[$functionName] Resolved group '$GroupName' to ID: $groupId (from $($groupIdArray.Count) result(s))"
+        Write-Log -logFile $LogFile -module $functionName -Message "Resolved group '$GroupName' to ID: $groupId (from $($groupIdArray.Count) result(s))" -logLevel "Information"
     }
     catch {
         Write-Verbose "[$functionName] Error resolving group name: $($_.Exception.Message)"
