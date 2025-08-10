@@ -119,7 +119,7 @@ function GetGroupDirectAssignments()
             
             try
             {
-                $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth 10)
+                $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
                 Write-Verbose "[$functionName] Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)"
                 Write-Log -logFile $LogFile -module $functionName -Message "Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -logLevel "Information"
                 if ($batchResponse -and $batchResponse.responses)
