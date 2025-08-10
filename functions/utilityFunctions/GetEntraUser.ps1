@@ -125,12 +125,29 @@ function GetEntraUser()
         {
             $searchTerm = $Name
             $searchUri = "groups"
-            $filterExpression = "contains(displayName, '$searchTerm') or startsWith(displayName, '$searchTerm') or endsWith(displayName, '$searchTerm')"
+            # First try simple startsWith filter (doesn't require advanced query)
+            $filterExpression = "startsWith(displayName, '$searchTerm')"
             Write-Verbose "[$functionName] Searching for substring matches in group properties for: $searchTerm"
-            Write-Verbose "[$functionName] Trying filter: $filterExpression" 
+            Write-Verbose "[$functionName] Trying basic filter: $filterExpression" 
+            
+            # Try basic startsWith first
+            $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $filterExpression -extraParameters $ExtraParameters
+            
+            # If basic filter doesn't return results, try advanced query with contains
+            if ($fallbackResults -in 400, 401, 403, 404 -or (-not $fallbackResults.value) -or $fallbackResults.value.Count -eq 0)
+            {
+                Write-Verbose "[$functionName] Basic filter returned no results. Trying advanced query with contains."
+                $advancedFilterExpression = "contains(displayName, '$searchTerm')"
+                Write-Verbose "[$functionName] Trying advanced filter: $advancedFilterExpression"
+                
+                # Use advanced query capabilities with ConsistencyLevel and count
+                $advancedExtraParameters = if ($ExtraParameters) { "$ExtraParameters&count=true" } else { "count=true" }
+                $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $advancedFilterExpression -extraParameters $advancedExtraParameters -consistencyLevel
+                Write-Verbose "[$functionName] Advanced query completed with $($fallbackResults.value.Count) results"
+            }
         }
         
-        $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $filterExpression -extraParameters $ExtraParameters
+        # $fallbackResults is already set from the group search logic above
         if ($fallbackResults -notin 400, 401, 403, 404 -and $fallbackResults.value -and $fallbackResults.value.Count -gt 0)
         {
             Write-Verbose "[$functionName] Filter approach succeeded with $($fallbackResults.value.Count) results"
