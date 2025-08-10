@@ -823,8 +823,28 @@ $exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would l
 $settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
 $autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
 $environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage your environment settings and configurations"
+$groupAssignmentsMenu = NewMenu -Title "Group Assignments Menu" -Description "Export Applications, Device Configurations, Compliance Policies and Autopilot Profiles Assigned to a groups"
+
+#region Group Assignments
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export App Assignments" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Device Configurations" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Device Compliance Policies" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export Autopilot Profiles" -Action {
+    Write-Host "Place your code here"
+}
+$groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments" -Action {
+    Write-Host "Place your code here"
+}
+#endregion Group Assignments
 
 #region export menu
+$exportMenu = AddMenuItem -menu $exportMenu -name "Export Group Assignments" -Submenu $groupAssignmentsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
