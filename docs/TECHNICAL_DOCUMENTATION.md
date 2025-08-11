@@ -785,111 +785,167 @@ This allows the same function to behave differently based on how it was accessed
 
 ## Testing Framework
 
-### Test Architecture
+### Unified Testing Framework
 
-The testing framework has been completely reorganized to support the new modular function structure:
+The Windows Autopilot Management Tool uses a **unified testing framework** with a single point of entry for all test execution. This framework provides comprehensive validation across all application components through centralized test management, categorization, and reporting.
 
-#### Test Helper System
-- **test-helper.ps1**: Common utilities for all tests
-  - `Load-AllFunctions`: Recursively loads all functions from the reorganized structure
-  - `Test-PowerShellVersion`: Detects PowerShell 5.1 vs 7+ for compatibility
-  - `Write-TestResult`: Version-aware test result display (Unicode vs ASCII)
-  - `Write-TestSection`: Formatted test section headers
+#### Single Point of Entry: Test-Runner.ps1
 
-#### Master Test Runner
-- **run-all-tests.ps1**: Comprehensive test execution system
-  - Runs all tests in isolated PowerShell sessions
-  - Provides detailed timing and results reporting
-  - PowerShell 5.1 compatible output formatting
-  - Supports test filtering and error handling
-  - Generates comprehensive test reports
+**All testing goes through `Test-Runner.ps1`** - this is the centralized test runner that replaces individual test script execution:
 
-### PowerShell 5.1 Compatibility
-
-The testing framework ensures full compatibility with PowerShell 5.1:
-- Automatic detection of PowerShell version
-- Unicode character fallbacks for older versions
-- Compatible cmdlet usage patterns
-- Version-specific feature handling
-
-### Test Structure
-Tests are located in `/TestScripts/` and follow this pattern:
-1. Load test-helper.ps1 for common utilities
-2. Use Load-AllFunctions to import reorganized function modules
-3. Create isolated test environment with version-aware output
-4. Execute test scenarios with validation
-5. Cleanup test environment
-
-### Current Test Coverage
-- **Next User Readiness**: `test-checknextuserreadiness.ps1` - Enhanced device readiness assessment
-- **Configuration system**: `test-settings-functions.ps1` - Settings management functions
-- **Device selection**: `test-device-selection.ps1` - Device lookup and selection
-- **Corporate device identifiers**: `test-corporate-device-identifier.ps1` - Corporate device management
-- **Syntax validation**: `test-syntax.ps1` - PowerShell syntax checking for all function files
-- **Authentication types**: `test-authentication-types.ps1` - OAuth flow testing
-- **Comprehensive integration**: `test-comprehensive.ps1` - End-to-end functionality
-- **Password change**: `test-password-change.ps1` - Credential management
-- **First-run wizard**: `test-firstrun-wizard.ps1` - Initial setup workflow
-- **Menu system**: `test-menu-inclusions.ps1` - Navigation and menu functionality
-
-### Testing Commands
-
-#### Master Test Runner (Recommended)
 ```powershell
-# Run all tests with detailed reporting
+# Standard test execution (replaces run-all-tests.ps1)
+.\TestScripts\Test-Runner.ps1 -TestCategory all
+
+# Category-based testing
+.\TestScripts\Test-Runner.ps1 -TestCategory unit
+.\TestScripts\Test-Runner.ps1 -TestCategory integration
+.\TestScripts\Test-Runner.ps1 -TestCategory comprehensive
+
+# Pattern-based testing
+.\TestScripts\Test-Runner.ps1 -TestCategory specific -TestPattern "test-menu*"
+
+# Test discovery
+.\TestScripts\Test-Runner.ps1 -ListTests
+.\TestScripts\Test-Runner.ps1 -ListCategories
+```
+
+#### Test Categories and Registry
+
+Tests are automatically discovered and categorized through a centralized **Test Registry**:
+
+| Category | Priority | Duration | Purpose | Test Count |
+|----------|----------|----------|---------|------------|
+| **syntax** | 1 | < 5 seconds | Quick syntax validation and function loading | 1 |
+| **core** | 2 | 30-60 seconds | Essential functionality required for basic operation | 3 |
+| **unit** | 3 | 2-4 minutes | Individual component and function tests | 10 |
+| **integration** | 4 | 3-5 minutes | Cross-component integration and workflow tests | 9 |
+| **comprehensive** | 5 | 5-8 minutes | Full workflow and end-to-end tests | 9 |
+| **validation** | 6 | 2-3 minutes | Final validation and verification tests | 4 |
+| **demo** | 7 | Variable | Interactive demonstration scripts | 7 |
+| **enhanced** | 4 | 2-3 minutes | Enhanced functionality tests (PR enhancements) | 3 |
+| **specialized** | 5 | 4-6 minutes | Advanced and specialized functionality tests | 12 |
+
+**Total Tests**: 58+ test files across 9 categories
+
+#### Unified Test Framework Integration
+
+All tests use the standardized unified framework pattern:
+
+```powershell
+#!/usr/bin/env pwsh
+# Load test helper and functions at script level
+. "$PSScriptRoot\test-helper.ps1"
+$rootPath = Split-Path -Parent $PSScriptRoot
+
+try {
+    # Load functions at script level (critical for proper scoping)
+    $loadSuccess = Load-AllFunctions -RootPath $rootPath
+    if (-not $loadSuccess) { throw "Failed to load functions" }
+    
+    # Initialize unified test environment
+    $testContext = Start-UnifiedTest -TestName "Test Name" -SkipFunctionCheck
+    
+    # Test execution logic...
+    
+    # Complete with proper cleanup
+    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passed -FailedTests $failed -TotalTests $total
+    exit $(if ($success) { 0 } else { 1 })
+}
+catch {
+    Write-Host "Test failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
+```
+
+### Test Helper Framework
+
+The `test-helper.ps1` provides the unified testing infrastructure:
+
+#### Core Framework Functions
+- **`Load-AllFunctions`**: Function loading with proper scoping
+- **`Start-UnifiedTest`**: Test environment initialization  
+- **`Complete-UnifiedTest`**: Cleanup and result reporting
+- **`Initialize-TestEnvironment`**: Mock data and global variable setup
+- **`Cleanup-TestEnvironment`**: Resource cleanup
+
+#### Utility Functions
+- **`Write-TestResult`**: Standardized test result output with PowerShell 5.1 compatibility
+- **`Write-TestSection`**: Consistent section headers
+- **`Test-FunctionExists`**: Function availability verification
+- **`New-MockDevice`**: Mock device data generation
+- **`Test-PowerShellVersion`**: Cross-version compatibility checks
+
+### Testing Best Practices
+
+#### Framework Usage
+- **Always use Test-Runner.ps1** as the single entry point for test execution
+- **Load functions at script level** to avoid scoping issues
+- **Use the unified framework pattern** for all new tests
+- **Add new tests to appropriate categories** in the Test Registry
+
+#### Test Development Standards
+```powershell
+# Proper temporary file handling (cross-platform)
+$tempDir = if ($IsWindows -or $env:OS -eq "Windows_NT") { $env:TEMP } else { "/tmp" }
+$testTempDir = Join-Path $tempDir "autopilot-test-$(Get-Random)"
+
+try {
+    New-Item -Path $testTempDir -ItemType Directory -Force | Out-Null
+    # Test logic using $testTempDir
+} finally {
+    # Always cleanup
+    if (Test-Path $testTempDir) {
+        Remove-Item -Path $testTempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+```
+
+#### Migration from Legacy Patterns
+
+❌ **Deprecated Patterns:**
+```powershell
+# Individual test script execution
+.\TestScripts\test-specific-functionality.ps1
+
+# Old test runner
 .\TestScripts\run-all-tests.ps1
-
-# Run specific test pattern
-.\TestScripts\run-all-tests.ps1 -TestPattern "test-settings*.ps1"
-
-# Continue on errors with verbose output
-.\TestScripts\run-all-tests.ps1 -ContinueOnError -ShowVerbose
-
-# Exclude specific tests
-.\TestScripts\run-all-tests.ps1 -ExcludePattern "test-comprehensive.ps1"
 ```
 
-#### Individual Tests
+✅ **Unified Framework Patterns:**
 ```powershell
-# Run specific test
-.\TestScripts\test-checknextuserreadiness.ps1
+# Centralized test execution
+.\TestScripts\Test-Runner.ps1 -TestCategory unit
 
-# Run configuration system tests
-.\TestScripts\test-settings-functions.ps1
-
-# Run syntax validation
-.\TestScripts\test-syntax.ps1
+# Pattern-based testing
+.\TestScripts\Test-Runner.ps1 -TestCategory specific -TestPattern "test-specific*"
 ```
 
-#### Legacy Batch Execution
-```powershell
-# Run all tests (legacy method)
-Get-ChildItem .\TestScripts\test-*.ps1 | Where-Object { $_.Name -ne 'test-helper.ps1' } | ForEach-Object { & $_.FullName }
+### Continuous Integration Integration
+
+#### Recommended CI/CD Test Execution
+```yaml
+# Fast validation (< 1 minute)
+- name: Syntax Tests
+  run: pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory syntax
+  
+# Core functionality (1-2 minutes)  
+- name: Core Tests
+  run: pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory core
+  
+# Standard test suite (5-10 minutes)
+- name: Unit and Integration Tests
+  run: |
+    pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory unit
+    pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory integration
+  
+# Full validation (15+ minutes)
+- name: Comprehensive Tests
+  run: pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all
+  timeout-minutes: 20
 ```
 
-### Test Development Guidelines
-
-#### Function Loading
-- Always use `Load-AllFunctions` from test-helper.ps1 for consistent function loading
-- Test in isolation using separate PowerShell sessions when possible
-- Verify function availability before testing
-
-#### Version Compatibility
-- Use `Test-PowerShellVersion` to detect PowerShell capabilities
-- Use `Write-TestResult` instead of direct Unicode characters
-- Test with both PowerShell 5.1 and 7+ when possible
-
-#### Test Structure
-- Create isolated test environments to avoid side effects
-- Include both positive and negative test cases
-- Validate expected outcomes with appropriate assertions
-- Clean up test artifacts after execution
-- Use comprehensive logging for test debugging
-
-#### Output Formatting
-- Use `Write-TestSection` for consistent section headers
-- Use `Write-TestResult` for pass/fail indicators
-- Provide meaningful error messages with context
+For complete testing framework documentation, see [UNIFIED_TESTING_FRAMEWORK.md](./UNIFIED_TESTING_FRAMEWORK.md).
 
 ## Build and Deployment
 

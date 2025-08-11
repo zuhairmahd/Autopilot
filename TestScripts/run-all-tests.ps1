@@ -1,10 +1,16 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Master test runner for all Autopilot tests
+    Legacy test runner - DEPRECATED: Use Test-Runner.ps1 instead
 .DESCRIPTION
-    This script runs all available test scripts in the TestScripts folder and provides
-    a comprehensive test report. It's designed to work with both PowerShell 5.1 and 7+.
+    This script is deprecated. Please use the new unified Test-Runner.ps1 for all testing.
+    This legacy runner is maintained for backward compatibility only.
+    
+    The new Test-Runner.ps1 provides:
+    - Advanced test categorization and filtering
+    - Better reporting and error handling
+    - Integration with the unified testing framework
+    - Support for different test types and execution modes
 .PARAMETER TestPattern
     Pattern to match test files (default: "test-*.ps1")
 .PARAMETER ExcludePattern
@@ -15,8 +21,15 @@
     Show verbose output from tests
 .NOTES
     Author: Automated Test System
-    Version: 1.0.0
+    Version: 1.0.0 (DEPRECATED)
     Compatible: PowerShell 5.1+
+    
+    MIGRATION NOTICE:
+    Please migrate to Test-Runner.ps1 for enhanced functionality:
+    - Old: .\run-all-tests.ps1
+    - New: .\Test-Runner.ps1 -TestCategory all
+    
+    See Test-Runner.ps1 -ListCategories for available test categories
 #>
 
 [CmdletBinding()]
@@ -26,6 +39,64 @@ param(
     [switch]$ContinueOnError,
     [switch]$ShowVerbose
 )
+
+# Check if new test runner exists and recommend its use
+$newTestRunner = Join-Path $PSScriptRoot "Test-Runner.ps1"
+if (Test-Path $newTestRunner) {
+    Write-Host "=" * 80 -ForegroundColor Yellow
+    Write-Host "DEPRECATION NOTICE" -ForegroundColor Yellow
+    Write-Host "=" * 80 -ForegroundColor Yellow
+    Write-Host "This script (run-all-tests.ps1) is deprecated." -ForegroundColor Red
+    Write-Host "Please use the new unified Test-Runner.ps1 instead:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Current command equivalent:" -ForegroundColor Cyan
+    if ($TestPattern -eq "test-*.ps1" -and $ExcludePattern -eq "test-helper.ps1") {
+        Write-Host "  .\Test-Runner.ps1 -TestCategory all" -ForegroundColor Green
+    } else {
+        Write-Host "  .\Test-Runner.ps1 -TestCategory specific -TestPattern '$TestPattern'" -ForegroundColor Green
+    }
+    Write-Host ""
+    Write-Host "Additional options:" -ForegroundColor Cyan
+    Write-Host "  .\Test-Runner.ps1 -ListCategories    # See available test categories" -ForegroundColor Green
+    Write-Host "  .\Test-Runner.ps1 -ListTests         # See all available tests" -ForegroundColor Green
+    Write-Host "  .\Test-Runner.ps1 -TestCategory unit # Run only unit tests" -ForegroundColor Green
+    Write-Host ""
+    
+    # Ask user if they want to proceed with legacy runner or switch
+    $response = Read-Host "Continue with legacy runner? (y/N) [Recommended: N to use new runner]"
+    if ($response -notmatch '^y|yes$') {
+        Write-Host "Launching new Test-Runner.ps1..." -ForegroundColor Green
+        
+        # Build arguments for new test runner
+        $newArgs = @()
+        
+        if ($TestPattern -ne "test-*.ps1") {
+            $newArgs += @('-TestCategory', 'specific', '-TestPattern', $TestPattern)
+        } else {
+            $newArgs += @('-TestCategory', 'all')
+        }
+        
+        if ($ContinueOnError) {
+            $newArgs += '-ContinueOnError'
+        }
+        
+        if ($ShowVerbose) {
+            $newArgs += '-ShowVerbose'
+        }
+        
+        try {
+            & $newTestRunner @newArgs
+            exit $LASTEXITCODE
+        }
+        catch {
+            Write-Host "Error launching new test runner: $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "Falling back to legacy runner..." -ForegroundColor Yellow
+        }
+    }
+    
+    Write-Host "Continuing with legacy runner..." -ForegroundColor Yellow
+    Write-Host "=" * 80 -ForegroundColor Yellow
+}
 
 # Load test helper functions
 try
