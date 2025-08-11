@@ -90,7 +90,7 @@ function ShowGroupAssignments()
     
     # Display assignments
     $assignments | ForEach-Object {
-        if ($AssignmentType -eq 'All')
+        if ($assignmentType -eq 'All')
         {
             Write-Verbose "[$functionName] Displaying the Assignment Type since the AssignmentType is 'All'"
             Write-Log -logFile $LogFile -Module $functionName -Message "Displaying the Assignment Type since the AssignmentType is 'All'"
