@@ -9,6 +9,12 @@ $ErrorActionPreference = "Continue"
 $validationsPassed = 0
 $validationsTotal = 0
 
+# Set up temporary directory for cross-platform compatibility
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$global:LogFile = Join-Path $tempDir "final-validation-issue-91.log"
+Write-Host "Using temporary directory: $tempDir" -ForegroundColor Gray
+Write-Host ""
+
 function Test-Requirement {
     param(
         [string]$RequirementName,
@@ -144,3 +150,19 @@ if ($validationsPassed -eq $validationsTotal) {
     Write-Host "⚠️ Some requirements may need additional attention." -ForegroundColor Yellow
     Write-Host "Review the failed validations above." -ForegroundColor Yellow
 }
+
+Write-Host ""
+Write-Host "=== Cleanup ===" -ForegroundColor Cyan
+
+# Clean up any temporary files created during validation
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$possibleTempFiles = @("test.log", "validation-test.log", "issue-91-validation.log", "final-validation-issue-91.log")
+foreach ($file in $possibleTempFiles) {
+    $fullPath = Join-Path $tempDir $file
+    if (Test-Path $fullPath) {
+        Remove-Item $fullPath -ErrorAction SilentlyContinue
+        Write-Host "✓ Cleaned up temporary file: $file" -ForegroundColor Green
+    }
+}
+
+Write-Host "✓ Validation cleanup completed" -ForegroundColor Green

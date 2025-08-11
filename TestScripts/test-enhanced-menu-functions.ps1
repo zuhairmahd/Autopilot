@@ -9,6 +9,11 @@ $testErrors = @()
 $testsPassed = 0
 $testsTotal = 0
 
+# Set up temporary directory for cross-platform compatibility
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$global:LogFile = Join-Path $tempDir "test-enhanced-menu.log"
+Write-Host "Using temporary directory: $tempDir" -ForegroundColor Gray
+
 # Test helper function
 function Test-Function {
     param(
@@ -175,3 +180,25 @@ if ($testsPassed -eq $testsTotal) {
 } else {
     Write-Host "⚠️  Some tests failed. Review the errors above." -ForegroundColor Yellow
 }
+
+Write-Host ""
+Write-Host "=== Cleanup ===" -ForegroundColor Cyan
+
+# Clean up any temporary files or global variables created during testing
+if (Get-Variable -Name "MenuHistory" -Scope Global -ErrorAction SilentlyContinue) {
+    $global:MenuHistory.Clear()
+    Write-Host "✓ Cleaned up global MenuHistory variable" -ForegroundColor Green
+}
+
+# Clean up any temporary log files that might have been created
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$possibleTempFiles = @("test.log", "menu-test.log", "test-enhanced-menu.log")
+foreach ($file in $possibleTempFiles) {
+    $fullPath = Join-Path $tempDir $file
+    if (Test-Path $fullPath) {
+        Remove-Item $fullPath -ErrorAction SilentlyContinue
+        Write-Host "✓ Cleaned up temporary file: $file" -ForegroundColor Green
+    }
+}
+
+Write-Host "✓ Cleanup completed" -ForegroundColor Green

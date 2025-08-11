@@ -9,6 +9,11 @@ $testErrors = @()
 $testsPassed = 0
 $testsTotal = 0
 
+# Set up temporary directory for cross-platform compatibility
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$global:LogFile = Join-Path $tempDir "test-graph-encryption.log"
+Write-Host "Using temporary directory: $tempDir" -ForegroundColor Gray
+
 # Test helper function
 function Test-Function {
     param(
@@ -249,3 +254,25 @@ Write-Host "=== Function Coverage Summary ===" -ForegroundColor Cyan
 Write-Host "Graph Functions Tested: 9" -ForegroundColor Blue
 Write-Host "Encryption Functions Tested: 7" -ForegroundColor Blue
 Write-Host "Total Functions Tested: 16" -ForegroundColor Blue
+
+Write-Host ""
+Write-Host "=== Cleanup ===" -ForegroundColor Cyan
+
+# Clean up any temporary files created during testing
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$possibleTempFiles = @("test.log", "graph-test.log", "encryption-test.log", "token-cache-test.dat", "test-graph-encryption.log")
+foreach ($file in $possibleTempFiles) {
+    $fullPath = Join-Path $tempDir $file
+    if (Test-Path $fullPath) {
+        Remove-Item $fullPath -ErrorAction SilentlyContinue
+        Write-Host "✓ Cleaned up temporary file: $file" -ForegroundColor Green
+    }
+}
+
+# Clean up any secure strings or sensitive test data from memory
+if (Get-Variable -Name "testPassword" -ErrorAction SilentlyContinue) {
+    Remove-Variable -Name "testPassword" -Force -ErrorAction SilentlyContinue
+    Write-Host "✓ Cleaned up test password variable" -ForegroundColor Green
+}
+
+Write-Host "✓ Cleanup completed" -ForegroundColor Green

@@ -9,6 +9,11 @@ $testErrors = @()
 $testsPassed = 0
 $testsTotal = 0
 
+# Set up temporary directory for cross-platform compatibility
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$global:LogFile = Join-Path $tempDir "test-utility-functions.log"
+Write-Host "Using temporary directory: $tempDir" -ForegroundColor Gray
+
 # Test helper function
 function Test-Function {
     param(
@@ -191,8 +196,9 @@ Test-Function "normalizeADUserDisplayName basic functionality" {
 Test-Function "Write-SafeLog basic functionality" {
     if (Get-Command Write-SafeLog -ErrorAction SilentlyContinue) {
         try {
-            # Set up a test log file variable
-            $script:LogFile = "/tmp/test-safe.log"
+            # Set up a test log file variable using $env:temp for cross-platform compatibility
+            $tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+            $script:LogFile = Join-Path $tempDir "test-safe.log"
             Write-SafeLog -Message "Test message"
             $true
         } catch {
@@ -223,7 +229,17 @@ if ($testsPassed -eq $testsTotal) {
     Write-Host "⚠️  Some tests failed. Review the errors above." -ForegroundColor Yellow
 }
 
-# Cleanup
-if (Test-Path "/tmp/test-safe.log") {
-    Remove-Item "/tmp/test-safe.log" -ErrorAction SilentlyContinue
+# Cleanup - Properly clean up any temporary files created during testing
+$tempDir = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$testLogFiles = @(
+    "test-safe.log",
+    "test-utility-functions.log"
+)
+foreach ($file in $testLogFiles) {
+    $fullPath = Join-Path $tempDir $file
+    if (Test-Path $fullPath) {
+        Remove-Item $fullPath -ErrorAction SilentlyContinue
+        Write-Host "✓ Cleaned up temporary file: $file" -ForegroundColor Green
+    }
 }
+Write-Host "✓ Cleanup completed" -ForegroundColor Green
