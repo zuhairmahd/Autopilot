@@ -31,7 +31,7 @@ param(
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
-    [string]$LogFile = "$pwd\Logs\Autopilot.log",
+    [string]$LogFilePath = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
     [string]$LogLevel = 'Information'
 )
@@ -102,6 +102,7 @@ if ($ShowVersion)
 }
 $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
+$global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
 Write-Log -LogFile $LogFile -StartLogging
 if (Test-Path $oldExecutableFileName)

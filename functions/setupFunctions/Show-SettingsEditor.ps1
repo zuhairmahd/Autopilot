@@ -463,7 +463,7 @@ function Get-DefaultSettingsStructure()
         Write-Verbose "[$functionName] Default settings structure created successfully"
         
         # Convert to PSCustomObject to match the JSON structure behavior
-        $jsonString = $defaultSettings | ConvertTo-Json -Depth $maxJSONDepth
+        $jsonString = $defaultSettings | ConvertTo-Json -Depth $global:maxJSONDepth
         $defaultStructure = $jsonString | ConvertFrom-Json
         
         Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure converted to PSCustomObject format" -LogLevel "Verbose"

@@ -30,7 +30,7 @@ jobs:
       - name: Run test suite
         shell: pwsh
         run: |
-          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\run-all-tests.ps1 -ShowVerbose
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -ShowVerbose
 
   code-analysis:
     needs: [tests]

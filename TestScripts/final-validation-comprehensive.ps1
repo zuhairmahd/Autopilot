@@ -46,8 +46,10 @@ try {
     $functionsToTest = @(
         'functions/setupFunctions/Test-AuthDefaults.ps1',
         'functions/setupFunctions/Show-SettingsEditor.ps1',
-        'functions/setupFunctions/Update-AuthSetting.ps1',
-        'functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1'
+        'functions/setupFunctions/Update-Setting.ps1',
+        'functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1',
+        'functions/utilityFunctions/Write-Log.ps1',
+        'functions/utilityFunctions/Globals.ps1'
     )
     
     $functionsLoaded = 0
@@ -72,6 +74,9 @@ try {
         Write-Host "✗ Some functions failed to load" -ForegroundColor Red
         exit 1
     }
+    
+    # Initialize logging for functions that require it
+    $Global:LogFile = "$testFolder\validation-test.log"
 
     Write-Host "`n=== Test 3: Auth Defaults Creation ===" -ForegroundColor Cyan
     
@@ -86,6 +91,8 @@ try {
         }
         domains = @{
             "test.com" = @{
+                groupsToInclude = @()
+                groupsToExclude = @()
                 settings = @{
                     domain = "test.com"
                     appMode = "test"
@@ -204,11 +211,11 @@ try {
 
     Write-Host "`n=== Test 5: Update Functions Validation ===" -ForegroundColor Cyan
     
-    if (Get-Command 'Update-AuthSetting' -ErrorAction SilentlyContinue) {
-        # Test individual auth setting update
-        $updateResult = Update-AuthSetting -SettingsFile $testSettingsFile -SettingName "cacheType" -SettingValue "File"
+    if (Get-Command 'Update-Setting' -ErrorAction SilentlyContinue) {
+        # Test individual auth setting update using unified Update-Setting function
+        $updateResult = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "cacheType" -SettingValue "File"
         if ($updateResult) {
-            Write-Host "✓ Update-AuthSetting works" -ForegroundColor Green
+            Write-Host "✓ Update-Setting (Auth) works" -ForegroundColor Green
             
             # Verify the update
             $content = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
@@ -219,11 +226,11 @@ try {
                 exit 1
             }
         } else {
-            Write-Host "✗ Update-AuthSetting failed" -ForegroundColor Red
+            Write-Host "✗ Update-Setting (Auth) failed" -ForegroundColor Red
             exit 1
         }
     } else {
-        Write-Host "✗ Update-AuthSetting function not available" -ForegroundColor Red
+        Write-Host "✗ Update-Setting function not available" -ForegroundColor Red
         exit 1
     }
 

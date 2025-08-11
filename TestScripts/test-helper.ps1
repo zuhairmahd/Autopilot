@@ -1,7 +1,8 @@
 # Comprehensive Test Helper Framework
 # This file provides a unified testing framework for all test scripts
 
-function Load-AllFunctions {
+function Load-AllFunctions
+{
     <#
     .SYNOPSIS
         Loads all functions from the reorganized functions folder structure
@@ -14,30 +15,37 @@ function Load-AllFunctions {
         [switch]$VerboseLoading = $false
     )
     
-    if (-not $RootPath) {
+    if (-not $RootPath)
+    {
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
     $functionsFolder = Join-Path $RootPath "functions"
     
-    if (-not (Test-Path $functionsFolder)) {
+    if (-not (Test-Path $functionsFolder))
+    {
         throw "Functions folder not found at: $functionsFolder"
     }
     
-    if ($VerboseLoading) {
+    if ($VerboseLoading)
+    {
         Write-Host "Loading functions from: $functionsFolder" -ForegroundColor Gray
     }
     
-    try {
+    try
+    {
         # Get all .ps1 files recursively, excluding test files - same as main.ps1
         $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
         
         $loadedCount = 0
         $errorCount = 0
         
-        foreach ($function in $functions) {
-            try {
-                if ($VerboseLoading) {
+        foreach ($function in $functions)
+        {
+            try
+            {
+                if ($VerboseLoading)
+                {
                     Write-Host "  Loading: $($function.Name)" -ForegroundColor Gray
                 }
                 
@@ -45,25 +53,31 @@ function Load-AllFunctions {
                 . $function.FullName
                 $loadedCount++
                 
-                if ($VerboseLoading) {
+                if ($VerboseLoading)
+                {
                     # Extract function names from the file for verification
                     $functionContent = Get-Content $function.FullName -Raw -ErrorAction SilentlyContinue
-                    if ($functionContent) {
+                    if ($functionContent)
+                    {
                         $functionNames = [regex]::Matches($functionContent, 'function\s+([a-zA-Z0-9_-]+)') | 
-                                        ForEach-Object { $_.Groups[1].Value }
+                            ForEach-Object { $_.Groups[1].Value }
                         
-                        foreach ($funcName in $functionNames) {
-                            if (Get-Command $funcName -ErrorAction SilentlyContinue) {
+                        foreach ($funcName in $functionNames)
+                        {
+                            if (Get-Command $funcName -ErrorAction SilentlyContinue)
+                            {
                                 Write-Host "    + Function available: $funcName" -ForegroundColor Green
                             }
                         }
                     }
                 }
             }
-            catch {
+            catch
+            {
                 $errorCount++
                 Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
-                if ($VerboseLoading) {
+                if ($VerboseLoading)
+                {
                     Write-Host $_.ScriptStackTrace -ForegroundColor Red
                 }
             }
@@ -72,19 +86,22 @@ function Load-AllFunctions {
         $totalFiles = $functions.Count
         Write-Host "Function loading summary: $loadedCount loaded, 0 skipped, $errorCount errors (Total: $totalFiles files)" -ForegroundColor Cyan
         
-        if ($errorCount -gt 0) {
+        if ($errorCount -gt 0)
+        {
             Write-Warning "Some function files failed to load. Tests may fail if they depend on these functions."
         }
         
         return $loadedCount -gt 0
     }
-    catch {
+    catch
+    {
         Write-Error "Failed to enumerate functions: $($_.Exception.Message)"
         return $false
     }
 }
 
-function Initialize-TestEnvironment {
+function Initialize-TestEnvironment
+{
     <#
     .SYNOPSIS
         Initializes the test environment with common variables, settings, and mock data
@@ -96,9 +113,11 @@ function Initialize-TestEnvironment {
         [string]$RootPath = $null
     )
     
-    if (-not $RootPath) {
+    if (-not $RootPath)
+    {
         $RootPath = Split-Path -Parent $PSScriptRoot
-        if (-not $RootPath) {
+        if (-not $RootPath)
+        {
             $RootPath = $PWD
         }
     }
@@ -106,40 +125,53 @@ function Initialize-TestEnvironment {
     Write-TestSection "Initializing Test Environment: $TestName"
     
     # Set up global variables commonly used by functions
-    $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+    $tempDir = if ($IsWindows)
+    {
+        $env:TEMP 
+    }
+    else
+    {
+        "/tmp" 
+    }
     $global:LogFile = Join-Path $tempDir "test.log"
     $global:logFile = Join-Path $tempDir "test.log"  # Add lowercase version for compatibility
-    $global:jsonDepth = 10  # Standard JSON depth for settings files
+    $global:jsonDepth = 100  # Standard JSON depth for settings files
     $global:SettingsFilePath = Join-Path $RootPath "settings.json"
     $global:StringsFilePath = Join-Path $RootPath "strings.json"
     $global:ConfigPath = Join-Path $RootPath ".secrets\config.json"
     
     # Initialize menu history for menu tests
-    if (-not $global:MenuHistory) {
+    if (-not $global:MenuHistory)
+    {
         $global:MenuHistory = [System.Collections.ArrayList]::new()
     }
-    if (-not $global:History) {
+    if (-not $global:History)
+    {
         $global:History = [System.Collections.ArrayList]::new()
     }
     
     # Load mock strings data commonly needed by tests
-    try {
-        if (Test-Path $global:StringsFilePath) {
+    try
+    {
+        if (Test-Path $global:StringsFilePath)
+        {
             $global:loadedStrings = Get-Content $global:StringsFilePath | ConvertFrom-Json
-        } else {
+        }
+        else
+        {
             # Create minimal mock strings data
             $global:loadedStrings = @{
-                deviceStates = @{
-                    ready = "Device ready"
+                deviceStates  = @{
+                    ready    = "Device ready"
                     notReady = "Device not ready"
-                    error = "Device error"
+                    error    = "Device error"
                 }
                 deviceActions = @{
-                    contactAdmin = "Contact your administrator"
-                    waitAndRetry = "Wait and retry"
+                    contactAdmin  = "Contact your administrator"
+                    waitAndRetry  = "Wait and retry"
                     checkSettings = "Check device settings"
                 }
-                menuItems = @{
+                menuItems     = @{
                     mainMenu = "Main Menu"
                     exitMenu = "Exit"
                 }
@@ -152,7 +184,8 @@ function Initialize-TestEnvironment {
         
         Write-TestResult "Mock data initialized successfully" $true
     }
-    catch {
+    catch
+    {
         Write-TestResult "Failed to initialize mock data: $($_.Exception.Message)" $false
         # Continue with empty mock data
         $global:loadedStrings = @{}
@@ -167,7 +200,8 @@ function Initialize-TestEnvironment {
     Write-TestResult "Test environment initialized" $true
 }
 
-function Cleanup-TestEnvironment {
+function Cleanup-TestEnvironment
+{
     <#
     .SYNOPSIS
         Cleans up test environment and temporary files
@@ -176,30 +210,36 @@ function Cleanup-TestEnvironment {
         [string]$TestFolder = $null
     )
     
-    try {
+    try
+    {
         # Restore original error action preference
-        if ($script:OriginalErrorActionPreference) {
+        if ($script:OriginalErrorActionPreference)
+        {
             $ErrorActionPreference = $script:OriginalErrorActionPreference
         }
         
         # Clean up test folder if specified
-        if ($TestFolder -and (Test-Path $TestFolder)) {
+        if ($TestFolder -and (Test-Path $TestFolder))
+        {
             Remove-Item -Path $TestFolder -Recurse -Force -ErrorAction SilentlyContinue
             Write-TestResult "Test folder cleaned up" $true
         }
         
         # Clean up global test variables (but preserve the important ones)
-        if (Get-Variable -Name "loadedStrings" -Scope Global -ErrorAction SilentlyContinue) {
+        if (Get-Variable -Name "loadedStrings" -Scope Global -ErrorAction SilentlyContinue)
+        {
             Remove-Variable -Name "loadedStrings" -Scope Global -Force -ErrorAction SilentlyContinue
         }
         
     }
-    catch {
+    catch
+    {
         Write-Warning "Error during cleanup: $($_.Exception.Message)"
     }
 }
 
-function New-MockDevice {
+function New-MockDevice
+{
     <#
     .SYNOPSIS
         Creates mock device data for testing
@@ -213,25 +253,26 @@ function New-MockDevice {
     )
     
     return @{
-        id = $DeviceId
-        deviceName = $DeviceName
-        serialNumber = $SerialNumber
-        isReady = $IsReady
-        issues = $Issues
-        managedDevice = @{
+        id              = $DeviceId
+        deviceName      = $DeviceName
+        serialNumber    = $SerialNumber
+        isReady         = $IsReady
+        issues          = $Issues
+        managedDevice   = @{
             device = @{
                 deviceName = $DeviceName
-                id = $DeviceId
+                id         = $DeviceId
             }
         }
         autopilotDevice = @{
             serialNumber = $SerialNumber
-            id = $DeviceId
+            id           = $DeviceId
         }
     }
 }
 
-function Test-FunctionExists {
+function Test-FunctionExists
+{
     <#
     .SYNOPSIS
         Tests if a function is available in the current session
@@ -240,19 +281,22 @@ function Test-FunctionExists {
         [string]$FunctionName
     )
     
-    try {
+    try
+    {
         $command = Get-Command $FunctionName -ErrorAction SilentlyContinue
         $result = $null -ne $command
         Write-Verbose "Test-FunctionExists: $FunctionName = $result"
         return $result
     }
-    catch {
+    catch
+    {
         Write-Verbose "Test-FunctionExists: Error testing $FunctionName - $($_.Exception.Message)"
         return $false
     }
 }
 
-function Test-PowerShellVersion {
+function Test-PowerShellVersion
+{
     <#
     .SYNOPSIS
         Tests if we're running PowerShell 5.1 and returns compatibility info
@@ -266,15 +310,16 @@ function Test-PowerShellVersion {
     $supportsUnicode = -not $isPS51
     
     return @{
-        Version = $version
-        IsPS51 = $isPS51
+        Version         = $version
+        IsPS51          = $isPS51
         SupportsUnicode = $supportsUnicode
-        MajorVersion = $version.Major
-        MinorVersion = $version.Minor
+        MajorVersion    = $version.Major
+        MinorVersion    = $version.Minor
     }
 }
 
-function Write-TestResult {
+function Write-TestResult
+{
     <#
     .SYNOPSIS
         Writes test results with PowerShell 5.1 compatibility
@@ -289,18 +334,50 @@ function Write-TestResult {
     
     $psInfo = Test-PowerShellVersion
     
-    if ($Success) {
-        $symbol = if ($psInfo.SupportsUnicode) { "✓" } else { "[PASS]" }
-        $color = if ($ForegroundColor) { $ForegroundColor } else { "Green" }
-    } else {
-        $symbol = if ($psInfo.SupportsUnicode) { "✗" } else { "[FAIL]" }
-        $color = if ($ForegroundColor) { $ForegroundColor } else { "Red" }
+    if ($Success)
+    {
+        $symbol = if ($psInfo.SupportsUnicode)
+        {
+            "✓" 
+        }
+        else
+        {
+            "[PASS]" 
+        }
+        $color = if ($ForegroundColor)
+        {
+            $ForegroundColor 
+        }
+        else
+        {
+            "Green" 
+        }
+    }
+    else
+    {
+        $symbol = if ($psInfo.SupportsUnicode)
+        {
+            "✗" 
+        }
+        else
+        {
+            "[FAIL]" 
+        }
+        $color = if ($ForegroundColor)
+        {
+            $ForegroundColor 
+        }
+        else
+        {
+            "Red" 
+        }
     }
     
     Write-Host "$symbol $Message" -ForegroundColor $color
 }
 
-function Write-TestSection {
+function Write-TestSection
+{
     <#
     .SYNOPSIS
         Writes a test section header with PowerShell 5.1 compatibility
@@ -313,7 +390,8 @@ function Write-TestSection {
     Write-Host "`n=== $Title ===" -ForegroundColor $ForegroundColor
 }
 
-function Write-TestSubSection {
+function Write-TestSubSection
+{
     <#
     .SYNOPSIS
         Writes a test subsection header with PowerShell 5.1 compatibility
@@ -326,7 +404,8 @@ function Write-TestSubSection {
     Write-Host "`n--- $Title ---" -ForegroundColor $ForegroundColor
 }
 
-function Start-UnifiedTest {
+function Start-UnifiedTest
+{
     <#
     .SYNOPSIS
         Unified test initialization that sets up everything needed for a test EXCEPT function loading
@@ -348,13 +427,16 @@ function Start-UnifiedTest {
     Write-Host ("=" * 80) -ForegroundColor Cyan
     
     # Determine paths
-    if (-not $RootPath) {
+    if (-not $RootPath)
+    {
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
     # Create test folder if specified
-    if ($TestFolder) {
-        if (Test-Path $TestFolder) {
+    if ($TestFolder)
+    {
+        if (Test-Path $TestFolder)
+        {
             Remove-Item -Path $TestFolder -Recurse -Force
         }
         New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
@@ -362,36 +444,43 @@ function Start-UnifiedTest {
     }
     
     # Check if functions are loaded (optional check)
-    if (-not $SkipFunctionCheck) {
+    if (-not $SkipFunctionCheck)
+    {
         Write-TestSection "Checking Function Availability"
         $coreFunction = Get-Command "Write-Log" -ErrorAction SilentlyContinue
-        if ($coreFunction) {
+        if ($coreFunction)
+        {
             Write-TestResult "Functions appear to be loaded (Write-Log found)" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Functions may not be loaded - continuing anyway" $true
         }
     }
     
     # Initialize test environment
-    try {
+    try
+    {
         Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
         Write-TestResult "Test environment initialized" $true
     }
-    catch {
+    catch
+    {
         Write-TestResult "Failed to initialize test environment: $($_.Exception.Message)" $false
         throw
     }
     
     # Return test context for cleanup
     return @{
-        TestName = $TestName
+        TestName   = $TestName
         TestFolder = $TestFolder 
-        RootPath = $RootPath
-        StartTime = Get-Date
+        RootPath   = $RootPath
+        StartTime  = Get-Date
     }
 }
 
-function Start-UnifiedTest-WithFunctionLoading {
+function Start-UnifiedTest-WithFunctionLoading
+{
     <#
     .SYNOPSIS
         Legacy unified test initialization that includes function loading (has scoping issues)
@@ -412,13 +501,16 @@ function Start-UnifiedTest-WithFunctionLoading {
     Write-Host ("=" * 80) -ForegroundColor Cyan
     
     # Determine paths
-    if (-not $RootPath) {
+    if (-not $RootPath)
+    {
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
     # Create test folder if specified
-    if ($TestFolder) {
-        if (Test-Path $TestFolder) {
+    if ($TestFolder)
+    {
+        if (Test-Path $TestFolder)
+        {
             Remove-Item -Path $TestFolder -Recurse -Force
         }
         New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
@@ -427,38 +519,44 @@ function Start-UnifiedTest-WithFunctionLoading {
     
     # Load all functions
     Write-TestSection "Loading Functions"
-    try {
+    try
+    {
         $loadSuccess = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$VerboseLoading
-        if (-not $loadSuccess) {
+        if (-not $loadSuccess)
+        {
             throw "Function loading failed"
         }
         Write-TestResult "Functions loaded successfully" $true
     }
-    catch {
+    catch
+    {
         Write-TestResult "Failed to load functions: $($_.Exception.Message)" $false
         throw
     }
     
     # Initialize test environment
-    try {
+    try
+    {
         Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
         Write-TestResult "Test environment initialized" $true
     }
-    catch {
+    catch
+    {
         Write-TestResult "Failed to initialize test environment: $($_.Exception.Message)" $false
         throw
     }
     
     # Return test context for cleanup
     return @{
-        TestName = $TestName
+        TestName   = $TestName
         TestFolder = $TestFolder 
-        RootPath = $RootPath
-        StartTime = Get-Date
+        RootPath   = $RootPath
+        StartTime  = Get-Date
     }
 }
 
-function Complete-UnifiedTest {
+function Complete-UnifiedTest
+{
     <#
     .SYNOPSIS
         Unified test cleanup and completion
@@ -481,7 +579,8 @@ function Complete-UnifiedTest {
     Write-Host "Test Completion Summary: $($TestContext.TestName)" -ForegroundColor Cyan
     Write-Host ("=" * 80) -ForegroundColor Cyan
     
-    if ($TotalTests -gt 0) {
+    if ($TotalTests -gt 0)
+    {
         Write-Host "Tests Passed: $PassedTests" -ForegroundColor Green
         Write-Host "Tests Failed: $FailedTests" -ForegroundColor Red  
         Write-Host "Total Tests: $TotalTests" -ForegroundColor Yellow
@@ -491,11 +590,13 @@ function Complete-UnifiedTest {
     Write-Host "Duration: $($duration.TotalSeconds.ToString('F2')) seconds" -ForegroundColor Gray
     
     # Cleanup
-    try {
+    try
+    {
         Cleanup-TestEnvironment -TestFolder $TestContext.TestFolder
         Write-TestResult "Cleanup completed successfully" $true
     }
-    catch {
+    catch
+    {
         Write-TestResult "Cleanup failed: $($_.Exception.Message)" $false
     }
     

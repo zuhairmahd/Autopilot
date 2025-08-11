@@ -32,6 +32,9 @@ try {
     Write-Host "✅ Loaded $($functions.Count) functions" -ForegroundColor Green
     Write-Host ""
     
+    # Initialize logging for functions that require it
+    $Global:LogFile = "$demoFolder\demo-settings.log"
+    
     # Create demo settings file
     Write-Host "📄 Creating demo settings file..." -ForegroundColor Cyan
     $demoSettingsFile = "demo-settings.json"
@@ -133,11 +136,8 @@ try {
     
     Write-Host "Setting types supported:" -ForegroundColor Yellow
     foreach ($setting in $settingTypes.Keys) {
-        $inputType = Get-SettingInputType -SettingName $setting -Value (Get-DefaultSettingsStructure).globalSettings.$setting
-        $description = Get-SettingDescription -SettingName $setting
         Write-Host "  📝 $setting" -ForegroundColor White
-        Write-Host "     Type: $inputType" -ForegroundColor Gray
-        Write-Host "     Description: $description" -ForegroundColor Gray
+        Write-Host "     Type: $($settingTypes[$setting])" -ForegroundColor Gray
         Write-Host ""
     }
     

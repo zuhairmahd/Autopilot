@@ -39,49 +39,54 @@ pwsh -File "./TestScripts/run-all-tests.ps1"
 pwsh -File "./main.ps1" -appMode "full" -Verbose
 ```
 
-### Validation Scenarios
-**ALWAYS manually validate any changes by running these complete scenarios:**
+### Testing and Validation
+**CRITICAL TIMING**: ALL builds and tests take significant time. **NEVER CANCEL** long-running operations.
 
-1. **Function Loading Test**: Run `pwsh -File "./TestScripts/test-syntax.ps1"` to verify all functions load correctly
-2. **Configuration System Test**: Run `pwsh -File "./TestScripts/test-settings-functions.ps1"` 
-3. **Menu System Test**: Run `pwsh -File "./TestScripts/test-menu-inclusions.ps1"`
-4. **Authentication Test**: Run `pwsh -File "./TestScripts/test-authentication-types.ps1"`
-5. **Core Validation**: Run `pwsh -File "./TestScripts/test-core-validation.ps1"` for essential functionality
-6. **Comprehensive Testing**: Run `pwsh -File "./TestScripts/test-comprehensive.ps1"` for thorough validation
+**UNIFIED TESTING FRAMEWORK**: All testing goes through a single point of entry - `Test-Runner.ps1`. This replaces individual test script execution and provides centralized test management.
+
+```bash
+# ALWAYS use the unified test runner - this is the single point of entry for all testing
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory syntax       # Quick validation (~5 seconds)
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory core         # Essential tests (~30-60 seconds)
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory unit         # Unit tests (~2-4 minutes)
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory integration  # Integration tests (~3-5 minutes)
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory comprehensive # Full tests (~5-8 minutes)
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all          # All tests (~15+ minutes)
+
+# Test discovery and information
+pwsh -File "./TestScripts/Test-Runner.ps1" -ListTests              # See all available tests
+pwsh -File "./TestScripts/Test-Runner.ps1" -ListCategories         # See test categories
+
+# Pattern-based testing
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory specific -TestPattern "test-menu*"
+
+# Advanced options
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory unit -ShowVerbose -ContinueOnError
+pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all -LogLevel Verbose -DryRun
+
+# Legacy run-all-tests.ps1 is DEPRECATED - it will redirect to Test-Runner.ps1
+```
+
+**DEPRECATED PATTERNS** - Do not use these:
+```bash
+# ❌ Don't run individual test scripts anymore
+pwsh -File "./TestScripts/test-specific-functionality.ps1"
+
+# ❌ Don't use the old test runner directly (it will redirect, but use the new one)
+pwsh -File "./TestScripts/run-all-tests.ps1"
+```
+
+**Validation Checklist** - Always validate changes using the unified test runner:
+- [ ] **Quick Syntax**: `Test-Runner.ps1 -TestCategory syntax` (< 5 seconds)
+- [ ] **Core Functions**: `Test-Runner.ps1 -TestCategory core` (30-60 seconds)  
+- [ ] **Unit Tests**: `Test-Runner.ps1 -TestCategory unit` (2-4 minutes)
+- [ ] **Integration Tests**: `Test-Runner.ps1 -TestCategory integration` (3-5 minutes)
+- [ ] **Full Validation**: `Test-Runner.ps1 -TestCategory all` (15+ minutes - use appropriate timeout)
 
 **End-to-End Validation**: Always run `pwsh -File "./main.ps1" -appMode "full" -Verbose` and verify:
 - Functions load without errors (should see "Importing function" messages)
 - Configuration files are processed correctly
 - Menu system initializes (even if authentication fails due to missing credentials)
-
-**Available Test Categories:**
-- **Demo Scripts**: `demo-*.ps1` - Interactive demonstrations of functionality
-- **Integration Tests**: `test-*-integration.ps1` - Cross-component validation
-- **Unit Tests**: `test-*.ps1` - Individual component testing
-- **Final Validation**: `final-validation*.ps1` - Pre-release comprehensive checks
-
-### Common Validation Commands
-```bash
-# Quick syntax validation (~1 second)
-pwsh -File "./TestScripts/test-syntax.ps1"
-
-# Core functionality validation (~30 seconds)
-pwsh -File "./TestScripts/test-core-validation.ps1"
-
-# Validate specific functionality (each ~16 seconds)
-pwsh -File "./TestScripts/test-configuration-system1.ps1"
-pwsh -File "./TestScripts/test-menu-logic-validation.ps1"
-pwsh -File "./TestScripts/test-settings-functions.ps1"
-
-# Comprehensive testing (~2-3 minutes)
-pwsh -File "./TestScripts/test-comprehensive.ps1"
-
-# Full test suite - NEVER CANCEL: 6 minutes total
-pwsh -File "./TestScripts/run-all-tests.ps1"
-
-# Final validation before release
-pwsh -File "./TestScripts/final-validation-comprehensive.ps1"
-```
 
 ## Architecture & Key Patterns
 
@@ -102,8 +107,47 @@ functions/
 
 **Function Loading**: All functions are dot-sourced from `/functions/` at startup, loaded recursively. Each module must be independent—avoid inter-module dependencies.
 
-**Menu Definitions**: All functions are dot-sourced from `/functions/` 
-Menu definitions are contained in settings.json in the menus object.  If any changes are made to the menu structure or functionality, the settings.json file must be updated accordingly.
+**Function Count**: 137 total functions organized across 9 categories:
+- **menuFunctions** (17): User interface and navigation system
+- **setupFunctions** (23): Configuration management and initialization  
+- **utilityFunctions** (18): General-purpose helper functions
+- **deviceFunctions** (12): Device operations and queries
+- **autopilotFunctions** (14): Autopilot device management
+- **graphFunctions** (22): Microsoft Graph API integration
+- **reportingFunctions** (11): Device assessment and reporting
+- **encryptionFunctions** (14): Security and encryption utilities
+- **updateFunctions** (6): Update and maintenance operations
+
+### Menu System Architecture
+
+The application uses a sophisticated hierarchical menu system with the following key characteristics:
+
+**Menu Configuration**: Menu definitions are stored in `settings.json` in the `menus` array. The menu system is data-driven and supports:
+- **Hierarchical Navigation**: Multi-level menu structure with submenus
+- **Role-Based Access**: Menu items filtered by `appMode` and `includeInDisplayModes`
+- **Stack-Based History**: Navigation history maintained in `$global:MenuHistory`
+- **Context-Aware Actions**: Menu functions adapt based on calling context
+- **Mnemonic Support**: Keyboard shortcuts for navigation (b=back, m=main, q/e/0=exit)
+
+**Key Menu Functions**:
+- `DisplayNumericMenu`: Primary menu rendering engine
+- `ShowMenu`: Menu orchestration and display coordination  
+- `Handle-MenuItemSelection`: User input processing and validation
+- `Handle-ActionExecution`: Action dispatch and execution
+- Navigation handlers for back/main menu/submenu operations
+
+**Menu Structure**: The main menu includes sections for:
+1. Device assignment and readiness checking
+2. Device status and troubleshooting
+3. Autopilot device management
+4. Application settings and configuration
+5. Update management
+6. Device exports and reporting
+7. Device actions (wipe, clean, sync)
+
+**Documentation**: Complete menu system documentation available in `/docs/MENU_SYSTEM_DOCUMENTATION.md` including all functions, usage patterns, and navigation flows.
+
+**Important**: If any changes are made to the menu structure or functionality, the `settings.json` file must be updated accordingly, and menu tests should be run to validate changes.
 
 ### Main Application Flow
 - **Entry Point**: `main.ps1` - handles initialization and menu navigation

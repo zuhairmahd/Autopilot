@@ -19,15 +19,20 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 
 ### Key Features
 
-- **Interactive Menu System**: User-friendly interface with hierarchical navigation
-- **Autopilot Device Management**: Import devices into Autopilot with automated hash generation
-- **Device Status Monitoring**: Real-time device enrollment and readiness status checking
-- **User Verification**: Validate user readiness for device assignment based on group memberships
-- **Corporate Device Identifier Management**: Mark devices as corporate-owned in Intune
-- **Bulk Operations**: Export device lists and perform batch operations
-- **App Assignment Reporting**: Comprehensive reporting and export functionality for Intune app assignments
-- **Security Features**: AES-256 encrypted configuration with secure password handling
-- **Automatic Setup**: First Run Wizard for easy initial configuration
+- **🎯 Role-Based Interface**: Customizable app modes (Help Desk, Registration, Advanced, Admin) with tailored menu options for different user roles
+- **📋 Interactive Menu System**: Intuitive hierarchical navigation with keyboard shortcuts and stack-based history
+- **⚡ Device Assignment Workflow**: Streamlined device-to-user assignment with automated readiness validation
+- **🔍 Comprehensive Device Monitoring**: Real-time device enrollment status, BitLocker keys, LAPS credentials, and health monitoring
+- **🚀 Autopilot Device Management**: Complete device lifecycle from import to deployment with hash generation and profile assignment
+- **👥 User Readiness Validation**: Intelligent assessment of user eligibility based on group memberships and organizational policies
+- **🏢 Corporate Device Management**: Mark devices as corporate-owned for Intune Device Preparation and compliance
+- **📊 Advanced Reporting & Export**: CSV exports for devices, assignments, storage analysis, and application deployments
+- **🔐 Enterprise Security**: AES-256 encrypted configuration, secure credential handling, and multi-factor authentication support
+- **⚙️ Automated Setup**: First Run Wizard with guided configuration and automatic credential encryption
+- **🔄 Smart Updates**: Automatic application updates with digital signature verification and rollback capabilities
+- **🌐 Multi-Domain Support**: Environment-specific configurations for different organizational domains
+- **📱 Device Actions**: Remote device management (restart, wipe, clean, sync) with proper authorization
+- **🎨 Menu Customization**: Flexible menu system that adapts to organizational needs and user permissions
 
 ## System Requirements
 
@@ -137,6 +142,17 @@ When you launch the application, you'll see the main menu with the following opt
    - View version information, copyright, and licensing details
    - Summary of application capabilities
 
+### Enhanced Navigation Features
+
+The menu system includes several advanced features for improved usability:
+
+- **🎯 Smart Navigation**: Contextual menu options that adapt based on your current operation
+- **⌨️ Keyboard Shortcuts**: Quick access using mnemonic keys for common actions
+- **📚 Navigation History**: Full back/forward navigation with menu stack memory
+- **🔍 Dynamic Filtering**: Menu items automatically shown/hidden based on your role and permissions
+- **💡 Contextual Help**: Descriptive menu items with clear explanations of functionality
+- **⚡ Quick Actions**: Direct access to frequently used operations from multiple menu paths
+
 ### Navigation Tips
 
 - **Type the number** of the menu option you want to select and press Enter
@@ -146,6 +162,7 @@ When you launch the application, you'll see the main menu with the following opt
   - 'q' or 'e' for Exit
   - '0' for Exit
 - **Menu history**: The last two options in submenus allow you to go back to the previous menu or return to the main menu
+- **Smart defaults**: The system remembers your preferences and suggests relevant actions
 
 ## Advanced Configuration
 
