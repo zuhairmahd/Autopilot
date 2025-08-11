@@ -1609,7 +1609,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         $hasCorrectNumberOfDevices = $false
         
         #region Check if the user exists first.
-        $userInfo = GetEntraUser -Name $userName -AccessToken $accessToken -findSimilar
+        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
         Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
         Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
