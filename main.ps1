@@ -1800,7 +1800,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
     #region Check if the group exists first using unified GetEntraUser function
-    $global:groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar
+    $global:groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar -verbose
     Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
     if ($groupInfo.GetType().Name -eq 'String')
     {
@@ -1843,47 +1843,32 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
             Write-Host "Displaying all $($searchResults.value.count) matches:"
         }
         # Display group selection menu similar to user selection
-        Write-Host ""
-        for ($i = 0; $i -lt [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay); $i++)
+        $possibleGroupName = DisplayUserList -UserList $groupInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
+        # Handle navigation options returned from DisplayUserList
+        if ($possibleGroupName -in $returnValues.Values)
         {
-            $group = $searchResults.value[$i]
-            Write-Host "[$($i + 1)] $($group.displayName)" -ForegroundColor Yellow
-            if ($group.description)
-            {
-                Write-Host "    Description: $($group.description)" -ForegroundColor Gray
-            }
+            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleGroupName"
+            return $possibleGroupName
         }
-        Write-Host "[B] Back to previous menu" -ForegroundColor Cyan
-        Write-Host "[M] Main menu" -ForegroundColor Cyan
-        Write-Host "[0] Exit" -ForegroundColor Red
-        Write-Host ""
-        
-        $choice = Read-Host "Please select a group (1-$([math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay)))"
-        
-        if ($choice -eq "B" -or $choice -eq "b" -or $choice -eq "Back" -or $choice -eq "back")
+        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
         {
             Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
             return $returnValues.backoutText
         }
-        elseif ($choice -eq "M" -or $choice -eq "m" -or $choice -eq "Main Menu" -or $choice -eq "main menu")
+        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
         {
             Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
             return "Main Menu"
         }
-        elseif ($choice -eq 0 -or $choice -eq "0")
+        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
         {
             Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
             return "EXIT_APPLICATION"
         }
-        elseif ([int]$choice -ge 1 -and [int]$choice -le [math]::Min($searchResults.value.count, [int]$settings.maxUserMatchDisplay))
-        {
-            $selectedGroup = $searchResults.value[[int]$choice - 1]
-            Write-Verbose "[$scriptName] User selected group: $($selectedGroup.displayName)"
-        }
         else
         {
-            Write-Host "Invalid selection. Please try again." -ForegroundColor Red
-            return $returnValues.backoutText
+            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
+            $userName = $possibleGroupName
         }
     }
     else

@@ -144,11 +144,7 @@
         "configFile": ".\\.secrets\\config.json",
         "showLicenseBanner": false,
         "deviceContactThresholdInDays": 30,
-        "groupPatternsToExclude": [
-            "^SG_",
-            "^O365_",
-            "Dynamic"
-        ]
+        "groupPatternsToExclude": []
     },
     "domains": {
         "arabictutor.com": {
@@ -181,11 +177,7 @@
                     "-test",
                     "onmicrosoft.com"
                 ],
-                "groupPatternsToExclude": [
-                    "^SG_",
-                    "^O365_",
-                    "Dynamic"
-                ],
+                "groupPatternsToExclude": [],
                 "release": "master",
                 "MinSerialNumberLength": 7,
                 "maxUserMatchDisplay": "10"
@@ -228,11 +220,7 @@
                     "-sup",
                     "-a"
                 ],
-                "groupPatternsToExclude": [
-                    "^SG_",
-                    "^ITN-",
-                    "Dynamic"
-                ],
+                "groupPatternsToExclude": [],
                 "release": "master",
                 "MinSerialNumberLength": 7,
                 "GroupTag": "MSB01"

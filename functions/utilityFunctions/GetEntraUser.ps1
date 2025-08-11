@@ -45,7 +45,7 @@ function GetEntraUser()
 
     $Info = CallGraphAPI @params
     Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
-    if ($Info -notin 400, 401, 403, 404)
+    if ($Info -notin 400, 401, 403, 404 -and $info.value.count -gt 0)
     {
         Write-Verbose "[$functionName] Exact match found for $($ObjectType): $Name"
         Write-Verbose "[$functionName] $ObjectType found: $($Info.displayName)"
@@ -107,7 +107,6 @@ function GetEntraUser()
     # Step 2: If no exact match found, perform substring search using $search parameter if the $findSimilar switch is set
     if ($FindSimilar)
     {
-
         Write-Verbose "[$functionName] No exact match found (Error code: $Info). Performing substring search using Graph API search."
         if ($ObjectType -eq 'User') 
         {
@@ -141,7 +140,14 @@ function GetEntraUser()
                 Write-Verbose "[$functionName] Trying advanced filter: $advancedFilterExpression"
                 
                 # Use advanced query capabilities with ConsistencyLevel and count
-                $advancedExtraParameters = if ($ExtraParameters) { "$ExtraParameters&count=true" } else { "count=true" }
+                $advancedExtraParameters = if ($ExtraParameters)
+                {
+                    "$ExtraParameters&count=true" 
+                }
+                else
+                {
+                    "count=true" 
+                }
                 $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $advancedFilterExpression -extraParameters $advancedExtraParameters -consistencyLevel
                 Write-Verbose "[$functionName] Advanced query completed with $($fallbackResults.value.Count) results"
             }
