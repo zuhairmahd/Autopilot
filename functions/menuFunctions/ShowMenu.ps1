@@ -281,24 +281,21 @@ function ShowMenu()
         }
         
         # Handle menu item selection
-        return Handle-MenuItemSelection -SelectedOption $selectedOption -Choices $choices -MenuItems $menuItems -CurrentMenu $Menu
-        #     $selectionResult = Handle-MenuItemSelection -SelectedOption $selectedOption -Choices $choices -MenuItems $menuItems -CurrentMenu $Menu
-        #     # Check if we need to auto-pop the stack for -ReturnsValue actions
+        # return Handle-MenuItemSelection -SelectedOption $selectedOption -Choices $choices -MenuItems $menuItems -CurrentMenu $Menu
+        $selectionResult = Handle-MenuItemSelection -SelectedOption $selectedOption -Choices $choices -MenuItems $menuItems -CurrentMenu $Menu
+        # Check if we need to auto-pop the stack for -ReturnsValue actions
         #     # This happens when:
         #     # 1. We pushed a menu to the stack (StackOperation was 'Push' or auto-pushed)
         #     # 2. The result is from a -ReturnsValue action (not navigation commands)
         #     # 3. The result is not null and not a menu object
-        #     if ($selectionResult -and 
-        #         ($StackOperation -eq 'Push' -or ($StackOperation -eq 'Auto' -and $CalledBy -in @('Action', 'Submenu', 'Custom_GroupAssignmentSubmenu'))) -and
-        #         $selectionResult -notin @("Back", "Main Menu", 0, "0", $null) -and
-        #         $selectionResult -isnot [hashtable]) 
-        #     {
-        #         Write-Verbose "[$functionName] Auto-popping stack for -ReturnsValue action result: $selectionResult"
-        #         $poppedMenu = Pop-MenuFromStack
-        #         Write-Verbose "[$functionName] Auto-popped menu: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })"
-        #     }
+        if ($selectionResult -and ($StackOperation -eq 'Push' -or ($StackOperation -eq 'Auto' -and $CalledBy -in @('Action', 'Submenu', 'Custom_GroupAssignmentSubmenu'))) -and $selectionResult -notin @("Back", "Main Menu", 0, "0", $null) -and $selectionResult -isnot [hashtable]) 
+        {
+            Write-Verbose "[$functionName] Auto-popping stack for -ReturnsValue action result: $selectionResult"
+            $poppedMenu = Pop-MenuFromStack
+            Write-Verbose "[$functionName] Auto-popped menu: $(if ($poppedMenu) { $poppedMenu.Title } else { 'null' })"
+        }
         
-        #     return $selectionResult
+        return $selectionResult
     }
 }
 

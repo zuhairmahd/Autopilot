@@ -1894,10 +1894,27 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
-    
-    # Pause to let user read the information
-    Write-Host ""
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
+    #region Handle navigation responses from GetDeviceByUser
+    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        return $returnValues.backoutText
+    }
+    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        return "EXIT_APPLICATION"
+    }        
+    else 
+    {
+        return $result
+    }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {

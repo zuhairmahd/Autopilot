@@ -22,7 +22,7 @@ function ShowGroupAssignments()
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
 
-    # Get group assignments
+    # Get group assignments (fetch once and reuse)
     $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $GroupName -includeBeta
     if ($assignments -eq 'noGroup')
     {
@@ -34,8 +34,10 @@ function ShowGroupAssignments()
         Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$GroupName'." -logLevel "Warning"
         return $returnValues.noGroupAssignmentsFoundMessage
     }
-    #Create Assignments menu
-    
+    # Cache all assignments to avoid re-query per selection
+    $allAssignments = @($assignments.allAssignments)
+
+    # Create Assignments menu (build once and reuse)
     #region Group Assignments
     $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $GroupName" -Description "What type of assignments would you like to see?"
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Application Assignments" -Action {
@@ -58,54 +60,55 @@ function ShowGroupAssignments()
         Write-Host "Displaying all assignments"
         return 'All'
     } -returnsValue
-    # Use proper stack operation to maintain menu navigation integrity
-    # $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
-    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Action' -StackOperation 'Push'
-
     #endregion Group Assignments
-    
-    # Validate that we got a proper assignment, not a navigation option
-    if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
-    {
-        Write-Verbose "[$functionName] ShowMenu returned navigation option: '$assignmentType', treating as navigation"
-        return $assignmentType
-    }
-    
-    # If assignmentType is null, user may have navigated away - don't continue processing
-    if ($null -eq $assignmentType)
-    {
-        Write-Verbose "[$functionName] ShowMenu returned null, user may have navigated away"
-        return $null
-    }
 
-    # Filter assignments by type
-    if ($assignmentType -ne 'All')
+    # Loop: after showing assignments, return to the assignment type menu
+    while ($true)
     {
-        $assignments = @($assignments.allAssignments | Where-Object { $_.Type -eq $assignmentType })
-        Write-Host "Found $($assignments.Count) assignments of type $assignmentType"
-    }
-    else
-    {
-        Write-Host "Found $($assignments.Count) assignments"   
-        $assignments = $assignments.allAssignments
-    }
-    
-    # Display assignments
-    $assignments | ForEach-Object {
-        if ($assignmentType -eq 'All')
+        # Use proper stack operation to maintain menu navigation integrity
+        $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
+        # $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Action'
+        # Validate that we got a proper assignment, not a navigation option
+        if ($assignmentType -eq "Back" -or $assignmentType -eq "Main Menu" -or $assignmentType -eq 0 -or $assignmentType -eq "0")
         {
-            Write-Verbose "[$functionName] Displaying the Assignment Type since the AssignmentType is 'All'"
-            Write-Log -logFile $LogFile -Module $functionName -Message "Displaying the Assignment Type since the AssignmentType is 'All'"
-            Write-Host "Assignment Type: $($_.Type)"
+            Write-Verbose "[$functionName] ShowMenu returned navigation option: '$assignmentType', treating as navigation"
+            return $assignmentType
         }
-        Write-Host "Name: $($_.Name)"
-        if ($null -ne $_.Intent)
+        # If assignmentType is null, user may have navigated away - don't continue processing
+        if ($null -eq $assignmentType)
         {
-            Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Intent $($_.Intent)"
-            Write-Host "Intent: $($_.Intent)"
+            Write-Verbose "[$functionName] ShowMenu returned null, user may have navigated away"
+            return $null
         }
+        # Filter assignments by type for display
+        if ($assignmentType -ne 'All')
+        {
+            $selectedAssignments = @($allAssignments | Where-Object { $_.Type -eq $assignmentType })
+            Write-Host "Found $($selectedAssignments.Count) assignments of type $assignmentType"
+        }
+        else
+        {
+            $selectedAssignments = $allAssignments
+            Write-Host "Found $($selectedAssignments.Count) assignments"
+        }
+        # Display assignments
+        $selectedAssignments | ForEach-Object {
+            if ($assignmentType -eq 'All')
+            {
+                Write-Verbose "[$functionName] Displaying the Assignment Type since the AssignmentType is 'All'"
+                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying the Assignment Type since the AssignmentType is 'All'"
+                Write-Host "Assignment Type: $($_.Type)"
+            }
+            Write-Host "Name: $($_.Name)"
+            if ($null -ne $_.Intent)
+            {
+                Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Intent $($_.Intent)"
+                Write-Host "Intent: $($_.Intent)"
+            }
+        }
+        Write-Host "Press any key to continue..."
+        [void][System.Console]::ReadKey($true)
+        # Loop continues to re-show the assignment type menu
     }
-    
-    # Return a special value to indicate successful completion
-    return "AssignmentsDisplayed"
+    return $returnValues.backoutText
 }
