@@ -1800,7 +1800,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
     #region Check if the group exists first using unified GetEntraUser function
-    $groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar
+    $global:groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar
     Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
     if ($groupInfo.GetType().Name -eq 'String')
     {
