@@ -39,6 +39,7 @@ try
             notInIntuneMessage            = 'The device is not in Intune.'
             noUserDeviceFoundMessage      = 'No user or device found.'
             noUserFoundInDirectoryMessage = 'This user does not exist'
+            noGroupFoundInDirectoryMessage = 'This group does not exist'
             ImportSuccessMessage          = 'The device was imported successfully.'
             ImportFailedMessage           = 'The device import failed.'
             DeleteSuccessMessage          = 'The device was deleted successfully.'

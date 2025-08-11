@@ -1,36 +1,46 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "Create Release",
-            "type": "shell",
-            "command": "powershell.exe",
-            "args": [
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                "${workspaceFolder}\\CreateRelease.ps1",
-                "-InputFile",
-                "${workspaceFolder}\\main.ps1",
-                "-Overwrite"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": true,
-                "panel": "new",
-                "showReuseMessage": true,
-                "close": true,
-                "clear": true
-            },
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            }
-        }
-    ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Create Release",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}\\CreateRelease.ps1",
+				"-InputFile",
+				"${workspaceFolder}\\main.ps1",
+				"-Overwrite"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": true,
+				"panel": "new",
+				"showReuseMessage": true,
+				"close": true,
+				"clear": true
+			},
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Run test syntax",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}\\TestScripts\\test-syntax.ps1\"",
+			"isBackground": false,
+			"problemMatcher": [
+				"$powershell"
+			],
+			"group": "build"
+		}
+	]
 }

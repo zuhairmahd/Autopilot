@@ -1594,6 +1594,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
+
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1608,7 +1609,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         $hasCorrectNumberOfDevices = $false
         
         #region Check if the user exists first.
-        $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
         Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
         Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
@@ -1659,7 +1660,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
                 Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
                 return "Main Menu"
             }
-            elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
+            elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
             {
                 Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
                 return "EXIT_APPLICATION"
@@ -1789,6 +1790,116 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
+$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+    if ($null -eq $groupName)
+    {
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        return $returnValues.backoutText
+    }
+    Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+    #region Check if the group exists 
+    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
+    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
+    if ($groupInfo.GetType().Name -eq 'String')
+    {
+        # Handle error messages from GetEntraUser
+        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
+        return $groupInfo
+    }
+    $selectedGroup = $null
+    $substringSearch = $groupInfo[1]
+    $searchResults = $groupInfo[0].value
+    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
+    {
+        # Exact match found
+        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
+        $selectedGroup = $searchResults.value[0]
+        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    }
+    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
+    {
+        # Similar matches found
+        Write-Host "Could not find an exact match for group '$groupName'."
+        if ($searchResults.value.count -eq 1)
+        {
+            Write-Host "Found a group with a similar name."
+        }
+        else
+        {
+            Write-Host "Found $($searchResults.value.count) groups with similar names:"
+        }
+        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
+        {
+            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+        }
+        elseif ($searchResults.value.count -eq 1)
+        {
+            Write-Host "Is this the correct group?"
+        }
+        else
+        {
+            Write-Host "Displaying all $($searchResults.value.count) matches:"
+        }
+        # Display group selection menu similar to user selection
+        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
+        # Handle navigation options returned from DisplayGroupList
+        if ($possibleGroupName -in $returnValues.Values)
+        {
+            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
+            return $possibleGroupName
+        }
+        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
+        {
+            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText
+        }
+        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
+        {
+            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+            return "Main Menu"
+        }
+        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
+        {
+            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+            return "EXIT_APPLICATION"
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
+            $selectedGroup = $possibleGroupName
+        }
+    }
+    else
+    {
+        return $returnValues.noGroupFoundMessage
+    }
+    #endregion Check if the group exists
+    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
+    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup 
+    #region Handle navigation responses from GetDeviceByUser
+    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+        return $returnValues.backoutText
+    }
+    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+        return "EXIT_APPLICATION"
+    }        
+    else 
+    {
+        return $result
+    }
+}
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $uri = "applications(appId='$appId')"
@@ -1871,6 +1982,24 @@ else
 #endregion Show Menu
 
 #region Cleanup
+# Clear sensitive data from memory before exiting
+Clear-SecureMemory -ClearScriptVariables
+
+# Cleanup temporary files 
+$filesCleaned = cleanupTempFiles
+if ($filesCleaned.AllRemoved)
+{
+    Write-Verbose "[$scriptName] All temporary files were cleaned."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+}
+Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+
+# Finish logging
+Write-Log -LogFile $LogFile -FinishLogging
+#endregion Cleanup
 # Clear sensitive data from memory before exiting
 Clear-SecureMemory -ClearScriptVariables
 

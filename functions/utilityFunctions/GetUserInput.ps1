@@ -4,7 +4,7 @@ function GetUserInput()
     param(
         [string]$Message,
         [string]$Prompt,
-        [validateSet('userName', 'serialNumber')]
+        [validateSet('userName', 'serialNumber', 'groupName')]
         [string]$InputType,
         $settings = $settings # Use the script-level $settings by default
     )

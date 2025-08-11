@@ -137,13 +137,15 @@
         "Repo": "Github",
         "timeInSeconds": "60",
         "maxUserMatchDisplay": 24,
+        "maxGroupMatchDisplay": 24,
         "maxWaitTime": "30",
         "autoUpdate": true,
         "appMode": "full",
         "testMode": false,
         "configFile": ".\\.secrets\\config.json",
         "showLicenseBanner": false,
-        "deviceContactThresholdInDays": 30
+        "deviceContactThresholdInDays": 30,
+        "groupPatternsToExclude": []
     },
     "domains": {
         "arabictutor.com": {
@@ -176,6 +178,7 @@
                     "-test",
                     "onmicrosoft.com"
                 ],
+                "groupPatternsToExclude": [],
                 "release": "master",
                 "MinSerialNumberLength": 7,
                 "maxUserMatchDisplay": "10"
@@ -200,6 +203,7 @@
                 "MaxSerialNumberLength": 10,
                 "deviceContactThresholdInDays": 30,
                 "maxUserMatchDisplay": 24,
+                "maxGroupMatchDisplay": 24,
                 "maxWaitTime": "30",
                 "showLicenseBanner": false,
                 "autoUpdate": false,
@@ -218,6 +222,7 @@
                     "-sup",
                     "-a"
                 ],
+                "groupPatternsToExclude": [],
                 "release": "master",
                 "MinSerialNumberLength": 7,
                 "GroupTag": "MSB01"
@@ -263,6 +268,15 @@
                     "name": "Lookup device by User",
                     "type": "action",
                     "includeInDisplayModes": []
+                },
+                {
+                    "description": "View group assignments for Intune policies and applications",
+                    "name": "View group assignments",
+                    "type": "action",
+                    "includeInDisplayModes": [
+                        "helpdesk",
+                        "advanced"
+                    ]
                 }
             ],
             "type": "submenu",
