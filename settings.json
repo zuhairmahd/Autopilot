@@ -202,6 +202,7 @@
                 "MaxSerialNumberLength": 10,
                 "deviceContactThresholdInDays": 30,
                 "maxUserMatchDisplay": 24,
+                "maxGroupMatchDisplay": 24,
                 "maxWaitTime": "30",
                 "showLicenseBanner": false,
                 "autoUpdate": false,

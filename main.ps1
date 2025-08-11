@@ -1800,7 +1800,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
     #region Check if the group exists first using unified GetEntraUser function
-    $global:groupInfo = GetEntraUser -ObjectType 'Group' -Name $groupName -AccessToken $accessToken -FindSimilar -verbose
+    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
     Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
     if ($groupInfo.GetType().Name -eq 'String')
     {
@@ -1843,11 +1843,11 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
             Write-Host "Displaying all $($searchResults.value.count) matches:"
         }
         # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayUserList -UserList $groupInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-        # Handle navigation options returned from DisplayUserList
+        $possibleGroupName = DisplayGroupList -GroupList $groupInfo[0].value -maxDisplay $settings.maxGroupMatchDisplay
+        # Handle navigation options returned from DisplayGroupList
         if ($possibleGroupName -in $returnValues.Values)
         {
-            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleGroupName"
+            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
             return $possibleGroupName
         }
         elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
@@ -1868,7 +1868,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         else
         {
             Write-Verbose "[$scriptName] User selected: $possibleGroupName"
-            $userName = $possibleGroupName
+            $selectedGroup = $possibleGroupName
         }
     }
     else
@@ -1879,7 +1879,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup.displayName
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup 
     #region Handle navigation responses from GetDeviceByUser
     if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
     {
