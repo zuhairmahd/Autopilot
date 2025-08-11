@@ -22,17 +22,29 @@ function GetEntraUser()
     {
         Write-Verbose "[$functionName] Attempting exact match for userPrincipalName: $Name"
         $Uri = "users/$Name"
-        $ExtraParameters = "select=givenName,surName,displayName,userPrincipalName,mail,id"
+        $ExtraParameters = "select=givenName,surname,displayName,userPrincipalName,mail,id"
+        $params = @{
+            AccessToken     = $accessToken
+            ResourcePath    = $Uri
+            ExtraParameters = $ExtraParameters
+        }
     }
     elseif ($ObjectType -eq 'Group')
     {
         Write-Verbose "[$functionName] Attempting exact match for group: $Name"
-        $Uri = "groups/$Name"
-        $ExtraParameters = "select=displayName,,id"
+        $Uri = "groups"
+        $filter = "displayName eq '$Name'"
+        $ExtraParameters = "select=displayName,id"
+        $params = @{
+            AccessToken     = $accessToken
+            ResourcePath    = $Uri
+            Filter          = $filter
+            ExtraParameters = $ExtraParameters
+        }
     }
-    $Info = CallGraphAPI -accessToken $AccessToken -ResourcePath $Uri -extraParameters $ExtraParameters
-    Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
 
+    $Info = CallGraphAPI @params
+    Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
     if ($Info -notin 400, 401, 403, 404)
     {
         Write-Verbose "[$functionName] Exact match found for $($ObjectType): $Name"
@@ -51,7 +63,6 @@ function GetEntraUser()
     {
         Write-Verbose "[$functionName] Exact match failed with error code: $Info"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "$objectType lookup failed with error code: $Info" -LogLevel "Error"
-
         # Display appropriate error message to user based on error code
         switch ($Info)
         {
@@ -65,11 +76,18 @@ function GetEntraUser()
             }
             403
             {
-                Write-Host "Forbidden. You do not have permission to access this user." -ForegroundColor Red 
+                Write-Host "Forbidden. You do not have permission to access this $ObjectType." -ForegroundColor Red 
             }
             404
             {
-                Write-Host "User '$UserName' not found in Entra ID." -ForegroundColor Red 
+                if ($ObjectType -eq 'User')
+                {
+                    Write-Host "User '$Name' not found in Entra ID." -ForegroundColor Red 
+                }
+                else
+                {
+                    Write-Host "Group '$Name' not found in Entra ID." -ForegroundColor Red 
+                }
             }
         }
         if ($ObjectType -eq 'User')
@@ -89,12 +107,13 @@ function GetEntraUser()
     # Step 2: If no exact match found, perform substring search using $search parameter if the $findSimilar switch is set
     if ($FindSimilar)
     {
+
         Write-Verbose "[$functionName] No exact match found (Error code: $Info). Performing substring search using Graph API search."
-        if ($objectType -eq 'User') 
+        if ($ObjectType -eq 'User') 
         {
             Write-Verbose "[$functionName] Normalizing username for search."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Normalizing username for search: $UserName" -LogLevel "Information"
-            $searchTerm = $UserName -replace '@.*$', ''
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Normalizing username for search: $Name" -LogLevel "Information"
+            $searchTerm = $Name -replace '@.*$', ''
             Write-Verbose "[$functionName] Cleaned search term: $searchTerm"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cleaned search term: $searchTerm" -LogLevel "Information"
             $searchUri = "users"
@@ -102,54 +121,110 @@ function GetEntraUser()
             Write-Verbose "[$functionName] Searching for substring matches in user properties for: $searchTerm"
             Write-Verbose "[$functionName] Trying filter: $filterExpression" 
         }        
-        elseif ($objectType -eq 'Group')
+        elseif ($ObjectType -eq 'Group')
         {
             $searchTerm = $Name
             $searchUri = "groups"
-            $filterExpression = "contains(displayName, '$searchTerm') or startsWith(displayName, '$searchTerm') or endsWith(displayName, '$searchTerm')"
+            # First try simple startsWith filter (doesn't require advanced query)
+            $filterExpression = "startsWith(displayName, '$searchTerm')"
             Write-Verbose "[$functionName] Searching for substring matches in group properties for: $searchTerm"
-            Write-Verbose "[$functionName] Trying filter: $filterExpression" 
+            Write-Verbose "[$functionName] Trying basic filter: $filterExpression" 
+            
+            # Try basic startsWith first
+            $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $filterExpression -extraParameters $ExtraParameters
+            
+            # If basic filter doesn't return results, try advanced query with contains
+            if ($fallbackResults -in 400, 401, 403, 404 -or (-not $fallbackResults.value) -or $fallbackResults.value.Count -eq 0)
+            {
+                Write-Verbose "[$functionName] Basic filter returned no results. Trying advanced query with contains."
+                $advancedFilterExpression = "contains(displayName, '$searchTerm')"
+                Write-Verbose "[$functionName] Trying advanced filter: $advancedFilterExpression"
+                
+                # Use advanced query capabilities with ConsistencyLevel and count
+                $advancedExtraParameters = if ($ExtraParameters) { "$ExtraParameters&count=true" } else { "count=true" }
+                $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $advancedFilterExpression -extraParameters $advancedExtraParameters -consistencyLevel
+                Write-Verbose "[$functionName] Advanced query completed with $($fallbackResults.value.Count) results"
+            }
         }
         
-        $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -filter $filterExpression -extraParameters $ExtraParameters
+        # $fallbackResults is already set from the group search logic above
         if ($fallbackResults -notin 400, 401, 403, 404 -and $fallbackResults.value -and $fallbackResults.value.Count -gt 0)
         {
+            Write-Verbose "[$functionName] Filter approach succeeded with $($fallbackResults.value.Count) results"
             $substringSearch = $true
             Write-Verbose "[$functionName] Filter approach succeeded with $($fallbackResults.value.Count) results"
             # Initialize filtered results array
             $filteredResults = @()
-            # Filter out excluded users
+            # Filter out excluded items
             foreach ($item in $fallbackResults.value)
             {
+                Write-Verbose "[$functionName] Processing $($ObjectType): $($item.displayName)"
                 #Check if the object is a duplicate record of a previous record
-                Write-Verbose "[$functionName] Processing $($objectType): $($item.displayName) ($($item.userPrincipalName))"
-                if ($filteredResults -contains $item.userPrincipalName -or $filteredResults -contains $item.displayName)
+                $uniqueKey = if ($ObjectType -eq 'User')
                 {
-                    Write-Verbose "[$functionName] $objectType $($item.displayName) is a duplicate, skipping."
+                    $item.userPrincipalName 
+                }
+                else
+                {
+                    $item.displayName 
+                }
+                Write-Verbose "[$functionName] Processing $($ObjectType): $($item.displayName) (Key: $uniqueKey)"
+                if ($filteredResults -contains $uniqueKey)
+                {
+                    Write-Verbose "[$functionName] $ObjectType $($item.displayName) is a duplicate, skipping."
                     continue
                 }
                 $excludeItem = $false
-                # Check if any of the exclusion patterns match this item
-                Write-Verbose "Checking against $($settings.userPatternsToExclude.Count) patterns to exclude."
-                if ($settings.userPatternsToExclude -and $settings.userPatternsToExclude.Count -gt 0)
+                # Check exclusion patterns based on object type
+                if ($ObjectType -eq 'User')
                 {
-                    foreach ($pattern in $settings.userPatternsToExclude)
+
+                    Write-Verbose "Checking against $($settings.userPatternsToExclude.Count) user patterns to exclude."
+                    if ($settings.userPatternsToExclude -and $settings.userPatternsToExclude.Count -gt 0)
+                 
                     {
-                        Write-Verbose "[$functionName] Checking $($objectType): $($item.displayName) ($($item.userPrincipalName)) against exclusion pattern: $pattern"
-                        if ($item.userPrincipalName.Contains($pattern) -or $item.displayName -match $pattern)
+                        foreach ($pattern in $settings.userPatternsToExclude)
                         {
-                            # If the item matches any exclusion pattern, mark them for exclusion
-                            Write-Verbose "[$functionName] $($objectType) $($item.displayName) matches exclusion pattern: $pattern"
-                            Write-Verbose "[$functionName] Excluding $($objectType): $($item.displayName) ($($item.userPrincipalName)) - Matched exclusion pattern: $pattern"
-                            $excludeItem = $true
-                            break
+                            Write-Verbose "[$functionName] Checking $($ObjectType): $($item.displayName) ($($item.userPrincipalName)) against exclusion pattern: $pattern"
+                            if ($item.userPrincipalName.Contains($pattern) -or $item.displayName -match $pattern)
+                            {
+                                Write-Verbose "[$functionName] $($ObjectType) $($item.displayName) matches exclusion pattern: $pattern"
+                                Write-Verbose "[$functionName] Excluding $($ObjectType): $($item.displayName) ($($item.userPrincipalName)) - Matched exclusion pattern: $pattern"
+                                $excludeItem = $true
+                                break
+                            }
                         }
                     }
                 }
-                # Add user to filtered results if not excluded
+                elseif ($ObjectType -eq 'Group')
+                {
+                    Write-Verbose "Checking against $($settings.groupPatternsToExclude.Count) group patterns to exclude."
+                    if ($settings.groupPatternsToExclude -and $settings.groupPatternsToExclude.Count -gt 0)
+                    {
+                        foreach ($pattern in $settings.groupPatternsToExclude)
+                        {
+                            Write-Verbose "[$functionName] Checking $($ObjectType): $($item.displayName) against exclusion pattern: $pattern"
+                            if ($item.displayName -match $pattern)
+                            {
+                                Write-Verbose "[$functionName] $($ObjectType) $($item.displayName) matches exclusion pattern: $pattern"
+                                Write-Verbose "[$functionName] Excluding $($ObjectType): $($item.displayName) - Matched exclusion pattern: $pattern"
+                                $excludeItem = $true
+                                break
+                            }
+                        }
+                    }
+                }
+                # Add item to filtered results if not excluded
                 if (-not $excludeItem)
                 {
-                    Write-Verbose "[$functionName] Including $($objectType): $($item.displayName) ($($item.userPrincipalName))"
+                    if ($ObjectType -eq 'User')
+                    {
+                        Write-Verbose "[$functionName] Including $($ObjectType): $($item.displayName) ($($item.userPrincipalName))"
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] Including $($ObjectType): $($item.displayName)"
+                    }
                     $filteredResults += $item
                 }
             }            
@@ -176,7 +251,7 @@ function GetEntraUser()
         else        
         {
             Write-Verbose "[$functionName] Search approach failed (Error code: $fallbackResults)"
-            if ($objectType -eq 'user')
+            if ($ObjectType -eq 'User')
             {
                 return $returnValues.noUserFoundInDirectoryMessage
             }
@@ -188,16 +263,19 @@ function GetEntraUser()
     }
     else
     {
-        if ($objectType -eq 'User')
+        if ($ObjectType -eq 'User')
         {
-            Write-Verbose "[$functionName] No matches found for userPrincipalName: $UserName"
+            Write-Verbose "[$functionName] No matches found for userPrincipalName: $Name"
             return $returnValues.noUserFoundInDirectoryMessage
         }
         else
         {
-            Write-Verbose "[$functionName] No matches found for groupName: $GroupName"
+            Write-Verbose "[$functionName] No matches found for groupName: $Name"
             return $returnValues.noGroupFoundMessage
         }
     }
+    else 
+    {
+        Write-Verbose "[$functionName] Match Similar switch was not used."
+    }
 }
-

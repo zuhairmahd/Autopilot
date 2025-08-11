@@ -56,6 +56,7 @@ function Test-StringsJsonExists()
                 deviceNotInIntuneMessage       = "The device is not in Intune."
                 noUserDeviceFoundMessage       = "No user or device found."
                 noUserFoundInDirectoryMessage  = "This user does not exist"
+                noGroupFoundInDirectoryMessage = "This group does not exist"
                 noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
                 noDeviceFound                  = "No device found"
                 deviceAssignedMessage          = "The device is assigned to a deployment profile."

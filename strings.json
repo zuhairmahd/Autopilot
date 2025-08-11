@@ -9,6 +9,7 @@
     "none": "No action",
     "contactAdmin": "Contact an Intune administrator",
     "contactHelpdesk": "Contact the helpdesk",
+    "connectToNetwork": "Connect the device to the network for at least 24 hours to update",
     "WipeOrClean": "Wipe or clean the device"
   },
   "returnValues": {
@@ -25,6 +26,7 @@
     "deviceRestartFailedMessage": "The device restart failed.",
     "unknownErrorMessage": "An unknown error occurred.",
     "noGroupFoundMessage": "No group found for the specified group name.",
+    "noGroupFoundInDirectoryMessage": "This group does not exist",
     "noGroupAssignmentsFoundMessage": "No assignments found for the specified group.",
     "noAccessTokenMessage": "Could not obtain an access token. Please check your credentials.",
     "noLAPSFoundMessage": "No LAPS password found for this device.",

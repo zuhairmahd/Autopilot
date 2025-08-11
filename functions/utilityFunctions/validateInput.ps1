@@ -80,6 +80,33 @@ function validateInput()
                 return $returnValue
             }
         }
+        'groupName'
+        {
+            Write-Verbose "[$functionName] Checking group name length: $($UserInput.Length)"
+            # Group names can be longer than usernames, set reasonable limits
+            $maxGroupNameLength = 256  # Microsoft Graph limit for displayName
+            $minGroupNameLength = 1
+            
+            if ($UserInput.Length -gt $maxGroupNameLength)
+            {
+                Write-Verbose "[$functionName] Group name exceeds maximum length of $maxGroupNameLength characters"
+                Write-Host "Group name cannot exceed $maxGroupNameLength characters." -ForegroundColor Red
+                return $returnValue
+            }
+            elseif ($UserInput.Length -lt $minGroupNameLength)
+            {
+                Write-Verbose "[$functionName] Group name is shorter than minimum length of $minGroupNameLength characters"
+                Write-Host "Group name must be at least $minGroupNameLength character." -ForegroundColor Red
+                return $returnValue
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Group name validation passed"
+                $returnValue.value = $UserInput
+                $returnValue.valid = $true
+                return $returnValue
+            }
+        }
         default
         {
             Write-Verbose "[$functionName] Unknown validation type: '$type'. Returning as is."

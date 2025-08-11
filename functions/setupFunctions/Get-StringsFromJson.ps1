@@ -56,6 +56,7 @@ function Get-StringsFromJson
             deviceNotInIntuneMessage       = 'The device is not in Intune.'
             noUserDeviceFoundMessage       = 'No user or device found.'
             noUserFoundInDirectoryMessage  = 'This user does not exist'
+            noGroupFoundInDirectoryMessage = 'This group does not exist'
             deviceUnknownActionMessage     = 'The action may still be in progress. You can check the device status in the Intune portal'
             deviceImportSuccessMessage     = 'The device was imported successfully.'
             deviceImportFailedMessage      = 'The device import failed.'
