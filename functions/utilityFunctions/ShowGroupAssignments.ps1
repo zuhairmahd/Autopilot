@@ -59,7 +59,9 @@ function ShowGroupAssignments()
         return 'All'
     } -returnsValue
     # Use proper stack operation to maintain menu navigation integrity
-    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
+    # $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
+    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Action' 
+    
     #endregion Group Assignments
     
     # Validate that we got a proper assignment, not a navigation option
