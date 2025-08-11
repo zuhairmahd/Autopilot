@@ -1799,7 +1799,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     }
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
-    #region Check if the group exists first using unified GetEntraUser function
+    #region Check if the group exists 
     $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
     Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
     if ($groupInfo.GetType().Name -eq 'String')
@@ -1843,7 +1843,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
             Write-Host "Displaying all $($searchResults.value.count) matches:"
         }
         # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayGroupList -GroupList $groupInfo[0].value -maxDisplay $settings.maxGroupMatchDisplay
+        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
         # Handle navigation options returned from DisplayGroupList
         if ($possibleGroupName -in $returnValues.Values)
         {
@@ -1875,8 +1875,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     {
         return $returnValues.noGroupFoundMessage
     }
-    #endregion Check if the group exists first.
-    
+    #endregion Check if the group exists
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
     $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup 

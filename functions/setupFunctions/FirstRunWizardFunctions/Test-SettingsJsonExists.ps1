@@ -39,7 +39,7 @@ function Test-SettingsJsonExists()
         # Define comprehensive default settings structure with correct property order
         $defaultSettings = @{
             description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version        = "1.3.0.0"
+            version        = $version
             auth           = @{
                 delegated           = $IsDelegated
                 authType            = "PublicAuthFlow"
@@ -187,12 +187,13 @@ function Test-SettingsJsonExists()
             )
             globalSettings = @{
                 configFile                   = ".\.secrets\config.json"
-                maxWaitTime                  = "30"
+                maxWaitTime                  = 30
                 showLicenseBanner            = $true
                 deviceContactThresholdInDays = 30
                 appMode                      = "full"
-                timeInSeconds                = "60"
-                maxUserMatchDisplay          = "10"
+                timeInSeconds                = 60
+                maxUserMatchDisplay          = 10
+                maxGroupMatchDisplay         = 10
                 release                      = "master"
                 repo                         = "Github"
                 testMode                     = $false
@@ -228,6 +229,7 @@ function Test-SettingsJsonExists()
                             "-test",
                             "onmicrosoft.com"
                         )
+                        groupPatternsToExclude           = @()  
                         desiredAutopilotProfiles        = @()
                     }
                 }

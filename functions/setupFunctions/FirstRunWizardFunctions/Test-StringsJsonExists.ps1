@@ -34,7 +34,7 @@ function Test-StringsJsonExists()
         # Define comprehensive default strings structure  
         $defaultStrings = @{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
-            version       = "1.1.0.0"
+            version       = $version
             returnValues  = @{
                 unknownErrorMessage            = "An unknown error occurred."
                 deviceActionPendingMessage     = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."
@@ -57,6 +57,8 @@ function Test-StringsJsonExists()
                 noUserDeviceFoundMessage       = "No user or device found."
                 noUserFoundInDirectoryMessage  = "This user does not exist"
                 noGroupFoundInDirectoryMessage = "This group does not exist"
+                noGroupFoundMessage            = "No group found for the specified group name."
+                noGroupAssignmentsFoundMessage = "No assignments found for the specified group."
                 noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
                 noDeviceFound                  = "No device found"
                 deviceAssignedMessage          = "The device is assigned to a deployment profile."

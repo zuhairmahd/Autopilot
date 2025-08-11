@@ -137,6 +137,7 @@
         "Repo": "Github",
         "timeInSeconds": "60",
         "maxUserMatchDisplay": 24,
+        "maxGroupMatchDisplay": 24,
         "maxWaitTime": "30",
         "autoUpdate": true,
         "appMode": "full",

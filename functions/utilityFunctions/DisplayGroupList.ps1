@@ -5,7 +5,7 @@ function DisplayGroupList()
         [Parameter(Mandatory = $true)]
         [array]$groupList,
         [Parameter(Mandatory = $false)]
-        [int]$maxDisplay = $settings.maxGroupMatchDisplay
+        [int]$maxDisplay = 10
     )
     
     $functionName = $MyInvocation.MyCommand.Name

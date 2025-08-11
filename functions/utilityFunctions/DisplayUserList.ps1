@@ -5,7 +5,7 @@ function DisplayUserList()
         [Parameter(Mandatory = $true)]
         [array]$UserList,
         [Parameter(Mandatory = $false)]
-        [int]$maxDisplay = $settings.maxUserMatchDisplay
+        [int]$maxDisplay = 10
     )
     
     $functionName = $MyInvocation.MyCommand.Name
