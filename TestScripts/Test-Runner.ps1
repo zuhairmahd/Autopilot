@@ -127,14 +127,14 @@ $TestRegistry = @{
     }
     'unit'          = @{
         Description       = 'Individual component and function tests'
-        Pattern           = 'test-settings-functions.ps1,test-json-merge.ps1,test-password-change.ps1,test-temporary-encryption.ps1,test-array-verification.ps1,test-array-storage-issue.ps1,test-getappassignmenttypes.ps1,test-checknextuserreadiness.ps1,test-corporate-device-identifier.ps1,test-backward-compatibility.ps1'
+        Pattern           = 'test-settings-functions.ps1,test-settings-viewer-simple.ps1,test-json-merge.ps1,test-password-change.ps1,test-temporary-encryption.ps1,test-array-verification.ps1,test-array-storage-issue.ps1,test-getappassignmenttypes.ps1,test-checknextuserreadiness.ps1,test-corporate-device-identifier.ps1,test-backward-compatibility.ps1'
         Priority          = 3
         EstimatedDuration = '2-4 minutes'
         Dependencies      = @('syntax', 'core')
     }
     'integration'   = @{
         Description       = 'Cross-component integration and workflow tests'
-        Pattern           = 'test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system1.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-migration-callers.ps1,test-menu-inclusions-integration.ps1,test-e2e-appmode.ps1'
+        Pattern           = 'test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system1.ps1,test-settings-integration.ps1,test-settings-viewer-menu-integration.ps1,test-auth-settings.ps1,test-migration-callers.ps1,test-menu-inclusions-integration.ps1,test-e2e-appmode.ps1'
         Priority          = 4
         EstimatedDuration = '3-5 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
