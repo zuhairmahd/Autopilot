@@ -62,7 +62,7 @@ function GetEntraUser()
     if ($Info -in 400, 401, 403, 404 -and -not $FindSimilar)
     {
         Write-Verbose "[$functionName] Exact match failed with error code: $Info"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "$objectType lookup failed with error code: $Info" -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "$ObjectType lookup failed with error code: $Info" -LogLevel "Error"
         # Display appropriate error message to user based on error code
         switch ($Info)
         {
