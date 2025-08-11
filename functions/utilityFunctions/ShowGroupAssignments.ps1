@@ -60,8 +60,8 @@ function ShowGroupAssignments()
     } -returnsValue
     # Use proper stack operation to maintain menu navigation integrity
     # $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Custom_GroupAssignmentSubmenu' -StackOperation 'Push'
-    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Action' 
-    
+    $assignmentType = ShowMenu -Menu $groupAssignmentsMenu -CalledBy 'Action' -StackOperation 'Push'
+
     #endregion Group Assignments
     
     # Validate that we got a proper assignment, not a navigation option
@@ -104,19 +104,6 @@ function ShowGroupAssignments()
             Write-Log -logFile $LogFile -Module $functionName -Message "Displaying Intent $($_.Intent)"
             Write-Host "Intent: $($_.Intent)"
         }
-    }
-    
-    # Add pause after displaying assignments
-    Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-    try 
-    {
-        $null = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
-    }
-    catch 
-    {
-        Write-Verbose "[$functionName] Error reading key input: $_"
-        # Fallback to Read-Host if RawUI fails
-        Read-Host "Press Enter to continue"
     }
     
     # Return a special value to indicate successful completion
