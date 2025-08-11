@@ -9,8 +9,8 @@ Write-Host ""
 try {
     # Load functions
     Write-Host "Loading functions..." -ForegroundColor Yellow
-    $functionsFolder = "$PWD\functions"
-    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    $functionsFolder = Join-Path $PSScriptRoot ".." "functions"
+    $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     foreach ($function in $functions) {
         . $function.FullName
     }

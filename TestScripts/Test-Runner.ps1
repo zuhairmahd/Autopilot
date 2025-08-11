@@ -333,8 +333,8 @@ function Show-TestListing {
     
     $uncategorizedTests = $allTests | Where-Object { 
         $testName = $_.Name
-        $categorizedTests | Where-Object { $_.Name -eq $testName } | ForEach-Object { $false }
-        if (-not ($categorizedTests | Where-Object { $_.Name -eq $testName })) { $true } else { $false }
+        $isCategorized = $categorizedTests | Where-Object { $_.Name -eq $testName }
+        return -not $isCategorized
     }
     
     if ($uncategorizedTests.Count -gt 0) {

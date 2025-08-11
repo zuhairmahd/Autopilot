@@ -46,8 +46,10 @@ try {
     $functionsToTest = @(
         'functions/setupFunctions/Test-AuthDefaults.ps1',
         'functions/setupFunctions/Show-SettingsEditor.ps1',
-        'functions/setupFunctions/Update-AuthSetting.ps1',
-        'functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1'
+        'functions/setupFunctions/Update-Setting.ps1',
+        'functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1',
+        'functions/utilityFunctions/Write-Log.ps1',
+        'functions/utilityFunctions/Globals.ps1'
     )
     
     $functionsLoaded = 0
@@ -72,6 +74,9 @@ try {
         Write-Host "✗ Some functions failed to load" -ForegroundColor Red
         exit 1
     }
+    
+    # Initialize logging for functions that require it
+    $Global:LogFile = "$testFolder\validation-test.log"
 
     Write-Host "`n=== Test 3: Auth Defaults Creation ===" -ForegroundColor Cyan
     

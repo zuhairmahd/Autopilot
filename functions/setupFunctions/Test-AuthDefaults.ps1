@@ -174,7 +174,7 @@ function Test-AuthDefaults()
             }
             
             # Save updated settings
-            $jsonOutput = $outputSettings | ConvertTo-Json -Depth $maxJSONDepth
+            $jsonOutput = $outputSettings | ConvertTo-Json -Depth $global:maxJSONDepth
             Set-Content -Path $SettingsFile -Value $jsonOutput -Force
             
             Write-Verbose "[$functionName] Auth defaults updated successfully"
