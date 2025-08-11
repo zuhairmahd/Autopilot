@@ -1225,6 +1225,84 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #endregion Autopilot menu
 
 #region Settings menu
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global settings" -Action {
+    Write-Host "Displaying global settings..." -ForegroundColor Cyan
+    $success = Show-SettingsViewer -SettingsType "Global" -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGlobal settings displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display global settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain settings" -Action {
+    Write-Host "Displaying domain-specific settings..." -ForegroundColor Cyan
+    
+    # Get the current domain from settings (same logic as domain settings editor)
+    $currentDomain = $domain
+    # If no current domain, try to get it from domains section or prompt user
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        try
+        {
+            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
+            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
+            {
+                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
+                if ($availableDomains.Count -eq 1)
+                {
+                    $currentDomain = $availableDomains[0]
+                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                }
+                else
+                {
+                    Write-Host "Available domains:" -ForegroundColor White
+                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                    {
+                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
+                    }
+                    
+                    do
+                    {
+                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
+                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                        {
+                            $currentDomain = $availableDomains[[int]$choice - 1]
+                            break
+                        }
+                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
+                    } while ($true)
+                }
+            }
+            else
+            {
+                $currentDomain = Read-Host "Enter domain name to view"
+            }
+        }
+        catch
+        {
+            $currentDomain = Read-Host "Enter domain name to view"
+        }
+    }
+    
+    if ([string]::IsNullOrWhiteSpace($currentDomain))
+    {
+        Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
+        return $returnValues.backoutText
+    }
+    
+    $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
     Write-Host "Launching global settings editor..." -ForegroundColor Cyan
     $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
