@@ -102,8 +102,47 @@ functions/
 
 **Function Loading**: All functions are dot-sourced from `/functions/` at startup, loaded recursively. Each module must be independent—avoid inter-module dependencies.
 
-**Menu Definitions**: All functions are dot-sourced from `/functions/` 
-Menu definitions are contained in settings.json in the menus object.  If any changes are made to the menu structure or functionality, the settings.json file must be updated accordingly.
+**Function Count**: 137 total functions organized across 9 categories:
+- **menuFunctions** (17): User interface and navigation system
+- **setupFunctions** (23): Configuration management and initialization  
+- **utilityFunctions** (18): General-purpose helper functions
+- **deviceFunctions** (12): Device operations and queries
+- **autopilotFunctions** (14): Autopilot device management
+- **graphFunctions** (22): Microsoft Graph API integration
+- **reportingFunctions** (11): Device assessment and reporting
+- **encryptionFunctions** (14): Security and encryption utilities
+- **updateFunctions** (6): Update and maintenance operations
+
+### Menu System Architecture
+
+The application uses a sophisticated hierarchical menu system with the following key characteristics:
+
+**Menu Configuration**: Menu definitions are stored in `settings.json` in the `menus` array. The menu system is data-driven and supports:
+- **Hierarchical Navigation**: Multi-level menu structure with submenus
+- **Role-Based Access**: Menu items filtered by `appMode` and `includeInDisplayModes`
+- **Stack-Based History**: Navigation history maintained in `$global:MenuHistory`
+- **Context-Aware Actions**: Menu functions adapt based on calling context
+- **Mnemonic Support**: Keyboard shortcuts for navigation (b=back, m=main, q/e/0=exit)
+
+**Key Menu Functions**:
+- `DisplayNumericMenu`: Primary menu rendering engine
+- `ShowMenu`: Menu orchestration and display coordination  
+- `Handle-MenuItemSelection`: User input processing and validation
+- `Handle-ActionExecution`: Action dispatch and execution
+- Navigation handlers for back/main menu/submenu operations
+
+**Menu Structure**: The main menu includes sections for:
+1. Device assignment and readiness checking
+2. Device status and troubleshooting
+3. Autopilot device management
+4. Application settings and configuration
+5. Update management
+6. Device exports and reporting
+7. Device actions (wipe, clean, sync)
+
+**Documentation**: Complete menu system documentation available in `/docs/MENU_SYSTEM_DOCUMENTATION.md` including all functions, usage patterns, and navigation flows.
+
+**Important**: If any changes are made to the menu structure or functionality, the `settings.json` file must be updated accordingly, and menu tests should be run to validate changes.
 
 ### Main Application Flow
 - **Entry Point**: `main.ps1` - handles initialization and menu navigation

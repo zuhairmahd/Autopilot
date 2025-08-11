@@ -57,27 +57,41 @@ The application uses a three-tier configuration hierarchy for maximum flexibilit
 Configuration merging is handled by the `MergeSettings` function in `setupFunctions/MergeSettings.ps1`.
 
 #### Menu System Architecture
-- Hierarchical menu navigation with stack-based history tracking
-- State maintained in global variables `$global:History` and `$global:MenuHistory`
-- Menu inclusion system allows role-based access control
-- Context-aware navigation with back/main menu functionality
+The application features a sophisticated menu system with the following characteristics:
+
+- **Hierarchical Navigation**: Multi-level menu structure with submenus
+- **Stack-Based History**: Navigation stack maintained in `$global:MenuHistory`
+- **Role-Based Access**: Menu items filtered by `appMode` and `includeInDisplayModes`
+- **Data-Driven Configuration**: Menus defined in `settings.json` → `menus` array
+- **Context-Aware Actions**: Menu functions adapt based on calling context
+- **Mnemonic Support**: Keyboard shortcuts for common navigation actions
+
+**Key Menu Functions**:
+- `DisplayNumericMenu`: Primary menu rendering engine
+- `ShowMenu`: Menu orchestration and display coordination
+- `Handle-MenuItemSelection`: User input processing and validation
+- `Handle-ActionExecution`: Action dispatch and execution
+- Navigation handlers for back/main menu/submenu operations
+
+For complete menu system documentation, see [MENU_SYSTEM_DOCUMENTATION.md](./MENU_SYSTEM_DOCUMENTATION.md).
 
 ### Function Categories Overview
 
-| Category | Purpose | Key Functions | Location |
-|----------|---------|---------------|----------|
-| **autopilotFunctions** | Autopilot device enrollment and management | `ImportAutopilotDevice`, `DeleteAutopilotDevice`, `AddCorporateDeviceIdentifier` | `autopilotFunctions/v1/`, `autopilotFunctions/v2/` |
-| **deviceFunctions** | Device queries, operations, and lifecycle | `GetDeviceByUser`, `RestartDevice`, `GetBitLockerRecoveryKey` | `deviceFunctions/` |
-| **reportingFunctions** | Device assessment and readiness analysis | `GetNextUserReadinessReport`, `GetDeviceEnrollmentStatus` | `reportingFunctions/` |
-| **graphFunctions** | Microsoft Graph API integration and authentication | `GetGraphAccessToken`, `CallGraphAPI`, `Get-DelegatedToken` | `graphFunctions/` |
-| **menuFunctions** | User interface and navigation system | `ShowMenu`, `AddMenuItem`, `Handle-MenuItemSelection` | `menuFunctions/` |
-| **encryptionFunctions** | Security, encryption, and credential management | `Load-EncryptedConfigFile`, `Get-SecurePassword` | `encryptionFunctions/` |
-| **setupFunctions** | Configuration management and initialization | `InitializeConfiguration`, `CreateConfiguration`, `MergeSettings` | `setupFunctions/` |
-| **utilityFunctions** | General-purpose helper functions | Logging, formatting, and utility operations | `utilityFunctions/` |
-| **GraphAPIFunctions.ps1** | Microsoft Graph API integration | `Get-AuthToken`, `Invoke-GraphAPIRequest` |
-| **MenuFunctions.ps1** | Interactive UI navigation system | `NewMenu`, `AddMenuItem`, `ShowMenu` |
-| **SettingsHelperFunctions.ps1** | Configuration management | `MergeSettings`, `Update-GlobalSetting` |
-| **EncryptionFunctions.ps1** | Secure configuration handling | `Load-EncryptedConfigFile`, `Invoke-JsonFileEncryption` |
+The application organizes its **137 functions** across 9 logical categories:
+
+| Category | Count | Purpose | Key Functions | Location |
+|----------|-------|---------|---------------|----------|
+| **menuFunctions** | 17 | User interface and navigation system | `DisplayNumericMenu`, `ShowMenu`, `Handle-MenuItemSelection` | `menuFunctions/` |
+| **setupFunctions** | 23 | Configuration management and initialization | `MergeSettings`, `Start-FirstRunWizard`, `Show-SettingsEditor` | `setupFunctions/` |
+| **utilityFunctions** | 18 | General-purpose helper functions | `Write-Log`, `GetUserInput`, `GetEntraUser` | `utilityFunctions/` |
+| **deviceFunctions** | 12 | Device queries, operations, and lifecycle | `GetDeviceByUser`, `RestartDevice`, `GetBitLockerRecoveryKey` | `deviceFunctions/` |
+| **autopilotFunctions** | 14 | Autopilot device enrollment and management | `ImportAutopilotDevice`, `GetDeviceHash`, `AddCorporateDeviceIdentifier` | `autopilotFunctions/v1/`, `autopilotFunctions/v2/` |
+| **graphFunctions** | 22 | Microsoft Graph API integration and authentication | `GetGraphAccessToken`, `CallGraphAPI`, `Get-DelegatedToken` | `graphFunctions/` |
+| **reportingFunctions** | 11 | Device assessment and readiness analysis | `GetNextUserReadinessReport`, `ExportDeviceList`, `ShowDeviceReport` | `reportingFunctions/` |
+| **encryptionFunctions** | 14 | Security, encryption, and credential management | `Load-EncryptedConfigFile`, `Get-SecurePassword`, `Invoke-JsonFileEncryption` | `encryptionFunctions/` |
+| **updateFunctions** | 6 | Application update and version management | `CheckForUpdates`, `GetLatestGithubRelease`, `Invoke-FileCertVerification` | `updateFunctions/` |
+
+**Total Functions**: 137 across 9 categories
 
 ## Configuration System
 
