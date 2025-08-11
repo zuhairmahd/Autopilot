@@ -35,7 +35,7 @@
 		{
 			"label": "Run test syntax",
 			"type": "shell",
-			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"c:\\Users\\zuhai\\code\\Autopilot\\TestScripts\\test-syntax.ps1\"",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}\\TestScripts\\test-syntax.ps1\"",
 			"isBackground": false,
 			"problemMatcher": [
 				"$powershell"
