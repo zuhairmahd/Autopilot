@@ -53,17 +53,6 @@ function Show-SettingsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $logFile = if ($Global:LogFile) { 
-        $Global:LogFile 
-    } else { 
-        $tempLogFile = "$env:TEMP\autopilot-settings.log"
-        # Ensure the directory exists
-        $logDir = Split-Path $tempLogFile -Parent
-        if (-not (Test-Path $logDir)) {
-            New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-        }
-        $tempLogFile
-    }
     Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Information"
     Write-Verbose "[$functionName] Starting settings editor for $SettingsType settings"
     

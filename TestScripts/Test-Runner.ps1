@@ -98,83 +98,86 @@ param(
 )
 
 # Load test helper functions
-try {
+try
+{
     . "$PSScriptRoot\test-helper.ps1"
     $psInfo = Test-PowerShellVersion
 }
-catch {
+catch
+{
     Write-Host "Failed to load test helper functions: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
 # Test Registry - Central definition of all test categories and their patterns
 $TestRegistry = @{
-    'syntax' = @{
-        Description = 'Quick syntax validation and function loading tests'
-        Pattern = 'test-syntax.ps1'
-        Priority = 1
+    'syntax'        = @{
+        Description       = 'Quick syntax validation and function loading tests'
+        Pattern           = 'test-syntax.ps1'
+        Priority          = 1
         EstimatedDuration = '< 5 seconds'
-        Dependencies = @()
+        Dependencies      = @()
     }
-    'core' = @{
-        Description = 'Essential functionality tests required for basic operation'
-        Pattern = 'test-core-validation.ps1,test-function-loading-validation.ps1,test-simple-function-loading.ps1'
-        Priority = 2
+    'core'          = @{
+        Description       = 'Essential functionality tests required for basic operation'
+        Pattern           = 'test-core-validation.ps1,test-function-loading-validation.ps1,test-simple-function-loading.ps1'
+        Priority          = 2
         EstimatedDuration = '30-60 seconds'
-        Dependencies = @('syntax')
+        Dependencies      = @('syntax')
     }
-    'unit' = @{
-        Description = 'Individual component and function tests'
-        Pattern = 'test-settings-functions.ps1,test-json-merge.ps1,test-password-change.ps1,test-temporary-encryption.ps1,test-array-verification.ps1,test-array-storage-issue.ps1,test-getappassignmenttypes.ps1,test-checknextuserreadiness.ps1,test-corporate-device-identifier.ps1,test-backward-compatibility.ps1'
-        Priority = 3
+    'unit'          = @{
+        Description       = 'Individual component and function tests'
+        Pattern           = 'test-settings-functions.ps1,test-json-merge.ps1,test-password-change.ps1,test-temporary-encryption.ps1,test-array-verification.ps1,test-array-storage-issue.ps1,test-getappassignmenttypes.ps1,test-checknextuserreadiness.ps1,test-corporate-device-identifier.ps1,test-backward-compatibility.ps1'
+        Priority          = 3
         EstimatedDuration = '2-4 minutes'
-        Dependencies = @('syntax', 'core')
+        Dependencies      = @('syntax', 'core')
     }
-    'integration' = @{
-        Description = 'Cross-component integration and workflow tests'
-        Pattern = 'test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system1.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-migration-callers.ps1,test-menu-inclusions-integration.ps1,test-e2e-appmode.ps1'
-        Priority = 4
+    'integration'   = @{
+        Description       = 'Cross-component integration and workflow tests'
+        Pattern           = 'test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system1.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-migration-callers.ps1,test-menu-inclusions-integration.ps1,test-e2e-appmode.ps1'
+        Priority          = 4
         EstimatedDuration = '3-5 minutes'
-        Dependencies = @('syntax', 'core', 'unit')
+        Dependencies      = @('syntax', 'core', 'unit')
     }
     'comprehensive' = @{
-        Description = 'Full workflow and end-to-end comprehensive tests'
-        Pattern = 'test-comprehensive.ps1,test-menu-system-comprehensive.ps1,test-configuration-comprehensive.ps1,test-appmode-comprehensive.ps1,test-auth-flows-comprehensive.ps1,test-autopilot-import-comprehensive.ps1,test-device-lookup-comprehensive.ps1,test-main-integration.ps1,test-menu-inclusions-e2e.ps1'
-        Priority = 5
+        Description       = 'Full workflow and end-to-end comprehensive tests'
+        Pattern           = 'test-comprehensive.ps1,test-menu-system-comprehensive.ps1,test-configuration-comprehensive.ps1,test-appmode-comprehensive.ps1,test-auth-flows-comprehensive.ps1,test-autopilot-import-comprehensive.ps1,test-device-lookup-comprehensive.ps1,test-main-integration.ps1,test-menu-inclusions-e2e.ps1'
+        Priority          = 5
         EstimatedDuration = '5-8 minutes'
-        Dependencies = @('syntax', 'core', 'unit', 'integration')
+        Dependencies      = @('syntax', 'core', 'unit', 'integration')
     }
-    'validation' = @{
-        Description = 'Final validation and verification tests'
-        Pattern = 'final-validation.ps1,final-validation-comprehensive.ps1,final-validation-issue-91.ps1,final-verification.ps1'
-        Priority = 6
+    'validation'    = @{
+        Description       = 'Final validation and verification tests'
+        Pattern           = 'final-validation.ps1,final-validation-comprehensive.ps1,final-validation-issue-91.ps1,final-verification.ps1'
+        Priority          = 6
         EstimatedDuration = '2-3 minutes'
-        Dependencies = @('syntax', 'core')
+        Dependencies      = @('syntax', 'core')
     }
-    'demo' = @{
-        Description = 'Interactive demonstration and showcase scripts'
-        Pattern = 'demo-*.ps1'
-        Priority = 7
+    'demo'          = @{
+        Description       = 'Interactive demonstration and showcase scripts'
+        Pattern           = 'demo-*.ps1'
+        Priority          = 7
         EstimatedDuration = 'Variable (interactive)'
-        Dependencies = @()
+        Dependencies      = @()
     }
-    'enhanced' = @{
-        Description = 'Enhanced functionality tests (new test scripts)'
-        Pattern = 'test-enhanced-menu-functions.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1'
-        Priority = 4
+    'enhanced'      = @{
+        Description       = 'Enhanced functionality tests (new test scripts)'
+        Pattern           = 'test-enhanced-menu-functions.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1'
+        Priority          = 4
         EstimatedDuration = '2-3 minutes'
-        Dependencies = @('syntax', 'core')
+        Dependencies      = @('syntax', 'core')
     }
-    'specialized' = @{
-        Description = 'Specialized and advanced functionality tests'
-        Pattern = 'test-appmode-refactored.ps1,test-appmode-wizard.ps1,test-autoupdate-wizard.ps1,test-firstrun-wizard.ps1,test-mnemonic-navigation.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-device-selection.ps1,test-delegated-auth-update.ps1,test-group-assignment-fixes.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1'
-        Priority = 5
+    'specialized'   = @{
+        Description       = 'Specialized and advanced functionality tests'
+        Pattern           = 'test-appmode-refactored.ps1,test-appmode-wizard.ps1,test-autoupdate-wizard.ps1,test-firstrun-wizard.ps1,test-mnemonic-navigation.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-device-selection.ps1,test-delegated-auth-update.ps1,test-group-assignment-fixes.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1'
+        Priority          = 5
         EstimatedDuration = '4-6 minutes'
-        Dependencies = @('syntax', 'core', 'unit')
+        Dependencies      = @('syntax', 'core', 'unit')
     }
 }
 
-function Get-TestFilesByCategory {
+function Get-TestFilesByCategory
+{
     <#
     .SYNOPSIS
         Gets test files for a specific category based on the test registry
@@ -183,7 +186,8 @@ function Get-TestFilesByCategory {
         [string]$Category
     )
     
-    if (-not $TestRegistry.ContainsKey($Category)) {
+    if (-not $TestRegistry.ContainsKey($Category))
+    {
         throw "Unknown test category: $Category"
     }
     
@@ -191,15 +195,20 @@ function Get-TestFilesByCategory {
     $patterns = $categoryInfo.Pattern -split ','
     $testFiles = @()
     
-    foreach ($pattern in $patterns) {
+    foreach ($pattern in $patterns)
+    {
         $pattern = $pattern.Trim()
-        if ($pattern.EndsWith('.ps1')) {
+        if ($pattern.EndsWith('.ps1'))
+        {
             # Exact file match
             $file = Get-ChildItem -Path $PSScriptRoot -Filter $pattern -ErrorAction SilentlyContinue
-            if ($file) {
+            if ($file)
+            {
                 $testFiles += $file
             }
-        } else {
+        }
+        else
+        {
             # Wildcard pattern
             $files = Get-ChildItem -Path $PSScriptRoot -Filter "$pattern*.ps1" -ErrorAction SilentlyContinue
             $testFiles += $files
@@ -208,7 +217,8 @@ function Get-TestFilesByCategory {
     
     # Apply exclusions
     $excludePatterns = $ExcludePattern -split ','
-    foreach ($excludePattern in $excludePatterns) {
+    foreach ($excludePattern in $excludePatterns)
+    {
         $excludePattern = $excludePattern.Trim()
         $testFiles = $testFiles | Where-Object { $_.Name -notlike $excludePattern }
     }
@@ -216,7 +226,8 @@ function Get-TestFilesByCategory {
     return $testFiles | Sort-Object Name | Get-Unique
 }
 
-function Get-AllTestFiles {
+function Get-AllTestFiles
+{
     <#
     .SYNOPSIS
         Gets all test files, excluding helpers and runners
@@ -226,7 +237,8 @@ function Get-AllTestFiles {
     
     # Apply exclusions
     $excludePatterns = $ExcludePattern -split ','
-    foreach ($excludePattern in $excludePatterns) {
+    foreach ($excludePattern in $excludePatterns)
+    {
         $excludePattern = $excludePattern.Trim()
         $allFiles = $allFiles | Where-Object { $_.Name -notlike $excludePattern }
     }
@@ -234,7 +246,8 @@ function Get-AllTestFiles {
     return $allFiles | Sort-Object Name
 }
 
-function Show-TestCategories {
+function Show-TestCategories
+{
     <#
     .SYNOPSIS
         Displays all available test categories and their descriptions
@@ -247,7 +260,8 @@ function Show-TestCategories {
     
     $sortedCategories = $TestRegistry.GetEnumerator() | Sort-Object { $_.Value.Priority }
     
-    foreach ($category in $sortedCategories) {
+    foreach ($category in $sortedCategories)
+    {
         $name = $category.Key
         $info = $category.Value
         
@@ -256,16 +270,19 @@ function Show-TestCategories {
         Write-Host "  Priority: $($info.Priority)" -ForegroundColor Gray
         Write-Host "  Estimated Duration: $($info.EstimatedDuration)" -ForegroundColor Gray
         
-        if ($info.Dependencies.Count -gt 0) {
+        if ($info.Dependencies.Count -gt 0)
+        {
             Write-Host "  Dependencies: $($info.Dependencies -join ', ')" -ForegroundColor Gray
         }
         
         # Show test count
-        try {
+        try
+        {
             $testCount = (Get-TestFilesByCategory -Category $name).Count
             Write-Host "  Tests: $testCount files" -ForegroundColor Cyan
         }
-        catch {
+        catch
+        {
             Write-Host "  Tests: Unable to determine count" -ForegroundColor Red
         }
         
@@ -278,7 +295,8 @@ function Show-TestCategories {
     Write-Host ""
 }
 
-function Show-TestListing {
+function Show-TestListing
+{
     <#
     .SYNOPSIS
         Lists all available tests organized by category
@@ -292,26 +310,33 @@ function Show-TestListing {
     $sortedCategories = $TestRegistry.GetEnumerator() | Sort-Object { $_.Value.Priority }
     $totalTests = 0
     
-    foreach ($category in $sortedCategories) {
+    foreach ($category in $sortedCategories)
+    {
         $name = $category.Key
         $info = $category.Value
         
         Write-Host "[$name] - $($info.Description)" -ForegroundColor Yellow
         
-        try {
+        try
+        {
             $tests = Get-TestFilesByCategory -Category $name
-            if ($tests.Count -gt 0) {
-                foreach ($test in $tests) {
+            if ($tests.Count -gt 0)
+            {
+                foreach ($test in $tests)
+                {
                     $sizeKB = [math]::Round($test.Length / 1024, 1)
                     Write-Host "  ✓ $($test.Name) ($sizeKB KB)" -ForegroundColor Green
                 }
                 $totalTests += $tests.Count
                 Write-Host "  Subtotal: $($tests.Count) tests" -ForegroundColor Cyan
-            } else {
+            }
+            else
+            {
                 Write-Host "  No tests found for this category" -ForegroundColor Gray
             }
         }
-        catch {
+        catch
+        {
             Write-Host "  Error loading tests: $($_.Exception.Message)" -ForegroundColor Red
         }
         
@@ -322,11 +347,14 @@ function Show-TestListing {
     $allTests = Get-AllTestFiles
     $categorizedTests = @()
     
-    foreach ($category in $TestRegistry.Keys) {
-        try {
+    foreach ($category in $TestRegistry.Keys)
+    {
+        try
+        {
             $categorizedTests += Get-TestFilesByCategory -Category $category
         }
-        catch {
+        catch
+        {
             # Skip categories with errors
         }
     }
@@ -337,9 +365,11 @@ function Show-TestListing {
         return -not $isCategorized
     }
     
-    if ($uncategorizedTests.Count -gt 0) {
+    if ($uncategorizedTests.Count -gt 0)
+    {
         Write-Host "[uncategorized] - Tests not assigned to a category" -ForegroundColor Magenta
-        foreach ($test in $uncategorizedTests) {
+        foreach ($test in $uncategorizedTests)
+        {
             $sizeKB = [math]::Round($test.Length / 1024, 1)
             Write-Host "  ? $($test.Name) ($sizeKB KB)" -ForegroundColor Yellow
         }
@@ -353,7 +383,8 @@ function Show-TestListing {
     Write-Host "=" * 80 -ForegroundColor Cyan
 }
 
-function Invoke-TestExecution {
+function Invoke-TestExecution
+{
     <#
     .SYNOPSIS
         Executes the selected tests with comprehensive reporting
@@ -363,15 +394,16 @@ function Invoke-TestExecution {
         [string]$CategoryName
     )
     
-    if ($TestFiles.Count -eq 0) {
+    if ($TestFiles.Count -eq 0)
+    {
         Write-Host "No test files found for category: $CategoryName" -ForegroundColor Red
         return @{
-            TotalTests = 0
-            PassedTests = 0
-            FailedTests = 0
+            TotalTests   = 0
+            PassedTests  = 0
+            FailedTests  = 0
             SkippedTests = 0
-            Duration = [TimeSpan]::Zero
-            Results = @()
+            Duration     = [TimeSpan]::Zero
+            Results      = @()
         }
     }
     
@@ -385,18 +417,20 @@ function Invoke-TestExecution {
     Write-Host "Tests to Run: $($TestFiles.Count)" -ForegroundColor White
     Write-Host ""
     
-    if ($DryRun) {
+    if ($DryRun)
+    {
         Write-Host "DRY RUN - Tests that would be executed:" -ForegroundColor Yellow
-        foreach ($file in $TestFiles) {
+        foreach ($file in $TestFiles)
+        {
             Write-Host "  - $($file.Name)" -ForegroundColor Cyan
         }
         return @{
-            TotalTests = $TestFiles.Count
-            PassedTests = 0
-            FailedTests = 0
+            TotalTests   = $TestFiles.Count
+            PassedTests  = 0
+            FailedTests  = 0
             SkippedTests = $TestFiles.Count
-            Duration = [TimeSpan]::Zero
-            Results = @()
+            Duration     = [TimeSpan]::Zero
+            Results      = @()
         }
     }
     
@@ -411,29 +445,32 @@ function Invoke-TestExecution {
     # Execute tests
     Write-TestSection "Running Tests"
     
-    for ($i = 0; $i -lt $TestFiles.Count; $i++) {
+    for ($i = 0; $i -lt $TestFiles.Count; $i++)
+    {
         $testFile = $TestFiles[$i]
         $testName = $testFile.BaseName
         $testPath = $testFile.FullName
         $progress = [math]::Round(($i / $totalTests) * 100, 1)
         
         Write-Host "[$($i + 1)/$totalTests] ($progress%) Running: $testName" -ForegroundColor Cyan
-        if ($LogLevel -in @('Verbose', 'Debug')) {
+        if ($LogLevel -in @('Verbose', 'Debug'))
+        {
             Write-Host "Path: $testPath" -ForegroundColor Gray
         }
         
         $testResult = @{
-            Name = $testName
-            Path = $testPath
-            Status = "Unknown"
-            Duration = $null
-            Output = ""
-            Error = $null
+            Name      = $testName
+            Path      = $testPath
+            Status    = "Unknown"
+            Duration  = $null
+            Output    = ""
+            Error     = $null
             StartTime = Get-Date
-            Category = $CategoryName
+            Category  = $CategoryName
         }
         
-        try {
+        try
+        {
             $testStartTime = Get-Date
             
             # Create test arguments
@@ -444,7 +481,8 @@ function Invoke-TestExecution {
             )
             
             # Add verbosity based on log level
-            if ($ShowVerbose -or $LogLevel -in @('Verbose', 'Debug')) {
+            if ($ShowVerbose -or $LogLevel -in @('Verbose', 'Debug'))
+            {
                 $testArgs += '-Verbose'
             }
             
@@ -458,31 +496,38 @@ function Invoke-TestExecution {
             $testResult.Duration = $duration
             $testResult.Output = $output -join "`n"
             
-            if ($exitCode -eq 0) {
+            if ($exitCode -eq 0)
+            {
                 $testResult.Status = "Passed"
                 Write-TestResult "$testName completed successfully ($($duration.TotalSeconds.ToString('F2'))s)" -Success $true
                 $passedTests++
-            } else {
+            }
+            else
+            {
                 $testResult.Status = "Failed"
                 $testResult.Error = "Exit code: $exitCode"
                 Write-TestResult "$testName failed with exit code $exitCode ($($duration.TotalSeconds.ToString('F2'))s)" -Success $false
                 $failedTests++
                 
-                if ($LogLevel -in @('Verbose', 'Debug') -and $testResult.Output) {
+                if ($LogLevel -in @('Verbose', 'Debug') -and $testResult.Output)
+                {
                     Write-Host "Test Output:" -ForegroundColor Yellow
                     $outputLines = $testResult.Output -split "`n" | Select-Object -Last 5
-                    foreach ($line in $outputLines) {
+                    foreach ($line in $outputLines)
+                    {
                         Write-Host "  $line" -ForegroundColor Gray
                     }
                 }
                 
-                if (-not $ContinueOnError) {
+                if (-not $ContinueOnError)
+                {
                     Write-Host "Stopping test execution due to failure. Use -ContinueOnError to continue." -ForegroundColor Red
                     break
                 }
             }
         }
-        catch {
+        catch
+        {
             $testResult.Status = "Error"
             $testResult.Error = $_.Exception.Message
             $testResult.Duration = (Get-Date) - $testResult.StartTime
@@ -490,7 +535,8 @@ function Invoke-TestExecution {
             Write-TestResult "$testName failed with error: $($_.Exception.Message)" -Success $false
             $failedTests++
             
-            if (-not $ContinueOnError) {
+            if (-not $ContinueOnError)
+            {
                 Write-Host "Stopping test execution due to error. Use -ContinueOnError to continue." -ForegroundColor Red
                 break
             }
@@ -499,7 +545,8 @@ function Invoke-TestExecution {
         $testResults += $testResult
         
         # Show progress for long test runs
-        if ($totalTests -gt 5 -and $LogLevel -ne 'Minimal') {
+        if ($totalTests -gt 5 -and $LogLevel -ne 'Minimal')
+        {
             Write-Host ""
         }
     }
@@ -507,17 +554,18 @@ function Invoke-TestExecution {
     $totalDuration = (Get-Date) - $startTime
     
     return @{
-        TotalTests = $totalTests
-        PassedTests = $passedTests
-        FailedTests = $failedTests
+        TotalTests   = $totalTests
+        PassedTests  = $passedTests
+        FailedTests  = $failedTests
         SkippedTests = $skippedTests
-        Duration = $totalDuration
-        Results = $testResults
-        Category = $CategoryName
+        Duration     = $totalDuration
+        Results      = $testResults
+        Category     = $CategoryName
     }
 }
 
-function Write-TestSummary {
+function Write-TestSummary
+{
     <#
     .SYNOPSIS
         Writes comprehensive test execution summary
@@ -543,7 +591,8 @@ function Write-TestSummary {
     Write-Host "Failed: $failed" -ForegroundColor Red
     Write-Host "Skipped: $skipped" -ForegroundColor Yellow
     
-    if ($total -gt 0) {
+    if ($total -gt 0)
+    {
         $successRate = ($passed / $total * 100).ToString('F1')
         Write-Host "Success Rate: $successRate%" -ForegroundColor Cyan
     }
@@ -557,18 +606,23 @@ function Write-TestSummary {
     
     # Detailed results table for failed tests
     $failedTests = $ExecutionResult.Results | Where-Object { $_.Status -ne "Passed" }
-    if ($failedTests.Count -gt 0 -and $LogLevel -ne 'Minimal') {
+    if ($failedTests.Count -gt 0 -and $LogLevel -ne 'Minimal')
+    {
         Write-TestSection "Failed Tests Details"
         
-        foreach ($failedTest in $failedTests) {
+        foreach ($failedTest in $failedTests)
+        {
             Write-Host "Test: $($failedTest.Name)" -ForegroundColor Red
-            if ($failedTest.Error) {
+            if ($failedTest.Error)
+            {
                 Write-Host "Error: $($failedTest.Error)" -ForegroundColor Yellow
             }
-            if ($failedTest.Output -and $failedTest.Output.Trim() -and $LogLevel -in @('Verbose', 'Debug')) {
+            if ($failedTest.Output -and $failedTest.Output.Trim() -and $LogLevel -in @('Verbose', 'Debug'))
+            {
                 Write-Host "Output (last 3 lines):" -ForegroundColor Yellow
                 $lines = $failedTest.Output -split "`n" | Where-Object { $_.Trim() } | Select-Object -Last 3
-                foreach ($line in $lines) {
+                foreach ($line in $lines)
+                {
                     Write-Host "  $line" -ForegroundColor Gray
                 }
             }
@@ -580,20 +634,24 @@ function Write-TestSummary {
 }
 
 # Main execution logic
-try {
+try
+{
     # Handle list operations
-    if ($ListCategories) {
+    if ($ListCategories)
+    {
         Show-TestCategories
         exit 0
     }
     
-    if ($ListTests) {
+    if ($ListTests)
+    {
         Show-TestListing
         exit 0
     }
     
     # Validate specific category requirements
-    if ($TestCategory -eq 'specific' -and -not $TestPattern) {
+    if ($TestCategory -eq 'specific' -and -not $TestPattern)
+    {
         Write-Host "Error: -TestPattern is required when using -TestCategory 'specific'" -ForegroundColor Red
         Write-Host "Example: -TestCategory specific -TestPattern 'test-menu*'" -ForegroundColor Yellow
         exit 1
@@ -602,17 +660,21 @@ try {
     # Get test files based on category
     $testFiles = @()
     
-    if ($TestCategory -eq 'all') {
+    if ($TestCategory -eq 'all')
+    {
         # Get all tests from all categories
         Write-TestSection "Discovering All Tests"
         
-        foreach ($category in $TestRegistry.Keys) {
-            try {
+        foreach ($category in $TestRegistry.Keys)
+        {
+            try
+            {
                 $categoryTests = Get-TestFilesByCategory -Category $category
                 $testFiles += $categoryTests
                 Write-Host "Found $($categoryTests.Count) tests in category: $category" -ForegroundColor Cyan
             }
-            catch {
+            catch
+            {
                 Write-Warning "Error loading category '$category': $($_.Exception.Message)"
             }
         }
@@ -621,7 +683,9 @@ try {
         $testFiles = $testFiles | Sort-Object Name | Get-Unique
         $categoryName = "All Categories"
         
-    } elseif ($TestCategory -eq 'specific') {
+    }
+    elseif ($TestCategory -eq 'specific')
+    {
         # Pattern-based selection
         Write-TestSection "Pattern-Based Test Discovery"
         Write-Host "Pattern: $TestPattern" -ForegroundColor Yellow
@@ -630,19 +694,23 @@ try {
         
         # Apply exclusions
         $excludePatterns = $ExcludePattern -split ','
-        foreach ($excludePattern in $excludePatterns) {
+        foreach ($excludePattern in $excludePatterns)
+        {
             $excludePattern = $excludePattern.Trim()
             $testFiles = $testFiles | Where-Object { $_.Name -notlike $excludePattern }
         }
         
         $categoryName = "Pattern: $TestPattern"
         
-    } else {
+    }
+    else
+    {
         # Category-based selection
         Write-TestSection "Category-Based Test Discovery"
         Write-Host "Category: $TestCategory" -ForegroundColor Yellow
         
-        if (-not $TestRegistry.ContainsKey($TestCategory)) {
+        if (-not $TestRegistry.ContainsKey($TestCategory))
+        {
             Write-Host "Error: Unknown test category '$TestCategory'" -ForegroundColor Red
             Write-Host "Use -ListCategories to see available categories" -ForegroundColor Yellow
             exit 1
@@ -654,7 +722,8 @@ try {
     
     Write-Host "Discovered $($testFiles.Count) test files" -ForegroundColor Green
     
-    if ($testFiles.Count -eq 0) {
+    if ($testFiles.Count -eq 0)
+    {
         Write-Host "No tests found matching the specified criteria" -ForegroundColor Yellow
         exit 0
     }
@@ -666,14 +735,22 @@ try {
     Write-TestSummary -ExecutionResult $executionResult
     
     # Set exit code based on results
-    $exitCode = if ($executionResult.FailedTests -eq 0 -and $executionResult.TotalTests -gt 0) { 0 } else { 1 }
+    $exitCode = if ($executionResult.FailedTests -eq 0 -and $executionResult.TotalTests -gt 0)
+    {
+        0 
+    }
+    else
+    {
+        1 
+    }
     
     Write-Host "Test Runner completed. Exit code: $exitCode" -ForegroundColor White
     Write-Host "=" * 80 -ForegroundColor Cyan
     
     exit $exitCode
 }
-catch {
+catch
+{
     Write-Host "Test Runner encountered an error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host $_.ScriptStackTrace -ForegroundColor Red
     exit 2
