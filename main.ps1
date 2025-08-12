@@ -1303,7 +1303,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specifi
         Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
     }
 }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings" -Action {
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
     
@@ -1409,11 +1409,11 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
 }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Edit group inclusion/exclusion settings" -Action {
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
     
-    $success = Show-GroupsEditor -SettingsFile $InitFile
+    $success = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
     if ($success)
     {
         Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
