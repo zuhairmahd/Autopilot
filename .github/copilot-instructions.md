@@ -64,7 +64,7 @@ pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory specific -TestPattern "
 pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory unit -ShowVerbose -ContinueOnError
 pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all -LogLevel Verbose -DryRun
 
-# Legacy run-all-tests.ps1 is DEPRECATED - it will redirect to Test-Runner.ps1
+# Legacy run-all-tests.ps1 is DEPRECATED and has been removed.
 ```
 
 **DEPRECATED PATTERNS** - Do not use these:
@@ -229,6 +229,7 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 - Use regular hashtables instead of ordered hashtables for PS 5.1 compatibility
 - Test with both PowerShell 5.1 and PowerShell 7+ when possible
 - Add version comments if PowerShell 5.1 compatibility cannot be maintained
+- If you must the syntax like 'write-host "$variablename: $value" be sure to surround the first variable with parentheses "$($variable): $value"
 
 ### Logging Standards
 - Use `Write-Log` function consistently with CMTrace format support
