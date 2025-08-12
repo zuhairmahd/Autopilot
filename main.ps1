@@ -452,7 +452,7 @@ if (Test-Path -Path $InitFile)
         }
     }   
     #merge the local and global settings.
-    $script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+    $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
     #if the appMode is not set, default to 'full', otherwise make sure it is avalid appMode.
     if (-not $script:settings.appMode)
     {
