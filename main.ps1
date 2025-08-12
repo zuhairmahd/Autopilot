@@ -1395,6 +1395,20 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
 }
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Edit group inclusion/exclusion settings" -Action {
+    Write-Host "Launching groups editor..." -ForegroundColor Cyan
+    Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
+    
+    $success = Show-GroupsEditor -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update group settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
