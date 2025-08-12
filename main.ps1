@@ -1225,7 +1225,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
 #endregion Autopilot menu
 
 #region Settings menu
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global settings" -Action {
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environment settings" -Action {
     Write-Host "Displaying global settings..." -ForegroundColor Cyan
     $success = Show-SettingsViewer -SettingsType "Global" -SettingsFile $InitFile
     if ($success)
@@ -1234,12 +1234,12 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global setting
     }
     else
     {
-        Write-Host "`nFailed to display global settings. Please check the logs for details." -ForegroundColor Red
+        Write-Host "`nFailed to display global environment settings. Please check the logs for details." -ForegroundColor Red
     }
 }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain settings" -Action {
-    Write-Host "Displaying domain-specific settings..." -ForegroundColor Cyan
-    
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
+    Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
+
     # Get the current domain from settings (same logic as domain settings editor)
     $currentDomain = $domain
     # If no current domain, try to get it from domains section or prompt user
@@ -2015,7 +2015,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     Write-Host "Authentication type: $($auth.AuthType)"
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
 }
-#endregion Menu Definitions
+#endregion Menu definitions
 
 #region Show Menu
 # Add the main menu to both history arrays for proper stack synchronization

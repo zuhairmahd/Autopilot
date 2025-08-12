@@ -318,7 +318,6 @@ function Cleanup-TestEnvironment()
                 Write-Warning "Error cleaning up test folder: $($_.Exception.Message)"
                 Write-TestResult "Test folder cleanup failed: $TestFolder" $false
             }
-            
         }
         
         # Clean up global test variables (but preserve the important ones)
