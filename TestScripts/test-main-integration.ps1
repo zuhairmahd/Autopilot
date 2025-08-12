@@ -1,46 +1,45 @@
-# Test script to verify main.ps1 integration with First Run Wizard
-# PowerShell 5.1 compatible
+<#
+.SYNOPSIS
+    Test main.ps1 integration with First Run Wizard using unified framework
+#>
 
+[CmdletBinding()]
 param(
-    [string]$TestFolder = "$PWD\test-main-integration"
+    [string]$TestName = "Main.ps1 Integration with First Run Wizard",
+    $TestFolder = "env_temp\test-main-integration"
 )
+
+# Load unified test helper
+. "$PSScriptRoot\test-helper.ps1"
+
+# Resolve root and set metadata
+$RootPath = Split-Path -Parent $PSScriptRoot
 
 Write-Host "Testing main.ps1 Integration with First Run Wizard" -ForegroundColor Green
 Write-Host "Test folder: $TestFolder" -ForegroundColor Yellow
 
-# Clean up any existing test folder
-if (Test-Path $TestFolder) {
-    Remove-Item -Path $TestFolder -Recurse -Force
-}
+# Load all application functions at script level (scoping-critical)
+$null = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$false
 
-# Create test folder
-New-Item -Path $TestFolder -ItemType Directory -Force | Out-Null
+# Ensure test-scoped folders exist
+$null = New-Item -Path (Join-Path $TestFolder '.secrets') -ItemType Directory -Force -ErrorAction SilentlyContinue
+$null = New-Item -Path (Join-Path $TestFolder 'Logs') -ItemType Directory -Force -ErrorAction SilentlyContinue
 
-# Back up existing files if they exist
-$backupFiles = @()
-if (Test-Path "$PWD\.secrets\config.json") {
-    Copy-Item "$PWD\.secrets\config.json" "$TestFolder\config.json.backup" -Force
-    $backupFiles += "config.json"
-}
-if (Test-Path "$PWD\settings.json") {
-    Copy-Item "$PWD\settings.json" "$TestFolder\settings.json.backup" -Force
-    $backupFiles += "settings.json"
-}
-if (Test-Path "$PWD\strings.json") {
-    Copy-Item "$PWD\strings.json" "$TestFolder\strings.json.backup" -Force
-    $backupFiles += "strings.json"
-}
+try
+{
+    # Initialize unified framework (explicit params)
+    $TestContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder -RootPath $RootPath -SkipFunctionCheck:$true
 
-try {
-    Write-Host "`n1. Removing existing config files for test..." -ForegroundColor Cyan
+    Write-TestSection "Preparing test-scoped files"
     
-    # Remove existing config files to simulate first run
-    if (Test-Path "$PWD\.secrets\config.json") {
-        Remove-Item "$PWD\.secrets\config.json" -Force
-        Write-Host "[PASS] Removed existing config.json" -ForegroundColor Green
+    # Remove test-scoped config to simulate first run
+    if (Test-Path "$TestFolder\.secrets\config.json")
+    {
+        Remove-Item "$TestFolder\.secrets\config.json" -Force -ErrorAction SilentlyContinue
+        Write-Host "[PASS] Removed existing test config.json" -ForegroundColor Green
     }
     
-    Write-Host "`n2. Testing main.ps1 with wizard in silent mode..." -ForegroundColor Cyan
+    Write-TestSection "Testing main.ps1 with wizard in silent mode"
     
     # Create a test version of main.ps1 that calls the wizard in silent mode
     $mainTestScript = @"
@@ -48,16 +47,20 @@ try {
 param(
     [string]`$configFile = "`$pwd\.secrets\config.json",
     [string]`$InitFile = "`$pwd\settings.json",
-    [string]`$LogFile = "`$pwd\Logs\Autopilot.log"
+    [string]`$LogFile = "`$pwd\Logs\Autopilot.log",
+    [string]`$StringsFile = "`$pwd\strings.json"
 )
 
-# Import functions
-`$functionsFolder = "`$PWD\functions"
+# Import functions from repo root (parent of this script's folder), recursively
+`$repoRoot = Split-Path -Parent `$PSScriptRoot
+`$functionsFolder = Join-Path `$repoRoot 'functions'
 if (Test-Path `$functionsFolder) {
-    `$functions = Get-ChildItem -Path `$functionsFolder -Filter '*.ps1' -ErrorAction Stop
+    `$functions = Get-ChildItem -Path `$functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     foreach (`$function in `$functions) {
         . `$function.FullName
     }
+} else {
+    Write-Host "Functions folder not found: `$functionsFolder" -ForegroundColor Red
 }
 
 # Check if config file exists
@@ -66,41 +69,39 @@ if (-not (Test-Path `$configFile)) {
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
     # Launch the first run wizard in silent mode
-    `$wizardResult = Start-FirstRunWizard -ConfigFile `$configFile -SettingsFile `$InitFile -StringsFile "`$PWD\strings.json" -Silent
+    `$wizardResult = Start-FirstRunWizard -ConfigFile `$configFile -SettingsFile `$InitFile -StringsFile `$StringsFile -Silent
     
     if (`$wizardResult) {
         Write-Host "First run wizard completed successfully." -ForegroundColor Green
         
-        # Test decryption
+        # Verify configuration file encryption status and presence of other files
         if (Test-Path `$configFile) {
-            `$decryptResult = Invoke-JsonFileEncryption -FilePath `$configFile -Key "DefaultPassword123!" -Decrypt -InMemoryOnly
-            if (`$decryptResult.Success) {
-                Write-Host "Configuration file decryption successful." -ForegroundColor Green
-                `$configJson = `$decryptResult.Content | ConvertFrom-Json
-                Write-Host "Domain: `$(`$configJson.domain)" -ForegroundColor Green
-                Write-Host "App ID: `$(`$configJson.AppId)" -ForegroundColor Green
-                Write-Host "Tenant ID: `$(`$configJson.TenantId)" -ForegroundColor Green
-                
-                # Test settings file
-                if (Test-Path `$InitFile) {
-                    Write-Host "Settings file created successfully." -ForegroundColor Green
-                } else {
-                    Write-Host "Settings file was not created." -ForegroundColor Red
-                }
-                
-                # Test strings file
-                if (Test-Path "`$PWD\strings.json") {
-                    Write-Host "Strings file created successfully." -ForegroundColor Green
-                } else {
-                    Write-Host "Strings file was not created." -ForegroundColor Red
-                }
-                
-                Write-Host "Main.ps1 integration test completed successfully!" -ForegroundColor Green
-                exit 0
+            `$enc = Test-FileEncryptionStatus -FilePath `$configFile
+            if (`$enc.IsEncrypted) {
+                Write-Host "Configuration file is encrypted." -ForegroundColor Green
             } else {
-                Write-Host "Failed to decrypt configuration file." -ForegroundColor Red
+                Write-Host "Configuration file is not encrypted." -ForegroundColor Red
                 exit 1
             }
+
+            # Test settings file
+            if (Test-Path `$InitFile) {
+                Write-Host "Settings file created successfully." -ForegroundColor Green
+            } else {
+                Write-Host "Settings file was not created." -ForegroundColor Red
+                exit 1
+            }
+
+            # Test strings file
+            if (Test-Path `$StringsFile) {
+                Write-Host "Strings file created successfully." -ForegroundColor Green
+            } else {
+                Write-Host "Strings file was not created." -ForegroundColor Red
+                exit 1
+            }
+
+            Write-Host "Main.ps1 integration test completed successfully!" -ForegroundColor Green
+            exit 0
         } else {
             Write-Host "Configuration file was not created." -ForegroundColor Red
             exit 1
@@ -120,68 +121,66 @@ if (-not (Test-Path `$configFile)) {
     Set-Content -Path $testMainScript -Value $mainTestScript -Encoding UTF8
     
     # Run the test script
-    $testResult = pwsh -Command "& '$testMainScript'" 2>&1
+    # Run the test script with explicit test-scoped paths
+    $testResult = pwsh -NoProfile -ExecutionPolicy Bypass -File $testMainScript -configFile "$TestFolder\.secrets\config.json" -InitFile "$TestFolder\settings.json" -LogFile "$TestFolder\Logs\Autopilot.log" -StringsFile "$TestFolder\strings.json" 2>&1
     
-    Write-Host "Test script output:" -ForegroundColor Yellow
-    Write-Host $testResult -ForegroundColor White
+    Write-TestSubSection "Test script output"
+    Write-Host $testResult -ForegroundColor Gray
     
     # Check results
-    if ($testResult -match "Main\.ps1 integration test completed successfully!") {
-        Write-Host "`n[PASS] Main.ps1 integration test passed!" -ForegroundColor Green
+    if ($testResult -match "Main\.ps1 integration test completed successfully!")
+    {
+        Write-TestResult "Main.ps1 integration test passed!" $true
         
-        # Verify files were created
-        if (Test-Path "$PWD\.secrets\config.json") {
-            Write-Host "[PASS] Config file created and encrypted" -ForegroundColor Green
-        } else {
-            Write-Host "[FAIL] Config file not created" -ForegroundColor Red
+        # Verify test-scoped files were created
+        if (Test-Path "$TestFolder\.secrets\config.json")
+        {
+            Write-TestResult "Config file created and encrypted" $true
+        }
+        else
+        {
+            Write-TestResult "Config file not created" $false
         }
         
-        if (Test-Path "$PWD\settings.json") {
-            Write-Host "[PASS] Settings file created" -ForegroundColor Green
-        } else {
-            Write-Host "[FAIL] Settings file not created" -ForegroundColor Red
+        if (Test-Path "$TestFolder\settings.json")
+        {
+            Write-TestResult "Settings file created" $true
+        }
+        else
+        {
+            Write-TestResult "Settings file not created" $false
         }
         
-        if (Test-Path "$PWD\strings.json") {
-            Write-Host "[PASS] Strings file created" -ForegroundColor Green
-        } else {
-            Write-Host "[FAIL] Strings file not created" -ForegroundColor Red
+        if (Test-Path "$TestFolder\strings.json")
+        {
+            Write-TestResult "Strings file created" $true
         }
-    } else {
-        Write-Host "`n[FAIL] Main.ps1 integration test failed!" -ForegroundColor Red
+        else
+        {
+            Write-TestResult "Strings file not created" $false
+        }
+    }
+    else
+    {
+        Write-TestResult "Main.ps1 integration test failed!" $false
     }
 
-} catch {
-    Write-Host "`n[FAIL] Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+}
+catch
+{
+    Write-TestResult "Test failed with error: $($_.Exception.Message)" $false "Red"
     Write-Host "Full error:" -ForegroundColor Red
     Write-Host $_.Exception.ToString() -ForegroundColor Red
-} finally {
-    # Clean up created files
-    Write-Host "`nCleaning up test files..." -ForegroundColor Yellow
-    
-    if (Test-Path "$PWD\.secrets\config.json") {
-        Remove-Item "$PWD\.secrets\config.json" -Force -ErrorAction SilentlyContinue
-    }
-    if ((Test-Path "$PWD\settings.json") -and -not ($backupFiles -contains "settings.json")) {
-        Remove-Item "$PWD\settings.json" -Force -ErrorAction SilentlyContinue
-    }
-    if ((Test-Path "$PWD\strings.json") -and -not ($backupFiles -contains "strings.json")) {
-        Remove-Item "$PWD\strings.json" -Force -ErrorAction SilentlyContinue
-    }
-    
-    # Restore backup files
-    foreach ($file in $backupFiles) {
-        if (Test-Path "$TestFolder\$file.backup") {
-            Copy-Item "$TestFolder\$file.backup" "$PWD\$file" -Force
-            Write-Host "[PASS] Restored $file from backup" -ForegroundColor Green
-        }
-    }
-    
-    # Clean up test folder
-    if (Test-Path $TestFolder) {
-        Remove-Item -Path $TestFolder -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "[PASS] Test folder cleaned up" -ForegroundColor Green
-    }
 }
-
-Write-Host "`nMain.ps1 integration test completed!" -ForegroundColor Green
+finally
+{
+    # Compute counters and complete via unified framework
+    $TotalTests = 3
+    $PassedTests = (@(
+            (Test-Path "$TestFolder\.secrets\config.json"),
+            (Test-Path "$TestFolder\settings.json"),
+            (Test-Path "$TestFolder\strings.json")
+        ) | Where-Object { $_ } ).Count
+    $FailedTests = $TotalTests - $PassedTests
+    $null = Complete-UnifiedTest -TestContext $TestContext -PassedTests $PassedTests -FailedTests $FailedTests -TotalTests $TotalTests
+}

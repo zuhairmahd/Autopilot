@@ -84,62 +84,72 @@ $TestRegistry = @{
 
 ### Using the Test Framework in New Tests
 
-All new tests **MUST** use the unified test framework. Here's the standard pattern:
+All new tests MUST use the unified test framework. Load functions at script scope, then initialize/complete the test via the unified helpers (which are parameterized). Use this pattern:
 
 ```powershell
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Your test description
+  Your test description
 .DESCRIPTION
-    Detailed test description
+  Detailed test description
 #>
 
 [CmdletBinding()]
 param()
 
-# Load test helper and functions at script level to avoid scoping issues
+# 1) Load test helper at script level
 . "$PSScriptRoot\test-helper.ps1"
-$rootPath = Split-Path -Parent $PSScriptRoot
+
+# 2) Resolve paths and metadata
+$RootPath   = Split-Path -Parent $PSScriptRoot  # repo root
+$TestName   = "Your Test Name"
+$TestFolder = Join-Path $RootPath "test-temp-$(Get-Random)"  # optional, enables auto-cleanup
+
+# 3) Load all functions once at script level (critical for scoping)
+$loadSuccess = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$true
+if (-not $loadSuccess) { throw "Failed to load functions" }
 
 try {
-    # Load functions at script level - CRITICAL for proper scoping
-    $loadSuccess = Load-AllFunctions -RootPath $rootPath
-    if (-not $loadSuccess) {
-        throw "Failed to load functions"
-    }
-    
-    # Initialize unified test without function loading (already done above)
-    $testContext = Start-UnifiedTest -TestName "Your Test Name" -SkipFunctionCheck
-    
-    # Your test logic here...
-    $passedTests = 0
-    $failedTests = 0
-    $totalTests = 0
-    
-    # Test execution...
-    
-    # Complete the test
-    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests $totalTests
-    exit $(if ($success) { 0 } else { 1 })
+  # 4) Initialize unified test (pass metadata explicitly)
+  $TestContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder -RootPath $RootPath -SkipFunctionCheck:$true
+
+  # 5) Your test logic...
+  $PassedTests = 0
+  $FailedTests = 0
+  $TotalTests  = 0
+
+  # Example assertion
+  $TotalTests++
+  if (Test-FunctionExists -FunctionName 'Some-Function') {
+    Write-TestResult "Some-Function is available" $true
+    $PassedTests++
+  } else {
+    Write-TestResult "Some-Function is missing" $false
+    $FailedTests++
+  }
+
+  # 6) Complete the test (pass counters explicitly)
+  $success = Complete-UnifiedTest -TestContext $TestContext -PassedTests $PassedTests -FailedTests $FailedTests -TotalTests $TotalTests
+  exit ($(if ($success) { 0 } else { 1 }))
 }
 catch {
-    Write-Host "Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+  Write-Host "Test failed with error: $($_.Exception.Message)" -ForegroundColor Red
+  exit 1
 }
 ```
 
 ### Key Framework Functions
 
-| Function | Purpose |
-|----------|---------|
-| `Load-AllFunctions` | Loads all application functions (call at script level) |
-| `Start-UnifiedTest` | Initializes test environment and context |
-| `Complete-UnifiedTest` | Handles cleanup and provides summary |
-| `Write-TestResult` | Standardized test result output |
-| `Write-TestSection` | Creates consistent section headers |
-| `Test-FunctionExists` | Verifies function availability |
-| `New-MockDevice` | Creates mock device data for testing |
+| Function | Purpose | Notes |
+|----------|---------|-------|
+| `Load-AllFunctions [-RootPath <path>] [-VerboseLoading]` | Recursively loads all application functions | Call at script level before Start-UnifiedTest |
+| `Start-UnifiedTest -TestName <name> [-TestFolder <path>] [-RootPath <path>] [-SkipFunctionCheck]` | Initializes test environment and returns context | Prefer to pass explicit parameters; returns `$TestContext` |
+| `Complete-UnifiedTest -TestContext <ctx> [-PassedTests <n>] [-FailedTests <n>] [-TotalTests <n>]` | Handles cleanup and provides summary | Supply counters for accurate summary |
+| `Write-TestResult -Message <text> -Success <bool>` | Standardized test result output | Use for each assertion |
+| `Write-TestSection -Title <text>` | Consistent section headers | — |
+| `Test-FunctionExists -FunctionName <name>` | Verifies function availability | — |
+| `New-MockDevice [...]` | Creates mock device data for testing | — |
 
 ## Test Execution Options
 
@@ -191,25 +201,22 @@ Choose the appropriate category based on your test's purpose:
 
 ### Temporary File Management
 
-All tests must properly manage temporary files:
+All tests must properly manage temporary files. Prefer letting the unified framework handle creation/cleanup by setting `$TestFolder` and calling `Start-UnifiedTest` and `Complete-UnifiedTest`:
 
 ```powershell
-# Cross-platform temporary directory
-$tempDir = if ($IsWindows -or $env:OS -eq "Windows_NT") { $env:TEMP } else { "/tmp" }
-$testTempDir = Join-Path $tempDir "autopilot-test-$(Get-Random)"
+# Minimal pattern
+. "$PSScriptRoot\test-helper.ps1"
+$RootPath = Split-Path -Parent $PSScriptRoot
+$TestFolder = Join-Path $RootPath "autopilot-test-$(Get-Random)"
+$TestName = "My Test"
+$SkipFunctionCheck = $true
+Load-AllFunctions -RootPath $RootPath | Out-Null
+$TestContext = Start-UnifiedTest
 
-try {
-    # Create temp directory
-    New-Item -Path $testTempDir -ItemType Directory -Force | Out-Null
-    
-    # Your test logic using $testTempDir
-    
-} finally {
-    # Always cleanup
-    if (Test-Path $testTempDir) {
-        Remove-Item -Path $testTempDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
-}
+# ... your test logic ...
+
+$PassedTests = 1; $FailedTests = 0; $TotalTests = 1
+Complete-UnifiedTest | Out-Null
 ```
 
 ## Migration from Individual Test Scripts
