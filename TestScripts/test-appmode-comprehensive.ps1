@@ -21,27 +21,35 @@ param()
 
 # Load functions at script level (same pattern as main.ps1)
 $functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder) {
+if (Test-Path $functionsFolder)
+{
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
-    foreach ($function in $functions) {
-        try {
+    foreach ($function in $functions)
+    {
+        try
+        {
             . $function.FullName
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
         }
     }
-} else {
+}
+else
+{
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
 
 # Initialize test environment
-try {
+try
+{
     $testContext = Start-UnifiedTest -TestName "Main.ps1 AppMode Comprehensive Test" -TestFolder "$PWD\test-appmode-comprehensive-temp" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
-catch {
+catch
+{
     Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
     exit 1
 }
@@ -49,26 +57,31 @@ catch {
 # Set up required global variables for testing
 $global:LogFile = "$PWD/test-appmode.log"
 
-try {
+try
+{
     Write-TestSection "Test 1: Valid AppMode Values"
     
     # Test all valid AppMode values
     $validAppModes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
     $validationResults = @()
     
-    foreach ($appMode in $validAppModes) {
+    foreach ($appMode in $validAppModes)
+    {
         Write-Host "Testing AppMode: $appMode" -ForegroundColor Cyan
         
         # Test that the mode is in the valid list
         $isValid = $appMode -in @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
         $validationResults += @{
-            Mode = $appMode
+            Mode  = $appMode
             Valid = $isValid
         }
         
-        if ($isValid) {
+        if ($isValid)
+        {
             Write-TestResult "AppMode '$appMode' is valid" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "AppMode '$appMode' is invalid" $false
         }
     }
@@ -82,19 +95,23 @@ try {
     $invalidAppModes = @('invalid', 'test', 'debug', 'production', '')
     $invalidationResults = @()
     
-    foreach ($appMode in $invalidAppModes) {
+    foreach ($appMode in $invalidAppModes)
+    {
         Write-Host "Testing invalid AppMode: '$appMode'" -ForegroundColor Cyan
         
         # Test that the mode is NOT in the valid list
         $isInvalid = $appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
         $invalidationResults += @{
-            Mode = $appMode
+            Mode    = $appMode
             Invalid = $isInvalid
         }
         
-        if ($isInvalid) {
+        if ($isInvalid)
+        {
             Write-TestResult "AppMode '$appMode' correctly identified as invalid" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "AppMode '$appMode' incorrectly accepted as valid" $false
         }
     }
@@ -109,38 +126,50 @@ try {
     
     # Create test local and global settings
     $localSettings = @{
-        appMode = "helpDesk"
+        appMode       = "helpDesk"
         customSetting = "local"
     }
     
     $globalSettings = @{
-        appMode = "full"
+        appMode       = "full"
         globalSetting = "global"
         customSetting = "global"
     }
     
     # Test MergeSettings function if available
-    if (Get-Command "MergeSettings" -ErrorAction SilentlyContinue) {
+    if (Get-Command "MergeSettings" -ErrorAction SilentlyContinue)
+    {
         $mergedSettings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
         
-        if ($mergedSettings.appMode -eq "helpDesk") {
+        if ($mergedSettings.appMode -eq "helpDesk")
+        {
             Write-TestResult "Local AppMode takes precedence in merge (helpDesk)" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Local AppMode merge failed - got: $($mergedSettings.appMode)" $false
         }
         
-        if ($mergedSettings.globalSetting -eq "global") {
+        if ($mergedSettings.globalSetting -eq "global")
+        {
             Write-TestResult "Global settings preserved in merge" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Global settings not preserved in merge" $false
         }
         
-        if ($mergedSettings.customSetting -eq "local") {
+        if ($mergedSettings.customSetting -eq "local")
+        {
             Write-TestResult "Local settings override global in merge" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Local override failed - got: $($mergedSettings.customSetting)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "MergeSettings function not available - skipping merge test" $true
     }
     
@@ -153,11 +182,21 @@ try {
     $emptySettings = @{}
     
     # Test that default should be 'full'
-    $defaultAppMode = if (-not $emptySettings.appMode) { 'full' } else { $emptySettings.appMode }
+    $defaultAppMode = if (-not $emptySettings.appMode)
+    {
+        'full' 
+    }
+    else
+    {
+        $emptySettings.appMode 
+    }
     
-    if ($defaultAppMode -eq 'full') {
+    if ($defaultAppMode -eq 'full')
+    {
         Write-TestResult "Default AppMode is correctly set to 'full'" $true
-    } else {
+    }
+    else
+    {
         Write-TestResult "Default AppMode is incorrect - got: $defaultAppMode" $false
     }
     
@@ -171,14 +210,18 @@ try {
     )
     
     $caseTestResults = @()
-    foreach ($variant in $caseVariants) {
+    foreach ($variant in $caseVariants)
+    {
         # Test if case-insensitive comparison would work
         $matches = $variant.Input.ToLower() -eq $variant.Expected.ToLower()
         $caseTestResults += $matches
         
-        if ($matches) {
+        if ($matches)
+        {
             Write-TestResult "Case variant '$($variant.Input)' matches '$($variant.Expected)' (case-insensitive)" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Case variant '$($variant.Input)' does not match '$($variant.Expected)'" $false
         }
     }
@@ -190,30 +233,50 @@ try {
     $totalTests = 5
     $passedTests = 0
     
-    if ($allValid) { $passedTests++ }
-    if ($allInvalid) { $passedTests++ }
-    if (Get-Command "MergeSettings" -ErrorAction SilentlyContinue) { $passedTests++ }
-    if ($defaultAppMode -eq 'full') { $passedTests++ }
-    if ($allCaseTestsPass) { $passedTests++ }
+    if ($allValid)
+    {
+        $passedTests++ 
+    }
+    if ($allInvalid)
+    {
+        $passedTests++ 
+    }
+    if (Get-Command "MergeSettings" -ErrorAction SilentlyContinue)
+    {
+        $passedTests++ 
+    }
+    if ($defaultAppMode -eq 'full')
+    {
+        $passedTests++ 
+    }
+    if ($allCaseTestsPass)
+    {
+        $passedTests++ 
+    }
     
     $failedTests = $totalTests - $passedTests
     
     Write-TestResult "AppMode comprehensive test completed" $true
 }
-catch {
+catch
+{
     Write-TestResult "Test failed with error: $($_.Exception.Message)" $false
     $failedTests = 5
     $passedTests = 0
     exit 1
 }
-finally {
+finally
+{
     # Complete unified test
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests 5
     
-    if ($success) {
+    if ($success)
+    {
         Write-Host "AppMode Comprehensive Test passed! [PASS]" -ForegroundColor Green
         exit 0
-    } else {
+    }
+    else
+    {
         Write-Host "AppMode Comprehensive Test failed! [FAIL]" -ForegroundColor Red
         exit 1
     }

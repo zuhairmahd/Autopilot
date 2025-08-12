@@ -7,9 +7,12 @@ $functionPath = "$PSScriptRoot\..\functions\setupFunctions\FirstRunWizardFunctio
 
 Write-Host "`nTesting silent mode..." -ForegroundColor Cyan
 $silentResult = Get-AppModeConfigurationFromUser -Silent
-if ($silentResult) {
+if ($silentResult)
+{
     Write-Host "Silent mode result: $($silentResult.appMode)" -ForegroundColor Green
-} else {
+}
+else
+{
     Write-Host "Silent mode failed" -ForegroundColor Red
 }
 
