@@ -249,20 +249,238 @@ function CallGraphAPI()
     }
     catch
     {
-        if ($null -eq $_.Exception.statusCode)
+        # Capture as much diagnostic information as possible about the failure
+        Write-Verbose "[$functionName] Exception type: $($PSItem.Exception.GetType().FullName)"
+        Write-Verbose "[$functionName] Exception message: $($PSItem.Exception.Message)"
+
+        # Walk inner exceptions (if any)
+        $inner = $PSItem.Exception.InnerException
+        while ($null -ne $inner)
         {
-            $statusCode = [regex]::Match($_.Exception.Message, '\d+').Value
-            Write-Verbose "[$functionName] Status code: $statusCode"
-            $statusCodeMessage = $_.Exception | Out-String
+            Write-Verbose "[$functionName] InnerException type: $($inner.GetType().FullName)"
+            Write-Verbose "[$functionName] InnerException message: $($inner.Message)"
+            $inner = $inner.InnerException
+        }
+
+        # Defaults
+        $statusDescription = $null
+        $statusMessage = $PSItem.Exception.Message
+        $statusCodeMessage = $null
+
+        # Try to extract status code from exception when available
+        if ($null -eq $PSItem.Exception.statusCode)
+        {
+            # Fallback: try to parse from exception message
+            $statusCode = [regex]::Match($PSItem.Exception.Message, '\d+').Value
+            Write-Verbose "[$functionName] Status code (parsed): $statusCode"
+            $statusCodeMessage = $PSItem.Exception | Out-String
             Write-Verbose "[$functionName] Status code message: $statusCodeMessage"
-            $statusMessage = $statusCodeMessage
         }
         else
         {
-            $statusCode = $_.Exception.statuscode.value__
-            $statusCodeMessage = $_.Exception.statuscode
-            $statusMessage = $_.Exception.Message
+            # PowerShell 5.1/7 HttpStatusCode
+            try
+            {
+                $statusCode = $PSItem.Exception.statuscode.value__ 
+            }
+            catch
+            {
+                $statusCode = [int]$PSItem.Exception.statuscode 
+            }
+            $statusCodeMessage = $PSItem.Exception.statuscode
+            Write-Verbose "[$functionName] Status code (from exception): $statusCode"
         }
+
+        # Attempt to extract response details (headers/body) across PS versions
+        $responseBodyRaw = $null
+        $responseJson = $null
+        $requestId = $null
+        $clientRequestId = $null
+        $serverDate = $null
+        $retryAfter = $null
+        $diagHeader = $null
+        $responseHeaders = @{}
+
+        $resp = $PSItem.Exception.Response
+        if ($null -ne $resp)
+        {
+            # Status description when available
+            try
+            {
+                $statusDescription = $resp.StatusDescription 
+            }
+            catch
+            { 
+            }
+
+            # Headers (handle both WebHeaderCollection and IDictionary-like)
+            try
+            {
+                if ($resp.Headers -and $resp.Headers -is [System.Net.WebHeaderCollection])
+                {
+                    foreach ($key in $resp.Headers.AllKeys)
+                    {
+                        $responseHeaders[$key] = $resp.Headers[$key]
+                    }
+                }
+                elseif ($resp.Headers)
+                {
+                    foreach ($kvp in $resp.Headers.GetEnumerator())
+                    {
+                        $responseHeaders[$kvp.Key] = ($kvp.Value -join ',')
+                    }
+                }
+            }
+            catch
+            {
+                Write-Verbose "[$functionName] Failed to enumerate response headers: $($_.Exception.Message)" 
+            }
+
+            # Common Graph headers
+            if ($responseHeaders.ContainsKey('request-id'))
+            {
+                $requestId = $responseHeaders['request-id'] 
+            }
+            if ($responseHeaders.ContainsKey('client-request-id'))
+            {
+                $clientRequestId = $responseHeaders['client-request-id'] 
+            }
+            if ($responseHeaders.ContainsKey('x-ms-ags-diagnostic'))
+            {
+                $diagHeader = $responseHeaders['x-ms-ags-diagnostic'] 
+            }
+            if ($responseHeaders.ContainsKey('Date'))
+            {
+                $serverDate = $responseHeaders['Date'] 
+            }
+            if ($responseHeaders.ContainsKey('Retry-After'))
+            {
+                $retryAfter = $responseHeaders['Retry-After'] 
+            }
+
+            # Body: handle HttpWebResponse stream and PS7 ErrorDetails fallbacks
+            try
+            {
+                if ($resp -is [System.Net.HttpWebResponse])
+                {
+                    $errorResponse = $resp.GetResponseStream()
+                    if ($errorResponse)
+                    {
+                        $streamReader = New-Object System.IO.StreamReader($errorResponse)
+                        $responseBodyRaw = $streamReader.ReadToEnd()
+                        $streamReader.Close()
+                    }
+                }
+            }
+            catch
+            {
+                Write-Verbose "[$functionName] Failed to read response stream: $($_.Exception.Message)" 
+            }
+        }
+
+        # Additional fallbacks commonly present in PS7
+        if (-not $responseBodyRaw)
+        {
+            try
+            {
+                if ($PSItem.ErrorDetails -and $PSItem.ErrorDetails.Message)
+                {
+                    $responseBodyRaw = $PSItem.ErrorDetails.Message 
+                } 
+            }
+            catch
+            {
+            }
+        }
+        if (-not $responseBodyRaw)
+        {
+            try
+            {
+                if ($PSItem.Exception.Response -and $PSItem.Exception.Response.Content)
+                {
+                    $responseBodyRaw = [string]$PSItem.Exception.Response.Content 
+                } 
+            }
+            catch
+            {
+            }
+        }
+
+        # Parse JSON body if it looks like JSON
+        if ($responseBodyRaw)
+        {
+            Write-Verbose "[$functionName] Raw server response captured (truncated for display if large)."
+            Write-Error "Server Response (raw): $responseBodyRaw"
+            try
+            {
+                $responseJson = $responseBodyRaw | ConvertFrom-Json -ErrorAction Stop 
+            }
+            catch
+            {
+                $responseJson = $null 
+            }
+        }
+
+        # Extract Graph error fields when available
+        if ($null -ne $responseJson -and $responseJson.error)
+        {
+            $graphError = $responseJson.error
+            $graphCode = $graphError.code
+            $graphMessage = $graphError.message
+            Write-Verbose "[$functionName] Graph error code: $graphCode"
+            Write-Verbose "[$functionName] Graph error message: $graphMessage"
+
+            if ($graphError.innerError)
+            {
+                $innerErr = $graphError.innerError
+                # Newer Graph may use camelCase innerError fields; older uses innererror
+                $requestId = $requestId ?? $innerErr.'request-id'
+                $clientRequestId = $clientRequestId ?? $innerErr.'client-request-id'
+                $serverDate = $serverDate ?? $innerErr.date
+                Write-Verbose "[$functionName] Graph innerError: request-id=$requestId client-request-id=$clientRequestId date=$serverDate"
+                # Some APIs include nested innererror with additional code/message
+                if ($innerErr.innererror)
+                {
+                    Write-Verbose "[$functionName] Graph nested innererror: $($innerErr.innererror | ConvertTo-Json -Depth 5)"
+                }
+            }
+        }
+
+        # Summarize headers and identifiers (avoid logging Authorization)
+        if ($responseHeaders.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] Response headers:"
+            foreach ($k in $responseHeaders.Keys | Sort-Object)
+            {
+                if ($k -ne 'Authorization')
+                {
+                    Write-Verbose "[$functionName]   $k: $($responseHeaders[$k])" 
+                }
+            }
+        }
+        if ($requestId)
+        {
+            Write-Verbose "[$functionName] Request-Id: $requestId" 
+        }
+        if ($clientRequestId)
+        {
+            Write-Verbose "[$functionName] Client-Request-Id: $clientRequestId" 
+        }
+        if ($diagHeader)
+        {
+            Write-Verbose "[$functionName] x-ms-ags-diagnostic: $diagHeader" 
+        }
+        if ($serverDate)
+        {
+            Write-Verbose "[$functionName] Server Date: $serverDate" 
+        }
+        if ($retryAfter)
+        {
+            Write-Verbose "[$functionName] Retry-After: $retryAfter" 
+        }
+
+        # Preserve existing switch logic for user-friendly messages
+        $statusMessage = $statusMessage
         switch ($statusCode)
         {
             400
@@ -289,40 +507,56 @@ function CallGraphAPI()
             {
                 Write-Host 'An unknown error occurred. Please check the error message below.' -ForegroundColor Red 
                 Write-Host "Error: $statusMessage" -ForegroundColor Red
-                Write-Host "The status code is $statusCode"
-                Write-Host "$statusCode indicates $statusCodeMessage"
+                if ($statusCode)
+                {
+                    Write-Host "The status code is $statusCode" 
+                }
+                if ($statusDescription)
+                {
+                    Write-Host "Status description: $statusDescription" 
+                }
+                if ($statusCodeMessage)
+                {
+                    Write-Host "$statusCode indicates $statusCodeMessage" 
+                }
                 Write-Host "Status message: $statusMessage"
+                if ($requestId)
+                {
+                    Write-Host "Request-Id: $requestId" 
+                }
+                if ($clientRequestId)
+                {
+                    Write-Host "Client-Request-Id: $clientRequestId" 
+                }
+                if ($retryAfter)
+                {
+                    Write-Host "Retry-After: $retryAfter" 
+                }
                 Write-Host 'The full error message follows below:'
                 Write-Host '----------------------------------------------------------'
                 Write-Host "$_"
-                if ($_.Exception.Response)
-                {
-                    $errorResponse = $_.Exception.Response.GetResponseStream()
-                    $streamReader = New-Object System.IO.StreamReader($errorResponse)
-                    $errorMessage = $streamReader.ReadToEnd()
-                    $streamReader.Close()
-                    Write-Error "Server Response: $errorMessage"
-                }   
+                # Raw server body already logged above when available
             }
         }
         Write-Verbose "[$functionName] Failed to call the Graph API: $_"
         Write-Verbose "[$functionName] The status code is $statusCode"
-        Write-Verbose "[$functionName] $statusCode indicates $statusCodeMessage"
+        if ($statusCodeMessage)
+        {
+            Write-Verbose "[$functionName] $statusCode indicates $statusCodeMessage" 
+        }
+        if ($statusDescription)
+        {
+            Write-Verbose "[$functionName] Status description: $statusDescription" 
+        }
         Write-Verbose "[$functionName] Status message: $statusMessage"
         Write-Verbose "[$functionName] The full error message follows below:"
         Write-Verbose "[$functionName] ----------------------------------------------------------"
         Write-Verbose "[$functionName] Error: $($_)"
-        Write-Verbose "[$functionName] Exception message: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Exception response: $($_.Exception.Response)"
-        if ($_.Exception.Response -and $psversionTable.PSVersion.Major -ge 7)
+        Write-Verbose "[$functionName] Exception message: $($PSItem.Exception.Message)"
+        Write-Verbose "[$functionName] Exception response: $($PSItem.Exception.Response)"
+        if ($responseBodyRaw)
         {
-            {
-                $errorResponse = $_.Exception.Response.GetResponseStream()
-                $streamReader = New-Object System.IO.StreamReader($errorResponse)
-                $errorMessage = $streamReader.ReadToEnd()
-                $streamReader.Close()
-                Write-Verbose "[$functionName] Server Response: $errorMessage"
-            }   
+            Write-Verbose "[$functionName] Server Response (raw): $responseBodyRaw" 
         }
         return $statusCode
         # return $null
