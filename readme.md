@@ -26,7 +26,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 - **🚀 Autopilot Device Management**: Complete device lifecycle from import to deployment with hash generation and profile assignment
 - **👥 User Readiness Validation**: Intelligent assessment of user eligibility based on group memberships and organizational policies
 - **🏢 Corporate Device Management**: Mark devices as corporate-owned for Intune Device Preparation and compliance
-- **📊 Advanced Reporting & Export**: CSV exports for devices, assignments, storage analysis, and application deployments
+- **📊 Advanced Reporting & Export**: CSV exports for devices, assignments, storage analysis, and application deployments with comprehensive group assignment analysis covering scripts, app protection policies, security baselines, and configuration policies
 - **🔐 Enterprise Security**: AES-256 encrypted configuration, secure credential handling, and multi-factor authentication support
 - **⚙️ Automated Setup**: First Run Wizard with guided configuration and automatic credential encryption
 - **🔄 Smart Updates**: Automatic application updates with digital signature verification and rollback capabilities
@@ -137,6 +137,12 @@ When you launch the application, you'll see the main menu with the following opt
    - **Export Imported Autopilot Devices**: Export devices pending Autopilot enrollment
    - **Export Managed Windows Devices**: Export all Intune-managed Windows devices
    - **Export app assignment report**: Comprehensive app assignment reporting with CSV export
+   - **Show Group Assignments**: View and export comprehensive group assignment analysis
+     - View assignments for Applications, Device Configurations, Compliance Policies
+     - View Device Management Scripts, App Protection Policies, Security Intents (Baselines)
+     - View Resource Access Profiles (VPN, Wi-Fi, Certificates), Autopilot Profiles
+     - View Device Health Scripts, Configuration Policies (Settings Catalog), Group Policy Configurations
+     - Export all assignment types to CSV for analysis and reporting
 
 8. **About**
    - View version information, copyright, and licensing details

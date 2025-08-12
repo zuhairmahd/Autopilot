@@ -53,9 +53,37 @@ function ShowGroupAssignments()
         Write-Host "Selected Assignment Type: Compliance"
         return 'Compliance'
     } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Management Scripts" -Action {
+        Write-Host "Selected Assignment Type: Script"
+        return 'Script'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show App Protection Policies" -Action {
+        Write-Host "Selected Assignment Type: AppProtection"
+        return 'AppProtection'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Security Intents (Baselines)" -Action {
+        Write-Host "Selected Assignment Type: Intent"
+        return 'Intent'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Resource Access Profiles" -Action {
+        Write-Host "Selected Assignment Type: ResourceAccess"
+        return 'ResourceAccess'
+    } -returnsValue
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Autopilot Profiles" -Action {
-        Write-Host "Selected Assignment Type: Autopilot"
-        return 'Autopilot'
+        Write-Host "Selected Assignment Type: AutopilotProfile"
+        return 'AutopilotProfile'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Device Health Scripts" -Action {
+        Write-Host "Selected Assignment Type: HealthScript"
+        return 'HealthScript'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Configuration Policies (Settings Catalog)" -Action {
+        Write-Host "Selected Assignment Type: ConfigurationPolicy"
+        return 'ConfigurationPolicy'
+    } -returnsValue
+    $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Group Policy Configurations" -Action {
+        Write-Host "Selected Assignment Type: GroupPolicy"
+        return 'GroupPolicy'
     } -returnsValue
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Export All Assignments" -Action {
         Write-Host "Displaying all assignments"
@@ -84,7 +112,30 @@ function ShowGroupAssignments()
         # Filter assignments by type for display
         if ($assignmentType -ne 'All')
         {
-            $selectedAssignments = @($allAssignments | Where-Object { $_.Type -eq $assignmentType })
+            # Map display type names to internal property names
+            $typePropertyMap = @{
+                'Application' = 'Application'
+                'Configuration' = 'Configuration'
+                'Compliance' = 'Compliance'
+                'Script' = 'Script'
+                'AppProtection' = 'AppProtection'
+                'Intent' = 'Intent'
+                'ResourceAccess' = 'ResourceAccess'
+                'AutopilotProfile' = 'AutopilotProfile'
+                'HealthScript' = 'HealthScript'
+                'ConfigurationPolicy' = 'ConfigurationPolicy'
+                'GroupPolicy' = 'GroupPolicy'
+            }
+            
+            $internalType = $typePropertyMap[$assignmentType]
+            if ($internalType)
+            {
+                $selectedAssignments = @($allAssignments | Where-Object { $_.Type -eq $internalType })
+            }
+            else
+            {
+                $selectedAssignments = @()
+            }
             Write-Host "Found $($selectedAssignments.Count) assignments of type $assignmentType"
         }
         else

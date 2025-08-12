@@ -143,7 +143,8 @@ The application uses a sophisticated hierarchical menu system with the following
 4. Application settings and configuration
 5. Update management
 6. Device exports and reporting
-7. Device actions (wipe, clean, sync)
+7. **Group assignment analysis** - Comprehensive analysis of Intune group assignments across all object types
+8. Device actions (wipe, clean, sync)
 
 **Documentation**: Complete menu system documentation available in `/docs/MENU_SYSTEM_DOCUMENTATION.md` including all functions, usage patterns, and navigation flows.
 
@@ -248,6 +249,20 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 - `/users/{id}/registeredDevices` - User device associations  
 - `/deviceManagement/managedDevices` - Intune managed device data
 - `/users/{id}/memberOf` - User group memberships
+
+### Group Assignment Analysis Endpoints
+The application provides comprehensive group assignment analysis across all Intune object types:
+- `/deviceAppManagement/mobileApps` - Mobile applications and assignments
+- `/deviceManagement/deviceConfigurations` - Device configuration policies and assignments
+- `/deviceManagement/deviceCompliancePolicies` - Device compliance policies and assignments
+- `/deviceManagement/deviceManagementScripts` - PowerShell device management scripts and assignments
+- `/deviceManagement/deviceHealthScripts` - Device health monitoring scripts and assignments (beta)
+- `/deviceAppManagement/managedAppPolicies` - App protection policies and assignments
+- `/deviceManagement/intents` - Security baselines and endpoint security policies and assignments
+- `/deviceManagement/resourceAccessProfiles` - VPN, Wi-Fi, certificate profiles and assignments
+- `/deviceManagement/configurationPolicies` - Settings catalog policies and assignments (beta)
+- `/deviceManagement/groupPolicyConfigurations` - Group policy ADMX configurations and assignments (beta)
+- `/deviceManagement/windowsAutopilotDeploymentProfiles` - Autopilot deployment profiles and assignments (beta)
 
 ### Required Scopes (defined in settings.json)
 - `User.Read.All` - Read user profiles and group memberships
