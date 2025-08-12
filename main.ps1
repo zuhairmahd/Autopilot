@@ -457,13 +457,13 @@ if (Test-Path -Path $InitFile)
     if (-not $script:settings.appMode)
     {
         Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
-        $script:settings.appMode = 'full'
+        $global:settings.appMode = 'full'
     }
-    elseif ($script:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
+    elseif ($global:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
     {
-        Write-Host "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
+        Write-Host "Invalid app mode specified: $($global:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
         Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($global:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
         exit 1
     }
     #load menus configuration from initFile
