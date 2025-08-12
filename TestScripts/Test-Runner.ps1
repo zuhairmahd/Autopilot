@@ -80,19 +80,16 @@
 param(
     [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized')]
     [string]$TestCategory = 'all',
-    
     [string]$TestPattern = $null,
-    [string]$ExcludePattern = "test-helper.ps1,Test-Runner.ps1,run-all-tests.ps1",
+    [string]$ExcludePattern = "test-helper.ps1,Test-Runner.ps1",
     [switch]$ListTests,
     [switch]$ListCategories,
     [switch]$ContinueOnError,
     [switch]$ShowVerbose,
     [switch]$DryRun,
     [switch]$ParallelExecution,
-    
     [ValidateSet('Console', 'JSON', 'XML')]
     [string]$OutputFormat = 'Console',
-    
     [ValidateSet('Minimal', 'Normal', 'Verbose', 'Debug')]
     [string]$LogLevel = 'Normal'
 )
@@ -120,35 +117,41 @@ $TestRegistry = @{
     }
     'core'          = @{
         Description       = 'Essential functionality tests required for basic operation'
-        Pattern           = 'test-core-validation.ps1,test-function-loading-validation.ps1,test-simple-function-loading.ps1'
+        # Dynamic: any "core" validation and function loading tests
+        Pattern           = 'test-core-*.ps1,test-function-loading*.ps1,test-*-function-loading*.ps1'
         Priority          = 2
         EstimatedDuration = '30-60 seconds'
         Dependencies      = @('syntax')
     }
     'unit'          = @{
         Description       = 'Individual component and function tests'
-        Pattern           = 'test-settings-functions.ps1,test-json-merge.ps1,test-password-change.ps1,test-temporary-encryption.ps1,test-array-verification.ps1,test-array-storage-issue.ps1,test-getappassignmenttypes.ps1,test-checknextuserreadiness.ps1,test-corporate-device-identifier.ps1,test-backward-compatibility.ps1'
+        # Dynamic: any test-*.ps1 that is not integration/comprehensive/validation/enhanced/specialized/core/syntax
+        Pattern           = 'test-*.ps1'
+        ExcludeRegex      = '(?i)(-integration|-comprehensive|^final-|-enhanced-|-wizard|^demo-)|test-(core-|.*function-loading)'
         Priority          = 3
         EstimatedDuration = '2-4 minutes'
         Dependencies      = @('syntax', 'core')
     }
     'integration'   = @{
         Description       = 'Cross-component integration and workflow tests'
-        Pattern           = 'test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system1.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-migration-callers.ps1,test-menu-inclusions-integration.ps1,test-e2e-appmode.ps1'
+        # Dynamic: suffix-based and common integration keywords
+        Pattern           = 'test-*-integration.ps1,test-e2e-*.ps1,test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system*.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-migration-*.ps1'
         Priority          = 4
         EstimatedDuration = '3-5 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
     }
     'comprehensive' = @{
         Description       = 'Full workflow and end-to-end comprehensive tests'
-        Pattern           = 'test-comprehensive.ps1,test-menu-system-comprehensive.ps1,test-configuration-comprehensive.ps1,test-appmode-comprehensive.ps1,test-auth-flows-comprehensive.ps1,test-autopilot-import-comprehensive.ps1,test-device-lookup-comprehensive.ps1,test-main-integration.ps1,test-menu-inclusions-e2e.ps1'
+        # Dynamic: any test with -comprehensive plus explicit inclusions
+        Pattern           = 'test-comprehensive.ps1,test-*-comprehensive.ps1,test-main-integration.ps1,test-menu-inclusions-e2e.ps1'
         Priority          = 5
         EstimatedDuration = '5-8 minutes'
         Dependencies      = @('syntax', 'core', 'unit', 'integration')
     }
     'validation'    = @{
         Description       = 'Final validation and verification tests'
-        Pattern           = 'final-validation.ps1,final-validation-comprehensive.ps1,final-validation-issue-91.ps1,final-verification.ps1'
+        # Dynamic: final validation/verification scripts
+        Pattern           = 'final-validation*.ps1,final-verification.ps1'
         Priority          = 6
         EstimatedDuration = '2-3 minutes'
         Dependencies      = @('syntax', 'core')
@@ -162,14 +165,16 @@ $TestRegistry = @{
     }
     'enhanced'      = @{
         Description       = 'Enhanced functionality tests (new test scripts)'
-        Pattern           = 'test-enhanced-menu-functions.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1'
+        # Dynamic: any enhanced-prefixed test, plus known additions
+        Pattern           = 'test-enhanced-*.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1'
         Priority          = 4
         EstimatedDuration = '2-3 minutes'
         Dependencies      = @('syntax', 'core')
     }
     'specialized'   = @{
         Description       = 'Specialized and advanced functionality tests'
-        Pattern           = 'test-appmode-refactored.ps1,test-appmode-wizard.ps1,test-autoupdate-wizard.ps1,test-firstrun-wizard.ps1,test-mnemonic-navigation.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-device-selection.ps1,test-delegated-auth-update.ps1,test-group-assignment-fixes.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1'
+        # Dynamic: wizard variants + explicit specialized scripts
+        Pattern           = 'test-*-wizard.ps1,test-appmode-refactored.ps1,test-autoupdate-wizard.ps1,test-firstrun-wizard.ps1,test-mnemonic-navigation.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-device-selection.ps1,test-delegated-auth-update.ps1,test-group-assignment-fixes.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1'
         Priority          = 5
         EstimatedDuration = '4-6 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
@@ -192,26 +197,42 @@ function Get-TestFilesByCategory
     }
     
     $categoryInfo = $TestRegistry[$Category]
-    $patterns = $categoryInfo.Pattern -split ','
+    $patterns = @()
+    if ($categoryInfo.ContainsKey('Pattern') -and $categoryInfo.Pattern)
+    {
+        $patterns = $categoryInfo.Pattern -split ','
+    }
+    # Optional regex support in future
+    $patternRegex = $null
+    if ($categoryInfo.ContainsKey('PatternRegex') -and $categoryInfo.PatternRegex)
+    {
+        $patternRegex = $categoryInfo.PatternRegex
+    }
     $testFiles = @()
     
-    foreach ($pattern in $patterns)
+    if ($patterns.Count -gt 0)
     {
-        $pattern = $pattern.Trim()
-        if ($pattern.EndsWith('.ps1'))
+        foreach ($pattern in $patterns)
         {
-            # Exact file match
-            $file = Get-ChildItem -Path $PSScriptRoot -Filter $pattern -ErrorAction SilentlyContinue
-            if ($file)
+            $pattern = $pattern.Trim()
+            if (-not $pattern)
             {
-                $testFiles += $file
+                continue 
+            }
+            # Use -Filter with pattern; supports wildcards like demo-*.ps1
+            $files = Get-ChildItem -Path $PSScriptRoot -Filter $pattern -ErrorAction SilentlyContinue
+            if ($files)
+            {
+                $testFiles += $files 
             }
         }
-        else
+    }
+    elseif ($patternRegex)
+    {
+        $files = Get-ChildItem -Path $PSScriptRoot -Filter '*.ps1' -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $patternRegex }
+        if ($files)
         {
-            # Wildcard pattern
-            $files = Get-ChildItem -Path $PSScriptRoot -Filter "$pattern*.ps1" -ErrorAction SilentlyContinue
-            $testFiles += $files
+            $testFiles += $files 
         }
     }
     
@@ -221,6 +242,12 @@ function Get-TestFilesByCategory
     {
         $excludePattern = $excludePattern.Trim()
         $testFiles = $testFiles | Where-Object { $_.Name -notlike $excludePattern }
+    }
+    # Apply category-level regex exclusion if provided
+    if ($categoryInfo.ContainsKey('ExcludeRegex') -and $categoryInfo.ExcludeRegex)
+    {
+        $excludeRegex = $categoryInfo.ExcludeRegex
+        $testFiles = $testFiles | Where-Object { $_.Name -notmatch $excludeRegex }
     }
     
     return $testFiles | Sort-Object Name | Get-Unique
@@ -233,7 +260,8 @@ function Get-AllTestFiles
         Gets all test files, excluding helpers and runners
     #>
     
-    $allFiles = Get-ChildItem -Path $PSScriptRoot -Filter "test-*.ps1" -ErrorAction SilentlyContinue
+    # Include all PS1 scripts in TestScripts folder (tests, demos, finals), excluding helpers/runners via ExcludePattern
+    $allFiles = Get-ChildItem -Path $PSScriptRoot -Filter "*.ps1" -ErrorAction SilentlyContinue
     
     # Apply exclusions
     $excludePatterns = $ExcludePattern -split ','
