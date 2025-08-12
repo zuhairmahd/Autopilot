@@ -14,8 +14,9 @@ function Show-GroupsEditor()
         Path to the settings.json file. Defaults to "settings.json".
     
     .PARAMETER DomainName
-        The domain name for which to edit group settings. If not provided, will prompt user
-        to select from available domains or use current domain.
+        The domain name for which to edit group settings. If not provided, will attempt 
+        to use the currently loaded domain from the session. If no loaded domain is 
+        available, will prompt user to select from available domains.
     
     .PARAMETER Silent
         If specified, uses defaults and minimal output.
@@ -34,7 +35,7 @@ function Show-GroupsEditor()
         - Maintains PowerShell 5.1 compatibility
         - Uses existing Update-Setting function for data persistence
         - Provides intuitive interface for managing group arrays
-        - Handles domain selection when not specified
+        - Handles domain selection when not specified (prioritizes loaded domain)
         - Supports both groupsToInclude and groupsToExclude editing
     #>
     [CmdletBinding()]
@@ -69,54 +70,80 @@ function Show-GroupsEditor()
             return $false
         }
         
-        # Get domain name if not specified
+        # Get domain name if not specified (following domain settings editor pattern)
         if ([string]::IsNullOrWhiteSpace($DomainName))
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No domain specified, prompting user to select" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] No domain specified, prompting user to select"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No domain specified, attempting to determine current domain" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] No domain specified, attempting to determine current domain"
             
-            $availableDomains = $currentSettings.domains.PSObject.Properties.Name
-            if ($availableDomains.Count -eq 0)
+            # Try to get the current domain from calling scope (same logic as domain settings editor)
+            $currentDomain = $null
+            try
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "No domains available in settings" -LogLevel "Error"
-                Write-Warning "[$functionName] No domains available in settings"
-                return $false
-            }
-            
-            if ($availableDomains.Count -eq 1)
-            {
-                $DomainName = $availableDomains[0]
-                Write-Log -LogFile $logFile -Module $functionName -Message "Auto-selected single domain: '$DomainName'" -LogLevel "Information"
-                Write-Verbose "[$functionName] Auto-selected single domain: '$DomainName'"
-            }
-            else
-            {
-                if (-not $Silent)
+                # Check if $domain variable exists in calling scope
+                $currentDomain = Get-Variable -Name "domain" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
+                if (-not [string]::IsNullOrWhiteSpace($currentDomain))
                 {
-                    Write-Host "`nAvailable domains:" -ForegroundColor Cyan
-                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
-                    {
-                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
-                    }
-                    
-                    do
-                    {
-                        $choice = Read-Host "Select domain (1-$($availableDomains.Count))"
-                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
-                        {
-                            $DomainName = $availableDomains[[int]$choice - 1]
-                            break
-                        }
-                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
-                    } while ($true)
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Found loaded domain from scope: '$currentDomain'"
+                    $DomainName = $currentDomain
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Unable to access domain variable from calling scope: $($_.Exception.Message)"
+            }
+            
+            # If no current domain found, fall back to domain selection
+            if ([string]::IsNullOrWhiteSpace($DomainName))
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] No loaded domain found, falling back to domain selection"
+                
+                $availableDomains = $currentSettings.domains.PSObject.Properties.Name
+                if ($availableDomains.Count -eq 0)
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "No domains available in settings" -LogLevel "Error"
+                    Write-Warning "[$functionName] No domains available in settings"
+                    return $false
+                }
+                
+                if ($availableDomains.Count -eq 1)
+                {
+                    $DomainName = $availableDomains[0]
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Auto-selected single domain: '$DomainName'" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Auto-selected single domain: '$DomainName'"
                 }
                 else
                 {
-                    $DomainName = $availableDomains[0]  # Use first domain in silent mode
+                    if (-not $Silent)
+                    {
+                        Write-Host "`nAvailable domains:" -ForegroundColor Cyan
+                        for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                        {
+                            Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
+                        }
+                        
+                        do
+                        {
+                            $choice = Read-Host "Select domain (1-$($availableDomains.Count))"
+                            if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                            {
+                                $DomainName = $availableDomains[[int]$choice - 1]
+                                break
+                            }
+                            Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
+                        } while ($true)
+                    }
+                    else
+                    {
+                        $DomainName = $availableDomains[0]  # Use first domain in silent mode
+                    }
+                    
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User selected domain: '$DomainName'" -LogLevel "Information"
+                    Write-Verbose "[$functionName] User selected domain: '$DomainName'"
                 }
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "User selected domain: '$DomainName'" -LogLevel "Information"
-                Write-Verbose "[$functionName] User selected domain: '$DomainName'"
             }
         }
         

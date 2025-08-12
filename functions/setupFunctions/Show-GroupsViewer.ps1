@@ -14,8 +14,9 @@ function Show-GroupsViewer()
         Path to the settings.json file. Defaults to "settings.json".
     
     .PARAMETER DomainName
-        Optional domain name to view group settings for. If not provided, displays settings
-        for all domains.
+        Optional domain name to view group settings for. If not provided, will attempt
+        to use the currently loaded domain from the session. If no loaded domain is
+        available, displays settings for all domains.
     
     .PARAMETER Silent
         If specified, uses minimal output for programmatic usage.
@@ -27,7 +28,8 @@ function Show-GroupsViewer()
     .EXAMPLE
         Show-GroupsViewer
         
-        Displays group settings for all domains.
+        Displays group settings for the currently loaded domain if available, 
+        otherwise displays settings for all domains.
     
     .EXAMPLE
         Show-GroupsViewer -DomainName "contoso.com"
@@ -42,7 +44,7 @@ function Show-GroupsViewer()
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Read-only display with no modification capabilities
-        - Supports both single domain and all domains display
+        - Supports both single domain and all domains display (prioritizes loaded domain)
         - Uses similar formatting to other settings viewers
         - Complements the Show-GroupsEditor function
     #>
@@ -86,13 +88,46 @@ function Show-GroupsViewer()
             return $false
         }
         
-        # Determine which domains to display
+        # Determine which domains to display (following domain settings viewer pattern)
         $domainsToDisplay = @()
         if ([string]::IsNullOrWhiteSpace($DomainName))
         {
-            $domainsToDisplay = $availableDomains
-            Write-Log -LogFile $logFile -Module $functionName -Message "Displaying group settings for all $($availableDomains.Count) domains" -LogLevel "Information"
-            Write-Verbose "[$functionName] Displaying group settings for all $($availableDomains.Count) domains"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No domain specified, attempting to determine current domain" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] No domain specified, attempting to determine current domain"
+            
+            # Try to get the current domain from calling scope (same logic as domain settings viewer)
+            $currentDomain = $null
+            try
+            {
+                # Check if $domain variable exists in calling scope
+                $currentDomain = Get-Variable -Name "domain" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
+                if (-not [string]::IsNullOrWhiteSpace($currentDomain) -and $availableDomains -contains $currentDomain)
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Found loaded domain from scope: '$currentDomain'"
+                    $DomainName = $currentDomain
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Unable to access domain variable from calling scope: $($_.Exception.Message)"
+            }
+            
+            # If loaded domain found and valid, use it
+            if (-not [string]::IsNullOrWhiteSpace($DomainName))
+            {
+                $domainsToDisplay = @($DomainName)
+                Write-Log -LogFile $logFile -Module $functionName -Message "Displaying group settings for loaded domain: '$DomainName'" -LogLevel "Information"
+                Write-Verbose "[$functionName] Displaying group settings for loaded domain: '$DomainName'"
+            }
+            else
+            {
+                # Fall back to showing all domains if no loaded domain
+                $domainsToDisplay = $availableDomains
+                Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, displaying group settings for all $($availableDomains.Count) domains" -LogLevel "Information"
+                Write-Verbose "[$functionName] No loaded domain found, displaying group settings for all $($availableDomains.Count) domains"
+            }
         }
         else
         {
