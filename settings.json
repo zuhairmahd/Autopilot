@@ -275,7 +275,7 @@
                                                       },
                                                       {
                                                           "description":  "Lookup the device the application is running on",
-                                                          "name":  "Use this device\u0027s serial number",
+                                                          "name":  "Use this device's serial number",
                                                           "type":  "action",
                                                           "includeInDisplayModes":  [
 
@@ -297,7 +297,7 @@
                                     },
                                     {
                                         "description":  "View group assignments for Intune policies and applications",
-                                        "name":  "View group assignments",
+                                        "name":  "Show Group Assignments",
                                         "type":  "action",
                                         "includeInDisplayModes":  [
                                                                       "helpdesk",
@@ -315,6 +315,14 @@
                       "description":  "Import a device into Autopilot and perform related actions",
                       "name":  "Autopilot menu",
                       "items":  [
+                                    {
+                                        "description":  "Quick import a device into Autopilot with default settings",
+                                        "name":  "Quick Import device into Autopilot (requires admin rights)",
+                                        "type":  "action",
+                                        "includeInDisplayModes":  [
+                                                                      "registration"
+                                                                  ]
+                                    },
                                     {
                                         "description":  "Import a device into Autopilot",
                                         "name":  "Import device into Autopilot",
@@ -334,6 +342,14 @@
                                     {
                                         "description":  "Import a Corporate Device Identifier for Device Preparation",
                                         "name":  "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
+                                        "type":  "action",
+                                        "includeInDisplayModes":  [
+                                                                      "advancedRegistration"
+                                                                  ]
+                                    },
+                                    {
+                                        "description":  "Delete a Corporate Device Identifier from Device Preparation",
+                                        "name":  "Delete Corporate Device Identifier from Device Preparation (requires admin rights)",
                                         "type":  "action",
                                         "includeInDisplayModes":  [
                                                                       "advancedRegistration"
@@ -391,7 +407,7 @@
                       "items":  [
                                     {
                                         "description":  "Change the global and local environment settings for the application",
-                                        "name":  "Change global environment settings",
+                                        "name":  "Change environment settings",
                                         "type":  "submenu",
                                         "items":  [
                                                       {
