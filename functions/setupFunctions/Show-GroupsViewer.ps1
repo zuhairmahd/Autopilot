@@ -127,7 +127,11 @@ function Show-GroupsViewer()
             $domainSettings = $currentSettings.domains.$domain
             
             # Get current group settings with safe defaults
-            $includeGroups = if ($domainSettings.PSObject.Properties.Name -contains 'groupsToInclude') 
+            # Cache property names to avoid repeated enumeration
+            $domainPropertyNames = $domainSettings.PSObject.Properties.Name
+            
+            # Get current group settings with safe defaults
+            $includeGroups = if ($domainPropertyNames -contains 'groupsToInclude') 
             { 
                 $domainSettings.groupsToInclude 
             } 
