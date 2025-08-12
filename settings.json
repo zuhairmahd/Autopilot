@@ -369,6 +369,18 @@
                     "type": "submenu",
                     "items": [
                         {
+                            "name": "View global settings",
+                            "description": "View the current global environment settings for the application",
+                            "type": "action",
+                            "includeInDisplayModes": []
+                        },
+                        {
+                            "name": "View domain settings",
+                            "description": "View the current domain specific settings for the application",
+                            "type": "action",
+                            "includeInDisplayModes": []
+                        },
+                        {
                             "name": "Change global environment settings",
                             "description": "Change the global environment settings for the application",
                             "type": "action",

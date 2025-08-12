@@ -1,7 +1,7 @@
 # Comprehensive Test Helper Framework
 # This file provides a unified testing framework for all test scripts
 
-function Load-AllFunctions
+function Load-AllFunctions()
 {
     <#
     .SYNOPSIS
@@ -100,7 +100,7 @@ function Load-AllFunctions
     }
 }
 
-function Initialize-TestEnvironment
+function Initialize-TestEnvironment()
 {
     <#
     .SYNOPSIS
@@ -133,8 +133,29 @@ function Initialize-TestEnvironment
     {
         "/tmp" 
     }
-    $global:LogFile = Join-Path $tempDir "test.log"
-    $global:logFile = Join-Path $tempDir "test.log"  # Add lowercase version for compatibility
+    # Simplified: only validate that the intended log file path is syntactically valid.
+    # No file or directory creation; no side effects beyond setting globals.
+    $logCandidate = if ($global:LogFile -and [string]::IsNullOrWhiteSpace([string]$global:LogFile) -eq $false)
+    {
+        [string]$global:LogFile
+    }
+    else
+    {
+        Join-Path $tempDir "test.log"
+    }
+    try
+    {
+        # Throws if path contains invalid characters or format
+        $null = [System.IO.Path]::GetFullPath($logCandidate)
+        $global:LogFile = $logCandidate
+        $global:logFile = $global:LogFile  # Lowercase alias for compatibility
+    }
+    catch
+    {
+        Write-Warning "Invalid LogFile path specified: '$logCandidate'. Continuing without a log file path."
+        $global:LogFile = $null
+        $global:logFile = $null
+    }
     $global:jsonDepth = 100  # Standard JSON depth for settings files
     $global:SettingsFilePath = Join-Path $RootPath "settings.json"
     $global:StringsFilePath = Join-Path $RootPath "strings.json"
@@ -200,7 +221,7 @@ function Initialize-TestEnvironment
     Write-TestResult "Test environment initialized" $true
 }
 
-function Cleanup-TestEnvironment
+function Cleanup-TestEnvironment()
 {
     <#
     .SYNOPSIS
@@ -209,7 +230,6 @@ function Cleanup-TestEnvironment
     param(
         [string]$TestFolder = $null
     )
-    
     try
     {
         # Restore original error action preference
@@ -219,10 +239,85 @@ function Cleanup-TestEnvironment
         }
         
         # Clean up test folder if specified
-        if ($TestFolder -and (Test-Path $TestFolder))
+        if ($TestFolder -and (Test-Path -LiteralPath $TestFolder))
         {
-            Remove-Item -Path $TestFolder -Recurse -Force -ErrorAction SilentlyContinue
-            Write-TestResult "Test folder cleaned up" $true
+            try
+            {
+                # If current location is inside the test folder, move out to avoid lock
+                try
+                {
+                    $currentPath = (Get-Location).Path
+                    if ($currentPath -like (Join-Path $TestFolder '*'))
+                    {
+                        $fallback = if ($env:TEMP)
+                        {
+                            $env:TEMP 
+                        }
+                        else
+                        {
+                            [Environment]::GetFolderPath('UserProfile') 
+                        }
+                        Set-Location -Path $fallback -ErrorAction SilentlyContinue
+                    }
+                }
+                catch
+                { 
+                }
+
+                # Clear read-only/system attributes that can block deletion on Windows
+                try
+                {
+                    $items = Get-ChildItem -LiteralPath $TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+                    foreach ($item in $items)
+                    {
+                        try
+                        {
+                            $item.Attributes = 'Normal' 
+                        }
+                        catch
+                        { 
+                        }
+                    }
+                    try
+                    {
+                        $folderItem = Get-Item -LiteralPath $TestFolder -Force -ErrorAction SilentlyContinue
+                        if ($folderItem)
+                        {
+                            try
+                            {
+                                $folderItem.Attributes = 'Normal' 
+                            }
+                            catch
+                            { 
+                            } 
+                        }
+                    }
+                    catch
+                    { 
+                    }
+                }
+                catch
+                { 
+                }
+
+                # Attempt deletion with strict error handling
+                Remove-Item -LiteralPath $TestFolder -Recurse -Force -ErrorAction Stop
+
+                # Verify deletion
+                if (Test-Path -LiteralPath $TestFolder)
+                {
+                    Write-TestResult "Test folder not fully removed: $TestFolder" $false
+                }
+                else
+                {
+                    Write-TestResult "Test folder cleaned up" $true
+                }
+            }
+            catch
+            {
+                Write-Warning "Error cleaning up test folder: $($_.Exception.Message)"
+                Write-TestResult "Test folder cleanup failed: $TestFolder" $false
+            }
         }
         
         # Clean up global test variables (but preserve the important ones)
@@ -230,7 +325,6 @@ function Cleanup-TestEnvironment
         {
             Remove-Variable -Name "loadedStrings" -Scope Global -Force -ErrorAction SilentlyContinue
         }
-        
     }
     catch
     {
@@ -238,7 +332,7 @@ function Cleanup-TestEnvironment
     }
 }
 
-function New-MockDevice
+function New-MockDevice()
 {
     <#
     .SYNOPSIS
@@ -271,7 +365,7 @@ function New-MockDevice
     }
 }
 
-function Test-FunctionExists
+function Test-FunctionExists()
 {
     <#
     .SYNOPSIS
@@ -295,7 +389,7 @@ function Test-FunctionExists
     }
 }
 
-function Test-PowerShellVersion
+function Test-PowerShellVersion()
 {
     <#
     .SYNOPSIS
@@ -318,7 +412,7 @@ function Test-PowerShellVersion
     }
 }
 
-function Write-TestResult
+function Write-TestResult()
 {
     <#
     .SYNOPSIS
@@ -376,7 +470,7 @@ function Write-TestResult
     Write-Host "$symbol $Message" -ForegroundColor $color
 }
 
-function Write-TestSection
+function Write-TestSection()
 {
     <#
     .SYNOPSIS
@@ -390,7 +484,7 @@ function Write-TestSection
     Write-Host "`n=== $Title ===" -ForegroundColor $ForegroundColor
 }
 
-function Write-TestSubSection
+function Write-TestSubSection()
 {
     <#
     .SYNOPSIS
@@ -404,7 +498,7 @@ function Write-TestSubSection
     Write-Host "`n--- $Title ---" -ForegroundColor $ForegroundColor
 }
 
-function Start-UnifiedTest
+function Start-UnifiedTest()
 {
     <#
     .SYNOPSIS
@@ -479,7 +573,7 @@ function Start-UnifiedTest
     }
 }
 
-function Start-UnifiedTest-WithFunctionLoading
+function Start-UnifiedTest-WithFunctionLoading()
 {
     <#
     .SYNOPSIS
@@ -491,7 +585,6 @@ function Start-UnifiedTest-WithFunctionLoading
     param(
         [Parameter(Mandatory = $true)]
         [string]$TestName,
-        
         [string]$TestFolder = $null,
         [string]$RootPath = $null,
         [switch]$VerboseLoading = $false
@@ -555,7 +648,7 @@ function Start-UnifiedTest-WithFunctionLoading
     }
 }
 
-function Complete-UnifiedTest
+function Complete-UnifiedTest()
 {
     <#
     .SYNOPSIS
@@ -566,7 +659,6 @@ function Complete-UnifiedTest
     param(
         [Parameter(Mandatory = $true)]
         $TestContext,
-        
         [int]$PassedTests = 0,
         [int]$FailedTests = 0,
         [int]$TotalTests = 0

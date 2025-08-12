@@ -7,7 +7,8 @@ param(
 )
 
 # Use unified test framework
-try {
+try
+{
     # Load test helper functions
     . "$PSScriptRoot\test-helper.ps1"
     
@@ -16,28 +17,34 @@ try {
     
     # Load all functions at script level (same as main.ps1)
     $functionsFolder = "$PWD\functions"
-    if (Test-Path $functionsFolder) {
+    if (Test-Path $functionsFolder)
+    {
         $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
-        foreach ($function in $functions) {
+        foreach ($function in $functions)
+        {
             . $function.FullName
         }
         Write-TestResult "Functions loaded successfully" $true
-    } else {
+    }
+    else
+    {
         Write-TestResult "Functions folder not found" $false
         exit 1
     }
     
     # Initialize unified test environment  
-    $testContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder
+    $global:testContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder
     
     Write-TestResult "Test environment initialized" $true
 }
-catch {
+catch
+{
     Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
     exit 1
 }
 
-try {
+try
+{
     # Change to test directory
     Push-Location $TestFolder
 
@@ -48,12 +55,12 @@ try {
     
     $settings = @{
         description = "Test settings for array verification"
-        version = "1.0.0"
-        auth = @{
+        version     = "1.0.0"
+        auth        = @{
             changePwOnNextStart = $false
-            authType = "PublicAuthFlow"
-            delegated = $true
-            scope = @("offline_access", "openid")
+            authType            = "PublicAuthFlow"
+            delegated           = $true
+            scope               = @("offline_access", "openid")
         }
     }
     
@@ -98,25 +105,27 @@ try {
     $passedTests = ($result1, $result2, $result3, $result5 | Where-Object { $_ }).Count
     $failedTests = 4 - $passedTests
     $totalTests = 4
-    
+    Pop-Location
     # Complete the test using unified framework
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests $totalTests
     
-} catch {
+}
+catch
+{
     Write-TestResult "Test failed with error: $($_.Exception.Message)" -Success $false
     Write-Host "Full error: $($_.Exception | Format-List * | Out-String)" -ForegroundColor Red
     
     # Complete test with failure  
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests 0 -FailedTests 1 -TotalTests 1
     exit 1
-} finally {
-    # Clean up
-    Pop-Location
 }
-if ($success) {
+if ($success)
+{
     Write-Host "`nArray verification test completed successfully!" -ForegroundColor Green
     exit 0
-} else {
+}
+else
+{
     Write-Host "`nArray verification test failed!" -ForegroundColor Red
     exit 1
 }
