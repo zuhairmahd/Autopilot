@@ -1303,6 +1303,20 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specifi
         Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
     }
 }
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings" -Action {
+    Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
+    Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
+    
+    $success = Show-GroupsViewer -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGroup settings displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
     Write-Host "Launching global settings editor..." -ForegroundColor Cyan
     $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
