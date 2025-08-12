@@ -21,7 +21,8 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Access token is present."
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
-
+    Write-Host "Getting group assignments for '$GroupName'..."
+    Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
     $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $GroupName -includeBeta
     if ($assignments -eq 'noGroup')
@@ -106,6 +107,12 @@ function ShowGroupAssignments()
                 Write-Host "Intent: $($_.Intent)"
             }
         }
+        #export the assignments to a csv file.
+        $dateString = (Get-Date -Format "yyyyMMdd")
+        $safeGroupName = $GroupName -replace '[\\/:*?"<>|]', '_'
+        $csvPath = "$pwd\${safeGroupName}-$dateString.csv"
+        $selectedAssignments | Export-Csv -Path $csvPath -NoTypeInformation
+        Write-Host "Exported assignments to $csvPath"
         Write-Host "Press any key to continue..."
         [void][System.Console]::ReadKey($true)
         # Loop continues to re-show the assignment type menu

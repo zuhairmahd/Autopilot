@@ -457,13 +457,13 @@ if (Test-Path -Path $InitFile)
     if (-not $script:settings.appMode)
     {
         Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
-        $script:settings.appMode = 'full'
+        $global:settings.appMode = 'full'
     }
-    elseif ($script:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
+    elseif ($global:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
     {
-        Write-Host "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
+        Write-Host "Invalid app mode specified: $($global:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
         Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($global:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
         exit 1
     }
     #load menus configuration from initFile
@@ -1303,6 +1303,20 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specifi
         Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
     }
 }
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
+    Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
+    Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
+    
+    $success = Show-GroupsViewer -SettingsFile $InitFile
+    if ($success)
+    {
+        Write-Host "`nGroup settings displayed successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
     Write-Host "Launching global settings editor..." -ForegroundColor Cyan
     $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
@@ -1393,6 +1407,20 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     else
     {
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
+    }
+}
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
+    Write-Host "Launching groups editor..." -ForegroundColor Cyan
+    Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
+    
+    $success = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
+    if ($success)
+    {
+        Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "`nFailed to update group settings. Please check the logs for details." -ForegroundColor Red
     }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu

@@ -149,7 +149,9 @@
     },
     "domains": {
         "arabictutor.com": {
-            "groupsToExclude": [],
+            "groupsToExclude": [
+                "admin"
+            ],
             "groupsToInclude": [],
             "settings": {
                 "operatingSystem": "Windows",
@@ -255,7 +257,7 @@
                         },
                         {
                             "description": "Lookup the device the application is running on",
-                            "name": "Use this device\u0027s serial number",
+                            "name": "Use this device's serial number",
                             "type": "action",
                             "includeInDisplayModes": []
                         }
@@ -271,7 +273,7 @@
                 },
                 {
                     "description": "View group assignments for Intune policies and applications",
-                    "name": "View group assignments",
+                    "name": "Show Group Assignments",
                     "type": "action",
                     "includeInDisplayModes": [
                         "helpdesk",
@@ -289,6 +291,14 @@
             "description": "Import a device into Autopilot and perform related actions",
             "name": "Autopilot menu",
             "items": [
+                {
+                    "description": "Quick import a device into Autopilot with default settings",
+                    "name": "Quick Import device into Autopilot (requires admin rights)",
+                    "type": "action",
+                    "includeInDisplayModes": [
+                        "registration"
+                    ]
+                },
                 {
                     "description": "Import a device into Autopilot",
                     "name": "Import device into Autopilot",
@@ -308,6 +318,14 @@
                 {
                     "description": "Import a Corporate Device Identifier for Device Preparation",
                     "name": "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
+                    "type": "action",
+                    "includeInDisplayModes": [
+                        "advancedRegistration"
+                    ]
+                },
+                {
+                    "description": "Delete a Corporate Device Identifier from Device Preparation",
+                    "name": "Delete Corporate Device Identifier from Device Preparation (requires admin rights)",
                     "type": "action",
                     "includeInDisplayModes": [
                         "advancedRegistration"
@@ -365,18 +383,24 @@
             "items": [
                 {
                     "description": "Change the global and local environment settings for the application",
-                    "name": "Change global environment settings",
+                    "name": "Change environment settings",
                     "type": "submenu",
                     "items": [
                         {
-                            "name": "View global settings",
+                            "name": "View global environment settings",
                             "description": "View the current global environment settings for the application",
                             "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
-                            "name": "View domain settings",
-                            "description": "View the current domain specific settings for the application",
+                            "name": "View domain specific environment settings",
+                            "description": "View the current domain specific environment settings for the application",
+                            "type": "action",
+                            "includeInDisplayModes": []
+                        },
+                        {
+                            "name": "View group inclusion/exclusion settings for all domains",
+                            "description": "View the current group inclusion and exclusion settings for domains",
                             "type": "action",
                             "includeInDisplayModes": []
                         },
@@ -395,6 +419,12 @@
                         {
                             "name": "Change authentication settings",
                             "description": "Change the authentication settings (such as authentication type) for the application",
+                            "type": "action",
+                            "includeInDisplayModes": []
+                        },
+                        {
+                            "name": "Change group inclusion/exclusion",
+                            "description": "Edit domain-level group inclusion and exclusion settings",
                             "type": "action",
                             "includeInDisplayModes": []
                         }
@@ -587,6 +617,44 @@
             ],
             "type": "submenu",
             "includeInDisplayModes": []
+        },
+        {
+            "name": "Group Assignments",
+            "description": "Choose the type of assignment you want to view",
+            "type": "submenu",
+            "includeInDisplayModes": [],
+            "items": [
+                {
+                    "description": "Show all applications directly assigned to the group",
+                    "name": "Show Application Assignments",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
+                    "description": "View device configurations assigned to the group",
+                    "name": "Show Device Configurations",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
+                    "name": "Show Device Compliance Policies",
+                    "description": "View device compliance policies assigned to the group",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
+                    "name": "Show Autopilot Profiles",
+                    "description": "View Autopilot profiles assigned to the group",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
+                    "name": "Export All Assignments",
+                    "description": "Export all assignments for the group",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                }
+            ]
         }
     ]
 }

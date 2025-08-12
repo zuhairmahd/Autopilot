@@ -298,66 +298,227 @@ Example configuration:
 
 ---
 
-### Authentication Settings Management
+## Configuration Editors and Viewers
 
-The application provides comprehensive management of Microsoft Graph API authentication settings through an interactive settings editor.
+The application includes comprehensive tools for managing various configuration settings through interactive editors and read-only viewers. These tools provide user-friendly interfaces for modifying application configuration without requiring manual JSON editing.
 
-#### Accessing Authentication Settings
+### Settings Editors and Viewers
 
-**Navigation Path**: Main Menu → Change application settings → Change environment settings → Change authentication settings
+#### Global Settings Editor/Viewer
+**Navigation Path**: Main Menu → Change application settings → Change global environment settings → View/Change global environment settings
 
-#### Available Authentication Settings
+**Purpose**: Manage application-wide settings that apply across all domains.
 
-| Setting | Description | Default Value |
-|---------|-------------|---------------|
-| **authType** | Authentication method | `PublicAuthFlow` |
-| **delegated** | Use delegated permissions (user context) | `true` |
-| **scope** | Microsoft Graph API permissions | Standard set of device management scopes |
-| **changePwOnNextStart** | Force password change on next startup | `false` |
-| **noSaveRefreshToken** | Disable refresh token caching | `false` |
-| **forceNewToken** | Force new token acquisition | `false` |
-| **renewalLeadTime** | Token renewal time (minutes before expiry) | `5` |
-| **cacheType** | Token cache storage method | `Memory` |
-| **secureString** | Use secure string for token storage | `false` |
+**Features**:
+- Interactive editing of global configuration parameters
+- Real-time validation of setting values
+- Automatic backup creation before changes
+- Read-only viewer for current global settings
+- Type-aware input handling (strings, booleans, arrays, numbers)
 
-#### Authentication Types
+**Example Settings**:
+- `maxNumberOfDevicesAllowed`: Maximum devices per user
+- `timeInSeconds`: Default timeout values
+- `autoUpdate`: Automatic update settings
+- `showLicenseBanner`: UI display preferences
 
-- **PublicAuthFlow** (Recommended): Uses public client authentication suitable for most scenarios
-- **PrivateAuthFlow**: Uses confidential client with app secrets (requires additional configuration)
-- **Interactive**: Browser-based interactive authentication
-- **Device**: Device code flow authentication
+#### Domain Settings Editor/Viewer
+**Navigation Path**: Main Menu → Change application settings → Change global environment settings → View/Change domain specific settings
 
-#### Advanced Configuration Requirements
+**Purpose**: Manage domain-specific configuration settings for individual organizational domains.
 
-⚠️ **Important**: Certain authentication settings require additional configuration:
+**Features**:
+- Domain selection interface for multi-domain environments
+- Interactive editing of domain-specific parameters
+- Automatic domain detection and validation
+- Backup and restore capabilities
+- Read-only viewer for current domain settings
 
-- **Setting `delegated` to `false`**: Requires application permissions and client secret configuration
-- **Using `authType` other than `PublicAuthFlow`**: Requires client credentials to be configured
+**Example Settings**:
+- `operatingSystem`: Target OS for device management
+- `deviceNamePrefix`: Naming convention for devices
+- `DesiredAutopilotProfiles`: Autopilot profile assignments
+- `userPatternsToExclude`: User filtering patterns
+- `groupPatternsToExclude`: Group filtering patterns
 
-When these advanced settings are modified, the application will display a warning and remind you to ensure proper client secret configuration in your settings files.
+#### Authentication Settings Editor
+**Navigation Path**: Main Menu → Change application settings → Change global environment settings → Change authentication settings
 
-#### Managing Authentication Scopes
+**Purpose**: Configure Microsoft Graph API authentication parameters.
 
-The `scope` setting allows you to configure which Microsoft Graph API permissions the application requests. The default scopes provide comprehensive device management capabilities:
+**Features**:
+- Authentication type selection (PublicAuthFlow, PrivateAuthFlow, Interactive, Device)
+- Microsoft Graph API scope management
+- Token caching and renewal configuration
+- Credential validation and testing
+- Security warnings for advanced configurations
 
-- `offline_access` - Offline access for refresh tokens
-- `openid` - OpenID Connect authentication  
-- `Device.ReadWrite.All` - Device management permissions
-- `DeviceManagementApps.Read.All` - App management read permissions
-- `DeviceManagementConfiguration.ReadWrite.All` - Configuration management
-- `DeviceManagementManagedDevices.PrivilegedOperations.All` - Device operations
-- `DeviceManagementManagedDevices.ReadWrite.All` - Managed device access
-- `DeviceManagementServiceConfig.ReadWrite.All` - Service configuration
+**Key Settings**:
+- `authType`: Authentication method
+- `delegated`: Use delegated vs application permissions
+- `scope`: Microsoft Graph API permissions array
+- `renewalLeadTime`: Token renewal timing
+- `cacheType`: Token storage method
 
-#### Settings Editor Features
+### Groups Editor and Viewer
 
-- **Current Value Display**: Shows existing values with visual highlighting
-- **Type-Aware Input**: Specialized input handlers for different data types (boolean, array, enumerated values)
-- **Input Validation**: Real-time validation with error messages
-- **Array Management**: Interactive array editor for scope permissions
-- **Automatic Backup**: Creates backups before making changes
+#### Groups Settings Viewer
+**Navigation Path**: Main Menu → Change application settings → Change global environment settings → View group inclusion/exclusion settings
+
+**Purpose**: Display current group inclusion and exclusion settings for all domains or a specific domain.
+
+**Features**:
+- Read-only display of group filtering configuration
+- Support for all domains or specific domain viewing
+- Clear formatting with descriptions and summaries
+- Group count statistics and overview
+- Consistent with other settings viewers
+
+**Display Format**:
+```
+══ Groups Settings Viewer ══
+Domain: example.com
+
+Groups to Include:
+  Description: Groups in this list will be specifically included in operations
+  Current Value: [4 group(s)]
+    - security-group-1
+    - enrollment-group-prod
+    - license-group-office365
+    - department-group-it
+
+Groups to Exclude:
+  Description: Groups in this list will be specifically excluded from operations
+  Current Value: (empty - no groups specified)
+
+Summary:
+  Domains displayed: 1
+  Total groups to include: 4
+  Total groups to exclude: 0
+```
+
+#### Groups Settings Editor
+**Navigation Path**: Main Menu → Change application settings → Change global environment settings → Edit group inclusion/exclusion settings
+
+**Purpose**: Interactive editor for domain-level group inclusion and exclusion settings.
+
+**Features**:
+- Interactive group array editing with user-friendly prompts
+- Automatic domain selection for multi-domain environments
+- Safe group list modification with validation
+- Automatic timestamped backup creation
+- Post-update verification and confirmation
+- Change detection (only saves if modifications made)
+
+**Usage Workflow**:
+1. **Domain Selection**: Automatically selects domain or prompts user choice
+2. **Current Settings Display**: Shows existing groups to include/exclude
+3. **Interactive Editing**: 
+   - Choose to modify groups to include (y/n)
+   - Enter group names one per line
+   - Empty line to finish input
+   - Option to keep current values by pressing Enter
+4. **Change Confirmation**: Reviews and saves only if changes detected
+5. **Backup and Verification**: Creates backup and verifies save success
+
+**Example Usage Session**:
+```
+══ Groups Editor ══
+Managing group inclusion/exclusion settings for domain: contoso.com
+
+══ Groups to Include ══
+Current groups to include:
+  - existing-group-1
+  - existing-group-2
+
+Do you want to modify groups to include? (y/n): y
+Enter group names to include (one per line).
+Press Enter on empty line to finish.
+Leave first line empty to keep current values.
+Group name: new-security-group
+Group name: another-group
+Group name: [Enter to finish]
+
+Groups to Exclude settings...
+[Similar interface for exclusion groups]
+
+Saving changes...
+Group settings updated successfully!
+```
+
+#### Settings Storage Structure
+
+**Groups Settings Location**:
+Groups are stored at the domain level in `settings.json`, separate from the domain's `settings` sub-object:
+
+```json
+{
+  "domains": {
+    "example.com": {
+      "groupsToInclude": [
+        "security-group-1",
+        "enrollment-group-prod"
+      ],
+      "groupsToExclude": [
+        "excluded-group-1"
+      ],
+      "settings": {
+        // Other domain-specific settings
+      }
+    }
+  }
+}
+```
+
+**Why Domain Level?**:
+- Groups control operations across the entire domain
+- Separate from domain-specific configuration settings  
+- Maintains backward compatibility
+- Aligns with existing data structure hierarchy
+
+### Editor Common Features
+
+All configuration editors share these common features:
+
+#### Safety and Backup
+- **Automatic Backups**: Timestamped backup files created before any modification
+- **Change Detection**: Only saves when actual changes are made
+- **Verification**: Post-save verification to ensure changes were applied correctly
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+
+#### User Experience
+- **Consistent Interface**: All editors follow the same UI patterns and color schemes
+- **Clear Navigation**: Intuitive prompts and instructions throughout
+- **Visual Feedback**: Color-coded output for status, warnings, and confirmations
+- **Contextual Help**: Descriptive text explaining each setting's purpose
+
+#### Technical Implementation
+- **PowerShell 5.1 Compatibility**: Works across all Windows PowerShell versions
+- **Robust Error Handling**: Graceful handling of file access, JSON parsing, and validation errors
+- **Comprehensive Logging**: Detailed logging for troubleshooting and audit trails
+- **Input Validation**: Type-aware validation for different setting types
+
+#### Programmatic Usage
+
+All editors support programmatic usage for automation scenarios:
+
+```powershell
+# Groups Editor - Silent mode
+Show-GroupsEditor -DomainName "contoso.com" -Silent
+
+# Settings Editor - Specific domain
+Show-SettingsEditor -SettingsType "Domain" -DomainName "contoso.com" -SettingsFile "custom-settings.json"
+
+# Groups Viewer - Specific domain only
+Show-GroupsViewer -DomainName "contoso.com" -Silent
+
+# Settings Viewer - Global settings
+Show-SettingsViewer -SettingsType "Global"
+```
 
 ---
+
+
 
 ## Security and Password Management
 
