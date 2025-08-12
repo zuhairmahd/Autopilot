@@ -131,7 +131,10 @@ function Show-GroupsEditor()
         $domainSettings = $currentSettings.domains.$DomainName
         
         # Get current group settings with safe defaults
-        $currentIncludeGroups = if ($domainSettings.PSObject.Properties.Name -contains 'groupsToInclude') 
+        $domainPropertyNames = $domainSettings.PSObject.Properties.Name
+        
+        # Get current group settings with safe defaults
+        $currentIncludeGroups = if ($domainPropertyNames -contains 'groupsToInclude') 
         { 
             $domainSettings.groupsToInclude 
         } 
