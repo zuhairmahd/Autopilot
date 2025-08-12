@@ -466,6 +466,10 @@ function Update-DomainGroupSetting()
         
         # Ensure Groups is always an array, even for single items
         $groupsArray = @($Groups)
+        # Ensure the property exists before assignment
+        if (-not ($settingsObj.domains.$DomainName.PSObject.Properties.Name -contains $GroupType)) {
+            $settingsObj.domains.$DomainName | Add-Member -MemberType NoteProperty -Name $GroupType -Value $null
+        }
         $settingsObj.domains.$DomainName.$GroupType = $groupsArray
         
         # Create backup
