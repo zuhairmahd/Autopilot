@@ -197,13 +197,13 @@ function Show-GroupsViewer()
                 {
                     Write-Host "════════════════════════════════════════" -ForegroundColor Yellow
                     Write-Host "Domain: " -NoNewline -ForegroundColor White
-                    Write-Host "$domain" -ForegroundColor Yellow -BackgroundColor DarkMagenta
+                    Write-Host "$domain" -ForegroundColor Yellow
                     Write-Host "════════════════════════════════════════" -ForegroundColor Yellow
                 }
                 else
                 {
                     Write-Host "Domain: " -NoNewline -ForegroundColor White
-                    Write-Host "$domain" -ForegroundColor Yellow -BackgroundColor DarkMagenta
+                    Write-Host "$domain" -ForegroundColor Yellow
                 }
                 
                 # Display Groups to Include

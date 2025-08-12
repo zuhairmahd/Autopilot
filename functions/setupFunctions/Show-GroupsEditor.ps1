@@ -185,8 +185,8 @@ function Show-GroupsEditor()
         if (-not $Silent)
         {
             Write-Host "`n══ Groups Editor ══" -ForegroundColor Cyan
-            Write-Host "Managing group inclusion/exclusion settings for domain: " -NoNewline -ForegroundColor White
-            Write-Host "$DomainName" -ForegroundColor Yellow -BackgroundColor DarkMagenta
+            Write-Host "Managing group inclusion/exclusion settings for domain: " -ForegroundColor White
+            Write-Host "    $DomainName" -ForegroundColor Yellow
             Write-Host "These settings control which groups are included or excluded from operations.`n" -ForegroundColor Gray
         }
         
@@ -194,67 +194,145 @@ function Show-GroupsEditor()
         $updatedIncludeGroups = $null
         $updatedExcludeGroups = $null
         
-        # Edit Groups to Include
+        # Create groups editing menu using the well-documented menu system
         if (-not $Silent)
         {
-            Write-Host "══ Groups to Include ══" -ForegroundColor Green
-            Write-Host "Groups in this list will be specifically included in operations." -ForegroundColor Gray
-            Write-Host "Current groups to include:" -ForegroundColor Cyan
+            $groupsEditMenu = NewMenu -Title "Groups Editor for $DomainName" -Description "Select which group settings you want to modify:"
             
-            if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
-            {
-                foreach ($group in $currentIncludeGroups)
-                {
-                    Write-Host "  - $group" -ForegroundColor White
-                }
-            }
-            else
-            {
-                Write-Host "  (no groups specified)" -ForegroundColor Gray
-            }
+            $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "Edit Groups to Include" -Action {
+                Write-Host "Selected: Edit Groups to Include" -ForegroundColor Green
+                return 'include'
+            } -ReturnsValue
             
-            $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
-            if ($choice -eq 'y' -or $choice -eq 'Y')
-            {
-                $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include"
-                if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
-                {
-                    $hasChanges = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Groups to include changed" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Groups to include changed"
-                }
-            }
-        }
-        
-        # Edit Groups to Exclude
-        if (-not $Silent)
-        {
-            Write-Host "`n══ Groups to Exclude ══" -ForegroundColor Red
-            Write-Host "Groups in this list will be specifically excluded from operations." -ForegroundColor Gray
-            Write-Host "Current groups to exclude:" -ForegroundColor Cyan
+            $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "Edit Groups to Exclude" -Action {
+                Write-Host "Selected: Edit Groups to Exclude" -ForegroundColor Red
+                return 'exclude'
+            } -ReturnsValue
             
-            if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
-            {
-                foreach ($group in $currentExcludeGroups)
-                {
-                    Write-Host "  - $group" -ForegroundColor White
-                }
-            }
-            else
-            {
-                Write-Host "  (no groups specified)" -ForegroundColor Gray
-            }
+            $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "View Current Group Settings" -Action {
+                Write-Host "Selected: View Current Group Settings" -ForegroundColor Cyan
+                return 'view'
+            } -ReturnsValue
             
-            $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
-            if ($choice -eq 'y' -or $choice -eq 'Y')
+            # Loop: after editing groups, return to the group type selection menu
+            while ($true)
             {
-                $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude"
-                if ($null -ne $updatedExcludeGroups -and (Compare-ArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups))
+                # Use proper stack operation to maintain menu navigation integrity
+                $groupChoice = ShowMenu -Menu $groupsEditMenu -CalledBy 'Custom_GroupsEditorSubmenu' -StackOperation 'Push'
+                
+                # Validate that we got a proper choice, not a navigation option
+                if ($groupChoice -eq "Back" -or $groupChoice -eq "Main Menu" -or $groupChoice -eq 0 -or $groupChoice -eq "0")
                 {
-                    $hasChanges = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Groups to exclude changed" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Groups to exclude changed"
+                    Write-Verbose "[$functionName] ShowMenu returned navigation option: '$groupChoice', treating as navigation"
+                    break
                 }
+                
+                # If groupChoice is null, user may have navigated away - don't continue processing
+                if ($null -eq $groupChoice)
+                {
+                    Write-Verbose "[$functionName] ShowMenu returned null, user may have navigated away"
+                    break
+                }
+                
+                # Process the user's choice
+                if ($groupChoice -eq 'include')
+                {
+                    Write-Host "`n══ Groups to Include ══" -ForegroundColor Green
+                    Write-Host "Groups in this list will be specifically included in operations." -ForegroundColor Gray
+                    Write-Host "Current groups to include:" -ForegroundColor Cyan
+                    
+                    if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
+                    {
+                        foreach ($group in $currentIncludeGroups)
+                        {
+                            Write-Host "  - $group" -ForegroundColor White
+                        }
+                    }
+                    else
+                    {
+                        Write-Host "  (no groups specified)" -ForegroundColor Gray
+                    }
+                    
+                    $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
+                    if ($choice -eq 'y' -or $choice -eq 'Y')
+                    {
+                        $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include"
+                        if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
+                        {
+                            $hasChanges = $true
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Groups to include changed" -LogLevel "Information"
+                            Write-Verbose "[$functionName] Groups to include changed"
+                        }
+                    }
+                }
+                elseif ($groupChoice -eq 'exclude')
+                {
+                    Write-Host "`n══ Groups to Exclude ══" -ForegroundColor Red
+                    Write-Host "Groups in this list will be specifically excluded from operations." -ForegroundColor Gray
+                    Write-Host "Current groups to exclude:" -ForegroundColor Cyan
+                    
+                    if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
+                    {
+                        foreach ($group in $currentExcludeGroups)
+                        {
+                            Write-Host "  - $group" -ForegroundColor White
+                        }
+                    }
+                    else
+                    {
+                        Write-Host "  (no groups specified)" -ForegroundColor Gray
+                    }
+                    
+                    $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
+                    if ($choice -eq 'y' -or $choice -eq 'Y')
+                    {
+                        $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude"
+                        if ($null -ne $updatedExcludeGroups -and (Compare-ArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups))
+                        {
+                            $hasChanges = $true
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Groups to exclude changed" -LogLevel "Information"
+                            Write-Verbose "[$functionName] Groups to exclude changed"
+                        }
+                    }
+                }
+                elseif ($groupChoice -eq 'view')
+                {
+                    Write-Host "`n══ Current Group Settings ══" -ForegroundColor Cyan
+                    Write-Host "Domain: $DomainName`n" -ForegroundColor Yellow
+                    
+                    Write-Host "Groups to Include:" -ForegroundColor Green
+                    if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
+                    {
+                        foreach ($group in $currentIncludeGroups)
+                        {
+                            Write-Host "  - $group" -ForegroundColor White
+                        }
+                        Write-Host "  Total: $($currentIncludeGroups.Count) group(s)" -ForegroundColor Gray
+                    }
+                    else
+                    {
+                        Write-Host "  (no groups specified)" -ForegroundColor Gray
+                    }
+                    
+                    Write-Host "`nGroups to Exclude:" -ForegroundColor Red
+                    if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
+                    {
+                        foreach ($group in $currentExcludeGroups)
+                        {
+                            Write-Host "  - $group" -ForegroundColor White
+                        }
+                        Write-Host "  Total: $($currentExcludeGroups.Count) group(s)" -ForegroundColor Gray
+                    }
+                    else
+                    {
+                        Write-Host "  (no groups specified)" -ForegroundColor Gray
+                    }
+                    
+                    Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
+                    [void][System.Console]::ReadKey($true)
+                }
+                
+                # Continue the loop to allow for multiple edits
             }
         }
         
