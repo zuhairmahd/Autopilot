@@ -137,7 +137,7 @@ function Request-AdditionalScopes()
         
         if ($newAccessToken)
         {
-            Write-Host "✓ Successfully re-authenticated with additional scopes!" -ForegroundColor Green
+            Write-Host "Successfully re-authenticated with additional scopes!" -ForegroundColor Green
             $result.Success = $true
             $result.NewAccessToken = $newAccessToken
             Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully obtained new access token with additional scopes" -LogLevel "Information"

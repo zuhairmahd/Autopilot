@@ -242,7 +242,8 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 - Use regular hashtables instead of ordered hashtables for PS 5.1 compatibility
 - Test with both PowerShell 5.1 and PowerShell 7+ when possible
 - Add version comments if PowerShell 5.1 compatibility cannot be maintained
-- If you must the syntax like 'write-host "$variablename: $value" be sure to surround the first variable with parentheses "$($variable): $value"
+- If you must the syntax like 'write-host "$variableName: $value" be sure to surround the first variable with parentheses "$($variable): $value"
+- Avoid using unicode characters such as ✓ in your write-host and other write statements as they break Powershell 5.1  It is fine to use them for test scripts, as we test on Powershell 7+.  Main.ps1 and other functions, however, will always need to be compatible with Powershell 5.1 for Windows.
 
 ### Logging Standards
 - Use `Write-Log` function consistently with CMTrace format support

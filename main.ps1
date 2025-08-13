@@ -801,7 +801,7 @@ if ($accessToken)
         
         if ($scopeValidation.HasAllRequiredScopes)
         {
-            Write-Verbose "[$scriptName] ✓ All required Microsoft Graph scopes are available"
+            Write-Verbose "[$scriptName] All required Microsoft Graph scopes are available"
             Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
         }
         else
