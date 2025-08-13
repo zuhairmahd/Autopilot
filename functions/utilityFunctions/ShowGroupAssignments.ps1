@@ -176,12 +176,18 @@ function ShowGroupAssignments()
                 Write-Host "Intent: $($_.Intent)"
             }
         }
-        #export the assignments to a csv file.
-        $dateString = (Get-Date -Format "yyyyMMdd")
-        $safeGroupName = $groupName -replace '[\\/:*?"<>|]', '_'
-        $csvPath = "$pwd\${safeGroupName}-$dateString.csv"
-        $selectedAssignments | Export-Csv -Path $csvPath -NoTypeInformation
-        Write-Host "Exported assignments to $csvPath"
+        if ($assignmentType -eq 'All')
+        {
+            #export the assignments to a csv file.
+            Write-Verbose "[$functionName] Exporting assignments to CSV"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Exporting assignments to CSV"
+            $dateString = (Get-Date -Format "yyyyMMdd")
+            $safeGroupName = $groupName -replace '[\\/:*?"<>|]', '_'
+            $csvPath = "$pwd\${safeGroupName}-$dateString.csv"
+            $selectedAssignments | Export-Csv -Path $csvPath -NoTypeInformation
+            Write-Host "Exported assignments to $csvPath"
+            Write-Log -logFile $LogFile -Module $functionName -Message "Exported assignments to $csvPath" -logLevel "Information"
+        }
         Write-Host "Press any key to continue..."
         [void][System.Console]::ReadKey($true)
         # Loop continues to re-show the assignment type menu
