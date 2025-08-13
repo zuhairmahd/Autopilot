@@ -42,6 +42,8 @@ function Write-Log()
         [switch]$PassThru,
         [Parameter(Mandatory = $true, ParameterSetName = 'StartLogging')]
         [switch]$StartLogging,
+        [Parameter(Mandatory = $false, ParameterSetName = 'StartLogging')]
+        [switch]$OverwriteLog,
         [Parameter(Mandatory = $true, ParameterSetName = 'FinishLogging')]
         [switch]$FinishLogging,
         [Parameter(Mandatory = $false, ParameterSetName = 'Normal')]
@@ -87,6 +89,11 @@ function Write-Log()
             {
                 New-Item -Path $logDir -ItemType Directory -Force | Out-Null
             }
+            
+            if ($OverwriteLog)
+            {
+                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue
+            }   
             
             # Check for log rotation if file exists and is too large
             if ((Test-Path $LogFile) -and (Get-Item $LogFile).Length -gt ($MaxLogSizeMB * 1MB))

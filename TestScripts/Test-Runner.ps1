@@ -166,7 +166,7 @@ $TestRegistry = @{
     'enhanced'      = @{
         Description       = 'Enhanced functionality tests (new test scripts)'
         # Dynamic: any enhanced-prefixed test, plus known additions
-        Pattern           = 'test-enhanced-*.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1'
+        Pattern           = 'test-enhanced-*.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1,test-expanded-group-assignments.ps1'
         Priority          = 4
         EstimatedDuration = '2-3 minutes'
         Dependencies      = @('syntax', 'core')

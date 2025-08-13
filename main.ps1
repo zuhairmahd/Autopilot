@@ -10,6 +10,7 @@ param(
     [switch]$showAuth,
     [switch]$showVersion,
     [switch]$showSettings,
+    [switch]$OverwriteLogs,
     [switch]$SecureString,
     [switch]$ResetAuth,
     [switch]$ForceNewToken,
@@ -104,7 +105,16 @@ $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
-Write-Log -LogFile $LogFile -StartLogging
+if ($OverwriteLogs)
+{
+    Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
+    Write-Log -LogFile $LogFile -StartLogging -OverwriteLog
+}
+else
+{
+    Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
+    Write-Log -LogFile $LogFile -StartLogging
+}
 if (Test-Path $oldExecutableFileName)
 {
     Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
@@ -1922,7 +1932,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     {
         # Exact match found
         Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value[0]
+        $selectedGroup = $searchResults.value
         Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
     }
     elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
@@ -1985,7 +1995,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     #endregion Check if the group exists
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -GroupName $selectedGroup 
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup 
     #region Handle navigation responses from GetDeviceByUser
     if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
     {

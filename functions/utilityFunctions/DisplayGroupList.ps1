@@ -56,7 +56,7 @@ function DisplayGroupList()
         Write-Verbose "[$functionName] Creating action for group: $group"
         $action = {
             Write-Verbose "[$functionName] Returning group name: $($group.displayName)"
-            return $group.displayName
+            return $group
         }.GetNewClosure()
         # Add the menu item with the action
         $groupMenu = AddMenuItem -Menu $groupMenu -Name $menuItemName -Action $action -ReturnsValue
@@ -65,13 +65,14 @@ function DisplayGroupList()
     Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
     Write-Verbose "[$functionName] Current menu title: $($groupMenu.Title)"
     $selectedGroup = ShowMenu -Menu $groupMenu -CalledBy 'Action'
-    if ($null -ne $selectedGroup -and $selectedGroup -is [string])
+    if ($null -ne $selectedGroup)
     {
-        Write-Verbose "[$functionName] Selected group: $selectedGroup"
+        Write-Verbose "[$functionName] Selected group: $($selectedGroup.displayName)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected group: $($selectedGroup.displayName)" -LogLevel "Information"
     }
     else
     {
-        Write-Verbose "[$functionName] Selected group is null or not a string"
+        Write-Verbose "[$functionName] Selected group is null"
     }
     return $selectedGroup
 }

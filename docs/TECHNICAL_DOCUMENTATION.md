@@ -264,6 +264,26 @@ The application requires specific Microsoft Graph API permissions for full funct
 #### Application Management
 - `/deviceAppManagement/mobileApps` - Application information
 - `/deviceAppManagement/mobileApps/{id}/assignments` - App assignment management
+- `/deviceAppManagement/managedAppPolicies` - App protection policies
+- `/deviceAppManagement/managedAppPolicies/{id}/assignments` - App protection policy assignments
+
+#### Device Management and Configuration
+- `/deviceManagement/deviceConfigurations` - Device configuration policies
+- `/deviceManagement/deviceConfigurations/{id}/assignments` - Configuration assignments
+- `/deviceManagement/deviceCompliancePolicies` - Compliance policies
+- `/deviceManagement/deviceCompliancePolicies/{id}/assignments` - Compliance assignments
+- `/deviceManagement/deviceManagementScripts` - PowerShell scripts
+- `/deviceManagement/deviceManagementScripts/{id}/assignments` - Script assignments
+- `/deviceManagement/deviceHealthScripts` - Health monitoring scripts (beta)
+- `/deviceManagement/deviceHealthScripts/{id}/assignments` - Health script assignments (beta)
+- `/deviceManagement/intents` - Security baselines and endpoint security policies
+- `/deviceManagement/intents/{id}/assignments` - Security intent assignments
+- `/deviceManagement/resourceAccessProfiles` - VPN, Wi-Fi, certificate profiles
+- `/deviceManagement/resourceAccessProfiles/{id}/assignments` - Resource access assignments
+- `/deviceManagement/configurationPolicies` - Settings catalog policies (beta)
+- `/deviceManagement/configurationPolicies/{id}/assignments` - Configuration policy assignments (beta)
+- `/deviceManagement/groupPolicyConfigurations` - Group policy ADMX settings (beta)
+- `/deviceManagement/groupPolicyConfigurations/{id}/assignments` - Group policy assignments (beta)
 
 ### Corporate Device Identifier Management
 
@@ -631,6 +651,37 @@ GetAppAssignmentTypes -AccessToken <String> [-Export] [-outputPath <String>] [-f
 - Supports CSV export with resolved group names
 - Returns categorized app assignment data (Required, Available, Unassigned)
 
+#### GetGroupDirectAssignments.ps1
+
+**GetGroupDirectAssignments**
+```powershell
+GetGroupDirectAssignments -GroupName <String> [-AccessToken <String>] [-IncludeBeta] [-ShowSummary] [-BatchSize <Int32>]
+```
+- Retrieves comprehensive group assignment analysis across all Intune object types
+- Supports both v1.0 and beta Microsoft Graph API endpoints for maximum coverage
+- Uses efficient batch API calls to minimize latency and API throttling
+- Returns categorized assignments for:
+  - **Applications**: Mobile apps and their deployment assignments
+  - **Device Configurations**: Configuration profiles and settings
+  - **Compliance Policies**: Device compliance and security policies
+  - **Device Management Scripts**: PowerShell scripts for device automation
+  - **App Protection Policies**: Mobile application management policies
+  - **Security Intents**: Security baselines and endpoint security policies
+  - **Resource Access Profiles**: VPN, Wi-Fi, and certificate profiles
+  - **Autopilot Profiles**: Windows Autopilot deployment profiles (beta only)
+  - **Device Health Scripts**: Proactive health monitoring scripts (beta only)
+  - **Configuration Policies**: Settings catalog policies (beta only)
+  - **Group Policy Configurations**: ADMX-based group policies (beta only)
+
+**ShowGroupAssignments**
+```powershell
+ShowGroupAssignments -GroupName <String> [-accessToken <String>]
+```
+- Interactive menu-driven interface for viewing and exporting group assignments
+- Provides filtered views by assignment type with detailed information display
+- Supports CSV export with automatic filename generation based on group name and date
+- Integrates with the application's hierarchical menu system for seamless navigation
+
 ## Menu System Architecture
 
 ### Menu System Components
@@ -780,7 +831,9 @@ This allows the same function to behave differently based on how it was accessed
 ├── MenuFunctions.ps1                 # UI navigation
 ├── SettingsHelperFunctions.ps1       # Configuration
 ├── EncryptionFunctions.ps1           # Security
-└── GetAppAssignmentTypes.ps1         # App reporting
+├── GetAppAssignmentTypes.ps1         # App reporting
+├── GetGroupDirectAssignments.ps1     # Comprehensive group assignment analysis
+└── ShowGroupAssignments.ps1          # Interactive group assignment viewer
 ```
 
 ## Testing Framework

@@ -5,7 +5,7 @@ function GetGroupDirectAssignments()
         [Parameter(Mandatory = $false)]
         [string] $AccessToken,
         [Parameter(Mandatory = $true)]
-        [string] $GroupName,
+        $GroupName,
         [Parameter(Mandatory = $false)]
         [switch] $IncludeBeta,
         [switch]$ShowSummary,
@@ -14,52 +14,60 @@ function GetGroupDirectAssignments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting to get direct assignments for group: $GroupName"
-    Write-Log -logFile $LogFile -module $functionName -Message "Starting to get direct assignments for group: $GroupName" -logLevel "Information"
-    
-    if (-not $AccessToken)
+    #log the incoming parameters 
+    Write-Verbose "[$functionName] Incoming parameters:"
+    if ($AccessToken)
     {
-        Write-Verbose "[$functionName] No AccessToken provided; relying on default authentication in CallGraphAPI."
-        Write-Log -logFile $LogFile -module $functionName -Message "No AccessToken provided; relying on default authentication in CallGraphAPI." -logLevel "Warning"
+        Write-Verbose "[$functionName] AccessToken provided"
+        Write-Log -logFile $LogFile -module $functionName -Message "AccessToken: $AccessToken" -logLevel "Information"
+    }
+    Write-Verbose "[$functionName] GroupName: $GroupName"
+    Write-Verbose "[$functionName] IncludeBeta: $IncludeBeta"
+    Write-Verbose "[$functionName] ShowSummary: $ShowSummary"
+    Write-Verbose "[$functionName] BatchSize: $BatchSize"
+    #now write-log them.
+    Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "IncludeBeta: $IncludeBeta" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
+    # PowerShell 5.1 compatible array handling and safe indexing
+    $groupIds = $GroupName
+    $groupIdArray = @($groupIds)
+    $groupId = $groupIdArray[0]
+    
+    Write-Verbose "[$functionName] Group name: $($groupId.displayName)"
+    Write-Verbose "[$functionName] Group ID: $($groupId.Id)"
+    Write-Log -logFile $LogFile -module $functionName -Message "Group name: $($groupId.displayName)" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "Group ID: $($groupId.Id)" -logLevel "Information"
+    
+    # Validate that we have a group ID to work with
+    if (-not $groupId.Id)
+    {
+        Write-Verbose "[$functionName] No group ID available, cannot proceed with assignment retrieval"
+        Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -logLevel "Error"
+        return $assignments
     }
     
-    # First, get the group ID from the group name using the existing utility function
-    Write-Verbose "[$functionName] Resolving group name '$GroupName' to group ID"
-    Write-Log -logFile $LogFile -module $functionName -Message "Resolving group name '$GroupName' to group ID" -logLevel "Information"
-    
-    try
-    {
-        $groupIds = GetGroupIdsByNames -AccessToken $AccessToken -GroupNames @($GroupName)
-        
-        if (-not $groupIds -or $groupIds.Count -eq 0)
-        {
-            Write-Verbose "[$functionName] No group ID found for group name: $GroupName"
-            Write-Log -logFile $LogFile -module $functionName -Message "No group ID found for group name: $GroupName" -logLevel "Warning"
-            return @('noGroup')
-        }
-        
-        # Ensure $groupIds is treated as an array and properly extract the first (or only) group ID
-        $groupIdArray = @($groupIds)
-        $groupId = $groupIdArray[0]
-        Write-Verbose "[$functionName] Resolved group '$GroupName' to ID: $groupId (from $($groupIdArray.Count) result(s))"
-        Write-Log -logFile $LogFile -module $functionName -Message "Resolved group '$GroupName' to ID: $groupId (from $($groupIdArray.Count) result(s))" -logLevel "Information"
-    }
-    catch
-    {
-        Write-Verbose "[$functionName] Error resolving group name: $($_.Exception.Message)"
-        Write-Log -logFile $LogFile -module $functionName -Message "Error resolving group name: $($_.Exception.Message)" -logLevel "Error"
-        return @()
-    }
+    # Store the group ID value for filtering assignments
+    $groupIdValue = $groupId.Id
     
     # Initialize result object
     $assignments = [PSCustomObject]@{
-        GroupName                = $GroupName
-        GroupId                  = $groupId
-        AppAssignments           = @()
-        ConfigurationAssignments = @()
-        ComplianceAssignments    = @()
-        AutopilotAssignments     = @()
-        AllAssignments           = @()
+        GroupName                      = $groupId.displayName 
+        GroupId                        = $groupId.Id
+        AppAssignments                 = @()
+        ConfigurationAssignments       = @()
+        ComplianceAssignments          = @()
+        AutopilotAssignments           = @()
+        ScriptAssignments              = @()
+        HealthScriptAssignments        = @()
+        AppProtectionAssignments       = @()
+        IntentAssignments              = @()
+        ResourceAccessAssignments      = @()
+        ConfigurationPolicyAssignments = @()
+        GroupPolicyAssignments         = @()
+        AllAssignments                 = @()
     }
     
     # Determine API version based on IncludeBeta parameter
@@ -75,8 +83,9 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion with batch size: $BatchSize" -logLevel "Information"
     
     # Helper function to process batch assignments
-    function Process-BatchAssignments
+    function Invoke-BatchAssignments
     {
+        [CmdletBinding()]
         param(
             [array]$Resources,
             [string]$ResourceType,
@@ -120,7 +129,7 @@ function GetGroupDirectAssignments()
             
             try
             {
-                $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
+                $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
                 Write-Verbose "[$functionName] Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)"
                 Write-Log -logFile $LogFile -module $functionName -Message "Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -logLevel "Information"
                 if ($batchResponse -and $batchResponse.responses)
@@ -136,7 +145,7 @@ function GetGroupDirectAssignments()
                             {
                                 $relevantAssignments = $response.body.value | Where-Object { 
                                     $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
-                                    $_.target.groupId -eq $groupId 
+                                    $_.target.groupId -eq $groupIdValue 
                                 }
                                 
                                 foreach ($assignment in $relevantAssignments)
@@ -168,6 +177,34 @@ function GetGroupDirectAssignments()
                                         {
                                             $assignments.AutopilotAssignments += $assignmentObject 
                                         }
+                                        "Script"
+                                        {
+                                            $assignments.ScriptAssignments += $assignmentObject 
+                                        }
+                                        "HealthScript"
+                                        {
+                                            $assignments.HealthScriptAssignments += $assignmentObject 
+                                        }
+                                        "AppProtection"
+                                        {
+                                            $assignments.AppProtectionAssignments += $assignmentObject 
+                                        }
+                                        "Intent"
+                                        {
+                                            $assignments.IntentAssignments += $assignmentObject 
+                                        }
+                                        "ResourceAccess"
+                                        {
+                                            $assignments.ResourceAccessAssignments += $assignmentObject 
+                                        }
+                                        "ConfigurationPolicy"
+                                        {
+                                            $assignments.ConfigurationPolicyAssignments += $assignmentObject 
+                                        }
+                                        "GroupPolicy"
+                                        {
+                                            $assignments.GroupPolicyAssignments += $assignmentObject 
+                                        }
                                     }
                                     $assignments.AllAssignments += $assignmentObject
                                 }
@@ -197,81 +234,158 @@ function GetGroupDirectAssignments()
     
     try
     {
-        # Get all resource lists first (4 API calls total)
-        Write-Verbose "[$functionName] Getting all resource lists for assignments"
-        Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments" -logLevel "Information"
+        # Get all resource lists using a single batch API call for better performance
+        Write-Verbose "[$functionName] Getting all resource lists for assignments using batch API"
+        Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments using batch API" -logLevel "Information"
         
-        # Get Mobile Apps
-        $appUri = "deviceAppManagement/mobileApps"
-        $appExtraParameters = "select=id,displayName"
-        $appResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $appUri -APIVersion $apiVersion -ExtraParameters $appExtraParameters
-        $mobileApps = if ($appResponse -and $appResponse.value)
-        {
-            $appResponse.value 
-        }
-        else
-        {
-            @() 
+        # Create batch request for all resource lists
+        $batchRequestBody = @{
+            requests = @()
         }
         
-        # Get Device Configurations
-        $configUri = "deviceManagement/deviceConfigurations"
-        $configExtraParameters = "select=id,displayName"
-        $configResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $configUri -APIVersion $apiVersion -ExtraParameters $configExtraParameters
-        $deviceConfigs = if ($configResponse -and $configResponse.value)
-        {
-            $configResponse.value 
-        }
-        else
-        {
-            @() 
-        }
+        # Define resource endpoints and their IDs
+        $resourceEndpoints = @(
+            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName" }
+            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName" }
+            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName" }
+            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName" }
+            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName" }
+            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName" }
+            @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName" }
+        )
         
-        # Get Compliance Policies
-        $complianceUri = "deviceManagement/deviceCompliancePolicies"
-        $complianceExtraParameters = "select=id,displayName"
-        $complianceResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $complianceUri -APIVersion $apiVersion -ExtraParameters $complianceExtraParameters
-        $compliancePolicies = if ($complianceResponse -and $complianceResponse.value)
-        {
-            $complianceResponse.value 
-        }
-        else
-        {
-            @() 
-        }
-        
-        # Get Autopilot Profiles (if IncludeBeta)
-        $autopilotProfiles = @()
+        # Add beta endpoints if IncludeBeta is specified
         if ($IncludeBeta.IsPresent)
         {
-            $autopilotUri = "deviceManagement/windowsAutopilotDeploymentProfiles"
-            $autopilotExtraParameters = "select=id,displayName"
-            $autopilotResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $autopilotUri -APIVersion $apiVersion -ExtraParameters $autopilotExtraParameters
-            $autopilotProfiles = if ($autopilotResponse -and $autopilotResponse.value)
-            {
-                $autopilotResponse.value 
-            }
-            else
-            {
-                @() 
+            $resourceEndpoints += @(
+                @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles"; extraParams = "select=id,displayName" }
+                @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts"; extraParams = "select=id,displayName" }
+                @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies"; extraParams = "select=id,name" }
+                @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations"; extraParams = "select=id,displayName" }
+            )
+        }
+        
+        # Build batch request
+        foreach ($endpoint in $resourceEndpoints)
+        {
+            $requestUrl = "$($endpoint.url)?`$$($endpoint.extraParams)"
+            $batchRequestBody.requests += @{
+                id     = $endpoint.id
+                method = "GET"
+                url    = $requestUrl
             }
         }
         
-        Write-Verbose "[$functionName] Retrieved resource counts - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count)"
-        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count)" -logLevel "Information"
+        Write-Verbose "[$functionName] Sending batch request for $($resourceEndpoints.Count) resource lists"
+        Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for $($resourceEndpoints.Count) resource lists" -logLevel "Information"
+        
+        # Send batch request
+        $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
+        
+        # Initialize variables for all resource types
+        $mobileApps = @()
+        $deviceConfigs = @()
+        $compliancePolicies = @()
+        $autopilotProfiles = @()
+        $deviceScripts = @()
+        $healthScripts = @()
+        $appProtectionPolicies = @()
+        $intents = @()
+        $resourceAccessProfiles = @()
+        $configurationPolicies = @()
+        $groupPolicyConfigs = @()
+        
+        # Process batch response
+        if ($batchResponse -and $batchResponse.responses)
+        {
+            Write-Verbose "[$functionName] Processing batch response for resource lists"
+            Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -logLevel "Information"
+            
+            foreach ($response in $batchResponse.responses)
+            {
+                if ($response.status -eq 200 -and $response.body -and $response.body.value)
+                {
+                    switch ($response.id)
+                    {
+                        "mobileApps"
+                        {
+                            $mobileApps = $response.body.value 
+                        }
+                        "deviceConfigs"
+                        {
+                            $deviceConfigs = $response.body.value 
+                        }
+                        "compliancePolicies"
+                        {
+                            $compliancePolicies = $response.body.value 
+                        }
+                        "deviceScripts"
+                        {
+                            $deviceScripts = $response.body.value 
+                        }
+                        "appProtectionPolicies"
+                        {
+                            $appProtectionPolicies = $response.body.value 
+                        }
+                        "intents"
+                        {
+                            $intents = $response.body.value 
+                        }
+                        "resourceAccessProfiles"
+                        {
+                            $resourceAccessProfiles = $response.body.value 
+                        }
+                        "autopilotProfiles"
+                        {
+                            $autopilotProfiles = $response.body.value 
+                        }
+                        "healthScripts"
+                        {
+                            $healthScripts = $response.body.value 
+                        }
+                        "configurationPolicies"
+                        { 
+                            # Configuration policies use 'name' instead of 'displayName', so we normalize it
+                            $configurationPolicies = $response.body.value | ForEach-Object { 
+                                $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                            }
+                        }
+                        "groupPolicyConfigs"
+                        {
+                            $groupPolicyConfigs = $response.body.value 
+                        }
+                    }
+                }
+                elseif ($response.status -ne 200)
+                {
+                    Write-Verbose "[$functionName] Failed to get resource list for $($response.id). Status: $($response.status)"
+                    Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Status: $($response.status)" -logLevel "Warning"
+                }
+            }
+        }
+        
+        Write-Verbose "[$functionName] Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)"
+        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)" -logLevel "Information"
         
         # Process assignments using batch API for each resource type
-        Process-BatchAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
-        Process-BatchAssignments -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
-        Process-BatchAssignments -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
+        Invoke-BatchAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
+        Invoke-BatchAssignments -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
+        Invoke-BatchAssignments -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
+        Invoke-BatchAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -AssignmentCategory "Script"
+        Invoke-BatchAssignments -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -AssignmentCategory "AppProtection"
+        Invoke-BatchAssignments -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -AssignmentCategory "Intent"
+        Invoke-BatchAssignments -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -AssignmentCategory "ResourceAccess"
         
         if ($IncludeBeta.IsPresent)
         {
-            Process-BatchAssignments -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
+            Invoke-BatchAssignments -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
+            Invoke-BatchAssignments -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -AssignmentCategory "HealthScript"
+            Invoke-BatchAssignments -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -AssignmentCategory "ConfigurationPolicy"
+            Invoke-BatchAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
         }
         
-        Write-Verbose "[$functionName] Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count)"
-        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count)" -logLevel "Information"
+        Write-Verbose "[$functionName] Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count)"
+        Write-Log -logFile $LogFile -module $functionName -Message "Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count)" -logLevel "Information"
     }
     catch
     {
@@ -281,17 +395,24 @@ function GetGroupDirectAssignments()
     
     # Summary
     $totalAssignments = $assignments.AllAssignments.Count
-    Write-Verbose "[$functionName] Total assignments found for group '$GroupName': $totalAssignments"
-    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$GroupName': $totalAssignments" -logLevel "Information"
+    Write-Verbose "[$functionName] Total assignments found for group '$($groupId.displayName)': $totalAssignments"
+    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$($groupId.displayName)': $totalAssignments" -logLevel "Information"
     if ($ShowSummary)
     {
-        Write-Host "Group Direct Assignments Summary for '$GroupName':" -ForegroundColor Green
+        Write-Host "Group Direct Assignments Summary for '$($groupId.displayName)':" -ForegroundColor Green
         Write-Host "  Apps: $($assignments.AppAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Configurations: $($assignments.ConfigurationAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Compliance Policies: $($assignments.ComplianceAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "  Scripts: $($assignments.ScriptAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "  App Protection Policies: $($assignments.AppProtectionAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "  Security Intents: $($assignments.IntentAssignments.Count)" -ForegroundColor Yellow
+        Write-Host "  Resource Access Profiles: $($assignments.ResourceAccessAssignments.Count)" -ForegroundColor Yellow
         if ($IncludeBeta.IsPresent)
         {
             Write-Host "  Autopilot Profiles: $($assignments.AutopilotAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Health Scripts: $($assignments.HealthScriptAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Configuration Policies: $($assignments.ConfigurationPolicyAssignments.Count)" -ForegroundColor Yellow
+            Write-Host "  Group Policy Configurations: $($assignments.GroupPolicyAssignments.Count)" -ForegroundColor Yellow
         }
         Write-Host "  Total: $totalAssignments" -ForegroundColor Cyan
     }

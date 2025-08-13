@@ -64,17 +64,30 @@ pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory specific -TestPattern "
 pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory unit -ShowVerbose -ContinueOnError
 pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all -LogLevel Verbose -DryRun
 
-# Legacy run-all-tests.ps1 is DEPRECATED - it will redirect to Test-Runner.ps1
+# Legacy run-all-tests.ps1 is DEPRECATED and has been removed.
 ```
 
 **DEPRECATED PATTERNS** - Do not use these:
 ```bash
-# ❌ Don't run individual test scripts anymore
+# ❌ Don't run individual test scripts anymore - use unified Test-Runner.ps1 instead
 pwsh -File "./TestScripts/test-specific-functionality.ps1"
 
 # ❌ Don't use the old test runner directly (it will redirect, but use the new one)
 pwsh -File "./TestScripts/run-all-tests.ps1"
 ```
+
+**CRITICAL TESTING REQUIREMENT**: ALL new tests MUST be added through the unified testing framework (Test-Runner.ps1). When creating new test files:
+1. Add them to the TestScripts directory with descriptive names
+2. Register them in Test-Runner.ps1 configuration for proper categorization
+3. **NEVER run individual test scripts directly** - always use Test-Runner.ps1 categories
+4. Ensure tests integrate with the unified reporting and failure handling system
+5. **MANDATORY**: All tests created or modified MUST be validated through Test-Runner.ps1 before submission
+
+**TESTING COMPLIANCE**: 
+- ✅ **REQUIRED**: Use `Test-Runner.ps1 -TestCategory <category>` for all testing
+- ❌ **PROHIBITED**: Direct execution of individual test files (e.g., `pwsh -File test-specific.ps1`)
+- ❌ **PROHIBITED**: Creating standalone test scripts that bypass the unified framework
+- ✅ **REQUIRED**: All new functionality must include tests registered in Test-Runner.ps1
 
 **Validation Checklist** - Always validate changes using the unified test runner:
 - [ ] **Quick Syntax**: `Test-Runner.ps1 -TestCategory syntax` (< 5 seconds)
@@ -143,7 +156,8 @@ The application uses a sophisticated hierarchical menu system with the following
 4. Application settings and configuration
 5. Update management
 6. Device exports and reporting
-7. Device actions (wipe, clean, sync)
+7. **Group assignment analysis** - Comprehensive analysis of Intune group assignments across all object types
+8. Device actions (wipe, clean, sync)
 
 **Documentation**: Complete menu system documentation available in `/docs/MENU_SYSTEM_DOCUMENTATION.md` including all functions, usage patterns, and navigation flows.
 
@@ -228,12 +242,15 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 - Use regular hashtables instead of ordered hashtables for PS 5.1 compatibility
 - Test with both PowerShell 5.1 and PowerShell 7+ when possible
 - Add version comments if PowerShell 5.1 compatibility cannot be maintained
+- If you must the syntax like 'write-host "$variablename: $value" be sure to surround the first variable with parentheses "$($variable): $value"
 
 ### Logging Standards
 - Use `Write-Log` function consistently with CMTrace format support
 - Include `$functionName = $MyInvocation.MyCommand.Name` at start of functions
 - Log at appropriate levels: Error, Warning, Information, Verbose, Debug
 - Include detailed verbose logging for troubleshooting
+- **Console Output Control**: Rich diagnostic information is available only in verbose mode (`-Verbose`) to prevent console clutter, while all information is always logged to log files
+- **CallGraphAPI Improvements**: Extensive error diagnostics including Graph error codes, request IDs, headers, and response bodies are logged for troubleshooting but only displayed in verbose mode
 
 ### Error Handling Best Practices
 - Wrap API calls in try-catch blocks with comprehensive error handling
@@ -243,11 +260,33 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 
 ## Microsoft Graph API Integration
 
+### API Optimization and Batch Processing
+The application uses Microsoft Graph batch API functionality to optimize performance and reduce network latency:
+- **Batch Resource Lists**: Initial resource list calls (mobile apps, device configurations, etc.) are batched into a single API call instead of individual calls
+- **Batch Assignment Retrieval**: Assignment data for multiple resources is retrieved using batch requests with configurable batch sizes (default: 20 requests per batch)
+- **Intelligent API Version Selection**: Automatically uses appropriate API versions (v1.0 vs beta) based on feature requirements
+- **Throttling Management**: Built-in delays and error handling to prevent API throttling
+- **Efficient Data Processing**: Minimizes redundant API calls through intelligent caching and batch processing
+
 ### Primary Endpoints
 - `/deviceManagement/windowsAutopilotDeviceIdentities` - Autopilot device management
 - `/users/{id}/registeredDevices` - User device associations  
 - `/deviceManagement/managedDevices` - Intune managed device data
 - `/users/{id}/memberOf` - User group memberships
+
+### Group Assignment Analysis Endpoints
+The application provides comprehensive group assignment analysis across all Intune object types:
+- `/deviceAppManagement/mobileApps` - Mobile applications and assignments
+- `/deviceManagement/deviceConfigurations` - Device configuration policies and assignments
+- `/deviceManagement/deviceCompliancePolicies` - Device compliance policies and assignments
+- `/deviceManagement/deviceManagementScripts` - PowerShell device management scripts and assignments
+- `/deviceManagement/deviceHealthScripts` - Device health monitoring scripts and assignments (beta)
+- `/deviceAppManagement/managedAppPolicies` - App protection policies and assignments
+- `/deviceManagement/intents` - Security baselines and endpoint security policies and assignments
+- `/deviceManagement/resourceAccessProfiles` - VPN, Wi-Fi, certificate profiles and assignments
+- `/deviceManagement/configurationPolicies` - Settings catalog policies and assignments (beta)
+- `/deviceManagement/groupPolicyConfigurations` - Group policy ADMX configurations and assignments (beta)
+- `/deviceManagement/windowsAutopilotDeploymentProfiles` - Autopilot deployment profiles and assignments (beta)
 
 ### Required Scopes (defined in settings.json)
 - `User.Read.All` - Read user profiles and group memberships
