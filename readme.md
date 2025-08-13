@@ -26,7 +26,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 - **🚀 Autopilot Device Management**: Complete device lifecycle from import to deployment with hash generation and profile assignment
 - **👥 User Readiness Validation**: Intelligent assessment of user eligibility based on group memberships and organizational policies
 - **🏢 Corporate Device Management**: Mark devices as corporate-owned for Intune Device Preparation and compliance
-- **📊 Advanced Reporting & Export**: CSV exports for devices, assignments, storage analysis, and application deployments with comprehensive group assignment analysis covering scripts, app protection policies, security baselines, and configuration policies
+- **📊 Advanced Reporting & Export**: CSV exports for devices, assignments, storage analysis, and application deployments with comprehensive group assignment analysis covering scripts, app protection policies, security baselines, and configuration policies. Optimized with Microsoft Graph batch API for efficient data retrieval.
 - **🔐 Enterprise Security**: AES-256 encrypted configuration, secure credential handling, and multi-factor authentication support
 - **⚙️ Automated Setup**: First Run Wizard with guided configuration and automatic credential encryption
 - **🔄 Smart Updates**: Automatic application updates with digital signature verification and rollback capabilities

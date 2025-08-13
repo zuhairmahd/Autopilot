@@ -25,7 +25,7 @@ function CallGraphAPI()
     }
     else
     {
-        Write-Host 'Access token not provided. Please provide a valid access token.' -ForegroundColor Red
+        Write-Verbose "[$functionName] Access token not provided. Please provide a valid access token."
         Write-Log -LogFile $logFile -Module $functionName -Message "Access token not provided." -LogLevel "Error"
         return
     }
@@ -481,7 +481,7 @@ function CallGraphAPI()
         {
             Write-Verbose "[$functionName] Raw server response captured (truncated for display if large)."
             Write-Log -LogFile $logFile -Module $functionName -Message "Raw server response captured (truncated for display if large)." -LogLevel "Information"
-            Write-Error "Server Response (raw): $responseBodyRaw"
+            Write-Verbose "[$functionName] Server Response (raw): $responseBodyRaw"
             Write-Log -LogFile $logFile -Module $functionName -Message "Server Response (raw): $responseBodyRaw" -LogLevel "Error"
             try
             {
@@ -639,8 +639,8 @@ $rawBodyForLog
 "@
 
             Write-Log -Message $logMessage -LogFile $logFile -Module $functionName -LogLevel Error -CMTraceFormat:$false -ErrorAction SilentlyContinue
-            # Fallback to Write-Error to ensure we don't lose diagnostics
-            Write-Error "[$functionName] (fallback) $logMessage" -ErrorAction SilentlyContinue
+            # Fallback verbose logging to ensure we don't lose diagnostics
+            Write-Verbose "[$functionName] (fallback) $logMessage"
         }
         catch
         {
@@ -656,67 +656,67 @@ $rawBodyForLog
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Log -Message "Status code: $statusCode" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
-                Write-Host 'Bad request. Please check the resource name.' -ForegroundColor Red 
+                Write-Verbose "[$functionName] Bad request. Please check the resource name." 
             }
             401
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Log -Message "Status code: $statusCode" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
-                Write-Host 'Unauthorized. Please check your access token.' -ForegroundColor Red 
+                Write-Verbose "[$functionName] Unauthorized. Please check your access token." 
             }
             403
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Log -Message "Status code: $statusCode" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
-                Write-Host 'Forbidden. You do not have permission to access this resource.' -ForegroundColor Red 
+                Write-Verbose "[$functionName] Forbidden. You do not have permission to access this resource." 
             }
             404
             {
                 Write-Verbose "[$functionName] Status code: $statusCode"
                 Write-Log -Message "Status code: $statusCode" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
-                Write-Host 'Not found. The resource does not exist.' -ForegroundColor Red 
+                Write-Verbose "[$functionName] Not found. The resource does not exist." 
             }
             default
             {
-                Write-Host 'An unknown error occurred. Please check the error message below.' -ForegroundColor Red 
+                Write-Verbose "[$functionName] An unknown error occurred. Please check the error message below." 
                 Write-Log -Message "(fallback) $logMessage" -LogFile $logFile -Module $functionName -LogLevel Error -CMTraceFormat:$false -ErrorAction SilentlyContinue
-                Write-Host "Error: $statusMessage" -ForegroundColor Red
+                Write-Verbose "[$functionName] Error: $statusMessage"
                 Write-Log -Message "(fallback) $logMessage" -LogFile $logFile -Module $functionName -LogLevel Error -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 if ($statusCode)
                 {
-                    Write-Host "The status code is $statusCode" 
+                    Write-Verbose "[$functionName] The status code is $statusCode" 
                     Write-Log -Message "The status code is $statusCode" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 }
                 if ($statusDescription)
                 {
-                    Write-Host "Status description: $statusDescription" 
+                    Write-Verbose "[$functionName] Status description: $statusDescription" 
                     Write-Log -Message "Status description: $statusDescription" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 }
                 if ($statusCodeMessage)
                 {
-                    Write-Host "$statusCode indicates $statusCodeMessage" 
+                    Write-Verbose "[$functionName] $statusCode indicates $statusCodeMessage" 
                     Write-Log -Message "$statusCode indicates $statusCodeMessage" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 }
-                Write-Host "Status message: $statusMessage"
+                Write-Verbose "[$functionName] Status message: $statusMessage"
                 Write-Log -Message "Status message: $statusMessage" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 if ($requestId)
                 {
-                    Write-Host "Request-Id: $requestId" 
+                    Write-Verbose "[$functionName] Request-Id: $requestId" 
                     Write-Log -Message "Request-Id: $requestId" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 }
                 if ($clientRequestId)
                 {
-                    Write-Host "Client-Request-Id: $clientRequestId" 
+                    Write-Verbose "[$functionName] Client-Request-Id: $clientRequestId" 
                     Write-Log -Message "Client-Request-Id: $clientRequestId" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 }
                 if ($retryAfter)
                 {
-                    Write-Host "Retry-After: $retryAfter" 
+                    Write-Verbose "[$functionName] Retry-After: $retryAfter" 
                     Write-Log -Message "Retry-After: $retryAfter" -LogFile $logFile -Module $functionName -LogLevel Information -CMTraceFormat:$false -ErrorAction SilentlyContinue
                 }
-                Write-Host 'The full error message follows below:'
-                Write-Host '----------------------------------------------------------'
-                Write-Host "$_"
+                Write-Verbose "[$functionName] The full error message follows below:"
+                Write-Verbose "[$functionName] ----------------------------------------------------------"
+                Write-Verbose "[$functionName] $_"
                 # Raw server body already logged above when available
             }
         }

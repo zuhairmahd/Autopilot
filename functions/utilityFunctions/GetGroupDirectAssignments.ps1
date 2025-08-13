@@ -127,7 +127,7 @@ function GetGroupDirectAssignments()
             
             try
             {
-                $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
+                $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
                 Write-Verbose "[$functionName] Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)"
                 Write-Log -logFile $LogFile -module $functionName -Message "Received batch response for ${ResourceType} batch $($batchIndex / $BatchSize + 1)" -logLevel "Information"
                 if ($batchResponse -and $batchResponse.responses)
@@ -232,178 +232,107 @@ function GetGroupDirectAssignments()
     
     try
     {
-        # Get all resource lists first (4 API calls total)
-        Write-Verbose "[$functionName] Getting all resource lists for assignments"
-        Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments" -logLevel "Information"
+        # Get all resource lists using a single batch API call for better performance
+        Write-Verbose "[$functionName] Getting all resource lists for assignments using batch API"
+        Write-Log -logFile $LogFile -module $functionName -Message "Getting all resource lists for assignments using batch API" -logLevel "Information"
         
-        # Get Mobile Apps
-        $appUri = "deviceAppManagement/mobileApps"
-        $appExtraParameters = "select=id,displayName"
-        $appResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $appUri -APIVersion $apiVersion -ExtraParameters $appExtraParameters
-        $mobileApps = if ($appResponse -and $appResponse.value)
-        {
-            $appResponse.value 
-        }
-        else
-        {
-            @() 
+        # Create batch request for all resource lists
+        $batchRequestBody = @{
+            requests = @()
         }
         
-        # Get Device Configurations
-        $configUri = "deviceManagement/deviceConfigurations"
-        $configExtraParameters = "select=id,displayName"
-        $configResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $configUri -APIVersion $apiVersion -ExtraParameters $configExtraParameters
-        $deviceConfigs = if ($configResponse -and $configResponse.value)
+        # Define resource endpoints and their IDs
+        $resourceEndpoints = @(
+            @{ id = "mobileApps"; url = "deviceAppManagement/mobileApps"; extraParams = "select=id,displayName" }
+            @{ id = "deviceConfigs"; url = "deviceManagement/deviceConfigurations"; extraParams = "select=id,displayName" }
+            @{ id = "compliancePolicies"; url = "deviceManagement/deviceCompliancePolicies"; extraParams = "select=id,displayName" }
+            @{ id = "deviceScripts"; url = "deviceManagement/deviceManagementScripts"; extraParams = "select=id,displayName" }
+            @{ id = "appProtectionPolicies"; url = "deviceAppManagement/managedAppPolicies"; extraParams = "select=id,displayName" }
+            @{ id = "intents"; url = "deviceManagement/intents"; extraParams = "select=id,displayName" }
+            @{ id = "resourceAccessProfiles"; url = "deviceManagement/resourceAccessProfiles"; extraParams = "select=id,displayName" }
+        )
+        
+        # Add beta endpoints if IncludeBeta is specified
+        if ($IncludeBeta.IsPresent)
         {
-            $configResponse.value 
-        }
-        else
-        {
-            @() 
+            $resourceEndpoints += @(
+                @{ id = "autopilotProfiles"; url = "deviceManagement/windowsAutopilotDeploymentProfiles"; extraParams = "select=id,displayName" }
+                @{ id = "healthScripts"; url = "deviceManagement/deviceHealthScripts"; extraParams = "select=id,displayName" }
+                @{ id = "configurationPolicies"; url = "deviceManagement/configurationPolicies"; extraParams = "select=id,name" }
+                @{ id = "groupPolicyConfigs"; url = "deviceManagement/groupPolicyConfigurations"; extraParams = "select=id,displayName" }
+            )
         }
         
-        # Get Compliance Policies
-        $complianceUri = "deviceManagement/deviceCompliancePolicies"
-        $complianceExtraParameters = "select=id,displayName"
-        $complianceResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $complianceUri -APIVersion $apiVersion -ExtraParameters $complianceExtraParameters
-        $compliancePolicies = if ($complianceResponse -and $complianceResponse.value)
+        # Build batch request
+        foreach ($endpoint in $resourceEndpoints)
         {
-            $complianceResponse.value 
-        }
-        else
-        {
-            @() 
+            $requestUrl = "$($endpoint.url)?`$$($endpoint.extraParams)"
+            $batchRequestBody.requests += @{
+                id     = $endpoint.id
+                method = "GET"
+                url    = $requestUrl
+            }
         }
         
-        # Get Autopilot Profiles (if IncludeBeta)
+        Write-Verbose "[$functionName] Sending batch request for $($resourceEndpoints.Count) resource lists"
+        Write-Log -logFile $LogFile -module $functionName -Message "Sending batch request for $($resourceEndpoints.Count) resource lists" -logLevel "Information"
+        
+        # Send batch request
+        $batchResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath "`$batch" -APIVersion $apiVersion -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $global:maxJSONDepth)
+        
+        # Initialize variables for all resource types
+        $mobileApps = @()
+        $deviceConfigs = @()
+        $compliancePolicies = @()
         $autopilotProfiles = @()
-        if ($IncludeBeta.IsPresent)
-        {
-            $autopilotUri = "deviceManagement/windowsAutopilotDeploymentProfiles"
-            $autopilotExtraParameters = "select=id,displayName"
-            $autopilotResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $autopilotUri -APIVersion $apiVersion -ExtraParameters $autopilotExtraParameters
-            $autopilotProfiles = if ($autopilotResponse -and $autopilotResponse.value)
-            {
-                $autopilotResponse.value 
-            }
-            else
-            {
-                @() 
-            }
-        }
-
-        # Get Device Management Scripts
         $deviceScripts = @()
-        $scriptsUri = "deviceManagement/deviceManagementScripts"
-        $scriptsExtraParameters = "select=id,displayName"
-        $scriptsResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $scriptsUri -APIVersion $apiVersion -ExtraParameters $scriptsExtraParameters
-        $deviceScripts = if ($scriptsResponse -and $scriptsResponse.value)
-        {
-            $scriptsResponse.value 
-        }
-        else
-        {
-            @() 
-        }
-
-        # Get Device Health Scripts (if IncludeBeta)
         $healthScripts = @()
-        if ($IncludeBeta.IsPresent)
-        {
-            $healthScriptsUri = "deviceManagement/deviceHealthScripts"
-            $healthScriptsExtraParameters = "select=id,displayName"
-            $healthScriptsResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $healthScriptsUri -APIVersion $apiVersion -ExtraParameters $healthScriptsExtraParameters
-            $healthScripts = if ($healthScriptsResponse -and $healthScriptsResponse.value)
-            {
-                $healthScriptsResponse.value 
-            }
-            else
-            {
-                @() 
-            }
-        }
-
-        # Get App Protection Policies
         $appProtectionPolicies = @()
-        $appProtectionUri = "deviceAppManagement/managedAppPolicies"
-        $appProtectionExtraParameters = "select=id,displayName"
-        $appProtectionResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $appProtectionUri -APIVersion $apiVersion -ExtraParameters $appProtectionExtraParameters
-        $appProtectionPolicies = if ($appProtectionResponse -and $appProtectionResponse.value)
-        {
-            $appProtectionResponse.value 
-        }
-        else
-        {
-            @() 
-        }
-
-        # Get Device Management Intents (Security Baselines)
         $intents = @()
-        $intentsUri = "deviceManagement/intents"
-        $intentsExtraParameters = "select=id,displayName"
-        $intentsResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $intentsUri -APIVersion $apiVersion -ExtraParameters $intentsExtraParameters
-        $intents = if ($intentsResponse -and $intentsResponse.value)
-        {
-            $intentsResponse.value 
-        }
-        else
-        {
-            @() 
-        }
-
-        # Get Resource Access Profiles (VPN, WiFi, Certificates)
         $resourceAccessProfiles = @()
-        $resourceAccessUri = "deviceManagement/resourceAccessProfiles"
-        $resourceAccessExtraParameters = "select=id,displayName"
-        $resourceAccessResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $resourceAccessUri -APIVersion $apiVersion -ExtraParameters $resourceAccessExtraParameters
-        $resourceAccessProfiles = if ($resourceAccessResponse -and $resourceAccessResponse.value)
-        {
-            $resourceAccessResponse.value 
-        }
-        else
-        {
-            @() 
-        }
-
-        # Get Configuration Policies (Settings Catalog) (if IncludeBeta)
         $configurationPolicies = @()
-        if ($IncludeBeta.IsPresent)
+        $groupPolicyConfigs = @()
+        
+        # Process batch response
+        if ($batchResponse -and $batchResponse.responses)
         {
-            $configPoliciesUri = "deviceManagement/configurationPolicies"
-            $configPoliciesExtraParameters = "select=id,name"
-            $configPoliciesResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $configPoliciesUri -APIVersion $apiVersion -ExtraParameters $configPoliciesExtraParameters
-            $configurationPolicies = if ($configPoliciesResponse -and $configPoliciesResponse.value)
+            Write-Verbose "[$functionName] Processing batch response for resource lists"
+            Write-Log -logFile $LogFile -module $functionName -Message "Processing batch response for resource lists" -logLevel "Information"
+            
+            foreach ($response in $batchResponse.responses)
             {
-                $configPoliciesResponse.value | ForEach-Object { 
-                    # Configuration policies use 'name' instead of 'displayName', so we normalize it
-                    $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                if ($response.status -eq 200 -and $response.body -and $response.body.value)
+                {
+                    switch ($response.id)
+                    {
+                        "mobileApps" { $mobileApps = $response.body.value }
+                        "deviceConfigs" { $deviceConfigs = $response.body.value }
+                        "compliancePolicies" { $compliancePolicies = $response.body.value }
+                        "deviceScripts" { $deviceScripts = $response.body.value }
+                        "appProtectionPolicies" { $appProtectionPolicies = $response.body.value }
+                        "intents" { $intents = $response.body.value }
+                        "resourceAccessProfiles" { $resourceAccessProfiles = $response.body.value }
+                        "autopilotProfiles" { $autopilotProfiles = $response.body.value }
+                        "healthScripts" { $healthScripts = $response.body.value }
+                        "configurationPolicies" { 
+                            # Configuration policies use 'name' instead of 'displayName', so we normalize it
+                            $configurationPolicies = $response.body.value | ForEach-Object { 
+                                $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
+                            }
+                        }
+                        "groupPolicyConfigs" { $groupPolicyConfigs = $response.body.value }
+                    }
+                }
+                elseif ($response.status -ne 200)
+                {
+                    Write-Verbose "[$functionName] Failed to get resource list for $($response.id). Status: $($response.status)"
+                    Write-Log -logFile $LogFile -module $functionName -Message "Failed to get resource list for $($response.id). Status: $($response.status)" -logLevel "Warning"
                 }
             }
-            else
-            {
-                @() 
-            }
-        }
-
-        # Get Group Policy Configurations (if IncludeBeta)
-        $groupPolicyConfigs = @()
-        if ($IncludeBeta.IsPresent)
-        {
-            $groupPolicyUri = "deviceManagement/groupPolicyConfigurations"
-            $groupPolicyExtraParameters = "select=id,displayName"
-            $groupPolicyResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $groupPolicyUri -APIVersion $apiVersion -ExtraParameters $groupPolicyExtraParameters
-            $groupPolicyConfigs = if ($groupPolicyResponse -and $groupPolicyResponse.value)
-            {
-                $groupPolicyResponse.value 
-            }
-            else
-            {
-                @() 
-            }
         }
         
-        Write-Verbose "[$functionName] Retrieved resource counts - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)"
-        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)" -logLevel "Information"
+        Write-Verbose "[$functionName] Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)"
+        Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)" -logLevel "Information"
         
         # Process assignments using batch API for each resource type
         Process-BatchAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"

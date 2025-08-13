@@ -236,6 +236,8 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 - Include `$functionName = $MyInvocation.MyCommand.Name` at start of functions
 - Log at appropriate levels: Error, Warning, Information, Verbose, Debug
 - Include detailed verbose logging for troubleshooting
+- **Console Output Control**: Rich diagnostic information is available only in verbose mode (`-Verbose`) to prevent console clutter, while all information is always logged to log files
+- **CallGraphAPI Improvements**: Extensive error diagnostics including Graph error codes, request IDs, headers, and response bodies are logged for troubleshooting but only displayed in verbose mode
 
 ### Error Handling Best Practices
 - Wrap API calls in try-catch blocks with comprehensive error handling
@@ -244,6 +246,14 @@ pwsh -File "./CreateRelease.ps1" -CreateModule -InputFile "./main.ps1" -Overwrit
 - Validate JSON structure before processing
 
 ## Microsoft Graph API Integration
+
+### API Optimization and Batch Processing
+The application uses Microsoft Graph batch API functionality to optimize performance and reduce network latency:
+- **Batch Resource Lists**: Initial resource list calls (mobile apps, device configurations, etc.) are batched into a single API call instead of individual calls
+- **Batch Assignment Retrieval**: Assignment data for multiple resources is retrieved using batch requests with configurable batch sizes (default: 20 requests per batch)
+- **Intelligent API Version Selection**: Automatically uses appropriate API versions (v1.0 vs beta) based on feature requirements
+- **Throttling Management**: Built-in delays and error handling to prevent API throttling
+- **Efficient Data Processing**: Minimizes redundant API calls through intelligent caching and batch processing
 
 ### Primary Endpoints
 - `/deviceManagement/windowsAutopilotDeviceIdentities` - Autopilot device management
