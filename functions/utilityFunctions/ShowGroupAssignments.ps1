@@ -39,7 +39,7 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Access token is present."
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
-    Write-Host "Getting group assignments for '$($group.displayName)'..."
+    Write-Host "Getting group assignments for '$groupName'..."
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
     $global:assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -verbose 

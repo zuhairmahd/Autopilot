@@ -31,22 +31,31 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "IncludeBeta: $IncludeBeta" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -logLevel "Information"
     Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
-    Write-Verbose "[$functionName] Group name: $($groupName.displayName)"
-    Write-Verbose "[$functionName] Group ID: $($groupName.Id)"
-    Write-Log -logFile $LogFile -module $functionName -Message "Group name: $($groupName.displayName)" -logLevel "Information"
-    Write-Log -logFile $LogFile -module $functionName -Message "Group ID: $($groupName.Id)" -logLevel "Information"
+    # PowerShell 5.1 compatible array handling and safe indexing
+    $groupIds = $GroupName
+    $groupIdArray = @($groupIds)
+    $groupId = $groupIdArray[0]
+    
+    Write-Verbose "[$functionName] Group name: $($groupId.displayName)"
+    Write-Verbose "[$functionName] Group ID: $($groupId.Id)"
+    Write-Log -logFile $LogFile -module $functionName -Message "Group name: $($groupId.displayName)" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "Group ID: $($groupId.Id)" -logLevel "Information"
+    
     # Validate that we have a group ID to work with
-    if (-not $groupName.Id)
+    if (-not $groupId.Id)
     {
         Write-Verbose "[$functionName] No group ID available, cannot proceed with assignment retrieval"
         Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -logLevel "Error"
         return $assignments
     }
     
+    # Store the group ID value for filtering assignments
+    $groupIdValue = $groupId.Id
+    
     # Initialize result object
     $assignments = [PSCustomObject]@{
-        GroupName                      = $groupName.displayName 
-        GroupId                        = $groupName.Id
+        GroupName                      = $groupId.displayName 
+        GroupId                        = $groupId.Id
         AppAssignments                 = @()
         ConfigurationAssignments       = @()
         ComplianceAssignments          = @()
@@ -386,11 +395,11 @@ function GetGroupDirectAssignments()
     
     # Summary
     $totalAssignments = $assignments.AllAssignments.Count
-    Write-Verbose "[$functionName] Total assignments found for group '$groupName': $totalAssignments"
-    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$groupName': $totalAssignments" -logLevel "Information"
+    Write-Verbose "[$functionName] Total assignments found for group '$($groupId.displayName)': $totalAssignments"
+    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$($groupId.displayName)': $totalAssignments" -logLevel "Information"
     if ($ShowSummary)
     {
-        Write-Host "Group Direct Assignments Summary for '$groupName':" -ForegroundColor Green
+        Write-Host "Group Direct Assignments Summary for '$($groupId.displayName)':" -ForegroundColor Green
         Write-Host "  Apps: $($assignments.AppAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Configurations: $($assignments.ConfigurationAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Compliance Policies: $($assignments.ComplianceAssignments.Count)" -ForegroundColor Yellow

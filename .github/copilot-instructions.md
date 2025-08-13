@@ -79,8 +79,15 @@ pwsh -File "./TestScripts/run-all-tests.ps1"
 **CRITICAL TESTING REQUIREMENT**: ALL new tests MUST be added through the unified testing framework (Test-Runner.ps1). When creating new test files:
 1. Add them to the TestScripts directory with descriptive names
 2. Register them in Test-Runner.ps1 configuration for proper categorization
-3. Never run individual test scripts directly - always use Test-Runner.ps1 categories
+3. **NEVER run individual test scripts directly** - always use Test-Runner.ps1 categories
 4. Ensure tests integrate with the unified reporting and failure handling system
+5. **MANDATORY**: All tests created or modified MUST be validated through Test-Runner.ps1 before submission
+
+**TESTING COMPLIANCE**: 
+- ✅ **REQUIRED**: Use `Test-Runner.ps1 -TestCategory <category>` for all testing
+- ❌ **PROHIBITED**: Direct execution of individual test files (e.g., `pwsh -File test-specific.ps1`)
+- ❌ **PROHIBITED**: Creating standalone test scripts that bypass the unified framework
+- ✅ **REQUIRED**: All new functionality must include tests registered in Test-Runner.ps1
 
 **Validation Checklist** - Always validate changes using the unified test runner:
 - [ ] **Quick Syntax**: `Test-Runner.ps1 -TestCategory syntax` (< 5 seconds)
