@@ -90,7 +90,11 @@ Write-Host "`nTesting GetGroupDirectAssignments function..." -ForegroundColor Ye
 
 try {
     # Test the function with mock data
-    $result = GetGroupDirectAssignments -GroupName "TestGroup" -AccessToken "mock-token" -IncludeBeta -ShowSummary -BatchSize 5
+    $mockGroup = [PSCustomObject]@{
+        id = "12345678-1234-1234-1234-123456789012"
+        displayName = "TestGroup"
+    }
+    $result = GetGroupDirectAssignments -Group $mockGroup -AccessToken "mock-token" -IncludeBeta -ShowSummary -BatchSize 5
     
     # Validate the result structure
     if ($result -and $result.GroupName -eq "TestGroup") {
