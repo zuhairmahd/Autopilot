@@ -53,20 +53,20 @@ function GetGroupDirectAssignments()
     
     # Initialize result object
     $assignments = [PSCustomObject]@{
-        GroupName                = $GroupName
-        GroupId                  = $groupId
-        AppAssignments           = @()
-        ConfigurationAssignments = @()
-        ComplianceAssignments    = @()
-        AutopilotAssignments     = @()
-        ScriptAssignments        = @()
-        HealthScriptAssignments  = @()
-        AppProtectionAssignments = @()
-        IntentAssignments        = @()
-        ResourceAccessAssignments = @()
+        GroupName                      = $GroupName
+        GroupId                        = $groupId
+        AppAssignments                 = @()
+        ConfigurationAssignments       = @()
+        ComplianceAssignments          = @()
+        AutopilotAssignments           = @()
+        ScriptAssignments              = @()
+        HealthScriptAssignments        = @()
+        AppProtectionAssignments       = @()
+        IntentAssignments              = @()
+        ResourceAccessAssignments      = @()
         ConfigurationPolicyAssignments = @()
-        GroupPolicyAssignments   = @()
-        AllAssignments           = @()
+        GroupPolicyAssignments         = @()
+        AllAssignments                 = @()
     }
     
     # Determine API version based on IncludeBeta parameter
