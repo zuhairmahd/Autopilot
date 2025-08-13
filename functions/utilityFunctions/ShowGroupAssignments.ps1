@@ -42,7 +42,7 @@ function ShowGroupAssignments()
     Write-Host "Getting group assignments for '$groupName'..."
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
-    $global:assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta -verbose 
+    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta
     if ($assignments -eq 'noGroup')
     {
         Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -logLevel "Warning"
