@@ -19,9 +19,9 @@
     "requiredScopes": [
         {
             "Scope": "User.Read.All",
-            "Reason": "Required to read user profiles, group memberships, and registered devices.",
+            "Reason": "Required to read user profiles, group memberships, registered devices, and user directory information.",
             "Endpoints": [
-                "/users",
+                "users",
                 "users/{id}",
                 "users/{id}/memberOf",
                 "users/{id}/registeredDevices"
@@ -29,32 +29,37 @@
         },
         {
             "Scope": "Device.Read.All",
-            "Reason": "Required to read Microsoft Entra ID device objects.",
+            "Reason": "Required to read Microsoft Entra ID device objects and device directory information.",
             "Endpoints": [
-                "devices"
+                "devices",
+                "devices/{id}"
             ]
         },
         {
             "Scope": "DeviceManagementApps.ReadWrite.All",
-            "Reason": "Required to read application information and manage app assignments.",
+            "Reason": "Required to read and write mobile application information, app assignments, and app protection policies in Microsoft Intune.",
             "Endpoints": [
                 "deviceAppManagement/mobileApps",
-                "deviceAppManagement/mobileApps/{id}/assignments"
+                "deviceAppManagement/mobileApps/{id}/assignments",
+                "deviceAppManagement/managedAppPolicies"
             ]
         },
         {
             "Scope": "DeviceManagementConfiguration.Read.All",
-            "Reason": "Required to read Intune device configuration policies.",
+            "Reason": "Required to read Intune device configuration policies, compliance policies, and settings catalog configurations.",
             "Endpoints": [
-                "deviceManagement/deviceConfigurations"
+                "deviceManagement/deviceConfigurations",
+                "deviceManagement/deviceCompliancePolicies",
+                "deviceManagement/configurationPolicies"
             ]
         },
         {
             "Scope": "DeviceManagementManagedDevices.Read.All",
-            "Reason": "Required to read Intune managed device properties.",
+            "Reason": "Required to read Intune managed device properties, device health status, and device compliance information.",
             "Endpoints": [
-                "/deviceManagement/managedDevices",
-                "deviceManagement/managedDevices/{id}"
+                "deviceManagement/managedDevices",
+                "deviceManagement/managedDevices/{id}",
+                "deviceManagement/managedDevices/{id}/deviceCompliancePolicyStates"
             ]
         },
         {
@@ -66,18 +71,22 @@
         },
         {
             "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-            "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
+            "Reason": "Required for privileged device operations including reading local administrator (LAPS) passwords, device sync, wipe, and restart operations.",
             "Endpoints": [
-                "directory/deviceLocalCredentials"
+                "directory/deviceLocalCredentials",
+                "deviceManagement/managedDevices/{id}/syncDevice",
+                "deviceManagement/managedDevices/{id}/wipe",
+                "deviceManagement/managedDevices/{id}/rebootNow"
             ]
         },
         {
             "Scope": "DeviceManagementServiceConfig.ReadWrite.All",
-            "Reason": "Required to read Autopilot events and to read and manage Autopilot device identities.",
+            "Reason": "Required to read and write Intune service configuration including Autopilot events, device identities, and enrollment profiles.",
             "Endpoints": [
                 "deviceManagement/autopilotEvents",
                 "deviceManagement/importedWindowsAutopilotDeviceIdentities",
-                "deviceManagement/windowsAutopilotDeviceIdentities"
+                "deviceManagement/windowsAutopilotDeviceIdentities",
+                "deviceManagement/windowsAutopilotDeploymentProfiles"
             ]
         },
         {
@@ -97,39 +106,32 @@
         },
         {
             "Scope": "DeviceManagementConfiguration.ReadWrite.All",
-            "Reason": "Required to create, update, and delete Intune device configuration policies.",
+            "Reason": "Required to create, update, and delete Intune device configuration policies and settings catalog configurations.",
             "Endpoints": [
-                "deviceManagement/deviceConfigurations"
+                "deviceManagement/deviceConfigurations",
+                "deviceManagement/configurationPolicies",
+                "deviceManagement/groupPolicyConfigurations"
             ]
         },
         {
             "Scope": "DeviceManagementApps.Read.All",
-            "Reason": "Required to read application information in Intune.",
+            "Reason": "Required to read mobile application information and app assignments in Microsoft Intune.",
             "Endpoints": [
-                "deviceAppManagement/mobileApps"
+                "deviceAppManagement/mobileApps",
+                "deviceAppManagement/mobileApps/{id}/assignments"
             ]
         },
         {
             "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
-            "Reason": "Required to create, update, and delete Intune managed device properties.",
+            "Reason": "Required to create, update, and delete Intune managed device properties and perform device management operations.",
             "Endpoints": [
-                "deviceManagement/managedDevices"
+                "deviceManagement/managedDevices",
+                "deviceManagement/managedDevices/{id}",
+                "deviceManagement/managedDevices/{id}/retire",
+                "deviceManagement/managedDevices/{id}/wipe"
             ]
         },
-        {
-            "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-            "Reason": "Required for privileged operations on managed devices, such as reading LAPS passwords.",
-            "Endpoints": [
-                "deviceManagement/managedDevices"
-            ]
-        },
-        {
-            "Scope": "BitlockerKey.Read.All",
-            "Reason": "Required to read BitLocker recovery keys for all devices.",
-            "Endpoints": [
-                "informationProtection/bitlocker/recoveryKeys"
-            ]
-        }
+
     ],
     "globalSettings": {
         "operatingSystem": "Windows",
