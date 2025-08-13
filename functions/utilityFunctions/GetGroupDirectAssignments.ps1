@@ -5,7 +5,7 @@ function GetGroupDirectAssignments()
         [Parameter(Mandatory = $false)]
         [string] $AccessToken,
         [Parameter(Mandatory = $true)]
-        [string] $GroupName,
+        $Group,
         [Parameter(Mandatory = $false)]
         [switch] $IncludeBeta,
         [switch]$ShowSummary,
@@ -23,38 +23,10 @@ function GetGroupDirectAssignments()
         Write-Log -logFile $LogFile -module $functionName -Message "No AccessToken provided; relying on default authentication in CallGraphAPI." -logLevel "Warning"
     }
     
-    # First, get the group ID from the group name using the existing utility function
-    Write-Verbose "[$functionName] Resolving group name '$GroupName' to group ID"
-    Write-Log -logFile $LogFile -module $functionName -Message "Resolving group name '$GroupName' to group ID" -logLevel "Information"
-    
-    try
-    {
-        $groupIds = GetGroupIdsByNames -AccessToken $AccessToken -GroupNames @($GroupName)
-        
-        if (-not $groupIds -or $groupIds.Count -eq 0)
-        {
-            Write-Verbose "[$functionName] No group ID found for group name: $GroupName"
-            Write-Log -logFile $LogFile -module $functionName -Message "No group ID found for group name: $GroupName" -logLevel "Warning"
-            return @('noGroup')
-        }
-        
-        # Ensure $groupIds is treated as an array and properly extract the first (or only) group ID
-        $groupIdArray = @($groupIds)
-        $groupId = $groupIdArray[0]
-        Write-Verbose "[$functionName] Resolved group '$GroupName' to ID: $groupId (from $($groupIdArray.Count) result(s))"
-        Write-Log -logFile $LogFile -module $functionName -Message "Resolved group '$GroupName' to ID: $groupId (from $($groupIdArray.Count) result(s))" -logLevel "Information"
-    }
-    catch
-    {
-        Write-Verbose "[$functionName] Error resolving group name: $($_.Exception.Message)"
-        Write-Log -logFile $LogFile -module $functionName -Message "Error resolving group name: $($_.Exception.Message)" -logLevel "Error"
-        return @()
-    }
-    
     # Initialize result object
     $assignments = [PSCustomObject]@{
-        GroupName                      = $GroupName
-        GroupId                        = $groupId
+        GroupName                      = $group.displayName 
+        GroupId                        = $group.Id
         AppAssignments                 = @()
         ConfigurationAssignments       = @()
         ComplianceAssignments          = @()
@@ -82,7 +54,7 @@ function GetGroupDirectAssignments()
     Write-Log -logFile $LogFile -module $functionName -Message "Using API version: $apiVersion with batch size: $BatchSize" -logLevel "Information"
     
     # Helper function to process batch assignments
-    function Process-BatchAssignments
+    function Invoke-BatchAssignments
     {
         param(
             [array]$Resources,
@@ -305,22 +277,53 @@ function GetGroupDirectAssignments()
                 {
                     switch ($response.id)
                     {
-                        "mobileApps" { $mobileApps = $response.body.value }
-                        "deviceConfigs" { $deviceConfigs = $response.body.value }
-                        "compliancePolicies" { $compliancePolicies = $response.body.value }
-                        "deviceScripts" { $deviceScripts = $response.body.value }
-                        "appProtectionPolicies" { $appProtectionPolicies = $response.body.value }
-                        "intents" { $intents = $response.body.value }
-                        "resourceAccessProfiles" { $resourceAccessProfiles = $response.body.value }
-                        "autopilotProfiles" { $autopilotProfiles = $response.body.value }
-                        "healthScripts" { $healthScripts = $response.body.value }
-                        "configurationPolicies" { 
+                        "mobileApps"
+                        {
+                            $mobileApps = $response.body.value 
+                        }
+                        "deviceConfigs"
+                        {
+                            $deviceConfigs = $response.body.value 
+                        }
+                        "compliancePolicies"
+                        {
+                            $compliancePolicies = $response.body.value 
+                        }
+                        "deviceScripts"
+                        {
+                            $deviceScripts = $response.body.value 
+                        }
+                        "appProtectionPolicies"
+                        {
+                            $appProtectionPolicies = $response.body.value 
+                        }
+                        "intents"
+                        {
+                            $intents = $response.body.value 
+                        }
+                        "resourceAccessProfiles"
+                        {
+                            $resourceAccessProfiles = $response.body.value 
+                        }
+                        "autopilotProfiles"
+                        {
+                            $autopilotProfiles = $response.body.value 
+                        }
+                        "healthScripts"
+                        {
+                            $healthScripts = $response.body.value 
+                        }
+                        "configurationPolicies"
+                        { 
                             # Configuration policies use 'name' instead of 'displayName', so we normalize it
                             $configurationPolicies = $response.body.value | ForEach-Object { 
                                 $_ | Add-Member -NotePropertyName 'displayName' -NotePropertyValue $_.name -Force -PassThru
                             }
                         }
-                        "groupPolicyConfigs" { $groupPolicyConfigs = $response.body.value }
+                        "groupPolicyConfigs"
+                        {
+                            $groupPolicyConfigs = $response.body.value 
+                        }
                     }
                 }
                 elseif ($response.status -ne 200)

@@ -249,10 +249,6 @@ function CallGraphAPI()
     Write-Log -LogFile $logFile -Module $functionName -Message "URI: $encodedUri." -LogLevel "Information"
     Write-Verbose "[$functionName] Method: $method."
     Write-Log -LogFile $logFile -Module $functionName -Message "Method: $method." -LogLevel "Information"
-    Write-Verbose "[$functionName] Headers: $($headers | Out-String)."
-    Write-Log -LogFile $logFile -Module $functionName -Message "Headers: $($headers | Out-String)." -LogLevel "Information"
-    Write-Verbose "[$functionName] Body: $($body | Out-String)."
-    Write-Log -LogFile $logFile -Module $functionName -Message "Body: $($body | Out-String)." -LogLevel "Information"
     #endregion
     try
     {

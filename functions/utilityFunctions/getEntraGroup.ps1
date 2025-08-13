@@ -23,8 +23,9 @@ function GetEntraGroup()
     $Uri = "groups"
     $filter = "displayName eq '$groupName'"
     $ExtraParameters = "select=displayName,id"
-    
-    $Info = CallGraphAPI -AccessToken $accessToken -ResourcePath $Uri -Filter $filter -ExtraParameters = $ExtraParameters
+    Write-Verbose "[$functionName] Calling Graph API with $Uri/$filter/$ExtraParameters"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Calling Graph API with $Uri/$filter/$ExtraParameters" -LogLevel "Information"
+    $Info = CallGraphAPI -AccessToken $accessToken -ResourcePath $Uri -Filter $filter -ExtraParameters $ExtraParameters
     Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exact match API response: $($Info | Out-String)" -LogLevel "Information"
     if ($Info -notin 400, 401, 403, 404 -and $info.value.count -gt 0)
@@ -97,7 +98,7 @@ function GetEntraGroup()
         }
         Write-Verbose "[$functionName] Trying $search with clause: $searchClause"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Trying $search with clause: $searchClause" -LogLevel "Information"
-        $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $searchUri -extraParameters $searchExtra -consistencyLevel
+        $fallbackResults = CallGraphAPI -accessToken $AccessToken -ResourcePath $Uri -extraParameters $searchExtra -consistencyLevel
         if ($fallbackResults -is [int])
         {
             Write-Verbose "[$functionName] $search call returned status code: $fallbackResults" 

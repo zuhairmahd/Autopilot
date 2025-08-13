@@ -2,8 +2,7 @@ function ShowGroupAssignments()
 {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)]
-        [string]$GroupName,
+        [string]$Group,
         [string]$accessToken
     )
 
@@ -24,7 +23,7 @@ function ShowGroupAssignments()
     Write-Host "Getting group assignments for '$GroupName'..."
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
-    $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $GroupName -includeBeta
+    $assignments = GetGroupDirectAssignments -accessToken $accessToken -Group $Group -includeBeta
     if ($assignments -eq 'noGroup')
     {
         Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$GroupName'." -logLevel "Warning"
@@ -114,17 +113,17 @@ function ShowGroupAssignments()
         {
             # Map display type names to internal property names
             $typePropertyMap = @{
-                'Application' = 'Application'
-                'Configuration' = 'Configuration'
-                'Compliance' = 'Compliance'
-                'Script' = 'Script'
-                'AppProtection' = 'AppProtection'
-                'Intent' = 'Intent'
-                'ResourceAccess' = 'ResourceAccess'
-                'AutopilotProfile' = 'AutopilotProfile'
-                'HealthScript' = 'HealthScript'
+                'Application'         = 'Application'
+                'Configuration'       = 'Configuration'
+                'Compliance'          = 'Compliance'
+                'Script'              = 'Script'
+                'AppProtection'       = 'AppProtection'
+                'Intent'              = 'Intent'
+                'ResourceAccess'      = 'ResourceAccess'
+                'AutopilotProfile'    = 'AutopilotProfile'
+                'HealthScript'        = 'HealthScript'
                 'ConfigurationPolicy' = 'ConfigurationPolicy'
-                'GroupPolicy' = 'GroupPolicy'
+                'GroupPolicy'         = 'GroupPolicy'
             }
             
             $internalType = $typePropertyMap[$assignmentType]
