@@ -10,7 +10,15 @@
         "scope": [
             "offline_access",
             "openid",
-            "Device.ReadWrite.All"
+            "Device.ReadWrite.All",
+            "DeviceManagementApps.Read.All",
+            "DeviceManagementConfiguration.ReadWrite.All",
+            "DeviceManagementManagedDevices.PrivilegedOperations.All",
+            "DeviceManagementManagedDevices.ReadWrite.All",
+            "DeviceManagementApps.ReadWrite.All",
+            "BitlockerKey.Read.All",
+            "User.Read.All",
+            "DeviceManagementServiceConfig.ReadWrite.All"
         ],
         "CacheType": "Memory",
         "SecureString": false,
@@ -131,7 +139,6 @@
                 "deviceManagement/managedDevices/{id}/wipe"
             ]
         },
-
     ],
     "globalSettings": {
         "operatingSystem": "Windows",
