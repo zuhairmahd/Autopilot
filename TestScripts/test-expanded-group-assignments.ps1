@@ -175,13 +175,13 @@ function Test-BatchProcessingCalls {
     $functionContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1" -Raw
     
     $expectedBatchCalls = @(
-        'Process-BatchAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts"',
-        'Process-BatchAssignments -Resources $appProtectionPolicies -ResourceType "App Protection Policies"',
-        'Process-BatchAssignments -Resources $intents -ResourceType "Device Management Intents"',
-        'Process-BatchAssignments -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles"',
-        'Process-BatchAssignments -Resources $healthScripts -ResourceType "Device Health Scripts"',
-        'Process-BatchAssignments -Resources $configurationPolicies -ResourceType "Configuration Policies"',
-        'Process-BatchAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations"'
+        'Invoke-BatchAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts"',
+        'Invoke-BatchAssignments -Resources $appProtectionPolicies -ResourceType "App Protection Policies"',
+        'Invoke-BatchAssignments -Resources $intents -ResourceType "Device Management Intents"',
+        'Invoke-BatchAssignments -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles"',
+        'Invoke-BatchAssignments -Resources $healthScripts -ResourceType "Device Health Scripts"',
+        'Invoke-BatchAssignments -Resources $configurationPolicies -ResourceType "Configuration Policies"',
+        'Invoke-BatchAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations"'
     )
     
     $missingCalls = @()

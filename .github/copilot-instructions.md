@@ -69,12 +69,18 @@ pwsh -File "./TestScripts/Test-Runner.ps1" -TestCategory all -LogLevel Verbose -
 
 **DEPRECATED PATTERNS** - Do not use these:
 ```bash
-# ❌ Don't run individual test scripts anymore
+# ❌ Don't run individual test scripts anymore - use unified Test-Runner.ps1 instead
 pwsh -File "./TestScripts/test-specific-functionality.ps1"
 
 # ❌ Don't use the old test runner directly (it will redirect, but use the new one)
 pwsh -File "./TestScripts/run-all-tests.ps1"
 ```
+
+**CRITICAL TESTING REQUIREMENT**: ALL new tests MUST be added through the unified testing framework (Test-Runner.ps1). When creating new test files:
+1. Add them to the TestScripts directory with descriptive names
+2. Register them in Test-Runner.ps1 configuration for proper categorization
+3. Never run individual test scripts directly - always use Test-Runner.ps1 categories
+4. Ensure tests integrate with the unified reporting and failure handling system
 
 **Validation Checklist** - Always validate changes using the unified test runner:
 - [ ] **Quick Syntax**: `Test-Runner.ps1 -TestCategory syntax` (< 5 seconds)

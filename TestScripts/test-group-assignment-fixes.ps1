@@ -155,7 +155,7 @@ function Test-CodePatterns {
         $hasSimplifiedImplementation = $idsContent -match 'Initialize session cache' -and $idsContent -notmatch 'Resolve-FromIndex'
         
         # Check for batch API implementation patterns
-        $hasBatchProcessing = $directContent -match 'Process-BatchAssignments'
+        $hasBatchProcessing = $directContent -match 'Invoke-BatchAssignments'
         $hasBatchRequestBody = $directContent -match 'batchRequestBody = @{'
         $hasBatchAPICall = $directContent -match 'ResourcePath.*\$batch'
         

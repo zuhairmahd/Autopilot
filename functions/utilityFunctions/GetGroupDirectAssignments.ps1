@@ -5,7 +5,7 @@ function GetGroupDirectAssignments()
         [Parameter(Mandatory = $false)]
         [string] $AccessToken,
         [Parameter(Mandatory = $true)]
-        $Group,
+        $GroupName,
         [Parameter(Mandatory = $false)]
         [switch] $IncludeBeta,
         [switch]$ShowSummary,
@@ -16,41 +16,46 @@ function GetGroupDirectAssignments()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Extract group name and ID for logging and processing
-    $groupName = if ($Group -and $Group.displayName)
+    # Safe array handling for group input - ensure PowerShell 5.1 compatibility
+    $groupIds = $GroupName
+    $groupIdArray = @($groupIds)
+    $groupId = $groupIdArray[0]
+    
+    $groupName = if ($groupId -and $groupId.displayName)
     { 
-        $Group.displayName 
+        $groupId.displayName 
     }
-    elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName'))
+    elseif ($groupId -is [hashtable] -and $groupId.ContainsKey('displayName'))
     {
-        $Group['displayName']
+        $groupId['displayName']
     }
-    elseif ($Group -is [string])
+    elseif ($groupId -is [string])
     { 
-        $Group 
+        $groupId 
     }
     else
     { 
         "Unknown" 
     }
     
-    $groupId = if ($Group -and $Group.id)
+    $groupIdValue = if ($groupId -and $groupId.id)
     { 
-        $Group.id 
+        $groupId.id 
     }
-    elseif ($Group -is [hashtable] -and $Group.ContainsKey('id'))
+    elseif ($groupId -is [hashtable] -and $groupId.ContainsKey('id'))
     {
-        $Group['id']
+        $groupId['id']
     }
     else
     { 
         $null 
     }
     
-    Write-Verbose "[$functionName] Starting to get direct assignments for group: $groupName (ID: $groupId)"
-    Write-Log -logFile $LogFile -module $functionName -Message "Starting to get direct assignments for group: $groupName (ID: $groupId)" -logLevel "Information"
+    Write-Verbose "[$functionName] Starting to get direct assignments for group: $groupName (ID: $groupIdValue)"
+    Write-Log -logFile $LogFile -module $functionName -Message "Starting to get direct assignments for group: $groupName (ID: $groupIdValue)" -logLevel "Information"
     
     # Validate that we have a group ID to work with
-    if (-not $groupId)
+    if (-not $groupIdValue)
     {
         Write-Verbose "[$functionName] No group ID available, cannot proceed with assignment retrieval"
         Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -logLevel "Error"
@@ -66,7 +71,7 @@ function GetGroupDirectAssignments()
     # Initialize result object
     $assignments = [PSCustomObject]@{
         GroupName                      = $groupName 
-        GroupId                        = $groupId
+        GroupId                        = $groupIdValue
         AppAssignments                 = @()
         ConfigurationAssignments       = @()
         ComplianceAssignments          = @()
@@ -155,7 +160,7 @@ function GetGroupDirectAssignments()
                             {
                                 $relevantAssignments = $response.body.value | Where-Object { 
                                     $_.target.'@odata.type' -eq '#microsoft.graph.groupAssignmentTarget' -and 
-                                    $_.target.groupId -eq $groupId 
+                                    $_.target.groupId -eq $groupIdValue 
                                 }
                                 
                                 foreach ($assignment in $relevantAssignments)
