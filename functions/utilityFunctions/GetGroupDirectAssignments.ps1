@@ -14,64 +14,39 @@ function GetGroupDirectAssignments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    
-    # Extract group name and ID for logging and processing
-    # Safe array handling for group input - ensure PowerShell 5.1 compatibility
-    $groupIds = $GroupName
-    $groupIdArray = @($groupIds)
-    $groupId = $groupIdArray[0]
-    
-    $groupName = if ($groupId -and $groupId.displayName)
-    { 
-        $groupId.displayName 
-    }
-    elseif ($groupId -is [hashtable] -and $groupId.ContainsKey('displayName'))
+    #log the incoming parameters 
+    Write-Verbose "[$functionName] Incoming parameters:"
+    if ($AccessToken)
     {
-        $groupId['displayName']
+        Write-Verbose "[$functionName] AccessToken provided"
+        Write-Log -logFile $LogFile -module $functionName -Message "AccessToken: $AccessToken" -logLevel "Information"
     }
-    elseif ($groupId -is [string])
-    { 
-        $groupId 
-    }
-    else
-    { 
-        "Unknown" 
-    }
-    
-    $groupIdValue = if ($groupId -and $groupId.id)
-    { 
-        $groupId.id 
-    }
-    elseif ($groupId -is [hashtable] -and $groupId.ContainsKey('id'))
-    {
-        $groupId['id']
-    }
-    else
-    { 
-        $null 
-    }
-    
-    Write-Verbose "[$functionName] Starting to get direct assignments for group: $groupName (ID: $groupIdValue)"
-    Write-Log -logFile $LogFile -module $functionName -Message "Starting to get direct assignments for group: $groupName (ID: $groupIdValue)" -logLevel "Information"
-    
+    Write-Verbose "[$functionName] GroupName: $GroupName"
+    Write-Verbose "[$functionName] IncludeBeta: $IncludeBeta"
+    Write-Verbose "[$functionName] ShowSummary: $ShowSummary"
+    Write-Verbose "[$functionName] BatchSize: $BatchSize"
+    #now write-log them.
+    Write-Log -logFile $LogFile -module $functionName -Message "Incoming parameters:" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "GroupName: $GroupName" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "IncludeBeta: $IncludeBeta" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "ShowSummary: $ShowSummary" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "BatchSize: $BatchSize" -logLevel "Information"
+    Write-Verbose "[$functionName] Group name: $($groupName.displayName)"
+    Write-Verbose "[$functionName] Group ID: $($groupName.Id)"
+    Write-Log -logFile $LogFile -module $functionName -Message "Group name: $($groupName.displayName)" -logLevel "Information"
+    Write-Log -logFile $LogFile -module $functionName -Message "Group ID: $($groupName.Id)" -logLevel "Information"
     # Validate that we have a group ID to work with
-    if (-not $groupIdValue)
+    if (-not $groupName.Id)
     {
         Write-Verbose "[$functionName] No group ID available, cannot proceed with assignment retrieval"
         Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -logLevel "Error"
         return $assignments
     }
     
-    if (-not $AccessToken)
-    {
-        Write-Verbose "[$functionName] No AccessToken provided; relying on default authentication in CallGraphAPI."
-        Write-Log -logFile $LogFile -module $functionName -Message "No AccessToken provided; relying on default authentication in CallGraphAPI." -logLevel "Warning"
-    }
-    
     # Initialize result object
     $assignments = [PSCustomObject]@{
-        GroupName                      = $groupName 
-        GroupId                        = $groupIdValue
+        GroupName                      = $groupName.displayName 
+        GroupId                        = $groupName.Id
         AppAssignments                 = @()
         ConfigurationAssignments       = @()
         ComplianceAssignments          = @()
@@ -101,6 +76,7 @@ function GetGroupDirectAssignments()
     # Helper function to process batch assignments
     function Invoke-BatchAssignments
     {
+        [CmdletBinding()]
         param(
             [array]$Resources,
             [string]$ResourceType,
