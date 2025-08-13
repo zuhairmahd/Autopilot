@@ -9,13 +9,20 @@ function ShowGroupAssignments()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Extract group name for logging and display
-    $groupName = if ($Group -and $Group.displayName) { 
+    $groupName = if ($Group -and $Group.displayName)
+    { 
         $Group.displayName 
-    } elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName')) {
+    }
+    elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName'))
+    {
         $Group['displayName']
-    } elseif ($Group -is [string]) { 
+    }
+    elseif ($Group -is [string])
+    { 
         $Group 
-    } else { 
+    }
+    else
+    { 
         "Unknown" 
     }
     
@@ -32,7 +39,7 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Access token is present."
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
-    Write-Host "Getting group assignments for '$groupName'..."
+    Write-Host "Getting group assignments for '$($groupName.displayName)'..."
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
     $assignments = GetGroupDirectAssignments -accessToken $accessToken -Group $Group -includeBeta

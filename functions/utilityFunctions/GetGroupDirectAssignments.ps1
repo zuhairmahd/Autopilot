@@ -16,21 +16,33 @@ function GetGroupDirectAssignments()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Extract group name and ID for logging and processing
-    $groupName = if ($Group -and $Group.displayName) { 
+    $groupName = if ($Group -and $Group.displayName)
+    { 
         $Group.displayName 
-    } elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName')) {
+    }
+    elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName'))
+    {
         $Group['displayName']
-    } elseif ($Group -is [string]) { 
+    }
+    elseif ($Group -is [string])
+    { 
         $Group 
-    } else { 
+    }
+    else
+    { 
         "Unknown" 
     }
     
-    $groupId = if ($Group -and $Group.id) { 
+    $groupId = if ($Group -and $Group.id)
+    { 
         $Group.id 
-    } elseif ($Group -is [hashtable] -and $Group.ContainsKey('id')) {
+    }
+    elseif ($Group -is [hashtable] -and $Group.ContainsKey('id'))
+    {
         $Group['id']
-    } else { 
+    }
+    else
+    { 
         $null 
     }
     
