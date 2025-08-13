@@ -10,6 +10,7 @@ function CallGraphAPI()
         [string]$APIVersion = 'beta',
         [string]$method = 'get',
         [string]$Filter = $null,
+        [string]$Search = $null,
         [string]$ExtraParameters = $null,
         [string]$body = $null,
         [switch]$consistencyLevel,
@@ -35,6 +36,8 @@ function CallGraphAPI()
     Write-Log -LogFile $logFile -Module $functionName -Message "Method: $method" -LogLevel "Information"
     Write-Verbose "[$functionName] Filter: $filter"
     Write-Log -LogFile $logFile -Module $functionName -Message "Filter: $filter" -LogLevel "Information"
+    Write-Verbose "[$functionName] Search: $Search"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Search: $Search" -LogLevel "Information"
     Write-Verbose "[$functionName] Extra Parameters: $ExtraParameters"
     Write-Log -LogFile $logFile -Module $functionName -Message "Extra Parameters: $ExtraParameters" -LogLevel "Information"
     Write-Verbose "[$functionName] Version: $APIVersion"
@@ -134,6 +137,35 @@ function CallGraphAPI()
         $encodedUri = $uri
     }
     
+    # Handle search parameter
+    if ($Search)
+    {
+        Write-Verbose "[$functionName] Processing search parameter: $Search"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Processing search parameter: $Search" -LogLevel "Information"
+        
+        # URL encode the search string
+        $encodedSearch = [uri]::EscapeUriString($Search)
+        Write-Verbose "[$functionName] Encoded search: $encodedSearch"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Encoded search: $encodedSearch" -LogLevel "Information"
+        
+        # Add search parameter to URI
+        if ($encodedUri.Contains("?"))
+        {
+            $encodedUri = "$encodedUri&`$search=$encodedSearch"
+        }
+        else
+        {
+            $encodedUri = "$encodedUri`?`$search=$encodedSearch"
+        }
+        Write-Verbose "[$functionName] Uri after applying search: $encodedUri"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Uri after applying search: $encodedUri" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No search parameter provided."
+        Write-Log -LogFile $logFile -Module $functionName -Message "No search parameter provided." -LogLevel "Information"
+    }
+    
     if ($extraParameters)
     {
         Write-Verbose "[$functionName] Extra parameters provided."
@@ -180,16 +212,16 @@ function CallGraphAPI()
         $queryString = $paramsList -join '&'
         Write-Verbose "[$functionName] Final query string: $queryString"
         Write-Log -LogFile $logFile -Module $functionName -Message "Final query string: $queryString" -LogLevel "Information"
-        if ($filter) 
+        if ($filter -or $Search) 
         {
-            Write-Verbose "[$functionName] Adding extra parameters to the uri along with the filter."
-            Write-Log -LogFile $logFile -Module $functionName -Message "Adding extra parameters to the uri along with the filter." -LogLevel "Information"
+            Write-Verbose "[$functionName] Adding extra parameters to the uri along with existing parameters."
+            Write-Log -LogFile $logFile -Module $functionName -Message "Adding extra parameters to the uri along with existing parameters." -LogLevel "Information"
             $encodedUri = "$encodedUri`&$queryString"
         }
         else
         {
-            Write-Verbose "[$functionName] No filter provided. Adding extra parameters to the uri."
-            Write-Log -LogFile $logFile -Module $functionName -Message "No filter provided. Adding extra parameters to the uri." -LogLevel "Information"
+            Write-Verbose "[$functionName] No filter or search provided. Adding extra parameters to the uri."
+            Write-Log -LogFile $logFile -Module $functionName -Message "No filter or search provided. Adding extra parameters to the uri." -LogLevel "Information"
             $encodedUri = "$encodedUri`?$queryString"
         }
     }

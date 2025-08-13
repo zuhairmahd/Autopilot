@@ -14,8 +14,36 @@ function GetGroupDirectAssignments()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting to get direct assignments for group: $GroupName"
-    Write-Log -logFile $LogFile -module $functionName -Message "Starting to get direct assignments for group: $GroupName" -logLevel "Information"
+    
+    # Extract group name and ID for logging and processing
+    $groupName = if ($Group -and $Group.displayName) { 
+        $Group.displayName 
+    } elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName')) {
+        $Group['displayName']
+    } elseif ($Group -is [string]) { 
+        $Group 
+    } else { 
+        "Unknown" 
+    }
+    
+    $groupId = if ($Group -and $Group.id) { 
+        $Group.id 
+    } elseif ($Group -is [hashtable] -and $Group.ContainsKey('id')) {
+        $Group['id']
+    } else { 
+        $null 
+    }
+    
+    Write-Verbose "[$functionName] Starting to get direct assignments for group: $groupName (ID: $groupId)"
+    Write-Log -logFile $LogFile -module $functionName -Message "Starting to get direct assignments for group: $groupName (ID: $groupId)" -logLevel "Information"
+    
+    # Validate that we have a group ID to work with
+    if (-not $groupId)
+    {
+        Write-Verbose "[$functionName] No group ID available, cannot proceed with assignment retrieval"
+        Write-Log -logFile $LogFile -module $functionName -Message "No group ID available, cannot proceed with assignment retrieval" -logLevel "Error"
+        return $assignments
+    }
     
     if (-not $AccessToken)
     {
@@ -25,8 +53,8 @@ function GetGroupDirectAssignments()
     
     # Initialize result object
     $assignments = [PSCustomObject]@{
-        GroupName                      = $group.displayName 
-        GroupId                        = $group.Id
+        GroupName                      = $groupName 
+        GroupId                        = $groupId
         AppAssignments                 = @()
         ConfigurationAssignments       = @()
         ComplianceAssignments          = @()
@@ -338,20 +366,20 @@ function GetGroupDirectAssignments()
         Write-Log -logFile $LogFile -module $functionName -Message "Retrieved resource counts via batch - Apps: $($mobileApps.Count), Configs: $($deviceConfigs.Count), Compliance: $($compliancePolicies.Count), Autopilot: $($autopilotProfiles.Count), Scripts: $($deviceScripts.Count), HealthScripts: $($healthScripts.Count), AppProtection: $($appProtectionPolicies.Count), Intents: $($intents.Count), ResourceAccess: $($resourceAccessProfiles.Count), ConfigPolicies: $($configurationPolicies.Count), GroupPolicy: $($groupPolicyConfigs.Count)" -logLevel "Information"
         
         # Process assignments using batch API for each resource type
-        Process-BatchAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
-        Process-BatchAssignments -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
-        Process-BatchAssignments -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
-        Process-BatchAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -AssignmentCategory "Script"
-        Process-BatchAssignments -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -AssignmentCategory "AppProtection"
-        Process-BatchAssignments -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -AssignmentCategory "Intent"
-        Process-BatchAssignments -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -AssignmentCategory "ResourceAccess"
+        Invoke-BatchAssignments -Resources $mobileApps -ResourceType "Mobile Apps" -BaseUri "deviceAppManagement/mobileApps" -AssignmentCategory "Application"
+        Invoke-BatchAssignments -Resources $deviceConfigs -ResourceType "Device Configurations" -BaseUri "deviceManagement/deviceConfigurations" -AssignmentCategory "Configuration"
+        Invoke-BatchAssignments -Resources $compliancePolicies -ResourceType "Compliance Policies" -BaseUri "deviceManagement/deviceCompliancePolicies" -AssignmentCategory "Compliance"
+        Invoke-BatchAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts" -BaseUri "deviceManagement/deviceManagementScripts" -AssignmentCategory "Script"
+        Invoke-BatchAssignments -Resources $appProtectionPolicies -ResourceType "App Protection Policies" -BaseUri "deviceAppManagement/managedAppPolicies" -AssignmentCategory "AppProtection"
+        Invoke-BatchAssignments -Resources $intents -ResourceType "Device Management Intents" -BaseUri "deviceManagement/intents" -AssignmentCategory "Intent"
+        Invoke-BatchAssignments -Resources $resourceAccessProfiles -ResourceType "Resource Access Profiles" -BaseUri "deviceManagement/resourceAccessProfiles" -AssignmentCategory "ResourceAccess"
         
         if ($IncludeBeta.IsPresent)
         {
-            Process-BatchAssignments -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
-            Process-BatchAssignments -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -AssignmentCategory "HealthScript"
-            Process-BatchAssignments -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -AssignmentCategory "ConfigurationPolicy"
-            Process-BatchAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
+            Invoke-BatchAssignments -Resources $autopilotProfiles -ResourceType "Autopilot Profiles" -BaseUri "deviceManagement/windowsAutopilotDeploymentProfiles" -AssignmentCategory "AutopilotProfile"
+            Invoke-BatchAssignments -Resources $healthScripts -ResourceType "Device Health Scripts" -BaseUri "deviceManagement/deviceHealthScripts" -AssignmentCategory "HealthScript"
+            Invoke-BatchAssignments -Resources $configurationPolicies -ResourceType "Configuration Policies" -BaseUri "deviceManagement/configurationPolicies" -AssignmentCategory "ConfigurationPolicy"
+            Invoke-BatchAssignments -Resources $groupPolicyConfigs -ResourceType "Group Policy Configurations" -BaseUri "deviceManagement/groupPolicyConfigurations" -AssignmentCategory "GroupPolicy"
         }
         
         Write-Verbose "[$functionName] Batch processing complete. Found assignments - Apps: $($assignments.AppAssignments.Count), Configs: $($assignments.ConfigurationAssignments.Count), Compliance: $($assignments.ComplianceAssignments.Count), Autopilot: $($assignments.AutopilotAssignments.Count), Scripts: $($assignments.ScriptAssignments.Count), HealthScripts: $($assignments.HealthScriptAssignments.Count), AppProtection: $($assignments.AppProtectionAssignments.Count), Intents: $($assignments.IntentAssignments.Count), ResourceAccess: $($assignments.ResourceAccessAssignments.Count), ConfigPolicies: $($assignments.ConfigurationPolicyAssignments.Count), GroupPolicy: $($assignments.GroupPolicyAssignments.Count)"
@@ -365,11 +393,11 @@ function GetGroupDirectAssignments()
     
     # Summary
     $totalAssignments = $assignments.AllAssignments.Count
-    Write-Verbose "[$functionName] Total assignments found for group '$GroupName': $totalAssignments"
-    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$GroupName': $totalAssignments" -logLevel "Information"
+    Write-Verbose "[$functionName] Total assignments found for group '$groupName': $totalAssignments"
+    Write-Log -logFile $LogFile -module $functionName -Message "Total assignments found for group '$groupName': $totalAssignments" -logLevel "Information"
     if ($ShowSummary)
     {
-        Write-Host "Group Direct Assignments Summary for '$GroupName':" -ForegroundColor Green
+        Write-Host "Group Direct Assignments Summary for '$groupName':" -ForegroundColor Green
         Write-Host "  Apps: $($assignments.AppAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Configurations: $($assignments.ConfigurationAssignments.Count)" -ForegroundColor Yellow
         Write-Host "  Compliance Policies: $($assignments.ComplianceAssignments.Count)" -ForegroundColor Yellow

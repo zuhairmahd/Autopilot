@@ -7,8 +7,20 @@ function ShowGroupAssignments()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Retrieving group assignments for '$GroupName'..."
-    Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving group assignments for '$GroupName'..."
+    
+    # Extract group name for logging and display
+    $groupName = if ($Group -and $Group.displayName) { 
+        $Group.displayName 
+    } elseif ($Group -is [hashtable] -and $Group.ContainsKey('displayName')) {
+        $Group['displayName']
+    } elseif ($Group -is [string]) { 
+        $Group 
+    } else { 
+        "Unknown" 
+    }
+    
+    Write-Verbose "[$functionName] Retrieving group assignments for '$groupName'..."
+    Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving group assignments for '$groupName'..." -logLevel "Information"
     if (-not $accessToken)
     {
         Write-Error "Access token is required."
@@ -20,18 +32,18 @@ function ShowGroupAssignments()
         Write-Verbose "[$functionName] Access token is present."
         Write-Log -logFile $LogFile -Module $functionName -Message "Access token is present."
     }
-    Write-Host "Getting group assignments for '$GroupName'..."
+    Write-Host "Getting group assignments for '$groupName'..."
     Write-Host "This may take a while..."
     # Get group assignments (fetch once and reuse)
     $assignments = GetGroupDirectAssignments -accessToken $accessToken -Group $Group -includeBeta
     if ($assignments -eq 'noGroup')
     {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$GroupName'." -logLevel "Warning"
+        Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -logLevel "Warning"
         return $returnValues.noGroupFoundMessage
     }   
     if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
     {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$GroupName'." -logLevel "Warning"
+        Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -logLevel "Warning"
         return $returnValues.noGroupAssignmentsFoundMessage
     }
     # Cache all assignments to avoid re-query per selection
@@ -39,7 +51,7 @@ function ShowGroupAssignments()
 
     # Create Assignments menu (build once and reuse)
     #region Group Assignments
-    $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $GroupName" -Description "What type of assignments would you like to see?"
+    $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $groupName" -Description "What type of assignments would you like to see?"
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Application Assignments" -Action {
         Write-Host "Selected Assignment Type: Application"
         return 'Application'
@@ -159,7 +171,7 @@ function ShowGroupAssignments()
         }
         #export the assignments to a csv file.
         $dateString = (Get-Date -Format "yyyyMMdd")
-        $safeGroupName = $GroupName -replace '[\\/:*?"<>|]', '_'
+        $safeGroupName = $groupName -replace '[\\/:*?"<>|]', '_'
         $csvPath = "$pwd\${safeGroupName}-$dateString.csv"
         $selectedAssignments | Export-Csv -Path $csvPath -NoTypeInformation
         Write-Host "Exported assignments to $csvPath"
