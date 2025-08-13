@@ -786,10 +786,12 @@ if ($accessToken)
     Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Information"
     
-    try {
+    try
+    {
         # Get the current requested scopes for delegated authentication
         $currentRequestedScopes = @()
-        if ($auth.Delegated -eq $true) {
+        if ($auth.Delegated -eq $true)
+        {
             $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
             Write-Verbose "[$scriptName] Delegated authentication - using required scopes as requested scopes"
         }
@@ -797,40 +799,53 @@ if ($accessToken)
         # Perform scope validation
         $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
         
-        if ($scopeValidation.HasAllRequiredScopes) {
+        if ($scopeValidation.HasAllRequiredScopes)
+        {
             Write-Verbose "[$scriptName] ✓ All required Microsoft Graph scopes are available"
             Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
-        } else {
+        }
+        else
+        {
             Write-Host ""
-            Write-Host "⚠ Microsoft Graph Scope Validation Results:" -ForegroundColor Yellow
+            Write-Host "Microsoft Graph Scope Validation Results:" -ForegroundColor Yellow
             Write-Host "Some required permissions are missing. This may limit functionality." -ForegroundColor Yellow
             
             # Show missing scopes in verbose mode or if user wants details
-            if ($VerbosePreference -eq 'Continue' -or $scopeValidation.MissingScopes.Count -le 5) {
+            if ($VerbosePreference -eq 'Continue' -or $scopeValidation.MissingScopes.Count -le 5)
+            {
                 Write-Host "`nMissing permissions:" -ForegroundColor Cyan
-                foreach ($missingScope in $scopeValidation.MissingScopes) {
-                    Write-Host "  • $($missingScope.Scope)" -ForegroundColor White
+                foreach ($missingScope in $scopeValidation.MissingScopes)
+                {
+                    Write-Host "  - $($missingScope.Scope)" -ForegroundColor White
                     Write-Host "    Impact: $($missingScope.Reason)" -ForegroundColor Gray
                 }
-            } else {
+            }
+            else
+            {
                 Write-Host "`nMissing $($scopeValidation.MissingScopes.Count) permissions. Use -Verbose to see details." -ForegroundColor Gray
             }
             
             Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
             
             # For delegated authentication, offer to request additional scopes
-            if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)) {
+            if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken))
+            {
                 Write-Host ""
                 $scopeRequest = Request-AdditionalScopes -MissingScopes $scopeValidation.MissingScopes -AuthConfiguration $auth -CurrentScopes $currentRequestedScopes -AuthParams $getTokenParams
                 
-                if ($scopeRequest.Success) {
-                    Write-Host "✓ Successfully obtained additional permissions!" -ForegroundColor Green
+                if ($scopeRequest.Success)
+                {
+                    Write-Host "Successfully obtained additional permissions!" -ForegroundColor Green
                     $accessToken = $scopeRequest.NewAccessToken
                     Write-Log -LogFile $LogFile -Module $scriptName -Message "Successfully updated access token with additional scopes" -LogLevel "Information"
-                } elseif ($scopeRequest.UserCancelled) {
+                }
+                elseif ($scopeRequest.UserCancelled)
+                {
                     Write-Host "Continuing with current permissions. Some features may be unavailable." -ForegroundColor Yellow
                     Write-Log -LogFile $LogFile -Module $scriptName -Message "User cancelled additional scope request" -LogLevel "Information"
-                } else {
+                }
+                else
+                {
                     Write-Host "Could not obtain additional permissions: $($scopeRequest.ErrorMessage)" -ForegroundColor Red
                     Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to obtain additional scopes: $($scopeRequest.ErrorMessage)" -LogLevel "Warning"
                 }
@@ -840,10 +855,11 @@ if ($accessToken)
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation completed with $($scopeValidation.MissingScopes.Count) missing scopes" -LogLevel "Warning"
         }
     }
-    catch {
+    catch
+    {
         Write-Warning "[$scriptName] Scope validation failed: $($_.Exception.Message)"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation failed: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Host "⚠ Could not validate Microsoft Graph API permissions. Continuing..." -ForegroundColor Yellow
+        Write-Host "Could not validate Microsoft Graph API permissions. Continuing..." -ForegroundColor Yellow
     }
     
     if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)

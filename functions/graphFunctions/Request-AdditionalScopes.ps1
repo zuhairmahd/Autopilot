@@ -1,68 +1,57 @@
-function Request-AdditionalScopes
+function Request-AdditionalScopes()
 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
         [array]$MissingScopes = @(),
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$AuthConfiguration,
-        
         [Parameter(Mandatory = $false)]
         [array]$CurrentScopes = @(),
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$AuthParams
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting additional scope request process"
-    
-    # Ensure LogFile variable exists for Write-Log calls
-    if (-not (Get-Variable -Name LogFile -Scope Global -ErrorAction SilentlyContinue)) {
-        $global:LogFile = "$env:TEMP\autopilot-scope-validation.log"
-    }
-    
-    # Try to use Write-Log if available, otherwise use Write-Verbose
-    try {
-        if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional scope request for $($MissingScopes.Count) missing scopes" -LogLevel "Information"
-        } else {
-            Write-Verbose "[$functionName] Starting additional scope request for $($MissingScopes.Count) missing scopes (Write-Log not available)"
-        }
-    } catch {
-        Write-Verbose "[$functionName] Starting additional scope request for $($MissingScopes.Count) missing scopes (Write-Log failed: $($_.Exception.Message))"
-    }
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional scope request for $($MissingScopes.Count) missing scopes" -LogLevel "Information"
+    Write-Verbose "[$functionName] Starting additional scope request for $($MissingScopes.Count) missing scopes (Write-Log not available)"
     
     $result = @{
-        Success = $false
+        Success        = $false
         NewAccessToken = $null
-        ErrorMessage = ""
-        UserCancelled = $false
+        ErrorMessage   = ""
+        UserCancelled  = $false
     }
     
     # Handle empty missing scopes - nothing to request
-    if ($MissingScopes.Count -eq 0) {
+    if ($MissingScopes.Count -eq 0)
+    {
         Write-Verbose "[$functionName] No missing scopes - nothing to request"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No missing scopes - nothing to request" -LogLevel "Information"
         $result.Success = $true
         $result.ErrorMessage = "No additional scopes needed."
         return $result
     }
     
-    try {
+    try
+    {
         # Check if this is delegated authentication
         $isDelegated = $AuthConfiguration.Delegated -eq $true
         
-        if (-not $isDelegated) {
+        if (-not $isDelegated)
+        {
             # For application authentication, we cannot request additional scopes at runtime
             Write-Host "`nApplication authentication is being used." -ForegroundColor Yellow
             Write-Host "Missing application permissions cannot be requested at runtime." -ForegroundColor Yellow
             Write-Host "`nThe following application permissions need to be added by an administrator:" -ForegroundColor Cyan
-            
-            foreach ($scope in $MissingScopes) {
-                Write-Host "  • $($scope.Scope)" -ForegroundColor White
+            write-log -logFile $LogFile -module $functionName -message "The following application permissions need to be added by an administrator:" -loglevel "Warning"
+            foreach ($scope in $MissingScopes)
+            {
+                Write-Host "  - $($scope.Scope)" -ForegroundColor White
                 Write-Host "    Reason: $($scope.Reason)" -ForegroundColor Gray
-                if ($scope.Endpoints -and $scope.Endpoints.Count -gt 0) {
+                if ($scope.Endpoints -and $scope.Endpoints.Count -gt 0)
+                {
                     Write-Host "    Affects endpoints: $($scope.Endpoints -join ', ')" -ForegroundColor Gray
                 }
                 Write-Host ""
@@ -79,13 +68,8 @@ function Request-AdditionalScopes
             Write-Host ""
             
             $result.ErrorMessage = "Application permissions require administrator consent and cannot be requested at runtime."
-            try {
-                if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Application authentication detected. Cannot request additional scopes at runtime." -LogLevel "Warning"
-                }
-            } catch {
-                # Ignore logging errors in tests
-            }
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Application authentication detected. Cannot request additional scopes at runtime." -LogLevel "Warning"
+            Write-Verbose "[$functionName] Application authentication detected. Cannot request additional scopes at runtime."
             return $result
         }
         
@@ -94,10 +78,12 @@ function Request-AdditionalScopes
         Write-Host "Additional scopes can be requested by re-authenticating." -ForegroundColor Green
         Write-Host "`nThe following delegated permissions are missing:" -ForegroundColor Cyan
         
-        foreach ($scope in $MissingScopes) {
-            Write-Host "  • $($scope.Scope)" -ForegroundColor White
+        foreach ($scope in $MissingScopes)
+        {
+            Write-Host "  - $($scope.Scope)" -ForegroundColor White
             Write-Host "    Reason: $($scope.Reason)" -ForegroundColor Gray
-            if ($scope.Endpoints -and $scope.Endpoints.Count -gt 0) {
+            if ($scope.Endpoints -and $scope.Endpoints.Count -gt 0)
+            {
                 Write-Host "    Affects endpoints: $($scope.Endpoints -join ', ')" -ForegroundColor Gray
             }
             Write-Host ""
@@ -109,22 +95,19 @@ function Request-AdditionalScopes
         Write-Host ""
         $userChoice = Read-Host "Enter 'Yes' to re-authenticate with additional scopes, or 'No' to continue with limited functionality"
         
-        while ($userChoice -notin @('Yes', 'No', 'Y', 'N')) {
+        while ($userChoice -notin @('Yes', 'No', 'Y', 'N'))
+        {
             Write-Host "Invalid choice. Please enter 'Yes' or 'No'." -ForegroundColor Red
             [console]::beep(1000, 500)
             $userChoice = Read-Host "Enter 'Yes' to re-authenticate, or 'No' to continue with limited functionality"
         }
         
-        if ($userChoice -in @('No', 'N')) {
+        if ($userChoice -in @('No', 'N'))
+        {
             Write-Host "Continuing with current permissions. Some functionality may be limited." -ForegroundColor Yellow
             $result.UserCancelled = $true
-            try {
-                if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "User chose not to re-authenticate for additional scopes" -LogLevel "Information"
-                }
-            } catch {
-                # Ignore logging errors in tests
-            }
+            Write-Log -LogFile $LogFile -Module $functionName -Message "User chose not to re-authenticate for additional scopes" -LogLevel "Information"
+            Write-Verbose "[$functionName] User chose not to re-authenticate for additional scopes"
             return $result
         }
         
@@ -141,14 +124,7 @@ function Request-AdditionalScopes
         $finalScopesString = $finalScopes -join ' '
         
         Write-Verbose "[$functionName] New scope list: $finalScopesString"
-        try {
-            if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Re-authenticating with scopes: $finalScopesString" -LogLevel "Information"
-            }
-        } catch {
-            # Ignore logging errors in tests
-        }
-        
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Re-authenticating with scopes: $finalScopesString" -LogLevel "Information"
         # Create new auth parameters with additional scopes
         $newAuthParams = $AuthParams.Clone()
         $newAuthParams.Scope = $finalScopes
@@ -159,41 +135,27 @@ function Request-AdditionalScopes
         # Request new token with additional scopes
         $newAccessToken = GetGraphAccessToken @newAuthParams
         
-        if ($newAccessToken) {
+        if ($newAccessToken)
+        {
             Write-Host "✓ Successfully re-authenticated with additional scopes!" -ForegroundColor Green
             $result.Success = $true
             $result.NewAccessToken = $newAccessToken
-            try {
-                if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully obtained new access token with additional scopes" -LogLevel "Information"
-                }
-            } catch {
-                # Ignore logging errors in tests
-            }
-        } else {
-            Write-Host "✗ Failed to obtain new access token with additional scopes." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully obtained new access token with additional scopes" -LogLevel "Information"
+            Write-Verbose "[$functionName] Successfully obtained new access token with additional scopes"
+        }
+        else
+        {
+            Write-Host "Failed to obtain new access token with additional scopes." -ForegroundColor Red
             $result.ErrorMessage = "Failed to obtain new access token during re-authentication."
-            try {
-                if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to obtain new access token with additional scopes" -LogLevel "Error"
-                }
-            } catch {
-                # Ignore logging errors in tests
-            }
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to obtain new access token with additional scopes" -LogLevel "Error"
         }
         
         return $result
     }
-    catch {
+    catch
+    {
         Write-Error "[$functionName] Error during additional scope request: $($_.Exception.Message)"
-        try {
-            if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Error during additional scope request: $($_.Exception.Message)" -LogLevel "Error"
-            }
-        } catch {
-            # Ignore logging errors in tests
-        }
-        
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error during additional scope request: $($_.Exception.Message)" -LogLevel "Error"
         $result.Success = $false
         $result.ErrorMessage = "Error during additional scope request: $($_.Exception.Message)"
         return $result
