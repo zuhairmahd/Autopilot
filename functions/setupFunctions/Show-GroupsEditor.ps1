@@ -437,9 +437,54 @@ function Get-GroupArrayInput()
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting group array input for $GroupType groups" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Getting group array input for $GroupType groups"
     
+    # Determine if we should ask about replace vs add
+    $shouldReplaceExisting = $true
+    if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
+    {
+        Write-Host "`nYou have existing groups in this list." -ForegroundColor Yellow
+        Write-Host "Do you want to:" -ForegroundColor White
+        Write-Host "  1. Replace all existing groups with new ones" -ForegroundColor White
+        Write-Host "  2. Add new groups to the existing ones" -ForegroundColor White
+        Write-Host "  3. Keep current groups unchanged" -ForegroundColor White
+        
+        do
+        {
+            $choice = Read-Host "Enter your choice (1-3)"
+            switch ($choice)
+            {
+                '1' {
+                    $shouldReplaceExisting = $true
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing $GroupType groups" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User chose to replace existing $GroupType groups"
+                    break
+                }
+                '2' {
+                    $shouldReplaceExisting = $false
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing $GroupType groups" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User chose to add to existing $GroupType groups"
+                    break
+                }
+                '3' {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current $GroupType groups unchanged" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User chose to keep current $GroupType groups unchanged"
+                    return $CurrentGroups
+                }
+                default {
+                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                    continue
+                }
+            }
+            break
+        } while ($true)
+    }
+    
     Write-Host "`nEnter group names to $GroupType (one per line)." -ForegroundColor Yellow
     Write-Host "Press Enter on empty line to finish." -ForegroundColor Gray
-    Write-Host "Leave first line empty to keep current values." -ForegroundColor Gray
+    if (-not $shouldReplaceExisting)
+    {
+        Write-Host "New groups will be added to the existing ones." -ForegroundColor Green
+    }
+    Write-Host "Leave first line empty to cancel." -ForegroundColor Gray
     
     $newGroups = @()
     $firstInput = $true
@@ -454,8 +499,8 @@ function Get-GroupArrayInput()
             # If first input is empty, return current groups
             if ([string]::IsNullOrWhiteSpace($input))
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current $GroupType groups" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] User chose to keep current $GroupType groups"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current $GroupType groups" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] User cancelled input, keeping current $GroupType groups"
                 return $CurrentGroups
             }
             
@@ -476,16 +521,24 @@ function Get-GroupArrayInput()
         }
     } while ($true)
     
-    # Ensure single values are still treated as arrays
-    if ($newGroups.Count -eq 1)
+    # Determine final result based on user choice
+    if ($shouldReplaceExisting -or -not $CurrentGroups -or $CurrentGroups.Count -eq 0)
     {
-        $result = @($newGroups[0])
-        Write-Log -LogFile $logFile -Module $functionName -Message "Single group converted to array to maintain type consistency" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Single group converted to array to maintain type consistency"
+        # Replace existing groups or no existing groups
+        $result = $newGroups
     }
     else
     {
-        $result = $newGroups
+        # Add to existing groups
+        $result = @($CurrentGroups) + @($newGroups)
+    }
+    
+    # Ensure single values are still treated as arrays
+    if ($result.Count -eq 1)
+    {
+        $result = @($result[0])
+        Write-Log -LogFile $logFile -Module $functionName -Message "Single group converted to array to maintain type consistency" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Single group converted to array to maintain type consistency"
     }
     
     Write-Log -LogFile $logFile -Module $functionName -Message "Returning $GroupType group array with $($result.Count) groups" -LogLevel "Information"
