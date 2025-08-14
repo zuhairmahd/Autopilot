@@ -96,54 +96,23 @@
             "Reason": "Standard scope to get basic user profile information during sign-in."
         },
         {
-            "scope": "DeviceManagementConfiguration.ReadWrite.All",
-            "endpoints": [
+            "Scope": "DeviceManagementConfiguration.ReadWrite.All",
+            "Endpoints": [
                 "deviceManagement/deviceConfigurations"
             ],
-            "reason": "Required to create, update, and delete Intune device configuration policies."
+            "Reason": "Required to create, update, and delete Intune device configuration policies."
         },
         {
-            "scope": "DeviceManagementApps.Read.All",
-            "endpoints": [
-                "deviceAppManagement/mobileApps"
-            ],
-            "reason": "Required to read application information in Intune."
-        },
-        {
-            "scope": "DeviceManagementManagedDevices.ReadWrite.All",
-            "endpoints": [
+            "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
+            "Endpoints": [
                 "deviceManagement/managedDevices"
             ],
-            "reason": "Required to create, update, and delete Intune managed device properties."
+            "Reason": "Required to create, update, and delete Intune managed device properties."
         },
         {
-            "scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-            "endpoints": [
-                "deviceManagement/managedDevices"
-            ],
-            "reason": "Required for privileged operations on managed devices, such as reading LAPS passwords."
-        },
-        {
-            "scope": "BitlockerKey.Read.All",
-            "endpoints": [
-                "informationProtection/bitlocker/recoveryKeys"
-            ],
-            "reason": "Required to read BitLocker recovery keys for all devices."
-        },
-        {
-            "scope": "openid",
-            "endpoints": [],
-            "reason": "Standard scope required for user sign-in with OpenID Connect."
-        },
-        {
-            "scope": "profile",
-            "endpoints": [],
-            "reason": "Standard scope to get basic user profile information during sign-in."
-        },
-        {
-            "scope": "offline_access",
-            "endpoints": [],
-            "reason": "Standard scope that provides refresh tokens to maintain access when the user is not active."
+            "Scope": "offline_access",
+            "Endpoints": [],
+            "Reason": "Standard scope that provides refresh tokens to maintain access when the user is not active."
         }
     ],
     "globalSettings": {
