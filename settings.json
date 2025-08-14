@@ -1,233 +1,173 @@
 {
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
-    "version": "1.1",
+    "version": "1.0.0.0",
     "auth": {
+        "cacheType": "Memory",
         "changePwOnNextStart": false,
-        "authType": "PublicAuthFlow",
-        "NoSaveRefreshToken": false,
-        "ForceNewToken": false,
+        "noSaveRefreshToken": false,
+        "forceNewToken": false,
         "renewalLeadTime": 5,
         "scope": [
             "offline_access",
             "openid",
-            "Device.ReadWrite.All"
+            "Device.ReadWrite.All",
+            "DeviceManagementApps.Read.All",
+            "DeviceManagementConfiguration.ReadWrite.All",
+            "DeviceManagementManagedDevices.PrivilegedOperations.All",
+            "DeviceManagementManagedDevices.ReadWrite.All",
+            "DeviceManagementServiceConfig.ReadWrite.All"
         ],
-        "CacheType": "Memory",
-        "SecureString": false,
-        "Delegated": true
+        "authType": "PublicAuthFlow",
+        "secureString": false,
+        "delegated": true
     },
     "requiredScopes": [
         {
             "Scope": "User.Read.All",
-            "Reason": "Required to read user profiles, group memberships, and registered devices.",
             "Endpoints": [
                 "/users",
                 "users/{id}",
                 "users/{id}/memberOf",
                 "users/{id}/registeredDevices"
-            ]
+            ],
+            "Reason": "Required to read user profiles, group memberships, and registered devices."
         },
         {
             "Scope": "Device.Read.All",
-            "Reason": "Required to read Microsoft Entra ID device objects.",
             "Endpoints": [
                 "devices"
-            ]
+            ],
+            "Reason": "Required to read Microsoft Entra ID device objects."
         },
         {
             "Scope": "DeviceManagementApps.ReadWrite.All",
-            "Reason": "Required to read application information and manage app assignments.",
             "Endpoints": [
                 "deviceAppManagement/mobileApps",
                 "deviceAppManagement/mobileApps/{id}/assignments"
-            ]
+            ],
+            "Reason": "Required to read application information and manage app assignments."
         },
         {
             "Scope": "DeviceManagementConfiguration.Read.All",
-            "Reason": "Required to read Intune device configuration policies.",
             "Endpoints": [
                 "deviceManagement/deviceConfigurations"
-            ]
+            ],
+            "Reason": "Required to read Intune device configuration policies."
         },
         {
             "Scope": "DeviceManagementManagedDevices.Read.All",
-            "Reason": "Required to read Intune managed device properties.",
             "Endpoints": [
                 "/deviceManagement/managedDevices",
                 "deviceManagement/managedDevices/{id}"
-            ]
-        },
-        {
-            "Scope": "BitlockerKey.Read.All",
-            "Reason": "Required to read BitLocker recovery keys for all devices.",
-            "Endpoints": [
-                "informationProtection/bitlocker/recoveryKeys"
-            ]
+            ],
+            "Reason": "Required to read Intune managed device properties."
         },
         {
             "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-            "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
             "Endpoints": [
                 "directory/deviceLocalCredentials"
-            ]
+            ],
+            "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords."
         },
         {
             "Scope": "DeviceManagementServiceConfig.ReadWrite.All",
-            "Reason": "Required to read Autopilot events and to read and manage Autopilot device identities.",
             "Endpoints": [
                 "deviceManagement/autopilotEvents",
                 "deviceManagement/importedWindowsAutopilotDeviceIdentities",
                 "deviceManagement/windowsAutopilotDeviceIdentities"
-            ]
-        },
-        {
-            "Scope": "openid",
-            "Reason": "Standard scope required for user sign-in with OpenID Connect.",
-            "Endpoints": []
-        },
-        {
-            "Scope": "profile",
-            "Reason": "Standard scope to get basic user profile information during sign-in.",
-            "Endpoints": []
-        },
-        {
-            "Scope": "offline_access",
-            "Reason": "Standard scope that provides refresh tokens to maintain access when the user is not active.",
-            "Endpoints": []
-        },
-        {
-            "Scope": "DeviceManagementConfiguration.ReadWrite.All",
-            "Reason": "Required to create, update, and delete Intune device configuration policies.",
-            "Endpoints": [
-                "deviceManagement/deviceConfigurations"
-            ]
-        },
-        {
-            "Scope": "DeviceManagementApps.Read.All",
-            "Reason": "Required to read application information in Intune.",
-            "Endpoints": [
-                "deviceAppManagement/mobileApps"
-            ]
-        },
-        {
-            "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
-            "Reason": "Required to create, update, and delete Intune managed device properties.",
-            "Endpoints": [
-                "deviceManagement/managedDevices"
-            ]
-        },
-        {
-            "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
-            "Reason": "Required for privileged operations on managed devices, such as reading LAPS passwords.",
-            "Endpoints": [
-                "deviceManagement/managedDevices"
-            ]
+            ],
+            "Reason": "Required to read Autopilot events and to read and manage Autopilot device identities."
         },
         {
             "Scope": "BitlockerKey.Read.All",
-            "Reason": "Required to read BitLocker recovery keys for all devices.",
             "Endpoints": [
                 "informationProtection/bitlocker/recoveryKeys"
-            ]
+            ],
+            "Reason": "Required to read BitLocker recovery keys for all devices."
+        },
+        {
+            "Scope": "openid",
+            "Endpoints": [],
+            "Reason": "Standard scope required for user sign-in with OpenID Connect."
+        },
+        {
+            "Scope": "profile",
+            "Endpoints": [],
+            "Reason": "Standard scope to get basic user profile information during sign-in."
+        },
+        {
+            "Scope": "DeviceManagementConfiguration.ReadWrite.All",
+            "Endpoints": [
+                "deviceManagement/deviceConfigurations"
+            ],
+            "Reason": "Required to create, update, and delete Intune device configuration policies."
+        },
+        {
+            "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
+            "Endpoints": [
+                "deviceManagement/managedDevices"
+            ],
+            "Reason": "Required to create, update, and delete Intune managed device properties."
+        },
+        {
+            "Scope": "offline_access",
+            "Endpoints": [],
+            "Reason": "Standard scope that provides refresh tokens to maintain access when the user is not active."
         }
     ],
     "globalSettings": {
         "operatingSystem": "Windows",
-        "Release": "master",
-        "Repo": "Github",
-        "timeInSeconds": "60",
-        "maxUserMatchDisplay": 24,
-        "maxGroupMatchDisplay": 24,
-        "maxWaitTime": "30",
+        "release": "master",
+        "repo": "Github",
+        "timeInSeconds": 60,
+        "maxUserMatchDisplay": 10,
+        "maxWaitTime": 30,
         "autoUpdate": true,
         "appMode": "full",
+        "maxGroupMatchDisplay": 10,
         "testMode": false,
         "configFile": ".\\.secrets\\config.json",
-        "showLicenseBanner": false,
-        "deviceContactThresholdInDays": 30,
-        "groupPatternsToExclude": []
+        "showLicenseBanner": true,
+        "deviceContactThresholdInDays": 30
     },
     "domains": {
-        "arabictutor.com": {
-            "groupsToExclude": [
-                "admin"
-            ],
-            "groupsToInclude": [],
-            "settings": {
-                "operatingSystem": "Windows",
-                "repo": "Github",
-                "MinUsernameLength": 3,
-                "timeInSeconds": "60",
-                "DesiredAutopilotProfiles": [
-                    "windowsCloudConfig Autopilot profile",
-                    "Hybrid join profile"
-                ],
-                "MaxSerialNumberLength": 100,
-                "deviceContactThresholdInDays": 30,
-                "GroupTag": "ENTRA",
-                "maxWaitTime": "30",
-                "showLicenseBanner": true,
-                "autoUpdate": true,
-                "MinimumDevicePhysicalMemoryInGB": 8,
-                "MaxUserNameLength": 50,
-                "domain": "arabictutor.com",
-                "preferredBrowser": "Chrome",
-                "appMode": "full",
-                "deviceNamePrefix": "vmware",
-                "privateSession": false,
-                "maxNumberOfDevicesAllowed": 15,
-                "userPatternsToExclude": [
-                    "-test",
-                    "onmicrosoft.com"
-                ],
-                "groupPatternsToExclude": [],
-                "release": "master",
-                "MinSerialNumberLength": 7,
-                "maxUserMatchDisplay": "10"
-            }
-        },
         "gao.gov": {
-            "groupsToExclude": [],
             "groupsToInclude": [
                 "sg_Office_365_License_G5_wth_windows_pilot",
                 "sg_passwrd_hash_stage",
                 "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
                 "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
             ],
+            "groupsToExclude": [],
             "settings": {
-                "operatingSystem": "Windows",
-                "maxNumberOfDevicesAllowed": 20,
-                "repo": "Github",
-                "timeInSeconds": "60",
-                "DesiredAutopilotProfiles": [
-                    "msb"
-                ],
-                "MaxSerialNumberLength": 10,
-                "deviceContactThresholdInDays": 30,
-                "maxUserMatchDisplay": 24,
-                "maxGroupMatchDisplay": 24,
-                "maxWaitTime": "30",
-                "showLicenseBanner": false,
-                "autoUpdate": false,
-                "MinimumDevicePhysicalMemoryInGB": 16,
-                "MaxUserNameLength": 25,
-                "domain": "gao.gov",
-                "preferredBrowser": "Chrome",
-                "appMode": "full",
-                "deviceNamePrefix": "w11-",
                 "privateSession": true,
-                "MinUsernameLength": 3,
+                "maxUserNameLength": 20,
+                "maxSerialNumberLength": 11,
+                "maxUserMatchDisplay": 20,
+                "maxNumberOfDevicesAllowed": 20,
+                "operatingSystem": "Windows",
+                "maxWaitTime": "30",
+                "preferredBrowser": "Chrome",
+                "minSerialNumberLength": 7,
+                "deviceContactThresholdInDays": 30,
+                "deviceNamePrefix": "w11-",
+                "release": "master",
+                "showLicenseBanner": false,
+                "appMode": "full",
                 "userPatternsToExclude": [
                     "-cma",
-                    "-test",
-                    "onmicrosoft.com",
-                    "-sup",
                     "-a"
                 ],
+                "desiredAutopilotProfiles": [
+                    "MSB01"
+                ],
+                "autoUpdate": false,
+                "timeInSeconds": "60",
+                "repo": "Github",
+                "minUsernameLength": 3,
+                "minimumDevicePhysicalMemoryInGB": 16,
                 "groupPatternsToExclude": [],
-                "release": "master",
-                "MinSerialNumberLength": 7,
-                "GroupTag": "MSB01"
+                "domain": "gao.gov"
             }
         }
     },
@@ -270,15 +210,6 @@
                     "name": "Lookup device by User",
                     "type": "action",
                     "includeInDisplayModes": []
-                },
-                {
-                    "description": "View group assignments for Intune policies and applications",
-                    "name": "Show Group Assignments",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk",
-                        "advanced"
-                    ]
                 }
             ],
             "type": "submenu",
@@ -291,14 +222,6 @@
             "description": "Import a device into Autopilot and perform related actions",
             "name": "Autopilot menu",
             "items": [
-                {
-                    "description": "Quick import a device into Autopilot with default settings",
-                    "name": "Quick Import device into Autopilot (requires admin rights)",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "registration"
-                    ]
-                },
                 {
                     "description": "Import a device into Autopilot",
                     "name": "Import device into Autopilot",
@@ -318,14 +241,6 @@
                 {
                     "description": "Import a Corporate Device Identifier for Device Preparation",
                     "name": "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "advancedRegistration"
-                    ]
-                },
-                {
-                    "description": "Delete a Corporate Device Identifier from Device Preparation",
-                    "name": "Delete Corporate Device Identifier from Device Preparation (requires admin rights)",
                     "type": "action",
                     "includeInDisplayModes": [
                         "advancedRegistration"
@@ -382,63 +297,19 @@
             "name": "Change application settings",
             "items": [
                 {
-                    "description": "Change the global and local environment settings for the application",
-                    "name": "Change environment settings",
-                    "type": "submenu",
-                    "items": [
-                        {
-                            "name": "View global environment settings",
-                            "description": "View the current global environment settings for the application",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        },
-                        {
-                            "name": "View domain specific environment settings",
-                            "description": "View the current domain specific environment settings for the application",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        },
-                        {
-                            "name": "View group inclusion/exclusion settings for all domains",
-                            "description": "View the current group inclusion and exclusion settings for domains",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        },
-                        {
-                            "name": "Change global environment settings",
-                            "description": "Change the global environment settings for the application",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        },
-                        {
-                            "name": "Change domain specific settings",
-                            "description": "Change the domain specific settings for the application",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        },
-                        {
-                            "name": "Change authentication settings",
-                            "description": "Change the authentication settings (such as authentication type) for the application",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        },
-                        {
-                            "name": "Change group inclusion/exclusion",
-                            "description": "Edit domain-level group inclusion and exclusion settings",
-                            "type": "action",
-                            "includeInDisplayModes": []
-                        }
-                    ],
-                    "includeInDisplayModes": []
-                },
-                {
-                    "description": "Change the password and Azure app information",
-                    "name": "Change Entra credentials",
+                    "description": "Change the application settings",
+                    "name": "Change application settings",
                     "type": "action",
                     "includeInDisplayModes": []
                 },
                 {
-                    "description": "Turn Auto Updates on or off",
+                    "description": "Change the password and authentication information",
+                    "name": "Change password and authentication information",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
+                    "description": "Change the Auto Update setting",
                     "name": "Change Auto Update setting",
                     "type": "action",
                     "includeInDisplayModes": []
@@ -456,6 +327,12 @@
                         "admin",
                         "custom"
                     ]
+                },
+                {
+                    "description": "Restore the application to its default settings",
+                    "name": "Restore defaults",
+                    "type": "action",
+                    "includeInDisplayModes": []
                 }
             ],
             "type": "submenu",
@@ -588,15 +465,6 @@
                     ]
                 },
                 {
-                    "description": "Get the BIOS password for the device if it exists",
-                    "name": "Get Hardware Password Details",
-                    "type": "action",
-                    "includeInDisplayModes": [
-                        "helpdesk",
-                        "registration"
-                    ]
-                },
-                {
                     "description": "Restart the selected device",
                     "name": "Restart Device",
                     "type": "action",
@@ -617,44 +485,6 @@
             ],
             "type": "submenu",
             "includeInDisplayModes": []
-        },
-        {
-            "name": "Group Assignments",
-            "description": "Choose the type of assignment you want to view",
-            "type": "submenu",
-            "includeInDisplayModes": [],
-            "items": [
-                {
-                    "description": "Show all applications directly assigned to the group",
-                    "name": "Show Application Assignments",
-                    "type": "action",
-                    "includeInDisplayModes": []
-                },
-                {
-                    "description": "View device configurations assigned to the group",
-                    "name": "Show Device Configurations",
-                    "type": "action",
-                    "includeInDisplayModes": []
-                },
-                {
-                    "name": "Show Device Compliance Policies",
-                    "description": "View device compliance policies assigned to the group",
-                    "type": "action",
-                    "includeInDisplayModes": []
-                },
-                {
-                    "name": "Show Autopilot Profiles",
-                    "description": "View Autopilot profiles assigned to the group",
-                    "type": "action",
-                    "includeInDisplayModes": []
-                },
-                {
-                    "name": "Export All Assignments",
-                    "description": "Export all assignments for the group",
-                    "type": "action",
-                    "includeInDisplayModes": []
-                }
-            ]
         }
     ]
 }

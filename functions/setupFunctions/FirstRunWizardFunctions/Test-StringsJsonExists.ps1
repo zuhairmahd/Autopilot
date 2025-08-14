@@ -22,7 +22,6 @@ function Test-StringsJsonExists()
     param(
         [Parameter(Mandatory = $true)]
         [string]$StringsFile,
-        
         [switch]$Silent
     )
     
@@ -34,7 +33,7 @@ function Test-StringsJsonExists()
         # Define comprehensive default strings structure  
         $defaultStrings = @{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
-            version       = $version
+            version       = $version.version.toString()
             returnValues  = @{
                 unknownErrorMessage            = "An unknown error occurred."
                 deviceActionPendingMessage     = "The device is pending an action. Turn on the device, make sure it is connected and perform a sync if needed."

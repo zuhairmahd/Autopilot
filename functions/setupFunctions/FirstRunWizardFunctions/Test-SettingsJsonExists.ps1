@@ -39,7 +39,7 @@ function Test-SettingsJsonExists()
         # Define comprehensive default settings structure with correct property order
         $defaultSettings = @{
             description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version        = $version
+            version        = $version.version.toString()
             auth           = @{
                 delegated           = $IsDelegated
                 authType            = "PublicAuthFlow"
@@ -229,7 +229,7 @@ function Test-SettingsJsonExists()
                             "-test",
                             "onmicrosoft.com"
                         )
-                        groupPatternsToExclude           = @()  
+                        groupPatternsToExclude          = @()  
                         desiredAutopilotProfiles        = @()
                     }
                 }
