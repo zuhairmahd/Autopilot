@@ -14,7 +14,6 @@ function Test-ScopeAvailability()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting scope availability validation"
-    Write-Verbose "[$functionName] Starting scope availability validation (Write-Log not available)"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting scope availability validation" -LogLevel "Information"
     # Initialize the result object
     $result = @{
