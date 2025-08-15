@@ -236,7 +236,7 @@
                         },
                         {
                             "description": "Lookup the device the application is running on",
-                            "name": "Use this device\u0027s serial number",
+                            "name": "Use this device's serial number",
                             "type": "action",
                             "includeInDisplayModes": []
                         }
