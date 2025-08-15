@@ -1097,6 +1097,7 @@ function Get-ArrayInput()
     # Ensure single values are still treated as arrays
     if ($result.Count -eq 1)
     {
+        # Force single element to remain as array 
         $result = @($result[0])
         Write-Log -LogFile $logFile -Module $functionName -Message "Single value converted to array to maintain type consistency" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Single value converted to array to maintain type consistency"

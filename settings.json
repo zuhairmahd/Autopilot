@@ -182,7 +182,9 @@
                 "repo": "Github",
                 "minUsernameLength": 3,
                 "timeInSeconds": "60",
-                "desiredAutopilotProfiles": "cloudconfig",
+                "desiredAutopilotProfiles": [
+                    "cloudconfig"
+                ],
                 "maxSerialNumberLength": 50,
                 "maxUserMatchDisplay": "10",
                 "maxWaitTime": "30",

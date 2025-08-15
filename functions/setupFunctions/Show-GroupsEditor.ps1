@@ -190,10 +190,6 @@ function Show-GroupsEditor()
             Write-Host "These settings control which groups are included or excluded from operations.`n" -ForegroundColor Gray
         }
         
-        $hasChanges = $false
-        $updatedIncludeGroups = $null
-        $updatedExcludeGroups = $null
-        
         # Create groups editing menu using the well-documented menu system
         if (-not $Silent)
         {
@@ -259,9 +255,27 @@ function Show-GroupsEditor()
                         $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include"
                         if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
                         {
-                            $hasChanges = $true
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to include changed" -LogLevel "Information"
                             Write-Verbose "[$functionName] Groups to include changed"
+                            
+                            # Save changes immediately
+                            Write-Host "`nSaving changes..." -ForegroundColor Yellow
+                            $includeSuccess = Update-DomainGroupSetting -SettingsFile $SettingsFile -DomainName $DomainName -GroupType "groupsToInclude" -Groups $updatedIncludeGroups
+                            if ($includeSuccess)
+                            {
+                                Write-Host "Group settings updated successfully!" -ForegroundColor Green
+                                Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
+                                Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                                [void][System.Console]::ReadKey($true)
+                                # Update current values for future operations
+                                $currentIncludeGroups = $updatedIncludeGroups
+                            }
+                            else
+                            {
+                                Write-Host "Failed to update group settings!" -ForegroundColor Red
+                                Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                                [void][System.Console]::ReadKey($true)
+                            }
                         }
                     }
                 }
@@ -289,9 +303,27 @@ function Show-GroupsEditor()
                         $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude"
                         if ($null -ne $updatedExcludeGroups -and (Compare-ArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups))
                         {
-                            $hasChanges = $true
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to exclude changed" -LogLevel "Information"
                             Write-Verbose "[$functionName] Groups to exclude changed"
+                            
+                            # Save changes immediately
+                            Write-Host "`nSaving changes..." -ForegroundColor Yellow
+                            $excludeSuccess = Update-DomainGroupSetting -SettingsFile $SettingsFile -DomainName $DomainName -GroupType "groupsToExclude" -Groups $updatedExcludeGroups
+                            if ($excludeSuccess)
+                            {
+                                Write-Host "Group settings updated successfully!" -ForegroundColor Green
+                                Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
+                                Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                                [void][System.Console]::ReadKey($true)
+                                # Update current values for future operations
+                                $currentExcludeGroups = $updatedExcludeGroups
+                            }
+                            else
+                            {
+                                Write-Host "Failed to update group settings!" -ForegroundColor Red
+                                Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                                [void][System.Console]::ReadKey($true)
+                            }
                         }
                     }
                 }
@@ -336,80 +368,11 @@ function Show-GroupsEditor()
             }
         }
         
-        # Save changes if any were made
-        if ($hasChanges)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Changes detected, saving updates" -LogLevel "Information"
-            Write-Verbose "[$functionName] Changes detected, saving updates"
-            
-            if (-not $Silent)
-            {
-                Write-Host "`nSaving changes..." -ForegroundColor Yellow
-            }
-            
-            $success = $true
-            
-            # Update groups to include if changed
-            if ($null -ne $updatedIncludeGroups)
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Updating groupsToInclude for domain '$DomainName'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Updating groupsToInclude for domain '$DomainName'"
-                
-                $includeSuccess = Update-DomainGroupSetting -SettingsFile $SettingsFile -DomainName $DomainName -GroupType "groupsToInclude" -Groups $updatedIncludeGroups
-                if (-not $includeSuccess)
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update groupsToInclude" -LogLevel "Error"
-                    Write-Warning "[$functionName] Failed to update groupsToInclude"
-                    $success = $false
-                }
-            }
-            
-            # Update groups to exclude if changed
-            if ($null -ne $updatedExcludeGroups)
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Updating groupsToExclude for domain '$DomainName'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Updating groupsToExclude for domain '$DomainName'"
-                
-                $excludeSuccess = Update-DomainGroupSetting -SettingsFile $SettingsFile -DomainName $DomainName -GroupType "groupsToExclude" -Groups $updatedExcludeGroups
-                if (-not $excludeSuccess)
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update groupsToExclude" -LogLevel "Error"
-                    Write-Warning "[$functionName] Failed to update groupsToExclude"
-                    $success = $false
-                }
-            }
-            
-            if ($success)
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Group settings updated successfully" -LogLevel "Information"
-                Write-Verbose "[$functionName] Group settings updated successfully"
-                if (-not $Silent)
-                {
-                    Write-Host "Group settings updated successfully!" -ForegroundColor Green
-                }
-                return $true
-            }
-            else
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update some group settings" -LogLevel "Error"
-                Write-Warning "[$functionName] Failed to update some group settings"
-                if (-not $Silent)
-                {
-                    Write-Host "Failed to update some group settings!" -ForegroundColor Red
-                }
-                return $false
-            }
-        }
-        else
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No changes were made" -LogLevel "Information"
-            Write-Verbose "[$functionName] No changes were made"
-            if (-not $Silent)
-            {
-                Write-Host "No changes were made." -ForegroundColor Yellow
-            }
-            return $true
-        }
+        # Since settings are now saved immediately after each edit operation,
+        # we no longer need to defer saving until the end
+        Write-Log -LogFile $logFile -Module $functionName -Message "Groups editor completed" -LogLevel "Information"
+        Write-Verbose "[$functionName] Groups editor completed"
+        return $true
     }
     catch
     {
@@ -536,6 +499,7 @@ function Get-GroupArrayInput()
     # Ensure single values are still treated as arrays
     if ($result.Count -eq 1)
     {
+        # Force single element to remain as array
         $result = @($result[0])
         Write-Log -LogFile $logFile -Module $functionName -Message "Single group converted to array to maintain type consistency" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Single group converted to array to maintain type consistency"
@@ -627,11 +591,13 @@ function Update-DomainGroupSetting()
         
         # Ensure Groups is always an array, even for single items
         $groupsArray = @($Groups)
+        
         # Ensure the property exists before assignment
         if (-not ($settingsObj.domains.$DomainName.PSObject.Properties.Name -contains $GroupType))
         {
             $settingsObj.domains.$DomainName | Add-Member -MemberType NoteProperty -Name $GroupType -Value $null
         }
+        
         $settingsObj.domains.$DomainName.$GroupType = $groupsArray
         
         # Create backup
