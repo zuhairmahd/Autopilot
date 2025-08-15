@@ -1504,14 +1504,26 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
     
-    $success = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
-    if ($success)
+    $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
+    #region Handle navigation responses from GetDeviceByUser
+    if ($result -eq "Back" -or $result -eq "back")
     {
-        Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
+        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+        return $returnValues.backoutText
     }
-    else
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
     {
-        Write-Host "`nFailed to update group settings. Please check the logs for details." -ForegroundColor Red
+        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from device selection."
+        return "EXIT_APPLICATION"
+    }        
+    else 
+    {
+        return $result
     }
 }
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
@@ -1792,7 +1804,6 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'

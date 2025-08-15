@@ -999,8 +999,53 @@ function Get-ArrayInput()
         Write-Host "  (empty)" -ForegroundColor Gray
     }
     
+    # Determine if we should ask about replace vs add
+    $shouldReplaceExisting = $true
+    if ($CurrentValue -and $CurrentValue.Count -gt 0)
+    {
+        Write-Host "`nYou have existing values in this array." -ForegroundColor Yellow
+        Write-Host "Do you want to:" -ForegroundColor White
+        Write-Host "  1. Replace all existing values with new ones" -ForegroundColor White
+        Write-Host "  2. Add new values to the existing ones" -ForegroundColor White
+        Write-Host "  3. Keep current values unchanged" -ForegroundColor White
+        
+        do
+        {
+            $choice = Read-Host "Enter your choice (1-3)"
+            switch ($choice)
+            {
+                '1' {
+                    $shouldReplaceExisting = $true
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing array values" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User chose to replace existing array values"
+                    break
+                }
+                '2' {
+                    $shouldReplaceExisting = $false
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing array values" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User chose to add to existing array values"
+                    break
+                }
+                '3' {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current array values unchanged" -LogLevel "Verbose"
+                    Write-Verbose "[$functionName] User chose to keep current array values unchanged"
+                    return $CurrentValue
+                }
+                default {
+                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                    continue
+                }
+            }
+            break
+        } while ($true)
+    }
+    
     Write-Host "`nEnter new values (one per line). Press Enter on empty line to finish:" -ForegroundColor Yellow
-    Write-Host "Leave first line empty to keep current values." -ForegroundColor Gray
+    if (-not $shouldReplaceExisting)
+    {
+        Write-Host "New values will be added to the existing ones." -ForegroundColor Green
+    }
+    Write-Host "Leave first line empty to cancel." -ForegroundColor Gray
     
     $newValues = @()
     $firstInput = $true
@@ -1015,8 +1060,8 @@ function Get-ArrayInput()
             # If first input is empty, return current values
             if ([string]::IsNullOrWhiteSpace($input))
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current array values" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] User chose to keep current array values"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current array values" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] User cancelled input, keeping current array values"
                 return $CurrentValue
             }
             
@@ -1037,16 +1082,25 @@ function Get-ArrayInput()
         }
     } while ($true)
     
-    # Ensure single values are still treated as arrays
-    if ($newValues.Count -eq 1)
+    # Determine final result based on user choice
+    if ($shouldReplaceExisting -or -not $CurrentValue -or $CurrentValue.Count -eq 0)
     {
-        $result = @($newValues[0])
-        Write-Log -LogFile $logFile -Module $functionName -Message "Single value converted to array to maintain type consistency" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Single value converted to array to maintain type consistency"
+        # Replace existing values or no existing values
+        $result = $newValues
     }
     else
     {
-        $result = $newValues
+        # Add to existing values
+        $result = @($CurrentValue) + @($newValues)
+    }
+    
+    # Ensure single values are still treated as arrays
+    if ($result.Count -eq 1)
+    {
+        # Force single element to remain as array 
+        $result = @($result[0])
+        Write-Log -LogFile $logFile -Module $functionName -Message "Single value converted to array to maintain type consistency" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Single value converted to array to maintain type consistency"
     }
     
     Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values" -LogLevel "Information"

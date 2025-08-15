@@ -212,6 +212,7 @@ function Test-SettingsJsonExists()
                         appMode                         = "full"
                         timeInSeconds                   = "60"
                         maxUserMatchDisplay             = "10"
+                        maxGroupMatchDisplay            = 10
                         release                         = "master"
                         repo                            = "Github"
                         autoUpdate                      = $true

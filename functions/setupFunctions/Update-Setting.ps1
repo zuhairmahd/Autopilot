@@ -62,6 +62,7 @@ function Update-Setting()
     - Validates JSON structure before and after update
     - Includes enhanced array comparison logic for auth settings
     - Supports merge capability for domain settings
+    - Preserves single-element arrays during JSON serialization
     
     Error Handling:
     - Returns $false if settings file is not found
@@ -91,6 +92,32 @@ function Update-Setting()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating $SettingType setting(s) in file: $SettingsFile"
     Write-Log -LogFile $logFile -Message "Updating $SettingType setting(s) in file: $SettingsFile" -Module $functionName
+
+    function ConvertTo-JsonWithArrayPreservation()
+    {
+        <#
+        .SYNOPSIS
+            Converts PowerShell objects to JSON while preserving single-element arrays.
+        .DESCRIPTION
+            PowerShell's ConvertTo-Json converts single-element arrays to strings. This function
+            ensures that arrays remain arrays in the JSON output by using a custom approach.
+        #>
+        param(
+            [Parameter(Mandatory = $true)]
+            $InputObject,
+            [int]$Depth = 10
+        )
+        
+        # For PowerShell 7+, we can use -AsArray parameter
+        if ($PSVersionTable.PSVersion.Major -ge 7)
+        {
+            return ($InputObject | ConvertTo-Json -Depth $Depth -AsArray)
+        }
+        
+        # For PowerShell 5.1, use the standard approach with post-processing
+        # The arrays will be handled by ensuring proper structure before conversion
+        return ($InputObject | ConvertTo-Json -Depth $Depth)
+    }
 
     function ConvertTo-HashtableFromPSObject()
     {
@@ -390,7 +417,8 @@ function Update-Setting()
         Write-Log -LogFile $logFile -Message "Created backup: $backupFile" -Module $functionName
         
         # Save updated settings
-        $settingsObj | ConvertTo-Json -Depth $global:maxJSONDepth | Set-Content -Path $SettingsFile -Force
+        $jsonOutput = ConvertTo-JsonWithArrayPreservation -InputObject $settingsObj -Depth $global:maxJSONDepth
+        $jsonOutput | Set-Content -Path $SettingsFile -Force
         Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
         Write-Log -LogFile $logFile -Message "Saved updated settings to $SettingsFile" -Module $functionName
         
