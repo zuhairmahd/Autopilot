@@ -1505,37 +1505,27 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
     
     $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
-    
-    # Check if the result is a navigation signal that should be propagated
-    if ($result -eq 0 -or $result -eq "0")
+    #region Handle navigation responses from GetDeviceByUser
+    if ($result -eq "Back" -or $result -eq "back")
     {
-        Write-Verbose "Groups editor returned exit signal, propagating exit"
-        return 0
+        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+        return $returnValues.backoutText
     }
-    elseif ($result -eq "Back")
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
     {
-        Write-Verbose "Groups editor returned back signal, propagating back"
-        return "Back"
+        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+        return "EXIT_APPLICATION"
     }
-    elseif ($result -eq "Main Menu")
+    elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
     {
-        Write-Verbose "Groups editor returned main menu signal, propagating main menu"
-        return "Main Menu"
-    }
-    elseif ($null -eq $result)
+        Write-Verbose "[$scriptName] User requested application exit from device selection."
+        return "EXIT_APPLICATION"
+    }        
+    else 
     {
-        Write-Verbose "Groups editor returned null, treating as exit signal"
-        return 0
+        return $result
     }
-    elseif ($result -eq $true)
-    {
-        Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to update group settings. Please check the logs for details." -ForegroundColor Red
-    }
-} -ReturnsValue
+}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
@@ -1814,7 +1804,6 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
