@@ -111,7 +111,7 @@ function Update-Setting()
         # For PowerShell 7+, we can use -AsArray parameter
         if ($PSVersionTable.PSVersion.Major -ge 7)
         {
-            return ($InputObject | ConvertTo-Json -Depth $Depth -AsArray:$false)
+            return ($InputObject | ConvertTo-Json -Depth $Depth -AsArray)
         }
         
         # For PowerShell 5.1, use the standard approach with post-processing
