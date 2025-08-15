@@ -73,6 +73,7 @@ param(
     [switch]$NoVersionUpdate,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
     [switch]$SecretsOnly,
+    [switch]$AddDebug,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
     [switch]$UpdateSettings
 )
@@ -1151,8 +1152,28 @@ if (Test-Path $outputFile)
     }
 }
 
+$params = @{
+    inputFile   = $newscriptFile
+    outputFile  = $OutputFile
+    x64         = $true
+    version     = $Version
+    title       = "Intune Registration"
+    description = "Register devices in Intune and perform other Autopilot device functions"
+    STA         = $true
+    company     = $CompanyName
+    product     = "Intune Autopilot Registration"
+    copyright   = '2025'
+}
+if ($AddDebug)
+{
+    Write-Host "Adding debug information to parameters"
+    $params.Debug = $true
+}
+
 Write-Host "Building executable from $newscriptFile to $OutputFile"
-$result = Invoke-ps2exe -inputFile $newscriptFile -outputFile $OutputFile -x64 -version $Version -title "Intune Registration" -description "Register devices in Intune and perform other Autopilot device functions" -company $CompanyName -product "Intune Autopilot Registration" -copyright '2025'
+Write-Host "parameters used:"
+$params | Format-List | Out-Host
+$result = Invoke-ps2exe @params -ErrorAction Stop
 if ($result -match $successMessage)
 {
     Write-Host "Executable created successfully: $OutputFile"

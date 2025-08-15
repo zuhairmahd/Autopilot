@@ -194,42 +194,29 @@ function Show-GroupsEditor()
         if (-not $Silent)
         {
             $groupsEditMenu = NewMenu -Title "Groups Editor for $DomainName" -Description "Select which group settings you want to modify:"
-            
             $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "Edit Groups to Include" -Action {
                 Write-Host "Selected: Edit Groups to Include" -ForegroundColor Green
                 return 'include'
             } -ReturnsValue
-            
             $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "Edit Groups to Exclude" -Action {
                 Write-Host "Selected: Edit Groups to Exclude" -ForegroundColor Red
                 return 'exclude'
             } -ReturnsValue
-            
             $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "View Current Group Settings" -Action {
                 Write-Host "Selected: View Current Group Settings" -ForegroundColor Cyan
                 return 'view'
             } -ReturnsValue
-            
             # Loop: after editing groups, return to the group type selection menu
             while ($true)
             {
                 # Use proper stack operation to maintain menu navigation integrity
                 $groupChoice = ShowMenu -Menu $groupsEditMenu -CalledBy 'Custom_GroupsEditorSubmenu' -StackOperation 'Push'
-                
                 # Validate that we got a proper choice, not a navigation option
-                if ($groupChoice -eq "Back" -or $groupChoice -eq "Main Menu" -or $groupChoice -eq 0 -or $groupChoice -eq "0")
+                if ($null -eq $groupChoice -or $groupChoice -eq "Back" -or $groupChoice -eq "Main Menu" -or $groupChoice -eq 0 -or $groupChoice -eq "0")
                 {
                     Write-Verbose "[$functionName] ShowMenu returned navigation option: '$groupChoice', treating as navigation"
                     break
                 }
-                
-                # If groupChoice is null, user may have navigated away - don't continue processing
-                if ($null -eq $groupChoice)
-                {
-                    Write-Verbose "[$functionName] ShowMenu returned null, user may have navigated away"
-                    break
-                }
-                
                 # Process the user's choice
                 if ($groupChoice -eq 'include')
                 {
@@ -363,8 +350,13 @@ function Show-GroupsEditor()
                     Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
                     [void][System.Console]::ReadKey($true)
                 }
-                
                 # Continue the loop to allow for multiple edits
+            }
+            Write-Verbose "[$functionName] User finished editing groups, returning $groupChoice"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User finished editing groups, returning $groupChoice" -LogLevel "Verbose"
+            if ($null -eq $groupChoice -or $groupChoice -eq 0 -or $groupChoice -eq "0" -or $groupChoice -eq "Back" -or $groupChoice -eq "Main Menu")
+            {
+                return $groupChoice
             }
         }
         
@@ -415,24 +407,28 @@ function Get-GroupArrayInput()
             $choice = Read-Host "Enter your choice (1-3)"
             switch ($choice)
             {
-                '1' {
+                '1'
+                {
                     $shouldReplaceExisting = $true
                     Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing $GroupType groups" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] User chose to replace existing $GroupType groups"
                     break
                 }
-                '2' {
+                '2'
+                {
                     $shouldReplaceExisting = $false
                     Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing $GroupType groups" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] User chose to add to existing $GroupType groups"
                     break
                 }
-                '3' {
+                '3'
+                {
                     Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current $GroupType groups unchanged" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] User chose to keep current $GroupType groups unchanged"
                     return $CurrentGroups
                 }
-                default {
+                default
+                {
                     Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
                     continue
                 }
