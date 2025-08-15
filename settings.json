@@ -2,11 +2,11 @@
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.0.0.0",
     "auth": {
+        "noSaveRefreshToken": false,
         "cacheType": "Memory",
         "changePwOnNextStart": false,
-        "noSaveRefreshToken": false,
+        "delegated": true,
         "forceNewToken": false,
-        "renewalLeadTime": 5,
         "scope": [
             "offline_access",
             "openid",
@@ -19,7 +19,7 @@
         ],
         "authType": "PublicAuthFlow",
         "secureString": false,
-        "delegated": true
+        "renewalLeadTime": 5
     },
     "requiredScopes": [
         {
@@ -117,15 +117,15 @@
     ],
     "globalSettings": {
         "operatingSystem": "Windows",
-        "release": "master",
         "repo": "Github",
         "timeInSeconds": 60,
+        "testMode": false,
         "maxUserMatchDisplay": 10,
         "maxWaitTime": 30,
         "autoUpdate": true,
         "appMode": "full",
         "maxGroupMatchDisplay": 10,
-        "testMode": false,
+        "release": "master",
         "configFile": ".\\.secrets\\config.json",
         "showLicenseBanner": true,
         "deviceContactThresholdInDays": 30
@@ -140,34 +140,71 @@
             ],
             "groupsToExclude": [],
             "settings": {
-                "privateSession": true,
-                "maxUserNameLength": 20,
+                "operatingSystem": "Windows",
+                "maxNumberOfDevicesAllowed": 20,
+                "repo": "Github",
+                "minSerialNumberLength": 7,
+                "timeInSeconds": "60",
+                "desiredAutopilotProfiles": [
+                    "MSB01"
+                ],
                 "maxSerialNumberLength": 11,
                 "maxUserMatchDisplay": 20,
-                "maxNumberOfDevicesAllowed": 20,
-                "operatingSystem": "Windows",
                 "maxWaitTime": "30",
+                "autoUpdate": false,
+                "minimumDevicePhysicalMemoryInGB": 16,
+                "maxUserNameLength": 20,
+                "domain": "gao.gov",
                 "preferredBrowser": "Chrome",
-                "minSerialNumberLength": 7,
-                "deviceContactThresholdInDays": 30,
-                "deviceNamePrefix": "w11-",
-                "release": "master",
-                "showLicenseBanner": false,
                 "appMode": "full",
+                "groupPatternsToExclude": [],
+                "deviceNamePrefix": "w11-",
+                "privateSession": true,
+                "minUsernameLength": 3,
                 "userPatternsToExclude": [
                     "-cma",
                     "-a"
                 ],
-                "desiredAutopilotProfiles": [
-                    "MSB01"
-                ],
-                "autoUpdate": false,
-                "timeInSeconds": "60",
+                "release": "master",
+                "showLicenseBanner": false,
+                "deviceContactThresholdInDays": 30
+            }
+        },
+        "arabictutor.com": {
+            "groupsToInclude": [
+                "admin",
+                "autopilot",
+                "allusers"
+            ],
+            "groupsToExclude": [],
+            "settings": {
+                "operatingSystem": "Windows",
                 "repo": "Github",
                 "minUsernameLength": 3,
-                "minimumDevicePhysicalMemoryInGB": 16,
+                "timeInSeconds": "60",
+                "desiredAutopilotProfiles": "cloudconfig",
+                "maxSerialNumberLength": 50,
+                "maxUserMatchDisplay": "10",
+                "maxWaitTime": "30",
+                "showLicenseBanner": true,
+                "autoUpdate": false,
+                "minimumDevicePhysicalMemoryInGB": 8,
+                "maxUserNameLength": 50,
+                "domain": "arabictutor.com",
+                "preferredBrowser": "Chrome",
+                "appMode": "full",
                 "groupPatternsToExclude": [],
-                "domain": "gao.gov"
+                "deviceNamePrefix": "",
+                "privateSession": false,
+                "maxNumberOfDevicesAllowed": 15,
+                "userPatternsToExclude": [
+                    "-test",
+                    "onmicrosoft.com",
+                    "autopilot"
+                ],
+                "release": "master",
+                "minSerialNumberLength": 7,
+                "deviceContactThresholdInDays": 30
             }
         }
     },
@@ -197,7 +234,7 @@
                         },
                         {
                             "description": "Lookup the device the application is running on",
-                            "name": "Use this device's serial number",
+                            "name": "Use this device\u0027s serial number",
                             "type": "action",
                             "includeInDisplayModes": []
                         }
