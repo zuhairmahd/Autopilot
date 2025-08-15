@@ -1504,8 +1504,30 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
     
-    $success = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
-    if ($success)
+    $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
+    
+    # Check if the result is a navigation signal that should be propagated
+    if ($result -eq 0 -or $result -eq "0")
+    {
+        Write-Verbose "Groups editor returned exit signal, propagating exit"
+        return 0
+    }
+    elseif ($result -eq "Back")
+    {
+        Write-Verbose "Groups editor returned back signal, propagating back"
+        return "Back"
+    }
+    elseif ($result -eq "Main Menu")
+    {
+        Write-Verbose "Groups editor returned main menu signal, propagating main menu"
+        return "Main Menu"
+    }
+    elseif ($null -eq $result)
+    {
+        Write-Verbose "Groups editor returned null, treating as exit signal"
+        return 0
+    }
+    elseif ($result -eq $true)
     {
         Write-Host "`nGroup settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
     }
@@ -1513,7 +1535,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     {
         Write-Host "`nFailed to update group settings. Please check the logs for details." -ForegroundColor Red
     }
-}
+} -ReturnsValue
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
