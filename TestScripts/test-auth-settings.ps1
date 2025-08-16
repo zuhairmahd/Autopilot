@@ -2,7 +2,7 @@
 
 # Test script for authentication settings functionality
 param(
-    [string]$TestFolder = "$PWD\test-auth-settings-temp"
+    [string]$TestFolder = $null
 )
 
 # Load test helper functions

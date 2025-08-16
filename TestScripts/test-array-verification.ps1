@@ -3,7 +3,7 @@
 # Test script for array verification in Update-Setting function
 param(
     [string]$TestName = "Array Verification Test",
-    [string]$TestFolder = "$PWD\test-array-verification-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

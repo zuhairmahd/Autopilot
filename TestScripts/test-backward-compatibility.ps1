@@ -1,7 +1,7 @@
 # Test backward compatibility with existing settings.json containing autoUpdate
 
 param(
-    [string]$TestFolder = "$PWD\test-backward-compat-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

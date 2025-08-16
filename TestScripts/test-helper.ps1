@@ -526,7 +526,14 @@ function Start-UnifiedTest()
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
-    # Create test folder if specified
+    # Create test folder - use system temp if not specified
+    if (-not $TestFolder)
+    {
+        $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+        $TestFolder = Join-Path $tempDir "autopilot-test-$(Get-Random)"
+        Write-TestResult "Auto-generated test folder: $TestFolder" $true
+    }
+    
     if ($TestFolder)
     {
         if (Test-Path $TestFolder)
@@ -599,7 +606,14 @@ function Start-UnifiedTest-WithFunctionLoading()
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
-    # Create test folder if specified
+    # Create test folder - use system temp if not specified
+    if (-not $TestFolder)
+    {
+        $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+        $TestFolder = Join-Path $tempDir "autopilot-test-$(Get-Random)"
+        Write-TestResult "Auto-generated test folder: $TestFolder" $true
+    }
+    
     if ($TestFolder)
     {
         if (Test-Path $TestFolder)

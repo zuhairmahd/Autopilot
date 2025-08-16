@@ -5,7 +5,7 @@
 # PowerShell 5.1 compatible
 
 param(
-    [string]$TestFolder = "$PWD\test-merge-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

@@ -40,7 +40,7 @@ if (Test-Path $functionsFolder) {
 
 # Initialize test environment
 try {
-    $testContext = Start-UnifiedTest -TestName "Configuration Management Comprehensive Test" -TestFolder "$PWD\test-config-mgmt-temp" -SkipFunctionCheck
+    $testContext = Start-UnifiedTest -TestName "Configuration Management Comprehensive Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
 catch {
@@ -145,7 +145,7 @@ try {
         Write-Host "Testing settings file creation..." -ForegroundColor Cyan
         
         try {
-            $testSettingsPath = "$PWD\test-config-mgmt-temp\test-settings.json"
+            $testSettingsPath = Join-Path $testContext.TestFolder "test-settings.json"
             
             # Test settings file creation
             $created = Test-SettingsJsonExists -SettingsFile $testSettingsPath -Silent -DomainName "test.example.com"

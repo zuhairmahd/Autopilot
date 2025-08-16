@@ -39,7 +39,7 @@ if (Test-Path $functionsFolder) {
 
 # Initialize test environment
 try {
-    $testContext = Start-UnifiedTest -TestName "Autopilot Import Functionality Test" -TestFolder "$PWD\test-autopilot-import-temp" -SkipFunctionCheck
+    $testContext = Start-UnifiedTest -TestName "Autopilot Import Functionality Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
 catch {

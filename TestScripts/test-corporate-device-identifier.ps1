@@ -6,7 +6,7 @@
 # PowerShell 5.1 compatible
 
 param(
-    [string]$TestFolder = "$PWD\test-corp-device-temp"
+    [string]$TestFolder = $null
 )
 
 Write-Host "Testing Corporate Device Identifier Functions" -ForegroundColor Green

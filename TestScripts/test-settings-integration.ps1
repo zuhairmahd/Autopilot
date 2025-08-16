@@ -3,7 +3,7 @@
 # Integration test for Settings Menu functionality using mock data
 param(
     [string]$TestName = "Settings Integration Test",
-    [string]$TestFolder = "$PWD\test-settings-integration-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

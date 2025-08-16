@@ -207,7 +207,8 @@ All tests must properly manage temporary files. Prefer letting the unified frame
 # Minimal pattern
 . "$PSScriptRoot\test-helper.ps1"
 $RootPath = Split-Path -Parent $PSScriptRoot
-$TestFolder = Join-Path $RootPath "autopilot-test-$(Get-Random)"
+$tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+$TestFolder = Join-Path $tempDir "autopilot-test-$(Get-Random)"
 $TestName = "My Test"
 $SkipFunctionCheck = $true
 Load-AllFunctions -RootPath $RootPath | Out-Null

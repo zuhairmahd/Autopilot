@@ -39,7 +39,7 @@ if (Test-Path $functionsFolder) {
 
 # Initialize test environment
 try {
-    $testContext = Start-UnifiedTest -TestName "Menu System Comprehensive Test" -TestFolder "$PWD\test-menu-system-temp" -SkipFunctionCheck
+    $testContext = Start-UnifiedTest -TestName "Menu System Comprehensive Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
 catch {

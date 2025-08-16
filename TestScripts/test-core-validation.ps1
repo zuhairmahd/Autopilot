@@ -2,7 +2,7 @@
 
 # Core functionality validation test 
 param(
-    [string]$TestFolder = "$PWD\test-core-validation-temp"
+    [string]$TestFolder = $null
 )
 
 Write-Host "=== Core Auth Settings Functionality Validation ===" -ForegroundColor Green

@@ -15,7 +15,7 @@
 param(
     [string]$Domain = "arabictutor.com",  # Default to test domain
     [string]$TestName = "Groups Editor Demo",
-    [string]$TestFolder = "$PWD\demo-groups-editor-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

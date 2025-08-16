@@ -2,7 +2,7 @@
 
 # Comprehensive validation test for all requested functionality
 param(
-    [string]$TestFolder = "$PWD\test-final-validation-temp"
+    [string]$TestFolder = $null
 )
 
 Write-Host "=== Final Validation Test for Auth Settings Implementation ===" -ForegroundColor Green

@@ -1,7 +1,7 @@
 # Testing Temporary Encryption Setup After First Run Wizard
 
 param(
-    [string]$TestFolder = "$PWD\test-temp-encryption-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework
