@@ -16,7 +16,13 @@
 param()
 
 # Load test helper functions
-. "$PSScriptRoot\test-helper.ps1"
+$helperFile = Join-Path $PSScriptRoot 'test-helper.ps1'
+if (Test-Path $helperFile) {
+    . $helperFile
+} else {
+    Write-Host "✗ Required test helper file not found: $helperFile" -ForegroundColor Red
+    exit 1
+}
 
 # Simple test that focuses on the key validation points
 $testName = "Missing Files Fix Test (Issue #104) - Refactored"
