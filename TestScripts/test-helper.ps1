@@ -9,10 +9,12 @@ function Load-AllFunctions()
     .DESCRIPTION
         This function recursively loads all PowerShell function files from the functions folder
         to support the reorganized codebase structure with enhanced error handling and reporting
+        NOTE: This function returns a script block that should be invoked at script level
     #>
     param(
         [string]$RootPath = $null,
-        [switch]$VerboseLoading = $false
+        [switch]$VerboseLoading = $false,
+        [switch]$ReturnScriptBlock = $false
     )
     
     if (-not $RootPath)
@@ -39,6 +41,7 @@ function Load-AllFunctions()
         
         $loadedCount = 0
         $errorCount = 0
+        $scriptBlockCommands = @()
         
         foreach ($function in $functions)
         {
@@ -49,11 +52,17 @@ function Load-AllFunctions()
                     Write-Host "  Loading: $($function.Name)" -ForegroundColor Gray
                 }
                 
-                # Dot-source the function file - same as main.ps1
-                . $function.FullName
+                if ($ReturnScriptBlock) {
+                    # Add to script block for execution at caller level
+                    $scriptBlockCommands += ". '$($function.FullName)'"
+                } else {
+                    # Use global scope specification to ensure functions are defined globally
+                    $functionContent = Get-Content $function.FullName -Raw
+                    $Global:ExecutionContext.InvokeCommand.InvokeScript($false, [scriptblock]::Create($functionContent), $null, $null)
+                }
                 $loadedCount++
                 
-                if ($VerboseLoading)
+                if ($VerboseLoading -and -not $ReturnScriptBlock)
                 {
                     # Extract function names from the file for verification
                     $functionContent = Get-Content $function.FullName -Raw -ErrorAction SilentlyContinue
@@ -81,6 +90,10 @@ function Load-AllFunctions()
                     Write-Host $_.ScriptStackTrace -ForegroundColor Red
                 }
             }
+        }
+        
+        if ($ReturnScriptBlock) {
+            return [scriptblock]::Create($scriptBlockCommands -join "`n")
         }
         
         $totalFiles = $functions.Count
