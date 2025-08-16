@@ -110,7 +110,8 @@ function Initialize-TestEnvironment()
     #>
     param(
         [string]$TestName = "Unknown Test",
-        [string]$RootPath = $null
+        [string]$RootPath = $null,
+        [string]$TestFolder = $null
     )
     
     if (-not $RootPath)
@@ -133,6 +134,10 @@ function Initialize-TestEnvironment()
     {
         "/tmp" 
     }
+    
+    # Use test folder for logs if available, otherwise system temp
+    $logBaseDir = if ($TestFolder) { $TestFolder } else { $tempDir }
+    
     # Simplified: only validate that the intended log file path is syntactically valid.
     # No file or directory creation; no side effects beyond setting globals.
     $logCandidate = if ($global:LogFile -and [string]::IsNullOrWhiteSpace([string]$global:LogFile) -eq $false)
@@ -141,7 +146,7 @@ function Initialize-TestEnvironment()
     }
     else
     {
-        Join-Path $tempDir "test.log"
+        Join-Path $logBaseDir "test.log"
     }
     try
     {
@@ -365,6 +370,59 @@ function New-MockDevice()
     }
 }
 
+function New-MockSettingsFile()
+{
+    <#
+    .SYNOPSIS
+        Creates a mock settings.json file in the test folder
+    .DESCRIPTION
+        Creates a properly formatted settings file with optional content for testing
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TestFolder,
+        [string]$FileName = "test-settings.json",
+        [hashtable]$CustomContent = @{},
+        [switch]$IncludeAuth
+    )
+    
+    $filePath = Join-Path $TestFolder $FileName
+    
+    # Base settings structure
+    $settings = @{
+        description = "Test settings file"
+        version = "1.0.0"
+        globalSettings = @{
+            appMode = "test"
+        }
+    }
+    
+    # Add auth section if requested
+    if ($IncludeAuth) {
+        $settings.auth = @{
+            changePwOnNextStart = $false
+            authType = "PublicAuthFlow"
+            noSaveRefreshToken = $false
+            forceNewToken = $false
+            renewalLeadTime = 5
+            scope = @("offline_access", "openid", "Device.ReadWrite.All", "DeviceManagementManagedDevices.ReadWrite.All", "User.Read.All", "DeviceManagementServiceConfig.ReadWrite.All", "DeviceManagementApps.Read.All")
+            cacheType = "FileSystem"
+            secureString = $true
+            delegated = $true
+        }
+    }
+    
+    # Merge custom content
+    foreach ($key in $CustomContent.Keys) {
+        $settings[$key] = $CustomContent[$key]
+    }
+    
+    # Write to file
+    $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $filePath -Force
+    
+    return $filePath
+}
+
 function Test-FunctionExists()
 {
     <#
@@ -562,7 +620,7 @@ function Start-UnifiedTest()
     # Initialize test environment
     try
     {
-        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
+        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath -TestFolder $TestFolder
         Write-TestResult "Test environment initialized" $true
     }
     catch
@@ -644,7 +702,7 @@ function Start-UnifiedTest-WithFunctionLoading()
     # Initialize test environment
     try
     {
-        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
+        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath -TestFolder $TestFolder
         Write-TestResult "Test environment initialized" $true
     }
     catch

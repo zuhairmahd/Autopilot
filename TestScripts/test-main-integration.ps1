@@ -6,7 +6,7 @@
 [CmdletBinding()]
 param(
     [string]$TestName = "Main.ps1 Integration with First Run Wizard",
-    $TestFolder = "env_temp\test-main-integration"
+    [string]$TestFolder = $null
 )
 
 # Load unified test helper
@@ -16,27 +16,28 @@ param(
 $RootPath = Split-Path -Parent $PSScriptRoot
 
 Write-Host "Testing main.ps1 Integration with First Run Wizard" -ForegroundColor Green
-Write-Host "Test folder: $TestFolder" -ForegroundColor Yellow
 
 # Load all application functions at script level (scoping-critical)
 $null = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$false
-
-# Ensure test-scoped folders exist
-$null = New-Item -Path (Join-Path $TestFolder '.secrets') -ItemType Directory -Force -ErrorAction SilentlyContinue
-$null = New-Item -Path (Join-Path $TestFolder 'Logs') -ItemType Directory -Force -ErrorAction SilentlyContinue
 
 try
 {
     # Initialize unified framework (explicit params)
     $TestContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder -RootPath $RootPath -SkipFunctionCheck:$true
+    Write-Host "Test folder: $($TestContext.TestFolder)" -ForegroundColor Yellow
 
     Write-TestSection "Preparing test-scoped files"
     
+    # Ensure test-scoped folders exist
+    $null = New-Item -Path (Join-Path $TestContext.TestFolder '.secrets') -ItemType Directory -Force -ErrorAction SilentlyContinue
+    $null = New-Item -Path (Join-Path $TestContext.TestFolder 'Logs') -ItemType Directory -Force -ErrorAction SilentlyContinue
+    
     # Remove test-scoped config to simulate first run
-    if (Test-Path "$TestFolder\.secrets\config.json")
+    $testConfigPath = Join-Path $TestContext.TestFolder ".secrets\config.json"
+    if (Test-Path $testConfigPath)
     {
-        Remove-Item "$TestFolder\.secrets\config.json" -Force -ErrorAction SilentlyContinue
-        Write-Host "[PASS] Removed existing test config.json" -ForegroundColor Green
+        Remove-Item $testConfigPath -Force -ErrorAction SilentlyContinue
+        Write-TestResult "Removed existing test config.json" $true
     }
     
     Write-TestSection "Testing main.ps1 with wizard in silent mode"
@@ -45,9 +46,9 @@ try
     $mainTestScript = @"
 # Test version of main.ps1 that uses silent mode for wizard
 param(
-    [string]`$configFile = "`$pwd\.secrets\config.json",
-    [string]`$InitFile = "`$pwd\settings.json",
-    [string]`$LogFile = "`$pwd\Logs\Autopilot.log",
+    [string]`$configFile = "`$($TestContext.TestFolder)\.secrets\config.json",
+    [string]`$InitFile = "`$($TestContext.TestFolder)\settings.json",
+    [string]`$LogFile = "`$($TestContext.TestFolder)\Logs\Autopilot.log",
     [string]`$StringsFile = "`$pwd\strings.json"
 )
 

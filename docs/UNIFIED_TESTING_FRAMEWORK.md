@@ -84,7 +84,7 @@ $TestRegistry = @{
 
 ### Using the Test Framework in New Tests
 
-All new tests MUST use the unified test framework. Load functions at script scope, then initialize/complete the test via the unified helpers (which are parameterized). Use this pattern:
+All new tests MUST use the unified test framework. Load functions at script scope, then initialize/complete the test via the unified helpers. Use this pattern:
 
 ```powershell
 #!/usr/bin/env pwsh
@@ -96,22 +96,23 @@ All new tests MUST use the unified test framework. Load functions at script scop
 #>
 
 [CmdletBinding()]
-param()
+param(
+    [string]$TestName = "Your Test Name",
+    [string]$TestFolder = $null
+)
 
 # 1) Load test helper at script level
 . "$PSScriptRoot\test-helper.ps1"
 
 # 2) Resolve paths and metadata
 $RootPath   = Split-Path -Parent $PSScriptRoot  # repo root
-$TestName   = "Your Test Name"
-$TestFolder = Join-Path $RootPath "test-temp-$(Get-Random)"  # optional, enables auto-cleanup
 
 # 3) Load all functions once at script level (critical for scoping)
-$loadSuccess = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$true
+$loadSuccess = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$false
 if (-not $loadSuccess) { throw "Failed to load functions" }
 
 try {
-  # 4) Initialize unified test (pass metadata explicitly)
+  # 4) Initialize unified test (auto-generates temp folder in system temp if not specified)
   $TestContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder -RootPath $RootPath -SkipFunctionCheck:$true
 
   # 5) Your test logic...
@@ -129,6 +130,10 @@ try {
     $FailedTests++
   }
 
+  # Use helper to create mock settings files in test folder
+  $testSettingsFile = New-MockSettingsFile -TestFolder $TestContext.TestFolder -FileName "test-settings.json" -IncludeAuth
+  Write-TestResult "Mock settings file created: $testSettingsFile" $true
+
   # 6) Complete the test (pass counters explicitly)
   $success = Complete-UnifiedTest -TestContext $TestContext -PassedTests $PassedTests -FailedTests $FailedTests -TotalTests $TotalTests
   exit ($(if ($success) { 0 } else { 1 }))
@@ -144,12 +149,13 @@ catch {
 | Function | Purpose | Notes |
 |----------|---------|-------|
 | `Load-AllFunctions [-RootPath <path>] [-VerboseLoading]` | Recursively loads all application functions | Call at script level before Start-UnifiedTest |
-| `Start-UnifiedTest -TestName <name> [-TestFolder <path>] [-RootPath <path>] [-SkipFunctionCheck]` | Initializes test environment and returns context | Prefer to pass explicit parameters; returns `$TestContext` |
+| `Start-UnifiedTest -TestName <name> [-TestFolder <path>] [-RootPath <path>] [-SkipFunctionCheck]` | Initializes test environment and returns context | Auto-generates temp folder in system temp if not specified; returns `$TestContext` |
 | `Complete-UnifiedTest -TestContext <ctx> [-PassedTests <n>] [-FailedTests <n>] [-TotalTests <n>]` | Handles cleanup and provides summary | Supply counters for accurate summary |
 | `Write-TestResult -Message <text> -Success <bool>` | Standardized test result output | Use for each assertion |
 | `Write-TestSection -Title <text>` | Consistent section headers | — |
 | `Test-FunctionExists -FunctionName <name>` | Verifies function availability | — |
 | `New-MockDevice [...]` | Creates mock device data for testing | — |
+| `New-MockSettingsFile -TestFolder <path> -FileName <name> [-IncludeAuth] [-CustomContent <hashtable>]` | Creates mock settings files in test folder | Prevents creation of files in project directory |
 
 ## Test Execution Options
 
@@ -201,24 +207,31 @@ Choose the appropriate category based on your test's purpose:
 
 ### Temporary File Management
 
-All tests must properly manage temporary files. Prefer letting the unified framework handle creation/cleanup by setting `$TestFolder` and calling `Start-UnifiedTest` and `Complete-UnifiedTest`:
+All tests must properly manage temporary files and **NEVER create files in the project directory**. The unified framework automatically handles temp directory creation:
 
 ```powershell
-# Minimal pattern
+# Automatic temp directory handling (RECOMMENDED)
 . "$PSScriptRoot\test-helper.ps1"
 $RootPath = Split-Path -Parent $PSScriptRoot
-$tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
-$TestFolder = Join-Path $tempDir "autopilot-test-$(Get-Random)"
 $TestName = "My Test"
-$SkipFunctionCheck = $true
 Load-AllFunctions -RootPath $RootPath | Out-Null
-$TestContext = Start-UnifiedTest
+$TestContext = Start-UnifiedTest -TestName $TestName -RootPath $RootPath -SkipFunctionCheck:$true
+# TestContext.TestFolder will be auto-generated in system temp (/tmp or $env:TEMP)
+
+# Create test files using helpers to prevent project directory pollution
+$testSettingsFile = New-MockSettingsFile -TestFolder $TestContext.TestFolder -FileName "test-settings.json" -IncludeAuth
 
 # ... your test logic ...
 
-$PassedTests = 1; $FailedTests = 0; $TotalTests = 1
-Complete-UnifiedTest | Out-Null
+Complete-UnifiedTest -TestContext $TestContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests $totalTests
 ```
+
+**Key Requirements:**
+- All temporary files MUST be created in system temp directories (`$env:TEMP` on Windows, `/tmp` on other platforms)
+- NEVER use relative paths like `"test-settings.json"` which create files in the project directory
+- Use `New-MockSettingsFile` helper to create test configuration files
+- Let the unified framework handle temp directory creation and cleanup
+- All test files should be isolated and automatically cleaned up
 
 ## Migration from Individual Test Scripts
 

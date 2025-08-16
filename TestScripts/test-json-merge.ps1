@@ -99,8 +99,10 @@ try {
     $totalTests++
     
     # Copy the actual settings.json for this test
-    $actualSettings = Get-Content -Path "$PWD\settings.json" -Raw
-    Set-Content -Path $testSettingsFile -Value $actualSettings -Encoding UTF8
+    $actualSettingsPath = Join-Path (Split-Path -Parent $PSScriptRoot) "settings.json"
+    if (Test-Path $actualSettingsPath) {
+        $actualSettings = Get-Content -Path $actualSettingsPath -Raw
+        Set-Content -Path $testSettingsFile -Value $actualSettings -Encoding UTF8
     
     if (Test-FunctionExists "Test-SettingsJsonExists") {
         $result = Test-SettingsJsonExists -SettingsFile $testSettingsFile -Silent -DomainName "example.com"
@@ -179,8 +181,10 @@ try {
     $totalTests++
     
     # Copy the actual strings.json for this test
-    $actualStrings = Get-Content -Path "$PWD\strings.json" -Raw
-    Set-Content -Path $testStringsFile -Value $actualStrings -Encoding UTF8
+    $actualStringsPath = Join-Path (Split-Path -Parent $PSScriptRoot) "strings.json"
+    if (Test-Path $actualStringsPath) {
+        $actualStrings = Get-Content -Path $actualStringsPath -Raw
+        Set-Content -Path $testStringsFile -Value $actualStrings -Encoding UTF8
     
     if (Test-FunctionExists "Test-StringsJsonExists") {
         $result = Test-StringsJsonExists -StringsFile $testStringsFile -Silent

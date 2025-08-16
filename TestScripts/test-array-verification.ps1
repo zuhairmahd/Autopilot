@@ -15,25 +15,19 @@ try
     $psInfo = Test-PowerShellVersion
     Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor Cyan
     
+    # Determine paths
+    $RootPath = Split-Path -Parent $PSScriptRoot
+    
     # Load all functions at script level (same as main.ps1)
-    $functionsFolder = "$PWD\functions"
-    if (Test-Path $functionsFolder)
-    {
-        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
-        foreach ($function in $functions)
-        {
-            . $function.FullName
-        }
-        Write-TestResult "Functions loaded successfully" $true
-    }
-    else
-    {
-        Write-TestResult "Functions folder not found" $false
+    $loadSuccess = Load-AllFunctions -RootPath $RootPath -VerboseLoading:$false
+    if (-not $loadSuccess) {
+        Write-TestResult "Functions loading failed" $false
         exit 1
     }
+    Write-TestResult "Functions loaded successfully" $true
     
     # Initialize unified test environment  
-    $global:testContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder
+    $global:testContext = Start-UnifiedTest -TestName $TestName -TestFolder $TestFolder -RootPath $RootPath -SkipFunctionCheck:$true
     
     Write-TestResult "Test environment initialized" $true
 }
@@ -45,27 +39,11 @@ catch
 
 try
 {
-    # Change to test directory
-    Push-Location $TestFolder
-
     Write-TestSection "Testing Array Verification in Update-Setting"
     
-    # Create a test settings file with auth section
-    $testSettingsFile = "test-settings.json"
-    
-    $settings = @{
-        description = "Test settings for array verification"
-        version     = "1.0.0"
-        auth        = @{
-            changePwOnNextStart = $false
-            authType            = "PublicAuthFlow"
-            delegated           = $true
-            scope               = @("offline_access", "openid")
-        }
-    }
-    
-    $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $testSettingsFile -Force
-    Write-TestResult "Test settings file created" -Success $true
+    # Create a test settings file with auth section using the helper
+    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.json" -IncludeAuth
+    Write-TestResult "Test settings file created at: $testSettingsFile" -Success $true
     
     # Test 1: Update with identical array
     Write-TestSubSection "Test 1: Update with identical array"
@@ -105,7 +83,7 @@ try
     $passedTests = ($result1, $result2, $result3, $result5 | Where-Object { $_ }).Count
     $failedTests = 4 - $passedTests
     $totalTests = 4
-    Pop-Location
+    
     # Complete the test using unified framework
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests $totalTests
     
