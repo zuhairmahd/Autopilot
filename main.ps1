@@ -517,9 +517,16 @@ else
     $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
     if (-not $settingsCreated)
     {
-            
+        Write-Verbose "[$scriptName] Failed to create settings.json file"
     }
-        
+    
+    # Ensure strings.json file is created if missing
+    Write-Verbose "[$scriptName] Checking strings.json for missing default values"
+    $stringsCreated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
+    if (-not $stringsCreated)
+    {
+        Write-Verbose "[$scriptName] Failed to create strings.json file"
+    }
 
     # Set auth as a script variable so it can be accessed by functions
     $script:Auth = $auth
