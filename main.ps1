@@ -514,7 +514,7 @@ else
 {
     Write-Host "Configuration file $initFile not found. Using default values." -ForegroundColor Yellow
     
-    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
+    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -DomainName $domain
     if (-not $settingsCreated)
     {
         Write-Verbose "[$scriptName] Failed to create settings.json file"
