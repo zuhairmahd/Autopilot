@@ -2,7 +2,7 @@
 # PowerShell 5.1 compatible
 
 param(
-    [string]$TestFolder = "$PWD\test-firstrun-temp"
+    [string]$TestFolder = $null
 )
 
 Write-Host "Testing First Run Wizard Functions" -ForegroundColor Green

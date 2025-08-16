@@ -5,7 +5,7 @@
 
 param(
     [string]$TestName = "Settings Functionality Demo",
-    [string]$TestFolder = "$PWD\demo-settings-functionality-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

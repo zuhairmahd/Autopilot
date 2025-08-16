@@ -2,7 +2,7 @@
 # PowerShell 5.1 compatible
 
 param(
-    [string]$TestFolder = "$PWD\test-delegated-auth-temp"
+    [string]$TestFolder = $null
 )
 
 Write-Host "Testing Delegated Authentication Property Update" -ForegroundColor Green

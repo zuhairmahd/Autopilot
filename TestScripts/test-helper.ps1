@@ -9,10 +9,12 @@ function Load-AllFunctions()
     .DESCRIPTION
         This function recursively loads all PowerShell function files from the functions folder
         to support the reorganized codebase structure with enhanced error handling and reporting
+        NOTE: This function returns a script block that should be invoked at script level
     #>
     param(
         [string]$RootPath = $null,
-        [switch]$VerboseLoading = $false
+        [switch]$VerboseLoading = $false,
+        [switch]$ReturnScriptBlock = $false
     )
     
     if (-not $RootPath)
@@ -39,6 +41,7 @@ function Load-AllFunctions()
         
         $loadedCount = 0
         $errorCount = 0
+        $scriptBlockCommands = @()
         
         foreach ($function in $functions)
         {
@@ -49,11 +52,17 @@ function Load-AllFunctions()
                     Write-Host "  Loading: $($function.Name)" -ForegroundColor Gray
                 }
                 
-                # Dot-source the function file - same as main.ps1
-                . $function.FullName
+                if ($ReturnScriptBlock) {
+                    # Add to script block for execution at caller level
+                    $scriptBlockCommands += ". '$($function.FullName)'"
+                } else {
+                    # Use global scope specification to ensure functions are defined globally
+                    $functionContent = Get-Content $function.FullName -Raw
+                    $Global:ExecutionContext.InvokeCommand.InvokeScript($false, [scriptblock]::Create($functionContent), $null, $null)
+                }
                 $loadedCount++
                 
-                if ($VerboseLoading)
+                if ($VerboseLoading -and -not $ReturnScriptBlock)
                 {
                     # Extract function names from the file for verification
                     $functionContent = Get-Content $function.FullName -Raw -ErrorAction SilentlyContinue
@@ -83,6 +92,10 @@ function Load-AllFunctions()
             }
         }
         
+        if ($ReturnScriptBlock) {
+            return [scriptblock]::Create($scriptBlockCommands -join "`n")
+        }
+        
         $totalFiles = $functions.Count
         Write-Host "Function loading summary: $loadedCount loaded, 0 skipped, $errorCount errors (Total: $totalFiles files)" -ForegroundColor Cyan
         
@@ -110,7 +123,8 @@ function Initialize-TestEnvironment()
     #>
     param(
         [string]$TestName = "Unknown Test",
-        [string]$RootPath = $null
+        [string]$RootPath = $null,
+        [string]$TestFolder = $null
     )
     
     if (-not $RootPath)
@@ -133,6 +147,10 @@ function Initialize-TestEnvironment()
     {
         "/tmp" 
     }
+    
+    # Use test folder for logs if available, otherwise system temp
+    $logBaseDir = if ($TestFolder) { $TestFolder } else { $tempDir }
+    
     # Simplified: only validate that the intended log file path is syntactically valid.
     # No file or directory creation; no side effects beyond setting globals.
     $logCandidate = if ($global:LogFile -and [string]::IsNullOrWhiteSpace([string]$global:LogFile) -eq $false)
@@ -141,7 +159,7 @@ function Initialize-TestEnvironment()
     }
     else
     {
-        Join-Path $tempDir "test.log"
+        Join-Path $logBaseDir "test.log"
     }
     try
     {
@@ -365,6 +383,59 @@ function New-MockDevice()
     }
 }
 
+function New-MockSettingsFile()
+{
+    <#
+    .SYNOPSIS
+        Creates a mock settings.json file in the test folder
+    .DESCRIPTION
+        Creates a properly formatted settings file with optional content for testing
+    #>
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TestFolder,
+        [string]$FileName = "test-settings.json",
+        [hashtable]$CustomContent = @{},
+        [switch]$IncludeAuth
+    )
+    
+    $filePath = Join-Path $TestFolder $FileName
+    
+    # Base settings structure
+    $settings = @{
+        description = "Test settings file"
+        version = "1.0.0"
+        globalSettings = @{
+            appMode = "test"
+        }
+    }
+    
+    # Add auth section if requested
+    if ($IncludeAuth) {
+        $settings.auth = @{
+            changePwOnNextStart = $false
+            authType = "PublicAuthFlow"
+            noSaveRefreshToken = $false
+            forceNewToken = $false
+            renewalLeadTime = 5
+            scope = @("offline_access", "openid", "Device.ReadWrite.All", "DeviceManagementManagedDevices.ReadWrite.All", "User.Read.All", "DeviceManagementServiceConfig.ReadWrite.All", "DeviceManagementApps.Read.All")
+            cacheType = "FileSystem"
+            secureString = $true
+            delegated = $true
+        }
+    }
+    
+    # Merge custom content
+    foreach ($key in $CustomContent.Keys) {
+        $settings[$key] = $CustomContent[$key]
+    }
+    
+    # Write to file
+    $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $filePath -Force
+    
+    return $filePath
+}
+
 function Test-FunctionExists()
 {
     <#
@@ -526,7 +597,14 @@ function Start-UnifiedTest()
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
-    # Create test folder if specified
+    # Create test folder - use system temp if not specified
+    if (-not $TestFolder)
+    {
+        $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+        $TestFolder = Join-Path $tempDir "autopilot-test-$(Get-Random)"
+        Write-TestResult "Auto-generated test folder: $TestFolder" $true
+    }
+    
     if ($TestFolder)
     {
         if (Test-Path $TestFolder)
@@ -555,7 +633,7 @@ function Start-UnifiedTest()
     # Initialize test environment
     try
     {
-        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
+        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath -TestFolder $TestFolder
         Write-TestResult "Test environment initialized" $true
     }
     catch
@@ -599,7 +677,14 @@ function Start-UnifiedTest-WithFunctionLoading()
         $RootPath = Split-Path -Parent $PSScriptRoot
     }
     
-    # Create test folder if specified
+    # Create test folder - use system temp if not specified
+    if (-not $TestFolder)
+    {
+        $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+        $TestFolder = Join-Path $tempDir "autopilot-test-$(Get-Random)"
+        Write-TestResult "Auto-generated test folder: $TestFolder" $true
+    }
+    
     if ($TestFolder)
     {
         if (Test-Path $TestFolder)
@@ -630,7 +715,7 @@ function Start-UnifiedTest-WithFunctionLoading()
     # Initialize test environment
     try
     {
-        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath
+        Initialize-TestEnvironment -TestName $TestName -RootPath $RootPath -TestFolder $TestFolder
         Write-TestResult "Test environment initialized" $true
     }
     catch

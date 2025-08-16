@@ -1,7 +1,7 @@
 # Testing Mnemonic Navigation Functionality
 
 param(
-    [string]$TestFolder = "$PWD\test-mnemonic-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

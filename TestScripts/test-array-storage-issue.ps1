@@ -3,7 +3,7 @@
 # Test script to verify array storage issue with single entries using mock data
 param(
     [string]$TestName = "Array Storage Issue Test",
-    [string]$TestFolder = "$PWD\test-array-storage-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

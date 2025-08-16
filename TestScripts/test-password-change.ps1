@@ -3,7 +3,7 @@
 # Test script to verify password change functionality when changePWOnNextStart is true
 
 param(
-    [string]$TestFolder = "$PWD\test-password-change-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

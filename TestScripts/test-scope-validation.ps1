@@ -5,7 +5,7 @@
 
 param(
     [string]$TestName = "Scope Validation Functions Test",
-    [string]$TestFolder = "$PWD\test-scope-validation-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

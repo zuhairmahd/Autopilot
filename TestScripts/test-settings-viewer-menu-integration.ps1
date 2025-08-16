@@ -2,7 +2,7 @@
 # PowerShell 5.1 compatible
 
 param(
-    [string]$TestFolder = "$PWD\test-menu-integration-temp"
+    [string]$TestFolder = $null
 )
 
 # Load test helper functions

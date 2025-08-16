@@ -3,7 +3,7 @@
 # Test script for Settings Editor functionality using mock data
 param(
     [string]$TestName = "Settings Editor Functionality Test",
-    [string]$TestFolder = "$PWD\test-settings-editor-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

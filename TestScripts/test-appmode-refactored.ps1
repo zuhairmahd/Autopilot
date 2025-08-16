@@ -2,7 +2,7 @@
 
 param(
     [string]$TestName = "Enhanced App Mode Refactoring Test",
-    [string]$TestFolder = "$PWD\test-appmode-refactored-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

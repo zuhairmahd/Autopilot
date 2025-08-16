@@ -1,7 +1,7 @@
 # Testing Settings Menu AutoUpdate Integration
 
 param(
-    [string]$TestFolder = "$PWD\test-settings-menu-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

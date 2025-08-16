@@ -39,7 +39,7 @@ if (Test-Path $functionsFolder) {
 
 # Initialize test environment
 try {
-    $testContext = Start-UnifiedTest -TestName "Authentication Flows Comprehensive Test" -TestFolder "$PWD\test-auth-flows-temp" -SkipFunctionCheck
+    $testContext = Start-UnifiedTest -TestName "Authentication Flows Comprehensive Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
 catch {

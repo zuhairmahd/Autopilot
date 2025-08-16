@@ -2,7 +2,7 @@
 # This creates a demo that shows how the wizard would prompt users
 
 param(
-    [string]$TestFolder = "$PWD\demo-autoupdate-temp"
+    [string]$TestFolder = $null
 )
 
 Write-Host "AutoUpdate First-Run Wizard Demo" -ForegroundColor Green

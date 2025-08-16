@@ -2,7 +2,7 @@
 
 param(
     [string]$TestName = "App Mode Configuration Integration Test",
-    [string]$TestFolder = "$PWD\test-appmode-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

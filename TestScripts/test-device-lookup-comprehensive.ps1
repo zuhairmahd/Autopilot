@@ -40,7 +40,7 @@ if (Test-Path $functionsFolder) {
 
 # Initialize test environment
 try {
-    $testContext = Start-UnifiedTest -TestName "Device Lookup Scenarios Test" -TestFolder "$PWD\test-device-lookup-temp" -SkipFunctionCheck
+    $testContext = Start-UnifiedTest -TestName "Device Lookup Scenarios Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
 catch {

@@ -2,7 +2,7 @@
 
 param(
     [string]$TestName = "Auto Update First Run Wizard Integration Test",
-    [string]$TestFolder = "$PWD\test-autoupdate-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework

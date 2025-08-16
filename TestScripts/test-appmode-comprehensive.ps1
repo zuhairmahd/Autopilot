@@ -45,7 +45,7 @@ else
 # Initialize test environment
 try
 {
-    $testContext = Start-UnifiedTest -TestName "Main.ps1 AppMode Comprehensive Test" -TestFolder "$PWD\test-appmode-comprehensive-temp" -SkipFunctionCheck
+    $testContext = Start-UnifiedTest -TestName "Main.ps1 AppMode Comprehensive Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
 catch

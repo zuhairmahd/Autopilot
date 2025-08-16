@@ -2,7 +2,7 @@
 
 param(
     [string]$TestName = "End-to-End App Mode Integration Test",
-    [string]$TestFolder = "$PWD\test-e2e-appmode-temp"
+    [string]$TestFolder = $null
 )
 
 # Use unified test framework
