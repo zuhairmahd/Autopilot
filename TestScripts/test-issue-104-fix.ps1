@@ -4,10 +4,11 @@
     Simple test for Issue #104 fix validation
 .DESCRIPTION
     Validates that the code fix for missing strings.json/settings.json files is present in main.ps1
+    Updated to validate the refactored implementation using Initialize-ApplicationConfiguration
 .NOTES
     Author: Copilot
-    Version: 1.0.0
-    Purpose: Verify the fix for Issue #104 is correctly implemented
+    Version: 2.0.0
+    Purpose: Verify the fix for Issue #104 is correctly implemented through refactoring
 #>
 
 [CmdletBinding()]
@@ -19,43 +20,28 @@ Write-Host "Testing that main.ps1 contains the fix for missing configuration fil
 $passedTests = 0
 $failedTests = 0
 
-# Test 1: Check that main.ps1 contains the necessary Test-StringsJsonExists call
-Write-Host "`nTest 1: Checking for Test-StringsJsonExists call in main.ps1..." -ForegroundColor Yellow
+# Test 1: Check that main.ps1 uses the new Initialize-ApplicationConfiguration approach
+Write-Host "`nTest 1: Checking for Initialize-ApplicationConfiguration usage in main.ps1..." -ForegroundColor Yellow
 
 try {
     $mainContent = Get-Content -Path "$PWD\main.ps1" -Raw
     
-    # Look for the specific pattern that indicates the fix is present
-    # We should find Test-StringsJsonExists being called after Test-SettingsJsonExists in the else block
-    $pattern1 = 'Test-SettingsJsonExists.*-SettingsFile.*\$initFile.*-Silent'
-    $pattern2 = 'Test-StringsJsonExists.*-StringsFile.*\$stringsFile.*-Silent'
+    # Look for the new pattern that indicates the refactored fix is present
+    $pattern1 = 'Initialize-ApplicationConfiguration.*-InitFile.*-StringsFile.*-Domain'
+    $pattern2 = 'configResult\.Success'
     
     $match1 = $mainContent -match $pattern1
     $match2 = $mainContent -match $pattern2
     
     if ($match1 -and $match2) {
-        # Find the positions to ensure correct order
-        $pos1 = $mainContent.IndexOf('Test-SettingsJsonExists')
-        $pos2 = $mainContent.IndexOf('Test-StringsJsonExists')
-        
-        # There should be at least two occurrences - one in the if block and one in the else block
-        $settingsMatches = ([regex]'Test-SettingsJsonExists').Matches($mainContent)
-        $stringsMatches = ([regex]'Test-StringsJsonExists').Matches($mainContent)
-        
-        if ($settingsMatches.Count -ge 2 -and $stringsMatches.Count -ge 2) {
-            Write-Host "  ✓ Found Test-SettingsJsonExists calls: $($settingsMatches.Count)" -ForegroundColor Green
-            Write-Host "  ✓ Found Test-StringsJsonExists calls: $($stringsMatches.Count)" -ForegroundColor Green
-            Write-Host "  ✓ Fix is present - both functions are called in multiple places" -ForegroundColor Green
-            $passedTests++
-        } else {
-            Write-Host "  ✗ Insufficient function calls found" -ForegroundColor Red
-            Write-Host "    Settings calls: $($settingsMatches.Count), Strings calls: $($stringsMatches.Count)" -ForegroundColor Red
-            $failedTests++
-        }
+        Write-Host "  ✓ Found Initialize-ApplicationConfiguration call with proper parameters" -ForegroundColor Green
+        Write-Host "  ✓ Found success checking pattern" -ForegroundColor Green
+        Write-Host "  ✓ Refactored fix is present - using centralized configuration initialization" -ForegroundColor Green
+        $passedTests++
     } else {
-        Write-Host "  ✗ Required function calls not found in main.ps1" -ForegroundColor Red
-        Write-Host "    Test-SettingsJsonExists pattern found: $match1" -ForegroundColor Red
-        Write-Host "    Test-StringsJsonExists pattern found: $match2" -ForegroundColor Red
+        Write-Host "  ✗ Required refactored patterns not found in main.ps1" -ForegroundColor Red
+        Write-Host "    Initialize-ApplicationConfiguration pattern found: $match1" -ForegroundColor Red
+        Write-Host "    Success checking pattern found: $match2" -ForegroundColor Red
         $failedTests++
     }
 }
@@ -64,54 +50,74 @@ catch {
     $failedTests++
 }
 
-# Test 2: Check the specific else block contains both calls
-Write-Host "`nTest 2: Checking else block specifically..." -ForegroundColor Yellow
+# Test 2: Check that the old duplicate code paths have been eliminated
+Write-Host "`nTest 2: Checking that old duplicate configuration logic has been removed..." -ForegroundColor Yellow
 
 try {
     $mainContent = Get-Content -Path "$PWD\main.ps1" -Raw
     
-    # Find the else block that handles missing settings file
-    $elseBlockRegex = '(?s)else\s*\{[^}]*Configuration file.*not found[^}]*\}'
-    $elseBlockMatch = [regex]::Match($mainContent, $elseBlockRegex)
+    # Count occurrences of the old patterns that should now be eliminated
+    $oldIfElsePattern = 'if \(Test-Path -Path \$InitFile\)'
+    $oldElsePattern = 'Configuration file.*not found.*Using default values'
     
-    if ($elseBlockMatch.Success) {
-        $elseBlockContent = $elseBlockMatch.Value
-        
-        $hasSettingsCall = $elseBlockContent -match 'Test-SettingsJsonExists'
-        $hasStringsCall = $elseBlockContent -match 'Test-StringsJsonExists'
-        
-        if ($hasSettingsCall -and $hasStringsCall) {
-            Write-Host "  ✓ Else block contains both Test-SettingsJsonExists and Test-StringsJsonExists calls" -ForegroundColor Green
-            $passedTests++
-        } else {
-            Write-Host "  ✗ Else block missing required function calls" -ForegroundColor Red
-            Write-Host "    Has Test-SettingsJsonExists: $hasSettingsCall" -ForegroundColor Red
-            Write-Host "    Has Test-StringsJsonExists: $hasStringsCall" -ForegroundColor Red
-            $failedTests++
-        }
+    $hasOldIfElse = $mainContent -match $oldIfElsePattern
+    $hasOldElse = $mainContent -match $oldElsePattern
+    
+    if (-not $hasOldIfElse -and -not $hasOldElse) {
+        Write-Host "  ✓ Old duplicate configuration logic has been successfully removed" -ForegroundColor Green
+        $passedTests++
     } else {
-        Write-Host "  ✗ Could not find the expected else block in main.ps1" -ForegroundColor Red
+        Write-Host "  ✗ Old configuration logic patterns still found - refactoring incomplete" -ForegroundColor Red
+        Write-Host "    Old if-else pattern found: $hasOldIfElse" -ForegroundColor Red
+        Write-Host "    Old else block pattern found: $hasOldElse" -ForegroundColor Red
         $failedTests++
     }
 }
 catch {
-    Write-Host "  ✗ Error analyzing else block: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  ✗ Error analyzing configuration logic: $($_.Exception.Message)" -ForegroundColor Red
     $failedTests++
 }
 
-# Test 3: Verify the functions themselves exist
-Write-Host "`nTest 3: Verifying required functions exist..." -ForegroundColor Yellow
+# Test 3: Verify the new helper function exists
+Write-Host "`nTest 3: Verifying Initialize-ApplicationConfiguration helper function exists..." -ForegroundColor Yellow
 
-$settingsExists = Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1"
-$stringsExists = Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-StringsJsonExists.ps1"
+$helperExists = Test-Path "functions/setupFunctions/Initialize-ApplicationConfiguration.ps1"
+$originalFunctionsExist = (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1") -and (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-StringsJsonExists.ps1")
 
-if ($settingsExists -and $stringsExists) {
-    Write-Host "  ✓ Both Test-SettingsJsonExists.ps1 and Test-StringsJsonExists.ps1 files exist" -ForegroundColor Green
+if ($helperExists -and $originalFunctionsExist) {
+    Write-Host "  ✓ Initialize-ApplicationConfiguration.ps1 helper function exists" -ForegroundColor Green
+    Write-Host "  ✓ Original Test-SettingsJsonExists.ps1 and Test-StringsJsonExists.ps1 still exist for reuse" -ForegroundColor Green
     $passedTests++
 } else {
     Write-Host "  ✗ Required function files missing" -ForegroundColor Red
-    Write-Host "    Test-SettingsJsonExists.ps1 exists: $settingsExists" -ForegroundColor Red
-    Write-Host "    Test-StringsJsonExists.ps1 exists: $stringsExists" -ForegroundColor Red
+    Write-Host "    Initialize-ApplicationConfiguration.ps1 exists: $helperExists" -ForegroundColor Red
+    Write-Host "    Original functions exist: $originalFunctionsExist" -ForegroundColor Red
+    $failedTests++
+}
+
+# Test 4: Verify that the new approach handles both existing and missing file scenarios
+Write-Host "`nTest 4: Checking that single code path handles all scenarios..." -ForegroundColor Yellow
+
+try {
+    $mainContent = Get-Content -Path "$PWD\main.ps1" -Raw
+    
+    # Look for evidence that there's now a single unified path
+    $singleConfigCall = ([regex]'Initialize-ApplicationConfiguration').Matches($mainContent).Count
+    $duplicateRegions = ([regex]'#region Define variables').Matches($mainContent).Count
+    
+    if ($singleConfigCall -eq 1 -and $duplicateRegions -eq 1) {
+        Write-Host "  ✓ Single Initialize-ApplicationConfiguration call found" -ForegroundColor Green
+        Write-Host "  ✓ No duplicate code regions - clean refactoring" -ForegroundColor Green
+        $passedTests++
+    } else {
+        Write-Host "  ✗ Code structure indicates incomplete refactoring" -ForegroundColor Red
+        Write-Host "    Initialize-ApplicationConfiguration calls: $singleConfigCall (expected: 1)" -ForegroundColor Red
+        Write-Host "    Define variables regions: $duplicateRegions (expected: 1)" -ForegroundColor Red
+        $failedTests++
+    }
+}
+catch {
+    Write-Host "  ✗ Error analyzing code structure: $($_.Exception.Message)" -ForegroundColor Red
     $failedTests++
 }
 
@@ -123,8 +129,8 @@ Write-Host "Passed: $passedTests" -ForegroundColor Green
 Write-Host "Failed: $failedTests" -ForegroundColor $(if ($failedTests -eq 0) { 'Green' } else { 'Red' })
 
 if ($failedTests -eq 0) {
-    Write-Host "`n✓ SUCCESS: Issue #104 fix is correctly implemented!" -ForegroundColor Green
-    Write-Host "The main.ps1 file now includes Test-StringsJsonExists call when settings.json is missing." -ForegroundColor Green
+    Write-Host "`n✓ SUCCESS: Issue #104 fix is correctly implemented through comprehensive refactoring!" -ForegroundColor Green
+    Write-Host "The main.ps1 file now uses a unified configuration initialization approach that handles all scenarios." -ForegroundColor Green
     exit 0
 } else {
     Write-Host "`n✗ FAILURE: Issue #104 fix needs attention." -ForegroundColor Red

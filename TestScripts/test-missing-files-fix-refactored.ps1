@@ -15,8 +15,12 @@
 [CmdletBinding()]
 param()
 
+# Load test helper functions
+. "$PSScriptRoot\test-helper.ps1"
+
 # Simple test that focuses on the key validation points
-Write-Host "=== $testName ===" -ForegroundColor Cyan
+$testName = "Missing Files Fix Test (Issue #104) - Refactored"
+Start-Test $testName
 
 # Test 1: Verify the new helper function exists and loads correctly
 Write-Host "=== Test 1: Validate Initialize-ApplicationConfiguration Function ===" -ForegroundColor Yellow
@@ -150,8 +154,10 @@ Write-Host "Failed: $($totalCount - $passedCount)" -ForegroundColor $(if ($passe
 if ($passedCount -eq $totalCount) {
     Write-Host "`n✓ SUCCESS: Issue #104 fix validated through comprehensive refactoring!" -ForegroundColor Green
     Write-Host "The refactored solution eliminates the original code duplication and robustness issues." -ForegroundColor Green
+    End-Test $testName $true
     exit 0
 } else {
     Write-Host "`n✗ FAILURE: Issue #104 refactored solution needs attention." -ForegroundColor Red
+    End-Test $testName $false
     exit 1
 }
