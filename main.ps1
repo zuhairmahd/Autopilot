@@ -332,200 +332,48 @@ else
         exit 1
     }
 }
-if (Test-Path -Path $InitFile)
-{
-    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    
-    # Ensure settings.json file has all required default values
-    Write-Verbose "[$scriptName] Checking settings.json for missing default values"
-    # Use domain if available, otherwise default to example.com
-    $domainForDefaults = if ($domain)
-    {
-        $domain 
-    }
-    else
-    {
-        "contoso.com" 
-    }
-    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
-    if ($settingsUpdated)
-    {
-        Write-Verbose "[$scriptName] Settings file checked/updated successfully"
-    }
-    
-    # Ensure strings.json file has all required default values  
-    Write-Verbose "[$scriptName] Checking strings.json for missing default values"
-    $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
-    if ($stringsUpdated)
-    {
-        Write-Verbose "[$scriptName] Strings file checked/updated successfully"
-    }
-    
-    $globalSettings = @{}
-    $localSettings = @{}
-    
-    # Load the init file content (potentially updated with new defaults)
-    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-    # Load auth configuration from init file
-    $authConfiguration = $initFileContent.auth
-    $auth = @{}
-    Write-Verbose "[$scriptName] Loading Auth configuration from init file"
-    foreach ($key in $authConfiguration.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the init file as $($authConfiguration.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
-            if ($authConfiguration.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
-                $auth.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($authConfiguration.$key))."
-                $auth.add($key, $authConfiguration.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            $auth.add($key, $PSBoundParameters[$key])
-        }
-    }
-    
-    # Set auth as a script variable so it can be accessed by functions
-    $script:Auth = $auth
-    
-    $globalConfigData = $initFileContent | Select-Object -ExpandProperty 'globalSettings'
-    Write-Verbose "[$scriptName] Reading global settings..."
-    Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $globalConfigData.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $globalConfigData.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($globalConfigData.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($globalConfigData.$key)"
-            if ($globalConfigData.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
-                $globalSettings.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($globalConfigData.$key))."
-                $globalSettings.add($key, $globalConfigData.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            $globalSettings.add($key, $PSBoundParameters[$key])
-        }
-    }
-    $localConfigData = ($initFileContent | Select-Object -ExpandProperty "domains").$domain
-    Write-Verbose "[$scriptName] Reading local settings for domain $domain..."
-    Write-Verbose "[$scriptName] Found $($localConfigData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $localConfigData.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $localConfigData.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($localConfigData.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($localConfigData.$key)"
-            if ($localConfigData.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($localConfigData.$key)
-                $localSettings.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-                # Set-Variable -Name $key -Value $keyBooleanValue
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($localConfigData.$key))."
-                # Set-Variable -Name $key -Value $localConfigData.$key
-                $localSettings.add($key, $localConfigData.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the commandline as $($PSBoundParameters[$key])"
-            #add it to the local settings hashtable.
-            $localSettings.add($key, $PSBoundParameters[$key])
-        }
-    }   
-    #merge the local and global settings.
-    $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-    #if the appMode is not set, default to 'full', otherwise make sure it is avalid appMode.
-    if (-not $script:settings.appMode)
-    {
-        Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
-        $global:settings.appMode = 'full'
-    }
-    elseif ($global:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
-    {
-        Write-Host "Invalid app mode specified: $($global:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
-        Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($global:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
-        exit 1
-    }
-    #load menus configuration from initFile
-    $menus = $initFileContent.menus
-    Write-Verbose "[$scriptName] Loaded $($($menus.Count)) menus from $InitFile"
-    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($($menus.Count)) menus from $InitFile" -logLevel "Information"
-    #region handle scopes
-    $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
-    $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
-    # Ensure arrays are properly handled and merge them, eliminating duplicates
-    Write-Verbose "[$scriptName] Merging basicScopes and additionalScopes and removing duplicates."
-    # Initialize as empty arrays if null
-    if ($null -eq $basicScopes) 
-    { 
-        Write-Verbose "[$scriptName] No basic scopes found in the configuration file. Initializing as empty array."
-        $basicScopes = @() 
-    }
-    if ($null -eq $additionalScopes) 
-    { 
-        Write-Verbose "[$scriptName] No additional scopes found in the configuration file. Initializing as empty array."
-        $additionalScopes = @() 
-    }
-    # Ensure they are arrays
-    Write-Verbose "[$scriptName] Ensuring basicScopes and additionalScopes are arrays."
-    $basicScopes = @($basicScopes)
-    Write-Verbose "[$scriptName] Basic scopes has $($basicScopes.Count) items."
-    $additionalScopes = @($additionalScopes)
-    Write-Verbose "[$scriptName] Additional scopes has $($additionalScopes.Count) items."
-    # Merge arrays and remove duplicates based on Scope property
-    Write-Verbose "[$scriptName] Merging scopes and removing duplicates."
-    $allScopes = @($basicScopes) + @($additionalScopes)
-    Write-Verbose "[$scriptName] Total scopes before deduplication: $($allScopes.Count)"
-    $requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
-    Write-Verbose "[$scriptName] Merged scopes - Total unique scopes: $($requiredScopes.Count)"
-    #endregion handle scopes
-}
-else
-{
-    Write-Host "Configuration file $initFile not found. Using default values." -ForegroundColor Yellow
-    
-    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
-    if (-not $settingsCreated)
-    {
-            
-    }
-        
+# Initialize application configuration using centralized helper functions
+Write-Verbose "[$scriptName] Initializing application configuration"
 
-    # Set auth as a script variable so it can be accessed by functions
-    $script:Auth = $auth
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain) { $domain } else { "contoso.com" }
+
+# Initialize configuration with helper function
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters -LogFile $LogFile -ScriptName $scriptName
+
+if (-not $configResult.Success)
+{
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Verbose "[$scriptName] Configuration initialization failed: $($configResult.ErrorMessage)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    exit 1
 }
+
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings  
+$localSettings = $configResult.LocalSettings
+$menus = $configResult.Menus
+$requiredScopes = $configResult.RequiredScopes
+
+# Set auth as a script variable so it can be accessed by functions
+$script:Auth = $auth
+
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+
 #endregion Load parameters from the configuration file if it exists
-
 #region Define variables
 if ($settings.Repo -eq 'github')
 {
