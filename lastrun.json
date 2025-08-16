@@ -1,8 +1,8 @@
 {
-  "hash": "ECEEEF3CC819DDC53F9F6A1002FB6A09E16C4DC97487307243FACF49959D721E",
-  "version": "3.3.0.29954",
-  "date": "2025-08-13",
-  "GUID": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-  "stringsVersion": "1.1.0.0",
-  "settingsVersion": "1.1"
+    "version":  "3.3.0.29956",
+    "hash":  "3C3C72B7DE5B463F7F8DF7540CB0E31290FC3A36B0C3D55FA0F7E3056CFAD90D",
+    "settingsVersion":  "1.0.0.0",
+    "date":  "2025-08-16",
+    "stringsVersion":  "1.0.0.0",
+    "GUID":  "c2c08149-3c1f-4558-9e4c-87487943bbf5"
 }
