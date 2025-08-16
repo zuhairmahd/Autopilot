@@ -359,13 +359,19 @@ $requiredScopes = $configResult.RequiredScopes
 # Set auth as a script variable so it can be accessed by functions
 $script:Auth = $auth
 
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
 Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
 Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 
 #endregion Load parameters from the configuration file if it exists
 #region Define variables
