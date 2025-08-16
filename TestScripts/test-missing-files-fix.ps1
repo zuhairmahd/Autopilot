@@ -16,6 +16,7 @@
 param()
 
 # Simple test that focuses on the key validation points
+$testName = "Test for missing configuration files fix (Issue #104) - Refactored Implementation"
 Write-Host "=== $testName ===" -ForegroundColor Cyan
 
 # Test 1: Verify the new helper function exists and loads correctly
