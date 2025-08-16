@@ -332,85 +332,44 @@ else
         exit 1
     }
 }
-if (Test-Path -Path $InitFile)
+# Initialize application configuration using centralized helper functions
+Write-Verbose "[$scriptName] Initializing application configuration"
+
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain) { $domain } else { "contoso.com" }
+
+# Initialize configuration with helper function
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters -LogFile $LogFile -ScriptName $scriptName
+
+if (-not $configResult.Success)
 {
-    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    
-    # Ensure settings.json file has all required default values
-    Write-Verbose "[$scriptName] Checking settings.json for missing default values"
-    # Use domain if available, otherwise default to example.com
-    $domainForDefaults = if ($domain)
-    {
-        $domain 
-    }
-    else
-    {
-        "contoso.com" 
-    }
-    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
-    if ($settingsUpdated)
-    {
-        Write-Verbose "[$scriptName] Settings file checked/updated successfully"
-    }
-    
-    # Ensure strings.json file has all required default values  
-    Write-Verbose "[$scriptName] Checking strings.json for missing default values"
-    $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
-    if ($stringsUpdated)
-    {
-        Write-Verbose "[$scriptName] Strings file checked/updated successfully"
-    }
-    
-    $globalSettings = @{}
-    $localSettings = @{}
-    
-    # Load the init file content (potentially updated with new defaults)
-    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-    # Load auth configuration from init file
-    $authConfiguration = $initFileContent.auth
-    $auth = @{}
-    Write-Verbose "[$scriptName] Loading Auth configuration from init file"
-    foreach ($key in $authConfiguration.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the init file as $($authConfiguration.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
-            if ($authConfiguration.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
-                $auth.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($authConfiguration.$key))."
-                $auth.add($key, $authConfiguration.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            $auth.add($key, $PSBoundParameters[$key])
-        }
-    }
-    
-    # Set auth as a script variable so it can be accessed by functions
-    $script:Auth = $auth
-    
-    $globalConfigData = $initFileContent | Select-Object -ExpandProperty 'globalSettings'
-    Write-Verbose "[$scriptName] Reading global settings..."
-    Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $globalConfigData.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $globalConfigData.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($globalConfigData.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($globalConfigData.$key)"
-            if ($globalConfigData.$key -in ('true', 'false'))
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Verbose "[$scriptName] Configuration initialization failed: $($configResult.ErrorMessage)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    exit 1
+}
+
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings  
+$localSettings = $configResult.LocalSettings
+$menus = $configResult.Menus
+$requiredScopes = $configResult.RequiredScopes
+
+# Set auth as a script variable so it can be accessed by functions
+$script:Auth = $auth
+
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count)" -LogLevel "Information"
+
+#endregion Load parameters from the configuration file if it exists
+#region Define variables
+if ($settings.Repo -eq 'github')
             {
                 Write-Verbose "[$scriptName] Converting $key to boolean."
                 $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
