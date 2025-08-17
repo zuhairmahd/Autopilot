@@ -1,4 +1,7 @@
 {
+    "name": "menu.json",
+    "description": "This file contains the definitions for the menus used in the application.",
+    "version": "1.0.0.0",
     "mainMenu": {
         "Title": "Main Menu",
         "Description": "Please choose from one of the following options",
