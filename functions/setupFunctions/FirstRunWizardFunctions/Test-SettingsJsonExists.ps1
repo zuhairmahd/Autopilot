@@ -339,9 +339,73 @@ function Test-SettingsJsonExists()
                     includeInDisplayModes = @("advanced")
                     items                 = @(
                         @{
-                            name                  = "Change application settings"
-                            description           = "Change the application settings"
-                            type                  = "action"
+                            name                  = "Change environment Settings"
+                            description           = "Change the environment   settings"
+                            type                  = "submenu"
+                            items                 = @(
+                                @{
+                                    Name                  = "View global environment settings"
+                                    description           = "View the global environment settings"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                                @{
+                                    name                  = "View domain specific environment settings"
+                                    description           = "View the domain specific environment settings"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                                @{
+                                    name                  = "View group inclusion/exclusion settings for all domains"
+                                    description           = "View the group inclusion/exclusion settings for all domains"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                                @{
+                                    name                  = "Change global environment settings"
+                                    description           = "Change the global environment settings"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                                @{
+                                    name                  = "Change domain specific settings"
+                                    description           = "Change the domain specific settings"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                                @{
+                                    name                  = "Change authentication settings"
+                                    description           = "Change the authentication settings"
+                                    type                  = "action"
+                                    includeInDisplayModes = @()
+                                }
+                                @{
+                                    name                  = "Change group inclusion/exclusion settings"
+                                    description           = "Change the group inclusion/exclusion settings"
+                                    type                  = "submenu"
+                                    items                 = @(
+                                        @{
+                                            name                  = "Change groups to include"
+                                            description           = "Change the groups to include in the application"
+                                            type                  = "action"
+                                            includeInDisplayModes = @()
+                                        },
+                                        @{
+                                            name                  = "Change groups to exclude"
+                                            description           = "Change the groups to exclude from the application"
+                                            type                  = "action"
+                                            includeInDisplayModes = @()
+                                        },
+                                        @{
+                                            name                  = "View Current Group Settings"
+                                            description           = "View the current group settings for the application"
+                                            type                  = "action"
+                                            includeInDisplayModes = @()
+                                        }
+                                    )
+                                    includeInDisplayModes = @()
+                                }
+                            )
                             includeInDisplayModes = @()
                         },
                         @{
@@ -361,12 +425,6 @@ function Test-SettingsJsonExists()
                             description           = "Change the application mode"
                             type                  = "action"
                             includeInDisplayModes = @("full", "helpDesk", "advanced", "advancedRegistration", "registration", "admin", "custom")
-                        },  
-                        @{
-                            name                  = "Restore defaults"
-                            description           = "Restore the application to its default settings"
-                            type                  = "action"
-                            includeInDisplayModes = @()
                         }
                     )
                 },
@@ -379,6 +437,12 @@ function Test-SettingsJsonExists()
                 @{
                     name                  = "Restart the device"
                     description           = "Restart the device"
+                    type                  = "action"
+                    includeInDisplayModes = @()
+                },
+                @{
+                    name                  = "Show Group Assignments"
+                    description           = "Show the group assignments for the application"
                     type                  = "action"
                     includeInDisplayModes = @()
                 },

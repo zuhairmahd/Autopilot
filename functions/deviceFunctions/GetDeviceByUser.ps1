@@ -56,7 +56,6 @@ function GetDeviceByUser()
         else
         {
             # Create device selection menu
-            $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
             # Store devices in an array to reference later
             $devices = $deviceInfo.value
             $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
