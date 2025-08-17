@@ -3,6 +3,7 @@
         "Title": "Main Menu",
         "Description": "Please choose from one of the following options",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Give a device to a user",
@@ -30,7 +31,9 @@
                 "description": "Modify the application settings",
                 "blockType": "menu",
                 "menuName": "settingsMenu",
-                "includeInDisplayModes": ["advanced"]
+                "includeInDisplayModes": [
+                    "advanced"
+                ]
             },
             {
                 "name": "Check for script updates",
@@ -68,6 +71,7 @@
         "Title": "Check Device Status",
         "Description": "How would you like to lookup the device?",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Lookup device by Serial Number",
@@ -87,6 +91,7 @@
         "Title": "Lookup by Serial Number",
         "Description": "How would you like to enter the serial number?",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Enter a serial number",
@@ -106,6 +111,7 @@
         "Title": "Autopilot Menu",
         "Description": "Import a device into Autopilot and perform related actions",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Import device into Autopilot",
@@ -177,6 +183,7 @@
         "title": "Settings menu",
         "Description": "Make changes to the application settings",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Change environment Settings",
@@ -208,6 +215,7 @@
         "title": "Change Environment Menu",
         "Description": "Manage your environment settings and configurations",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "View global environment settings",
@@ -257,6 +265,7 @@
         "Title": "Export Menu",
         "Description": "Choose what you would like to export",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Export Autopilot Devices",
@@ -312,6 +321,7 @@
         "Title": "Options for Device With Serial Number $serialNumber",
         "Description": "Choose what you would like to do with this device:",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "Name": "Restart the device",
@@ -342,6 +352,7 @@
         "Title": "Device Actions for $deviceName",
         "Description": "Select an action to perform on this device:",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Wipe Device",
@@ -420,6 +431,7 @@
         "Title": "Export report",
         "Description": "Select the format to which you would like to export the report",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "Name": "Export to HTML",
@@ -437,6 +449,7 @@
         "Title": "Groups Editor for $DomainName",
         "Description": "Select which group settings you want to modify:",
         "type": "static",
+        "includeInDisplayModes": [],
         "items": [
             {
                 "name": "Edit Groups to Include",
