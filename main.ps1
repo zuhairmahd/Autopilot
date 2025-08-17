@@ -756,13 +756,28 @@ else
 #endregion initialization block with access token
 
 #region Menu Definitions
-$mainMenu = NewMenu -Title "Main Menu" -Description "Please choose from one of the following options"
-$CheckMenu = NewMenu -Title "Check Device Status" -Description "How would you like to lookup the device?"
-$serialNumberMenu = newMenu -Title "Lookup by Serial Number" -Description "How would you like to enter the serial number?."
-$exportMenu = newMenu -Title "Export Menu" -Description "Choose what you would like to export."
-$settingsMenu = NewMenu -title "Settings menu" -Description "Make changes to the application settings"
-$autopilotMenu = NewMenu -Title "Autopilot Menu" -Description "Import a device into Autopilot and perform related actions"
-$environmentMenu = newMenu -title "Change Environment Menu" -Description "Manage your environment settings and configurations"
+# Load menu configuration for filtering
+$script:menus = @()
+$menuConfig = Get-MenuConfiguration
+if ($menuConfig) {
+    # Convert the flat menu.json structure to array format for Test-MenuItemIncluded
+    foreach ($menuName in $menuConfig.PSObject.Properties.Name) {
+        $menu = $menuConfig.$menuName
+        if ($menu.items) {
+            $script:menus += $menu.items
+        }
+    }
+    Write-Verbose "Loaded $($script:menus.Count) menu items for filtering"
+}
+
+# Load menus from configuration where possible, fallback to manual creation
+$mainMenu = NewMenu -MenuName "mainMenu"
+$CheckMenu = NewMenu -MenuName "checkMenu"  
+$serialNumberMenu = NewMenu -MenuName "serialNumberMenu"
+$exportMenu = NewMenu -MenuName "exportMenu"
+$settingsMenu = NewMenu -MenuName "settingsMenu"
+$autopilotMenu = NewMenu -MenuName "autopilotMenu"
+$environmentMenu = NewMenu -MenuName "environmentMenu"
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {

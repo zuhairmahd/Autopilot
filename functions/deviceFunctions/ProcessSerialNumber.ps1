@@ -184,7 +184,9 @@ function ProcessSerialNumber()
             # Create and show device actions menu using main.ps1 menu structure
             Write-Verbose "[$functionName] Starting device actions menu loop"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Information"
-            $deviceActionsMenu = NewMenu -Title "Device Actions for $deviceName" -Description "Select an action to perform on this device:"
+            $deviceActionsMenu = NewMenu -MenuName "deviceActionsMenu"
+            # Update the title to include the actual device name
+            $deviceActionsMenu.Title = $deviceActionsMenu.Title -replace '\$deviceName', $deviceName
             #region Process devices
             # Add menu items for each device action
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
