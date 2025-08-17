@@ -106,8 +106,16 @@ function Get-AppModeConfigurationFromUser()
                 default { "Select an app mode to configure the application interface." }
             }
             
-            # Create the app mode selection menu
-            $appModeMenu = NewMenu -Title $menuTitle -Description $menuDescription
+            # Create the app mode selection menu from configuration
+            $appModeMenu = NewMenu -MenuName "appModeMenu"
+            if (-not $appModeMenu) {
+                # Fallback to manual creation if config not found
+                $appModeMenu = NewMenu -Title $menuTitle -Description $menuDescription
+            } else {
+                # Update title and description with actual values
+                $appModeMenu.Title = $appModeMenu.Title -replace '\$menuTitle', $menuTitle
+                $appModeMenu.Description = $appModeMenu.Description -replace '\$menuDescription', $menuDescription
+            }
             
             # Add menu items for each app mode
             foreach ($appMode in $appModes)

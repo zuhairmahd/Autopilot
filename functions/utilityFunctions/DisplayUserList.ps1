@@ -42,8 +42,12 @@ function DisplayUserList()
         Write-Verbose "[$functionName] User list has more than $maxDisplay users, truncating to $maxDisplay."
         $UserList = $UserList | Select-Object -First $maxDisplay
     }
-    # Create user selection menu
-    $userMenu = NewMenu -Title "Select a user" -Description "Did you mean:"
+    # Create user selection menu from configuration
+    $userMenu = NewMenu -MenuName "userMenu"
+    if (-not $userMenu) {
+        # Fallback to manual creation if config not found
+        $userMenu = NewMenu -Title "Select a user" -Description "Did you mean:"
+    }
     # Store devices in an array to reference later
     $users = $UserList
     Write-Verbose "[$functionName] Creating user menu with $($userList.Count) users."

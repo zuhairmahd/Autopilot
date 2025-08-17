@@ -42,8 +42,12 @@ function DisplayGroupList()
         Write-Verbose "[$functionName] Group list has more than $maxDisplay groups, truncating to $maxDisplay."
         $groupList = $groupList | Select-Object -First $maxDisplay
     }
-    # Create group selection menu
-    $groupMenu = NewMenu -Title "Select a group" -Description "Did you mean:"
+    # Create group selection menu from configuration
+    $groupMenu = NewMenu -MenuName "groupMenu"
+    if (-not $groupMenu) {
+        # Fallback to manual creation if config not found
+        $groupMenu = NewMenu -Title "Select a group" -Description "Did you mean:"
+    }
     $groups = $groupList
     Write-Verbose "[$functionName] Creating group menu with $($groupList.Count) groups."
     # Add each group as a menu item

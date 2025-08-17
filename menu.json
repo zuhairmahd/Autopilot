@@ -29,7 +29,8 @@
                 "name": "Change application settings",
                 "description": "Modify the application settings",
                 "blockType": "menu",
-                "menuName": "settingsMenu"
+                "menuName": "settingsMenu",
+                "includeInDisplayModes": ["advanced"]
             },
             {
                 "name": "Check for script updates",

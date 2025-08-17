@@ -272,7 +272,12 @@ function ShowDeviceReport()
     } 
     Write-Verbose "[$functionName] Prompting user for export decision"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Prompting user for export decision" -LogLevel "Information"
-    $reportExportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
+    # Create report export menu from configuration
+    $reportExportMenu = NewMenu -MenuName "reportExportMenu"
+    if (-not $reportExportMenu) {
+        # Fallback to manual creation if config not found
+        $reportExportMenu = NewMenu -Title "Export report" -Description "Select the format to which you would like to export the report"
+    }
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to HTML" -Action $HTMLAction -ReturnsValue
     $reportExportMenu = AddMenuItem -Menu $reportExportMenu -Name "Export to CSV" -Action $CSVAction -ReturnsValue
     $selection = ShowMenu -Menu $reportExportMenu -CalledBy 'Action'
