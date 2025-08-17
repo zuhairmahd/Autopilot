@@ -37,6 +37,7 @@ function Test-SettingsJsonExists()
     try
     {
         # Define comprehensive default settings structure with correct property order
+        #app modes are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom
         $defaultSettings = @{
             description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
             version        = $version.version.toString()
