@@ -12,16 +12,19 @@ function NewMenu()
         [string]$MenuConfigFile = "$pwd\menu.json"
     )
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Creating new menu - MenuName: '$MenuName', Title: '$Title'" -LogLevel "Debug"
     
     # If MenuName is provided, try to load from configuration
     if ($MenuName)
     {
         Write-Verbose "[$functionName] Loading menu from configuration: $MenuName"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Loading menu from configuration: $MenuName" -LogLevel "Debug"
         $menuConfig = Get-MenuConfiguration -MenuName $MenuName -MenuConfigFile $MenuConfigFile
         
         if ($menuConfig)
         {
             Write-Verbose "[$functionName] Successfully loaded menu configuration for: $MenuName"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully loaded menu configuration for: $MenuName" -LogLevel "Debug"
             
             # Create menu object from configuration
             $menu = [ordered]@{
@@ -34,6 +37,7 @@ function NewMenu()
             if ($menuConfig.type -eq "static" -and $menuConfig.items)
             {
                 Write-Verbose "[$functionName] Adding static menu items from configuration"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Adding $($menuConfig.items.Count) static menu items from configuration" -LogLevel "Debug"
                 foreach ($item in $menuConfig.items)
                 {
                     # Create menu item with proper structure for AddMenuItem compatibility
@@ -51,6 +55,7 @@ function NewMenu()
                     {
                         $menuItem.includeInDisplayModes = @("full")
                         Write-Verbose "[$functionName] Defaulting includeInDisplayModes to 'full' for item: $($item.name)"
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Defaulting includeInDisplayModes to 'full' for item: $($item.name)" -LogLevel "Debug"
                     }
                     
                     # Handle different block types
@@ -80,11 +85,13 @@ function NewMenu()
             }
             
             Write-Verbose "[$functionName] Created menu '$($menu.Title)' with $($menu.Items.Count) items from configuration"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Created menu '$($menu.Title)' with $($menu.Items.Count) items from configuration" -LogLevel "Information"
             return $menu
         }
         else
         {
             Write-Verbose "[$functionName] Could not load menu configuration for '$MenuName', falling back to manual creation"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Could not load menu configuration for '$MenuName', falling back to manual creation" -LogLevel "Warning"
         }
     }
     
@@ -95,7 +102,8 @@ function NewMenu()
         throw "Either MenuName (for configuration-based menu) or Title (for manual menu) must be provided"
     }
     
-    Write-Verbose "[$functionName] Creating new menu manually with title: $Title and description: $Description"    
+    Write-Verbose "[$functionName] Creating new menu manually with title: $Title and description: $Description"  
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Creating new menu manually with title: $Title and description: $Description" -LogLevel "Information"    
     $menu = [ordered]@{
         Title       = $Title
         Description = $Description

@@ -138,23 +138,29 @@ Test-Function "Static menu items loaded correctly" {
     Write-Verbose "Export menu loaded with $($menu.Items.Count) items"
 }
 
-# Test 6: includeInDisplayModes defaults to "full" when empty
-Test-Function "includeInDisplayModes defaults to 'full' when empty" {
+# Test 6: All menu items have proper includeInDisplayModes assignments including "full"
+Test-Function "All menu items have proper includeInDisplayModes assignments including 'full'" {
     $menu = NewMenu -MenuName "mainMenu"
     if (-not $menu) {
         throw "Failed to load main menu"
     }
     
-    # Find an item with empty includeInDisplayModes in menu.json
-    $itemWithEmptyModes = $menu.Items | Where-Object { 
-        $_.includeInDisplayModes -contains "full" -and $_.includeInDisplayModes.Count -eq 1
+    # Verify all menu items have "full" mode included and non-empty includeInDisplayModes
+    $itemsWithoutFull = $menu.Items | Where-Object { 
+        -not ($_.includeInDisplayModes -contains "full") -or $_.includeInDisplayModes.Count -eq 0
     }
     
-    if (-not $itemWithEmptyModes) {
-        throw "No items found with default 'full' mode"
+    if ($itemsWithoutFull) {
+        throw "Found $($itemsWithoutFull.Count) items without 'full' mode or with empty includeInDisplayModes: $($itemsWithoutFull.Name -join ', ')"
     }
     
-    Write-Verbose "Found items with default 'full' mode: $($itemWithEmptyModes.Count)"
+    # Verify all items have proper mode assignments
+    $totalItems = $menu.Items.Count
+    if ($totalItems -eq 0) {
+        throw "No menu items found"
+    }
+    
+    Write-Verbose "All $totalItems menu items have proper includeInDisplayModes assignments including 'full'"
 }
 
 # Test 7: AddMenuItem updates existing items
@@ -187,7 +193,10 @@ Test-Function "AddMenuItem updates existing items and preserves includeInDisplay
         throw "Action was not set on updated item"
     }
     
-    if ($updatedItem.includeInDisplayModes -ne $originalIncludeModes) {
+    if ($updatedItem.includeInDisplayModes.Count -ne $originalIncludeModes.Count -or 
+        ($updatedItem.includeInDisplayModes | Compare-Object $originalIncludeModes)) {
+        Write-Verbose "Original: [$($originalIncludeModes -join ', ')]"
+        Write-Verbose "Updated: [$($updatedItem.includeInDisplayModes -join ', ')]"
         throw "includeInDisplayModes was not preserved during update"
     }
     

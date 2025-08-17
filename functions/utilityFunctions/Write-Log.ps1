@@ -207,7 +207,23 @@ function Write-Log()
         
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
         $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
-        $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)        
+        
+        # Get context in a cross-platform way
+        try 
+        {
+            if ($IsWindows -or ($null -eq $IsWindows -and $env:OS -eq "Windows_NT"))
+            {
+                $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+            }
+            else
+            {
+                $Context = $env:USER
+            }
+        }
+        catch 
+        {
+            $Context = "Unknown"
+        }
         if ($CMTraceFormat)
         {
             # True CMTrace format: 
