@@ -2,6 +2,45 @@
     "name": "menu.json",
     "description": "This file contains the definitions for the menus used in the application.",
     "version": "1.0.0.0",
+    "appModeHierarchy": {
+        "full": ["*"],
+        "advanced": ["advanced", "helpdesk", "registration"],
+        "helpdesk": ["helpdesk", "registration"],
+        "registration": ["registration"],
+        "advancedRegistration": ["advancedRegistration", "registration"],
+        "admin": ["admin", "advanced", "helpdesk", "registration"],
+        "custom": []
+    },
+    "appModeDefaults": {
+        "full": {
+            "description": "Full administrative access with all features enabled",
+            "capabilities": ["all_menus", "all_actions", "settings_management", "advanced_diagnostics", "export_all", "device_management"]
+        },
+        "advanced": {
+            "description": "Advanced user with helpdesk and configuration capabilities",
+            "capabilities": ["advanced_features", "helpdesk_operations", "device_registration", "settings_view", "advanced_exports"]
+        },
+        "helpdesk": {
+            "description": "Helpdesk operator with device troubleshooting and user assignment capabilities",
+            "capabilities": ["device_assignment", "device_troubleshooting", "basic_exports", "device_actions", "user_management"]
+        },
+        "registration": {
+            "description": "Device registration specialist with Autopilot enrollment capabilities",
+            "capabilities": ["autopilot_registration", "device_import", "basic_exports", "device_status_check"]
+        },
+        "advancedRegistration": {
+            "description": "Advanced registration specialist with administrative Autopilot capabilities",
+            "capabilities": ["advanced_autopilot", "custom_import", "device_preparation", "advanced_device_actions"]
+        },
+        "admin": {
+            "description": "System administrator with full configuration and management capabilities",
+            "capabilities": ["system_administration", "advanced_features", "helpdesk_operations", "device_registration", "full_configuration"]
+        },
+        "custom": {
+            "description": "Customizable mode where users define their own access patterns",
+            "capabilities": ["user_defined"]
+        }
+    },
     "mainMenu": {
         "Title": "Main Menu",
         "Description": "Please choose from one of the following options",

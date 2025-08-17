@@ -19,7 +19,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 
 ### Key Features
 
-- **🎯 Role-Based Interface**: Customizable app modes (Help Desk, Registration, Advanced, Admin) with tailored menu options for different user roles
+- **🎯 Role-Based Interface**: Hierarchical app mode system with inheritance-based privilege escalation. Seven built-in modes (Full, Admin, Advanced, Helpdesk, Registration, Advanced Registration, Custom) with tailored menu options and capabilities for different organizational roles. See [App Mode Configuration Guide](docs/APP_MODE_CONFIGURATION.md) for detailed role definitions and defaults.
 - **📋 Interactive Menu System**: Intuitive hierarchical navigation with keyboard shortcuts and stack-based history
 - **⚡ Device Assignment Workflow**: Streamlined device-to-user assignment with automated readiness validation
 - **🔍 Comprehensive Device Monitoring**: Real-time device enrollment status, BitLocker keys, LAPS credentials, and health monitoring
