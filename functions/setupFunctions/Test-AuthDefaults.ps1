@@ -57,26 +57,16 @@ function Test-AuthDefaults()
     
     try
     {
-        # Define default auth structure with exact values from requirements
-        $defaultAuth = @{
-            changePwOnNextStart = $false
-            authType            = "PublicAuthFlow"
-            noSaveRefreshToken  = $false
-            forceNewToken       = $false
-            renewalLeadTime     = 5
-            scope               = @(
-                "offline_access",
-                "openid",
-                "Device.ReadWrite.All",
-                "DeviceManagementApps.Read.All",
-                "DeviceManagementConfiguration.ReadWrite.All",
-                "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                "DeviceManagementManagedDevices.ReadWrite.All",
-                "DeviceManagementServiceConfig.ReadWrite.All"
-            )
-            cacheType           = "Memory"
-            secureString        = $false
-            delegated           = $true
+        # Get default auth structure from centralized function - single source of truth
+        Write-Verbose "[$functionName] Getting default auth structure from centralized Get-ApplicationDefaults"
+        Write-SafeLogFallback "Getting default auth structure from centralized source" "Verbose"
+        
+        $defaultAuth = Get-ApplicationDefaults -DefaultType "Auth"
+        if (-not $defaultAuth)
+        {
+            Write-Warning "[$functionName] Failed to get auth defaults from centralized function"
+            Write-SafeLogFallback "Failed to get auth defaults from centralized function" "Error"
+            return $false
         }
         
         Write-Verbose "[$functionName] Default auth structure defined with $($defaultAuth.Keys.Count) properties"
@@ -211,11 +201,11 @@ function Get-AuthDefaults()
 {
     <#
     .SYNOPSIS
-        Returns the default auth configuration structure.
+        Returns the default auth configuration structure from centralized source.
     
     .DESCRIPTION
-        Provides the default auth configuration that should be present in settings.json.
-        This function serves as the single source of truth for auth defaults.
+        Wrapper function that calls Get-ApplicationDefaults for auth configuration.
+        This ensures consistency and eliminates duplicate default value definitions.
     
     .OUTPUTS
         System.Collections.Hashtable
@@ -225,32 +215,13 @@ function Get-AuthDefaults()
         $authDefaults = Get-AuthDefaults
     
     .NOTES
-        Uses the exact default auth structure provided in requirements.
+        Uses centralized Get-ApplicationDefaults as single source of truth.
     #>
     [CmdletBinding()]
     param()
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Returning default auth configuration"
+    Write-Verbose "[$functionName] Returning default auth configuration from centralized source"
     
-    return @{
-        changePwOnNextStart = $false
-        authType            = "PublicAuthFlow"
-        noSaveRefreshToken  = $false
-        forceNewToken       = $false
-        renewalLeadTime     = 5
-        scope               = @(
-            "offline_access",
-            "openid",
-            "Device.ReadWrite.All",
-            "DeviceManagementApps.Read.All",
-            "DeviceManagementConfiguration.ReadWrite.All",
-            "DeviceManagementManagedDevices.PrivilegedOperations.All",
-            "DeviceManagementManagedDevices.ReadWrite.All",
-            "DeviceManagementServiceConfig.ReadWrite.All"
-        )
-        cacheType           = "Memory"
-        secureString        = $false
-        delegated           = $true
-    }
+    return Get-ApplicationDefaults -DefaultType "Auth"
 }

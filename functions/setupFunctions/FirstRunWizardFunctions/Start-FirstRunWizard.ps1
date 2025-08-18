@@ -162,7 +162,7 @@ function Start-FirstRunWizard()
         
         # Step 5: Ensure settings.json exists with defaults
         Write-SafeLog "Ensuring settings.json exists with defaults" "Information"
-        $settingsCreated = Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $config.domain
+        $settingsCreated = Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated
         
         if (-not $settingsCreated)
         {

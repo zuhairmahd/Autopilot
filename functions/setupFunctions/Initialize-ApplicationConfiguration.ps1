@@ -169,7 +169,7 @@ function Initialize-ConfigurationFiles
     {
         # Ensure settings.json exists with defaults
         Write-Verbose "[$functionName] Ensuring settings.json exists with defaults"
-        $settingsCreated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $Domain
+        $settingsCreated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent
         if (-not $settingsCreated)
         {
             $result.ErrorMessage = "Failed to create or validate settings.json file"
