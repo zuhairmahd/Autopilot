@@ -415,7 +415,7 @@ function Test-MenuJsonExists()
                 )
             }
             deviceWaitMenu = [ordered]@{
-                Title = "Options for Device With Serial Number `$serialNumber"
+                Title = "Options for Device With Serial Number $serialNumber"
                 Description = "Choose what you would like to do with this device:"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
