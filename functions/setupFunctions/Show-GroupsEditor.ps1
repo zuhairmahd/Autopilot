@@ -101,11 +101,12 @@ function Show-GroupsEditor()
                 Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] No loaded domain found, falling back to domain selection"
                 
-                $availableDomains = $currentSettings.domains.PSObject.Properties.Name
+                $configPath = Split-Path $SettingsFile -Parent
+                $availableDomains = Get-AvailableDomains -ConfigurationPath $configPath -SettingsFile $SettingsFile
                 if ($availableDomains.Count -eq 0)
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "No domains available in settings" -LogLevel "Error"
-                    Write-Warning "[$functionName] No domains available in settings"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "No domains available" -LogLevel "Error"
+                    Write-Warning "[$functionName] No domains available"
                     return $false
                 }
                 
@@ -147,32 +148,30 @@ function Show-GroupsEditor()
             }
         }
         
-        # Validate domain exists
-        if (-not $currentSettings.domains.PSObject.Properties.Name -contains $DomainName)
+        # Validate domain exists and load domain configuration
+        $configPath = Split-Path $SettingsFile -Parent
+        $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+        
+        if ($null -eq $domainConfig)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' not found in settings" -LogLevel "Error"
-            Write-Warning "[$functionName] Domain '$DomainName' not found in settings"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Error"
+            Write-Warning "[$functionName] Domain '$DomainName' configuration not found"
             return $false
         }
         
-        $domainSettings = $currentSettings.domains.$DomainName
-        
         # Get current group settings with safe defaults
-        $domainPropertyNames = $domainSettings.PSObject.Properties.Name
-        
-        # Get current group settings with safe defaults
-        $currentIncludeGroups = if ($domainPropertyNames -contains 'groupsToInclude') 
+        $currentIncludeGroups = if ($domainConfig.groupsToInclude) 
         { 
-            $domainSettings.groupsToInclude 
+            $domainConfig.groupsToInclude 
         } 
         else 
         { 
             @() 
         }
         
-        $currentExcludeGroups = if ($domainSettings.PSObject.Properties.Name -contains 'groupsToExclude') 
+        $currentExcludeGroups = if ($domainConfig.groupsToExclude) 
         { 
-            $domainSettings.groupsToExclude 
+            $domainConfig.groupsToExclude 
         } 
         else 
         { 

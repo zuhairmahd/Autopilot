@@ -137,10 +137,25 @@ function Show-SettingsEditor()
         }
         else
         {
+            # Load domain settings from separate domain configuration file
+            $configPath = Split-Path $SettingsFile -Parent
+            $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+            
+            if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
+            {
+                Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for: $DomainName" -LogLevel "Warning"
+                return $false
+            }
+            
+            # Use the first domain's settings as template (from the main settings file for structure)
             $settingsTemplate = $defaultSettings.domains.PSObject.Properties | Select-Object -First 1 | ForEach-Object { $_.Value.settings }
-            $currentValues = $currentSettings.domains.$DomainName.settings
-            Write-Log -LogFile $logFile -Module $functionName -Message "Editing domain settings for domain: '$DomainName'" -LogLevel "Information"
-            Write-Verbose "[$functionName] Editing domain settings for domain: '$DomainName'"
+            
+            # But use the actual domain configuration for current values
+            $currentValues = $domainConfig.settings
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing domain settings for domain: '$DomainName' from separate configuration file" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing domain settings for domain: '$DomainName' from separate configuration file"
             if (-not $Silent)
             {
                 Write-Host "`n── Domain Settings Editor ──" -ForegroundColor Cyan
