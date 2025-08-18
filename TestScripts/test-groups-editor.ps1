@@ -28,7 +28,7 @@ foreach ($file in $functionFiles) {
 
 # Set global variables that the functions expect
 $global:maxJSONDepth = 10
-$global:logFile = "test.log"
+$global:logFile = Join-Path $scriptRoot "test.log"
 
 # Test 1: Function exists and can be called
 Write-Host "`n=== Test 1: Function Availability ===" -ForegroundColor Yellow
@@ -95,46 +95,59 @@ catch {
     Write-Host "✗ Error testing array comparison: $($_.Exception.Message)" -ForegroundColor Red
 }
 
-# Test 4: Settings file validation
-Write-Host "`n=== Test 4: Settings File Validation ===" -ForegroundColor Yellow
+# Test 4: Settings file validation and domain architecture
+Write-Host "`n=== Test 4: Settings File and Domain Architecture Validation ===" -ForegroundColor Yellow
 $settingsFile = Join-Path $scriptRoot "../settings.json"
 if (Test-Path $settingsFile) {
     Write-Host "✓ Settings file exists: $settingsFile" -ForegroundColor Green
     
     try {
         $settings = Get-Content $settingsFile -Raw | ConvertFrom-Json
-        if ($settings.domains) {
-            Write-Host "✓ Settings file has domains section" -ForegroundColor Green
-            
-            $domainNames = $settings.domains.PSObject.Properties.Name
-            Write-Host "   Available domains: $($domainNames -join ', ')" -ForegroundColor Cyan
+        
+        # Check for new domain architecture
+        $configPath = Split-Path $settingsFile -Parent
+        $availableDomains = Get-AvailableDomains -ConfigurationPath $configPath -SettingsFile $settingsFile
+        
+        if ($availableDomains.Count -gt 0) {
+            Write-Host "✓ New domain architecture working correctly" -ForegroundColor Green
+            Write-Host "   Available domains: $($availableDomains -join ', ')" -ForegroundColor Cyan
             
             # Check first domain for group properties
-            if ($domainNames.Count -gt 0) {
-                $firstDomain = $domainNames[0]
-                $domain = $settings.domains.$firstDomain
-                
-                $hasInclude = $domain.PSObject.Properties.Name -contains 'groupsToInclude'
-                $hasExclude = $domain.PSObject.Properties.Name -contains 'groupsToExclude'
-                
-                if ($hasInclude) {
-                    Write-Host "✓ Domain has groupsToInclude property" -ForegroundColor Green
-                } else {
-                    Write-Host "✗ Domain missing groupsToInclude property" -ForegroundColor Red
-                }
-                
-                if ($hasExclude) {
-                    Write-Host "✓ Domain has groupsToExclude property" -ForegroundColor Green
-                } else {
-                    Write-Host "✗ Domain missing groupsToExclude property" -ForegroundColor Red
+            if ($availableDomains.Count -gt 0) {
+                # Work around PowerShell array handling issues by processing all domains
+                foreach ($domainName in $availableDomains) {
+                    Write-Verbose "Testing domain: '$domainName' (Length: $($domainName.Length))"
+                    $domainConfig = Load-DomainConfiguration -DomainName $domainName -ConfigurationPath $configPath
+                    
+                    if ($domainConfig) {
+                        Write-Host "✓ Successfully loaded domain configuration for: $domainName" -ForegroundColor Green
+                        
+                        $hasInclude = $null -ne $domainConfig.groupsToInclude
+                        $hasExclude = $null -ne $domainConfig.groupsToExclude
+                        
+                        if ($hasInclude) {
+                            Write-Host "✓ Domain has groupsToInclude property" -ForegroundColor Green
+                        } else {
+                            Write-Host "✗ Domain missing groupsToInclude property" -ForegroundColor Red
+                        }
+                        
+                        if ($hasExclude) {
+                            Write-Host "✓ Domain has groupsToExclude property" -ForegroundColor Green
+                        } else {
+                            Write-Host "✗ Domain missing groupsToExclude property" -ForegroundColor Red
+                        }
+                        break  # Only test the first valid domain
+                    } else {
+                        Write-Host "✗ Failed to load domain configuration for: $domainName" -ForegroundColor Red
+                    }
                 }
             }
         } else {
-            Write-Host "✗ Settings file missing domains section" -ForegroundColor Red
+            Write-Host "✗ No domains available in new architecture" -ForegroundColor Red
         }
     }
     catch {
-        Write-Host "✗ Error parsing settings file: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "✗ Error testing domain architecture: $($_.Exception.Message)" -ForegroundColor Red
     }
 } else {
     Write-Host "✗ Settings file not found: $settingsFile" -ForegroundColor Red

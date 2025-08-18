@@ -51,22 +51,14 @@ function Show-GroupsEditor()
     
     try
     {
-        # Load current settings
-        Write-Log -LogFile $logFile -Module $functionName -Message "Loading current settings from: $SettingsFile" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Loading current settings from: $SettingsFile"
+        # Check if settings file exists for configuration path determination
+        Write-Log -LogFile $logFile -Module $functionName -Message "Checking settings file: $SettingsFile" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Checking settings file: $SettingsFile"
         
         if (-not (Test-Path -Path $SettingsFile))
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Error"
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
-            return $false
-        }
-        
-        $currentSettings = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
-        if (-not $currentSettings.domains)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No domains section found in settings file" -LogLevel "Error"
-            Write-Warning "[$functionName] No domains section found in settings file"
             return $false
         }
         
@@ -101,11 +93,12 @@ function Show-GroupsEditor()
                 Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] No loaded domain found, falling back to domain selection"
                 
-                $availableDomains = $currentSettings.domains.PSObject.Properties.Name
+                $configPath = Split-Path $SettingsFile -Parent
+                $availableDomains = Get-AvailableDomains -ConfigurationPath $configPath -SettingsFile $SettingsFile
                 if ($availableDomains.Count -eq 0)
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "No domains available in settings" -LogLevel "Error"
-                    Write-Warning "[$functionName] No domains available in settings"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "No domains available" -LogLevel "Error"
+                    Write-Warning "[$functionName] No domains available"
                     return $false
                 }
                 
@@ -147,32 +140,36 @@ function Show-GroupsEditor()
             }
         }
         
-        # Validate domain exists
-        if (-not $currentSettings.domains.PSObject.Properties.Name -contains $DomainName)
+        # Validate domain exists and load domain configuration using new architecture
+        $configPath = Split-Path $SettingsFile -Parent
+        Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from: $configPath" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from: $configPath"
+        
+        $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+        
+        if ($null -eq $domainConfig)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' not found in settings" -LogLevel "Error"
-            Write-Warning "[$functionName] Domain '$DomainName' not found in settings"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Error"
+            Write-Warning "[$functionName] Domain '$DomainName' configuration not found"
             return $false
         }
         
-        $domainSettings = $currentSettings.domains.$DomainName
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
+        Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
         # Get current group settings with safe defaults
-        $domainPropertyNames = $domainSettings.PSObject.Properties.Name
-        
-        # Get current group settings with safe defaults
-        $currentIncludeGroups = if ($domainPropertyNames -contains 'groupsToInclude') 
+        $currentIncludeGroups = if ($domainConfig.groupsToInclude) 
         { 
-            $domainSettings.groupsToInclude 
+            $domainConfig.groupsToInclude 
         } 
         else 
         { 
             @() 
         }
         
-        $currentExcludeGroups = if ($domainSettings.PSObject.Properties.Name -contains 'groupsToExclude') 
+        $currentExcludeGroups = if ($domainConfig.groupsToExclude) 
         { 
-            $domainSettings.groupsToExclude 
+            $domainConfig.groupsToExclude 
         } 
         else 
         { 
@@ -557,7 +554,7 @@ function Update-DomainGroupSetting()
 {
     <#
     .SYNOPSIS
-        Updates domain-level group settings using manual JSON manipulation.
+        Updates domain-level group settings using separate domain configuration files.
     #>
     [CmdletBinding()]
     param(
@@ -574,17 +571,22 @@ function Update-DomainGroupSetting()
     
     try
     {
-        # Load current settings
-        $jsonContent = Get-Content -Path $SettingsFile -Raw -Force
-        $settingsObj = $jsonContent | ConvertFrom-Json
+        # Determine configuration path from settings file
+        $configPath = Split-Path $SettingsFile -Parent
+        Write-Log -LogFile $logFile -Module $functionName -Message "Configuration path: $configPath" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Configuration path: $configPath"
         
-        # Ensure the domain exists
-        if (-not $settingsObj.domains.PSObject.Properties.Name -contains $DomainName)
+        # Load current domain configuration
+        $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+        if ($null -eq $domainConfig)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' not found" -LogLevel "Error"
-            Write-Warning "[$functionName] Domain '$DomainName' not found"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for '$DomainName'" -LogLevel "Error"
+            Write-Warning "[$functionName] Failed to load domain configuration for '$DomainName'"
             return $false
         }
+        
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
         # Update the specific group setting
         Write-Log -LogFile $logFile -Module $functionName -Message "Setting $GroupType to array with $($Groups.Count) groups" -LogLevel "Verbose"
@@ -593,57 +595,70 @@ function Update-DomainGroupSetting()
         # Ensure Groups is always an array, even for single items
         $groupsArray = @($Groups)
         
-        # Ensure the property exists before assignment
-        if (-not ($settingsObj.domains.$DomainName.PSObject.Properties.Name -contains $GroupType))
+        # Update the domain configuration
+        if ($GroupType -eq 'groupsToInclude')
         {
-            $settingsObj.domains.$DomainName | Add-Member -MemberType NoteProperty -Name $GroupType -Value $null
+            $domainConfig.groupsToInclude = $groupsArray
+        }
+        elseif ($GroupType -eq 'groupsToExclude')
+        {
+            $domainConfig.groupsToExclude = $groupsArray
         }
         
-        $settingsObj.domains.$DomainName.$GroupType = $groupsArray
+        Write-Log -LogFile $logFile -Module $functionName -Message "Updated $GroupType in domain configuration object" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Updated $GroupType in domain configuration object"
         
-        # Create backup
-        $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-        Copy-Item -Path $SettingsFile -Destination $backupFile -Force
-        Write-Log -LogFile $logFile -Module $functionName -Message "Created backup: $backupFile" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Created backup: $backupFile"
+        # Save the updated domain configuration
+        Write-Log -LogFile $logFile -Module $functionName -Message "Saving updated domain configuration" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Saving updated domain configuration"
         
-        # Save updated settings
-        $settingsObj | ConvertTo-Json -Depth $global:maxJSONDepth | Set-Content -Path $SettingsFile -Force
-        Write-Log -LogFile $logFile -Module $functionName -Message "Saved updated settings to $SettingsFile" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
-        
-        # Verify the update
-        $verifyContent = Get-Content -Path $SettingsFile -Raw -Force
-        $verifySettings = $verifyContent | ConvertFrom-Json
-        
-        if ($verifySettings.domains.$DomainName.PSObject.Properties.Name -contains $GroupType)
+        $success = Save-DomainConfiguration -DomainName $DomainName -DomainConfiguration $domainConfig -ConfigurationPath $configPath
+        if ($success)
         {
-            $actualGroups = $verifySettings.domains.$DomainName.$GroupType
-            $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved updated domain configuration" -LogLevel "Information"
+            Write-Verbose "[$functionName] Successfully saved updated domain configuration"
             
-            if ($null -eq $comparisonResult)
+            # Verify the update by reloading
+            Write-Log -LogFile $logFile -Module $functionName -Message "Verifying update by reloading domain configuration" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Verifying update by reloading domain configuration"
+            
+            $verifyConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+            if ($verifyConfig)
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated and verified $GroupType" -LogLevel "Information"
-                Write-Verbose "[$functionName] Successfully updated and verified $GroupType"
-                return $true
+                $actualGroups = if ($GroupType -eq 'groupsToInclude') { $verifyConfig.groupsToInclude } else { $verifyConfig.groupsToExclude }
+                $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+                
+                if ($null -eq $comparisonResult)
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated and verified $GroupType" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Successfully updated and verified $GroupType"
+                    return $true
+                }
+                else
+                {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType" -LogLevel "Warning"
+                    Write-Warning "[$functionName] Verification failed for $GroupType"
+                    return $false
+                }
             }
             else
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType" -LogLevel "Warning"
-                Write-Warning "[$functionName] Verification failed for $GroupType"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to reload domain configuration for verification" -LogLevel "Warning"
+                Write-Warning "[$functionName] Failed to reload domain configuration for verification"
                 return $false
             }
         }
         else
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Property $GroupType not found after update" -LogLevel "Warning"
-            Write-Warning "[$functionName] Property $GroupType not found after update"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save updated domain configuration" -LogLevel "Error"
+            Write-Warning "[$functionName] Failed to save updated domain configuration"
             return $false
         }
     }
     catch
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "Error updating ${GroupType}: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Full error details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
         Write-Warning "[$functionName] Error updating ${GroupType}: $($_.Exception.Message)"
         return $false
     }

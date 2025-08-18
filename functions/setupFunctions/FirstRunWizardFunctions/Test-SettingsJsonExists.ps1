@@ -6,7 +6,8 @@ function Test-SettingsJsonExists()
     
     .DESCRIPTION
         Checks if settings.json exists, and if not, creates it with comprehensive default values
-        based on the existing settings structure.
+        from the centralized Get-ApplicationDefaults function. Domain configurations are now
+        handled by separate domain files and are not included in the main settings.json.
     
     .PARAMETER SettingsFile
         Path to the settings.json file.
@@ -14,12 +15,20 @@ function Test-SettingsJsonExists()
     .PARAMETER Silent
         If specified, skips confirmation prompts.
     
-    .PARAMETER DomainName
-        The domain name to use for domain-specific configuration defaults.
+    .PARAMETER AuthType
+        The authentication type to use for default auth configuration.
+    
+    .PARAMETER IsDelegated
+        Whether to use delegated permissions by default.
     
     .OUTPUTS
         System.Boolean
         Returns $true if the file exists or was created successfully, $false otherwise.
+    
+    .NOTES
+        - Uses centralized Get-ApplicationDefaults function as single source of truth
+        - Domain configurations are now handled by separate domain files
+        - Eliminates duplicate default value definitions
     #>
     [CmdletBinding()]
     param(
@@ -27,8 +36,7 @@ function Test-SettingsJsonExists()
         [string]$SettingsFile,
         [switch]$Silent,
         [string]$AuthType = "Delegated",
-        [bool]$IsDelegated = $true,
-        [string]$DomainName = "example.com"
+        [bool]$IsDelegated = $true
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -36,207 +44,44 @@ function Test-SettingsJsonExists()
     Write-SafeLog "Ensuring settings.json exists: $SettingsFile" "Information"
     try
     {
-        # Define comprehensive default settings structure with correct property order
-        #app modes are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom
-        $defaultSettings = @{
-            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version        = $version.version.toString()
-            auth           = @{
-                delegated           = $IsDelegated
-                authType            = "PublicAuthFlow"
-                changePwOnNextStart = $false
-                renewalLeadTime     = 5
-                noSaveRefreshToken  = $false
-                secureString        = $false
-                forceNewToken       = $false
-                cacheType           = "Memory"
-                scope               = @(
-                    "offline_access",
-                    "openid", 
-                    "Device.ReadWrite.All",
-                    "DeviceManagementApps.Read.All",
-                    "DeviceManagementConfiguration.ReadWrite.All",
-                    "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                    "DeviceManagementManagedDevices.ReadWrite.All",
-                    "DeviceManagementServiceConfig.ReadWrite.All"
-                )
-            }
-            requiredScopes = @(
-                @{
-                    Scope     = "User.Read.All"
-                    Reason    = "Required to read user profiles, group memberships, and registered devices."
-                    Endpoints = @(
-                        "/users",
-                        "users/{id}",
-                        "users/{id}/memberOf",
-                        "users/{id}/registeredDevices"
-                    )
-                },
-                @{
-                    Scope     = "Device.Read.All"
-                    Reason    = "Required to read Microsoft Entra ID device objects."
-                    Endpoints = @(
-                        "devices"
-                    )
-                },
-                @{
-                    Scope     = "DeviceManagementApps.ReadWrite.All"
-                    Reason    = "Required to read application information and manage app assignments."
-                    Endpoints = @(
-                        "deviceAppManagement/mobileApps",
-                        "deviceAppManagement/mobileApps/{id}/assignments"
-                    )
-                },
-                @{
-                    Scope     = "DeviceManagementConfiguration.Read.All"
-                    Reason    = "Required to read Intune device configuration policies."
-                    Endpoints = @(
-                        "deviceManagement/deviceConfigurations"
-                    )
-                },
-                @{
-                    Scope     = "DeviceManagementManagedDevices.Read.All"
-                    Reason    = "Required to read Intune managed device properties."
-                    Endpoints = @(
-                        "/deviceManagement/managedDevices",
-                        "deviceManagement/managedDevices/{id}"
-                    )
-                },
-                @{
-                    Scope     = "DeviceManagementManagedDevices.PrivilegedOperations.All"
-                    Reason    = "Required for highly privileged operations, specifically to read local admin (LAPS) passwords."
-                    Endpoints = @(
-                        "directory/deviceLocalCredentials"
-                    )
-                },
-                @{
-                    Scope     = "DeviceManagementServiceConfig.ReadWrite.All"
-                    Reason    = "Required to read Autopilot events and to read and manage Autopilot device identities."
-                    Endpoints = @(
-                        "deviceManagement/autopilotEvents",
-                        "deviceManagement/importedWindowsAutopilotDeviceIdentities",
-                        "deviceManagement/windowsAutopilotDeviceIdentities"
-                    )
-                },
-                @{
-                    Scope     = "BitlockerKey.Read.All"
-                    Reason    = "Required to read BitLocker recovery keys for all devices."
-                    Endpoints = @(
-                        "informationProtection/bitlocker/recoveryKeys"
-                    )
-                },
-                @{
-                    Scope     = "openid"
-                    Reason    = "Standard scope required for user sign-in with OpenID Connect."
-                    Endpoints = @()
-                },
-                @{
-                    Scope     = "profile"
-                    Reason    = "Standard scope to get basic user profile information during sign-in."
-                    Endpoints = @()
-                },
-                @{
-                    scope     = "DeviceManagementConfiguration.ReadWrite.All"
-                    reason    = "Required to create, update, and delete Intune device configuration policies."
-                    endpoints = @(
-                        "deviceManagement/deviceConfigurations"
-                    )
-                },
-                @{
-                    scope     = "DeviceManagementApps.Read.All"
-                    reason    = "Required to read application information in Intune."
-                    endpoints = @(
-                        "deviceAppManagement/mobileApps"
-                    )
-                },
-                @{
-                    scope     = "DeviceManagementManagedDevices.ReadWrite.All"
-                    reason    = "Required to create, update, and delete Intune managed device properties."
-                    endpoints = @(
-                        "deviceManagement/managedDevices"
-                    )
-                },
-                @{
-                    scope     = "DeviceManagementManagedDevices.PrivilegedOperations.All"
-                    reason    = "Required for privileged operations on managed devices, such as reading LAPS passwords."
-                    endpoints = @(
-                        "deviceManagement/managedDevices"
-                    )
-                },
-                @{
-                    scope     = "BitlockerKey.Read.All"
-                    reason    = "Required to read BitLocker recovery keys for all devices."
-                    endpoints = @(
-                        "informationProtection/bitlocker/recoveryKeys"
-                    )
-                },
-                @{
-                    scope     = "openid"
-                    reason    = "Standard scope required for user sign-in with OpenID Connect."
-                    endpoints = @()
-                },
-                @{
-                    scope     = "profile"
-                    reason    = "Standard scope to get basic user profile information during sign-in."
-                    endpoints = @()
-                },
-                @{
-                    scope     = "offline_access"
-                    reason    = "Standard scope that provides refresh tokens to maintain access when the user is not active."
-                    endpoints = @()
-                }
-            )
-            globalSettings = @{
-                configFile                   = ".\.secrets\config.json"
-                maxWaitTime                  = 30
-                showLicenseBanner            = $true
-                deviceContactThresholdInDays = 30
-                appMode                      = "full"
-                timeInSeconds                = 60
-                maxUserMatchDisplay          = 10
-                maxGroupMatchDisplay         = 10
-                release                      = "master"
-                repo                         = "Github"
-                testMode                     = $false
-                operatingSystem              = "Windows"
-                autoUpdate                   = $true
-            }
-            domains        = @{
-                $DomainName = @{
-                    groupsToInclude = @()
-                    groupsToExclude = @()
-                    settings        = @{
-                        domain                          = $DomainName
-                        maxWaitTime                     = "30"
-                        showLicenseBanner               = $true
-                        deviceContactThresholdInDays    = 30
-                        appMode                         = "full"
-                        timeInSeconds                   = "60"
-                        maxUserMatchDisplay             = "10"
-                        maxGroupMatchDisplay            = 10
-                        release                         = "master"
-                        repo                            = "Github"
-                        autoUpdate                      = $true
-                        deviceNamePrefix                = ""
-                        operatingSystem                 = "Windows"
-                        minUsernameLength               = 3
-                        maxUserNameLength               = 50
-                        maxSerialNumberLength           = 50
-                        minSerialNumberLength           = 7
-                        minimumDevicePhysicalMemoryInGB = 8
-                        maxNumberOfDevicesAllowed       = 15
-                        preferredBrowser                = "Chrome"
-                        privateSession                  = $false
-                        userPatternsToExclude           = @( 
-                            "-test",
-                            "onmicrosoft.com"
-                        )
-                        groupPatternsToExclude          = @()  
-                        desiredAutopilotProfiles        = @()
-                    }
-                }
+        # Get comprehensive default settings structure from centralized source of truth
+        # This eliminates duplicate default value definitions
+        Write-Verbose "[$functionName] Getting default settings from centralized Get-ApplicationDefaults function"
+        Write-SafeLog "Getting default settings from centralized source" "Information"
+        
+        # Use centralized defaults - single source of truth
+        # Get version from global variable if available, otherwise use default
+        $versionString = if ($global:version -and $global:version.version) {
+            $global:version.version.toString()
+        } elseif ($version -and $version.version) {
+            $version.version.toString()
+        } else {
+            "1.3.0.0"  # Default version
+        }
+        Write-Verbose "[$functionName] Using version: $versionString"
+        Write-SafeLog "Using version: $versionString" "Information"
+        
+        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings" -Version $versionString
+        if (-not $defaultSettings)
+        {
+            Write-Verbose "[$functionName] Failed to get defaults from centralized function, creating fallback"
+            Write-SafeLog "Failed to get defaults from centralized function, using fallback" "Warning"
+            
+            # Fallback minimal structure in case centralized function fails
+            $defaultSettings = @{
+                description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+                version        = $versionString
+                auth           = Get-ApplicationDefaults -DefaultType "Auth"
+                globalSettings = Get-ApplicationDefaults -DefaultType "Global"
             }
         }
+        
+        Write-Verbose "[$functionName] Using centralized default settings structure"
+        Write-SafeLog "Using centralized default settings structure" "Information"
+        
+        # Note: Domain configurations are now handled by separate domain files
+        # The domains section is no longer included in the main settings.json default structure
+        # This eliminates the need for the $DomainName parameter in default settings creation
         if (Test-Path -Path $SettingsFile)
         {
             Write-Verbose "[$functionName] Settings file exists, checking for missing default values: $SettingsFile"

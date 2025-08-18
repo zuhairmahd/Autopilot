@@ -137,10 +137,55 @@ function Show-SettingsEditor()
         }
         else
         {
-            $settingsTemplate = $defaultSettings.domains.PSObject.Properties | Select-Object -First 1 | ForEach-Object { $_.Value.settings }
-            $currentValues = $currentSettings.domains.$DomainName.settings
-            Write-Log -LogFile $logFile -Module $functionName -Message "Editing domain settings for domain: '$DomainName'" -LogLevel "Information"
-            Write-Verbose "[$functionName] Editing domain settings for domain: '$DomainName'"
+            # Load domain settings from separate domain configuration file
+            $configPath = Split-Path $SettingsFile -Parent
+            Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from path: '$configPath'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from path: '$configPath'"
+            
+            $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+            
+            if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
+            {
+                Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for: $DomainName" -LogLevel "Warning"
+                return $false
+            }
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
+            
+            # Get domain settings template from centralized defaults (fixed approach)
+            Write-Log -LogFile $logFile -Module $functionName -Message "Getting domain settings template from centralized defaults for domain: '$DomainName'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Getting domain settings template from centralized defaults for domain: '$DomainName'"
+            
+            try
+            {
+                $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
+                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings)
+                {
+                    Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
+                    return $false
+                }
+                
+                $settingsTemplate = $domainTemplate.settings
+                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
+            }
+            catch
+            {
+                Write-Warning "[$functionName] Error retrieving domain template: $($_.Exception.Message)"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving domain template: $($_.Exception.Message)" -LogLevel "Error"
+                return $false
+            }
+            
+            # Use the actual domain configuration for current values
+            $currentValues = $domainConfig.settings
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using current domain settings with $($currentValues.PSObject.Properties.Count) properties" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Using current domain settings with $($currentValues.PSObject.Properties.Count) properties"
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Editing domain settings for domain: '$DomainName' from separate configuration file" -LogLevel "Information"
+            Write-Verbose "[$functionName] Editing domain settings for domain: '$DomainName' from separate configuration file"
             if (-not $Silent)
             {
                 Write-Host "`n── Domain Settings Editor ──" -ForegroundColor Cyan
@@ -370,99 +415,39 @@ function Get-DefaultSettingsStructure()
 {
     <#
     .SYNOPSIS
-        Retrieves the default settings structure efficiently without file operations.
+        Retrieves the default settings structure efficiently from centralized defaults.
+    
+    .DESCRIPTION
+        Uses the centralized Get-ApplicationDefaults function to retrieve default settings.
+        This ensures consistency and eliminates duplicate default value definitions.
     #>
     [CmdletBinding()]
     param()
 
     $functionName = $MyInvocation.MyCommand.Name
     
-    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure using cached defaults" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Retrieving default settings structure using cached defaults"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure from centralized defaults" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Retrieving default settings structure from centralized defaults"
     
     try
     {
-        # Instead of creating a temporary file and calling Test-SettingsJsonExists,
-        # directly create the default structure here to avoid unnecessary file operations
-        Write-Log -LogFile $logFile -Module $functionName -Message "Creating default structure without file operations" -LogLevel "Debug"
-        Write-Verbose "[$functionName] Creating default structure without file operations"
+        # Use centralized default values - single source of truth
+        Write-Log -LogFile $logFile -Module $functionName -Message "Getting defaults from Get-ApplicationDefaults" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Getting defaults from Get-ApplicationDefaults"
         
-        $defaultSettings = @{
-            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version        = "1.3.0.0"
-            auth           = @{
-                delegated           = $true
-                authType            = "PublicAuthFlow"
-                changePwOnNextStart = $false
-                renewalLeadTime     = 5
-                noSaveRefreshToken  = $false
-                secureString        = $false
-                forceNewToken       = $false
-                cacheType           = "Memory"
-                scope               = @(
-                    "offline_access",
-                    "openid", 
-                    "Device.ReadWrite.All",
-                    "DeviceManagementApps.Read.All",
-                    "DeviceManagementConfiguration.ReadWrite.All",
-                    "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                    "DeviceManagementManagedDevices.ReadWrite.All",
-                    "DeviceManagementServiceConfig.ReadWrite.All"
-                )
-            }
-            globalSettings = @{
-                configFile                   = ".\\.secrets\\config.json"
-                maxWaitTime                  = "30"
-                showLicenseBanner            = $true
-                deviceContactThresholdInDays = 30
-                appMode                      = "full"
-                timeInSeconds                = "60"
-                maxUserMatchDisplay          = "10"
-                release                      = "master"
-                repo                         = "Github"
-                testMode                     = $false
-                operatingSystem              = "Windows"
-                autoUpdate                   = $true
-            }
-            domains        = @{
-                "example.com" = @{
-                    groupsToInclude = @()
-                    groupsToExclude = @()
-                    settings        = @{
-                        domain                          = "example.com"
-                        maxWaitTime                     = "30"
-                        showLicenseBanner               = $true
-                        deviceContactThresholdInDays    = 30
-                        appMode                         = "full"
-                        timeInSeconds                   = "60"
-                        maxUserMatchDisplay             = "10"
-                        release                         = "master"
-                        repo                            = "Github"
-                        autoUpdate                      = $true
-                        deviceNamePrefix                = ""
-                        operatingSystem                 = "Windows"
-                        minUsernameLength               = 3
-                        maxUserNameLength               = 50
-                        maxSerialNumberLength           = 50
-                        minSerialNumberLength           = 7
-                        minimumDevicePhysicalMemoryInGB = 8
-                        maxNumberOfDevicesAllowed       = 15
-                        preferredBrowser                = "Chrome"
-                        privateSession                  = $false
-                        userPatternsToExclude           = @( 
-                            "-test",
-                            "onmicrosoft.com"
-                        )
-                        desiredAutopilotProfiles        = @()
-                    }
-                }
-            }
+        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+        
+        if (-not $defaultSettings)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings from centralized function" -LogLevel "Error"
+            Write-Verbose "[$functionName] Failed to get default settings from centralized function"
+            return $null
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure created successfully" -LogLevel "Information"
-        Write-Verbose "[$functionName] Default settings structure created successfully"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure retrieved successfully from centralized source" -LogLevel "Information"
+        Write-Verbose "[$functionName] Default settings structure retrieved successfully from centralized source"
         
-        # Convert to PSCustomObject to match the JSON structure behavior
+        # Convert to PSCustomObject to match the JSON structure behavior expected by consuming functions
         $jsonString = $defaultSettings | ConvertTo-Json -Depth $global:maxJSONDepth
         $defaultStructure = $jsonString | ConvertFrom-Json
         
@@ -473,8 +458,8 @@ function Get-DefaultSettingsStructure()
     }
     catch
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error creating default settings structure: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Verbose "[$functionName] Error creating default settings structure: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving default settings structure: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Verbose "[$functionName] Error retrieving default settings structure: $($_.Exception.Message)"
         return $null
     }
 }
@@ -593,8 +578,6 @@ function Get-SettingDescription()
         return "Configuration setting: $SettingName"
     }
 }
-
-
 
 function Get-SettingInput()
 {
@@ -1008,36 +991,34 @@ function Get-ArrayInput()
         Write-Host "  1. Replace all existing values with new ones" -ForegroundColor White
         Write-Host "  2. Add new values to the existing ones" -ForegroundColor White
         Write-Host "  3. Keep current values unchanged" -ForegroundColor White
-        
-        do
+        $choice = Read-Host "Enter your choice (1-3)"
+        while ($choice -notmatch '^[1-3]$')
         {
+            Write-Host "Invalid choice. Please enter a number between 1 and 3." -ForegroundColor Red
+            [console]::beep(1000, 500)
             $choice = Read-Host "Enter your choice (1-3)"
-            switch ($choice)
+        }
+        switch ($choice)
+        {
+            '1'
             {
-                '1' {
-                    $shouldReplaceExisting = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing array values" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to replace existing array values"
-                    break
-                }
-                '2' {
-                    $shouldReplaceExisting = $false
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing array values" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to add to existing array values"
-                    break
-                }
-                '3' {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current array values unchanged" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to keep current array values unchanged"
-                    return $CurrentValue
-                }
-                default {
-                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
-                    continue
-                }
+                Write-Verbose "[$functionName] User chose to replace existing values"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing values" -LogLevel "Information"
+                $shouldReplaceExisting = $true
             }
-            break
-        } while ($true)
+            '2'
+            {
+                Write-Verbose "[$functionName] User chose to add new values to existing ones"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add new values to existing ones" -LogLevel "Information"
+                $shouldReplaceExisting = $false
+            }
+            '3'
+            {
+                Write-Verbose "[$functionName] User chose to keep current values unchanged"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
+                return $CurrentValue
+            }
+        }
     }
     
     Write-Host "`nEnter new values (one per line). Press Enter on empty line to finish:" -ForegroundColor Yellow

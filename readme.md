@@ -84,7 +84,51 @@ For advanced scenarios where custom configuration is needed:
 
 ### Environment-Specific Configurations
 
-The tool supports domain-specific configurations. Refer to [Advanced Settings](./docs/Consolidated-Configuration-System.md) in the technical documentation for more information.
+The tool supports domain-specific configurations stored in separate files for better organization and management.
+
+#### Domain Configuration Files
+
+Starting with this version, domain-specific settings are stored in separate JSON files named after the domain (e.g., `contoso.com.json`, `fabrikam.com.json`). This provides several benefits:
+
+- **Better Organization**: Each domain has its own configuration file
+- **Easier Management**: Modify domain settings without affecting the main settings.json
+- **Simplified Backup**: Back up individual domain configurations separately
+- **Reduced Conflicts**: Multiple administrators can work on different domain configurations simultaneously
+
+#### Configuration Structure
+
+Each domain configuration file contains:
+```json
+{
+  "groupsToInclude": ["Domain-Users", "Device-Recipients"],
+  "groupsToExclude": ["Contractors", "Temporary-Users"],
+  "settings": {
+    "deviceNamePrefix": "CONTOSO-",
+    "domain": "contoso.com",
+    "maxNumberOfDevicesAllowed": 10,
+    "MinimumDevicePhysicalMemoryInGB": 8
+  },
+  "additionalScopes": []
+}
+```
+
+#### Automatic Migration
+
+The application automatically migrates existing domain configurations from the main `settings.json` file to separate domain files on first load. The migration:
+
+- Creates separate `.json` files for each domain
+- Preserves all existing settings and group configurations
+- Removes the domains section from the main settings.json after successful migration
+- Creates backups before making any changes
+
+#### Backward Compatibility
+
+The tool maintains backward compatibility with existing configurations:
+- Can still read domains from `settings.json` if separate files don't exist
+- Automatically creates domain files with default settings if needed
+- Supports loading from both formats during transition period
+
+For more technical details, refer to [Advanced Settings](./docs/Consolidated-Configuration-System.md) in the technical documentation.
 
 ## Menu Options
 

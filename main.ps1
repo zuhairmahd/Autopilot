@@ -375,7 +375,10 @@ Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded s
 
 #endregion Load parameters from the configuration file if it exists
 #region Define variables
-if ($settings.Repo -eq 'github')
+$defaultBranch = 'master'  # Default branch for fallback scenarios
+Write-Verbose "[$scriptName] Default branch: $defaultBranch"
+
+if ($settings.Repo -ieq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
     $baseSourceURL = 'https://raw.githubusercontent.com'
@@ -385,7 +388,6 @@ if ($settings.Repo -eq 'github')
     Write-Verbose "[$scriptName] Repository path: $repoPath"
     $repoName = 'autopilot'
     Write-Verbose "[$scriptName] Repository name: $repoName"
-    $defaultBranch = 'master'
     Write-Verbose "[$scriptName] Default branch: $defaultBranch"
     if ($settings.release -eq 'auto')
     {
@@ -410,7 +412,7 @@ if ($settings.Repo -eq 'github')
         $latestRelease = $settings.release
     }
 }
-elseif ($settings.Repo -eq 'gitlab')
+elseif ($settings.Repo -ieq 'gitlab')
 {
     $baseSourceURL = 'https://git.gao.gov'
     $baseURL = "https://git.gao.gov"
@@ -424,6 +426,11 @@ else
 {
     Write-Host 'Invalid repository specified.' -ForegroundColor Red
     Write-Host 'Defaulting to the main branch from GitHub.' -ForegroundColor Yellow
+    # Set defaults for GitHub when repository is invalid
+    $baseSourceURL = 'https://raw.githubusercontent.com'
+    $baseURL = "https://www.github.com"
+    $repoPath = 'zuhairmahd'
+    $repoName = 'autopilot'
     $latestRelease = $defaultBranch
 }
 $global:maxJSONDepth = 100
@@ -1389,8 +1396,8 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
         return $result
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials" -Action {
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
     while ($choice -notin @('yes', 'no'))
@@ -1415,7 +1422,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra credentials"
         Write-Host "Please check the logs for more information." -ForegroundColor Red
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update setting" -Action {
+# Auto Update settings action - matches menu.json item "Change Auto Update settings"
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settings" -Action {
     Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
     if ($settings.autoUpdate)
@@ -1467,7 +1475,8 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
 }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode setting" -Action {
+# App Mode settings action - matches menu.json item "Change App Mode settings"  
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings" -Action {
     Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
     

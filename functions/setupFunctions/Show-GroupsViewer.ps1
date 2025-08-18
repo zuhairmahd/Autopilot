@@ -61,9 +61,9 @@ function Show-GroupsViewer()
     
     try
     {
-        # Load current settings
-        Write-Log -LogFile $logFile -Module $functionName -Message "Loading current settings from: $SettingsFile" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Loading current settings from: $SettingsFile"
+        # Check if settings file exists for configuration path determination
+        Write-Log -LogFile $logFile -Module $functionName -Message "Checking settings file: $SettingsFile" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Checking settings file: $SettingsFile"
         
         if (-not (Test-Path -Path $SettingsFile))
         {
@@ -72,21 +72,21 @@ function Show-GroupsViewer()
             return $false
         }
         
-        $currentSettings = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
-        if (-not $currentSettings.domains)
+        # Get available domains using the new architecture
+        $configPath = Split-Path $SettingsFile -Parent
+        Write-Log -LogFile $logFile -Module $functionName -Message "Getting available domains from: $configPath" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Getting available domains from: $configPath"
+        
+        $availableDomains = Get-AvailableDomains -ConfigurationPath $configPath -SettingsFile $SettingsFile
+        if ($availableDomains.Count -eq 0)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No domains section found in settings file" -LogLevel "Error"
-            Write-Warning "[$functionName] No domains section found in settings file"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No domains available in configuration" -LogLevel "Error"
+            Write-Warning "[$functionName] No domains available in configuration"
             return $false
         }
         
-        $availableDomains = $currentSettings.domains.PSObject.Properties.Name
-        if ($availableDomains.Count -eq 0)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No domains available in settings" -LogLevel "Error"
-            Write-Warning "[$functionName] No domains available in settings"
-            return $false
-        }
+        Write-Log -LogFile $logFile -Module $functionName -Message "Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')" -LogLevel "Information"
+        Write-Verbose "[$functionName] Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')"
         
         # Determine which domains to display (following domain settings viewer pattern)
         $domainsToDisplay = @()
@@ -129,25 +129,31 @@ function Show-GroupsViewer()
         # Display each domain's group settings
         foreach ($domain in $domainsToDisplay)
         {
-            $domainSettings = $currentSettings.domains.$domain
+            Write-Log -LogFile $logFile -Module $functionName -Message "Loading configuration for domain: $domain" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Loading configuration for domain: $domain"
+            
+            # Load domain configuration using new architecture
+            $domainConfig = Load-DomainConfiguration -DomainName $domain -ConfigurationPath $configPath
+            if ($null -eq $domainConfig)
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load configuration for domain: $domain" -LogLevel "Warning"
+                Write-Warning "[$functionName] Failed to load configuration for domain: $domain"
+                continue
+            }
             
             # Get current group settings with safe defaults
-            # Cache property names to avoid repeated enumeration
-            $domainPropertyNames = $domainSettings.PSObject.Properties.Name
-            
-            # Get current group settings with safe defaults
-            $includeGroups = if ($domainPropertyNames -contains 'groupsToInclude') 
+            $includeGroups = if ($domainConfig.groupsToInclude) 
             { 
-                $domainSettings.groupsToInclude 
+                $domainConfig.groupsToInclude 
             } 
             else 
             { 
                 @() 
             }
             
-            $excludeGroups = if ($domainSettings.PSObject.Properties.Name -contains 'groupsToExclude') 
+            $excludeGroups = if ($domainConfig.groupsToExclude) 
             { 
-                $domainSettings.groupsToExclude 
+                $domainConfig.groupsToExclude 
             } 
             else 
             { 
