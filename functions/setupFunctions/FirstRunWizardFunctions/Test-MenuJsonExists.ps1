@@ -32,12 +32,12 @@ function Test-MenuJsonExists()
     
     try
     {
-        # Define comprehensive default menu structure
-        $defaultMenus = @{
+        # Define comprehensive default menu structure using ordered hashtables to preserve menu order
+        $defaultMenus = [ordered]@{
             name = "menu.json"
             description = "This file contains the definitions for the menus used in the application."
             version = $version.version.toString()
-            appModeHierarchy = @{
+            appModeHierarchy = [ordered]@{
                 full = @("*")
                 advanced = @("advanced", "helpdesk", "registration")
                 helpdesk = @("helpdesk")
@@ -46,8 +46,8 @@ function Test-MenuJsonExists()
                 admin = @("admin", "advanced", "helpdesk", "registration")
                 custom = @()
             }
-            appModeDefaults = @{
-                full = @{
+            appModeDefaults = [ordered]@{
+                full = [ordered]@{
                     description = "Full administrative access with all features enabled"
                     capabilities = @(
                         "all_menus",
@@ -58,7 +58,7 @@ function Test-MenuJsonExists()
                         "device_management"
                     )
                 }
-                advanced = @{
+                advanced = [ordered]@{
                     description = "Advanced user with helpdesk and configuration capabilities"
                     capabilities = @(
                         "advanced_features",
@@ -68,7 +68,7 @@ function Test-MenuJsonExists()
                         "advanced_exports"
                     )
                 }
-                helpdesk = @{
+                helpdesk = [ordered]@{
                     description = "Helpdesk operator with device troubleshooting and user assignment capabilities"
                     capabilities = @(
                         "device_assignment",
@@ -78,7 +78,7 @@ function Test-MenuJsonExists()
                         "user_management"
                     )
                 }
-                registration = @{
+                registration = [ordered]@{
                     description = "Device registration specialist with Autopilot enrollment capabilities"
                     capabilities = @(
                         "autopilot_registration",
@@ -87,7 +87,7 @@ function Test-MenuJsonExists()
                         "device_status_check"
                     )
                 }
-                advancedRegistration = @{
+                advancedRegistration = [ordered]@{
                     description = "Advanced registration specialist with administrative Autopilot capabilities"
                     capabilities = @(
                         "advanced_autopilot",
@@ -96,7 +96,7 @@ function Test-MenuJsonExists()
                         "advanced_device_actions"
                     )
                 }
-                admin = @{
+                admin = [ordered]@{
                     description = "System administrator with full configuration and management capabilities"
                     capabilities = @(
                         "system_administration",
@@ -106,249 +106,333 @@ function Test-MenuJsonExists()
                         "full_configuration"
                     )
                 }
-                custom = @{
+                custom = [ordered]@{
                     description = "Customizable mode where users define their own access patterns"
                     capabilities = @("user_defined")
                 }
             }
-            mainMenu = @{
+            mainMenu = [ordered]@{
                 Title = "Main Menu"
                 Description = "Please choose from one of the following options"
                 type = "static"
                 includeInDisplayModes = @()
                 items = @(
-                    @{
+                    [ordered]@{
                         name = "Give a device to a user"
                         description = "Start the user and device readiness check"
                         blockType = "action"
                         includeInDisplayModes = @("full", "helpdesk", "registration")
                     },
-                    @{
+                    [ordered]@{
                         name = "Check device status"
                         description = "Troubleshoot a device"
                         blockType = "menu"
                         menuName = "checkMenu"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     },
-                    @{
+                    [ordered]@{
                         name = "Autopilot menu"
                         description = "Import a device into Autopilot and perform related actions"
                         blockType = "menu"
                         menuName = "autopilotMenu"
                         includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
                     },
-                    @{
+                    [ordered]@{
                         name = "Change application settings"
                         description = "Modify the application settings"
                         blockType = "menu"
                         menuName = "settingsMenu"
                         includeInDisplayModes = @("full", "admin", "advanced")
                     },
-                    @{
-                        name = "Get group assignments for all objects"
-                        description = "Analyze group assignments across all Intune objects"
+                    [ordered]@{
+                        name = "Check for script updates"
+                        description = "Check if there are any updates available for the scripts"
                         blockType = "action"
                         includeInDisplayModes = @("full", "admin", "advanced")
                     },
-                    @{
-                        name = "Export devices and/or apps"
-                        description = "Export device and application data"
+                    [ordered]@{
+                        name = "Restart the device"
+                        description = "Restart the device"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
+                    },
+                    [ordered]@{
+                        name = "Show Group Assignments"
+                        description = "Show the group assignments for the device"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
+                    },
+                    [ordered]@{
+                        name = "Export Menu"
+                        description = "Export device information"
                         blockType = "menu"
                         menuName = "exportMenu"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+                        includeInDisplayModes = @("full", "admin", "advanced", "registration")
                     },
-                    @{
+                    [ordered]@{
                         name = "About"
-                        description = "About this application"
+                        description = "Learn more about this application"
                         blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration", "advancedRegistration")
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     }
                 )
             }
-            checkMenu = @{
+            checkMenu = [ordered]@{
                 Title = "Check Device Status"
-                Description = "Please choose from one of the following options"
+                Description = "How would you like to lookup the device?"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                 items = @(
-                    @{
-                        name = "Serial number"
-                        description = "Check a device by serial number"
+                    [ordered]@{
+                        name = "Lookup device by Serial Number"
+                        description = "Lookup a device by its serial number"
                         blockType = "menu"
                         menuName = "serialNumberMenu"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     },
-                    @{
-                        name = "User"
-                        description = "Check all devices assigned to a user"
-                        blockType = "action"
+                    [ordered]@{
+                        name = "Lookup device by User"
+                        description = "Lookup a device by the user id or email address"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     }
                 )
             }
-            serialNumberMenu = @{
-                Title = "Options for Device With Serial Number"
-                Description = "Choose what you would like to do with this device:"
-                type = "dynamic"
+            serialNumberMenu = [ordered]@{
+                Title = "Lookup by Serial Number"
+                Description = "How would you like to enter the serial number?"
+                type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                 items = @(
-                    @{
-                        name = "Show device health status"
-                        description = "Display device health and status information"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration", "advancedRegistration")
+                    [ordered]@{
+                        name = "Enter a serial number"
+                        description = "Lookup a device by its serial number"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     },
-                    @{
-                        name = "Check next user readiness state"
-                        description = "Check if device is ready for next user"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
-                    },
-                    @{
-                        name = "Device actions"
-                        description = "Perform actions on this device"
-                        blockType = "menu"
-                        menuName = "deviceActionsMenu"
+                    [ordered]@{
+                        name = "Use this device's serial number"
+                        description = "Lookup the device the application is running on"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     }
                 )
             }
-            autopilotMenu = @{
+            autopilotMenu = [ordered]@{
                 Title = "Autopilot Menu"
-                Description = "Please choose from one of the following options"
+                Description = "Import a device into Autopilot and perform related actions"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
                 items = @(
-                    @{
-                        name = "Import a CSV file"
-                        description = "Import Autopilot devices from CSV file"
-                        blockType = "action"
+                    [ordered]@{
+                        name = "Import device into Autopilot"
+                        description = "Import a device into Autopilot"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
                     },
-                    @{
-                        name = "Import from PowerShell"
-                        description = "Import device using PowerShell method"
-                        blockType = "action"
+                    [ordered]@{
+                        name = "Custom import device into Autopilot (requires admin rights)"
+                        description = "Custom import a device into Autopilot"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Import Corporate Device Identifier for Device Preparation (requires admin rights)"
+                        description = "Import a Corporate Device Identifier for Device Preparation"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)"
+                        description = "Export a Corporate Device Identifier for manual upload to Device Preparation"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Get device hash for manual upload to Autopilot (requires admin rights)"
+                        description = "Get the device hash for manual upload to Autopilot"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
                     },
-                    @{
-                        name = "Delete a device"
+                    [ordered]@{
+                        name = "Download and install latest Windows updates(requires admin rights)"
+                        description = "Download and install the latest Windows updates"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Check device Autopilot status"
+                        description = "Check if a device is registered in Autopilot"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Delete device from Autopilot"
                         description = "Delete a device from Autopilot"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "advancedRegistration")
                     },
-                    @{
-                        name = "Assign a deployment profile"
-                        description = "Assign deployment profile to device"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                    [ordered]@{
+                        name = "Quick Import device into Autopilot (requires admin rights)"
+                        description = "Quick import a device into Autopilot"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advancedRegistration")
                     },
-                    @{
-                        name = "Show Autopilot events"
-                        description = "Display Autopilot enrollment events"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration", "advancedRegistration")
-                    },
-                    @{
-                        name = "Get unmanaged devices"
-                        description = "Show devices not managed by Intune"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced")
+                    [ordered]@{
+                        name = "Delete Corporate Device Identifier from Device Preparation (requires admin rights)"
+                        description = "Delete a Corporate Device Identifier from Device Preparation"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advancedRegistration")
                     }
                 )
             }
-            settingsMenu = @{
-                Title = "Application Settings"
-                Description = "Please choose from one of the following options"
+            settingsMenu = [ordered]@{
+                Title = "Settings menu"
+                Description = "Make changes to the application settings"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced")
                 items = @(
-                    @{
-                        name = "Change authentication settings"
-                        description = "Modify authentication configuration"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin")
-                    },
-                    @{
+                    [ordered]@{
                         name = "Change environment settings"
-                        description = "Modify environment configuration"
+                        description = "Change the environment settings"
                         blockType = "menu"
                         menuName = "environmentMenu"
                         includeInDisplayModes = @("full", "admin", "advanced")
                     },
-                    @{
-                        name = "Change app mode"
-                        description = "Change the application mode"
+                    [ordered]@{
+                        name = "Change Entra Credentials"
+                        description = "Change the Entra credentials"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
+                    },
+                    [ordered]@{
+                        name = "Change Auto Update settings"
+                        description = "Change the Auto Update settings"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
+                    },
+                    [ordered]@{
+                        name = "Change App Mode settings"
+                        description = "Change the App Mode settings"
                         blockType = "action"
                         includeInDisplayModes = @("full", "admin")
                     }
                 )
             }
-            environmentMenu = @{
-                Title = "Environment Settings"
-                Description = "Please choose from one of the following options"
+            environmentMenu = [ordered]@{
+                Title = "Change Environment Menu"
+                Description = "Manage your environment settings and configurations"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced")
                 items = @(
-                    @{
-                        name = "View current settings"
-                        description = "Display current configuration settings"
+                    [ordered]@{
+                        name = "View global environment settings"
+                        description = "View the global environment settings"
                         blockType = "action"
                         includeInDisplayModes = @("full", "admin", "advanced")
                     },
-                    @{
-                        name = "Edit settings"
-                        description = "Modify application settings"
+                    [ordered]@{
+                        name = "View domain specific environment settings"
+                        description = "View the domain specific environment settings"
                         blockType = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
+                    },
+                    [ordered]@{
+                        name = "View group inclusion/exclusion settings for all domains"
+                        description = "View the group inclusion/exclusion settings for all domains"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
+                    },
+                    [ordered]@{
+                        name = "Change global environment settings"
+                        description = "Change the global environment settings"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin")
+                    },
+                    [ordered]@{
+                        name = "Change domain specific settings"
+                        description = "Change the domain specific environment settings"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin")
+                    },
+                    [ordered]@{
+                        name = "Change authentication settings"
+                        description = "Change the authentication settings"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin")
+                    },
+                    [ordered]@{
+                        name = "Change group inclusion/exclusion"
+                        description = "Change the group inclusion/exclusion settings"
+                        blockType = "menu"
+                        menuName = "groupsEditMenu"
                         includeInDisplayModes = @("full", "admin")
                     }
                 )
             }
-            exportMenu = @{
-                Title = "Export Options"
-                Description = "Please choose from one of the following options"
+            exportMenu = [ordered]@{
+                Title = "Export Menu"
+                Description = "Choose what you would like to export"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                 items = @(
-                    @{
-                        name = "Export all devices to CSV"
-                        description = "Export all device information"
-                        blockType = "action"
+                    [ordered]@{
+                        name = "Export Autopilot Devices"
+                        description = "Export Autopilot devices to a CSV file"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Export Imported Autopilot Devices"
+                        description = "Export imported Autopilot devices to a CSV file"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                    },
+                    [ordered]@{
+                        name = "Export Managed Windows Devices"
+                        description = "Export managed Windows devices to a CSV file"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     },
-                    @{
-                        name = "Export all applications to CSV"
-                        description = "Export all application information"
-                        blockType = "action"
+                    [ordered]@{
+                        name = "Export Unmanaged Windows Devices"
+                        description = "Export unmanaged Windows devices to a CSV file"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced")
                     },
-                    @{
-                        name = "Export Autopilot devices to CSV"
-                        description = "Export Autopilot device information"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "registration", "advancedRegistration")
+                    [ordered]@{
+                        name = "Export device storage report"
+                        description = "Export a report of device storage to a CSV file"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+                    },
+                    [ordered]@{
+                        name = "Export Application Assignments"
+                        description = "Export application assignments to a CSV file"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
                     }
                 )
             }
-            deviceWaitMenu = @{
-                Title = "Options for Device With Serial Number"
+            deviceWaitMenu = [ordered]@{
+                Title = "Options for Device With Serial Number `$serialNumber"
                 Description = "Choose what you would like to do with this device:"
                 type = "static"
                 includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                 items = @(
-                    @{
+                    [ordered]@{
                         Name = "Restart the device"
                         Description = "Restart the device"
                         blockType = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     },
-                    @{
+                    [ordered]@{
                         Name = "Continue to wait for profile assignment"
                         Description = "Continue to wait for profile assignment"
                         blockType = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     },
-                    @{
+                    [ordered]@{
                         Name = "Delete the device from Autopilot"
                         Description = "Delete the device from Autopilot"
                         blockType = "action"
@@ -356,56 +440,143 @@ function Test-MenuJsonExists()
                     }
                 )
             }
-            deviceMenu = @{
+            deviceMenu = [ordered]@{
                 Title = "Device Selection"
-                Description = "Select a device for user"
+                Description = "Select a device for user `$UserName (`$(`$deviceInfo.value[0].userDisplayName))"
                 type = "dynamic"
                 includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
-                items = @()
             }
-            deviceActionsMenu = @{
-                Title = "Device Actions"
+            deviceActionsMenu = [ordered]@{
+                Title = "Device Actions for `$deviceName"
                 Description = "Select an action to perform on this device:"
-                type = "dynamic"
-                includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
+                type = "static"
+                includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                 items = @(
-                    @{
+                    [ordered]@{
                         name = "Wipe Device"
-                        description = "Wipe the device"
-                        blockType = "action"
+                        description = "Wipe the selected device"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     },
-                    @{
+                    [ordered]@{
                         name = "Clean Device"
-                        description = "Clean the device"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
+                        description = "Clean the selected device"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced")
                     },
-                    @{
+                    [ordered]@{
                         name = "Sync Device"
-                        description = "Sync the device"
-                        blockType = "action"
+                        description = "Sync the selected device"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+                    },
+                    [ordered]@{
+                        name = "Get LAPS Password"
+                        description = "Retrieve the LAPS password for the selected device"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
                     },
-                    @{
+                    [ordered]@{
+                        name = "Get BitLocker Recovery Key"
+                        description = "Retrieve the BitLocker recovery key for the selected device"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
+                    },
+                    [ordered]@{
+                        name = "Get Hardware Password Details"
+                        description = "Retrieve the BIOS password details for the selected device"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk")
+                    },
+                    [ordered]@{
                         name = "Restart Device"
-                        description = "Restart the device"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration", "advancedRegistration")
+                        description = "Restart the selected device"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     },
-                    @{
+                    [ordered]@{
                         name = "Show Device Health Status"
-                        description = "Display device health information"
-                        blockType = "action"
-                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration", "advancedRegistration")
+                        description = "Show the health status of the selected device"
+                        type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     },
-                    @{
+                    [ordered]@{
                         name = "Check next user readiness state"
-                        description = "Check if device is ready for next user"
-                        blockType = "action"
+                        description = "Check the next user readiness state for the selected device"
+                        type = "action"
                         includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
                     }
                 )
+            }
+            reportExportMenu = [ordered]@{
+                Title = "Export report"
+                Description = "Select the format to which you would like to export the report"
+                type = "static"
+                includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+                items = @(
+                    [ordered]@{
+                        Name = "Export to HTML"
+                        Description = "Export the report in HTML format"
+                        Type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+                    },
+                    [ordered]@{
+                        Name = "Export to CSV"
+                        Description = "Export the report in CSV format"
+                        Type = "action"
+                        includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+                    }
+                )
+            }
+            groupsEditMenu = [ordered]@{
+                Title = "Groups Editor for `$DomainName"
+                Description = "Select which group settings you want to modify:"
+                type = "static"
+                includeInDisplayModes = @("full", "admin")
+                items = @(
+                    [ordered]@{
+                        name = "Edit Groups to Include"
+                        description = "Modify the groups that are included"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin")
+                    },
+                    [ordered]@{
+                        name = "Edit Groups to Exclude"
+                        description = "Modify the groups that are excluded"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin")
+                    },
+                    [ordered]@{
+                        name = "View Current Group Settings"
+                        description = "View the current group settings"
+                        blockType = "action"
+                        includeInDisplayModes = @("full", "admin")
+                    }
+                )
+            }
+            appModeMenu = [ordered]@{
+                Title = "`$menuTitle"
+                Description = "`$menuDescription"
+                type = "dynamic"
+                includeInDisplayModes = @("full", "admin")
+            }
+            groupMenu = [ordered]@{
+                Title = "Select a group"
+                Description = "Did you mean:"
+                type = "dynamic"
+                includeInDisplayModes = @("full", "admin", "advanced")
+            }
+            userMenu = [ordered]@{
+                Title = "Select a user"
+                Description = "Did you mean:"
+                type = "dynamic"
+                includeInDisplayModes = @("full", "admin", "advanced", "helpdesk", "registration")
+            }
+            groupAssignmentsMenu = [ordered]@{
+                Title = "Group Assignments for `$groupName"
+                Description = "What type of assignments would you like to see?"
+                type = "dynamic"
+                includeInDisplayModes = @("full", "admin", "advanced")
             }
         }
         

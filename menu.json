@@ -170,7 +170,7 @@
                 ]
             },
             {
-                "name": "Show group assignments",
+                "name": "Show Group Assignments",
                 "description": "Show the group assignments for the device",
                 "blockType": "action",
                 "includeInDisplayModes": [
