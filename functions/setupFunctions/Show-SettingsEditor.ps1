@@ -385,102 +385,39 @@ function Get-DefaultSettingsStructure()
 {
     <#
     .SYNOPSIS
-        Retrieves the default settings structure efficiently without file operations.
+        Retrieves the default settings structure efficiently from centralized defaults.
+    
+    .DESCRIPTION
+        Uses the centralized Get-ApplicationDefaults function to retrieve default settings.
+        This ensures consistency and eliminates duplicate default value definitions.
     #>
     [CmdletBinding()]
     param()
 
     $functionName = $MyInvocation.MyCommand.Name
     
-    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure using cached defaults" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Retrieving default settings structure using cached defaults"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure from centralized defaults" -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Retrieving default settings structure from centralized defaults"
     
     try
     {
-        # Instead of creating a temporary file and calling Test-SettingsJsonExists,
-        # directly create the default structure here to avoid unnecessary file operations
-        Write-Log -LogFile $logFile -Module $functionName -Message "Creating default structure without file operations" -LogLevel "Debug"
-        Write-Verbose "[$functionName] Creating default structure without file operations"
+        # Use centralized default values - single source of truth
+        Write-Log -LogFile $logFile -Module $functionName -Message "Getting defaults from Get-ApplicationDefaults" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Getting defaults from Get-ApplicationDefaults"
         
-        $defaultSettings = @{
-            description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-            version        = "1.3.0.0"
-            auth           = @{
-                delegated           = $true
-                authType            = "PublicAuthFlow"
-                changePwOnNextStart = $false
-                renewalLeadTime     = 5
-                noSaveRefreshToken  = $false
-                secureString        = $false
-                forceNewToken       = $false
-                cacheType           = "Memory"
-                scope               = @(
-                    "offline_access",
-                    "openid", 
-                    "Device.ReadWrite.All",
-                    "DeviceManagementApps.Read.All",
-                    "DeviceManagementConfiguration.ReadWrite.All",
-                    "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                    "DeviceManagementManagedDevices.ReadWrite.All",
-                    "DeviceManagementServiceConfig.ReadWrite.All"
-                )
-            }
-            globalSettings = @{
-                configFile                   = ".\\.secrets\\config.json"
-                maxWaitTime                  = "30"
-                showLicenseBanner            = $true
-                deviceContactThresholdInDays = 30
-                appMode                      = "full"
-                timeInSeconds                = "60"
-                maxUserMatchDisplay          = "10"
-                maxGroupMatchDisplay         = 10
-                release                      = "master"
-                repo                         = "Github"
-                testMode                     = $false
-                operatingSystem              = "Windows"
-                autoUpdate                   = $true
-            }
-            domains        = @{
-                "example.com" = @{
-                    groupsToInclude = @()
-                    groupsToExclude = @()
-                    settings        = @{
-                        domain                          = "example.com"
-                        maxWaitTime                     = "30"
-                        showLicenseBanner               = $true
-                        deviceContactThresholdInDays    = 30
-                        appMode                         = "full"
-                        timeInSeconds                   = "60"
-                        maxUserMatchDisplay             = "10"
-                        maxGroupMatchDisplay            = 10
-                        release                         = "master"
-                        repo                            = "Github"
-                        autoUpdate                      = $true
-                        deviceNamePrefix                = ""
-                        operatingSystem                 = "Windows"
-                        minUsernameLength               = 3
-                        maxUserNameLength               = 50
-                        maxSerialNumberLength           = 50
-                        minSerialNumberLength           = 7
-                        minimumDevicePhysicalMemoryInGB = 8
-                        maxNumberOfDevicesAllowed       = 15
-                        preferredBrowser                = "Chrome"
-                        privateSession                  = $false
-                        groupPatternsToExclude          = @()
-                        userPatternsToExclude           = @( 
-                            "-test",
-                            "onmicrosoft.com"
-                        )
-                        desiredAutopilotProfiles        = @()
-                    }
-                }
-            }
+        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+        
+        if (-not $defaultSettings)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get default settings from centralized function" -LogLevel "Error"
+            Write-Verbose "[$functionName] Failed to get default settings from centralized function"
+            return $null
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure created successfully" -LogLevel "Information"
-        Write-Verbose "[$functionName] Default settings structure created successfully"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Default settings structure retrieved successfully from centralized source" -LogLevel "Information"
+        Write-Verbose "[$functionName] Default settings structure retrieved successfully from centralized source"
         
-        # Convert to PSCustomObject to match the JSON structure behavior
+        # Convert to PSCustomObject to match the JSON structure behavior expected by consuming functions
         $jsonString = $defaultSettings | ConvertTo-Json -Depth $global:maxJSONDepth
         $defaultStructure = $jsonString | ConvertFrom-Json
         
@@ -491,8 +428,8 @@ function Get-DefaultSettingsStructure()
     }
     catch
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error creating default settings structure: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Verbose "[$functionName] Error creating default settings structure: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving default settings structure: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Verbose "[$functionName] Error retrieving default settings structure: $($_.Exception.Message)"
         return $null
     }
 }

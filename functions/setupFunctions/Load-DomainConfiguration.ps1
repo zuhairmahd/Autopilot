@@ -77,21 +77,55 @@ function Load-DomainConfiguration
             }
         }
         
-        # Create new domain configuration with defaults
+        # Create new domain configuration with defaults from centralized source
         Write-Verbose "[$functionName] Creating new domain configuration for: $DomainName"
         Write-Log -LogFile $logFile -Message "Creating new domain configuration for: $DomainName" -Module $functionName -LogLevel "Information"
         
-        $defaultDomainConfig = [PSCustomObject]@{
-            groupsToInclude = @()
-            groupsToExclude = @()
-            settings = [PSCustomObject]($GlobalSettings.Clone())
-            additionalScopes = @()
+        # Get default domain structure from centralized source
+        try {
+            $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
+            if (-not $domainDefaults) {
+                Write-Warning "[$functionName] Failed to get domain defaults from centralized source, using fallback"
+                Write-Log -LogFile $logFile -Message "Failed to get domain defaults from centralized source, using fallback" -Module $functionName -LogLevel "Warning"
+                
+                # Fallback to minimal structure
+                $domainDefaults = @{
+                    groupsToInclude = @()
+                    groupsToExclude = @()
+                    settings = $GlobalSettings.Clone()
+                    additionalScopes = @()
+                }
+            }
+        } catch {
+            Write-Warning "[$functionName] Error getting centralized defaults: $($_.Exception.Message)"
+            Write-Log -LogFile $logFile -Message "Error getting centralized defaults: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
+            
+            # Fallback to minimal structure
+            $domainDefaults = @{
+                groupsToInclude = @()
+                groupsToExclude = @()
+                settings = $GlobalSettings.Clone()
+                additionalScopes = @()
+            }
         }
         
-        # Add domain name to settings if not present
-        if (-not $defaultDomainConfig.settings.domain)
-        {
-            $defaultDomainConfig.settings | Add-Member -MemberType NoteProperty -Name "domain" -Value $DomainName -Force
+        # Merge global settings with domain defaults if global settings provided
+        if ($GlobalSettings -and $GlobalSettings.Count -gt 0) {
+            # Merge global settings into domain settings defaults
+            foreach ($key in $GlobalSettings.Keys) {
+                $domainDefaults.settings[$key] = $GlobalSettings[$key]
+            }
+        }
+        
+        # Ensure domain name is set correctly
+        $domainDefaults.settings.domain = $DomainName
+        
+        # Convert to PSCustomObject for consistent behavior, but use hashtable for settings for mutability
+        $defaultDomainConfig = [PSCustomObject]@{
+            groupsToInclude = $domainDefaults.groupsToInclude
+            groupsToExclude = $domainDefaults.groupsToExclude
+            settings = $domainDefaults.settings  # Keep as hashtable for mutability
+            additionalScopes = $domainDefaults.additionalScopes
         }
         
         # Save the new configuration
