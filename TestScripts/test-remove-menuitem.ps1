@@ -7,8 +7,14 @@ Write-Host "Testing Remove-MenuItem function and conditional device action menu 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $functionFiles = Get-ChildItem -Path "$projectRoot/functions" -Filter "*.ps1" -Recurse
 
-# Initialize globals to prevent errors
-$global:LogFile = ""
+# Initialize globals to prevent errors - set valid log file path
+$global:LogFile = "/tmp/test_remove_menuitem.log"
+
+# Ensure log directory exists
+$logDir = Split-Path $global:LogFile -Parent
+if (-not (Test-Path $logDir)) {
+    New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+}
 
 Write-Host "Loading functions..." -ForegroundColor Gray
 foreach ($file in $functionFiles) {

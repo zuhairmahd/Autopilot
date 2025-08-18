@@ -40,6 +40,7 @@ $testFailed = 0
 
 # Import required functions
 try {
+    . "$PSScriptRoot/../functions/utilityFunctions/Write-Log.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Test-MenuJsonExists.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertTo-OrderedJson.ps1"  
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
@@ -50,10 +51,16 @@ catch {
     exit 1
 }
 
-# Mock required variables
-$version = @{ version = @{ toString = { "1.0.0.0" } } }
-$maxJSONDepth = 10
-$LogFile = "/tmp/test.log"
+# Mock required variables and ensure log directory exists
+$global:version = @{ version = @{ toString = { "1.0.0.0" } } }
+$global:maxJSONDepth = 10
+$global:LogFile = "/tmp/test_menu_order.log"
+
+# Ensure log directory exists
+$logDir = Split-Path $global:LogFile -Parent
+if (-not (Test-Path $logDir)) {
+    New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+}
 
 Write-Host "Testing menu order preservation in Test-MenuJsonExists" -ForegroundColor Cyan
 
