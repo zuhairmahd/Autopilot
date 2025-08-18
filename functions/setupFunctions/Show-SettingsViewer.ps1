@@ -139,6 +139,9 @@ function Show-SettingsViewer()
         {
             # Load domain settings from separate domain configuration file
             $configPath = Split-Path $SettingsFile -Parent
+            Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from path: '$configPath'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from path: '$configPath'"
+            
             $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
             
             if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
@@ -148,11 +151,35 @@ function Show-SettingsViewer()
                 return $false
             }
             
-            # Use the first domain's settings as template (from the main settings file for structure)
-            $settingsTemplate = $defaultSettings.domains.PSObject.Properties | Select-Object -First 1 | ForEach-Object { $_.Value.settings }
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
             
-            # But use the actual domain configuration for current values
+            # Get domain settings template from centralized defaults (fixed approach)
+            Write-Log -LogFile $logFile -Module $functionName -Message "Getting domain settings template from centralized defaults for domain: '$DomainName'" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Getting domain settings template from centralized defaults for domain: '$DomainName'"
+            
+            try {
+                $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
+                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings) {
+                    Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
+                    return $false
+                }
+                
+                $settingsTemplate = $domainTemplate.settings
+                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
+            }
+            catch {
+                Write-Warning "[$functionName] Error retrieving domain template: $($_.Exception.Message)"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving domain template: $($_.Exception.Message)" -LogLevel "Error"
+                return $false
+            }
+            
+            # Use the actual domain configuration for current values
             $currentValues = $domainConfig.settings
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using current domain settings with $($currentValues.PSObject.Properties.Count) properties" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Using current domain settings with $($currentValues.PSObject.Properties.Count) properties"
             
             Write-Log -LogFile $logFile -Module $functionName -Message "Displaying domain settings for domain: '$DomainName' from separate configuration file" -LogLevel "Information"
             Write-Verbose "[$functionName] Displaying domain settings for domain: '$DomainName' from separate configuration file"
