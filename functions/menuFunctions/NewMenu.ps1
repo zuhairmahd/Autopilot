@@ -62,9 +62,11 @@ function NewMenu()
                     if ($item.blockType -eq "action" -or $item.type -eq "action")
                     {
                         # Set placeholder action that can be overridden by AddMenuItem
+                        # Capture the item name in the closure
+                        $itemName = $item.name
                         $menuItem.Action = {
-                            Write-Host "Action not implemented for menu item: $($item.name)" -ForegroundColor Yellow
-                        }
+                            Write-Host "Action not implemented for menu item: $itemName" -ForegroundColor Yellow
+                        }.GetNewClosure()
                     }
                     elseif ($item.blockType -eq "menu" -or $item.type -eq "submenu")
                     {

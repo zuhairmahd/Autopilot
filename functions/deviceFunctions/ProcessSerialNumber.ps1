@@ -193,14 +193,20 @@ function ProcessSerialNumber()
                 Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
             }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Wipe Device'" -LogLevel "Debug"
+            
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
                 Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
             }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Clean Device'" -LogLevel "Debug"
+            
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
                 Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Sync Device'" -LogLevel "Debug"
+            # Add LAPS Password action - always assign action regardless of availability
             Write-Verbose "[$functionName] Checking if device has LAPS credentials."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device has LAPS credentials." -LogLevel "Verbose"
             Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
@@ -220,7 +226,16 @@ function ProcessSerialNumber()
                         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy LAPS password to clipboard. Error: $_" -LogLevel "Error"
                     }
                 }
-            }            
+            }
+            else
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
+                    Write-Host "`nNo LAPS credentials available for this device." -ForegroundColor Yellow
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS password requested but no credentials available for device." -LogLevel "Warning"
+                }
+            }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Get LAPS Password'" -LogLevel "Debug"
+            # Add BitLocker Recovery Key action - always assign action regardless of availability
             Write-Verbose "Checking if we have bitlocker keys for this device."
             Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)" -LogLevel "Information"
@@ -245,6 +260,15 @@ function ProcessSerialNumber()
                     }
                 }
             }
+            else
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
+                    Write-Host "`nNo BitLocker recovery keys available for this device." -ForegroundColor Yellow
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key requested but no keys available for device." -LogLevel "Warning"
+                }
+            }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Get BitLocker Recovery Key'" -LogLevel "Debug"
+            # Add Hardware Password Details action - always assign action regardless of availability  
             Write-Verbose "[$functionName] Checking if device has hardware password details."
             Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
             if ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0)
@@ -273,10 +297,21 @@ function ProcessSerialNumber()
                     }
                 }
             }
+            else
+            {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get Hardware Password Details" -Action {
+                    Write-Host "`nNo hardware password details available for this device." -ForegroundColor Yellow
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hardware password details requested but none available for device." -LogLevel "Warning"
+                }
+            }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Get Hardware Password Details'" -LogLevel "Debug"
+            
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
             }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Restart Device'" -LogLevel "Debug"
+            
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
                 Write-Verbose "[$functionName] Device report: $deviceReport"
@@ -315,9 +350,12 @@ function ProcessSerialNumber()
                 }
                 return $returnValues.backoutText
             }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Show Device Health Status'" -LogLevel "Debug"
+            
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
                 return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
-            }            # Show the device actions menu with navigation context
+            }
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Check next user readiness state'" -LogLevel "Debug"# Show the device actions menu with navigation context
             Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)" -LogLevel "Information"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
