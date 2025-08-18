@@ -27,24 +27,42 @@ The Windows Autopilot Management Tool uses a sophisticated hierarchical menu sys
 
 The menu system consists of several key components that work together:
 
-1. **Menu Configuration** (`settings.json` → `menus` array)
+1. **Menu Configuration** (`menu.json` → flat object structure with menu names as keys)
 2. **Menu Functions** (`functions/menuFunctions/`)
 3. **Action Functions** (spread across all function categories)
 4. **Navigation Stack** (runtime menu history)
 
 ### Menu Data Structure
 
-Menus are defined in `settings.json` using a hierarchical structure:
+Menus are now defined in `menu.json` using a flat object structure where each key is a menu name:
 
 ```json
 {
-  "name": "Menu Name",
-  "description": "What this menu does",
-  "type": "action|submenu",
-  "includeInDisplayModes": ["helpdesk", "registration", "advanced"],
-  "items": [/* submenu items if type is submenu */]
+  "mainMenu": {
+    "Title": "Main Menu",
+    "Description": "Please choose from one of the following options",
+    "type": "static",
+    "items": [
+      {
+        "name": "Give a device to a user",
+        "description": "Start the user and device readiness check",
+        "blockType": "action",
+        "includeInDisplayModes": ["helpdesk", "registration"]
+      },
+      {
+        "name": "Check device status", 
+        "description": "Troubleshoot a device",
+        "blockType": "menu",
+        "menuName": "checkMenu"
+      }
+    ]
+  }
 }
 ```
+
+**Dynamic Menu Support**: Menus can be marked as `"type": "dynamic"` for runtime generation, or `"type": "static"` for configuration-based items.
+
+**Variable Substitution**: Menu titles and descriptions support variables like `$deviceName`, `$DomainName`, `$serialNumber` that are substituted at runtime.
 
 ### Application Modes
 
@@ -183,7 +201,7 @@ The system supports multiple application modes that control menu visibility:
 
 ### Main Menu Structure
 
-The application's main menu is defined in `settings.json` and includes these primary sections:
+The application's main menu is defined in `menu.json` and includes these primary sections:
 
 1. **Give a device to a user**
    - User and device readiness validation

@@ -19,7 +19,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 
 ### Key Features
 
-- **🎯 Role-Based Interface**: Customizable app modes (Help Desk, Registration, Advanced, Admin) with tailored menu options for different user roles
+- **🎯 Role-Based Interface**: Hierarchical app mode system with inheritance-based privilege escalation. Seven built-in modes (Full, Admin, Advanced, Helpdesk, Registration, Advanced Registration, Custom) with tailored menu options and capabilities for different organizational roles. See [App Mode Configuration Guide](docs/APP_MODE_CONFIGURATION.md) for detailed role definitions and defaults.
 - **📋 Interactive Menu System**: Intuitive hierarchical navigation with keyboard shortcuts and stack-based history
 - **⚡ Device Assignment Workflow**: Streamlined device-to-user assignment with automated readiness validation
 - **🔍 Comprehensive Device Monitoring**: Real-time device enrollment status, BitLocker keys, LAPS credentials, and health monitoring
@@ -79,6 +79,8 @@ For advanced scenarios where custom configuration is needed:
 3. **Configure authentication**: Place your `config.json` file in the [`.secrets` folder](./.secrets)
 4. **Configure application settings**: Ensure [`settings.json`](./settings.json) is configured for your environment
 5. **Set up encryption**: On first run, the script will prompt you to encrypt your configuration file
+
+**Note**: The application automatically creates and manages essential configuration files (`settings.json`, `strings.json`, `menu.json`) with comprehensive defaults if they are missing. This ensures a smooth setup experience and automatic recovery from configuration issues.
 
 ### Environment-Specific Configurations
 

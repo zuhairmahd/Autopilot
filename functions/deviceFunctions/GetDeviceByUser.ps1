@@ -55,10 +55,20 @@ function GetDeviceByUser()
         }
         else
         {
-            # Create device selection menu
+            # Create device selection menu from configuration
             # Store devices in an array to reference later
             $devices = $deviceInfo.value
-            $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
+            $deviceMenu = NewMenu -MenuName "deviceMenu"
+            if (-not $deviceMenu) {
+                # Fallback to manual creation if config not found
+                $deviceMenu = NewMenu -Title "Device Selection" -Description "Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))"
+            } else {
+                # Update description with actual user name
+                $deviceMenu.Description = $deviceMenu.Description -replace '\$UserName', $UserName
+                if ($deviceInfo.value -and $deviceInfo.value.Count -gt 0 -and $deviceInfo.value[0].userDisplayName) {
+                    $deviceMenu.Description = $deviceMenu.Description -replace '\$\(\$deviceInfo\.value\[0\]\.userDisplayName\)', $deviceInfo.value[0].userDisplayName
+                }
+            }
             Write-Verbose "[$functionName] Creating device menu with $($devices.Count) devices"
             # Add each device as a menu item
             foreach ($device in $devices)

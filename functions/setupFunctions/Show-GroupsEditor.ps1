@@ -193,7 +193,12 @@ function Show-GroupsEditor()
         # Create groups editing menu using the well-documented menu system
         if (-not $Silent)
         {
-            $groupsEditMenu = NewMenu -Title "Groups Editor for $DomainName" -Description "Select which group settings you want to modify:"
+            # Create menu from configuration, will update title with dynamic variable
+            $groupsEditMenu = NewMenu -MenuName "groupsEditMenu"
+            # Update the title to include the actual domain name
+            $groupsEditMenu.Title = $groupsEditMenu.Title -replace '\$DomainName', $DomainName
+            
+            # Set actions for the menu items
             $groupsEditMenu = AddMenuItem -Menu $groupsEditMenu -Name "Edit Groups to Include" -Action {
                 Write-Host "Selected: Edit Groups to Include" -ForegroundColor Green
                 return 'include'

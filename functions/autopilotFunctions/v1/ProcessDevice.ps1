@@ -131,7 +131,15 @@ function ProcessDevice()
                     }
                     # Show options for problem devices
                     Write-Host "What would you like to do?"
-                    $deviceWaitMenu = NewMenu -Title "Options for Device With Serial Number $serialNumber" -Description "Choose what you would like to do with this device:"
+                    # Create device wait menu from configuration
+                    $deviceWaitMenu = NewMenu -MenuName "deviceWaitMenu"
+                    if (-not $deviceWaitMenu) {
+                        # Fallback to manual creation if config not found
+                        $deviceWaitMenu = NewMenu -Title "Options for Device With Serial Number $serialNumber" -Description "Choose what you would like to do with this device:"
+                    } else {
+                        # Update title with actual serial number
+                        $deviceWaitMenu.Title = $deviceWaitMenu.Title -replace '\$serialNumber', $serialNumber
+                    }
                     $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
                         Write-Host "Restarting the device..."
                         Write-Verbose "[$functionName] User chose to restart the device."

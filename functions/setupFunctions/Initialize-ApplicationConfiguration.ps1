@@ -185,6 +185,16 @@ function Initialize-ConfigurationFiles
             return $result
         }
         
+        # Ensure menu.json exists with defaults
+        Write-Verbose "[$functionName] Ensuring menu.json exists with defaults"
+        $MenuFile = "$pwd\menu.json"
+        $menuCreated = Test-MenuJsonExists -MenuFile $MenuFile -Silent
+        if (-not $menuCreated)
+        {
+            $result.ErrorMessage = "Failed to create or validate menu.json file"
+            return $result
+        }
+        
         $result.Success = $true
         return $result
     }

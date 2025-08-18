@@ -11,7 +11,7 @@ function Test-MenuItemIncluded()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be included"
     Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
-    Write-Log -LogFile $LogFile -Module $functionName -Message "App mode: $($settings.appMode)" -LogLevel "Debug"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with app mode: $($settings.appMode)" -LogLevel "Debug"
 
     # If $Menus parameter is null, always assume the menu needs to be displayed
     if ($null -eq $Menus)
@@ -20,11 +20,17 @@ function Test-MenuItemIncluded()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Menus parameter is null, allowing menu item '$MenuItemName'" -LogLevel "Debug"
         return $true
     }
-    # If the $settings.appMode is 'full', assume the menu needs to be displayed.
-    elseif ($settings.appMode -eq 'full')
+    
+    # Get app mode hierarchy from menu configuration
+    $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $settings.appMode
+    Write-Verbose "[$functionName] App mode hierarchy for '$($settings.appMode)': [$($hierarchyAllowed -join ', ')]"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "App mode hierarchy for '$($settings.appMode)': [$($hierarchyAllowed -join ', ')]" -LogLevel "Debug"
+
+    # If the $settings.appMode hierarchy includes '*', assume the menu needs to be displayed (full mode)
+    if ($hierarchyAllowed -contains '*')
     {
-        Write-Verbose "[$functionName] App mode is 'full', allowing menu item '$MenuItemName'"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "App mode is 'full', allowing menu item '$MenuItemName'" -LogLevel "Debug"
+        Write-Verbose "[$functionName] App mode hierarchy includes '*' (full access), allowing menu item '$MenuItemName'"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "App mode hierarchy includes '*' (full access), allowing menu item '$MenuItemName'" -LogLevel "Debug"
         return $true
     }
 
@@ -79,7 +85,7 @@ function Test-MenuItemIncluded()
     if ($null -eq $foundMenuItem)
     {
         Write-Verbose "[$functionName] Menu item '$MenuItemName' not found in menus configuration, allowing by default"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' not found in menus configuration, allowing by default" -LogLevel "Debug"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' not found in menus configuration, allowing by default" -LogLevel "Information"
         return $true
     }
 
@@ -89,9 +95,19 @@ function Test-MenuItemIncluded()
     # Check if the menu item has includeInDisplayModes array
     if ($foundMenuItem.includeInDisplayModes -and $foundMenuItem.includeInDisplayModes.Count -gt 0)
     {
-        $appModeMatches = $foundMenuItem.includeInDisplayModes -contains $settings.appMode
-        Write-Verbose "[$functionName] Menu item '$MenuItemName' includeInDisplayModes check: $appModeMatches (looking for '$($settings.appMode)' in [$($foundMenuItem.includeInDisplayModes -join ', ')])"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' includeInDisplayModes check: $appModeMatches" -LogLevel "Debug"
+        # Use hierarchical checking instead of direct matching
+        $appModeMatches = $false
+        foreach ($allowedMode in $foundMenuItem.includeInDisplayModes)
+        {
+            if ($hierarchyAllowed -contains $allowedMode)
+            {
+                $appModeMatches = $true
+                break
+            }
+        }
+        
+        Write-Verbose "[$functionName] Menu item '$MenuItemName' hierarchical includeInDisplayModes check: $appModeMatches (checking [$($foundMenuItem.includeInDisplayModes -join ', ')] against hierarchy [$($hierarchyAllowed -join ', ')])"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' hierarchical includeInDisplayModes check: $appModeMatches (checking [$($foundMenuItem.includeInDisplayModes -join ', ')] against hierarchy [$($hierarchyAllowed -join ', ')])" -LogLevel "Debug"
         return $appModeMatches
     }
 

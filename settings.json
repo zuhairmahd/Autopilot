@@ -2,11 +2,11 @@
     "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version": "1.0.0.0",
     "auth": {
+        "cacheType": "Memory",
         "changePwOnNextStart": false,
-        "authType": "PublicAuthFlow",
+        "delegated": true,
         "noSaveRefreshToken": false,
         "forceNewToken": false,
-        "renewalLeadTime": 5,
         "scope": [
             "offline_access",
             "openid",
@@ -17,9 +17,9 @@
             "DeviceManagementManagedDevices.ReadWrite.All",
             "DeviceManagementServiceConfig.ReadWrite.All"
         ],
-        "cacheType": "Memory",
+        "authType": "PublicAuthFlow",
         "secureString": false,
-        "delegated": true
+        "renewalLeadTime": 5
     },
     "requiredScopes": [
         {
@@ -117,60 +117,20 @@
     ],
     "globalSettings": {
         "operatingSystem": "Windows",
-        "release": "master",
         "repo": "Github",
         "timeInSeconds": 60,
+        "testMode": false,
         "maxUserMatchDisplay": 10,
         "maxWaitTime": 30,
         "autoUpdate": true,
         "appMode": "full",
         "maxGroupMatchDisplay": 10,
-        "testMode": false,
+        "release": "master",
         "configFile": ".\\.secrets\\config.json",
         "showLicenseBanner": true,
         "deviceContactThresholdInDays": 30
     },
     "domains": {
-        "arabictutor.com": {
-            "groupsToExclude": [],
-            "groupsToInclude": [
-                "admin",
-                "autopilot",
-                "allusers"
-            ],
-            "settings": {
-                "operatingSystem": "Windows",
-                "repo": "Github",
-                "minUsernameLength": 3,
-                "timeInSeconds": "60",
-                "desiredAutopilotProfiles": [
-                    "cloudconfig"
-                ],
-                "maxSerialNumberLength": 50,
-                "maxUserMatchDisplay": "10",
-                "maxWaitTime": "30",
-                "showLicenseBanner": true,
-                "autoUpdate": false,
-                "minimumDevicePhysicalMemoryInGB": 8,
-                "maxUserNameLength": 50,
-                "domain": "arabictutor.com",
-                "preferredBrowser": "Chrome",
-                "appMode": "full",
-                "groupPatternsToExclude": [],
-                "maxGroupMatchDisplay": 10,
-                "deviceNamePrefix": "",
-                "privateSession": false,
-                "maxNumberOfDevicesAllowed": 15,
-                "userPatternsToExclude": [
-                    "-test",
-                    "onmicrosoft.com",
-                    "autopilot"
-                ],
-                "release": "master",
-                "minSerialNumberLength": 7,
-                "deviceContactThresholdInDays": 30
-            }
-        },
         "gao.gov": {
             "groupsToExclude": [],
             "groupsToInclude": [
@@ -181,8 +141,9 @@
             ],
             "settings": {
                 "operatingSystem": "Windows",
+                "maxNumberOfDevicesAllowed": 20,
                 "repo": "Github",
-                "minUsernameLength": 3,
+                "minSerialNumberLength": 7,
                 "timeInSeconds": "60",
                 "desiredAutopilotProfiles": [
                     "MSB01"
@@ -190,7 +151,6 @@
                 "maxSerialNumberLength": 11,
                 "maxUserMatchDisplay": 20,
                 "maxWaitTime": "30",
-                "showLicenseBanner": false,
                 "autoUpdate": false,
                 "minimumDevicePhysicalMemoryInGB": 16,
                 "maxUserNameLength": 20,
@@ -200,13 +160,53 @@
                 "groupPatternsToExclude": [],
                 "deviceNamePrefix": "w11-",
                 "privateSession": true,
-                "maxNumberOfDevicesAllowed": 20,
+                "minUsernameLength": 3,
                 "userPatternsToExclude": [
                     "-cma",
                     "-a"
                 ],
                 "release": "master",
+                "showLicenseBanner": false,
+                "deviceContactThresholdInDays": 30
+            }
+        },
+        "arabictutor.com": {
+            "groupsToExclude": [],
+            "groupsToInclude": [
+                "admin",
+                "autopilot",
+                "allusers"
+            ],
+            "settings": {
+                "operatingSystem": "Windows",
+                "maxNumberOfDevicesAllowed": 15,
+                "repo": "Github",
                 "minSerialNumberLength": 7,
+                "timeInSeconds": "60",
+                "desiredAutopilotProfiles": [
+                    "cloudconfig"
+                ],
+                "maxSerialNumberLength": 50,
+                "maxUserMatchDisplay": "10",
+                "maxWaitTime": "30",
+                "autoUpdate": false,
+                "minimumDevicePhysicalMemoryInGB": 8,
+                "maxUserNameLength": 50,
+                "domain": "arabictutor.com",
+                "preferredBrowser": "Chrome",
+                "appMode": "full",
+                "groupPatternsToExclude": [],
+                "maxGroupMatchDisplay": 10,
+                "deviceNamePrefix": "",
+                "privateSession": false,
+                "minUsernameLength": 3,
+                "userPatternsToExclude": [
+                    "-test",
+                    "onmicrosoft.com",
+                    "autopilot"
+                ],
+                "release": "master",
+                "showLicenseBanner": false,
                 "deviceContactThresholdInDays": 30
             }
         }
@@ -337,70 +337,90 @@
             "name": "Change application settings",
             "items": [
                 {
-                    "name": "Change environment Settings",
                     "description": "Change the environment   settings",
-                    "type": "submenu",
+                    "name": "Change environment Settings",
                     "items": [
                         {
-                            "name": "View global environment settings",
                             "description": "View the global environment settings",
-                            "blockType": "action",
+                            "Name": "View global environment settings",
+                            "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
-                            "name": "View domain specific environment settings",
                             "description": "View the domain specific environment settings",
-                            "blockType": "action",
+                            "name": "View domain specific environment settings",
+                            "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
-                            "name": "View group inclusion/exclusion settings for all domains",
                             "description": "View the group inclusion/exclusion settings for all domains",
-                            "blockType": "action",
+                            "name": "View group inclusion/exclusion settings for all domains",
+                            "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
-                            "name": "Change global environment settings",
                             "description": "Change the global environment settings",
-                            "blockType": "action",
+                            "name": "Change global environment settings",
+                            "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
+                            "description": "Change the domain specific settings",
                             "name": "Change domain specific settings",
-                            "description": "Change the domain specific environment settings",
-                            "blockType": "action",
+                            "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
-                            "name": "Change authentication settings",
                             "description": "Change the authentication settings",
-                            "blockType": "action",
+                            "name": "Change authentication settings",
+                            "type": "action",
                             "includeInDisplayModes": []
                         },
                         {
-                            "name": "Change group inclusion/exclusion",
                             "description": "Change the group inclusion/exclusion settings",
-                            "blockType": "menu",
-                            "menuName": "groupsEditMenu"
+                            "name": "Change group inclusion/exclusion settings",
+                            "items": [
+                                {
+                                    "description": "Change the groups to include in the application",
+                                    "name": "Change groups to include",
+                                    "type": "action",
+                                    "includeInDisplayModes": []
+                                },
+                                {
+                                    "description": "Change the groups to exclude from the application",
+                                    "name": "Change groups to exclude",
+                                    "type": "action",
+                                    "includeInDisplayModes": []
+                                },
+                                {
+                                    "description": "View the current group settings for the application",
+                                    "name": "View Current Group Settings",
+                                    "type": "action",
+                                    "includeInDisplayModes": []
+                                }
+                            ],
+                            "type": "submenu",
+                            "includeInDisplayModes": []
                         }
                     ],
+                    "type": "submenu",
                     "includeInDisplayModes": []
                 },
                 {
-                    "name": "Change Entra Credentials",
-                    "description": "Change the Entra credentials",
-                    "blockType": "action",
-                    "includeInDisplayModes": []
-                },
-                {
-                    "name": "Change Auto Update setting",
-                    "description": "Change the Auto Update setting",
+                    "description": "Change the password and authentication information",
+                    "name": "Change password and authentication information",
                     "type": "action",
                     "includeInDisplayModes": []
                 },
                 {
-                    "name": "Change App Mode setting",
+                    "description": "Change the Auto Update setting",
+                    "name": "Change Auto Update setting",
+                    "type": "action",
+                    "includeInDisplayModes": []
+                },
+                {
                     "description": "Change the application mode",
+                    "name": "Change App Mode setting",
                     "type": "action",
                     "includeInDisplayModes": [
                         "full",
@@ -427,6 +447,12 @@
         {
             "description": "Restart the device",
             "name": "Restart the device",
+            "type": "action",
+            "includeInDisplayModes": []
+        },
+        {
+            "description": "Show the group assignments for the application",
+            "name": "Show Group Assignments",
             "type": "action",
             "includeInDisplayModes": []
         },

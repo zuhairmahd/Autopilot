@@ -56,9 +56,15 @@ function ShowGroupAssignments()
     # Cache all assignments to avoid re-query per selection
     $allAssignments = @($assignments.allAssignments)
 
-    # Create Assignments menu (build once and reuse)
-    #region Group Assignments
-    $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $groupName" -Description "What type of assignments would you like to see?"
+    # Create Assignments menu from configuration
+    $groupAssignmentsMenu = NewMenu -MenuName "groupAssignmentsMenu"
+    if (-not $groupAssignmentsMenu) {
+        # Fallback to manual creation if config not found
+        $groupAssignmentsMenu = NewMenu -Title "Group Assignments for $groupName" -Description "What type of assignments would you like to see?"
+    } else {
+        # Update title with actual group name
+        $groupAssignmentsMenu.Title = $groupAssignmentsMenu.Title -replace '\$groupName', $groupName
+    }
     $groupAssignmentsMenu = AddMenuItem -menu $groupAssignmentsMenu -name "Show Application Assignments ($($assignments.AppAssignments.count))" -Action {
         Write-Host "Selected Assignment Type: Application"
         return 'Application'
