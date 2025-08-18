@@ -10,12 +10,7 @@ function Remove-MenuItem()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Removing menu item: $ItemName from menu: $($Menu.Title)"
-    
-    # Only log if LogFile is available
-    if ($LogFile -and (Test-Path (Split-Path $LogFile -Parent) -PathType Container))
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing menu item: $ItemName from menu: $($Menu.Title)" -LogLevel "Debug"
-    }
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing menu item: $ItemName from menu: $($Menu.Title)" -LogLevel "Debug"
     
     # Find and remove the item from the menu items array
     $originalCount = $Menu.Items.Count
@@ -25,18 +20,12 @@ function Remove-MenuItem()
     if ($originalCount -gt $newCount)
     {
         Write-Verbose "[$functionName] Successfully removed menu item: $ItemName"
-        if ($LogFile -and (Test-Path (Split-Path $LogFile -Parent) -PathType Container))
-        {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully removed menu item: $ItemName" -LogLevel "Information"
-        }
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully removed menu item: $ItemName" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] Menu item not found: $ItemName"
-        if ($LogFile -and (Test-Path (Split-Path $LogFile -Parent) -PathType Container))
-        {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Menu item not found for removal: $ItemName" -LogLevel "Warning"
-        }
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Menu item not found for removal: $ItemName" -LogLevel "Warning"
     }
     
     return $Menu
