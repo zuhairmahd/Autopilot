@@ -218,7 +218,7 @@ function ProcessSerialNumber()
             # Check Hardware Password Details availability
             Write-Verbose "[$functionName] Checking if device has hardware password details."
             Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
-            if (-not ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0))
+            if ($null -eq $enrollmentState.managedDevice.hardwarePassword -or $enrollmentState.managedDevice.hardwarePassword.count -eq 0)
             {
                 Write-Verbose "[$functionName] No hardware password details available - removing menu item"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hardware Password Details menu item excluded - no details available" -LogLevel "Information"
