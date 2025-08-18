@@ -206,7 +206,7 @@ function ProcessSerialNumber()
                 SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
             }
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Sync Device'" -LogLevel "Debug"
-            # Add LAPS Password action - always assign action regardless of availability
+            # Add LAPS Password action - only if LAPS credentials are available
             Write-Verbose "[$functionName] Checking if device has LAPS credentials."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device has LAPS credentials." -LogLevel "Verbose"
             Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
@@ -226,16 +226,14 @@ function ProcessSerialNumber()
                         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to copy LAPS password to clipboard. Error: $_" -LogLevel "Error"
                     }
                 }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS Password menu item added - credentials available" -LogLevel "Debug"
             }
             else
             {
-                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
-                    Write-Host "`nNo LAPS credentials available for this device." -ForegroundColor Yellow
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS password requested but no credentials available for device." -LogLevel "Warning"
-                }
+                Write-Verbose "[$functionName] No LAPS credentials available - menu item will not be shown"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS Password menu item excluded - no credentials available" -LogLevel "Information"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Get LAPS Password'" -LogLevel "Debug"
-            # Add BitLocker Recovery Key action - always assign action regardless of availability
+            # Add BitLocker Recovery Key action - only if BitLocker keys are available
             Write-Verbose "Checking if we have bitlocker keys for this device."
             Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)" -LogLevel "Information"
@@ -259,16 +257,14 @@ function ProcessSerialNumber()
                         }
                     }
                 }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker Recovery Key menu item added - keys available" -LogLevel "Debug"
             }
             else
             {
-                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
-                    Write-Host "`nNo BitLocker recovery keys available for this device." -ForegroundColor Yellow
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key requested but no keys available for device." -LogLevel "Warning"
-                }
+                Write-Verbose "[$functionName] No BitLocker recovery keys available - menu item will not be shown"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker Recovery Key menu item excluded - no keys available" -LogLevel "Information"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Get BitLocker Recovery Key'" -LogLevel "Debug"
-            # Add Hardware Password Details action - always assign action regardless of availability  
+            # Add Hardware Password Details action - only if hardware password details are available
             Write-Verbose "[$functionName] Checking if device has hardware password details."
             Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
             if ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0)
@@ -296,15 +292,13 @@ function ProcessSerialNumber()
                         Write-Host "No hardware password details found."
                     }
                 }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hardware Password Details menu item added - details available" -LogLevel "Debug"
             }
             else
             {
-                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get Hardware Password Details" -Action {
-                    Write-Host "`nNo hardware password details available for this device." -ForegroundColor Yellow
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hardware password details requested but none available for device." -LogLevel "Warning"
-                }
+                Write-Verbose "[$functionName] No hardware password details available - menu item will not be shown"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hardware Password Details menu item excluded - no details available" -LogLevel "Information"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Get Hardware Password Details'" -LogLevel "Debug"
             
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
                 Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
