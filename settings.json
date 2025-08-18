@@ -1,573 +1,154 @@
 ﻿{
-    "description":  "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
-    "version":  "1.1.0.0",
-    "auth":  {
-                 "NoSaveRefreshToken":  false,
-                 "changePWOnNextStart":  false,
-                 "authType":  "Interactive",
-                 "Delegated":  true,
-                 "ForceNewToken":  false,
-                 "scope":  [
-                               "offline_access",
-                               "openid",
-                               "Device.ReadWrite.All",
-                               "DeviceManagementApps.Read.All",
-                               "DeviceManagementConfiguration.ReadWrite.All",
-                               "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                               "DeviceManagementManagedDevices.ReadWrite.All",
-                               "DeviceManagementServiceConfig.ReadWrite.All"
-                           ],
-                 "CacheType":  "Memory",
-                 "SecureString":  false,
-                 "renewalLeadTime":  5
-             },
-    "requiredScopes":  [
-                           {
-                               "Scope":  "User.Read.All",
-                               "Reason":  "Required to read user profiles, group memberships, and registered devices.",
-                               "Endpoints":  [
-                                                 "/users",
-                                                 "users/{id}",
-                                                 "users/{id}/memberOf",
-                                                 "users/{id}/registeredDevices"
-                                             ]
-                           },
-                           {
-                               "Scope":  "Device.Read.All",
-                               "Reason":  "Required to read Microsoft Entra ID device objects.",
-                               "Endpoints":  [
-                                                 "devices"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementApps.ReadWrite.All",
-                               "Reason":  "Required to read application information and manage app assignments.",
-                               "Endpoints":  [
-                                                 "deviceAppManagement/mobileApps",
-                                                 "deviceAppManagement/mobileApps/{id}/assignments"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementConfiguration.Read.All",
-                               "Reason":  "Required to read Intune device configuration policies.",
-                               "Endpoints":  [
-                                                 "deviceManagement/deviceConfigurations"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementManagedDevices.Read.All",
-                               "Reason":  "Required to read Intune managed device properties.",
-                               "Endpoints":  [
-                                                 "/deviceManagement/managedDevices",
-                                                 "deviceManagement/managedDevices/{id}"
-                                             ]
-                           },
-                           {
-                               "Scope":  "BitlockerKey.Read.All",
-                               "Reason":  "Required to read BitLocker recovery keys for all devices.",
-                               "Endpoints":  [
-                                                 "informationProtection/bitlocker/recoveryKeys"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                               "Reason":  "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
-                               "Endpoints":  [
-                                                 "directory/deviceLocalCredentials"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementServiceConfig.ReadWrite.All",
-                               "Reason":  "Required to read Autopilot events and to read and manage Autopilot device identities.",
-                               "Endpoints":  [
-                                                 "deviceManagement/autopilotEvents",
-                                                 "deviceManagement/importedWindowsAutopilotDeviceIdentities",
-                                                 "deviceManagement/windowsAutopilotDeviceIdentities"
-                                             ]
-                           },
-                           {
-                               "Scope":  "openid",
-                               "Reason":  "Standard scope required for user sign-in with OpenID Connect.",
-                               "Endpoints":  [
-
-                                             ]
-                           },
-                           {
-                               "Scope":  "profile",
-                               "Reason":  "Standard scope to get basic user profile information during sign-in.",
-                               "Endpoints":  [
-
-                                             ]
-                           },
-                           {
-                               "Scope":  "offline_access",
-                               "Reason":  "Standard scope that provides refresh tokens to maintain access when the user is not active.",
-                               "Endpoints":  [
-
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementConfiguration.ReadWrite.All",
-                               "Reason":  "Required to create, update, and delete Intune device configuration policies.",
-                               "Endpoints":  [
-                                                 "deviceManagement/deviceConfigurations"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementApps.Read.All",
-                               "Reason":  "Required to read application information in Intune.",
-                               "Endpoints":  [
-                                                 "deviceAppManagement/mobileApps"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementManagedDevices.ReadWrite.All",
-                               "Reason":  "Required to create, update, and delete Intune managed device properties.",
-                               "Endpoints":  [
-                                                 "deviceManagement/managedDevices"
-                                             ]
-                           },
-                           {
-                               "Scope":  "DeviceManagementManagedDevices.PrivilegedOperations.All",
-                               "Reason":  "Required for privileged operations on managed devices, such as reading LAPS passwords.",
-                               "Endpoints":  [
-                                                 "deviceManagement/managedDevices"
-                                             ]
-                           },
-                           {
-                               "Scope":  "BitlockerKey.Read.All",
-                               "Reason":  "Required to read BitLocker recovery keys for all devices.",
-                               "Endpoints":  [
-                                                 "informationProtection/bitlocker/recoveryKeys"
-                                             ]
-                           }
-                       ],
-    "globalSettings":  {
-                           "operatingSystem":  "Windows",
-                           "Release":  "master",
-                           "Repo":  "Github",
-                           "timeInSeconds":  "60",
-                           "maxUserMatchDisplay":  "10",
-                           "maxWaitTime":  "30",
-                           "autoUpdate":  false,
-                           "appMode":  "full",
-                           "maxGroupMatchDisplay":  10,
-                           "testMode":  false,
-                           "configFile":  ".\\\\.secrets\\\\config.json",
-                           "showLicenseBanner":  false,
-                           "deviceContactThresholdInDays":  30
-                       },
-    "domains":  {
-                    "arabictutor.com":  {
-                                            "groupsToExclude":  [
-
-                                                                ],
-                                            "groupsToInclude":  [
-
-                                                                ],
-                                            "settings":  {
-                                                             "operatingSystem":  "Windows",
-                                                             "maxGroupMatchDisplay":  10,
-                                                             "repo":  "Github",
-                                                             "MinSerialNumberLength":  7,
-                                                             "timeInSeconds":  "60",
-                                                             "MinUsernameLength":  3,
-                                                             "MaxSerialNumberLength":  100,
-                                                             "DesiredAutopilotProfiles":  [
-                                                                                              "windowsCloudConfig Autopilot profile",
-                                                                                              "Hybrid join profile"
-                                                                                          ],
-                                                             "maxUserMatchDisplay":  "10",
-                                                             "maxWaitTime":  "30",
-                                                             "autoUpdate":  false,
-                                                             "MinimumDevicePhysicalMemoryInGB":  8,
-                                                             "MaxUserNameLength":  50,
-                                                             "domain":  "arabictutor.com",
-                                                             "preferredBrowser":  "Chrome",
-                                                             "appMode":  "full",
-                                                             "groupPatternsToExclude":  [
-
-                                                                                        ],
-                                                             "deviceContactThresholdInDays":  30,
-                                                             "deviceNamePrefix":  "vmware",
-                                                             "privateSession":  false,
-                                                             "maxNumberOfDevicesAllowed":  15,
-                                                             "userPatternsToExclude":  [
-                                                                                           "-test",
-                                                                                           "onmicrosoft.com"
-                                                                                       ],
-                                                             "release":  "master",
-                                                             "showLicenseBanner":  false,
-                                                             "GroupTag":  "ENTRA"
-                                                         }
-                                        },
-                    "gao.gov":  {
-                                    "groupsToExclude":  [
-
-                                                        ],
-                                    "groupsToInclude":  [
-                                                            "sg_Office_365_License_G5_wth_windows_pilot",
-                                                            "sg_passwrd_hash_stage",
-                                                            "ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB",
-                                                            "ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED"
-                                                        ],
-                                    "settings":  {
-                                                     "maxNumberOfDevicesAllowed":  20,
-                                                     "DesiredAutopilotProfiles":  [
-                                                                                      "msb"
-                                                                                  ],
-                                                     "MaxSerialNumberLength":  100,
-                                                     "GroupTag":  "MSB01",
-                                                     "showLicenseBanner":  false,
-                                                     "MinimumDevicePhysicalMemoryInGB":  16,
-                                                     "MaxUserNameLength":  50,
-                                                     "domain":  "gao.gov",
-                                                     "preferredBrowser":  "Chrome",
-                                                     "appMode":  "test",
-                                                     "deviceNamePrefix":  "w11-",
-                                                     "privateSession":  true,
-                                                     "MinUsernameLength":  3,
-                                                     "userPatternsToExclude":  [
-                                                                                   "-cma",
-                                                                                   "-test",
-                                                                                   "onmicrosoft.com",
-                                                                                   "-sup",
-                                                                                   "-a"
-                                                                               ],
-                                                     "MinSerialNumberLength":  7
-                                                 }
-                                }
-                },
-    "menus":  [
-                  {
-                      "description":  "Start the user and device readiness check",
-                      "name":  "Give a device to a user",
-                      "type":  "action",
-                      "includeInDisplayModes":  [
-                                                    "helpdesk",
-                                                    "registration"
-                                                ]
-                  },
-                  {
-                      "description":  "Troubleshoot a device",
-                      "name":  "Check device status",
-                      "items":  [
-                                    {
-                                        "description":  "Lookup a device by its serial number",
-                                        "name":  "Lookup device by Serial Number",
-                                        "items":  [
-                                                      {
-                                                          "description":  "Lookup a device by its serial number",
-                                                          "name":  "Enter a serial number",
-                                                          "type":  "action",
-                                                          "includeInDisplayModes":  [
-
-                                                                                    ]
-                                                      },
-                                                      {
-                                                          "description":  "Lookup the device the application is running on",
-                                                          "name":  "Use this device\u0027s serial number",
-                                                          "type":  "action",
-                                                          "includeInDisplayModes":  [
-
-                                                                                    ]
-                                                      }
-                                                  ],
-                                        "type":  "submenu",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Lookup a device by the user id or email address",
-                                        "name":  "Lookup device by User",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    }
-                                ],
-                      "type":  "submenu",
-                      "includeInDisplayModes":  [
-                                                    "helpdesk",
-                                                    "registration"
-                                                ]
-                  },
-                  {
-                      "description":  "Import a device into Autopilot and perform related actions",
-                      "name":  "Autopilot menu",
-                      "items":  [
-                                    {
-                                        "description":  "Import a device into Autopilot",
-                                        "name":  "Import device into Autopilot",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Custom import a device into Autopilot",
-                                        "name":  "Custom import device into Autopilot (requires admin rights)",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "advancedRegistration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Import a Corporate Device Identifier for Device Preparation",
-                                        "name":  "Import Corporate Device Identifier for Device Preparation (requires admin rights)",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "advancedRegistration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Export a Corporate Device Identifier for manual upload to Device Preparation",
-                                        "name":  "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "advancedRegistration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Get the device hash for manual upload to Autopilot",
-                                        "name":  "Get device hash for manual upload to Autopilot (requires admin rights)",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Download and install the latest Windows updates",
-                                        "name":  "Download and install latest Windows updates(requires admin rights)",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Check if a device is registered in Autopilot",
-                                        "name":  "Check device Autopilot status",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Delete a device from Autopilot",
-                                        "name":  "Delete device from Autopilot",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    }
-                                ],
-                      "type":  "submenu",
-                      "includeInDisplayModes":  [
-                                                    "registration"
-                                                ]
-                  },
-                  {
-                      "description":  "Change the application settings",
-                      "name":  "Change application settings",
-                      "items":  [
-                                    {
-                                        "description":  "Change the application settings",
-                                        "name":  "Change application settings",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Change the password and authentication information",
-                                        "name":  "Change password and authentication information",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Change the Auto Update setting",
-                                        "name":  "Change Auto Update setting",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Restore the application to its default settings",
-                                        "name":  "Restore defaults",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    }
-                                ],
-                      "type":  "submenu",
-                      "includeInDisplayModes":  [
-                                                    "advanced"
-                                                ]
-                  },
-                  {
-                      "description":  "Check for updates to the scripts used by the application",
-                      "name":  "Check for script updates",
-                      "type":  "action",
-                      "includeInDisplayModes":  [
-
-                                                ]
-                  },
-                  {
-                      "description":  "Restart the device",
-                      "name":  "Restart the device",
-                      "type":  "action",
-                      "includeInDisplayModes":  [
-
-                                                ]
-                  },
-                  {
-                      "description":  "Export various device configuration",
-                      "name":  "Export Menu",
-                      "items":  [
-                                    {
-                                        "description":  "Export Autopilot devices to a CSV file",
-                                        "name":  "Export Autopilot Devices",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Export imported Autopilot devices to a CSV file",
-                                        "name":  "Export Imported Autopilot Devices",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Export managed Windows devices to a CSV file",
-                                        "name":  "Export Managed Windows Devices",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Export unmanaged Windows devices to a CSV file",
-                                        "name":  "Export Unmanaged Windows Devices",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "advanced"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Export a report of device storage to a CSV file",
-                                        "name":  "Export device storage report",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Export application assignments to a CSV file",
-                                        "name":  "Export Application Assignments",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "advanced"
-                                                                  ]
-                                    }
-                                ],
-                      "type":  "submenu",
-                      "includeInDisplayModes":  [
-                                                    "registration"
-                                                ]
-                  },
-                  {
-                      "description":  "Learn more about the application",
-                      "name":  "About",
-                      "type":  "action",
-                      "includeInDisplayModes":  [
-
-                                                ]
-                  },
-                  {
-                      "description":  "Perform various device actions",
-                      "name":  "Device Actions",
-                      "items":  [
-                                    {
-                                        "description":  "Wipe the selected device",
-                                        "name":  "Wipe Device",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "helpdesk",
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Clean the selected device",
-                                        "name":  "Clean Device",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "advanced"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Sync the selected device",
-                                        "name":  "Sync Device",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "helpdesk",
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Retrieve the LAPS password for the selected device",
-                                        "name":  "Get LAPS Password",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "helpdesk",
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Retrieve the BitLocker recovery key for the selected device",
-                                        "name":  "Get BitLocker Recovery Key",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-                                                                      "helpdesk",
-                                                                      "registration"
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Restart the selected device",
-                                        "name":  "Restart Device",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Show the health status of the selected device",
-                                        "name":  "Show Device Health Status",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    },
-                                    {
-                                        "description":  "Check the next user readiness state for the selected device",
-                                        "name":  "Check next user readiness state",
-                                        "type":  "action",
-                                        "includeInDisplayModes":  [
-
-                                                                  ]
-                                    }
-                                ],
-                      "type":  "submenu",
-                      "includeInDisplayModes":  [
-
-                                                ]
-                  }
-              ]
+    "description": "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
+    "version": "1.1.0.0",
+    "auth": {
+        "NoSaveRefreshToken": false,
+        "changePWOnNextStart": false,
+        "authType": "publicAuthFlow",
+        "Delegated": true,
+        "ForceNewToken": false,
+        "scope": [
+            "offline_access",
+            "openid",
+            "Device.ReadWrite.All",
+            "DeviceManagementApps.Read.All",
+            "DeviceManagementConfiguration.ReadWrite.All",
+            "DeviceManagementManagedDevices.PrivilegedOperations.All",
+            "DeviceManagementManagedDevices.ReadWrite.All",
+            "DeviceManagementServiceConfig.ReadWrite.All"
+        ],
+        "CacheType": "Memory",
+        "SecureString": false,
+        "renewalLeadTime": 5
+    },
+    "requiredScopes": [
+        {
+            "Scope": "User.Read.All",
+            "Reason": "Required to read user profiles, group memberships, and registered devices.",
+            "Endpoints": [
+                "/users",
+                "users/{id}",
+                "users/{id}/memberOf",
+                "users/{id}/registeredDevices"
+            ]
+        },
+        {
+            "Scope": "Device.Read.All",
+            "Reason": "Required to read Microsoft Entra ID device objects.",
+            "Endpoints": [
+                "devices"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementApps.ReadWrite.All",
+            "Reason": "Required to read application information and manage app assignments.",
+            "Endpoints": [
+                "deviceAppManagement/mobileApps",
+                "deviceAppManagement/mobileApps/{id}/assignments"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementConfiguration.Read.All",
+            "Reason": "Required to read Intune device configuration policies.",
+            "Endpoints": [
+                "deviceManagement/deviceConfigurations"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementManagedDevices.Read.All",
+            "Reason": "Required to read Intune managed device properties.",
+            "Endpoints": [
+                "/deviceManagement/managedDevices",
+                "deviceManagement/managedDevices/{id}"
+            ]
+        },
+        {
+            "Scope": "BitlockerKey.Read.All",
+            "Reason": "Required to read BitLocker recovery keys for all devices.",
+            "Endpoints": [
+                "informationProtection/bitlocker/recoveryKeys"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
+            "Reason": "Required for highly privileged operations, specifically to read local admin (LAPS) passwords.",
+            "Endpoints": [
+                "directory/deviceLocalCredentials"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementServiceConfig.ReadWrite.All",
+            "Reason": "Required to read Autopilot events and to read and manage Autopilot device identities.",
+            "Endpoints": [
+                "deviceManagement/autopilotEvents",
+                "deviceManagement/importedWindowsAutopilotDeviceIdentities",
+                "deviceManagement/windowsAutopilotDeviceIdentities"
+            ]
+        },
+        {
+            "Scope": "openid",
+            "Reason": "Standard scope required for user sign-in with OpenID Connect.",
+            "Endpoints": []
+        },
+        {
+            "Scope": "profile",
+            "Reason": "Standard scope to get basic user profile information during sign-in.",
+            "Endpoints": []
+        },
+        {
+            "Scope": "offline_access",
+            "Reason": "Standard scope that provides refresh tokens to maintain access when the user is not active.",
+            "Endpoints": []
+        },
+        {
+            "Scope": "DeviceManagementConfiguration.ReadWrite.All",
+            "Reason": "Required to create, update, and delete Intune device configuration policies.",
+            "Endpoints": [
+                "deviceManagement/deviceConfigurations"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementApps.Read.All",
+            "Reason": "Required to read application information in Intune.",
+            "Endpoints": [
+                "deviceAppManagement/mobileApps"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementManagedDevices.ReadWrite.All",
+            "Reason": "Required to create, update, and delete Intune managed device properties.",
+            "Endpoints": [
+                "deviceManagement/managedDevices"
+            ]
+        },
+        {
+            "Scope": "DeviceManagementManagedDevices.PrivilegedOperations.All",
+            "Reason": "Required for privileged operations on managed devices, such as reading LAPS passwords.",
+            "Endpoints": [
+                "deviceManagement/managedDevices"
+            ]
+        },
+        {
+            "Scope": "BitlockerKey.Read.All",
+            "Reason": "Required to read BitLocker recovery keys for all devices.",
+            "Endpoints": [
+                "informationProtection/bitlocker/recoveryKeys"
+            ]
+        }
+    ],
+    "globalSettings": {
+        "operatingSystem": "Windows",
+        "Release": "master",
+        "Repo": "Github",
+        "timeInSeconds": "60",
+        "maxUserMatchDisplay": "10",
+        "maxWaitTime": "30",
+        "autoUpdate": false,
+        "appMode": "full",
+        "maxGroupMatchDisplay": 10,
+        "testMode": false,
+        "configFile": ".\\\\.secrets\\\\config.json",
+        "showLicenseBanner": false,
+        "deviceContactThresholdInDays": 30
+    }
 }

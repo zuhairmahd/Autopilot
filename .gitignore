@@ -47,3 +47,7 @@ config.json
 temp*
 *temp
 *.zuh
+*.com.json
+*.gov.json
+*.org.json
+*.net.json
