@@ -50,7 +50,18 @@ function Test-SettingsJsonExists()
         Write-SafeLog "Getting default settings from centralized source" "Information"
         
         # Use centralized defaults - single source of truth
-        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings" -Version $version.version.toString()
+        # Get version from global variable if available, otherwise use default
+        $versionString = if ($global:version -and $global:version.version) {
+            $global:version.version.toString()
+        } elseif ($version -and $version.version) {
+            $version.version.toString()
+        } else {
+            "1.3.0.0"  # Default version
+        }
+        Write-Verbose "[$functionName] Using version: $versionString"
+        Write-SafeLog "Using version: $versionString" "Information"
+        
+        $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings" -Version $versionString
         if (-not $defaultSettings)
         {
             Write-Verbose "[$functionName] Failed to get defaults from centralized function, creating fallback"
@@ -59,7 +70,7 @@ function Test-SettingsJsonExists()
             # Fallback minimal structure in case centralized function fails
             $defaultSettings = @{
                 description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-                version        = $version.version.toString()
+                version        = $versionString
                 auth           = Get-ApplicationDefaults -DefaultType "Auth"
                 globalSettings = Get-ApplicationDefaults -DefaultType "Global"
             }

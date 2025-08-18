@@ -32,11 +32,21 @@ function Test-MenuJsonExists()
     
     try
     {
+        # Get version from global variable if available, otherwise use default
+        $versionString = if ($global:version -and $global:version.version) {
+            $global:version.version.toString()
+        } elseif ($version -and $version.version) {
+            $version.version.toString()
+        } else {
+            "1.3.0.0"  # Default version
+        }
+        Write-Verbose "[$functionName] Using version: $versionString"
+        
         # Define comprehensive default menu structure using ordered hashtables to preserve menu order
         $defaultMenus = [ordered]@{
             name = "menu.json"
             description = "This file contains the definitions for the menus used in the application."
-            version = $version.version.toString()
+            version = $versionString
             appModeHierarchy = [ordered]@{
                 full = @("*")
                 advanced = @("advanced", "helpdesk", "registration")
