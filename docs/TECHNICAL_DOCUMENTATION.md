@@ -158,6 +158,52 @@ The tool uses multiple configuration files with specific purposes:
 }
 ```
 
+### Separate Domain Configuration Files
+
+Starting with this version, domain-specific configurations are stored in separate JSON files instead of within the main `settings.json`. This provides better organization and management of domain-specific settings.
+
+#### Domain File Structure
+
+Each domain has its own configuration file named `{domain}.json` (e.g., `contoso.com.json`):
+
+```json
+{
+  "groupsToInclude": ["Contoso-Users", "Device-Recipients"],
+  "groupsToExclude": ["Contractors", "Temporary-Staff"],
+  "settings": {
+    "deviceNamePrefix": "CONTOSO-",
+    "domain": "contoso.com",
+    "maxNumberOfDevicesAllowed": 10,
+    "MinimumDevicePhysicalMemoryInGB": 8,
+    "GroupTag": "CONTOSO-Autopilot",
+    "DesiredAutopilotProfiles": ["Contoso-Standard", "Contoso-Secure"]
+  },
+  "additionalScopes": [
+    {
+      "Scope": "CustomScope.Read.All",
+      "Reason": "Required for custom domain operations"
+    }
+  ]
+}
+```
+
+#### Migration Process
+
+The application automatically migrates from the legacy format (domains in `settings.json`) to separate files:
+
+1. **Detection**: On startup, checks if domains exist in `settings.json`
+2. **Migration**: Creates separate domain files with complete configuration
+3. **Cleanup**: Removes domains section from `settings.json` after successful migration
+4. **Backup**: Creates timestamped backups before any changes
+
+#### Benefits
+
+- **Modularity**: Each domain can be managed independently
+- **Version Control**: Easier to track changes to specific domain configurations
+- **Collaboration**: Multiple administrators can work on different domains simultaneously
+- **Backup**: Individual domain configurations can be backed up separately
+- **Security**: Domain-specific settings can be secured with different permissions
+
 ### Configuration Functions Reference
 
 #### Core Configuration Functions
@@ -172,10 +218,32 @@ The tool uses multiple configuration files with specific purposes:
 - Creates timestamped backups before modification
 - Validates JSON structure before and after update
 
-**`Update-DomainSettings`** (SettingsHelperFunctions.ps1)
-- Updates or creates domain-specific configurations
-- Supports merge and replace modes
-- Preserves other domains and global settings
+**`Update-Setting`** (Update-Setting.ps1)
+- **Enhanced for separate domain files**: Now saves domain settings to separate configuration files
+- Supports merge and replace modes for domain settings
+- Maintains backward compatibility with legacy format
+
+#### New Domain Configuration Functions
+
+**`Load-DomainConfiguration`** (Load-DomainConfiguration.ps1)
+- Loads domain-specific configuration from separate JSON files
+- Creates default configuration with global settings if file doesn't exist
+- Supports fallback to legacy format for backward compatibility
+
+**`Save-DomainConfiguration`** (Save-DomainConfiguration.ps1)
+- Saves domain configuration to separate JSON files
+- Creates timestamped backups before modifications
+- Validates JSON structure and provides error handling
+
+**`Migrate-DomainsToSeparateFiles`** (Migrate-DomainsToSeparateFiles.ps1)
+- Migrates domain configurations from settings.json to separate files
+- Preserves all existing settings, groups, and additional scopes
+- Provides detailed migration results and error reporting
+
+**`Get-AvailableDomains`** (Get-AvailableDomains.ps1)
+- Scans for available domain configuration files
+- Supports both separate files and legacy format
+- Used by domain selection interfaces
 
 **`Get-JsonConfiguration`** (MiscFunctions.ps1)
 - Universal JSON configuration loader with fallback support
