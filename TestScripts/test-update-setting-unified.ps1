@@ -146,8 +146,17 @@ try {
     $result = Update-Setting -SettingType "Domain" -SettingsFile $TestSettingsFile -DomainName "test.com" -Settings $newDomainSettings -MergeSettings
     
     if ($result) {
-        $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
-        $domainSettings = $verifySettings.domains."test.com".settings
+        # Check domain settings in the separate domain file (new architecture)
+        $domainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.json"
+        if (Test-Path $domainConfigFile) {
+            $domainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
+            $domainSettings = $domainConfig.settings
+        } else {
+            # Fallback to old format for backward compatibility
+            $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
+            $domainSettings = $verifySettings.domains."test.com".settings
+        }
+        
         if ($domainSettings.GroupTag -eq "MERGED-GROUP" -and 
             $domainSettings.newSetting -eq "newValue" -and 
             $domainSettings.customSetting -eq "domainValue") {
@@ -175,8 +184,17 @@ try {
     $result = Update-Setting -SettingType "Domain" -SettingsFile $TestSettingsFile -DomainName "test.com" -Settings $replaceDomainSettings
     
     if ($result) {
-        $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
-        $domainSettings = $verifySettings.domains."test.com".settings
+        # Check domain settings in the separate domain file (new architecture)
+        $domainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.json"
+        if (Test-Path $domainConfigFile) {
+            $domainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
+            $domainSettings = $domainConfig.settings
+        } else {
+            # Fallback to old format for backward compatibility
+            $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
+            $domainSettings = $verifySettings.domains."test.com".settings
+        }
+        
         if ($domainSettings.GroupTag -eq "REPLACED-GROUP" -and 
             $domainSettings.onlySetting -eq "replaceValue" -and 
             -not ($domainSettings.PSObject.Properties.Name -contains "customSetting")) {
@@ -203,20 +221,35 @@ try {
     $result = Update-Setting -SettingType "Domain" -SettingsFile $TestSettingsFile -DomainName "newdomain.com" -Settings $newDomainSettings
     
     if ($result) {
-        $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
-        if ($verifySettings.domains.PSObject.Properties.Name -contains "newdomain.com") {
-            $newDomainObj = $verifySettings.domains."newdomain.com"
-            if ($newDomainObj.settings.GroupTag -eq "NEW-DOMAIN" -and 
-                $newDomainObj.groupsToInclude -is [array] -and 
-                $newDomainObj.groupsToExclude -is [array]) {
+        # Check for new domain in separate domain file (new architecture)
+        $newDomainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "newdomain.com.json"
+        if (Test-Path $newDomainConfigFile) {
+            $newDomainConfig = Get-Content -Path $newDomainConfigFile -Raw | ConvertFrom-Json
+            if ($newDomainConfig.settings.GroupTag -eq "NEW-DOMAIN" -and 
+                $newDomainConfig.groupsToInclude -is [array] -and 
+                $newDomainConfig.groupsToExclude -is [array]) {
                 Write-Host "✓ New domain creation successful" -ForegroundColor Green
             } else {
                 Write-Host "✗ New domain structure verification failed" -ForegroundColor Red
                 throw "New domain structure verification failed"
             }
         } else {
-            Write-Host "✗ New domain not found" -ForegroundColor Red
-            throw "New domain not found"
+            # Fallback to old format for backward compatibility
+            $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
+            if ($verifySettings.domains.PSObject.Properties.Name -contains "newdomain.com") {
+                $newDomainObj = $verifySettings.domains."newdomain.com"
+                if ($newDomainObj.settings.GroupTag -eq "NEW-DOMAIN" -and 
+                    $newDomainObj.groupsToInclude -is [array] -and 
+                    $newDomainObj.groupsToExclude -is [array]) {
+                    Write-Host "✓ New domain creation successful" -ForegroundColor Green
+                } else {
+                    Write-Host "✗ New domain structure verification failed" -ForegroundColor Red
+                    throw "New domain structure verification failed"
+                }
+            } else {
+                Write-Host "✗ New domain not found" -ForegroundColor Red
+                throw "New domain not found"
+            }
         }
     } else {
         Write-Host "✗ New domain creation failed" -ForegroundColor Red

@@ -348,8 +348,43 @@ function Update-Setting()
                 Write-Verbose "[$functionName] Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)"
                 Write-Log -LogFile $logFile -Message "Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)" -Module $functionName
                 
-                # Load existing domain configuration
+                # Check if domain exists in main settings.json and migrate if needed
                 $configPath = Split-Path $SettingsFile -Parent
+                $domainConfigFile = Join-Path $configPath "$DomainName.json"
+                
+                if (-not (Test-Path $domainConfigFile) -and $settingsObj.domains -and $settingsObj.domains.PSObject.Properties.Name -contains $DomainName) {
+                    Write-Verbose "[$functionName] Found domain '$DomainName' in main settings file, migrating to separate file"
+                    Write-Log -LogFile $logFile -Message "Found domain '$DomainName' in main settings file, migrating to separate file" -Module $functionName
+                    
+                    # Get the existing domain configuration from main settings
+                    $existingDomainConfig = $settingsObj.domains.$DomainName
+                    
+                    # Convert to hashtable for easier manipulation
+                    $domainConfigHash = @{
+                        groupsToInclude = if ($existingDomainConfig.groupsToInclude) { $existingDomainConfig.groupsToInclude } else { @() }
+                        groupsToExclude = if ($existingDomainConfig.groupsToExclude) { $existingDomainConfig.groupsToExclude } else { @() }
+                        settings = if ($existingDomainConfig.settings) { 
+                            $settingsHash = @{}
+                            $existingDomainConfig.settings.PSObject.Properties | ForEach-Object {
+                                $settingsHash[$_.Name] = $_.Value
+                            }
+                            $settingsHash
+                        } else { @{} }
+                        additionalScopes = if ($existingDomainConfig.additionalScopes) { $existingDomainConfig.additionalScopes } else { @() }
+                    }
+                    
+                    # Save the migrated domain configuration to separate file
+                    $saveResult = Save-DomainConfiguration -DomainName $DomainName -DomainConfiguration $domainConfigHash -ConfigurationPath $configPath
+                    if ($saveResult) {
+                        Write-Verbose "[$functionName] Successfully migrated domain '$DomainName' to separate file"
+                        Write-Log -LogFile $logFile -Message "Successfully migrated domain '$DomainName' to separate file" -Module $functionName
+                    } else {
+                        Write-Warning "[$functionName] Failed to save migrated domain configuration for '$DomainName'"
+                        Write-Log -LogFile $logFile -Message "Failed to save migrated domain configuration for '$DomainName'" -Module $functionName -LogLevel "Warning"
+                    }
+                }
+                
+                # Load existing domain configuration
                 $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
                 
                 if ($null -eq $domainConfig)
