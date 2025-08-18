@@ -158,9 +158,11 @@ function Show-SettingsEditor()
             Write-Log -LogFile $logFile -Module $functionName -Message "Getting domain settings template from centralized defaults for domain: '$DomainName'" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Getting domain settings template from centralized defaults for domain: '$DomainName'"
             
-            try {
+            try
+            {
                 $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings) {
+                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings)
+                {
                     Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
                     Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
                     return $false
@@ -170,7 +172,8 @@ function Show-SettingsEditor()
                 Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
-            catch {
+            catch
+            {
                 Write-Warning "[$functionName] Error retrieving domain template: $($_.Exception.Message)"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving domain template: $($_.Exception.Message)" -LogLevel "Error"
                 return $false
@@ -575,8 +578,6 @@ function Get-SettingDescription()
         return "Configuration setting: $SettingName"
     }
 }
-
-
 
 function Get-SettingInput()
 {
@@ -990,40 +991,34 @@ function Get-ArrayInput()
         Write-Host "  1. Replace all existing values with new ones" -ForegroundColor White
         Write-Host "  2. Add new values to the existing ones" -ForegroundColor White
         Write-Host "  3. Keep current values unchanged" -ForegroundColor White
-        
-        do
+        $choice = Read-Host "Enter your choice (1-3)"
+        while ($choice -notmatch '^[1-3]$')
         {
+            Write-Host "Invalid choice. Please enter a number between 1 and 3." -ForegroundColor Red
+            [console]::beep(1000, 500)
             $choice = Read-Host "Enter your choice (1-3)"
-            switch ($choice)
+        }
+        switch ($choice)
+        {
+            '1'
             {
-                '1'
-                {
-                    $shouldReplaceExisting = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing array values" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to replace existing array values"
-                    break
-                }
-                '2'
-                {
-                    $shouldReplaceExisting = $false
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing array values" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to add to existing array values"
-                    break
-                }
-                '3'
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current array values unchanged" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to keep current array values unchanged"
-                    return $CurrentValue
-                }
-                default
-                {
-                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
-                    continue
-                }
+                Write-Verbose "[$functionName] User chose to replace existing values"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing values" -LogLevel "Information"
+                $shouldReplaceExisting = $true
             }
-            break
-        } while ($true)
+            '2'
+            {
+                Write-Verbose "[$functionName] User chose to add new values to existing ones"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add new values to existing ones" -LogLevel "Information"
+                $shouldReplaceExisting = $false
+            }
+            '3'
+            {
+                Write-Verbose "[$functionName] User chose to keep current values unchanged"
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
+                return $CurrentValue
+            }
+        }
     }
     
     Write-Host "`nEnter new values (one per line). Press Enter on empty line to finish:" -ForegroundColor Yellow
