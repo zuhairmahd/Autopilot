@@ -8,22 +8,22 @@ param(
 # Use unified test framework
 try {
     # Load test helper functions
-    . "$PSScriptRoot\test-helper.ps1"
+    . "$PSScriptRoot/test-helper.ps1"
     
     # Load the new domain configuration functions directly
-    . "$PSScriptRoot\..\functions\setupFunctions\Load-DomainConfiguration.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\Save-DomainConfiguration.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\Migrate-DomainsToSeparateFiles.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\Initialize-ApplicationConfiguration.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\Update-Setting.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\Get-ApplicationDefaults.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\FirstRunWizardFunctions\Test-SettingsJsonExists.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\FirstRunWizardFunctions\ConvertFrom-JsonToHashtable.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\MergeSettings.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/Load-DomainConfiguration.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/Save-DomainConfiguration.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/Migrate-DomainsToSeparateFiles.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/Initialize-ApplicationConfiguration.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/Update-Setting.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/Get-ApplicationDefaults.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/MergeSettings.ps1"
     
     # Load other essential functions
-    . "$PSScriptRoot\..\functions\utilityFunctions\Write-Log.ps1"
-    . "$PSScriptRoot\..\functions\utilityFunctions\Write-SafeLog.ps1"
+    . "$PSScriptRoot/../functions/utilityFunctions/Write-Log.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Write-SafeLog.ps1"
     
     # Initialize unified test environment
     $testContext = Start-UnifiedTest -TestName "Separate Domain Configuration Files" -TestFolder $TestFolder

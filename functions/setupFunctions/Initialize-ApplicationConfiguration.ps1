@@ -354,7 +354,31 @@ function Initialize-LocalSettings
     Write-Verbose "[$functionName] Processing domain settings for $Domain from separate file"
     Write-Log -LogFile $logFile -Message "Processing domain settings for $Domain from separate file" -Module $functionName -LogLevel "Information"
     
-    foreach ($key in $localConfigData.PSObject.Properties.Name)
+    # Handle both hashtables and PSCustomObjects correctly
+    # Avoid hashtable system properties (IsReadOnly, IsFixedSize, IsSynchronized, Keys, Values, SyncRoot, Count)
+    $settingsKeys = @()
+    if ($localConfigData -is [hashtable])
+    {
+        Write-Verbose "[$functionName] Processing hashtable-based domain settings"
+        $settingsKeys = $localConfigData.Keys
+    }
+    elseif ($localConfigData.PSObject.Properties)
+    {
+        Write-Verbose "[$functionName] Processing PSCustomObject-based domain settings"
+        # Filter out hashtable system properties in case they were inadvertently included
+        $unwantedProperties = @('IsReadOnly', 'IsFixedSize', 'IsSynchronized', 'Keys', 'Values', 'SyncRoot', 'Count')
+        $settingsKeys = $localConfigData.PSObject.Properties.Name | Where-Object { $_ -notin $unwantedProperties }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No settings properties found in domain configuration"
+        Write-Log -LogFile $logFile -Message "No settings properties found in domain configuration" -Module $functionName -LogLevel "Warning"
+    }
+    
+    Write-Verbose "[$functionName] Processing $($settingsKeys.Count) settings keys"
+    Write-Log -LogFile $logFile -Message "Processing $($settingsKeys.Count) settings keys: $($settingsKeys -join ', ')" -Module $functionName -LogLevel "Verbose"
+    
+    foreach ($key in $settingsKeys)
     {
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $localConfigData.$key)
         {
