@@ -375,7 +375,10 @@ Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded s
 
 #endregion Load parameters from the configuration file if it exists
 #region Define variables
-if ($settings.Repo -eq 'github')
+$defaultBranch = 'master'  # Default branch for fallback scenarios
+Write-Verbose "[$scriptName] Default branch: $defaultBranch"
+
+if ($settings.Repo -ieq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
     $baseSourceURL = 'https://raw.githubusercontent.com'
@@ -385,7 +388,6 @@ if ($settings.Repo -eq 'github')
     Write-Verbose "[$scriptName] Repository path: $repoPath"
     $repoName = 'autopilot'
     Write-Verbose "[$scriptName] Repository name: $repoName"
-    $defaultBranch = 'master'
     Write-Verbose "[$scriptName] Default branch: $defaultBranch"
     if ($settings.release -eq 'auto')
     {
@@ -410,7 +412,7 @@ if ($settings.Repo -eq 'github')
         $latestRelease = $settings.release
     }
 }
-elseif ($settings.Repo -eq 'gitlab')
+elseif ($settings.Repo -ieq 'gitlab')
 {
     $baseSourceURL = 'https://git.gao.gov'
     $baseURL = "https://git.gao.gov"
@@ -424,6 +426,11 @@ else
 {
     Write-Host 'Invalid repository specified.' -ForegroundColor Red
     Write-Host 'Defaulting to the main branch from GitHub.' -ForegroundColor Yellow
+    # Set defaults for GitHub when repository is invalid
+    $baseSourceURL = 'https://raw.githubusercontent.com'
+    $baseURL = "https://www.github.com"
+    $repoPath = 'zuhairmahd'
+    $repoName = 'autopilot'
     $latestRelease = $defaultBranch
 }
 $global:maxJSONDepth = 100
