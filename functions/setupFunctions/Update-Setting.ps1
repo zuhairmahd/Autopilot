@@ -344,89 +344,92 @@ function Update-Setting()
             
             'Domain'
             {
-                # Convert domains to hashtable for easier manipulation (PowerShell 5.1 compatible)
-                Write-Verbose "[$functionName] Processing domain settings for '$DomainName' (Merge=$MergeSettings)"
-                Write-Log -LogFile $logFile -Message "Processing domain settings for '$DomainName' (Merge=$MergeSettings)" -Module $functionName
-                $domainsHash = @{}
-                foreach ($domainProperty in $settingsObj.domains.PSObject.Properties)
-                {
-                    $domainHash = @{}
-                    
-                    # Convert each domain's properties
-                    foreach ($property in $domainProperty.Value.PSObject.Properties)
-                    {
-                        if ($property.Name -eq 'settings' -and $property.Value -is [PSCustomObject])
-                        {
-                            # Convert settings object to hashtable using helper function
-                            $settingsHash = ConvertTo-HashtableFromPSObject -PSObject $property.Value -Context "domain '$($domainProperty.Name)' settings"
-                            $domainHash[$property.Name] = $settingsHash
-                        }
-                        else
-                        {
-                            $domainHash[$property.Name] = $property.Value
-                        }
-                    }
-                    
-                    $domainsHash[$domainProperty.Name] = $domainHash
-                }
+                # Use new separate domain configuration file approach
+                Write-Verbose "[$functionName] Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)"
+                Write-Log -LogFile $logFile -Message "Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)" -Module $functionName
                 
-                # Initialize domain if it doesn't exist
-                if (-not $domainsHash.ContainsKey($DomainName))
+                # Load existing domain configuration
+                $configPath = Split-Path $SettingsFile -Parent
+                $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+                
+                if ($null -eq $domainConfig)
                 {
-                    Write-Verbose "[$functionName] Creating new domain entry for: $DomainName"
-                    Write-Log -LogFile $logFile -Message "Creating new domain entry for: $DomainName" -Module $functionName
-                    $domainsHash[$DomainName] = @{
-                        "groupsToInclude" = @()
-                        "groupsToExclude" = @()
-                        "settings"        = @{}
-                    }
+                    Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
+                    Write-Log -LogFile $logFile -Message "Failed to load domain configuration for: $DomainName" -Module $functionName -LogLevel "Warning"
+                    return $false
                 }
                 
                 # Update domain settings
-                if ($MergeSettings -and $domainsHash[$DomainName].ContainsKey('settings'))
+                if ($MergeSettings -and $domainConfig.settings)
                 {
                     # Merge with existing settings
                     Write-Verbose "[$functionName] Merging settings with existing domain configuration"
                     Write-Log -LogFile $logFile -Message "Merging provided settings into existing domain configuration for '$DomainName'" -Module $functionName
+                    
+                    # Convert PSCustomObject to hashtable for easier manipulation
+                    $existingSettings = @{}
+                    foreach ($prop in $domainConfig.settings.PSObject.Properties)
+                    {
+                        $existingSettings[$prop.Name] = $prop.Value
+                    }
+                    
+                    # Merge new settings
                     foreach ($key in $Settings.Keys)
                     {
-                        $domainsHash[$DomainName]['settings'][$key] = $Settings[$key]
+                        $existingSettings[$key] = $Settings[$key]
                         Write-Verbose "[$functionName] Updated domain setting: $key = $($Settings[$key])"
                         Write-Log -LogFile $logFile -Message "Updated domain setting: $key = $($Settings[$key])" -Module $functionName -LogLevel "Verbose"
                     }
+                    
+                    # Convert back to PSCustomObject
+                    $domainConfig.settings = [PSCustomObject]$existingSettings
                 }
                 else
                 {
                     # Replace entire settings section
                     Write-Verbose "[$functionName] Replacing entire settings section for domain"
                     Write-Log -LogFile $logFile -Message "Replacing entire settings section for domain '$DomainName'" -Module $functionName
-                    $domainsHash[$DomainName]['settings'] = $Settings
+                    $domainConfig.settings = [PSCustomObject]$Settings
                 }
                 
-                # Convert back to nested PSCustomObjects using helper function
-                Write-Verbose "[$functionName] Converting domains hashtable back to PSCustomObject structure"
-                Write-Log -LogFile $logFile -Message "Converting domains hashtable back to PSCustomObject structure" -Module $functionName
-                $settingsObj.domains = ConvertTo-PSObjectFromHashtable -DomainsHash $domainsHash
+                # Save the updated domain configuration
+                $saveSuccess = Save-DomainConfiguration -DomainName $DomainName -DomainConfiguration $domainConfig -ConfigurationPath $configPath
+                if (-not $saveSuccess)
+                {
+                    Write-Warning "[$functionName] Failed to save domain configuration for: $DomainName"
+                    Write-Log -LogFile $logFile -Message "Failed to save domain configuration for: $DomainName" -Module $functionName -LogLevel "Warning"
+                    return $false
+                }
+                
+                Write-Verbose "[$functionName] Successfully updated domain configuration file for: $DomainName"
+                Write-Log -LogFile $logFile -Message "Successfully updated domain configuration file for: $DomainName" -Module $functionName
             }
         }
         
-        # Create backup
-        $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-        Copy-Item -Path $SettingsFile -Destination $backupFile -Force
-        Write-Verbose "[$functionName] Created backup: $backupFile"
-        Write-Log -LogFile $logFile -Message "Created backup: $backupFile" -Module $functionName
-        
-        # Save updated settings
-        $jsonOutput = ConvertTo-JsonWithArrayPreservation -InputObject $settingsObj -Depth $global:maxJSONDepth
-        $jsonOutput | Set-Content -Path $SettingsFile -Force
-        Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
-        Write-Log -LogFile $logFile -Message "Saved updated settings to $SettingsFile" -Module $functionName
+        # Create backup and save updated settings (not needed for Domain type as it uses separate files)
+        if ($SettingType -ne 'Domain')
+        {
+            $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+            Copy-Item -Path $SettingsFile -Destination $backupFile -Force
+            Write-Verbose "[$functionName] Created backup: $backupFile"
+            Write-Log -LogFile $logFile -Message "Created backup: $backupFile" -Module $functionName
+            
+            # Save updated settings
+            $jsonOutput = ConvertTo-JsonWithArrayPreservation -InputObject $settingsObj -Depth $global:maxJSONDepth
+            $jsonOutput | Set-Content -Path $SettingsFile -Force
+            Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
+            Write-Log -LogFile $logFile -Message "Saved updated settings to $SettingsFile" -Module $functionName
+        }
         
         # Verify the update based on setting type
         Write-Verbose "[$functionName] Verifying update for SettingType '$SettingType'"
         Write-Log -LogFile $logFile -Message "Verifying update for SettingType '$SettingType'" -Module $functionName -LogLevel "Verbose"
-        $verifyContent = Get-Content -Path $SettingsFile -Raw -Force
-        $verifySettings = $verifyContent | ConvertFrom-Json
+        
+        if ($SettingType -ne 'Domain')
+        {
+            $verifyContent = Get-Content -Path $SettingsFile -Raw -Force
+            $verifySettings = $verifyContent | ConvertFrom-Json
+        }
         
         $verificationResult = switch ($SettingType)
         {
@@ -494,16 +497,39 @@ function Update-Setting()
             }
             'Domain'
             {
-                if ($verifySettings.domains.PSObject.Properties.Name -contains $DomainName)
+                # Verify domain configuration was saved to separate file
+                $configPath = Split-Path $SettingsFile -Parent
+                $domainConfigFile = Join-Path $configPath "$DomainName.json"
+                
+                if (Test-Path $domainConfigFile)
                 {
-                    Write-Verbose "[$functionName] Successfully updated and verified domain settings"
-                    Write-Log -LogFile $logFile -Message "Successfully updated and verified domain settings for '$DomainName'" -Module $functionName
-                    $true
+                    try
+                    {
+                        $verifyDomainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
+                        if ($verifyDomainConfig.settings)
+                        {
+                            Write-Verbose "[$functionName] Successfully updated and verified domain settings in separate file"
+                            Write-Log -LogFile $logFile -Message "Successfully updated and verified domain settings for '$DomainName' in separate file" -Module $functionName
+                            $true
+                        }
+                        else
+                        {
+                            Write-Warning "[$functionName] Domain configuration file exists but missing settings section"
+                            Write-Log -LogFile $logFile -Message "Domain configuration file exists but missing settings section for '$DomainName'" -Module $functionName -LogLevel "Warning"
+                            $false
+                        }
+                    }
+                    catch
+                    {
+                        Write-Warning "[$functionName] Failed to parse domain configuration file: $($_.Exception.Message)"
+                        Write-Log -LogFile $logFile -Message "Failed to parse domain configuration file for '$DomainName': $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
+                        $false
+                    }
                 }
                 else
                 {
-                    Write-Warning "[$functionName] Failed to verify domain settings update"
-                    Write-Log -LogFile $logFile -Message "Failed to verify domain settings update for '$DomainName'" -Module $functionName -LogLevel "Warning"
+                    Write-Warning "[$functionName] Failed to verify domain settings - configuration file not found"
+                    Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Warning"
                     $false
                 }
             }

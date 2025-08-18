@@ -100,7 +100,7 @@ function Initialize-ApplicationConfiguration
                 $result.GlobalSettings = $globalResult.GlobalSettings
                 
                 # Step 5: Process domain-specific settings
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings
                 $result.LocalSettings = $localResult.LocalSettings
                 
                 # Step 6: Load menus
@@ -306,32 +306,54 @@ function Initialize-LocalSettings
 {
     <#
     .SYNOPSIS
-        Processes domain-specific settings from configuration file.
+        Processes domain-specific settings from separate domain configuration files.
     #>
     [CmdletBinding()]
     param(
         [object]$InitFileContent,
         [string]$Domain,
-        [hashtable]$PSBoundParameters
+        [hashtable]$PSBoundParameters,
+        [hashtable]$GlobalSettings = @{}
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     $localSettings = @{}
     
-    if ($null -eq $InitFileContent.domains -or $null -eq $InitFileContent.domains.$Domain)
+    # First, check for migration from old format (domains in settings.json)
+    if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
+    {
+        Write-Verbose "[$functionName] Found domain configuration in settings.json, performing migration"
+        Write-Log -LogFile $logFile -Message "Found domain configuration in settings.json, performing migration" -Module $functionName -LogLevel "Information"
+        
+        $settingsFile = Join-Path $pwd "settings.json"
+        $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -RemoveFromSettings $true
+        
+        if ($migrationResult.Success)
+        {
+            Write-Verbose "[$functionName] Migration completed successfully"
+            Write-Log -LogFile $logFile -Message "Domain migration completed successfully" -Module $functionName -LogLevel "Information"
+        }
+        else
+        {
+            Write-Warning "[$functionName] Migration had issues: $($migrationResult.ErrorMessages -join '; ')"
+            Write-Log -LogFile $logFile -Message "Domain migration had issues: $($migrationResult.ErrorMessages -join '; ')" -Module $functionName -LogLevel "Warning"
+        }
+    }
+    
+    # Load domain configuration from separate file
+    Write-Verbose "[$functionName] Loading domain configuration from separate file for: $Domain"
+    $domainConfig = Load-DomainConfiguration -DomainName $Domain -GlobalSettings $GlobalSettings -ConfigurationPath $pwd
+    
+    if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
     {
         Write-Verbose "[$functionName] No domain-specific settings found for $Domain"
         return @{ LocalSettings = $localSettings }
     }
     
-    $localConfigData = $InitFileContent.domains.$Domain.settings
-    if ($null -eq $localConfigData)
-    {
-        Write-Verbose "[$functionName] No settings object found for domain $Domain"
-        return @{ LocalSettings = $localSettings }
-    }
+    $localConfigData = $domainConfig.settings
+    Write-Verbose "[$functionName] Processing domain settings for $Domain from separate file"
+    Write-Log -LogFile $logFile -Message "Processing domain settings for $Domain from separate file" -Module $functionName -LogLevel "Information"
     
-    Write-Verbose "[$functionName] Processing domain settings for $Domain"
     foreach ($key in $localConfigData.PSObject.Properties.Name)
     {
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $localConfigData.$key)
@@ -380,11 +402,23 @@ function Initialize-RequiredScopes
         $basicScopes = @() 
     }
     
-    # Get additional scopes for the domain
+    # Get additional scopes for the domain from separate file
     $additionalScopes = $null
+    
+    # First check if domain exists in old format (for backward compatibility)
     if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
     {
         $additionalScopes = $InitFileContent.domains.$Domain.additionalScopes
+    }
+    else
+    {
+        # Load from separate domain file
+        Write-Verbose "[$functionName] Loading additional scopes from separate domain file for: $Domain"
+        $domainConfig = Load-DomainConfiguration -DomainName $Domain -ConfigurationPath $pwd
+        if ($domainConfig -and $domainConfig.additionalScopes)
+        {
+            $additionalScopes = $domainConfig.additionalScopes
+        }
     }
     
     if ($null -eq $additionalScopes) 
