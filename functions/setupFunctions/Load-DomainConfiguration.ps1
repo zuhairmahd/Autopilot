@@ -194,11 +194,24 @@ function Load-DomainConfiguration
         
         # Convert to PSCustomObject for consistent behavior, but use hashtable for settings for mutability
         Write-Log -LogFile $logFile -Message "Creating domain configuration object with structure validation" -Module $functionName -LogLevel "Verbose"
+        
+        # Explicitly create empty arrays to ensure they're preserved  
         $defaultDomainConfig = [PSCustomObject]@{
-            groupsToInclude = if ($domainDefaults.groupsToInclude) { $domainDefaults.groupsToInclude } else { @() }
-            groupsToExclude = if ($domainDefaults.groupsToExclude) { $domainDefaults.groupsToExclude } else { @() }
+            groupsToInclude = [System.Array]@()
+            groupsToExclude = [System.Array]@()
             settings = $domainDefaults.settings  # Keep as hashtable for mutability
-            additionalScopes = if ($domainDefaults.additionalScopes) { $domainDefaults.additionalScopes } else { @() }
+            additionalScopes = [System.Array]@()
+        }
+        
+        # If domain defaults have non-empty arrays, use them
+        if ($domainDefaults.groupsToInclude -and $domainDefaults.groupsToInclude.Count -gt 0) {
+            $defaultDomainConfig.groupsToInclude = [System.Array]$domainDefaults.groupsToInclude
+        }
+        if ($domainDefaults.groupsToExclude -and $domainDefaults.groupsToExclude.Count -gt 0) {
+            $defaultDomainConfig.groupsToExclude = [System.Array]$domainDefaults.groupsToExclude
+        }
+        if ($domainDefaults.additionalScopes -and $domainDefaults.additionalScopes.Count -gt 0) {
+            $defaultDomainConfig.additionalScopes = [System.Array]$domainDefaults.additionalScopes
         }
         
         Write-Log -LogFile $logFile -Message "Domain configuration object created with properties: $($defaultDomainConfig.PSObject.Properties.Name -join ', ')" -Module $functionName -LogLevel "Verbose"

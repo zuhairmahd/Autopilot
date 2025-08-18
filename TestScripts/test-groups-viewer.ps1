@@ -13,6 +13,9 @@ param()
 try {
     . "./functions/utilityFunctions/Write-Log.ps1"
     . "./functions/setupFunctions/Show-GroupsViewer.ps1"
+    . "./functions/setupFunctions/Get-AvailableDomains.ps1"
+    . "./functions/setupFunctions/Load-DomainConfiguration.ps1"
+    . "./functions/setupFunctions/Get-ApplicationDefaults.ps1"
     Write-Host "✓ Successfully imported required functions" -ForegroundColor Green
 } catch {
     Write-Host "✗ Failed to import functions: $($_.Exception.Message)" -ForegroundColor Red
@@ -20,7 +23,8 @@ try {
 }
 
 # Set up logging
-$logFile = "./test-groups-viewer.log"
+$global:logFile = "./test-groups-viewer.log"
+$global:maxJSONDepth = 10
 
 Write-Host "`n=== Testing Show-GroupsViewer Function ===" -ForegroundColor Cyan
 

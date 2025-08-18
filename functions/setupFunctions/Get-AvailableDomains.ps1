@@ -28,6 +28,7 @@ function Get-AvailableDomains
         for backward compatibility during transition.
     #>
     [CmdletBinding()]
+    [OutputType([System.Array])]
     param(
         [Parameter(Mandatory = $false)]
         [string]$ConfigurationPath = $pwd,
@@ -62,10 +63,18 @@ function Get-AvailableDomains
             try
             {
                 $content = Get-Content -Path $file.FullName -Raw | ConvertFrom-Json
-                if ($content.groupsToInclude -and $content.groupsToExclude -and $content.settings)
+                # Check that it's an object (not an array) and has the required properties
+                if ($content -is [PSCustomObject] -and 
+                    $content.PSObject.Properties.Name -contains 'groupsToInclude' -and 
+                    $content.PSObject.Properties.Name -contains 'groupsToExclude' -and 
+                    $content.PSObject.Properties.Name -contains 'settings')
                 {
-                    $availableDomains += $domainName
+                    $availableDomains = $availableDomains + @($domainName)
                     Write-Verbose "[$functionName] Found domain configuration: $domainName"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Skipping file that doesn't match domain format: $($file.Name)"
                 }
             }
             catch
@@ -87,7 +96,7 @@ function Get-AvailableDomains
                     {
                         if ($legacyDomain -notin $availableDomains)
                         {
-                            $availableDomains += $legacyDomain
+                            $availableDomains = $availableDomains + @($legacyDomain)
                             Write-Verbose "[$functionName] Found legacy domain configuration: $legacyDomain"
                         }
                     }
@@ -102,7 +111,16 @@ function Get-AvailableDomains
         Write-Verbose "[$functionName] Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')"
         Write-Log -LogFile $logFile -Message "Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')" -Module $functionName -LogLevel "Information"
         
-        return $availableDomains
+        # Debug: Check what we're about to return
+        Write-Verbose "[$functionName] Debug: About to return array of type $($availableDomains.GetType().Name) with $($availableDomains.Count) items"
+        for ($i = 0; $i -lt $availableDomains.Count; $i++) {
+            Write-Verbose "[$functionName] Debug: Domain[$i] = '$($availableDomains[$i])' (Length: $($availableDomains[$i].Length))"
+        }
+        
+        # Ensure we always return an array, even for single items (PowerShell array coercion issue)
+        $resultArray = [System.Array]@($availableDomains)
+        Write-Verbose "[$functionName] Debug: Final result array type: $($resultArray.GetType().Name), Count: $($resultArray.Count)"
+        return $resultArray
     }
     catch
     {
