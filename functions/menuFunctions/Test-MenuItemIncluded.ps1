@@ -85,7 +85,7 @@ function Test-MenuItemIncluded()
     if ($null -eq $foundMenuItem)
     {
         Write-Verbose "[$functionName] Menu item '$MenuItemName' not found in menus configuration, allowing by default"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' not found in menus configuration, allowing by default" -LogLevel "Warning"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' not found in menus configuration, allowing by default" -LogLevel "Information"
         return $true
     }
 
