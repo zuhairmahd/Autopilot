@@ -26,7 +26,7 @@ full (All Features)
 - **full**: Can access ALL features and menus (wildcard access)
 - **admin**: Gets admin + advanced + helpdesk + registration features
 - **advanced**: Gets advanced + helpdesk + registration features  
-- **helpdesk**: Gets helpdesk + registration features
+- **helpdesk**: Gets helpdesk features
 - **registration**: Gets only registration features
 - **advancedRegistration**: Gets advancedRegistration + registration features
 - **custom**: User-defined access patterns
@@ -111,7 +111,6 @@ full (All Features)
 - Basic export and reporting functions
 - Device actions (wipe, sync, restart)
 - User management and device lookup
-- Basic registration operations
 
 **Menu Access**: Helpdesk-specific features + all registration capabilities
 
