@@ -433,6 +433,7 @@ function Get-DefaultSettingsStructure()
                 appMode                      = "full"
                 timeInSeconds                = "60"
                 maxUserMatchDisplay          = "10"
+                maxGroupMatchDisplay         = 10
                 release                      = "master"
                 repo                         = "Github"
                 testMode                     = $false
@@ -451,6 +452,7 @@ function Get-DefaultSettingsStructure()
                         appMode                         = "full"
                         timeInSeconds                   = "60"
                         maxUserMatchDisplay             = "10"
+                        maxGroupMatchDisplay            = 10
                         release                         = "master"
                         repo                            = "Github"
                         autoUpdate                      = $true
@@ -464,6 +466,7 @@ function Get-DefaultSettingsStructure()
                         maxNumberOfDevicesAllowed       = 15
                         preferredBrowser                = "Chrome"
                         privateSession                  = $false
+                        groupPatternsToExclude          = @()
                         userPatternsToExclude           = @( 
                             "-test",
                             "onmicrosoft.com"
@@ -1029,24 +1032,28 @@ function Get-ArrayInput()
             $choice = Read-Host "Enter your choice (1-3)"
             switch ($choice)
             {
-                '1' {
+                '1'
+                {
                     $shouldReplaceExisting = $true
                     Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing array values" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] User chose to replace existing array values"
                     break
                 }
-                '2' {
+                '2'
+                {
                     $shouldReplaceExisting = $false
                     Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing array values" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] User chose to add to existing array values"
                     break
                 }
-                '3' {
+                '3'
+                {
                     Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current array values unchanged" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] User chose to keep current array values unchanged"
                     return $CurrentValue
                 }
-                default {
+                default
+                {
                     Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
                     continue
                 }
