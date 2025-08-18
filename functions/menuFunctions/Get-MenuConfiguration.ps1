@@ -15,8 +15,20 @@ function Get-MenuConfiguration()
     if (-not (Test-Path $MenuConfigFile))
     {
         Write-Verbose "[$functionName] Menu configuration file not found: $MenuConfigFile"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration file not found: $MenuConfigFile" -LogLevel "Warning"
-        return $null
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration file not found: $MenuConfigFile, attempting to create with defaults" -LogLevel "Warning"
+        
+        # Attempt to create the menu file with defaults
+        if (Test-MenuJsonExists -MenuFile $MenuConfigFile -Silent)
+        {
+            Write-Verbose "[$functionName] Successfully created default menu configuration file"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully created default menu configuration file" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Failed to create default menu configuration file"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to create default menu configuration file" -LogLevel "Error"
+            return $null
+        }
     }
     
     try

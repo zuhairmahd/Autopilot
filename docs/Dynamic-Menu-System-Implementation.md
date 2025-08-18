@@ -20,7 +20,25 @@ The Windows Autopilot Management Tool now features a fully dynamic menu system t
 
 ### 3. New Menu Configuration Functions
 - **Get-MenuConfiguration**: Loads menu definitions from `menu.json`
+- **Test-MenuJsonExists**: Ensures `menu.json` exists with comprehensive defaults
 - **Set-MenuItemActions**: Helper for mapping menu item names to actions (created but not used in final approach)
+
+#### Test-MenuJsonExists Function
+The `Test-MenuJsonExists` function provides automatic menu.json management similar to settings.json and strings.json:
+
+**Features:**
+- **Automatic Creation**: Creates `menu.json` with comprehensive defaults when missing
+- **Intelligent Merging**: Updates existing files with missing menu configurations
+- **Version Management**: Tracks configuration version for future updates
+- **Error Handling**: Graceful fallback and comprehensive logging
+- **Silent Mode**: Can run without user prompts during automated setup
+
+**Integration Points:**
+- Called during application startup via `Initialize-ApplicationConfiguration`
+- Invoked by `Get-MenuConfiguration` when menu file is missing
+- Used in first-run wizard setup process
+
+This ensures users never encounter missing menu configuration errors and automatically receive new menu definitions when the application is updated.
 
 ### 4. Updated Menu Creation Throughout Codebase
 Updated all files that use `NewMenu` to leverage the new dynamic system:

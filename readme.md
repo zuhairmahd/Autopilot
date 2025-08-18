@@ -80,6 +80,8 @@ For advanced scenarios where custom configuration is needed:
 4. **Configure application settings**: Ensure [`settings.json`](./settings.json) is configured for your environment
 5. **Set up encryption**: On first run, the script will prompt you to encrypt your configuration file
 
+**Note**: The application automatically creates and manages essential configuration files (`settings.json`, `strings.json`, `menu.json`) with comprehensive defaults if they are missing. This ensures a smooth setup experience and automatic recovery from configuration issues.
+
 ### Environment-Specific Configurations
 
 The tool supports domain-specific configurations. Refer to [Advanced Settings](./docs/Consolidated-Configuration-System.md) in the technical documentation for more information.

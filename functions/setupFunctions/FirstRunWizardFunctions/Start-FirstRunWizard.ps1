@@ -219,7 +219,17 @@ function Start-FirstRunWizard()
             Write-SafeLog "Failed to ensure strings.json exists" "Warning"
         }
         
-        # Step 7: Display completion message
+        # Step 7: Ensure menu.json exists with defaults
+        Write-SafeLog "Ensuring menu.json exists with defaults" "Information"
+        $MenuFile = "$pwd\menu.json"
+        $menuCreated = Test-MenuJsonExists -MenuFile $MenuFile -Silent:$Silent
+        
+        if (-not $menuCreated)
+        {
+            Write-SafeLog "Failed to ensure menu.json exists" "Warning"
+        }
+        
+        # Step 8: Display completion message
         if (-not $Silent)
         {
             Write-Host "`n" -ForegroundColor Green
@@ -231,6 +241,7 @@ function Start-FirstRunWizard()
             Write-Host "• $ConfigFile (encrypted)" -ForegroundColor Green
             Write-Host "• $SettingsFile" -ForegroundColor Green
             Write-Host "• $StringsFile" -ForegroundColor Green
+            Write-Host "• $MenuFile" -ForegroundColor Green
             Write-Host "`nConfiguration Summary:" -ForegroundColor White
             Write-Host "• Domain: $($config.domain)" -ForegroundColor Cyan
             Write-Host "• Authentication: $($authConfig.AuthType)" -ForegroundColor Cyan
