@@ -64,13 +64,13 @@ function Initialize-ApplicationConfiguration
     {
         # Initialize result object
         $result = @{
-            Auth = @{}
+            Auth           = @{}
             GlobalSettings = @{}
-            LocalSettings = @{}
-            Menus = @()
+            LocalSettings  = @{}
+            Menus          = @()
             RequiredScopes = @()
-            Success = $false
-            ErrorMessage = ""
+            Success        = $false
+            ErrorMessage   = ""
         }
         
         # Step 1: Ensure configuration files exist with defaults
@@ -126,8 +126,8 @@ function Initialize-ApplicationConfiguration
             # Use default auth configuration when no settings file exists
             $result.Auth = @{
                 delegated = $true
-                authType = "PublicAuthFlow"
-                scope = @("offline_access", "openid", "Device.ReadWrite.All")
+                authType  = "PublicAuthFlow"
+                scope     = @("offline_access", "openid", "Device.ReadWrite.All")
             }
             
             # Initialize empty collections for other settings
@@ -318,16 +318,15 @@ function Initialize-LocalSettings
     
     $functionName = $MyInvocation.MyCommand.Name
     $localSettings = @{}
-    
+    Write-Verbose "[$functionName] Initializing local settings for domain: $Domain"
+    write-log -LogFile $LogFile -Message "Initializing local settings for domain: $Domain" -Module $functionName -LogLevel "Information"
     # First, check for migration from old format (domains in settings.json)
     if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
     {
         Write-Verbose "[$functionName] Found domain configuration in settings.json, performing migration"
         Write-Log -LogFile $logFile -Message "Found domain configuration in settings.json, performing migration" -Module $functionName -LogLevel "Information"
-        
         $settingsFile = Join-Path $pwd "settings.json"
         $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -RemoveFromSettings $true
-        
         if ($migrationResult.Success)
         {
             Write-Verbose "[$functionName] Migration completed successfully"
@@ -350,7 +349,7 @@ function Initialize-LocalSettings
         return @{ LocalSettings = $localSettings }
     }
     
-    $localConfigData = $domainConfig.settings
+    $localConfigData = ConvertFrom-JsonToHashtable -JsonObject $domainConfig
     Write-Verbose "[$functionName] Processing domain settings for $Domain from separate file"
     Write-Log -LogFile $logFile -Message "Processing domain settings for $Domain from separate file" -Module $functionName -LogLevel "Information"
     

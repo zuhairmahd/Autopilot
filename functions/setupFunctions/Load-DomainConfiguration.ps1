@@ -73,34 +73,55 @@ function Load-DomainConfiguration
                 # Validate the loaded configuration structure
                 Write-Log -LogFile $logFile -Message "Validating loaded domain configuration structure..." -Module $functionName -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Validating loaded domain configuration structure..."
-                
                 $isValid = $true
                 $validationErrors = @()
-                
-                if (-not $domainContent.PSObject.Properties.Name -contains 'settings') {
+                Write-Verbose "[$functionName] Validating local domain settings"
+                write-log -logFile $logFile -message "Validating local domain settings" -module $functionName -logLevel "Information"
+                if (-not $domainContent.PSObject.Properties.Name -contains 'settings')
+                {
+                    Write-Log -LogFile $logFile -Message "Missing 'settings' property" -Module $functionName -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Missing 'settings' property"
                     $validationErrors += "Missing 'settings' property"
                     $isValid = $false
                 }
-                
-                if (-not $domainContent.PSObject.Properties.Name -contains 'groupsToInclude') {
+                Write-Verbose "[$functionName] Found valid Settings object"
+                write-log -logFile $logFile -message "Found valid Settings object" -module $functionName -logLevel "Information"
+                Write-Verbose "[$functionName] Validating groupsToInclude property"
+                write-log -logFile $logFile -message "Validating groupsToInclude property" -module $functionName -logLevel "Information"
+                if (-not $domainContent.PSObject.Properties.Name -contains 'groupsToInclude')
+                {
+                    Write-Log -LogFile $logFile -Message "Missing 'groupsToInclude' property" -Module $functionName -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Missing 'groupsToInclude' property"
                     $validationErrors += "Missing 'groupsToInclude' property"
                     $isValid = $false
                 }
-                
-                if (-not $domainContent.PSObject.Properties.Name -contains 'groupsToExclude') {
+                Write-Verbose "[$functionName] Found valid groupsToInclude object"
+                write-log -logFile $logFile -message "Found valid groupsToInclude object" -module $functionName -logLevel "Information"
+                Write-Verbose "[$functionName] Validating groupsToExclude property"
+                write-log -logFile $logFile -message "Validating groupsToExclude property" -module $functionName -logLevel "Information"
+                if (-not $domainContent.PSObject.Properties.Name -contains 'groupsToExclude')
+                {
+                    Write-Log -LogFile $logFile -Message "Missing 'groupsToExclude' property" -Module $functionName -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Missing 'groupsToExclude' property"
                     $validationErrors += "Missing 'groupsToExclude' property"
                     $isValid = $false
                 }
-                
-                if ($isValid) {
+                Write-Verbose "[$functionName] Found valid groupsToExclude object"
+                write-log -logFile $logFile -message "Found valid groupsToExclude object" -module $functionName -logLevel "Information"
+                if ($isValid)
+                {
                     Write-Log -LogFile $logFile -Message "Domain configuration validation passed" -Module $functionName -LogLevel "Verbose"
                     Write-Verbose "[$functionName] Domain configuration validation passed"
-                } else {
+                }
+                else
+                {
                     Write-Log -LogFile $logFile -Message "Domain configuration validation failed: $($validationErrors -join ', ')" -Module $functionName -LogLevel "Warning"
                     Write-Verbose "[$functionName] Domain configuration validation failed: $($validationErrors -join ', ')"
                     # Continue anyway, as we'll fix missing properties below
                 }
-                
+                Write-Verbose "[$functionName] Domain configuration validation passed. Returning valid object to calling function."
+                Write-Log -LogFile $logFile -Message "Domain configuration validation passed. Returning valid object to calling function." -Module $functionName -LogLevel "Information"
+
                 return $domainContent
             }
             catch
@@ -126,26 +147,39 @@ function Load-DomainConfiguration
         Write-Log -LogFile $logFile -Message "Attempting to get domain defaults from centralized source" -Module $functionName -LogLevel "Verbose"
         Write-Verbose "[$functionName] Attempting to get domain defaults from centralized source"
         
-        try {
+        try
+        {
             $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-            if (-not $domainDefaults) {
+            if (-not $domainDefaults)
+            {
                 Write-Warning "[$functionName] Failed to get domain defaults from centralized source, using fallback"
                 Write-Log -LogFile $logFile -Message "Failed to get domain defaults from centralized source, using fallback" -Module $functionName -LogLevel "Warning"
                 
                 # Fallback to minimal structure
                 Write-Log -LogFile $logFile -Message "Creating fallback domain structure" -Module $functionName -LogLevel "Verbose"
                 $domainDefaults = @{
-                    groupsToInclude = @()
-                    groupsToExclude = @()
-                    settings = if ($GlobalSettings -and $GlobalSettings.Count -gt 0) { $GlobalSettings.Clone() } else { @{ domain = $DomainName } }
+                    groupsToInclude  = @()
+                    groupsToExclude  = @()
+                    settings         = if ($GlobalSettings -and $GlobalSettings.Count -gt 0)
+                    {
+                        $GlobalSettings.Clone() 
+                    }
+                    else
+                    {
+                        @{ domain = $DomainName } 
+                    }
                     additionalScopes = @()
                 }
-            } else {
+            }
+            else
+            {
                 Write-Log -LogFile $logFile -Message "Successfully retrieved domain defaults from centralized source" -Module $functionName -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Successfully retrieved domain defaults from centralized source"
                 Write-Log -LogFile $logFile -Message "Domain defaults structure: $($domainDefaults.Keys -join ', ')" -Module $functionName -LogLevel "Debug"
             }
-        } catch {
+        }
+        catch
+        {
             Write-Warning "[$functionName] Error getting centralized defaults: $($_.Exception.Message)"
             Write-Log -LogFile $logFile -Message "Error getting centralized defaults: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
             Write-Log -LogFile $logFile -Message "Full error details: $($_.Exception | Format-List * | Out-String)" -Module $functionName -LogLevel "Debug"
@@ -153,23 +187,33 @@ function Load-DomainConfiguration
             # Fallback to minimal structure
             Write-Log -LogFile $logFile -Message "Creating fallback domain structure due to error" -Module $functionName -LogLevel "Warning"
             $domainDefaults = @{
-                groupsToInclude = @()
-                groupsToExclude = @()
-                settings = if ($GlobalSettings -and $GlobalSettings.Count -gt 0) { $GlobalSettings.Clone() } else { @{ domain = $DomainName } }
+                groupsToInclude  = @()
+                groupsToExclude  = @()
+                settings         = if ($GlobalSettings -and $GlobalSettings.Count -gt 0)
+                {
+                    $GlobalSettings.Clone() 
+                }
+                else
+                {
+                    @{ domain = $DomainName } 
+                }
                 additionalScopes = @()
             }
         }
         
         # Merge global settings with domain defaults if global settings provided
-        if ($GlobalSettings -and $GlobalSettings.Count -gt 0) {
+        if ($GlobalSettings -and $GlobalSettings.Count -gt 0)
+        {
             Write-Log -LogFile $logFile -Message "Merging $($GlobalSettings.Count) global settings into domain defaults" -Module $functionName -LogLevel "Verbose"
             Write-Verbose "[$functionName] Merging $($GlobalSettings.Count) global settings into domain defaults"
             
             # Ensure settings is a hashtable for merging
-            if ($domainDefaults.settings -isnot [hashtable]) {
+            if ($domainDefaults.settings -isnot [hashtable])
+            {
                 Write-Log -LogFile $logFile -Message "Converting domain settings to hashtable for merging" -Module $functionName -LogLevel "Verbose"
                 $tempSettings = @{}
-                if ($domainDefaults.settings) {
+                if ($domainDefaults.settings)
+                {
                     $domainDefaults.settings.PSObject.Properties | ForEach-Object {
                         $tempSettings[$_.Name] = $_.Value
                     }
@@ -178,13 +222,16 @@ function Load-DomainConfiguration
             }
             
             # Merge global settings into domain settings defaults
-            foreach ($key in $GlobalSettings.Keys) {
+            foreach ($key in $GlobalSettings.Keys)
+            {
                 $domainDefaults.settings[$key] = $GlobalSettings[$key]
                 Write-Log -LogFile $logFile -Message "Merged global setting: $key = $($GlobalSettings[$key])" -Module $functionName -LogLevel "Debug"
             }
             
             Write-Log -LogFile $logFile -Message "Global settings merge completed" -Module $functionName -LogLevel "Verbose"
-        } else {
+        }
+        else
+        {
             Write-Log -LogFile $logFile -Message "No global settings provided for merging" -Module $functionName -LogLevel "Verbose"
         }
         
@@ -197,20 +244,23 @@ function Load-DomainConfiguration
         
         # Explicitly create empty arrays to ensure they're preserved  
         $defaultDomainConfig = [PSCustomObject]@{
-            groupsToInclude = [System.Array]@()
-            groupsToExclude = [System.Array]@()
-            settings = $domainDefaults.settings  # Keep as hashtable for mutability
+            groupsToInclude  = [System.Array]@()
+            groupsToExclude  = [System.Array]@()
+            settings         = $domainDefaults.settings  # Keep as hashtable for mutability
             additionalScopes = [System.Array]@()
         }
         
         # If domain defaults have non-empty arrays, use them
-        if ($domainDefaults.groupsToInclude -and $domainDefaults.groupsToInclude.Count -gt 0) {
+        if ($domainDefaults.groupsToInclude -and $domainDefaults.groupsToInclude.Count -gt 0)
+        {
             $defaultDomainConfig.groupsToInclude = [System.Array]$domainDefaults.groupsToInclude
         }
-        if ($domainDefaults.groupsToExclude -and $domainDefaults.groupsToExclude.Count -gt 0) {
+        if ($domainDefaults.groupsToExclude -and $domainDefaults.groupsToExclude.Count -gt 0)
+        {
             $defaultDomainConfig.groupsToExclude = [System.Array]$domainDefaults.groupsToExclude
         }
-        if ($domainDefaults.additionalScopes -and $domainDefaults.additionalScopes.Count -gt 0) {
+        if ($domainDefaults.additionalScopes -and $domainDefaults.additionalScopes.Count -gt 0)
+        {
             $defaultDomainConfig.additionalScopes = [System.Array]$domainDefaults.additionalScopes
         }
         
@@ -242,9 +292,9 @@ function Load-DomainConfiguration
         # Return minimal default configuration as fallback
         Write-Log -LogFile $logFile -Message "Returning minimal fallback configuration due to error" -Module $functionName -LogLevel "Warning"
         return [PSCustomObject]@{
-            groupsToInclude = @()
-            groupsToExclude = @()
-            settings = [PSCustomObject]@{ domain = $DomainName }
+            groupsToInclude  = @()
+            groupsToExclude  = @()
+            settings         = [PSCustomObject]@{ domain = $DomainName }
             additionalScopes = @()
         }
     }

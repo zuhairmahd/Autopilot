@@ -336,7 +336,14 @@ else
 Write-Verbose "[$scriptName] Initializing application configuration"
 
 # Use domain if available, otherwise default to contoso.com
-$domainForDefaults = if ($domain) { $domain } else { "contoso.com" }
+$domainForDefaults = if ($domain)
+{
+    $domain 
+}
+else
+{
+    "contoso.com" 
+}
 
 # Initialize configuration with helper function
 $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters -LogFile $LogFile -ScriptName $scriptName
@@ -361,7 +368,7 @@ $script:Auth = $auth
 
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
@@ -766,11 +773,14 @@ else
 # Load menu configuration for filtering
 $script:menus = @()
 $menuConfig = Get-MenuConfiguration
-if ($menuConfig) {
+if ($menuConfig)
+{
     # Convert the flat menu.json structure to array format for Test-MenuItemIncluded
-    foreach ($menuName in $menuConfig.PSObject.Properties.Name) {
+    foreach ($menuName in $menuConfig.PSObject.Properties.Name)
+    {
         $menu = $menuConfig.$menuName
-        if ($menu.items) {
+        if ($menu.items)
+        {
             $script:menus += $menu.items
         }
     }
