@@ -368,7 +368,7 @@ $script:Auth = $auth
 
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
@@ -379,31 +379,36 @@ Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-
 #endregion Load parameters from the configuration file if it exists
-#region Define variables
-$defaultBranch = 'master'  # Default branch for fallback scenarios
-Write-Verbose "[$scriptName] Default branch: $defaultBranch"
 
-if ($settings.Repo -ieq 'github')
+#region Define variables
+if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Using GitHub repository." -LogLevel "Information"
     $baseSourceURL = 'https://raw.githubusercontent.com'
+    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
     $baseURL = "https://www.github.com"
     Write-Verbose "[$scriptName] Base URL: $baseURL"
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
     $repoPath = 'zuhairmahd'
     Write-Verbose "[$scriptName] Repository path: $repoPath"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
     $repoName = 'autopilot'
     Write-Verbose "[$scriptName] Repository name: $repoName"
-    Write-Verbose "[$scriptName] Default branch: $defaultBranch"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository name: $repoName" -LogLevel "Information"
     if ($settings.release -eq 'auto')
     {
         Write-Verbose "[$scriptName] Release is set to 'auto'. Fetching the latest release from GitHub."
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Release is set to 'auto'. Fetching the latest release from GitHub." -LogLevel "Information"
         $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
         Write-Verbose "[$scriptName] Latest release fetched: $latestRelease"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release fetched: $latestRelease" -LogLevel "Information"
         if ($latestRelease)
         {
             Write-Verbose "[$scriptName] Successfully retrieved the latest release information from GitHub."
+            Write-Log -logFile $LogFile -Module $scriptName -Message "Successfully retrieved the latest release information from GitHub." -LogLevel "Information"
             Write-Host "Latest release: $latestRelease" -ForegroundColor Cyan
         }
         else
@@ -411,23 +416,15 @@ if ($settings.Repo -ieq 'github')
             Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
             Write-Host "Defaulting to $defaultBranch branch." -ForegroundColor Yellow
             $latestRelease = $defaultBranch
+            Write-Log -logFile $LogFile -Module $scriptName -Message "Defaulting to $defaultBranch branch." -LogLevel "Information"
         }
     }
     else
     {
         Write-Verbose "[$scriptName] Using specified release: $($settings.release)"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Using specified release: $($settings.release)" -LogLevel "Information"
         $latestRelease = $settings.release
     }
-}
-elseif ($settings.Repo -ieq 'gitlab')
-{
-    $baseSourceURL = 'https://git.gao.gov'
-    $baseURL = "https://git.gao.gov"
-    Write-Verbose "[$scriptName] Base URL: $baseURL"
-    $repoPath = 'mahmoudz'
-    $repoName = 'autopilot-deployment'
-    $repoId = '1031'
-    $latestRelease = GetLatestGitlabRelease -RepositoryId $repoId
 }
 else
 {
@@ -439,6 +436,8 @@ else
     $repoPath = 'zuhairmahd'
     $repoName = 'autopilot'
     $latestRelease = $defaultBranch
+    Write-Verbose "[$scriptName] Invalid repository specified. Defaulting to GitHub main branch."
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Invalid repository specified. Defaulting to GitHub main branch." -LogLevel "Information"
 }
 $global:maxJSONDepth = 100
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
@@ -499,7 +498,6 @@ Write-Verbose "[$scriptName] Show auth: $showAuth"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
 Write-Verbose "[$scriptName] Log level: $LogLevel"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
- 
 Write-Verbose "[$scriptName] Group tag: $settings.GroupTag"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
 Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
@@ -615,115 +613,132 @@ else
 #region initialization block with access token
 if ($ResetAuth)
 {
+    Write-Verbose "[$scriptName] Resetting authentication..."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Resetting authentication as requested by user" -LogLevel "Information"
     if (Start-FirstRunWizard -authOnly)
     {
         Write-Host "The authentication information has been changed." -ForegroundColor Green
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "The authentication information has been changed." -LogLevel "Information"
     }
     else 
     {
         Write-Host "Failed to change the authentication information." -ForegroundColor Red
         Write-Host "Please check the logs for more information." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to change the authentication information." -LogLevel "Error"
+        Write-Log -logFile $LogFile -finishLogging
         exit 1
     }
 }
 Write-Verbose "[$scriptName] Initialization block started."
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
 Write-Verbose "[$scriptName] Force new token: $($auth.ForceNewToken )"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
 Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshToken )"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"  
 Write-Verbose "[$scriptName] No save refresh token: $($auth.NoSaveRefreshToken )"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
 Write-Verbose "[$scriptName] Getting access token..."
+Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
 $accessToken = GetGraphAccessToken @getTokenParams
-
 # Clear the cached user password now that authentication is complete
 if ($script:UserEncryptionPassword)
 {
     Write-Verbose "[$scriptName] Clearing cached user password after authentication"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Clearing cached user password after authentication" -LogLevel "Information"
     Clear-SecureMemory -Variables @("UserEncryptionPassword")
 }
 
 if ($accessToken)
 {
     Write-Verbose "[$scriptName] Access token retrieved successfully."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Access token retrieved successfully." -LogLevel "Information"
     
     # Validate scope availability for the retrieved access token
-    Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Information"
-    
-    try
+    if ($auth.validateScopes)
     {
-        # Get the current requested scopes for delegated authentication
-        $currentRequestedScopes = @()
-        if ($auth.Delegated -eq $true)
+        Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Information"
+        try
         {
-            $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
-            Write-Verbose "[$scriptName] Delegated authentication - using required scopes as requested scopes"
-        }
-        
-        # Perform scope validation
-        $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
-        
-        if ($scopeValidation.HasAllRequiredScopes)
-        {
-            Write-Verbose "[$scriptName] All required Microsoft Graph scopes are available"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
-        }
-        else
-        {
-            Write-Host ""
-            Write-Host "Microsoft Graph Scope Validation Results:" -ForegroundColor Yellow
-            Write-Host "Some required permissions are missing. This may limit functionality." -ForegroundColor Yellow
-            
-            # Show missing scopes in verbose mode or if user wants details
-            if ($VerbosePreference -eq 'Continue' -or $scopeValidation.MissingScopes.Count -le 5)
+            # Get the current requested scopes for delegated authentication
+            Write-Verbose "[$scriptName] Getting current requested scopes for delegated authentication"
+            Write-Log -logFile $LogFile -Module $scriptName -Message "Getting current requested scopes for delegated authentication" -LogLevel "Information"
+            $currentRequestedScopes = @()
+            if ($auth.Delegated -eq $true)
             {
-                Write-Host "`nMissing permissions:" -ForegroundColor Cyan
-                foreach ($missingScope in $scopeValidation.MissingScopes)
-                {
-                    Write-Host "  - $($missingScope.Scope)" -ForegroundColor White
-                    Write-Host "    Impact: $($missingScope.Reason)" -ForegroundColor Gray
-                }
+                $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
+                Write-Verbose "[$scriptName] Delegated authentication - using required scopes as requested scopes"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
+            }
+        
+            # Perform scope validation
+            Write-Verbose "[$scriptName] Performing scope validation..."
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Performing scope validation..." -LogLevel "Information"
+            $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
+            if ($scopeValidation.HasAllRequiredScopes)
+            {
+                Write-Verbose "[$scriptName] All required Microsoft Graph scopes are available"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
             }
             else
             {
-                Write-Host "`nMissing $($scopeValidation.MissingScopes.Count) permissions. Use -Verbose to see details." -ForegroundColor Gray
-            }
-            
-            Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
-            
-            # For delegated authentication, offer to request additional scopes
-            if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken))
-            {
                 Write-Host ""
-                $scopeRequest = Request-AdditionalScopes -MissingScopes $scopeValidation.MissingScopes -AuthConfiguration $auth -CurrentScopes $currentRequestedScopes -AuthParams $getTokenParams
-                
-                if ($scopeRequest.Success)
+                Write-Host "Microsoft Graph Scope Validation Results:" -ForegroundColor Yellow
+                Write-Host "Some required permissions are missing. This may limit functionality." -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Some required Microsoft Graph permissions are missing. This may limit functionality." -LogLevel "Warning"
+                Write-Verbose "[$scriptName] Some required Microsoft Graph permissions are missing. This may limit functionality."
+                # Show missing scopes in verbose mode or if user wants details
+                if ($scopeValidation.MissingScopes.Count -gt 0)
                 {
-                    Write-Host "Successfully obtained additional permissions!" -ForegroundColor Green
-                    $accessToken = $scopeRequest.NewAccessToken
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Successfully updated access token with additional scopes" -LogLevel "Information"
+                    Write-Host "`nMissing permissions:" -ForegroundColor Cyan
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Missing permissions:" -LogLevel "Information"
+                    foreach ($missingScope in $scopeValidation.MissingScopes)
+                    {
+                        Write-Host "  - $($missingScope.Scope)" -ForegroundColor White
+                        Write-Host "    Impact: $($missingScope.Reason)" -ForegroundColor Gray
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "  - $($missingScope.Scope)`n    Impact: $($missingScope.Reason)" -LogLevel "Information"
+                    }
                 }
-                elseif ($scopeRequest.UserCancelled)
-                {
-                    Write-Host "Continuing with current permissions. Some features may be unavailable." -ForegroundColor Yellow
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "User cancelled additional scope request" -LogLevel "Information"
-                }
-                else
-                {
-                    Write-Host "Could not obtain additional permissions: $($scopeRequest.ErrorMessage)" -ForegroundColor Red
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to obtain additional scopes: $($scopeRequest.ErrorMessage)" -LogLevel "Warning"
-                }
-            }
             
-            Write-Host ""
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation completed with $($scopeValidation.MissingScopes.Count) missing scopes" -LogLevel "Warning"
+                Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
+                Write-Verbose "[$scriptName] Recommended action: $($scopeValidation.RecommendedAction)"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Recommended action: $($scopeValidation.RecommendedAction)" -LogLevel "Information"
+                # For delegated authentication, offer to request additional scopes
+                if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken))
+                {
+                    Write-Verbose "[$scriptName] Requesting additional scopes..."
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Requesting additional scopes..." -LogLevel "Information"
+                    Write-Host ""
+                    $scopeRequest = Request-AdditionalScopes -MissingScopes $scopeValidation.MissingScopes -AuthConfiguration $auth -CurrentScopes $currentRequestedScopes -AuthParams $getTokenParams
+                    if ($scopeRequest.Success)
+                    {
+                        Write-Host "Successfully obtained additional permissions!" -ForegroundColor Green
+                        $accessToken = $scopeRequest.NewAccessToken
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Successfully updated access token with additional scopes" -LogLevel "Information"
+                    }
+                    elseif ($scopeRequest.UserCancelled)
+                    {
+                        Write-Host "Continuing with current permissions. Some features may be unavailable." -ForegroundColor Yellow
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "User cancelled additional scope request" -LogLevel "Information"
+                    }
+                    else
+                    {
+                        Write-Host "Could not obtain additional permissions: $($scopeRequest.ErrorMessage)" -ForegroundColor Red
+                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to obtain additional scopes: $($scopeRequest.ErrorMessage)" -LogLevel "Warning"
+                    }
+                }
+            
+                Write-Host ""
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation completed with $($scopeValidation.MissingScopes.Count) missing scopes" -LogLevel "Warning"
+            }
+        }
+        catch
+        {
+            Write-Warning "[$scriptName] Scope validation failed: $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation failed: $($_.Exception.Message)" -LogLevel "Error"
+            Write-Host "Could not validate Microsoft Graph API permissions. Continuing..." -ForegroundColor Yellow
         }
     }
-    catch
-    {
-        Write-Warning "[$scriptName] Scope validation failed: $($_.Exception.Message)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Scope validation failed: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Host "Could not validate Microsoft Graph API permissions. Continuing..." -ForegroundColor Yellow
-    }
-    
     if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
     {
         Write-Host "Forced new token retrieval due to parameters." -ForegroundColor Cyan 

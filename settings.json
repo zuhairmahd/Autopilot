@@ -5,6 +5,7 @@
     "forceNewToken": false,
     "changePwOnNextStart": false,
     "delegated": true,
+    "validateScopes": true,
     "scope": [
       "offline_access",
       "openid",

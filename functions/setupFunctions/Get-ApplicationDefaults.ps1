@@ -72,11 +72,12 @@ function Get-ApplicationDefaults()
     $defaults = @{
         
         # Authentication defaults - single source of truth
-        Auth = @{
+        Auth           = @{
             changePwOnNextStart = $false
             authType            = "PublicAuthFlow"
             noSaveRefreshToken  = $false
             forceNewToken       = $false
+            validateScopes      = $true
             renewalLeadTime     = 5
             scope               = @(
                 "offline_access",
@@ -94,7 +95,7 @@ function Get-ApplicationDefaults()
         }
         
         # Global settings defaults - single source of truth
-        Global = @{
+        Global         = @{
             configFile                   = ".\.secrets\config.json"
             maxWaitTime                  = 30
             showLicenseBanner            = $true
@@ -111,10 +112,10 @@ function Get-ApplicationDefaults()
         }
         
         # Domain template defaults - single source of truth for domain structure
-        Domain = @{
-            groupsToInclude = @()
-            groupsToExclude = @()
-            settings        = @{
+        Domain         = @{
+            groupsToInclude  = @()
+            groupsToExclude  = @()
+            settings         = @{
                 domain                          = $DomainName
                 maxWaitTime                     = 30
                 showLicenseBanner               = $true
@@ -265,22 +266,22 @@ function Get-ApplicationDefaults()
     $defaults.Overwrite = @{
         # Global settings that should be forcibly overwritten
         # These settings will only be applied during global settings processing
-        GlobalSettings = @{
+        GlobalSettings    = @{
             # Force automatic updates to be enabled
-            "autoUpdate" = $true
+            "autoUpdate"        = $true
             # Ensure license banner is shown
             "showLicenseBanner" = $true
             # Force test mode to be disabled in production
-            "testMode" = $false
+            "testMode"          = $false
         }
         
         # Local/domain settings that should be forcibly overwritten
         # These settings will only be applied during domain settings processing
-        LocalSettings = @{
+        LocalSettings     = @{
             # Ensure consistent device contact threshold across domains
-            "deviceContactThresholdInDays" = 30
+            "deviceContactThresholdInDays"    = 30
             # Standardize wait times across domains
-            "maxWaitTime" = 30
+            "maxWaitTime"                     = 30
             # Ensure minimum memory requirements are enforced
             "minimumDevicePhysicalMemoryInGB" = 8
         }
@@ -291,9 +292,9 @@ function Get-ApplicationDefaults()
             # Ensure consistent operating system specification
             "operatingSystem" = "Windows"
             # Standardize repository source
-            "repo" = "Github"
+            "repo"            = "Github"
             # Ensure consistent release branch
-            "release" = "master"
+            "release"         = "master"
         }
     }
     
