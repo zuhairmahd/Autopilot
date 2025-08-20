@@ -142,7 +142,7 @@ function Show-SettingsEditor()
             Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from path: '$configPath'" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from path: '$configPath'"
             
-            $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+            $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             
             if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
             {

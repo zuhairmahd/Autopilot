@@ -1,4 +1,4 @@
-function Initialize-ApplicationConfiguration
+function Initialize-ApplicationConfiguration()
 {
     <#
     .SYNOPSIS
@@ -149,7 +149,7 @@ function Initialize-ApplicationConfiguration
     }
 }
 
-function Initialize-ConfigurationFiles
+function Initialize-ConfigurationFiles()
 {
     <#
     .SYNOPSIS
@@ -341,7 +341,7 @@ function Initialize-LocalSettings
     
     # Load domain configuration from separate file
     Write-Verbose "[$functionName] Loading domain configuration from separate file for: $Domain"
-    $domainConfig = Load-DomainConfiguration -DomainName $Domain -GlobalSettings $GlobalSettings -ConfigurationPath $pwd
+    $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -GlobalSettings $GlobalSettings -ConfigurationPath $pwd
     
     if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
     {
@@ -437,7 +437,7 @@ function Initialize-RequiredScopes
     {
         # Load from separate domain file
         Write-Verbose "[$functionName] Loading additional scopes from separate domain file for: $Domain"
-        $domainConfig = Load-DomainConfiguration -DomainName $Domain -ConfigurationPath $pwd
+        $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -ConfigurationPath $pwd
         if ($domainConfig -and $domainConfig.additionalScopes)
         {
             $additionalScopes = $domainConfig.additionalScopes

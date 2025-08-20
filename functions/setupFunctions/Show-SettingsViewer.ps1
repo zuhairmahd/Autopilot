@@ -142,7 +142,7 @@ function Show-SettingsViewer()
             Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from path: '$configPath'" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from path: '$configPath'"
             
-            $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+            $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             
             if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
             {
@@ -158,9 +158,11 @@ function Show-SettingsViewer()
             Write-Log -LogFile $logFile -Module $functionName -Message "Getting domain settings template from centralized defaults for domain: '$DomainName'" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Getting domain settings template from centralized defaults for domain: '$DomainName'"
             
-            try {
+            try
+            {
                 $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings) {
+                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings)
+                {
                     Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
                     Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
                     return $false
@@ -170,7 +172,8 @@ function Show-SettingsViewer()
                 Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
-            catch {
+            catch
+            {
                 Write-Warning "[$functionName] Error retrieving domain template: $($_.Exception.Message)"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Error retrieving domain template: $($_.Exception.Message)" -LogLevel "Error"
                 return $false

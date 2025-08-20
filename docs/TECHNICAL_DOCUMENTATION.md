@@ -225,7 +225,7 @@ The application automatically migrates from the legacy format (domains in `setti
 
 #### New Domain Configuration Functions
 
-**`Load-DomainConfiguration`** (Load-DomainConfiguration.ps1)
+**`Get-DomainConfigurationFromFiles`** (Get-DomainConfigurationFromFiles.ps1)
 - Loads domain-specific configuration from separate JSON files
 - Creates default configuration with global settings if file doesn't exist
 - Supports fallback to legacy format for backward compatibility
