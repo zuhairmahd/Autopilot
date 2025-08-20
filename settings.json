@@ -126,6 +126,12 @@
   "globalSettings": {
     "operatingSystem": "Windows",
     "repo": "Github",
+    "repoInfo": {
+      "repoName": "Autopilot",
+      "baseSourceURL": "https://raw.githubusercontent.com",
+      "baseURL": "https://www.github.com",
+      "repoPath": "zuhairmahd"
+    },
     "release": "master",
     "deviceContactThresholdInDays": 30,
     "appMode": "full",

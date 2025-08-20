@@ -386,16 +386,44 @@ if ($settings.Repo -eq 'github')
 {
     Write-Verbose "[$scriptName] Using GitHub repository."
     Write-Log -logFile $LogFile -Module $scriptName -Message "Using GitHub repository." -LogLevel "Information"
-    $baseSourceURL = 'https://raw.githubusercontent.com'
+    $baseSourceURL = if ($settings.baseSourceURL)
+    {
+        $settings.baseSourceURL
+    }
+    else
+    {
+        'https://raw.githubusercontent.com'
+    }
     Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
     Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-    $baseURL = "https://www.github.com"
+    $baseURL = if ($settings.baseURL)
+    {
+        $settings.baseURL
+    }
+    else
+    {
+        "https://www.github.com"
+    }
     Write-Verbose "[$scriptName] Base URL: $baseURL"
     Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
-    $repoPath = 'zuhairmahd'
+    $repoPath = if ($settings.repoPath)
+    {
+        $settings.repoPath
+    }
+    else
+    {
+        'zuhairmahd'
+    }
     Write-Verbose "[$scriptName] Repository path: $repoPath"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
-    $repoName = 'autopilot'
+    $repoName = if ($settings.repoName)
+    {
+        $settings.repoName
+    }
+    else
+    {
+        'autopilot'
+    }
     Write-Verbose "[$scriptName] Repository name: $repoName"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository name: $repoName" -LogLevel "Information"
     if ($settings.release -eq 'auto')
