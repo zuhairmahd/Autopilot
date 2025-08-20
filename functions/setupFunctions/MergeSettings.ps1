@@ -50,95 +50,16 @@ function MergeSettings()
     $functionName = $MyInvocation.MyCommand.Name
     $merged = @{}
     
-    # Helper function to flatten a nested object into a flat hashtable
-    function ConvertTo-FlatHashtable($object, $prefix = '')
-    {
-        $flatHash = @{}
-        $functionName = $MyInvocation.MyCommand.Name
-        if ($object -is [hashtable] -or $object -is [System.Collections.IDictionary])
-        {
-            Write-Verbose "[$functionName] Flattening hashtable/dictionary with $($object.Keys.Count) keys"
-            foreach ($key in $object.Keys)
-            {
-                $fullKey = if ($prefix)
-                {
-                    "$prefix.$key" 
-                }
-                else
-                {
-                    $key 
-                }
-                $value = $object[$key]
-                
-                if (($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
-                    ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0))
-                {
-                    Write-Verbose "[$functionName] Found nested object at key: $fullKey"
-                    $nestedFlat = ConvertTo-FlatHashtable $value $fullKey
-                    foreach ($nestedKey in $nestedFlat.Keys)
-                    {
-                        $flatHash[$nestedKey] = $nestedFlat[$nestedKey]
-                    }
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Adding flat key: $fullKey"
-                    $flatHash[$fullKey] = $value
-                }
-            }
-        }
-        elseif ($object -is [PSCustomObject])
-        {
-            Write-Verbose "[$functionName] Flattening PSCustomObject with $($object.PSObject.Properties.Count) properties"
-            foreach ($property in $object.PSObject.Properties | Where-Object { $_.MemberType -eq 'NoteProperty' })
-            {
-                $fullKey = if ($prefix)
-                {
-                    "$prefix.$($property.Name)" 
-                }
-                else
-                {
-                    $property.Name 
-                }
-                $value = $property.Value
-                
-                if (($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
-                    ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0))
-                {
-                    Write-Verbose "[$functionName] Found nested object at property: $fullKey"
-                    $nestedFlat = ConvertTo-FlatHashtable $value $fullKey
-                    foreach ($nestedKey in $nestedFlat.Keys)
-                    {
-                        $flatHash[$nestedKey] = $nestedFlat[$nestedKey]
-                    }
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Adding flat property: $fullKey"
-                    $flatHash[$fullKey] = $value
-                }
-            }
-        }
-        else
-        {
-            # If it's a simple value, just return it with the prefix as key
-            if ($prefix)
-            {
-                $flatHash[$prefix] = $object
-            }
-        }
-        
-        return $flatHash
-    }    Write-Verbose "[$functionName] Merging settings with conflict resolution: $ConflictResolution"
+    Write-Verbose "[$functionName] Merging settings with conflict resolution: $ConflictResolution"
     
     # Flatten local settings
     Write-Verbose "[$functionName] Flattening local settings"
-    $flatLocalSettings = ConvertTo-FlatHashtable $localSettings
+    $flatLocalSettings = ConvertFrom-JsonToHashtable -JsonObject $localSettings -Flatten
     Write-Verbose "[$functionName] Local settings flattened to $($flatLocalSettings.Count) properties"
     
     # Flatten global settings
     Write-Verbose "[$functionName] Flattening global settings"
-    $flatGlobalSettings = ConvertTo-FlatHashtable $globalSettings
+    $flatGlobalSettings = ConvertFrom-JsonToHashtable -JsonObject $globalSettings -Flatten
     Write-Verbose "[$functionName] Global settings flattened to $($flatGlobalSettings.Count) properties"
     
     # Normalize all keys to simple format (remove any prefixes)

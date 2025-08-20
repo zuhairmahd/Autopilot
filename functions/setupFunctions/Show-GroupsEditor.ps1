@@ -145,8 +145,7 @@ function Show-GroupsEditor()
         Write-Log -LogFile $logFile -Module $functionName -Message "Loading domain configuration for '$DomainName' from: $configPath" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Loading domain configuration for '$DomainName' from: $configPath"
         
-        $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
-        
+        $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
         if ($null -eq $domainConfig)
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Error"
@@ -577,7 +576,7 @@ function Update-DomainGroupSetting()
         Write-Verbose "[$functionName] Configuration path: $configPath"
         
         # Load current domain configuration
-        $domainConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+        $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
         if ($null -eq $domainConfig)
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for '$DomainName'" -LogLevel "Error"
@@ -622,10 +621,17 @@ function Update-DomainGroupSetting()
             Write-Log -LogFile $logFile -Module $functionName -Message "Verifying update by reloading domain configuration" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Verifying update by reloading domain configuration"
             
-            $verifyConfig = Load-DomainConfiguration -DomainName $DomainName -ConfigurationPath $configPath
+            $verifyConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             if ($verifyConfig)
             {
-                $actualGroups = if ($GroupType -eq 'groupsToInclude') { $verifyConfig.groupsToInclude } else { $verifyConfig.groupsToExclude }
+                $actualGroups = if ($GroupType -eq 'groupsToInclude')
+                {
+                    $verifyConfig.groupsToInclude 
+                }
+                else
+                {
+                    $verifyConfig.groupsToExclude 
+                }
                 $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
                 
                 if ($null -eq $comparisonResult)

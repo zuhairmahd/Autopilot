@@ -1,4 +1,4 @@
-function Get-AvailableDomains
+function Get-AvailableDomains()
 {
     <#
     .SYNOPSIS
@@ -113,7 +113,8 @@ function Get-AvailableDomains
         
         # Debug: Check what we're about to return
         Write-Verbose "[$functionName] Debug: About to return array of type $($availableDomains.GetType().Name) with $($availableDomains.Count) items"
-        for ($i = 0; $i -lt $availableDomains.Count; $i++) {
+        for ($i = 0; $i -lt $availableDomains.Count; $i++)
+        {
             Write-Verbose "[$functionName] Debug: Domain[$i] = '$($availableDomains[$i])' (Length: $($availableDomains[$i].Length))"
         }
         

@@ -51,11 +51,16 @@ function Test-SettingsJsonExists()
         
         # Use centralized defaults - single source of truth
         # Get version from global variable if available, otherwise use default
-        $versionString = if ($global:version -and $global:version.version) {
+        $versionString = if ($global:version -and $global:version.version)
+        {
             $global:version.version.toString()
-        } elseif ($version -and $version.version) {
+        }
+        elseif ($version -and $version.version)
+        {
             $version.version.toString()
-        } else {
+        }
+        else
+        {
             "1.3.0.0"  # Default version
         }
         Write-Verbose "[$functionName] Using version: $versionString"

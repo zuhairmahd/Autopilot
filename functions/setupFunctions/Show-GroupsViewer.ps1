@@ -133,7 +133,7 @@ function Show-GroupsViewer()
             Write-Verbose "[$functionName] Loading configuration for domain: $domain"
             
             # Load domain configuration using new architecture
-            $domainConfig = Load-DomainConfiguration -DomainName $domain -ConfigurationPath $configPath
+            $domainConfig = Get-DomainConfigurationFromFiles -DomainName $domain -ConfigurationPath $configPath
             if ($null -eq $domainConfig)
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load configuration for domain: $domain" -LogLevel "Warning"
