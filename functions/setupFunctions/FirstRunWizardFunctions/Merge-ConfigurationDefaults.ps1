@@ -20,11 +20,6 @@ function Merge-ConfigurationDefaults()
         If $true (default), existing values in ExistingConfig are preserved.
         If $false, default values will overwrite existing values.
     
-    .PARAMETER OverwriteSettings
-        Optional PSCustomObject containing settings that should be forcibly overwritten
-        regardless of the PreserveExisting parameter value. Keys found in this object
-        will overwrite corresponding values in the merged configuration.
-    
     .OUTPUTS
         System.Collections.Hashtable or $null
         Returns the merged configuration hashtable if changes were made, or $null if no merge was needed.
@@ -40,18 +35,12 @@ function Merge-ConfigurationDefaults()
         
         Merges default settings into current settings, preserving existing values.
     
-    .EXAMPLE
-        $overwrite = [PSCustomObject]@{ CheckForUpdates = $true }
-        $merged = Merge-ConfigurationDefaults -ExistingConfig $currentSettings -DefaultConfig $defaultSettings -OverwriteSettings $overwrite
-        
-        Merges default settings and forces CheckForUpdates to be overwritten with the specified value.
-    
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Handles nested hashtables recursively
         - Preserves array values from existing configuration
         - Uses regular hashtables for broader compatibility
-        - OverwriteSettings provides granular control over specific setting values
+        - For force overwrite scenarios, use Get-ApplicationDefaults -DefaultType "Overwrite"
     #>
     [CmdletBinding()]
     [OutputType([System.Collections.Hashtable])]
@@ -60,189 +49,63 @@ function Merge-ConfigurationDefaults()
         [System.Collections.Hashtable]$ExistingConfig,
         [Parameter(Mandatory = $true)]
         [System.Collections.Hashtable]$DefaultConfig,
-        [bool]$PreserveExisting = $true,
-        [Parameter(Mandatory = $false)]
-        [PSCustomObject]$OverwriteSettings = $null
+        [bool]$PreserveExisting = $true
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting configuration merge"
     Write-Log -logFile $logFile -module $functionName -Message "Starting configuration merge"
     
-    # Convert OverwriteSettings to hashtable if provided
-    $overwriteHash = $null
-    if ($OverwriteSettings)
+    # Helper function to perform recursive merge
+    function MergeHashtables($existing, $defaults, $preserveExisting)
     {
-        Write-Verbose "[$functionName] Converting OverwriteSettings to hashtable for processing"
-        Write-Log -logFile $logFile -module $functionName -Message "Converting OverwriteSettings to hashtable for processing"
+        $merged = @{}
         
-        # Use a simplified conversion approach for the overwrite settings
-        $overwriteHash = @{}
-        if ($OverwriteSettings -is [PSCustomObject])
+        # First, copy all existing values
+        foreach ($key in $existing.Keys)
         {
-            $OverwriteSettings.PSObject.Properties | ForEach-Object {
-                $overwriteHash[$_.Name] = $_.Value
-            }
-        }
-        elseif ($OverwriteSettings -is [hashtable])
-        {
-            $overwriteHash = $OverwriteSettings
+            $merged[$key] = $existing[$key]
         }
         
-        Write-Verbose "[$functionName] OverwriteSettings converted to $($overwriteHash.Count) properties"
-        Write-Log -logFile $logFile -module $functionName -Message "OverwriteSettings converted to $($overwriteHash.Count) properties"
-    }
-    
-    # Helper function to check if a key should be overwritten
-    function ShouldOverwriteKey($key, $fullPath = '')
-    {
-        if (-not $overwriteHash) { return $false }
-        
-        # Check both the simple key and the full path
-        $keysToCheck = @($key)
-        if ($fullPath) { $keysToCheck += $fullPath }
-        
-        foreach ($checkKey in $keysToCheck)
+        # Then, add any missing keys from defaults
+        foreach ($key in $defaults.Keys)
         {
-            if ($overwriteHash.ContainsKey($checkKey))
+            if (-not $merged.ContainsKey($key))
             {
-                Write-Verbose "[$functionName] Key '$checkKey' found in OverwriteSettings - will be overwritten"
-                Write-Log -logFile $logFile -module $functionName -Message "Key '$checkKey' found in OverwriteSettings - will be overwritten"
-                return $true
+                Write-Verbose "[$functionName] Adding missing key: $key"
+                $merged[$key] = $defaults[$key]
+                return $true, $merged
             }
+            elseif ($merged[$key] -is [System.Collections.Hashtable] -and $defaults[$key] -is [System.Collections.Hashtable])
+            {
+                # Recursively merge nested hashtables
+                Write-Verbose "[$functionName] Merging nested hashtable: $key"
+                $nestedResult = MergeHashtables -existing $merged[$key] -defaults $defaults[$key] -preserveExisting $preserveExisting
+                if ($nestedResult[0])  # Changes were made
+                {
+                    $merged[$key] = $nestedResult[1]
+                    return $true, $merged
+                }
+            }
+            elseif (-not $preserveExisting)
+            {
+                # Overwrite existing value with default if PreserveExisting is false
+                Write-Verbose "[$functionName] Overwriting existing key: $key"
+                $merged[$key] = $defaults[$key]
+                return $true, $merged
+            }
+            # If PreserveExisting is true, keep the existing value
         }
-        return $false
+        
+        return $false, $merged
     }
     
     try
     {
-        # Track whether any changes were made
-        $changesMade = $false
-        
-        # Create a copy of the existing config to avoid modifying the original
-        $mergedConfig = @{}
-        
-        # First, copy all existing values
-        foreach ($key in $ExistingConfig.Keys)
-        {
-            $mergedConfig[$key] = $ExistingConfig[$key]
-        }
-        
-        # Then, add any missing keys from defaults
-        foreach ($key in $DefaultConfig.Keys)
-        {
-            if (-not $mergedConfig.ContainsKey($key))
-            {
-                Write-Verbose "[$functionName] Adding missing key: $key"
-                $mergedConfig[$key] = $DefaultConfig[$key]
-                $changesMade = $true
-            }
-            elseif ($mergedConfig[$key] -is [System.Collections.Hashtable] -and $DefaultConfig[$key] -is [System.Collections.Hashtable])
-            {
-                # Recursively merge nested hashtables
-                Write-Verbose "[$functionName] Merging nested hashtable: $key"
-                
-                # Create nested overwrite settings if any exist for this key
-                $nestedOverwrite = $null
-                if ($OverwriteSettings)
-                {
-                    $nestedOverwrite = [PSCustomObject]@{}
-                    $hasNestedOverwrites = $false
-                    
-                    # Check for nested overwrite settings with dot notation
-                    $OverwriteSettings.PSObject.Properties | ForEach-Object {
-                        if ($_.Name.StartsWith("$key."))
-                        {
-                            $nestedKey = $_.Name.Substring($key.Length + 1)
-                            $nestedOverwrite | Add-Member -MemberType NoteProperty -Name $nestedKey -Value $_.Value
-                            $hasNestedOverwrites = $true
-                        }
-                    }
-                    
-                    if (-not $hasNestedOverwrites)
-                    {
-                        $nestedOverwrite = $null
-                    }
-                }
-                
-                $nestedMerge = Merge-ConfigurationDefaults -ExistingConfig $mergedConfig[$key] -DefaultConfig $DefaultConfig[$key] -PreserveExisting $PreserveExisting -OverwriteSettings $nestedOverwrite
-                if ($nestedMerge)
-                {
-                    $mergedConfig[$key] = $nestedMerge
-                    $changesMade = $true
-                }
-            }
-            elseif (-not $PreserveExisting -or (ShouldOverwriteKey $key))
-            {
-                # Overwrite existing value with default if PreserveExisting is false OR if key is in OverwriteSettings
-                if (ShouldOverwriteKey $key)
-                {
-                    Write-Verbose "[$functionName] Force overwriting existing key due to OverwriteSettings: $key"
-                    Write-Log -logFile $logFile -module $functionName -Message "Force overwriting existing key due to OverwriteSettings: $key"
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Overwriting existing key: $key"
-                }
-                $mergedConfig[$key] = $DefaultConfig[$key]
-                $changesMade = $true
-            }
-            # If PreserveExisting is true and key is not in OverwriteSettings, keep the existing value
-        }
-        
-        # Apply any overwrite settings that specify values directly (not just forcing overwrite from defaults)
-        if ($overwriteHash)
-        {
-            Write-Verbose "[$functionName] Applying direct overwrite settings"
-            Write-Log -logFile $logFile -module $functionName -Message "Applying direct overwrite settings"
-            foreach ($overwriteKey in $overwriteHash.Keys)
-            {
-                # Handle flattened keys (dot notation)
-                if ($overwriteKey.Contains('.'))
-                {
-                    $keyParts = $overwriteKey.Split('.')
-                    $currentConfig = $mergedConfig
-                    
-                    # Navigate to the nested location
-                    for ($i = 0; $i -lt $keyParts.Length - 1; $i++)
-                    {
-                        $part = $keyParts[$i]
-                        if (-not $currentConfig.ContainsKey($part))
-                        {
-                            $currentConfig[$part] = @{}
-                        }
-                        elseif ($currentConfig[$part] -isnot [System.Collections.Hashtable])
-                        {
-                            # Convert to hashtable if it's not already
-                            $currentConfig[$part] = @{}
-                        }
-                        $currentConfig = $currentConfig[$part]
-                    }
-                    
-                    # Set the final value
-                    $finalKey = $keyParts[-1]
-                    $oldValue = if ($currentConfig.ContainsKey($finalKey)) { $currentConfig[$finalKey] } else { "NOT_SET" }
-                    $currentConfig[$finalKey] = $overwriteHash[$overwriteKey]
-                    $changesMade = $true
-                    
-                    Write-Verbose "[$functionName] Applied overwrite setting '$overwriteKey': $oldValue -> $($overwriteHash[$overwriteKey])"
-                    Write-Log -logFile $logFile -module $functionName -Message "Applied overwrite setting '$overwriteKey': $oldValue -> $($overwriteHash[$overwriteKey])"
-                }
-                else
-                {
-                    # Simple key
-                    if ($mergedConfig.ContainsKey($overwriteKey))
-                    {
-                        $oldValue = $mergedConfig[$overwriteKey]
-                        $mergedConfig[$overwriteKey] = $overwriteHash[$overwriteKey]
-                        $changesMade = $true
-                        
-                        Write-Verbose "[$functionName] Applied overwrite setting '$overwriteKey': $oldValue -> $($overwriteHash[$overwriteKey])"
-                        Write-Log -logFile $logFile -module $functionName -Message "Applied overwrite setting '$overwriteKey': $oldValue -> $($overwriteHash[$overwriteKey])"
-                    }
-                }
-            }
-        }
+        # Perform the merge
+        $mergeResult = MergeHashtables -existing $ExistingConfig -defaults $DefaultConfig -preserveExisting $PreserveExisting
+        $changesMade = $mergeResult[0]
+        $mergedConfig = $mergeResult[1]
         
         if ($changesMade)
         {

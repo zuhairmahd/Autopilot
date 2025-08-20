@@ -258,7 +258,7 @@ function Initialize-GlobalSettings
 {
     <#
     .SYNOPSIS
-        Processes global settings from configuration file.
+        Processes global settings from configuration file with overwrite support.
     #>
     [CmdletBinding()]
     param(
@@ -297,6 +297,44 @@ function Initialize-GlobalSettings
             $globalSettings.add($key, $PSBoundParameters[$key])
             Write-Verbose "[$functionName] Used command-line override for global $key"
         }
+    }
+    
+    # Apply overwrite settings to global configuration
+    Write-Verbose "[$functionName] Applying overwrite configuration to global settings"
+    try
+    {
+        $overwriteConfig = Get-ApplicationDefaults -DefaultType "Overwrite"
+        
+        # Apply global-specific overwrites
+        if ($overwriteConfig.GlobalSettings)
+        {
+            Write-Verbose "[$functionName] Applying $($overwriteConfig.GlobalSettings.Count) global overwrite settings"
+            foreach ($overwriteKey in $overwriteConfig.GlobalSettings.Keys)
+            {
+                $oldValue = if ($globalSettings.ContainsKey($overwriteKey)) { $globalSettings[$overwriteKey] } else { "NOT_SET" }
+                $globalSettings[$overwriteKey] = $overwriteConfig.GlobalSettings[$overwriteKey]
+                Write-Verbose "[$functionName] Applied global overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.GlobalSettings[$overwriteKey])"
+                Write-Log -LogFile $logFile -Message "Applied global overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.GlobalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
+            }
+        }
+        
+        # Apply universal overwrites
+        if ($overwriteConfig.UniversalSettings)
+        {
+            Write-Verbose "[$functionName] Applying $($overwriteConfig.UniversalSettings.Count) universal overwrite settings to global"
+            foreach ($overwriteKey in $overwriteConfig.UniversalSettings.Keys)
+            {
+                $oldValue = if ($globalSettings.ContainsKey($overwriteKey)) { $globalSettings[$overwriteKey] } else { "NOT_SET" }
+                $globalSettings[$overwriteKey] = $overwriteConfig.UniversalSettings[$overwriteKey]
+                Write-Verbose "[$functionName] Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])"
+                Write-Log -LogFile $logFile -Message "Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error applying overwrite configuration: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Message "Error applying overwrite configuration: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
     }
     
     return @{ GlobalSettings = $globalSettings }
@@ -398,6 +436,44 @@ function Initialize-LocalSettings
             $localSettings.add($key, $PSBoundParameters[$key])
             Write-Verbose "[$functionName] Used command-line override for local $key"
         }
+    }
+    
+    # Apply overwrite settings to local/domain configuration
+    Write-Verbose "[$functionName] Applying overwrite configuration to local settings"
+    try
+    {
+        $overwriteConfig = Get-ApplicationDefaults -DefaultType "Overwrite"
+        
+        # Apply local-specific overwrites
+        if ($overwriteConfig.LocalSettings)
+        {
+            Write-Verbose "[$functionName] Applying $($overwriteConfig.LocalSettings.Count) local overwrite settings"
+            foreach ($overwriteKey in $overwriteConfig.LocalSettings.Keys)
+            {
+                $oldValue = if ($localSettings.ContainsKey($overwriteKey)) { $localSettings[$overwriteKey] } else { "NOT_SET" }
+                $localSettings[$overwriteKey] = $overwriteConfig.LocalSettings[$overwriteKey]
+                Write-Verbose "[$functionName] Applied local overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.LocalSettings[$overwriteKey])"
+                Write-Log -LogFile $logFile -Message "Applied local overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.LocalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
+            }
+        }
+        
+        # Apply universal overwrites
+        if ($overwriteConfig.UniversalSettings)
+        {
+            Write-Verbose "[$functionName] Applying $($overwriteConfig.UniversalSettings.Count) universal overwrite settings to local"
+            foreach ($overwriteKey in $overwriteConfig.UniversalSettings.Keys)
+            {
+                $oldValue = if ($localSettings.ContainsKey($overwriteKey)) { $localSettings[$overwriteKey] } else { "NOT_SET" }
+                $localSettings[$overwriteKey] = $overwriteConfig.UniversalSettings[$overwriteKey]
+                Write-Verbose "[$functionName] Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])"
+                Write-Log -LogFile $logFile -Message "Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error applying overwrite configuration: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Message "Error applying overwrite configuration: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
     }
     
     return @{ LocalSettings = $localSettings }

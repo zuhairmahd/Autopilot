@@ -2,15 +2,15 @@ function Get-ApplicationDefaults()
 {
     <#
     .SYNOPSIS
-        Single source of truth for all application default values.
+        Single source of truth for all application default values and overwrite configurations.
     
     .DESCRIPTION
         Provides all default configuration structures for the application including
-        settings, auth, menus, and strings. This function serves as the centralized
-        repository for all default values to ensure consistency across the application.
+        settings, auth, menus, strings, and overwrite configurations. This function serves as the centralized
+        repository for all default values and force-overwrite settings to ensure consistency across the application.
     
     .PARAMETER DefaultType
-        Type of defaults to return: 'Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'All'
+        Type of defaults to return: 'Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'Overwrite', 'All'
     
     .PARAMETER DomainName
         Domain name to use for domain-specific defaults. Defaults to "example.com"
@@ -20,10 +20,13 @@ function Get-ApplicationDefaults()
     
     .OUTPUTS
         System.Collections.Hashtable
-        Returns hashtable with requested default configuration.
+        Returns hashtable with requested default configuration or overwrite settings.
     
     .EXAMPLE
         $authDefaults = Get-ApplicationDefaults -DefaultType "Auth"
+    
+    .EXAMPLE
+        $overwriteConfig = Get-ApplicationDefaults -DefaultType "Overwrite"
     
     .EXAMPLE
         $allDefaults = Get-ApplicationDefaults -DefaultType "All"
@@ -33,14 +36,15 @@ function Get-ApplicationDefaults()
     
     .NOTES
         - Maintains PowerShell 5.1 compatibility
-        - Single source of truth for all default values
+        - Single source of truth for all default values and overwrite configurations
         - Replaces individual default value functions to eliminate duplication
         - Domain configurations are now handled separately but this provides templates
+        - Overwrite configurations specify target locations (global, local, or universal)
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'All')]
+        [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'Overwrite', 'All')]
         [string]$DefaultType,
         [string]$DomainName = "example.com",
         [string]$Version
@@ -257,6 +261,42 @@ function Get-ApplicationDefaults()
         # This structure is maintained for backward compatibility during migration
     }
     
+    # Overwrite configurations - centralized force-overwrite settings
+    $defaults.Overwrite = @{
+        # Global settings that should be forcibly overwritten
+        # These settings will only be applied during global settings processing
+        GlobalSettings = @{
+            # Force automatic updates to be enabled
+            "autoUpdate" = $true
+            # Ensure license banner is shown
+            "showLicenseBanner" = $true
+            # Force test mode to be disabled in production
+            "testMode" = $false
+        }
+        
+        # Local/domain settings that should be forcibly overwritten
+        # These settings will only be applied during domain settings processing
+        LocalSettings = @{
+            # Ensure consistent device contact threshold across domains
+            "deviceContactThresholdInDays" = 30
+            # Standardize wait times across domains
+            "maxWaitTime" = 30
+            # Ensure minimum memory requirements are enforced
+            "minimumDevicePhysicalMemoryInGB" = 8
+        }
+        
+        # Universal settings that apply to both global and local contexts
+        # These will be applied to both global and domain settings processing
+        UniversalSettings = @{
+            # Ensure consistent operating system specification
+            "operatingSystem" = "Windows"
+            # Standardize repository source
+            "repo" = "Github"
+            # Ensure consistent release branch
+            "release" = "master"
+        }
+    }
+    
     Write-Verbose "[$functionName] Default structures created for: $($defaults.Keys -join ', ')"
     
     # Return requested defaults
@@ -281,6 +321,11 @@ function Get-ApplicationDefaults()
         {
             Write-Verbose "[$functionName] Returning complete settings defaults"
             return $defaults.Settings
+        }
+        'Overwrite'
+        {
+            Write-Verbose "[$functionName] Returning overwrite configuration"
+            return $defaults.Overwrite
         }
         'All'
         {
