@@ -60,6 +60,7 @@ function Merge-ConfigurationDefaults()
     function MergeHashtables($existing, $defaults, $preserveExisting)
     {
         $merged = @{}
+        $changesMade = $false
         
         # First, copy all existing values
         foreach ($key in $existing.Keys)
@@ -74,7 +75,7 @@ function Merge-ConfigurationDefaults()
             {
                 Write-Verbose "[$functionName] Adding missing key: $key"
                 $merged[$key] = $defaults[$key]
-                return $true, $merged
+                $changesMade = $true
             }
             elseif ($merged[$key] -is [System.Collections.Hashtable] -and $defaults[$key] -is [System.Collections.Hashtable])
             {
@@ -84,7 +85,7 @@ function Merge-ConfigurationDefaults()
                 if ($nestedResult[0])  # Changes were made
                 {
                     $merged[$key] = $nestedResult[1]
-                    return $true, $merged
+                    $changesMade = $true
                 }
             }
             elseif (-not $preserveExisting)
@@ -92,12 +93,12 @@ function Merge-ConfigurationDefaults()
                 # Overwrite existing value with default if PreserveExisting is false
                 Write-Verbose "[$functionName] Overwriting existing key: $key"
                 $merged[$key] = $defaults[$key]
-                return $true, $merged
+                $changesMade = $true
             }
             # If PreserveExisting is true, keep the existing value
         }
         
-        return $false, $merged
+        return $changesMade, $merged
     }
     
     try
