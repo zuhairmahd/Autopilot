@@ -96,6 +96,12 @@ function Get-ApplicationDefaults()
         
         # Global settings defaults - single source of truth
         Global         = @{
+            appInfo                      = @{
+                name        = "Autopilot"
+                companyName = ""
+                description = "Intune Helpdesk"
+                version     = $Version
+            }
             configFile                   = ".\.secrets\config.json"
             maxWaitTime                  = 30
             showLicenseBanner            = $true
@@ -122,6 +128,12 @@ function Get-ApplicationDefaults()
             groupsToInclude  = @()
             groupsToExclude  = @()
             settings         = @{
+                appInfo                         = @{
+                    name        = "Autopilot"
+                    companyName = "Zuhair Mahmoud"
+                    description = "Autopilot for Windows devices"
+                    version     = $Version
+                }
                 domain                          = $DomainName
                 maxWaitTime                     = 30
                 showLicenseBanner               = $true

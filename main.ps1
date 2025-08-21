@@ -80,28 +80,6 @@ else
 #endregion import functions.
 
 #region Initialize script
-$version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
-Write-Verbose "[$scriptName] Version: $($version | Out-String)"
-if (-not $version.version)
-{
-    Write-Verbose "[$scriptName] Unable to get file version. Defaulting to 1.0.0"
-    $version = @{
-        version     = [System.Version]::Parse('1.0.0.0')
-        companyName = 'Zuhair Mahmoud'
-        major       = 1
-        minor       = 0
-        build       = 0
-        revision    = 0
-    }
-}
-if ($ShowVersion)
-{
-    Write-Verbose "[$scriptName] Version: $version"
-    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
-    exit 0  
-}
-$oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
@@ -115,6 +93,71 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
+#If the scriptname is an executable, change the extension to an exe.
+if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
+    $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
+    if (Test-Path "$pwd\$scriptNameExe")
+    {
+        Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
+        Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
+        $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+    }
+    else 
+    {
+        Write-Verbose "[$scriptName] Executable file '$scriptNameExe' not found, checking for script file."
+        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found, checking for script file." -logLevel "Verbose"
+        $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+    }
+}
+Write-Verbose "[$scriptName] Version: $($version | Out-String)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
+$global:appMetaData = Get-ApplicationMetaDataFromDomain -verbose 
+Write-Verbose "[$scriptName] Application metadata retrieved successfully."
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
+    {
+        $version = $appMetaData.version
+        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Information"
+    }
+    else 
+    {
+        Write-Verbose "[$scriptName] Unable to find version information. Defaulting to 1.0.0.0."
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
+}
+if ($null -ne $appMetaData.companyName -and $appMetaData.companyName -ne $version.companyName)
+{
+    Write-Verbose "[$scriptName] Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
+    $version.companyName = $appMetaData.companyName
+    Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
+}
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -finishLogging
+    exit 0  
+}
+$oldExecutableFileName = 'main.exe.old'
 if (Test-Path $oldExecutableFileName)
 {
     Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"

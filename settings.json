@@ -124,6 +124,11 @@
     }
   ],
   "globalSettings": {
+    "appInfo": {
+      "name": "Autopilot",
+      "companyName": "Zuhair Mahmoud",
+      "description": "Autopilot for Windows devices"
+    },
     "operatingSystem": "Windows",
     "repo": "Github",
     "repoInfo": {

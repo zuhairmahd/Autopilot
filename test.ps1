@@ -82,6 +82,9 @@ else
 }
 #endregion import functions.
 
+$global:dt = Get-ApplicationMetaDataFromDomain -verbose 
+
+exit 0
 #region Initialize script
 $oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
