@@ -114,7 +114,7 @@ if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "Ex
 }
 Write-Verbose "[$scriptName] Version: $($version | Out-String)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$global:appMetaData = Get-ApplicationMetaDataFromDomain -verbose 
+$appMetaData = Get-ApplicationMetaDataFromDomain -verbose 
 Write-Verbose "[$scriptName] Application metadata retrieved successfully."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
 if (-not $version.version)
@@ -141,7 +141,7 @@ if (-not $version.version)
         }
     }
 }
-if ($null -ne $appMetaData.companyName -and $appMetaData.companyName -ne $version.companyName)
+if ([string]::IsNullOrEmpty($appMetaData.companyName) -and $appMetaData.companyName -ne $version.companyName)
 {
     Write-Verbose "[$scriptName] Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"

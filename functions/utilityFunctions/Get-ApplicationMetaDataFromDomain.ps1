@@ -51,7 +51,6 @@ function Get-ApplicationMetaDataFromDomain()
             $domainSettings = (Get-Content -Path $domainSettingsFile -Raw | ConvertFrom-Json).settings.appInfo
             Write-Verbose "[$functionName] Successfully loaded domain settings."
             Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded domain settings."
-            Write-Verbose "[$functionName] Successfully merged settings."
         }
         catch
         {
