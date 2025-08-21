@@ -82,7 +82,7 @@ else
 }
 #endregion import functions.
 
-$global:dt = Get-ApplicationMetaDataFromDomain -verbose 
+$global:dt = Get-WhoisInfo -DomainNameOrIPAddress 'arabictutor.com'
 
 exit 0
 #region Initialize script
