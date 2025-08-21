@@ -114,7 +114,7 @@ if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "Ex
 }
 Write-Verbose "[$scriptName] Version: $($version | Out-String)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$appMetaData = Get-ApplicationMetaDataFromDomain -verbose 
+$appMetaData = Get-ApplicationMetaDataFromDomain
 Write-Verbose "[$scriptName] Application metadata retrieved successfully."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
 if (-not $version.version)
