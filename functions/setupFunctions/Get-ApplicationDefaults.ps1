@@ -77,7 +77,6 @@ function Get-ApplicationDefaults()
             authType            = "PublicAuthFlow"
             noSaveRefreshToken  = $false
             forceNewToken       = $false
-            validateScopes      = $true
             renewalLeadTime     = 5
             scope               = @(
                 "offline_access",
@@ -99,6 +98,7 @@ function Get-ApplicationDefaults()
             configFile                   = ".\.secrets\config.json"
             maxWaitTime                  = 30
             showLicenseBanner            = $true
+            validateScopes               = $true
             deviceContactThresholdInDays = 30
             appMode                      = "full"
             timeInSeconds                = 60
@@ -129,6 +129,7 @@ function Get-ApplicationDefaults()
                     version     = $Version
                 }
                 domain                          = $DomainName
+                validateScopes                  = $true
                 maxWaitTime                     = 30
                 showLicenseBanner               = $true
                 deviceContactThresholdInDays    = 30

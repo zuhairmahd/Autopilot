@@ -730,7 +730,7 @@ if ($accessToken)
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Access token retrieved successfully." -LogLevel "Information"
     
     # Validate scope availability for the retrieved access token
-    if ($auth.validateScopes)
+    if ($settings.validateScopes)
     {
         Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Information"
