@@ -93,7 +93,8 @@ function Initialize-ApplicationConfiguration()
                 $result.GlobalSettings = $globalResult.GlobalSettings
                 
                 # Step 5: Process domain-specific settings
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -processConfigOverwrite
+                $configurationPath = Split-Path -Parent $InitFile
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath -processConfigOverwrite
                 $result.LocalSettings = $localResult.LocalSettings
                 
                 # Step 6: Load menus
@@ -380,20 +381,21 @@ function Initialize-LocalSettings()
         [string]$Domain,
         [hashtable]$PSBoundParameters,
         [hashtable]$GlobalSettings = @{},
+        [string]$ConfigurationPath = $pwd,
         [switch]$processConfigOverwrite
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     $localSettings = @{}
     Write-Verbose "[$functionName] Initializing local settings for domain: $Domain"
-    Write-Log -LogFile $LogFile -Message "Initializing local settings for domain: $Domain" -Module $functionName -LogLevel "Information"
+    Write-Log -LogFile $logFile -Message "Initializing local settings for domain: $Domain" -Module $functionName -LogLevel "Information"
     # First, check for migration from old format (domains in settings.json)
     if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
     {
         Write-Verbose "[$functionName] Found domain configuration in settings.json, performing migration"
         Write-Log -LogFile $logFile -Message "Found domain configuration in settings.json, performing migration" -Module $functionName -LogLevel "Information"
-        $settingsFile = Join-Path $pwd "settings.json"
-        $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -RemoveFromSettings $true
+        $settingsFile = Join-Path $ConfigurationPath "settings.json"
+        $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -ConfigurationPath $ConfigurationPath -RemoveFromSettings $true
         if ($migrationResult.Success)
         {
             Write-Verbose "[$functionName] Migration completed successfully"
@@ -408,7 +410,7 @@ function Initialize-LocalSettings()
     
     # Load domain configuration from separate file
     Write-Verbose "[$functionName] Loading domain configuration from separate file for: $Domain"
-    $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -GlobalSettings $GlobalSettings -ConfigurationPath $pwd
+    $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -GlobalSettings $GlobalSettings -ConfigurationPath $ConfigurationPath
     
     if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
     {

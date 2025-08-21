@@ -19,7 +19,10 @@ try
     . "$PSScriptRoot/../functions/setupFunctions/Update-Setting.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/Get-ApplicationDefaults.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Test-StringsJsonExists.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Test-MenuJsonExists.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertTo-OrderedJson.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/MergeSettings.ps1"
     
     # Load other essential functions
@@ -28,6 +31,9 @@ try
     
     # Initialize unified test environment
     $testContext = Start-UnifiedTest -TestName "Separate Domain Configuration Files" -TestFolder $TestFolder
+    
+    # Set global variable required by JSON functions
+    $global:maxJSONDepth = 10
     
     Write-TestResult "Test environment initialized" $true
 }
@@ -39,6 +45,7 @@ catch
 
 # Set up test files
 $LogFile = "$($testContext.TestFolder)\test.log"
+$global:logFile = $LogFile  # Set global variable for functions that expect it
 $configFile = "$($testContext.TestFolder)\.secrets\config.json"
 $settingsFile = "$($testContext.TestFolder)\settings.json"
 $stringsFile = "$($testContext.TestFolder)\strings.json"
@@ -132,16 +139,19 @@ try
             
             # Verify structure
             $newDomainContent = Get-Content $newDomainFile -Raw | ConvertFrom-Json
-            if ($newDomainContent.groupsToInclude -and 
-                $newDomainContent.groupsToExclude -and 
-                $newDomainContent.settings -and
-                $newDomainContent.settings.domain -eq "newdomain.com")
+            if ($null -ne $newDomainContent.groupsToInclude -and 
+                $null -ne $newDomainContent.groupsToExclude -and 
+                $null -ne $newDomainContent.settings -and
+                $newDomainContent.settings.domain -eq "newdomain.com" -and
+                $null -ne $newDomainContent.settings.appInfo -and
+                $null -ne $newDomainContent.settings.repoInfo)
             {
                 Write-TestResult "New domain configuration has correct structure" $true
             }
             else
             {
                 Write-TestResult "New domain configuration structure is incorrect" $false
+                Write-Verbose "Actual structure: $($newDomainContent | ConvertTo-Json -Depth 3)"
             }
         }
         else
@@ -249,14 +259,16 @@ try
     Write-TestSection "Testing Initialize-ApplicationConfiguration with separate domain files"
     
     # Test the updated Initialize-ApplicationConfiguration function
-    $initResult = Initialize-ApplicationConfiguration -InitFile $settingsFile -StringsFile $stringsFile -Domain "contoso.com" -LogFile $LogFile
+    $initResult = Initialize-ApplicationConfiguration -InitFile $settingsFile -StringsFile $stringsFile -Domain "contoso.com"
     
     if ($initResult.Success)
     {
         Write-TestResult "Initialize-ApplicationConfiguration succeeded with separate domain files" $true
         
         # Verify local settings were loaded from separate file
-        if ($initResult.LocalSettings.deviceNamePrefix -eq "CONTOSO-")
+        Write-Verbose "LocalSettings content: $($initResult.LocalSettings | ConvertTo-Json -Depth 2)"
+        Write-Verbose "Expected deviceNamePrefix: 'CONTOSO-', Actual: '$($initResult.LocalSettings.settings.deviceNamePrefix)'"
+        if ($initResult.LocalSettings.settings.deviceNamePrefix -eq "CONTOSO-")
         {
             Write-TestResult "Local settings loaded correctly from separate domain file" $true
         }
@@ -328,7 +340,7 @@ try
     $backwardCompatSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $legacySettingsFile -Encoding UTF8
     
     # Test loading with the legacy format
-    $legacyInitResult = Initialize-ApplicationConfiguration -InitFile $legacySettingsFile -StringsFile $stringsFile -Domain "legacy.com" -LogFile $LogFile
+    $legacyInitResult = Initialize-ApplicationConfiguration -InitFile $legacySettingsFile -StringsFile $stringsFile -Domain "legacy.com"
     
     if ($legacyInitResult.Success)
     {
@@ -336,6 +348,8 @@ try
         
         # Verify automatic migration occurred
         $legacyDomainFile = Join-Path $testContext.TestFolder "legacy.com.json"
+        Write-Verbose "Checking for legacy domain file at: $legacyDomainFile"
+        Write-Verbose "File exists: $(Test-Path $legacyDomainFile)"
         if (Test-Path $legacyDomainFile)
         {
             Write-TestResult "Legacy domain automatically migrated to separate file" $true
@@ -343,6 +357,8 @@ try
         else
         {
             Write-TestResult "Legacy domain not migrated to separate file" $false
+            # List files in test folder for debugging
+            Write-Verbose "Files in test folder: $(Get-ChildItem $testContext.TestFolder -Name)"
         }
     }
     else

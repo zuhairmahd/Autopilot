@@ -98,7 +98,7 @@ function ConvertTo-OrderedJson()
         }
         
         # Convert to JSON
-        $jsonResult = $orderedObject | ConvertTo-Json -Depth $maxJSONDepth
+        $jsonResult = $orderedObject | ConvertTo-Json -Depth $Depth
         Write-Verbose "[$functionName] Successfully converted to ordered JSON"
         
         return $jsonResult
