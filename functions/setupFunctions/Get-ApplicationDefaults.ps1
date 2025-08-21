@@ -108,8 +108,8 @@ function Get-ApplicationDefaults()
             repo                         = "Github"
             repoInfo                     = @{
                 repoName      = "Autopilot"
-                baseSourceURL = "https: / / raw.githubusercontent.com"
-                baseURL       = "https: / / www.github.com"
+                baseSourceURL = "https://raw.githubusercontent.com"
+                baseURL       = "https://www.github.com"
                 repoPath      = "zuhairmahd"
             }
             testMode                     = $false
@@ -122,13 +122,13 @@ function Get-ApplicationDefaults()
             groupsToInclude  = @()
             groupsToExclude  = @()
             settings         = @{
+                domain                          = $DomainName
                 appInfo                         = @{
                     name        = "Autopilot"
                     companyName = ""
                     description = "Autopilot for Windows devices"
                     version     = $Version
                 }
-                domain                          = $DomainName
                 validateScopes                  = $true
                 maxWaitTime                     = 30
                 showLicenseBanner               = $true
@@ -141,8 +141,8 @@ function Get-ApplicationDefaults()
                 repo                            = "Github"
                 repoInfo                        = @{
                     repoName      = "Autopilot"
-                    baseSourceURL = "https: / / raw.githubusercontent.com"
-                    baseURL       = "https: / / www.github.com"
+                    baseSourceURL = "https://raw.githubusercontent.com"
+                    baseURL       = "https://www.github.com"
                     repoPath      = "zuhairmahd"
                 }
                 autoUpdate                      = $true
@@ -301,34 +301,20 @@ function Get-ApplicationDefaults()
         # Global settings that should be forcibly overwritten
         # These settings will only be applied during global settings processing
         GlobalSettings    = @{
-            # Force automatic updates to be enabled
-            "autoUpdate"        = $true
-            # Ensure license banner is shown
-            "showLicenseBanner" = $true
-            # Force test mode to be disabled in production
-            "testMode"          = $false
+            #input global settings here
         }
         
         # Local/domain settings that should be forcibly overwritten
         # These settings will only be applied during domain settings processing
         LocalSettings     = @{
-            # Ensure consistent device contact threshold across domains
-            "deviceContactThresholdInDays"    = 30
-            # Standardize wait times across domains
-            "maxWaitTime"                     = 30
-            # Ensure minimum memory requirements are enforced
-            "minimumDevicePhysicalMemoryInGB" = 8
+            # Enter local settings here
         }
         
         # Universal settings that apply to both global and local contexts
         # These will be applied to both global and domain settings processing
         UniversalSettings = @{
-            # Ensure consistent operating system specification
-            "operatingSystem" = "Windows"
-            # Standardize repository source
-            "repo"            = "Github"
-            # Ensure consistent release branch
-            "release"         = "master"
+            "baseSourceURL" = "https://raw.githubusercontent.com"
+            "baseURL"       = "https://www.github.com"
         }
     }
     

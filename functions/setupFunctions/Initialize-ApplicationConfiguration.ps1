@@ -41,17 +41,10 @@ function Initialize-ApplicationConfiguration()
     param(
         [Parameter(Mandatory = $true)]
         [string]$InitFile,
-        
         [Parameter(Mandatory = $true)]
         [string]$StringsFile,
-        
         [string]$Domain = "contoso.com",
-        
-        [hashtable]$PSBoundParameters = @{},
-        
-        [string]$LogFile,
-        
-        [string]$ScriptName = "Initialize-ApplicationConfiguration"
+        [hashtable]$PSBoundParameters = @{}
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -96,11 +89,11 @@ function Initialize-ApplicationConfiguration()
                 $result.Auth = $authResult.Auth
                 
                 # Step 4: Process global settings
-                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -PSBoundParameters $PSBoundParameters
+                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -PSBoundParameters $PSBoundParameters -processConfigOverwrite
                 $result.GlobalSettings = $globalResult.GlobalSettings
                 
                 # Step 5: Process domain-specific settings
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -processConfigOverwrite
                 $result.LocalSettings = $localResult.LocalSettings
                 
                 # Step 6: Load menus
@@ -343,7 +336,6 @@ function Initialize-GlobalSettings()
                     Write-Log -LogFile $logFile -Message "Applied global overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.GlobalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
                 }
             }
-        
             # Apply universal overwrites
             Write-Verbose "[$functionName] Applying universal overwrite configuration"
             Write-Log -logFile $logFile -Message "Applying universal overwrite configuration" -module $functionName -logLevel "Information"
@@ -503,7 +495,6 @@ function Initialize-LocalSettings()
                     Write-Log -LogFile $logFile -Message "Applied local overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.LocalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
                 }
             }
-        
             # Apply universal overwrites
             Write-Verbose "[$functionName] Applying universal overwrite configuration to local settings"
             Write-Log -logFile $logFile -Message "Applying universal overwrite configuration to local settings" -module $functionName -logLevel "Information"

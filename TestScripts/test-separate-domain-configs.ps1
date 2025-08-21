@@ -118,7 +118,7 @@ try
     Write-TestSection "Testing Get-DomainConfigurationFromFiles function"
     
     # Test loading domain that doesn't exist yet (should create it)
-    $testDomainConfig = Get-DomainConfigurationFromFiles -DomainName "newdomain.com" -GlobalSettings $testSettings.globalSettings -ConfigurationPath $testContext.TestFolder
+    $global:testDomainConfig = Get-DomainConfigurationFromFiles -DomainName "newdomain.com" -GlobalSettings $testSettings.globalSettings -ConfigurationPath $testContext.TestFolder
 
     if ($testDomainConfig)
     {

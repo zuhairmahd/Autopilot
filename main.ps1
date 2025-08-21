@@ -394,7 +394,7 @@ else
 }
 
 # Initialize configuration with helper function
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters -LogFile $LogFile -ScriptName $scriptName
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
 
 if (-not $configResult.Success)
 {

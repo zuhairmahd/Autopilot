@@ -39,10 +39,8 @@ function Get-DomainConfigurationFromFiles()
     param(
         [Parameter(Mandatory = $true)]
         [string]$DomainName,
-        
         [Parameter(Mandatory = $false)]
         [hashtable]$GlobalSettings = @{},
-        
         [Parameter(Mandatory = $false)]
         [string]$ConfigurationPath = $pwd
     )
@@ -81,9 +79,9 @@ function Get-DomainConfigurationFromFiles()
             
             # Create the configuration object
             $newDomainConfig = [PSCustomObject]@{
-                groupsToInclude = $domainDefaults.groupsToInclude
-                groupsToExclude = $domainDefaults.groupsToExclude
-                settings = $domainDefaults.settings
+                groupsToInclude  = $domainDefaults.groupsToInclude
+                groupsToExclude  = $domainDefaults.groupsToExclude
+                settings         = $domainDefaults.settings
                 additionalScopes = $domainDefaults.additionalScopes
             }
             
@@ -103,9 +101,9 @@ function Get-DomainConfigurationFromFiles()
         
         # Return a minimal default configuration
         $fallbackConfig = [PSCustomObject]@{
-            groupsToInclude = @()
-            groupsToExclude = @()
-            settings = @{
+            groupsToInclude  = @()
+            groupsToExclude  = @()
+            settings         = @{
                 domain = $DomainName
             }
             additionalScopes = @()
