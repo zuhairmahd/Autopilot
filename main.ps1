@@ -93,7 +93,7 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
-#If the scriptname is an executable, change the extension to an exe.
+#If the scriptname is a Powershell, change the extension to an exe.
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
     Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
@@ -107,10 +107,15 @@ if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "Ex
     }
     else 
     {
-        Write-Verbose "[$scriptName] Executable file '$scriptNameExe' not found, checking for script file."
-        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found, checking for script file." -logLevel "Verbose"
-        $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+        Write-Verbose "[$scriptName] Executable file '$scriptNameExe' not found."
+        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -logLevel "Verbose"
     }
+}
+else 
+{
+    Write-Verbose "[$scriptName] Script file '$scriptName' found."
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -logLevel "Information"
+    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"        
 }
 Write-Verbose "[$scriptName] Version: $($version | Out-String)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
@@ -141,7 +146,7 @@ if (-not $version.version)
         }
     }
 }
-if ([string]::IsNullOrEmpty($appMetaData.companyName) -and $appMetaData.companyName -ne $version.companyName)
+if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
     Write-Verbose "[$scriptName] Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"

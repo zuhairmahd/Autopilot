@@ -124,7 +124,7 @@ function Get-ApplicationDefaults()
             settings         = @{
                 appInfo                         = @{
                     name        = "Autopilot"
-                    companyName = "Zuhair Mahmoud"
+                    companyName = ""
                     description = "Autopilot for Windows devices"
                     version     = $Version
                 }
