@@ -452,7 +452,7 @@
     ]
   },
   "environmentMenu": {
-    "Title": "Change Environment Menu",
+    "title": "Change Environment Menu",
     "Description": "Manage your environment settings and configurations",
     "type": "static",
     "includeInDisplayModes": [
