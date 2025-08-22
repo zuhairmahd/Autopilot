@@ -31,6 +31,12 @@ function getGroupMembership()
         Write-Error "GroupIds are required."
         Write-Log -logFile $logFile -module $functionName -Message "GroupIds are required." -logLevel "error"
         return $null
+    # Validate input
+    if (-not $groups -or $groups.Count -eq 0)
+    {
+        Write-Error "Groups are required."
+        Write-Log -logFile $logFile -module $functionName -Message "Groups are required." -logLevel "error"
+        return $null
     }
     Write-Verbose "[$functionName] Resolving group names to IDs..."
     Write-Log -logFile $logFile -module $functionName -Message "Resolving group names to IDs..."
