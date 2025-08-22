@@ -1,4 +1,4 @@
-﻿{
+{
     "description":  "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.",
     "version":  "1.3.0.0",
     "auth":  {
@@ -149,11 +149,11 @@
                            "maxWaitTime":  30,
                            "autoUpdate":  true,
                            "appMode":  "full",
-                           "validateScopes":  true,
+                           "validateScopes":  false,
                            "maxGroupMatchDisplay":  10,
                            "testMode":  false,
                            "configFile":  ".\\.secrets\\config.json",
-                           "showLicenseBanner":  true,
+                           "showLicenseBanner":  false,
                            "deviceContactThresholdInDays":  30
                        }
 }
