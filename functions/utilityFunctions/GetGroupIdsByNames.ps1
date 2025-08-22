@@ -170,7 +170,8 @@ function GetGroupIdsByNames()
                     Write-Verbose "[$functionName] Found GUID in missing items: $item"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found GUID in missing items: $item" -LogLevel "Information"
                     # For GUID types, OData filter should NOT quote the GUID
-                    $filterConditions += "id eq $item"
+                    # For GUID types, OData filter should quote the GUID
+                    $filterConditions += "id eq '$item'"
                 }
                 else
                 {
