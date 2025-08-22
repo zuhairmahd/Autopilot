@@ -400,7 +400,7 @@
     ]
   },
   "settingsMenu": {
-    "title": "Settings menu",
+    "Title": "Settings menu",
     "Description": "Make changes to the application settings",
     "type": "static",
     "includeInDisplayModes": [
@@ -452,7 +452,7 @@
     ]
   },
   "environmentMenu": {
-    "title": "Change Environment Menu",
+    "Title": "Change Environment Menu",
     "Description": "Manage your environment settings and configurations",
     "type": "static",
     "includeInDisplayModes": [

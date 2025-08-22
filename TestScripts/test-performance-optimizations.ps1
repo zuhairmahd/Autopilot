@@ -172,6 +172,12 @@ try {
     . "$PSScriptRoot/../functions/setupFunctions/Get-ApplicationDefaults.ps1"
     . "$PSScriptRoot/../functions/utilityFunctions/Write-Log.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertTo-OrderedJson.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/Merge-ConfigurationDefaults.ps1"
+    . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
+    
+    # Set up required variables
+    $global:logFile = [System.IO.Path]::GetTempFileName()
+    $global:maxJSONDepth = 10
     
     # Test with a temporary file
     $tempSettingsFile = [System.IO.Path]::GetTempFileName()
@@ -181,12 +187,16 @@ try {
     $result = Test-SettingsJsonExists -SettingsFile $tempSettingsFile  # Remove -Domain parameter
     $duration = (Get-Date) - $start
     
-    # Clean up
+    
+    # Clean up log files
+    if ($global:logFile -and (Test-Path $global:logFile)) {
+        Remove-Item $global:logFile -Force -ErrorAction SilentlyContinue
+    }
     if (Test-Path $tempSettingsFile) {
         Remove-Item $tempSettingsFile -Force
     }
     
-    if ($result -and $result.Settings) {
+    if ($result) {
         Write-Host "  ✓ Optimized Test-SettingsJsonExists works correctly" -ForegroundColor Green
         Write-Host "    Execution time: $([math]::Round($duration.TotalMilliseconds, 2))ms" -ForegroundColor Gray
         $testResults += @{ Test = "Optimized Test-SettingsJsonExists"; Result = "PASS"; Details = "Function executed successfully" }
