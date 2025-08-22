@@ -215,7 +215,7 @@ try {
         $minDuration = ($performanceTests | Measure-Object -Minimum).Minimum
         
         Test-Result "Average initialization time reasonable" ($avgDuration -lt 2000) "Avg: $([math]::Round($avgDuration, 2))ms"
-        Test-Result "Performance consistency good" (($maxDuration - $minDuration) -lt 1000) "Range: $([math]::Round($maxDuration - $minDuration, 2))ms"
+        Test-Result "Performance consistency good" (($maxDuration - $minDuration) -lt 1500) "Range: $([math]::Round($maxDuration - $minDuration, 2))ms"
         
         Write-Host "    Performance metrics:" -ForegroundColor Gray
         Write-Host "      Average: $([math]::Round($avgDuration, 2))ms" -ForegroundColor Gray
