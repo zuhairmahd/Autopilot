@@ -159,7 +159,7 @@ function GetGroupIdsByNames()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Making API call for missing items" -LogLevel "Information"
             # Build filter for API call
             $filterConditions = @()
-            $extraParams = 'select=id,displayName'
+            $extraParams = "select=id,displayName&top=999"
             $resourceURI = "groups"
             foreach ($item in $missingItems)
             {
@@ -169,23 +169,27 @@ function GetGroupIdsByNames()
                 {
                     Write-Verbose "[$functionName] Found GUID in missing items: $item"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found GUID in missing items: $item" -LogLevel "Information"
-                    $filterConditions += "id eq '$item'"
+                    # For GUID types, OData filter should NOT quote the GUID
+                    $filterConditions += "id eq $item"
                 }
                 else
                 {
                     Write-Verbose "[$functionName] Found Name in missing items: $item"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found Name in missing items: $item" -LogLevel "Information"
-                    $filterConditions += "displayName eq '$item'"
-                    $backupFilterCondition += "startsWith(displayName,'$item')"
+                    # Escape single quotes in OData string literals by doubling them
+                    $escapedName = $item -replace "'", "''"
+                    $filterConditions += "displayName eq '$escapedName'"
+                    # $filterConditions     += "startsWith(displayName,'$item')"
                 }
             }
             Write-Verbose "[$functionName] Filter conditions count: $($filterConditions.Count)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Filter conditions count: $($filterConditions.Count)" -LogLevel "Information"
             if ($filterConditions.Count -gt 0)
             {
+                # Join conditions with OR to match any of the requested IDs or names
+                $filter = $filterConditions -join ' or '
                 Write-Verbose "[$functionName] Built filter for API call: $filter"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Built filter for API call: $filter" -LogLevel "Information"
-                $filter = $filterConditions -join 'or'
                 $apiResponse = CallGraphAPI -accessToken $AccessToken -ResourcePath $resourceURI -APIVersion 'beta' -method 'get' -Filter $filter -ExtraParameters $extraParams -consistencyLevel
                 Write-Verbose "[$functionName] API response received: $($apiResponse | ConvertTo-Json -Depth $maxJsonDepth)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "API response received: $($apiResponse | ConvertTo-Json -Depth $maxJsonDepth | Out-String)" -LogLevel "Information"
