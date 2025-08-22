@@ -51,7 +51,11 @@ function Get-ApplicationDefaults()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting default values for type: $DefaultType"
+    
+    # Initialize script-level cache if not exists
+    if (-not $script:defaultsCache) {
+        $script:defaultsCache = @{}
+    }
     
     # Use global version if available, otherwise default
     if (-not $Version)
@@ -66,7 +70,14 @@ function Get-ApplicationDefaults()
         }
     }
     
-    Write-Verbose "[$functionName] Using version: $Version"
+    # Create cache key based on parameters
+    $cacheKey = "$DefaultType-$DomainName-$Version"
+    if ($script:defaultsCache.ContainsKey($cacheKey)) {
+        Write-Verbose "[$functionName] Returning cached defaults for: $cacheKey"
+        return $script:defaultsCache[$cacheKey]
+    }
+    
+    Write-Verbose "[$functionName] Getting default values for type: $DefaultType (cache miss: $cacheKey)"
     
     # Define all default structures
     $defaults = @{
@@ -326,32 +337,44 @@ function Get-ApplicationDefaults()
         'Auth'
         {
             Write-Verbose "[$functionName] Returning auth defaults"
-            return $defaults.Auth
+            $result = $defaults.Auth
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Global'
         {
             Write-Verbose "[$functionName] Returning global defaults"
-            return $defaults.Global
+            $result = $defaults.Global
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Domain'
         {
             Write-Verbose "[$functionName] Returning domain template defaults for: $DomainName"
-            return $defaults.Domain
+            $result = $defaults.Domain
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Settings'
         {
             Write-Verbose "[$functionName] Returning complete settings defaults"
-            return $defaults.Settings
+            $result = $defaults.Settings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Overwrite'
         {
             Write-Verbose "[$functionName] Returning overwrite configuration"
-            return $defaults.Overwrite
+            $result = $defaults.Overwrite
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'All'
         {
             Write-Verbose "[$functionName] Returning all defaults"
-            return $defaults
+            $result = $defaults
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         default
         {

@@ -72,12 +72,23 @@ function Test-SettingsJsonExists()
             Write-Verbose "[$functionName] Failed to get defaults from centralized function, creating fallback"
             Write-SafeLog "Failed to get defaults from centralized function, using fallback" "Warning"
             
-            # Fallback minimal structure in case centralized function fails
-            $defaultSettings = @{
-                description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
-                version        = $versionString
-                auth           = Get-ApplicationDefaults -DefaultType "Auth"
-                globalSettings = Get-ApplicationDefaults -DefaultType "Global"
+            # Get all defaults once and extract what we need for fallback
+            $allDefaults = Get-ApplicationDefaults -DefaultType "All" -Version $versionString
+            if ($allDefaults) {
+                $defaultSettings = @{
+                    description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+                    version        = $versionString
+                    auth           = $allDefaults.Auth
+                    globalSettings = $allDefaults.Global
+                }
+            } else {
+                # Ultimate fallback if even All fails
+                $defaultSettings = @{
+                    description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
+                    version        = $versionString
+                    auth           = @{ authType = "PublicAuthFlow"; changePwOnNextStart = $false }
+                    globalSettings = @{ domain = "example.com"; appMode = "full" }
+                }
             }
         }
         

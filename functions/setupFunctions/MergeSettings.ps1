@@ -52,17 +52,76 @@ function MergeSettings()
     
     Write-Verbose "[$functionName] Merging settings with conflict resolution: $ConflictResolution"
     
-    # Flatten local settings
-    Write-Verbose "[$functionName] Flattening local settings"
-    $flatLocalSettings = ConvertFrom-JsonToHashtable -JsonObject $localSettings -Flatten
-    Write-Verbose "[$functionName] Local settings flattened to $($flatLocalSettings.Count) properties"
+    # Function to detect if settings structure requires flattening
+    function Test-RequiresFlattening($object) {
+        if ($object -is [hashtable]) {
+            foreach ($value in $object.Values) {
+                if ($value -is [hashtable] -or $value -is [PSCustomObject]) {
+                    return $true
+                }
+                if ($value -is [array]) {
+                    foreach ($item in $value) {
+                        if ($item -is [hashtable] -or $item -is [PSCustomObject]) {
+                            return $true
+                        }
+                    }
+                }
+            }
+        } elseif ($object -is [PSCustomObject]) {
+            foreach ($property in $object.PSObject.Properties) {
+                $value = $property.Value
+                if ($value -is [hashtable] -or $value -is [PSCustomObject]) {
+                    return $true
+                }
+                if ($value -is [array]) {
+                    foreach ($item in $value) {
+                        if ($item -is [hashtable] -or $item -is [PSCustomObject]) {
+                            return $true
+                        }
+                    }
+                }
+            }
+        }
+        return $false
+    }
     
-    # Flatten global settings
-    Write-Verbose "[$functionName] Flattening global settings"
-    $flatGlobalSettings = ConvertFrom-JsonToHashtable -JsonObject $globalSettings -Flatten
-    Write-Verbose "[$functionName] Global settings flattened to $($flatGlobalSettings.Count) properties"
+    # Check if flattening is needed for either structure
+    $localNeedsFlattening = Test-RequiresFlattening $localSettings
+    $globalNeedsFlattening = Test-RequiresFlattening $globalSettings
+    $requiresFlattening = $localNeedsFlattening -or $globalNeedsFlattening
     
-    # Normalize all keys to simple format (remove any prefixes)
+    Write-Verbose "[$functionName] Local settings complexity check: $(if($localNeedsFlattening){'Complex - requires flattening'}else{'Simple - direct merge possible'})"
+    Write-Verbose "[$functionName] Global settings complexity check: $(if($globalNeedsFlattening){'Complex - requires flattening'}else{'Simple - direct merge possible'})"
+    
+    if ($requiresFlattening) {
+        Write-Verbose "[$functionName] Complex structures detected, using flattening approach"
+        
+        # Flatten local settings
+        Write-Verbose "[$functionName] Flattening local settings"
+        $flatLocalSettings = ConvertFrom-JsonToHashtable -JsonObject $localSettings -Flatten
+        Write-Verbose "[$functionName] Local settings flattened to $($flatLocalSettings.Count) properties"
+        
+        # Flatten global settings
+        Write-Verbose "[$functionName] Flattening global settings"
+        $flatGlobalSettings = ConvertFrom-JsonToHashtable -JsonObject $globalSettings -Flatten
+        Write-Verbose "[$functionName] Global settings flattened to $($flatGlobalSettings.Count) properties"
+        
+        $processLocal = $flatLocalSettings
+        $processGlobal = $flatGlobalSettings
+        $needsKeyNormalization = $true
+    } else {
+        Write-Verbose "[$functionName] Simple structures detected, using optimized direct merge"
+        
+        # Convert to hashtables without flattening
+        $processLocal = ConvertFrom-JsonToHashtable -JsonObject $localSettings
+        $processGlobal = ConvertFrom-JsonToHashtable -JsonObject $globalSettings
+        $needsKeyNormalization = $false
+        
+        Write-Verbose "[$functionName] Local settings converted to $($processLocal.Count) properties"
+        Write-Verbose "[$functionName] Global settings converted to $($processGlobal.Count) properties"
+    }
+    
+    # Normalize all keys to simple format (remove any prefixes) - only if flattening was used
     function Get-SimpleKey($key)
     {
         if ($key.Contains('.'))
@@ -72,32 +131,44 @@ function MergeSettings()
         return $key
     }
     
-    # Create normalized hashtables with simple keys
-    $normalizedLocal = @{}
-    foreach ($key in $flatLocalSettings.Keys)
-    {
-        $simpleKey = Get-SimpleKey $key
-        $normalizedLocal[$simpleKey] = $flatLocalSettings[$key]
-        Write-Verbose "[$functionName] Normalized local key: $key -> $simpleKey"
-    }
-    
-    $normalizedGlobal = @{}
-    foreach ($key in $flatGlobalSettings.Keys)
-    {
-        $simpleKey = Get-SimpleKey $key
-        $normalizedGlobal[$simpleKey] = $flatGlobalSettings[$key]
-        Write-Verbose "[$functionName] Normalized global key: $key -> $simpleKey"
+    # Conditional key normalization and merging based on complexity
+    if ($needsKeyNormalization) {
+        Write-Verbose "[$functionName] Normalizing flattened keys"
+        
+        # Create normalized hashtables with simple keys
+        $normalizedLocal = @{}
+        foreach ($key in $processLocal.Keys)
+        {
+            $simpleKey = Get-SimpleKey $key
+            $normalizedLocal[$simpleKey] = $processLocal[$key]
+            Write-Verbose "[$functionName] Normalized local key: $key -> $simpleKey"
+        }
+        
+        $normalizedGlobal = @{}
+        foreach ($key in $processGlobal.Keys)
+        {
+            $simpleKey = Get-SimpleKey $key
+            $normalizedGlobal[$simpleKey] = $processGlobal[$key]
+            Write-Verbose "[$functionName] Normalized global key: $key -> $simpleKey"
+        }
+        
+        $finalLocal = $normalizedLocal
+        $finalGlobal = $normalizedGlobal
+    } else {
+        Write-Verbose "[$functionName] Using direct keys (no normalization needed)"
+        $finalLocal = $processLocal
+        $finalGlobal = $processGlobal
     }
     
     # Start with local settings
-    foreach ($key in $normalizedLocal.Keys)
+    foreach ($key in $finalLocal.Keys)
     {
-        $merged[$key] = $normalizedLocal[$key]
+        $merged[$key] = $finalLocal[$key]
         Write-Verbose "[$functionName] Added local setting: $key"
     }
     
     # Merge global settings
-    foreach ($key in $normalizedGlobal.Keys)
+    foreach ($key in $finalGlobal.Keys)
     {
         if ($merged.ContainsKey($key))
         {
@@ -105,12 +176,12 @@ function MergeSettings()
             
             # If both are arrays, merge arrays
             if ($merged[$key] -is [System.Collections.IEnumerable] -and
-                $normalizedGlobal[$key] -is [System.Collections.IEnumerable] -and
+                $finalGlobal[$key] -is [System.Collections.IEnumerable] -and
                 ($merged[$key] -isnot [string]) -and
-                ($normalizedGlobal[$key] -isnot [string]))
+                ($finalGlobal[$key] -isnot [string]))
             {
                 Write-Verbose "[$functionName] Both values are arrays, merging arrays for: $key"
-                $merged[$key] = @($merged[$key] + $normalizedGlobal[$key])
+                $merged[$key] = @($merged[$key] + $finalGlobal[$key])
             }
             else
             {
@@ -118,7 +189,7 @@ function MergeSettings()
                 if ($ConflictResolution -eq 'Global')
                 {
                     Write-Verbose "[$functionName] Resolving conflict by using global value for: $key"
-                    $merged[$key] = $normalizedGlobal[$key]
+                    $merged[$key] = $finalGlobal[$key]
                 }
                 else
                 {
@@ -129,7 +200,7 @@ function MergeSettings()
         }
         else
         {
-            $merged[$key] = $normalizedGlobal[$key]
+            $merged[$key] = $finalGlobal[$key]
             Write-Verbose "[$functionName] Added global setting: $key"
         }
     }
