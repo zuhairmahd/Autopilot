@@ -1165,7 +1165,7 @@ function Get-ArrayInput()
             {
                 Write-Verbose "[$functionName] User chose to keep current values unchanged"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
-                return $CurrentValue
+                return ,$CurrentValue
             }
         }
     }
@@ -1192,7 +1192,7 @@ function Get-ArrayInput()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current array values" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] User cancelled input, keeping current array values"
-                return $CurrentValue
+                return ,$CurrentValue
             }
             
             $newValues += $input
@@ -1250,7 +1250,9 @@ function Get-ArrayInput()
     
     Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values. Array type verified: $($result -is [array])" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning array with $($result.Count) values. Array type verified: $($result -is [array])"
-    return $result
+    
+    # Use comma operator to preserve array type, preventing PowerShell from unwrapping single-element arrays
+    return ,$result
 }
 
 function Get-NumberInput()
