@@ -101,11 +101,12 @@ function VerifyGroupMembership()
             Write-Log -logFile $logFile -module $functionName -Message "Checking membership in $($groupsToInclude.Count) required groups for user $userName"
             $includedGroupMembership = getGroupMembership -accessToken $accessToken -userName $userName -Groups $groupsToInclude
             Write-Verbose "[$functionName] Number of included groups: $($includedGroupMembership.Count)"
-            write-log -logFile $logFile -module $functionName -message "Number of included groups: $($includedGroupMembership.Count)"
+            Write-Log -logFile $logFile -module $functionName -Message "Number of included groups: $($includedGroupMembership.Count)"
             Write-Verbose "[$functionName] Included group membership: $($includedGroupMembership -join ', ')"
-            write-log -logFile $logFile -module $functionName -message "Included group membership: $($includedGroupMembership -join ', ')"
+            Write-Log -logFile $logFile -module $functionName -Message "Included group membership: $($includedGroupMembership -join ', ')"
             # Determine missing required groups
             $missingGroups = $groupsToInclude | Where-Object { $includedGroupMembership -notcontains $_ }
+            $result.MissingGroups = $missingGroups
             if ($missingGroups.Count -gt 0)
             {
                 Write-Verbose "[$functionName] User $userName is missing membership in the following required groups: $($missingGroups -join ', ')"
@@ -118,11 +119,11 @@ function VerifyGroupMembership()
             Write-Log -logFile $logFile -module $functionName -Message "Checking membership in $($groupsToExclude.Count) excluded groups for user $userName"
             $excludedGroupMembership = getGroupMembership -accessToken $accessToken -userName $userName -Groups $groupsToExclude
             Write-Verbose "[$functionName] Number of excluded groups: $($excludedGroupMembership.Count)"
-            write-log -logFile $logFile -module $functionName -message "Number of excluded groups: $($excludedGroupMembership.Count)"
+            Write-Log -logFile $logFile -module $functionName -Message "Number of excluded groups: $($excludedGroupMembership.Count)"
             Write-Verbose "[$functionName] Excluded group membership: $($excludedGroupMembership -join ', ')"
-            write-log -logFile $logFile -module $functionName -message "Excluded group membership: $($excludedGroupMembership -join ', ')"
+            Write-Log -logFile $logFile -module $functionName -Message "Excluded group membership: $($excludedGroupMembership -join ', ')"
             # Determine forbidden groups
-            $forbiddenGroups = $excludedGroupMembership | Where-Object { $groups -contains $_ }
+            $result.ForbiddenGroups = $excludedGroupMembership 
             if ($forbiddenGroups.Count -gt 0)
             {
                 Write-Verbose "[$functionName] User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')"
@@ -134,8 +135,8 @@ function VerifyGroupMembership()
     {
         Write-Verbose "[$functionName] Error getting group membership: $_"
         Write-Log -logFile $logFile -module $functionName -Message "Error getting group membership: $_" -logLevel "Error"
-        Write-Host "Error getting group membership: $_" -ForegroundColor Red
-        return $null
+        $result.Error = "Error getting group membership: $_"
+        return $result
     }
     #endregion
     

@@ -2,6 +2,7 @@ function getGroupMembership()
 {
     [cmdletBinding()]
     param(
+        [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         [string]$userName,
@@ -26,12 +27,6 @@ function getGroupMembership()
         return $null
     }
     # Validate input
-    if (-not $GroupIds -or $GroupIds.Count -eq 0)
-    {
-        Write-Error "GroupIds are required."
-        Write-Log -logFile $logFile -module $functionName -Message "GroupIds are required." -logLevel "error"
-        return $null
-    # Validate input
     if (-not $groups -or $groups.Count -eq 0)
     {
         Write-Error "Groups are required."
@@ -53,7 +48,6 @@ function getGroupMembership()
         Write-Warning "[$functionName] Some group names could not be resolved to IDs."
         Write-Log -logFile $logFile -module $functionName -Message "Some group names could not be resolved to IDs." -logLevel "warning"
     }
-    
     #build a json object with the group ids
     $body = @{
         groupIds = $GroupIds
@@ -72,3 +66,4 @@ function getGroupMembership()
     Write-Log -logFile $logFile -module $functionName -Message "Resolved group IDs to names: $($groupNames -join ', ')"
     return $groupNames
 }
+
