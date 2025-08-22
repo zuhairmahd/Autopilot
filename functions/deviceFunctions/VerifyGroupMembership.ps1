@@ -43,13 +43,11 @@ function VerifyGroupMembership()
     Write-Verbose "[$functionName] Groups to include count: $(if ($groupsToInclude) { $groupsToInclude.Count } else { 0 })"
     Write-Log -logFile $logFile -module $functionName -Message "Groups to include count: $(if ($groupsToInclude) { $groupsToInclude.Count } else { 0 })" 
     Write-Verbose "[$functionName] Groups to exclude count: $(if ($groupsToExclude) { $groupsToExclude.Count } else { 0 })"
-    
     if ($groupsToInclude)
     {
         Write-Verbose "[$functionName] Groups to include: $($groupsToInclude -join ', ')"
         Write-Log -logFile $logFile -module $functionName -Message "Groups to include: $($groupsToInclude -join ', ')"
     }
-    
     if ($groupsToExclude)
     {
         Write-Verbose "[$functionName] Groups to exclude: $($groupsToExclude -join ', ')"
@@ -97,123 +95,48 @@ function VerifyGroupMembership()
     try
     {
         Write-Host "Getting group membership for user $userName ($($user.displayName))."
-        $groupUri = "users/$($userName)/memberOf/microsoft.graph.group"
-        $groupSelection = "select=displayName&top=999&orderby=displayName"
-        $response = CallGraphAPI -accessToken $accessToken -ResourcePath $groupUri -extraparameters $groupSelection
-        Write-Verbose "[$functionName] Got group membership: $($response | ConvertTo-Json -Depth 3)"
-        Write-Log -logFile $logFile -module $functionName -Message "Got group membership: $($response | ConvertTo-Json -Depth $maxJsonDepth)"
-        if ($response -is [string] -and $response -match '^\d+$')
+        if ($groupsToInclude.count -gt 0)
         {
-            Write-Verbose "[$functionName] Failed to get group membership (Error code: $response)"
-            Write-Log -logFile $logFile -module $functionName -Message "Failed to get group membership (Error code: $response)" -logLevel "Error"
-            Write-Host "The group membership for $userName could not be determined." -ForegroundColor Red
-            Write-Host "Please try again or contact an Intune administrator." -ForegroundColor Red
-            $result.Error = "Failed to get group membership (Error code: $response)"
-            return $result
+            Write-Verbose "[$functionName] Checking membership in $($groupsToInclude.Count) required groups for user $userName"
+            Write-Log -logFile $logFile -module $functionName -Message "Checking membership in $($groupsToInclude.Count) required groups for user $userName"
+            $includedGroupMembership = getGroupMembership -accessToken $accessToken -userName $userName -Groups $groupsToInclude
+            Write-Verbose "[$functionName] Number of included groups: $($includedGroupMembership.Count)"
+            Write-Log -logFile $logFile -module $functionName -Message "Number of included groups: $($includedGroupMembership.Count)"
+            Write-Verbose "[$functionName] Included group membership: $($includedGroupMembership -join ', ')"
+            Write-Log -logFile $logFile -module $functionName -Message "Included group membership: $($includedGroupMembership -join ', ')"
+            # Determine missing required groups
+            $missingGroups = $groupsToInclude | Where-Object { $includedGroupMembership -notcontains $_ }
+            $result.MissingGroups = $missingGroups
+            if ($missingGroups.Count -gt 0)
+            {
+                Write-Verbose "[$functionName] User $userName is missing membership in the following required groups: $($missingGroups -join ', ')"
+                Write-Log -logFile $logFile -module $functionName -Message "User $userName is missing membership in the following required groups: $($missingGroups -join ', ')" -logLevel "Warning"
+            }
         }
-        $groups = $response.value | Select-Object -ExpandProperty displayName | Sort-Object
-        $result.UserGroups = $groups
-        Write-Verbose "[$functionName] User $userName is a member of $($groups.Count) groups"
-        Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of $($groups.Count) groups"
-        Write-Host "User $userName is a member of $($groups.Count) groups."
-        Write-Verbose "[$functionName] Groups: $($groups -join ', ')"
+        if ($groupsToExclude.count -gt 0)
+        {
+            Write-Verbose "[$functionName] Checking membership in $($groupsToExclude.Count) excluded groups for user $userName"
+            Write-Log -logFile $logFile -module $functionName -Message "Checking membership in $($groupsToExclude.Count) excluded groups for user $userName"
+            $excludedGroupMembership = getGroupMembership -accessToken $accessToken -userName $userName -Groups $groupsToExclude
+            Write-Verbose "[$functionName] Number of excluded groups: $($excludedGroupMembership.Count)"
+            Write-Log -logFile $logFile -module $functionName -Message "Number of excluded groups: $($excludedGroupMembership.Count)"
+            Write-Verbose "[$functionName] Excluded group membership: $($excludedGroupMembership -join ', ')"
+            Write-Log -logFile $logFile -module $functionName -Message "Excluded group membership: $($excludedGroupMembership -join ', ')"
+            # Determine forbidden groups
+            $result.ForbiddenGroups = $excludedGroupMembership 
+            if ($forbiddenGroups.Count -gt 0)
+            {
+                Write-Verbose "[$functionName] User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')"
+                Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')" -logLevel "Warning"
+            }
+        }
     }
     catch
     {
         Write-Verbose "[$functionName] Error getting group membership: $_"
         Write-Log -logFile $logFile -module $functionName -Message "Error getting group membership: $_" -logLevel "Error"
-        Write-Host "Error getting group membership: $_" -ForegroundColor Red
         $result.Error = "Error getting group membership: $_"
         return $result
-    }
-    #endregion
-    
-    #region Check include group membership
-    Write-Verbose "[$functionName] Checking user $userName is in $($groupsToInclude.Count) included groups"
-    Write-Log -logFile $logFile -module $functionName -Message "Checking user $userName is in $($groupsToInclude.Count) included groups"
-    $missingGroups = @()
-    if ($null -eq $groupsToInclude -or $groupsToInclude.Count -eq 0)
-    {
-        Write-Verbose "[$functionName] No groups to include were specified. Skipping this check."
-        Write-Log -logFile $logFile -module $functionName -Message "No groups to include were specified. Skipping this check."
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Checking memberships for user $userName in $($groupsToInclude.Count) required groups"
-        Write-Log -logFile $logFile -module $functionName -Message "Checking memberships for user $userName in $($groupsToInclude.Count) required groups"
-        foreach ($group in $groupsToInclude)
-        {
-            Write-Verbose "[$functionName] Checking membership in required group: $group"
-            Write-Log -logFile $logFile -module $functionName -Message "Checking membership in required group: $group" -logLevel "Verbose"
-            if ($groups -notcontains $group)
-            {
-                Write-Verbose "[$functionName] User $userName is NOT a member of the required group: $group"
-                $missingGroups += $group
-            }
-            else
-            {
-                Write-Verbose "[$functionName] User $userName is a member of the required group: $group"
-                Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the required group: $group"
-            }
-        }
-        $result.MissingGroups = $missingGroups
-        Write-Verbose "[$functionName] Missing membership group count: $($missingGroups.Count)"
-        Write-Log -logFile $logFile -module $functionName -Message "Missing membership group count: $($missingGroups.Count)"
-        if ($missingGroups.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] User $userName is missing membership in $($missingGroups.Count) required groups: $($missingGroups -join ', ')"
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName is missing membership in $($missingGroups.Count) required groups: $($missingGroups -join ', ')" -logLevel "Warning"
-        }
-        else
-        {
-            Write-Verbose "[$functionName] User $userName is a member of all required groups"
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of all required groups"
-        }
-    }
-    #endregion
-    
-    #region Check exclude group membership
-    Write-Verbose "[$functionName] Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
-    Write-Log -logFile $logFile -module $functionName -Message "Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
-    $forbiddenGroups = @()
-    if ($null -eq $groupsToExclude -or $groupsToExclude.Count -eq 0)
-    {
-        Write-Verbose "[$functionName] No groups to exclude were specified. Skipping this check."
-        Write-Log -logFile $logFile -module $functionName -Message "No groups to exclude were specified. Skipping this check."
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
-        Write-Log -logFile $logFile -module $functionName -Message "Checking user $userName isn't in $($groupsToExclude.Count) excluded groups"
-        foreach ($group in $groupsToExclude)
-        {
-            Write-Verbose "[$functionName] Checking membership in excluded group: $group"
-            Write-Log -logFile $logFile -module $functionName -Message "Checking membership in excluded group: $group" -logLevel "Verbose"
-            if ($groups -contains $group)
-            {
-                Write-Verbose "[$functionName] User $userName is a member of the excluded group: $group (should not be)"
-                Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the excluded group: $group (should not be)"
-                $forbiddenGroups += $group
-            }
-            else
-            {
-                Write-Verbose "[$functionName] User $userName is not a member of the excluded group: $group (correct)"
-                Write-Log -logFile $logFile -module $functionName -Message "User $userName is not a member of the excluded group: $group (correct)"
-            }
-        }
-        $result.ForbiddenGroups = $forbiddenGroups
-        Write-Verbose "[$functionName] Forbidden group count: $($forbiddenGroups.Count)"
-        Write-Log -logFile $logFile -module $functionName -Message "Forbidden group count: $($forbiddenGroups.Count)"
-        if ($forbiddenGroups.Count -gt 0)
-        {
-            Write-Verbose "[$functionName] User $userName is a member of $($forbiddenGroups.Count) excluded groups: $($forbiddenGroups -join ', ')"
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of $($forbiddenGroups.Count) excluded groups: $($forbiddenGroups -join ', ')" -Level "Warning"
-        }
-        else
-        {
-            Write-Verbose "[$functionName] User $userName is not a member of any excluded groups"
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName is not a member of any excluded groups"
-        }
     }
     #endregion
     
