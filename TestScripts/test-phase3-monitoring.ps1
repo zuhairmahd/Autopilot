@@ -38,6 +38,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Import Write-Log function for logging support
+try {
+    . "$PSScriptRoot/../functions/utilityFunctions/Write-Log.ps1"
+} catch {
+    Write-Warning "Could not load Write-Log function: $($_.Exception.Message)"
+}
+
+# Set up temporary log file for functions that require it
+$tempPath = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { "/tmp" }
+$global:logFile = Join-Path $tempPath "monitoring-test-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+
 Write-Host "=== Phase 3 Performance Monitoring Framework ===" -ForegroundColor Yellow
 Write-Host "Mode: $MonitoringMode | Output: $OutputFormat" -ForegroundColor Gray
 Write-Host "Started: $(Get-Date)" -ForegroundColor Gray
@@ -118,6 +129,7 @@ function Test-PerformanceBaseline {
         . "$PSScriptRoot/../functions/setupFunctions/Get-ApplicationDefaults.ps1"
         . "$PSScriptRoot/../functions/setupFunctions/MergeSettings.ps1"
         . "$PSScriptRoot/../functions/setupFunctions/Get-DomainConfigurationFromFiles.ps1"
+        . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
     } catch {
         Write-Warning "Could not import all functions: $($_.Exception.Message)"
     }
@@ -148,8 +160,9 @@ function Test-PerformanceBaseline {
     # Test 3: Domain Configuration Performance
     Write-Host "  Measuring domain configuration..." -ForegroundColor Gray
     $domainTest = Measure-OptimizationImpact -TestName "Get-DomainConfigurationFromFiles" -TestScript {
-        $normal = Get-DomainConfigurationFromFiles -DomainName "baseline.test.com" -GlobalSettings @{test="value"} -ConfigurationPath $env:TEMP
-        $lazy = Get-DomainConfigurationFromFiles -DomainName "baseline.test.com" -GlobalSettings @{test="value"} -ConfigurationPath $env:TEMP -LazyLoad
+        $tempPath = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { "/tmp" }
+        $normal = Get-DomainConfigurationFromFiles -DomainName "baseline.test.com" -GlobalSettings @{test="value"} -ConfigurationPath $tempPath
+        $lazy = Get-DomainConfigurationFromFiles -DomainName "baseline.test.com" -GlobalSettings @{test="value"} -ConfigurationPath $tempPath -LazyLoad
         return @($normal, $lazy)
     }
     $baselineTests += $domainTest
@@ -160,7 +173,8 @@ function Test-PerformanceBaseline {
         # Simulate key startup operations
         $defaults = Get-ApplicationDefaults -DefaultType "Settings" -Version "startup.sim.1.0"
         $merge = MergeSettings -localSettings @{mode="test"} -globalSettings $defaults
-        $domain = Get-DomainConfigurationFromFiles -DomainName "startup.test.com" -GlobalSettings $merge -ConfigurationPath $env:TEMP -LazyLoad
+        $tempPath = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { "/tmp" }
+        $domain = Get-DomainConfigurationFromFiles -DomainName "startup.test.com" -GlobalSettings $merge -ConfigurationPath $tempPath -LazyLoad
         return @($defaults, $merge, $domain)
     }
     $baselineTests += $startupTest
@@ -177,6 +191,7 @@ function Test-OptimizationValidation {
     try {
         . "$PSScriptRoot/../functions/setupFunctions/Get-ApplicationDefaults.ps1"
         . "$PSScriptRoot/../functions/setupFunctions/MergeSettings.ps1"
+        . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
     } catch {
         Write-Warning "Could not import all functions: $($_.Exception.Message)"
     }
