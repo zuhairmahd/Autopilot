@@ -239,7 +239,9 @@ function Show-GroupsEditor()
                             }
                             Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
                         }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name)
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentIncludeGroups)
@@ -319,7 +321,9 @@ function Show-GroupsEditor()
                             }
                             Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
                         }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name)
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentExcludeGroups)
@@ -398,7 +402,9 @@ function Show-GroupsEditor()
                             }
                             Write-Host "  Total: $($currentIncludeGroups.Count) group(s) [Legacy Format]" -ForegroundColor Yellow
                         }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name)
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentIncludeGroups)
@@ -444,7 +450,9 @@ function Show-GroupsEditor()
                             }
                             Write-Host "  Total: $($currentExcludeGroups.Count) group(s) [Legacy Format]" -ForegroundColor Yellow
                         }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name)
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentExcludeGroups)
@@ -533,7 +541,9 @@ function Get-GroupArrayInput()
         {
             $currentFormat = "StringArray"
         }
-        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name -and $firstElement.id)
+        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name') -and $firstElement.ContainsKey('id')) -or 
+                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name') -and ($firstElement.PSObject.Properties.Name -contains 'id'))))
         {
             $currentFormat = "HashTableArray"
         }
