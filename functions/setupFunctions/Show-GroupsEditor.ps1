@@ -882,7 +882,7 @@ function Update-DomainGroupSetting()
             $verifyConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             if ($verifyConfig)
             {
-                $actualGroups = if ($GroupType -eq 'groupsToInclude')
+                $rawActualGroups = if ($GroupType -eq 'groupsToInclude')
                 {
                     $verifyConfig.groupsToInclude 
                 }
@@ -891,9 +891,28 @@ function Update-DomainGroupSetting()
                     $verifyConfig.groupsToExclude 
                 }
                 
+                # Ensure actualGroups is always an array for consistent comparison
+                # This handles the JSON serialization issue where single items become individual objects
+                $actualGroups = if ($null -eq $rawActualGroups)
+                {
+                    @()
+                }
+                elseif ($rawActualGroups -is [array])
+                {
+                    $rawActualGroups
+                }
+                else
+                {
+                    # Single item was deserialized as individual object - wrap in array
+                    @($rawActualGroups)
+                }
+                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups"
+                
                 # Handle different comparison strategies based on content type
                 $comparisonResult = $null
-                if ($groupsArray.Count -eq 0 -and ($null -eq $actualGroups -or $actualGroups.Count -eq 0))
+                if ($groupsArray.Count -eq 0 -and $actualGroups.Count -eq 0)
                 {
                     # Both are empty - verification successful
                     $comparisonResult = $null
@@ -901,7 +920,7 @@ function Update-DomainGroupSetting()
                 elseif ($groupsArray.Count -ne $actualGroups.Count)
                 {
                     # Different counts - verification failed
-                    $comparisonResult = @("Count mismatch")
+                    $comparisonResult = @("Count mismatch: saved $($groupsArray.Count), loaded $($actualGroups.Count)")
                 }
                 else
                 {
@@ -914,9 +933,13 @@ function Update-DomainGroupSetting()
                             $saved = $groupsArray[$i]
                             $loaded = $actualGroups[$i]
                             
-                            if (($saved.name -ne $loaded.name) -or ($saved.id -ne $loaded.id))
+                            # Handle case where loaded item might be PSCustomObject instead of hashtable
+                            $loadedName = if ($loaded -is [hashtable]) { $loaded.name } else { $loaded.name }
+                            $loadedId = if ($loaded -is [hashtable]) { $loaded.id } else { $loaded.id }
+                            
+                            if (($saved.name -ne $loadedName) -or ($saved.id -ne $loadedId))
                             {
-                                $comparisonResult = @("Hashtable content mismatch at index $i")
+                                $comparisonResult = @("Hashtable content mismatch at index $i`: saved($($saved.name),$($saved.id)) vs loaded($loadedName,$loadedId)")
                                 break
                             }
                         }
@@ -936,7 +959,8 @@ function Update-DomainGroupSetting()
                 }
                 else
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType. Saved: $($groupsArray.Count) items, Loaded: $($actualGroups.Count) items" -LogLevel "Warning"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType. Details: $($comparisonResult -join ', ')" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $($groupsArray.Count) items, Loaded: $($actualGroups.Count) items"
                     Write-Verbose "[$functionName] Verification failed for $GroupType. Comparison result: $($comparisonResult -join ', ')"
                     Write-Warning "[$functionName] Verification failed for $GroupType"
                     return $false
