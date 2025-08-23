@@ -157,8 +157,8 @@ function Show-GroupsEditor()
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
-        # Get current group settings with safe defaults
-        $currentIncludeGroups = if ($domainConfig.groupsToInclude -and $domainConfig.groupsToInclude.Count -gt 0) 
+        # Get current group settings - preserve arrays even if empty
+        $currentIncludeGroups = if ($null -ne $domainConfig.groupsToInclude) 
         { 
             $domainConfig.groupsToInclude 
         } 
@@ -167,7 +167,7 @@ function Show-GroupsEditor()
             @() 
         }
         
-        $currentExcludeGroups = if ($domainConfig.groupsToExclude -and $domainConfig.groupsToExclude.Count -gt 0) 
+        $currentExcludeGroups = if ($null -ne $domainConfig.groupsToExclude) 
         { 
             $domainConfig.groupsToExclude 
         } 
