@@ -42,6 +42,7 @@ function Show-GroupsEditor()
     param(
         [string]$SettingsFile = "settings.json",
         [string]$DomainName,
+        [string]$AccessToken,
         [switch]$Silent
     )
     
@@ -271,16 +272,8 @@ function Show-GroupsEditor()
                     $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
                     if ($choice -eq 'y' -or $choice -eq 'Y')
                     {
-                        # Try to get access token for group ID resolution
-                        $currentAccessToken = $null
-                        try
-                        {
-                            # Attempt to get access token from calling scope
-                            $currentAccessToken = Get-Variable -Name "accessToken" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
-                        }
-                        catch { }
                         
-                        $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include" -AccessToken $currentAccessToken
+                        $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include" -AccessToken $AccessToken
                         if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
                         {
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to include changed" -LogLevel "Information"
@@ -359,16 +352,7 @@ function Show-GroupsEditor()
                     $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
                     if ($choice -eq 'y' -or $choice -eq 'Y')
                     {
-                        # Try to get access token for group ID resolution
-                        $currentAccessToken = $null
-                        try
-                        {
-                            # Attempt to get access token from calling scope
-                            $currentAccessToken = Get-Variable -Name "accessToken" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
-                        }
-                        catch { }
-                        
-                        $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude" -AccessToken $currentAccessToken
+                        $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude" -AccessToken $AccessToken
                         if ($null -ne $updatedExcludeGroups -and (Compare-ArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups))
                         {
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to exclude changed" -LogLevel "Information"
@@ -545,13 +529,16 @@ function Get-GroupArrayInput()
     if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
     {
         $firstElement = $CurrentGroups[0]
-        if ($firstElement -is [string]) {
+        if ($firstElement -is [string])
+        {
             $currentFormat = "StringArray"
         }
-        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name -and $firstElement.id) {
+        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name -and $firstElement.id)
+        {
             $currentFormat = "HashTableArray"
         }
-        else {
+        else
+        {
             $currentFormat = "Unknown"
         }
     }
@@ -704,7 +691,7 @@ function Get-GroupArrayInput()
             {
                 $combinedGroups += @{
                     name = $groupName
-                    id = $null  # Will be resolved when VerifyGroupMembership is called
+                    id   = $null  # Will be resolved when VerifyGroupMembership is called
                 }
             }
         }
@@ -946,7 +933,7 @@ function Resolve-SingleGroupInteractive()
         Write-Host "  No access token available - saving group without ID resolution" -ForegroundColor Yellow
         return @{
             name = $GroupName
-            id = $null
+            id   = $null
         }
     }
     
@@ -965,7 +952,7 @@ function Resolve-SingleGroupInteractive()
                 Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
                 return @{
                     name = $group.displayName
-                    id = $group.id
+                    id   = $group.id
                 }
             }
             else
@@ -995,7 +982,7 @@ function Resolve-SingleGroupInteractive()
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
                         return @{
                             name = $selectedGroup.displayName
-                            id = $selectedGroup.id
+                            id   = $selectedGroup.id
                         }
                     }
                     Write-Host "  Invalid choice. Please enter a number between 0 and $($result.value.Count)." -ForegroundColor Red
@@ -1050,7 +1037,7 @@ function Resolve-SingleGroupInteractive()
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected similar group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
                         return @{
                             name = $selectedGroup.displayName
-                            id = $selectedGroup.id
+                            id   = $selectedGroup.id
                         }
                     }
                     Write-Host "  Invalid choice. Please enter 0, 00, or a number between 1 and $($similarResult.value.Count)." -ForegroundColor Red
@@ -1090,7 +1077,7 @@ function Resolve-SingleGroupInteractive()
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to save group without ID: '$GroupName'" -LogLevel "Verbose"
                             return @{
                                 name = $GroupName
-                                id = $null
+                                id   = $null
                             }
                         }
                         '3'
@@ -1121,7 +1108,7 @@ function Resolve-SingleGroupInteractive()
         {
             return @{
                 name = $GroupName
-                id = $null
+                id   = $null
             }
         }
         else
