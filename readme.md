@@ -417,27 +417,34 @@ The application includes comprehensive tools for managing various configuration 
 #### Groups Settings Viewer
 **Navigation Path**: Main Menu → Change application settings → Change global environment settings → View group inclusion/exclusion settings
 
-**Purpose**: Display current group inclusion and exclusion settings for all domains or a specific domain.
+**Purpose**: Display current group inclusion and exclusion settings for all domains or a specific domain with format detection.
 
-**Features**:
-- Read-only display of group filtering configuration
-- Support for all domains or specific domain viewing
-- Clear formatting with descriptions and summaries
-- Group count statistics and overview
-- Consistent with other settings viewers
+**Enhanced Features**:
+- **Format-Aware Display**: Automatically detects and displays legacy vs enhanced format
+- **Rich Information**: Shows both group names and IDs when available
+- **Format Indicators**: Clear visual indicators for format type
+- **Read-only display** of group filtering configuration
+- **Support for all domains** or specific domain viewing
+- **Clear formatting** with descriptions and summaries
+- **Group count statistics** and overview
+- **Consistent with other settings viewers**
 
-**Display Format**:
+**Display Format (Enhanced)**:
 ```
 ══ Groups Settings Viewer ══
 Domain: example.com
 
 Groups to Include:
   Description: Groups in this list will be specifically included in operations
-  Current Value: [4 group(s)]
-    - security-group-1
-    - enrollment-group-prod
-    - license-group-office365
-    - department-group-it
+  Current Value: [4 group(s)] [Enhanced Format]
+    - Name: security-group-1
+      ID:   12345678-1234-1234-1234-123456789abc
+    - Name: enrollment-group-prod
+      ID:   87654321-4321-4321-4321-abcdef123456
+    - Name: license-group-office365
+      ID:   11111111-1111-1111-1111-111111111111
+    - Name: department-group-it
+      ID:   22222222-2222-2222-2222-222222222222
 
 Groups to Exclude:
   Description: Groups in this list will be specifically excluded from operations
@@ -449,51 +456,112 @@ Summary:
   Total groups to exclude: 0
 ```
 
+**Display Format (Legacy)**:
+```
+══ Groups Settings Viewer ══
+Domain: example.com
+
+Groups to Include:
+  Description: Groups in this list will be specifically included in operations
+  Current Value: [2 group(s)] [Legacy Format]
+    - security-group-1
+    - enrollment-group-prod
+
+Groups to Exclude:
+  Description: Groups in this list will be specifically excluded from operations
+  Current Value: [1 group(s)] [Legacy Format]
+    - excluded-group-1
+
+Summary:
+  Domains displayed: 1
+  Total groups to include: 2
+  Total groups to exclude: 1
+```
+
 #### Groups Settings Editor
 **Navigation Path**: Main Menu → Change application settings → Change global environment settings → Edit group inclusion/exclusion settings
 
-**Purpose**: Interactive editor for domain-level group inclusion and exclusion settings.
+**Purpose**: Interactive editor for domain-level group inclusion and exclusion settings with automatic group ID resolution.
 
-**Features**:
-- Interactive group array editing with user-friendly prompts
-- Automatic domain selection for multi-domain environments
-- Safe group list modification with validation
-- Automatic timestamped backup creation
-- Post-update verification and confirmation
-- Change detection (only saves if modifications made)
+**Enhanced Features**:
+- **Smart Format Detection**: Automatically detects legacy string arrays vs enhanced hashtable format
+- **Real-Time ID Resolution**: Resolves group names to IDs during editing when possible
+- **Format Migration**: Automatically upgrades legacy configurations to enhanced format
+- **Rich Display**: Shows both group names and IDs with format indicators
+- **Interactive group array editing** with user-friendly prompts
+- **Automatic domain selection** for multi-domain environments
+- **Safe group list modification** with validation
+- **Automatic timestamped backup creation**
+- **Post-update verification and confirmation**
+- **Change detection** (only saves if modifications made)
 
 **Usage Workflow**:
 1. **Domain Selection**: Automatically selects domain or prompts user choice
-2. **Current Settings Display**: Shows existing groups to include/exclude
+2. **Current Settings Display**: Shows existing groups with format indicators:
+   - **[Enhanced Format]**: Groups with both names and IDs
+   - **[Legacy Format]**: Groups with names only (will be upgraded)
 3. **Interactive Editing**: 
-   - Choose to modify groups to include (y/n)
+   - Choose to modify groups to include/exclude (y/n)
    - Enter group names one per line
+   - **Group IDs automatically resolved** when access token available
+   - Visual feedback during ID resolution process
    - Empty line to finish input
    - Option to keep current values by pressing Enter
 4. **Change Confirmation**: Reviews and saves only if changes detected
 5. **Backup and Verification**: Creates backup and verifies save success
 
-**Example Usage Session**:
+**Example Usage Session (Enhanced Format)**:
 ```
 ══ Groups Editor ══
 Managing group inclusion/exclusion settings for domain: contoso.com
 
 ══ Groups to Include ══
 Current groups to include:
-  - existing-group-1
-  - existing-group-2
+  - Name: security-group-1
+    ID:   12345678-1234-1234-1234-123456789abc
+  - Name: enrollment-group-prod  
+    ID:   87654321-4321-4321-4321-abcdef123456
 
 Do you want to modify groups to include? (y/n): y
 Enter group names to include (one per line).
+Group IDs will be automatically resolved and stored.
 Press Enter on empty line to finish.
-Leave first line empty to keep current values.
+Leave first line empty to cancel.
 Group name: new-security-group
-Group name: another-group
+
+Resolving group IDs...
+  ✓ new-security-group -> 99999999-9999-9999-9999-999999999999
+
 Group name: [Enter to finish]
 
-Groups to Exclude settings...
-[Similar interface for exclusion groups]
+Saving changes...
+Group settings updated successfully!
+```
 
+**Example Usage Session (Legacy Format Migration)**:
+```
+══ Groups Editor ══
+Managing group inclusion/exclusion settings for domain: contoso.com
+
+══ Groups to Include ══
+Current groups to include:
+  - old-group-1
+  - old-group-2
+  (Note: Groups are in old format - will be upgraded)
+
+Do you want to modify groups to include? (y/n): y
+Converting existing groups to new format...
+Enter group names to include (one per line).
+Group IDs will be automatically resolved and stored.
+Press Enter on empty line to finish.
+Group name: additional-group
+
+Resolving group IDs...
+  ✓ old-group-1 -> (ID not found)
+  ✓ old-group-2 -> (ID not found)  
+  ✓ additional-group -> 88888888-8888-8888-8888-888888888888
+
+Groups will be saved without IDs and resolved later.
 Saving changes...
 Group settings updated successfully!
 ```
@@ -501,7 +569,41 @@ Group settings updated successfully!
 #### Settings Storage Structure
 
 **Groups Settings Location**:
-Groups are stored at the domain level in `settings.json`, separate from the domain's `settings` sub-object:
+Groups are stored at the domain level in `settings.json`, separate from the domain's `settings` sub-object.
+
+**Enhanced Format (Recommended)**:
+The new enhanced format stores both group names and IDs for improved performance and reliability:
+
+```json
+{
+  "domains": {
+    "example.com": {
+      "groupsToInclude": [
+        {
+          "name": "security-group-1",
+          "id": "12345678-1234-1234-1234-123456789abc"
+        },
+        {
+          "name": "enrollment-group-prod", 
+          "id": "87654321-4321-4321-4321-abcdef123456"
+        }
+      ],
+      "groupsToExclude": [
+        {
+          "name": "excluded-group-1",
+          "id": "11111111-1111-1111-1111-111111111111"
+        }
+      ],
+      "settings": {
+        // Other domain-specific settings
+      }
+    }
+  }
+}
+```
+
+**Legacy Format (Still Supported)**:
+The original string array format continues to work for backward compatibility:
 
 ```json
 {
@@ -521,6 +623,18 @@ Groups are stored at the domain level in `settings.json`, separate from the doma
   }
 }
 ```
+
+**Automatic Migration**:
+- Legacy string arrays are automatically upgraded to the enhanced format when:
+  - Groups are edited through the Groups Editor
+  - VerifyGroupMembership function processes them (if group IDs can be resolved)
+- No manual intervention required - migration is seamless and automatic
+- Enhanced format provides better performance by using group IDs for API calls
+
+**Format Benefits**:
+- **Enhanced Format**: Faster API calls using group IDs, reduced Graph API queries, better error handling
+- **Legacy Format**: Simple configuration, backward compatibility, easy manual editing
+- **Automatic Detection**: System automatically detects format and handles appropriately
 
 **Why Domain Level?**:
 - Groups control operations across the entire domain
