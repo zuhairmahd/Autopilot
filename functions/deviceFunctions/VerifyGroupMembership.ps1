@@ -28,7 +28,12 @@ function VerifyGroupMembership()
             return "StringArray"
         }
         elseif ($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) {
-            if ($firstElement.name -and $firstElement.id) {
+            # Accept hashtables with either name OR id (not requiring both to have values)
+            # Just check that the properties exist as keys, regardless of their values
+            $hasNameProperty = $firstElement.PSObject.Properties.Name -contains "name" -or $firstElement.ContainsKey("name")
+            $hasIdProperty = $firstElement.PSObject.Properties.Name -contains "id" -or $firstElement.ContainsKey("id")
+            
+            if ($hasNameProperty -and $hasIdProperty) {
                 return "HashTableArray"
             }
         }
@@ -46,9 +51,57 @@ function VerifyGroupMembership()
             "Empty" { return @(), @() }  # Return empty arrays for names and IDs
             "HashTableArray" {
                 # Extract names and IDs from hashtable format
-                $groupNames = @($groups | ForEach-Object { $_.name })
-                $groupIds = @($groups | ForEach-Object { $_.id })
+                # Handle cases where names might be null but IDs exist
+                $groupNames = @()
+                $groupIds = @()
+                
+                foreach ($group in $groups) {
+                    # Extract name (could be null/empty)
+                    $name = if ($group.name) { $group.name } else { $null }
+                    $groupNames += $name
+                    
+                    # Extract ID (could be null/empty) 
+                    $id = if ($group.id) { $group.id } else { $null }
+                    $groupIds += $id
+                }
+                
                 Write-Verbose "[$functionName] Extracted from hashtable format - Names: $($groupNames -join ', '), IDs: $($groupIds -join ', ')"
+                Write-Log -logFile $logFile -module $functionName -Message "Extracted from hashtable format - Names: $($groupNames -join ', '), IDs: $($groupIds -join ', ')"
+                
+                # If we have IDs but some names are null, try to resolve names from IDs
+                $hasNullNames = ($groupNames | Where-Object { $null -eq $_ -or $_ -eq "" }).Count -gt 0
+                $hasValidIds = ($groupIds | Where-Object { $null -ne $_ -and $_ -ne "" }).Count -gt 0
+                
+                if ($hasNullNames -and $hasValidIds -and $accessToken) {
+                    Write-Verbose "[$functionName] Some names are null but IDs exist, attempting to resolve names from IDs"
+                    Write-Log -logFile $logFile -module $functionName -Message "Some names are null but IDs exist, attempting to resolve names from IDs"
+                    
+                    try {
+                        # Get valid IDs for resolution
+                        $validIds = $groupIds | Where-Object { $null -ne $_ -and $_ -ne "" }
+                        if ($validIds.Count -gt 0) {
+                            $resolvedNames = GetGroupIdsByNames -accessToken $accessToken -groupNames $validIds
+                            Write-Verbose "[$functionName] Resolved $($resolvedNames.Count) names from $($validIds.Count) IDs"
+                            
+                            # Update the names array with resolved names where possible
+                            for ($i = 0; $i -lt $groupIds.Count; $i++) {
+                                if (($null -eq $groupNames[$i] -or $groupNames[$i] -eq "") -and ($null -ne $groupIds[$i] -and $groupIds[$i] -ne "")) {
+                                    # Find the resolved name for this ID
+                                    $idIndex = [Array]::IndexOf($validIds, $groupIds[$i])
+                                    if ($idIndex -ge 0 -and $idIndex -lt $resolvedNames.Count -and $resolvedNames[$idIndex]) {
+                                        $groupNames[$i] = $resolvedNames[$idIndex]
+                                        Write-Verbose "[$functionName] Resolved name for ID $($groupIds[$i]): $($resolvedNames[$idIndex])"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch {
+                        Write-Warning "[$functionName] Failed to resolve names from IDs for $groupType groups: $($_.Exception.Message)"
+                        Write-Log -logFile $logFile -module $functionName -Message "Failed to resolve names from IDs for $groupType groups: $($_.Exception.Message)" -logLevel "Warning"
+                    }
+                }
+                
                 return $groupNames, $groupIds
             }
             "StringArray" {
@@ -216,8 +269,77 @@ function VerifyGroupMembership()
             Write-Verbose "[$functionName] Included group membership: $($includedGroupMembership -join ', ')"
             Write-Log -logFile $logFile -module $functionName -Message "Included group membership: $($includedGroupMembership -join ', ')"
             
-            # Determine missing required groups - compare against group names for result consistency
-            $missingGroups = $includeGroupNames | Where-Object { $includedGroupMembership -notcontains $_ }
+            # Determine missing required groups with enhanced logic to handle null names
+            # Priority: Use IDs for comparison if available and names are unreliable
+            $missingGroups = @()
+            $missingGroupIds = @()
+            
+            # Determine comparison strategy based on available data
+            $useIdComparison = ($includeGroupIds.Count -gt 0) -and ($includeGroupIds | Where-Object { $null -ne $_ -and $_ -ne "" }).Count -gt 0
+            $hasReliableNames = ($includeGroupNames | Where-Object { $null -ne $_ -and $_ -ne "" }).Count -eq $includeGroupNames.Count
+            
+            Write-Verbose "[$functionName] Comparison strategy - UseIdComparison: $useIdComparison, HasReliableNames: $hasReliableNames"
+            Write-Log -logFile $logFile -module $functionName -Message "Comparison strategy - UseIdComparison: $useIdComparison, HasReliableNames: $hasReliableNames"
+            
+            if ($useIdComparison) {
+                # Use ID-based comparison when IDs are available
+                Write-Verbose "[$functionName] Using ID-based comparison for missing groups"
+                Write-Log -logFile $logFile -module $functionName -Message "Using ID-based comparison for missing groups"
+                
+                # getGroupMembership returns names, but we need to work with our original IDs
+                # Convert returned membership names back to IDs for comparison
+                $membershipIds = @()
+                if ($includedGroupMembership.Count -gt 0) {
+                    try {
+                        $membershipIds = GetGroupIdsByNames -accessToken $accessToken -groupNames $includedGroupMembership
+                        Write-Verbose "[$functionName] Converted membership names to IDs: $($membershipIds.Count) IDs"
+                    }
+                    catch {
+                        Write-Warning "[$functionName] Failed to convert membership names to IDs: $($_.Exception.Message)"
+                        Write-Log -logFile $logFile -module $functionName -Message "Failed to convert membership names to IDs: $($_.Exception.Message)" -logLevel "Warning"
+                    }
+                }
+                
+                # Compare required IDs against membership IDs
+                for ($i = 0; $i -lt $includeGroupIds.Count; $i++) {
+                    $requiredId = $includeGroupIds[$i]
+                    if ($null -ne $requiredId -and $requiredId -ne "" -and $membershipIds -notcontains $requiredId) {
+                        $missingGroupIds += $requiredId
+                        
+                        # For reporting, prefer the name if available, otherwise use ID
+                        $displayName = if ($i -lt $includeGroupNames.Count -and $null -ne $includeGroupNames[$i] -and $includeGroupNames[$i] -ne "") {
+                            $includeGroupNames[$i]
+                        } else {
+                            $requiredId  # Fallback to ID for user feedback
+                        }
+                        $missingGroups += $displayName
+                    }
+                }
+            }
+            elseif ($hasReliableNames) {
+                # Use traditional name-based comparison when names are reliable
+                Write-Verbose "[$functionName] Using name-based comparison for missing groups"
+                Write-Log -logFile $logFile -module $functionName -Message "Using name-based comparison for missing groups"
+                $missingGroups = $includeGroupNames | Where-Object { $includedGroupMembership -notcontains $_ }
+            }
+            else {
+                # Handle mixed/unreliable data scenario
+                Write-Warning "[$functionName] Cannot reliably determine missing groups - both names and IDs have issues"
+                Write-Log -logFile $logFile -module $functionName -Message "Cannot reliably determine missing groups - both names and IDs have issues" -logLevel "Warning"
+                
+                # Provide what information we can
+                for ($i = 0; $i -lt $includeGroupNames.Count; $i++) {
+                    $name = $includeGroupNames[$i]
+                    $id = if ($i -lt $includeGroupIds.Count) { $includeGroupIds[$i] } else { $null }
+                    
+                    # Use available identifier for comparison
+                    $identifier = if ($null -ne $name -and $name -ne "") { $name } else { $id }
+                    if ($null -ne $identifier -and $identifier -ne "" -and $includedGroupMembership -notcontains $identifier) {
+                        $missingGroups += $identifier
+                    }
+                }
+            }
+            
             $result.MissingGroups = $missingGroups
             if ($missingGroups.Count -gt 0)
             {
@@ -237,12 +359,73 @@ function VerifyGroupMembership()
             Write-Log -logFile $logFile -module $functionName -Message "Number of excluded groups: $($excludedGroupMembership.Count)"
             Write-Verbose "[$functionName] Excluded group membership: $($excludedGroupMembership -join ', ')"
             Write-Log -logFile $logFile -module $functionName -Message "Excluded group membership: $($excludedGroupMembership -join ', ')"
-            # Determine forbidden groups
-            $result.ForbiddenGroups = $excludedGroupMembership 
-            if ($forbiddenGroups.Count -gt 0)
+            # Determine forbidden groups with enhanced logic to handle null names
+            # Priority: Use IDs for comparison if available and names are unreliable
+            $forbiddenGroups = @()
+            $forbiddenGroupIds = @()
+            
+            # Determine comparison strategy based on available data
+            $useIdComparison = ($excludeGroupIds.Count -gt 0) -and ($excludeGroupIds | Where-Object { $null -ne $_ -and $_ -ne "" }).Count -gt 0
+            $hasReliableNames = ($excludeGroupNames | Where-Object { $null -ne $_ -and $_ -ne "" }).Count -eq $excludeGroupNames.Count
+            
+            Write-Verbose "[$functionName] Exclude comparison strategy - UseIdComparison: $useIdComparison, HasReliableNames: $hasReliableNames"
+            Write-Log -logFile $logFile -module $functionName -Message "Exclude comparison strategy - UseIdComparison: $useIdComparison, HasReliableNames: $hasReliableNames"
+            
+            if ($useIdComparison) {
+                # Use ID-based comparison when IDs are available
+                Write-Verbose "[$functionName] Using ID-based comparison for forbidden groups"
+                Write-Log -logFile $logFile -module $functionName -Message "Using ID-based comparison for forbidden groups"
+                
+                # getGroupMembership returns names, but we need to work with our original IDs
+                # Convert returned membership names back to IDs for comparison
+                $membershipIds = @()
+                if ($excludedGroupMembership.Count -gt 0) {
+                    try {
+                        $membershipIds = GetGroupIdsByNames -accessToken $accessToken -groupNames $excludedGroupMembership
+                        Write-Verbose "[$functionName] Converted exclude membership names to IDs: $($membershipIds.Count) IDs"
+                    }
+                    catch {
+                        Write-Warning "[$functionName] Failed to convert exclude membership names to IDs: $($_.Exception.Message)"
+                        Write-Log -logFile $logFile -module $functionName -Message "Failed to convert exclude membership names to IDs: $($_.Exception.Message)" -logLevel "Warning"
+                    }
+                }
+                
+                # Check which excluded IDs the user is actually a member of
+                for ($i = 0; $i -lt $excludeGroupIds.Count; $i++) {
+                    $excludedId = $excludeGroupIds[$i]
+                    if ($null -ne $excludedId -and $excludedId -ne "" -and $membershipIds -contains $excludedId) {
+                        $forbiddenGroupIds += $excludedId
+                        
+                        # For reporting, prefer the name if available, otherwise use ID
+                        $displayName = if ($i -lt $excludeGroupNames.Count -and $null -ne $excludeGroupNames[$i] -and $excludeGroupNames[$i] -ne "") {
+                            $excludeGroupNames[$i]
+                        } else {
+                            $excludedId  # Fallback to ID for user feedback
+                        }
+                        $forbiddenGroups += $displayName
+                    }
+                }
+            }
+            elseif ($hasReliableNames) {
+                # Use traditional name-based comparison when names are reliable
+                Write-Verbose "[$functionName] Using name-based comparison for forbidden groups"
+                Write-Log -logFile $logFile -module $functionName -Message "Using name-based comparison for forbidden groups"
+                $forbiddenGroups = $excludedGroupMembership
+            }
+            else {
+                # Handle mixed/unreliable data scenario
+                Write-Warning "[$functionName] Cannot reliably determine forbidden groups - both names and IDs have issues"
+                Write-Log -logFile $logFile -module $functionName -Message "Cannot reliably determine forbidden groups - both names and IDs have issues" -logLevel "Warning"
+                
+                # Use membership results as-is since we can't improve the comparison
+                $forbiddenGroups = $excludedGroupMembership
+            }
+            
+            $result.ForbiddenGroups = $forbiddenGroups
+            if ($result.ForbiddenGroups.Count -gt 0)
             {
-                Write-Verbose "[$functionName] User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')"
-                Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')" -logLevel "Warning"
+                Write-Verbose "[$functionName] User $userName is a member of the following forbidden groups: $($result.ForbiddenGroups -join ', ')"
+                Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the following forbidden groups: $($result.ForbiddenGroups -join ', ')" -logLevel "Warning"
             }
         }
     }
@@ -331,7 +514,7 @@ function VerifyGroupMembership()
     #endregion
     
     #region Determine result and return
-    if ($missingGroups.Count -eq 0 -and $forbiddenGroups.Count -eq 0)
+    if ($result.MissingGroups.Count -eq 0 -and $result.ForbiddenGroups.Count -eq 0)
     {
         Write-Verbose "[$functionName] User $userName has correct group memberships"
         Write-Log -logFile $logFile -module $functionName -Message "User $userName has correct group memberships"
@@ -342,15 +525,15 @@ function VerifyGroupMembership()
         Write-Verbose "[$functionName] User $userName does not have correct group memberships"
         Write-Log -logFile $logFile -module $functionName -Message "User $userName does not have correct group memberships"
         $result.Success = $false
-        if ($missingGroups.Count -gt 0)
+        if ($result.MissingGroups.Count -gt 0)
         {
-            Write-Host "User $userName is missing membership in the following required groups: $($missingGroups -join ', ')" -ForegroundColor Yellow
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName is missing membership in the following required groups: $($missingGroups -join ', ')"
+            Write-Host "User $userName is missing membership in the following required groups: $($result.MissingGroups -join ', ')" -ForegroundColor Yellow
+            Write-Log -logFile $logFile -module $functionName -Message "User $userName is missing membership in the following required groups: $($result.MissingGroups -join ', ')"
         }
-        if ($forbiddenGroups.Count -gt 0)
+        if ($result.ForbiddenGroups.Count -gt 0)
         {
-            Write-Host "User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')" -ForegroundColor Yellow
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the following forbidden groups: $($forbiddenGroups -join ', ')"
+            Write-Host "User $userName is a member of the following forbidden groups: $($result.ForbiddenGroups -join ', ')" -ForegroundColor Yellow
+            Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the following forbidden groups: $($result.ForbiddenGroups -join ', ')"
         }
     }
     Write-Verbose "[$functionName] Completed VerifyGroupMembership function with Success=$($result.Success)"
