@@ -1207,8 +1207,8 @@ function Resolve-SingleGroupInteractive()
     }
     catch
     {
-        Write-Warning "[$FunctionName] Error resolving group '$GroupName': $($_.Exception.Message)"
-        Write-Log -LogFile $logFile -Module $FunctionName -Message "Error resolving group '$GroupName': $($_.Exception.Message)" -LogLevel "Warning"
+        Write-Warning "[$FunctionName] Error resolving group '[REDACTED]': $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $FunctionName -Message "Error resolving group '[REDACTED]': $($_.Exception.Message)" -LogLevel "Warning"
         
         Write-Host "  Error occurred while searching for group. Save without ID? (y/n)" -ForegroundColor Red
         $choice = Read-Host
