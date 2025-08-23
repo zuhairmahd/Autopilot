@@ -42,6 +42,7 @@ function Show-GroupsEditor()
     param(
         [string]$SettingsFile = "settings.json",
         [string]$DomainName,
+        [string]$AccessToken,
         [switch]$Silent
     )
     
@@ -156,8 +157,8 @@ function Show-GroupsEditor()
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
-        # Get current group settings with safe defaults
-        $currentIncludeGroups = if ($domainConfig.groupsToInclude) 
+        # Get current group settings - preserve arrays even if empty
+        $currentIncludeGroups = if ($null -ne $domainConfig.groupsToInclude) 
         { 
             $domainConfig.groupsToInclude 
         } 
@@ -166,7 +167,7 @@ function Show-GroupsEditor()
             @() 
         }
         
-        $currentExcludeGroups = if ($domainConfig.groupsToExclude) 
+        $currentExcludeGroups = if ($null -ne $domainConfig.groupsToExclude) 
         { 
             $domainConfig.groupsToExclude 
         } 
@@ -224,12 +225,48 @@ function Show-GroupsEditor()
                     Write-Host "`n══ Groups to Include ══" -ForegroundColor Green
                     Write-Host "Groups in this list will be specifically included in operations." -ForegroundColor Gray
                     Write-Host "Current groups to include:" -ForegroundColor Cyan
-                    
+                    write-log -logFile $logFile -module $functionName -Message "Found $($currentIncludeGroups.Count) groups to include"
+                    Write-Verbose "[$functionName] Current groups to include count: $($currentIncludeGroups.Count)"
                     if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
                     {
-                        foreach ($group in $currentIncludeGroups)
+                        # Detect format and display accordingly
+                        $firstElement = $currentIncludeGroups | Select-Object -First 1
+                        Write-Verbose "[$functionName] Current groups to include format: $($firstElement.GetType().Name)"
+                        write-log -logFile $logFile -module $functionName -Message "Current groups to include format: $($firstElement.GetType().Name)"
+                        if ($firstElement -is [string])
                         {
-                            Write-Host "  - $group" -ForegroundColor White
+                            # Old string format
+                            foreach ($group in $currentIncludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
+                            Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
+                        }
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                        {
+                            # New hashtable format
+                            foreach ($group in $currentIncludeGroups)
+                            {
+                                Write-Host "  - Name: $($group.name)" -ForegroundColor White
+                                if ($group.id)
+                                {
+                                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
+                                }
+                                else
+                                {
+                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                }
+                            }
+                        }
+                        else
+                        {
+                            # Fallback for unknown format
+                            foreach ($group in $currentIncludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
                         }
                     }
                     else
@@ -238,9 +275,16 @@ function Show-GroupsEditor()
                     }
                     
                     $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
+                    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
+                    {
+                        Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
+                        [console]::beep(1000, 500)
+                        $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
+                    }
+
                     if ($choice -eq 'y' -or $choice -eq 'Y')
                     {
-                        $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include"
+                        $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include" -AccessToken $AccessToken
                         if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
                         {
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to include changed" -LogLevel "Information"
@@ -272,12 +316,48 @@ function Show-GroupsEditor()
                     Write-Host "`n══ Groups to Exclude ══" -ForegroundColor Red
                     Write-Host "Groups in this list will be specifically excluded from operations." -ForegroundColor Gray
                     Write-Host "Current groups to exclude:" -ForegroundColor Cyan
-                    
+                    Write-Verbose "[$functionName] $($currentExcludeGroups.count) groups to exclude: $($currentExcludeGroups -join ', ')"
+                    write-log -logFile $logFile -module $functionName -Message "$($currentExcludeGroups.count) groups to exclude: $($currentExcludeGroups -join ', ')"
                     if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
                     {
-                        foreach ($group in $currentExcludeGroups)
+                        # Detect format and display accordingly
+                        $firstElement = $currentExcludeGroups | Select-Object -First 1
+                        Write-Verbose "[$functionName] Current groups to exclude format: $($firstElement.GetType().Name)"
+                        write-log -logFile $logFile -module $functionName -Message "Current groups to exclude format: $($firstElement.GetType().Name)"
+                        if ($firstElement -is [string])
                         {
-                            Write-Host "  - $group" -ForegroundColor White
+                            # Old string format
+                            foreach ($group in $currentExcludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
+                            Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
+                        }
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                        {
+                            # New hashtable format
+                            foreach ($group in $currentExcludeGroups)
+                            {
+                                Write-Host "  - Name: $($group.name)" -ForegroundColor White
+                                if ($group.id)
+                                {
+                                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
+                                }
+                                else
+                                {
+                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                }
+                            }
+                        }
+                        else
+                        {
+                            # Fallback for unknown format
+                            foreach ($group in $currentExcludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
                         }
                     }
                     else
@@ -286,9 +366,15 @@ function Show-GroupsEditor()
                     }
                     
                     $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
+                    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
+                    {
+                        Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
+                        [console]::beep(1000, 500)
+                        $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
+                    }
                     if ($choice -eq 'y' -or $choice -eq 'Y')
                     {
-                        $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude"
+                        $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude" -AccessToken $AccessToken
                         if ($null -ne $updatedExcludeGroups -and (Compare-ArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups))
                         {
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to exclude changed" -LogLevel "Information"
@@ -323,11 +409,45 @@ function Show-GroupsEditor()
                     Write-Host "Groups to Include:" -ForegroundColor Green
                     if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
                     {
-                        foreach ($group in $currentIncludeGroups)
+                        # Detect format and display accordingly
+                        $firstElement = $currentIncludeGroups[0]
+                        if ($firstElement -is [string])
                         {
-                            Write-Host "  - $group" -ForegroundColor White
+                            # Old string format
+                            foreach ($group in $currentIncludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
+                            Write-Host "  Total: $($currentIncludeGroups.Count) group(s) [Legacy Format]" -ForegroundColor Yellow
                         }
-                        Write-Host "  Total: $($currentIncludeGroups.Count) group(s)" -ForegroundColor Gray
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                        {
+                            # New hashtable format
+                            foreach ($group in $currentIncludeGroups)
+                            {
+                                Write-Host "  - Name: $($group.name)" -ForegroundColor White
+                                if ($group.id)
+                                {
+                                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
+                                }
+                                else
+                                {
+                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                }
+                            }
+                            Write-Host "  Total: $($currentIncludeGroups.Count) group(s) [Enhanced Format]" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            # Fallback for unknown format
+                            foreach ($group in $currentIncludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
+                            Write-Host "  Total: $($currentIncludeGroups.Count) group(s)" -ForegroundColor Gray
+                        }
                     }
                     else
                     {
@@ -337,11 +457,45 @@ function Show-GroupsEditor()
                     Write-Host "`nGroups to Exclude:" -ForegroundColor Red
                     if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
                     {
-                        foreach ($group in $currentExcludeGroups)
+                        # Detect format and display accordingly
+                        $firstElement = $currentExcludeGroups[0]
+                        if ($firstElement -is [string])
                         {
-                            Write-Host "  - $group" -ForegroundColor White
+                            # Old string format
+                            foreach ($group in $currentExcludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
+                            Write-Host "  Total: $($currentExcludeGroups.Count) group(s) [Legacy Format]" -ForegroundColor Yellow
                         }
-                        Write-Host "  Total: $($currentExcludeGroups.Count) group(s)" -ForegroundColor Gray
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                        {
+                            # New hashtable format
+                            foreach ($group in $currentExcludeGroups)
+                            {
+                                Write-Host "  - Name: $($group.name)" -ForegroundColor White
+                                if ($group.id)
+                                {
+                                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
+                                }
+                                else
+                                {
+                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                }
+                            }
+                            Write-Host "  Total: $($currentExcludeGroups.Count) group(s) [Enhanced Format]" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            # Fallback for unknown format
+                            foreach ($group in $currentExcludeGroups)
+                            {
+                                Write-Host "  - $group" -ForegroundColor White
+                            }
+                            Write-Host "  Total: $($currentExcludeGroups.Count) group(s)" -ForegroundColor Gray
+                        }
                     }
                     else
                     {
@@ -381,17 +535,65 @@ function Get-GroupArrayInput()
 {
     <#
     .SYNOPSIS
-        Gets array input for group names with user-friendly interface.
+        Gets array input for group names and IDs with interactive resolution.
+        Supports both old string array format and new hashtable format.
+        Uses getEntraGroup for enhanced search capabilities.
     #>
     [CmdletBinding()]
     param(
         [array]$CurrentGroups,
-        [string]$GroupType
+        [string]$GroupType,
+        [string]$AccessToken  # Added for group ID resolution
     )
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting group array input for $GroupType groups" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Getting group array input for $GroupType groups"
+    
+    # Detect current format and display appropriately
+    $currentFormat = "Empty"
+    if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
+    {
+        $firstElement = $CurrentGroups[0]
+        if ($firstElement -is [string])
+        {
+            $currentFormat = "StringArray"
+        }
+        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name') -and $firstElement.ContainsKey('id')) -or 
+            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name') -and ($firstElement.PSObject.Properties.Name -contains 'id'))))
+        {
+            $currentFormat = "HashTableArray"
+        }
+        else
+        {
+            $currentFormat = "Unknown"
+        }
+    }
+    
+    Write-Verbose "[$functionName] Current groups format: $currentFormat"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Current groups format: $currentFormat" -LogLevel "Verbose"
+    
+    # Display current groups in appropriate format
+    if ($CurrentGroups -and $CurrentGroups.Count -gt 0)
+    {
+        Write-Host "`nCurrent groups:" -ForegroundColor Cyan
+        if ($currentFormat -eq "HashTableArray")
+        {
+            foreach ($group in $CurrentGroups)
+            {
+                Write-Host "  - Name: $($group.name)" -ForegroundColor White
+                Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
+            }
+        }
+        else
+        {
+            foreach ($group in $CurrentGroups)
+            {
+                Write-Host "  - $group" -ForegroundColor White
+            }
+        }
+    }
     
     # Determine if we should ask about replace vs add
     $shouldReplaceExisting = $true
@@ -439,6 +641,7 @@ function Get-GroupArrayInput()
     }
     
     Write-Host "`nEnter group names to $GroupType (one per line)." -ForegroundColor Yellow
+    Write-Host "Group names will be searched and resolved interactively." -ForegroundColor Green
     Write-Host "Press Enter on empty line to finish." -ForegroundColor Gray
     if (-not $shouldReplaceExisting)
     {
@@ -446,7 +649,7 @@ function Get-GroupArrayInput()
     }
     Write-Host "Leave first line empty to cancel." -ForegroundColor Gray
     
-    $newGroups = @()
+    $newGroupsHashTable = @()
     $firstInput = $true
     
     do
@@ -464,9 +667,14 @@ function Get-GroupArrayInput()
                 return $CurrentGroups
             }
             
-            $newGroups += $input.Trim()
-            Write-Log -LogFile $logFile -Module $functionName -Message "Added first $GroupType group: '$($input.Trim())'" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Added first $GroupType group: '$($input.Trim())'"
+            # Process the first group name
+            $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $input.Trim() -AccessToken $AccessToken -FunctionName $functionName
+            if ($resolvedGroup)
+            {
+                $newGroupsHashTable += $resolvedGroup
+                Write-Log -LogFile $logFile -Module $functionName -Message "Added first $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Added first $GroupType group: '$($resolvedGroup.name)'"
+            }
         }
         else
         {
@@ -475,35 +683,54 @@ function Get-GroupArrayInput()
             {
                 break
             }
-            $newGroups += $input.Trim()
-            Write-Log -LogFile $logFile -Module $functionName -Message "Added $GroupType group: '$($input.Trim())'" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Added $GroupType group: '$($input.Trim())'"
+            
+            # Process each additional group name
+            $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $input.Trim() -AccessToken $AccessToken -FunctionName $functionName
+            if ($resolvedGroup)
+            {
+                $newGroupsHashTable += $resolvedGroup
+                Write-Log -LogFile $logFile -Module $functionName -Message "Added $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Added $GroupType group: '$($resolvedGroup.name)'"
+            }
         }
     } while ($true)
     
-    # Determine final result based on user choice
+    # Determine final result based on user choice and format compatibility
     if ($shouldReplaceExisting -or -not $CurrentGroups -or $CurrentGroups.Count -eq 0)
     {
-        # Replace existing groups or no existing groups
-        $result = $newGroups
+        # Replace existing groups
+        $result = $newGroupsHashTable
     }
     else
     {
-        # Add to existing groups
-        $result = @($CurrentGroups) + @($newGroups)
+        # Add to existing groups - need to handle format conversion
+        $combinedGroups = @()
+        
+        # Add existing groups in hashtable format
+        if ($currentFormat -eq "HashTableArray")
+        {
+            $combinedGroups += $CurrentGroups
+        }
+        elseif ($currentFormat -eq "StringArray")
+        {
+            # Convert old string format to hashtable format
+            Write-Host "`nConverting existing groups to new format..." -ForegroundColor Yellow
+            foreach ($groupName in $CurrentGroups)
+            {
+                $combinedGroups += @{
+                    name = $groupName
+                    id   = $null  # Will be resolved when VerifyGroupMembership is called
+                }
+            }
+        }
+        
+        # Add new groups
+        $combinedGroups += $newGroupsHashTable
+        $result = $combinedGroups
     }
     
-    # Ensure single values are still treated as arrays
-    if ($result.Count -eq 1)
-    {
-        # Force single element to remain as array
-        $result = @($result[0])
-        Write-Log -LogFile $logFile -Module $functionName -Message "Single group converted to array to maintain type consistency" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Single group converted to array to maintain type consistency"
-    }
-    
-    Write-Log -LogFile $logFile -Module $functionName -Message "Returning $GroupType group array with $($result.Count) groups" -LogLevel "Information"
-    Write-Verbose "[$functionName] Returning $GroupType group array with $($result.Count) groups"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Returning $GroupType group array with $($result.Count) groups in hashtable format" -LogLevel "Information"
+    Write-Verbose "[$functionName] Returning $GroupType group array with $($result.Count) groups in hashtable format"
     return $result
 }
 
@@ -512,6 +739,7 @@ function Compare-ArrayContents()
     <#
     .SYNOPSIS
         Compares two arrays to determine if they have different contents.
+        Supports both string arrays and hashtable arrays with name/id properties.
     #>
     [CmdletBinding()]
     param(
@@ -541,12 +769,53 @@ function Compare-ArrayContents()
         return $true  # Change detected
     }
     
-    # Compare using Compare-Object
-    $comparison = Compare-Object -ReferenceObject $Array1 -DifferenceObject $Array2
-    $hasChanges = $null -ne $comparison
+    # Detect array formats
+    $format1 = if ($Array1[0] -is [string]) { "String" } elseif ($Array1[0].name -and $Array1[0].id) { "HashTable" } else { "Unknown" }
+    $format2 = if ($Array2[0] -is [string]) { "String" } elseif ($Array2[0].name -and $Array2[0].id) { "HashTable" } else { "Unknown" }
     
-    Write-Verbose "[$functionName] Array comparison result: hasChanges = $hasChanges"
-    return $hasChanges
+    Write-Verbose "[$functionName] Array1 format: $format1, Array2 format: $format2"
+    
+    # If formats are different, there's definitely a change
+    if ($format1 -ne $format2)
+    {
+        Write-Verbose "[$functionName] Different array formats detected - change detected"
+        return $true
+    }
+    
+    # Compare based on format
+    if ($format1 -eq "HashTable" -and $format2 -eq "HashTable")
+    {
+        # Compare hashtable arrays by name and id
+        if ($Array1.Count -ne $Array2.Count)
+        {
+            Write-Verbose "[$functionName] Different array lengths - change detected"
+            return $true
+        }
+        
+        for ($i = 0; $i -lt $Array1.Count; $i++)
+        {
+            $item1 = $Array1[$i]
+            $item2 = $Array2[$i]
+            
+            if ($item1.name -ne $item2.name -or $item1.id -ne $item2.id)
+            {
+                Write-Verbose "[$functionName] Hashtable content difference detected at index $i"
+                return $true
+            }
+        }
+        
+        Write-Verbose "[$functionName] Hashtable arrays are identical - no change"
+        return $false
+    }
+    else
+    {
+        # Use standard Compare-Object for string arrays
+        $comparison = Compare-Object -ReferenceObject $Array1 -DifferenceObject $Array2
+        $hasChanges = $null -ne $comparison
+        
+        Write-Verbose "[$functionName] Array comparison result: hasChanges = $hasChanges"
+        return $hasChanges
+    }
 }
 
 function Update-DomainGroupSetting()
@@ -624,7 +893,7 @@ function Update-DomainGroupSetting()
             $verifyConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             if ($verifyConfig)
             {
-                $actualGroups = if ($GroupType -eq 'groupsToInclude')
+                $rawActualGroups = if ($GroupType -eq 'groupsToInclude')
                 {
                     $verifyConfig.groupsToInclude 
                 }
@@ -632,7 +901,85 @@ function Update-DomainGroupSetting()
                 {
                     $verifyConfig.groupsToExclude 
                 }
-                $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+                
+                # Enhanced logging for debugging array handling issues - handle null cases
+                $rawType = if ($null -eq $rawActualGroups) { "null" } else { $rawActualGroups.GetType().Name }
+                $rawJson = if ($null -eq $rawActualGroups) { "null" } else { $rawActualGroups | ConvertTo-Json -Compress }
+                Write-Log -LogFile $logFile -Module $functionName -Message "Raw data from config: Type=$rawType, Value=$rawJson" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Raw data: Type=$rawType, IsNull=$($null -eq $rawActualGroups), IsArray=$($rawActualGroups -is [array])"
+                
+                # Ensure actualGroups is always an array for consistent comparison
+                # This handles the JSON serialization issue where single items become individual objects
+                $actualGroups = if ($null -eq $rawActualGroups)
+                {
+                    @()
+                }
+                elseif ($rawActualGroups -is [array])
+                {
+                    $rawActualGroups
+                }
+                else
+                {
+                    # Single item was deserialized as individual object - wrap in array
+                    @($rawActualGroups)
+                }
+                
+                # Enhanced logging for array conversion results - use safe count methods
+                $actualGroupsCount = if ($actualGroups -is [array]) { $actualGroups.Count } elseif ($null -eq $actualGroups) { 0 } else { 1 }
+                $groupsArrayCount = if ($groupsArray -is [array]) { $groupsArray.Count } elseif ($null -eq $groupsArray) { 0 } else { 1 }
+                
+                $actualType = if ($null -eq $actualGroups) { "null" } else { $actualGroups.GetType().Name }
+                $actualJson = if ($null -eq $actualGroups) { "null" } else { $actualGroups | ConvertTo-Json -Compress }
+                Write-Log -LogFile $logFile -Module $functionName -Message "After array conversion: Type=$actualType, SafeCount=$actualGroupsCount, Value=$actualJson" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] After conversion: Type=$actualType, SafeCount=$actualGroupsCount"
+                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $groupsArrayCount groups, Loaded $actualGroupsCount groups" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Verification: Saved $groupsArrayCount groups, Loaded $actualGroupsCount groups"
+                
+                # Handle different comparison strategies based on content type
+                $comparisonResult = $null
+                if ($groupsArrayCount -eq 0 -and $actualGroupsCount -eq 0)
+                {
+                    # Both are empty - verification successful
+                    $comparisonResult = $null
+                }
+                elseif ($groupsArrayCount -ne $actualGroupsCount)
+                {
+                    # Different counts - verification failed
+                    $savedType = if ($null -eq $groupsArray) { "null" } else { $groupsArray.GetType().Name }
+                    $loadedType = if ($null -eq $actualGroups) { "null" } else { $actualGroups.GetType().Name }
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Count mismatch detected: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Count mismatch: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType"
+                    $comparisonResult = @("Count mismatch: saved $groupsArrayCount, loaded $actualGroupsCount")
+                }
+                else
+                {
+                    # Same count, need to compare content
+                    if ($groupsArrayCount -gt 0 -and $groupsArray[0] -is [hashtable])
+                    {
+                        # Hashtable comparison - compare by ID and name
+                        for ($i = 0; $i -lt $groupsArrayCount; $i++)
+                        {
+                            $saved = $groupsArray[$i]
+                            $loaded = $actualGroups[$i]
+                            
+                            # Handle case where loaded item might be PSCustomObject instead of hashtable
+                            $loadedName = if ($loaded -is [hashtable]) { $loaded.name } else { $loaded.name }
+                            $loadedId = if ($loaded -is [hashtable]) { $loaded.id } else { $loaded.id }
+                            
+                            if (($saved.name -ne $loadedName) -or ($saved.id -ne $loadedId))
+                            {
+                                $comparisonResult = @("Hashtable content mismatch at index $i`: saved($($saved.name),$($saved.id)) vs loaded($loadedName,$loadedId)")
+                                break
+                            }
+                        }
+                    }
+                    else
+                    {
+                        # String or simple object comparison
+                        $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+                    }
+                }
                 
                 if ($null -eq $comparisonResult)
                 {
@@ -642,7 +989,9 @@ function Update-DomainGroupSetting()
                 }
                 else
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType" -LogLevel "Warning"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType. Details: $($comparisonResult -join ', ')" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $groupsArrayCount items, Loaded: $actualGroupsCount items"
+                    Write-Verbose "[$functionName] Verification failed for $GroupType. Comparison result: $($comparisonResult -join ', ')"
                     Write-Warning "[$functionName] Verification failed for $GroupType"
                     return $false
                 }
@@ -663,9 +1012,216 @@ function Update-DomainGroupSetting()
     }
     catch
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error updating ${GroupType}: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error updating $($GroupType): $($_.Exception.Message)" -LogLevel "Error"
         Write-Log -LogFile $logFile -Module $functionName -Message "Full error details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
-        Write-Warning "[$functionName] Error updating ${GroupType}: $($_.Exception.Message)"
+        Write-Warning "[$functionName] Error updating $($GroupType): $($_.Exception.Message)"
         return $false
+    }
+}
+
+function Resolve-SingleGroupInteractive()
+{
+    <#
+    .SYNOPSIS
+        Resolves a single group name to group object using interactive search.
+        Uses getEntraGroup function for better search capabilities.
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$GroupName,
+        [string]$AccessToken,
+        [string]$FunctionName
+    )
+    
+    Write-Verbose "[$FunctionName] Resolving group: '$GroupName'"
+    Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
+    
+    if (-not $AccessToken)
+    {
+        Write-Host "  No access token available - saving group without ID resolution" -ForegroundColor Yellow
+        return @{
+            name = $GroupName
+            id   = $null
+        }
+    }
+    
+    try
+    {
+        # First try exact match
+        Write-Host "  Searching for group: '$GroupName'..." -ForegroundColor Cyan
+        $result, $wasSubstringSearch = GetEntraGroup -accessToken $AccessToken -groupName $GroupName
+        
+        if ($result -and $result.value -and $result.value.Count -gt 0)
+        {
+            if ($result.value.Count -eq 1)
+            {
+                # Single exact match found
+                $group = $result.value[0]
+                Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
+                return @{
+                    name = $group.displayName
+                    id   = $group.id
+                }
+            }
+            else
+            {
+                # Multiple matches found, let user choose
+                Write-Host "  Multiple groups found matching '$GroupName':" -ForegroundColor Yellow
+                for ($i = 0; $i -lt $result.value.Count; $i++)
+                {
+                    $group = $result.value[$i]
+                    Write-Host "    $($i + 1). $($group.displayName) (ID: $($group.id))" -ForegroundColor White
+                }
+                Write-Host "    0. Skip this group" -ForegroundColor Gray
+                
+                do
+                {
+                    $choice = Read-Host "  Select group (0-$($result.value.Count))"
+                    if ($choice -eq "0")
+                    {
+                        Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
+                        return $null
+                    }
+                    elseif ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $result.value.Count)
+                    {
+                        $selectedGroup = $result.value[[int]$choice - 1]
+                        Write-Host "  Selected: '$($selectedGroup.displayName)'" -ForegroundColor Green
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
+                        return @{
+                            name = $selectedGroup.displayName
+                            id   = $selectedGroup.id
+                        }
+                    }
+                    Write-Host "  Invalid choice. Please enter a number between 0 and $($result.value.Count)." -ForegroundColor Red
+                } while ($true)
+            }
+        }
+        else
+        {
+            # No exact match, try similarity search
+            Write-Host "  No exact match found. Searching for similar groups..." -ForegroundColor Yellow
+            $similarResult, $wasSubstringSearch = GetEntraGroup -accessToken $AccessToken -groupName $GroupName -FindSimilar
+            
+            if ($similarResult -and $similarResult.value -and $similarResult.value.Count -gt 0)
+            {
+                Write-Host "  Similar groups found:" -ForegroundColor Yellow
+                for ($i = 0; $i -lt $similarResult.value.Count; $i++)
+                {
+                    $group = $similarResult.value[$i]
+                    Write-Host "    $($i + 1). $($group.displayName) (ID: $($group.id))" -ForegroundColor White
+                }
+                Write-Host "    0. Enter different group name" -ForegroundColor Gray
+                Write-Host "    00. Skip this group" -ForegroundColor Gray
+                
+                do
+                {
+                    $choice = Read-Host "  Select group, try different name, or skip (0/00/1-$($similarResult.value.Count))"
+                    if ($choice -eq "00")
+                    {
+                        Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
+                        return $null
+                    }
+                    elseif ($choice -eq "0")
+                    {
+                        # Let user enter a different group name
+                        $newGroupName = Read-Host "  Enter different group name"
+                        if (-not [string]::IsNullOrWhiteSpace($newGroupName))
+                        {
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different group name: '$($newGroupName.Trim())'" -LogLevel "Verbose"
+                            return Resolve-SingleGroupInteractive -GroupName $newGroupName.Trim() -AccessToken $AccessToken -FunctionName $FunctionName
+                        }
+                        else
+                        {
+                            Write-Host "  No name entered, skipping group" -ForegroundColor Yellow
+                            return $null
+                        }
+                    }
+                    elseif ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $similarResult.value.Count)
+                    {
+                        $selectedGroup = $similarResult.value[[int]$choice - 1]
+                        Write-Host "  Selected: '$($selectedGroup.displayName)'" -ForegroundColor Green
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected similar group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
+                        return @{
+                            name = $selectedGroup.displayName
+                            id   = $selectedGroup.id
+                        }
+                    }
+                    Write-Host "  Invalid choice. Please enter 0, 00, or a number between 1 and $($similarResult.value.Count)." -ForegroundColor Red
+                } while ($true)
+            }
+            else
+            {
+                # No similar groups found either
+                Write-Host "  No groups found matching '$GroupName'." -ForegroundColor Red
+                Write-Host "  Options:" -ForegroundColor White
+                Write-Host "    1. Try different group name" -ForegroundColor White
+                Write-Host "    2. Save group name without ID (will resolve later)" -ForegroundColor White
+                Write-Host "    3. Skip this group" -ForegroundColor White
+                
+                do
+                {
+                    $choice = Read-Host "  Select option (1-3)"
+                    switch ($choice)
+                    {
+                        '1'
+                        {
+                            $newGroupName = Read-Host "  Enter different group name"
+                            if (-not [string]::IsNullOrWhiteSpace($newGroupName))
+                            {
+                                Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different group name: '$($newGroupName.Trim())'" -LogLevel "Verbose"
+                                return Resolve-SingleGroupInteractive -GroupName $newGroupName.Trim() -AccessToken $AccessToken -FunctionName $FunctionName
+                            }
+                            else
+                            {
+                                Write-Host "  No name entered, please choose again" -ForegroundColor Yellow
+                                continue
+                            }
+                        }
+                        '2'
+                        {
+                            Write-Host "  Saving group '$GroupName' without ID" -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to save group without ID: '$GroupName'" -LogLevel "Verbose"
+                            return @{
+                                name = $GroupName
+                                id   = $null
+                            }
+                        }
+                        '3'
+                        {
+                            Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
+                            return $null
+                        }
+                        default
+                        {
+                            Write-Host "  Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                            continue
+                        }
+                    }
+                    break
+                } while ($true)
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "[$FunctionName] Error resolving group '[REDACTED]': $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $FunctionName -Message "Error resolving group '[REDACTED]': $($_.Exception.Message)" -LogLevel "Warning"
+        
+        Write-Host "  Error occurred while searching for group. Save without ID? (y/n)" -ForegroundColor Red
+        $choice = Read-Host
+        if ($choice -eq 'y' -or $choice -eq 'Y')
+        {
+            return @{
+                name = $GroupName
+                id   = $null
+            }
+        }
+        else
+        {
+            return $null
+        }
     }
 }

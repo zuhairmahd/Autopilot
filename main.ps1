@@ -1474,8 +1474,8 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
-    
-    $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain
+
+    $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain -accessToken $accessToken
     #region Handle navigation responses from GetDeviceByUser
     if ($result -eq "Back" -or $result -eq "back")
     {

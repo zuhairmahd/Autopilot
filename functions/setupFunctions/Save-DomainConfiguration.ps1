@@ -75,7 +75,8 @@ function Save-DomainConfiguration
         }
         
         # Convert configuration to JSON with proper formatting
-        $jsonContent = $DomainConfiguration | ConvertTo-Json -Depth 10
+        # Ensure arrays are preserved during JSON serialization (PowerShell 5.1 compatibility)
+        $jsonContent = $DomainConfiguration | ConvertTo-Json -Depth 10 -Compress:$false
         
         # Save to file
         $jsonContent | Out-File -FilePath $domainConfigFile -Encoding UTF8 -Force
