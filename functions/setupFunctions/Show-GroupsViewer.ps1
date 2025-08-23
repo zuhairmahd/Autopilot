@@ -204,10 +204,42 @@ function Show-GroupsViewer()
                 
                 if ($includeGroups -and $includeGroups.Count -gt 0)
                 {
-                    Write-Host "[$($includeGroups.Count) group(s)]" -ForegroundColor Green
-                    foreach ($group in $includeGroups)
+                    # Detect format and display accordingly
+                    $firstElement = $includeGroups[0]
+                    if ($firstElement -is [string])
                     {
-                        Write-Host "    - $group" -ForegroundColor White
+                        # Old string format
+                        Write-Host "[$($includeGroups.Count) group(s)] [Legacy Format]" -ForegroundColor Yellow
+                        foreach ($group in $includeGroups)
+                        {
+                            Write-Host "    - $group" -ForegroundColor White
+                        }
+                    }
+                    elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name)
+                    {
+                        # New hashtable format
+                        Write-Host "[$($includeGroups.Count) group(s)] [Enhanced Format]" -ForegroundColor Green
+                        foreach ($group in $includeGroups)
+                        {
+                            Write-Host "    - Name: $($group.name)" -ForegroundColor White
+                            if ($group.id)
+                            {
+                                Write-Host "      ID:   $($group.id)" -ForegroundColor Gray
+                            }
+                            else
+                            {
+                                Write-Host "      ID:   (not resolved)" -ForegroundColor Yellow
+                            }
+                        }
+                    }
+                    else
+                    {
+                        # Fallback for unknown format
+                        Write-Host "[$($includeGroups.Count) group(s)]" -ForegroundColor Green
+                        foreach ($group in $includeGroups)
+                        {
+                            Write-Host "    - $group" -ForegroundColor White
+                        }
                     }
                 }
                 else
@@ -223,10 +255,42 @@ function Show-GroupsViewer()
                 
                 if ($excludeGroups -and $excludeGroups.Count -gt 0)
                 {
-                    Write-Host "[$($excludeGroups.Count) group(s)]" -ForegroundColor Green
-                    foreach ($group in $excludeGroups)
+                    # Detect format and display accordingly
+                    $firstElement = $excludeGroups[0]
+                    if ($firstElement -is [string])
                     {
-                        Write-Host "    - $group" -ForegroundColor White
+                        # Old string format
+                        Write-Host "[$($excludeGroups.Count) group(s)] [Legacy Format]" -ForegroundColor Yellow
+                        foreach ($group in $excludeGroups)
+                        {
+                            Write-Host "    - $group" -ForegroundColor White
+                        }
+                    }
+                    elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and $firstElement.name)
+                    {
+                        # New hashtable format
+                        Write-Host "[$($excludeGroups.Count) group(s)] [Enhanced Format]" -ForegroundColor Green
+                        foreach ($group in $excludeGroups)
+                        {
+                            Write-Host "    - Name: $($group.name)" -ForegroundColor White
+                            if ($group.id)
+                            {
+                                Write-Host "      ID:   $($group.id)" -ForegroundColor Gray
+                            }
+                            else
+                            {
+                                Write-Host "      ID:   (not resolved)" -ForegroundColor Yellow
+                            }
+                        }
+                    }
+                    else
+                    {
+                        # Fallback for unknown format
+                        Write-Host "[$($excludeGroups.Count) group(s)]" -ForegroundColor Green
+                        foreach ($group in $excludeGroups)
+                        {
+                            Write-Host "    - $group" -ForegroundColor White
+                        }
                     }
                 }
                 else
