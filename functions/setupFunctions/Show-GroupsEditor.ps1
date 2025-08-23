@@ -525,8 +525,9 @@ function Get-GroupArrayInput()
 {
     <#
     .SYNOPSIS
-        Gets array input for group names and IDs with user-friendly interface.
+        Gets array input for group names and IDs with interactive resolution.
         Supports both old string array format and new hashtable format.
+        Uses getEntraGroup for enhanced search capabilities.
     #>
     [CmdletBinding()]
     param(
@@ -625,7 +626,7 @@ function Get-GroupArrayInput()
     }
     
     Write-Host "`nEnter group names to $GroupType (one per line)." -ForegroundColor Yellow
-    Write-Host "Group IDs will be automatically resolved and stored." -ForegroundColor Green
+    Write-Host "Group names will be searched and resolved interactively." -ForegroundColor Green
     Write-Host "Press Enter on empty line to finish." -ForegroundColor Gray
     if (-not $shouldReplaceExisting)
     {
@@ -633,7 +634,7 @@ function Get-GroupArrayInput()
     }
     Write-Host "Leave first line empty to cancel." -ForegroundColor Gray
     
-    $newGroupNames = @()
+    $newGroupsHashTable = @()
     $firstInput = $true
     
     do
@@ -651,9 +652,14 @@ function Get-GroupArrayInput()
                 return $CurrentGroups
             }
             
-            $newGroupNames += $input.Trim()
-            Write-Log -LogFile $logFile -Module $functionName -Message "Added first $GroupType group: '$($input.Trim())'" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Added first $GroupType group: '$($input.Trim())'"
+            # Process the first group name
+            $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $input.Trim() -AccessToken $AccessToken -FunctionName $functionName
+            if ($resolvedGroup)
+            {
+                $newGroupsHashTable += $resolvedGroup
+                Write-Log -LogFile $logFile -Module $functionName -Message "Added first $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Added first $GroupType group: '$($resolvedGroup.name)'"
+            }
         }
         else
         {
@@ -662,73 +668,17 @@ function Get-GroupArrayInput()
             {
                 break
             }
-            $newGroupNames += $input.Trim()
-            Write-Log -LogFile $logFile -Module $functionName -Message "Added $GroupType group: '$($input.Trim())'" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Added $GroupType group: '$($input.Trim())'"
+            
+            # Process each additional group name
+            $resolvedGroup = Resolve-SingleGroupInteractive -GroupName $input.Trim() -AccessToken $AccessToken -FunctionName $functionName
+            if ($resolvedGroup)
+            {
+                $newGroupsHashTable += $resolvedGroup
+                Write-Log -LogFile $logFile -Module $functionName -Message "Added $GroupType group: '$($resolvedGroup.name)'" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Added $GroupType group: '$($resolvedGroup.name)'"
+            }
         }
     } while ($true)
-    
-    # Resolve group names to IDs if AccessToken is provided
-    $newGroupsHashTable = @()
-    if ($newGroupNames.Count -gt 0)
-    {
-        Write-Host "`nResolving group IDs..." -ForegroundColor Yellow
-        
-        if ($AccessToken)
-        {
-            try
-            {
-                $resolvedIds = GetGroupIdsByNames -accessToken $AccessToken -groupNames $newGroupNames
-                Write-Verbose "[$functionName] Resolved $($resolvedIds.Count) group IDs for $($newGroupNames.Count) group names"
-                Write-Log -LogFile $logFile -Module $functionName -Message "Resolved $($resolvedIds.Count) group IDs for $($newGroupNames.Count) group names" -LogLevel "Information"
-                
-                for ($i = 0; $i -lt $newGroupNames.Count; $i++)
-                {
-                    $groupId = if ($i -lt $resolvedIds.Count) { $resolvedIds[$i] } else { $null }
-                    $newGroupsHashTable += @{
-                        name = $newGroupNames[$i]
-                        id = $groupId
-                    }
-                    
-                    if ($groupId)
-                    {
-                        Write-Host "  ✓ $($newGroupNames[$i]) -> $groupId" -ForegroundColor Green
-                    }
-                    else
-                    {
-                        Write-Host "  ⚠ $($newGroupNames[$i]) -> (ID not found)" -ForegroundColor Yellow
-                    }
-                }
-            }
-            catch
-            {
-                Write-Warning "[$functionName] Failed to resolve group IDs: $($_.Exception.Message)"
-                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to resolve group IDs: $($_.Exception.Message)" -LogLevel "Warning"
-                
-                # Create hashtable format without IDs
-                foreach ($groupName in $newGroupNames)
-                {
-                    $newGroupsHashTable += @{
-                        name = $groupName
-                        id = $null
-                    }
-                }
-                Write-Host "  Groups will be saved without IDs and resolved later." -ForegroundColor Yellow
-            }
-        }
-        else
-        {
-            Write-Host "  No access token provided - groups will be saved without IDs." -ForegroundColor Yellow
-            # Create hashtable format without IDs
-            foreach ($groupName in $newGroupNames)
-            {
-                $newGroupsHashTable += @{
-                    name = $groupName
-                    id = $null
-                }
-            }
-        }
-    }
     
     # Determine final result based on user choice and format compatibility
     if ($shouldReplaceExisting -or -not $CurrentGroups -or $CurrentGroups.Count -eq 0)
@@ -967,9 +917,216 @@ function Update-DomainGroupSetting()
     }
     catch
     {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error updating ${GroupType}: $($_.Exception.Message)" -LogLevel "Error"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error updating $($GroupType): $($_.Exception.Message)" -LogLevel "Error"
         Write-Log -LogFile $logFile -Module $functionName -Message "Full error details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
-        Write-Warning "[$functionName] Error updating ${GroupType}: $($_.Exception.Message)"
+        Write-Warning "[$functionName] Error updating $($GroupType): $($_.Exception.Message)"
         return $false
+    }
+}
+
+function Resolve-SingleGroupInteractive()
+{
+    <#
+    .SYNOPSIS
+        Resolves a single group name to group object using interactive search.
+        Uses getEntraGroup function for better search capabilities.
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$GroupName,
+        [string]$AccessToken,
+        [string]$FunctionName
+    )
+    
+    Write-Verbose "[$FunctionName] Resolving group: '$GroupName'"
+    Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
+    
+    if (-not $AccessToken)
+    {
+        Write-Host "  No access token available - saving group without ID resolution" -ForegroundColor Yellow
+        return @{
+            name = $GroupName
+            id = $null
+        }
+    }
+    
+    try
+    {
+        # First try exact match
+        Write-Host "  Searching for group: '$GroupName'..." -ForegroundColor Cyan
+        $result, $wasSubstringSearch = GetEntraGroup -accessToken $AccessToken -groupName $GroupName
+        
+        if ($result -and $result.value -and $result.value.Count -gt 0)
+        {
+            if ($result.value.Count -eq 1)
+            {
+                # Single exact match found
+                $group = $result.value[0]
+                Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
+                return @{
+                    name = $group.displayName
+                    id = $group.id
+                }
+            }
+            else
+            {
+                # Multiple matches found, let user choose
+                Write-Host "  Multiple groups found matching '$GroupName':" -ForegroundColor Yellow
+                for ($i = 0; $i -lt $result.value.Count; $i++)
+                {
+                    $group = $result.value[$i]
+                    Write-Host "    $($i + 1). $($group.displayName) (ID: $($group.id))" -ForegroundColor White
+                }
+                Write-Host "    0. Skip this group" -ForegroundColor Gray
+                
+                do
+                {
+                    $choice = Read-Host "  Select group (0-$($result.value.Count))"
+                    if ($choice -eq "0")
+                    {
+                        Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
+                        return $null
+                    }
+                    elseif ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $result.value.Count)
+                    {
+                        $selectedGroup = $result.value[[int]$choice - 1]
+                        Write-Host "  Selected: '$($selectedGroup.displayName)'" -ForegroundColor Green
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
+                        return @{
+                            name = $selectedGroup.displayName
+                            id = $selectedGroup.id
+                        }
+                    }
+                    Write-Host "  Invalid choice. Please enter a number between 0 and $($result.value.Count)." -ForegroundColor Red
+                } while ($true)
+            }
+        }
+        else
+        {
+            # No exact match, try similarity search
+            Write-Host "  No exact match found. Searching for similar groups..." -ForegroundColor Yellow
+            $similarResult, $wasSubstringSearch = GetEntraGroup -accessToken $AccessToken -groupName $GroupName -FindSimilar
+            
+            if ($similarResult -and $similarResult.value -and $similarResult.value.Count -gt 0)
+            {
+                Write-Host "  Similar groups found:" -ForegroundColor Yellow
+                for ($i = 0; $i -lt $similarResult.value.Count; $i++)
+                {
+                    $group = $similarResult.value[$i]
+                    Write-Host "    $($i + 1). $($group.displayName) (ID: $($group.id))" -ForegroundColor White
+                }
+                Write-Host "    0. Enter different group name" -ForegroundColor Gray
+                Write-Host "    00. Skip this group" -ForegroundColor Gray
+                
+                do
+                {
+                    $choice = Read-Host "  Select group, try different name, or skip (0/00/1-$($similarResult.value.Count))"
+                    if ($choice -eq "00")
+                    {
+                        Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
+                        return $null
+                    }
+                    elseif ($choice -eq "0")
+                    {
+                        # Let user enter a different group name
+                        $newGroupName = Read-Host "  Enter different group name"
+                        if (-not [string]::IsNullOrWhiteSpace($newGroupName))
+                        {
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different group name: '$($newGroupName.Trim())'" -LogLevel "Verbose"
+                            return Resolve-SingleGroupInteractive -GroupName $newGroupName.Trim() -AccessToken $AccessToken -FunctionName $FunctionName
+                        }
+                        else
+                        {
+                            Write-Host "  No name entered, skipping group" -ForegroundColor Yellow
+                            return $null
+                        }
+                    }
+                    elseif ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $similarResult.value.Count)
+                    {
+                        $selectedGroup = $similarResult.value[[int]$choice - 1]
+                        Write-Host "  Selected: '$($selectedGroup.displayName)'" -ForegroundColor Green
+                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected similar group: '$($selectedGroup.displayName)' (ID: $($selectedGroup.id))" -LogLevel "Verbose"
+                        return @{
+                            name = $selectedGroup.displayName
+                            id = $selectedGroup.id
+                        }
+                    }
+                    Write-Host "  Invalid choice. Please enter 0, 00, or a number between 1 and $($similarResult.value.Count)." -ForegroundColor Red
+                } while ($true)
+            }
+            else
+            {
+                # No similar groups found either
+                Write-Host "  No groups found matching '$GroupName'." -ForegroundColor Red
+                Write-Host "  Options:" -ForegroundColor White
+                Write-Host "    1. Try different group name" -ForegroundColor White
+                Write-Host "    2. Save group name without ID (will resolve later)" -ForegroundColor White
+                Write-Host "    3. Skip this group" -ForegroundColor White
+                
+                do
+                {
+                    $choice = Read-Host "  Select option (1-3)"
+                    switch ($choice)
+                    {
+                        '1'
+                        {
+                            $newGroupName = Read-Host "  Enter different group name"
+                            if (-not [string]::IsNullOrWhiteSpace($newGroupName))
+                            {
+                                Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different group name: '$($newGroupName.Trim())'" -LogLevel "Verbose"
+                                return Resolve-SingleGroupInteractive -GroupName $newGroupName.Trim() -AccessToken $AccessToken -FunctionName $FunctionName
+                            }
+                            else
+                            {
+                                Write-Host "  No name entered, please choose again" -ForegroundColor Yellow
+                                continue
+                            }
+                        }
+                        '2'
+                        {
+                            Write-Host "  Saving group '$GroupName' without ID" -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to save group without ID: '$GroupName'" -LogLevel "Verbose"
+                            return @{
+                                name = $GroupName
+                                id = $null
+                            }
+                        }
+                        '3'
+                        {
+                            Write-Host "  Skipping group '$GroupName'" -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped group: '$GroupName'" -LogLevel "Verbose"
+                            return $null
+                        }
+                        default
+                        {
+                            Write-Host "  Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                            continue
+                        }
+                    }
+                    break
+                } while ($true)
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "[$FunctionName] Error resolving group '$GroupName': $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $FunctionName -Message "Error resolving group '$GroupName': $($_.Exception.Message)" -LogLevel "Warning"
+        
+        Write-Host "  Error occurred while searching for group. Save without ID? (y/n)" -ForegroundColor Red
+        $choice = Read-Host
+        if ($choice -eq 'y' -or $choice -eq 'Y')
+        {
+            return @{
+                name = $GroupName
+                id = $null
+            }
+        }
+        else
+        {
+            return $null
+        }
     }
 }
