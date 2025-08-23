@@ -225,11 +225,15 @@ function Show-GroupsEditor()
                     Write-Host "`n══ Groups to Include ══" -ForegroundColor Green
                     Write-Host "Groups in this list will be specifically included in operations." -ForegroundColor Gray
                     Write-Host "Current groups to include:" -ForegroundColor Cyan
-                    
+                    Write-Verbose "[$functionName] Current groups to include: $($currentIncludeGroups -join ', ')"
+                    write-log -logFile $logFile -module $functionName -Message "Found $($currentIncludeGroups.Count) Current groups to include: $($currentIncludeGroups -join ', ')"
+                    Write-Verbose "[$functionName] Current groups to include count: $($currentIncludeGroups.Count)"
                     if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
                     {
                         # Detect format and display accordingly
                         $firstElement = $currentIncludeGroups[0]
+                        Write-Verbose "[$functionName] Current groups to include format: $($firstElement.GetType().Name)"
+                        write-log -logFile $logFile -module $functionName -Message "Current groups to include format: $($firstElement.GetType().Name)"
                         if ($firstElement -is [string])
                         {
                             # Old string format
@@ -240,8 +244,8 @@ function Show-GroupsEditor()
                             Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
                         }
                         elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentIncludeGroups)
@@ -307,11 +311,14 @@ function Show-GroupsEditor()
                     Write-Host "`n══ Groups to Exclude ══" -ForegroundColor Red
                     Write-Host "Groups in this list will be specifically excluded from operations." -ForegroundColor Gray
                     Write-Host "Current groups to exclude:" -ForegroundColor Cyan
-                    
+                    Write-Verbose "[$functionName] $($currentExcludeGroups.count) groups to exclude: $($currentExcludeGroups -join ', ')"
+                    write-log -logFile $logFile -module $functionName -Message "$($currentExcludeGroups.count) groups to exclude: $($currentExcludeGroups -join ', ')"
                     if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
                     {
                         # Detect format and display accordingly
                         $firstElement = $currentExcludeGroups[0]
+                        Write-Verbose "[$functionName] Current groups to exclude format: $($firstElement.GetType().Name)"
+                        write-log -logFile $logFile -module $functionName -Message "Current groups to exclude format: $($firstElement.GetType().Name)"
                         if ($firstElement -is [string])
                         {
                             # Old string format
@@ -322,8 +329,8 @@ function Show-GroupsEditor()
                             Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
                         }
                         elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentExcludeGroups)
@@ -403,8 +410,8 @@ function Show-GroupsEditor()
                             Write-Host "  Total: $($currentIncludeGroups.Count) group(s) [Legacy Format]" -ForegroundColor Yellow
                         }
                         elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentIncludeGroups)
@@ -451,8 +458,8 @@ function Show-GroupsEditor()
                             Write-Host "  Total: $($currentExcludeGroups.Count) group(s) [Legacy Format]" -ForegroundColor Yellow
                         }
                         elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
                             foreach ($group in $currentExcludeGroups)
@@ -542,8 +549,8 @@ function Get-GroupArrayInput()
             $currentFormat = "StringArray"
         }
         elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name') -and $firstElement.ContainsKey('id')) -or 
-                 ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name') -and ($firstElement.PSObject.Properties.Name -contains 'id'))))
+            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name') -and $firstElement.ContainsKey('id')) -or 
+            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name') -and ($firstElement.PSObject.Properties.Name -contains 'id'))))
         {
             $currentFormat = "HashTableArray"
         }
