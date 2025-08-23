@@ -891,6 +891,12 @@ function Update-DomainGroupSetting()
                     $verifyConfig.groupsToExclude 
                 }
                 
+                # Enhanced logging for debugging array handling issues - handle null cases
+                $rawType = if ($null -eq $rawActualGroups) { "null" } else { $rawActualGroups.GetType().Name }
+                $rawJson = if ($null -eq $rawActualGroups) { "null" } else { $rawActualGroups | ConvertTo-Json -Compress }
+                Write-Log -LogFile $logFile -Module $functionName -Message "Raw data from config: Type=$rawType, Value=$rawJson" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Raw data: Type=$rawType, IsNull=$($null -eq $rawActualGroups), IsArray=$($rawActualGroups -is [array])"
+                
                 # Ensure actualGroups is always an array for consistent comparison
                 # This handles the JSON serialization issue where single items become individual objects
                 $actualGroups = if ($null -eq $rawActualGroups)
@@ -907,28 +913,41 @@ function Update-DomainGroupSetting()
                     @($rawActualGroups)
                 }
                 
-                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups"
+                # Enhanced logging for array conversion results - use safe count methods
+                $actualGroupsCount = if ($actualGroups -is [array]) { $actualGroups.Count } elseif ($null -eq $actualGroups) { 0 } else { 1 }
+                $groupsArrayCount = if ($groupsArray -is [array]) { $groupsArray.Count } elseif ($null -eq $groupsArray) { 0 } else { 1 }
+                
+                $actualType = if ($null -eq $actualGroups) { "null" } else { $actualGroups.GetType().Name }
+                $actualJson = if ($null -eq $actualGroups) { "null" } else { $actualGroups | ConvertTo-Json -Compress }
+                Write-Log -LogFile $logFile -Module $functionName -Message "After array conversion: Type=$actualType, SafeCount=$actualGroupsCount, Value=$actualJson" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] After conversion: Type=$actualType, SafeCount=$actualGroupsCount"
+                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $groupsArrayCount groups, Loaded $actualGroupsCount groups" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Verification: Saved $groupsArrayCount groups, Loaded $actualGroupsCount groups"
                 
                 # Handle different comparison strategies based on content type
                 $comparisonResult = $null
-                if ($groupsArray.Count -eq 0 -and $actualGroups.Count -eq 0)
+                if ($groupsArrayCount -eq 0 -and $actualGroupsCount -eq 0)
                 {
                     # Both are empty - verification successful
                     $comparisonResult = $null
                 }
-                elseif ($groupsArray.Count -ne $actualGroups.Count)
+                elseif ($groupsArrayCount -ne $actualGroupsCount)
                 {
                     # Different counts - verification failed
-                    $comparisonResult = @("Count mismatch: saved $($groupsArray.Count), loaded $($actualGroups.Count)")
+                    $savedType = if ($null -eq $groupsArray) { "null" } else { $groupsArray.GetType().Name }
+                    $loadedType = if ($null -eq $actualGroups) { "null" } else { $actualGroups.GetType().Name }
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Count mismatch detected: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Count mismatch: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType"
+                    $comparisonResult = @("Count mismatch: saved $groupsArrayCount, loaded $actualGroupsCount")
                 }
                 else
                 {
                     # Same count, need to compare content
-                    if ($groupsArray.Count -gt 0 -and $groupsArray[0] -is [hashtable])
+                    if ($groupsArrayCount -gt 0 -and $groupsArray[0] -is [hashtable])
                     {
                         # Hashtable comparison - compare by ID and name
-                        for ($i = 0; $i -lt $groupsArray.Count; $i++)
+                        for ($i = 0; $i -lt $groupsArrayCount; $i++)
                         {
                             $saved = $groupsArray[$i]
                             $loaded = $actualGroups[$i]
@@ -960,7 +979,7 @@ function Update-DomainGroupSetting()
                 else
                 {
                     Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType. Details: $($comparisonResult -join ', ')" -LogLevel "Warning"
-                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $($groupsArray.Count) items, Loaded: $($actualGroups.Count) items"
+                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $groupsArrayCount items, Loaded: $actualGroupsCount items"
                     Write-Verbose "[$functionName] Verification failed for $GroupType. Comparison result: $($comparisonResult -join ', ')"
                     Write-Warning "[$functionName] Verification failed for $GroupType"
                     return $false
