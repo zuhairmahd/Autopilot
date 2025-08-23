@@ -53,6 +53,33 @@ function Initialize-ApplicationConfiguration()
     Write-Verbose "[$functionName] StringsFile: $StringsFile"
     Write-Verbose "[$functionName] Domain: $Domain"
     
+    # Helper function for batched file validation (Performance Optimization Phase 2)
+    function Test-ConfigurationFilesExist($FilesToCheck) {
+        $validationResults = @{}
+        $existingCount = 0
+        $missingCount = 0
+        
+        Write-Verbose "[$functionName] Batch validating $($FilesToCheck.Count) configuration files"
+        
+        foreach ($file in $FilesToCheck) {
+            $exists = Test-Path -Path $file.Path
+            $validationResults[$file.Type] = @{
+                Path = $file.Path
+                Exists = $exists
+                Type = $file.Type
+            }
+            
+            if ($exists) {
+                $existingCount++
+            } else {
+                $missingCount++
+            }
+        }
+        
+        Write-Verbose "[$functionName] File validation complete: $existingCount existing, $missingCount missing"
+        return $validationResults
+    }
+    
     try
     {
         # Initialize result object
@@ -74,8 +101,17 @@ function Initialize-ApplicationConfiguration()
             return $result
         }
         
-        # Step 2: Load and process configuration if settings.json exists
-        if (Test-Path -Path $InitFile)
+        # Step 2: Batch validate critical configuration files (Performance Optimization Phase 2)
+        $filesToValidate = @(
+            @{ Path = $InitFile; Type = "Settings" }
+            @{ Path = $StringsFile; Type = "Strings" }
+            @{ Path = "$([System.IO.Path]::GetDirectoryName($InitFile))\menu.json"; Type = "Menu" }
+        )
+        
+        $fileValidation = Test-ConfigurationFilesExist $filesToValidate
+        
+        # Step 3: Load and process configuration if settings.json exists
+        if ($fileValidation["Settings"].Exists)
         {
             Write-Verbose "[$functionName] Loading configuration from $InitFile"
             
@@ -221,29 +257,51 @@ function Initialize-AuthConfiguration()
     }
     
     Write-Verbose "[$functionName] Processing auth configuration"
+    
+    # Batch processing counters for performance optimization
+    $authProcessedCount = 0
+    $authBooleanCount = 0
+    $authOverrideCount = 0
+    
     foreach ($key in $AuthConfiguration.PSObject.Properties.Name)
     {
-        Write-Verbose "[$functionName] Processing auth key: $key"
+        # Conditional verbose logging - only log individual settings when explicit verbose is used
+        if ($VerbosePreference -eq 'Continue') {
+            Write-Verbose "[$functionName] Processing auth key: $key"
+        }
+        
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $AuthConfiguration.$key)
         {
             if ($AuthConfiguration.$key -in ('true', 'false'))
             {
                 $keyBooleanValue = [bool]::Parse($AuthConfiguration.$key)
                 $auth.add($key, $keyBooleanValue)
-                Write-Verbose "[$functionName] Set $key to boolean value: $keyBooleanValue"
+                if ($VerbosePreference -eq 'Continue') {
+                    Write-Verbose "[$functionName] Set $key to boolean value: $keyBooleanValue"
+                }
+                $authBooleanCount++
             }
             else
             {
                 $auth.add($key, $AuthConfiguration.$key)
-                Write-Verbose "[$functionName] Set $key to string value: $($AuthConfiguration.$key)"
+                if ($VerbosePreference -eq 'Continue') {
+                    Write-Verbose "[$functionName] Set $key to string value: $($AuthConfiguration.$key)"
+                }
             }
+            $authProcessedCount++
         }
         elseif ($PSBoundParameters.ContainsKey($key))
         {
             $auth.add($key, $PSBoundParameters[$key])
-            Write-Verbose "[$functionName] Used command-line parameter for $key`: $($PSBoundParameters[$key])"
+            if ($VerbosePreference -eq 'Continue') {
+                Write-Verbose "[$functionName] Used command-line parameter for $key`: $($PSBoundParameters[$key])"
+            }
+            $authOverrideCount++
         }
     }
+    
+    # Batch summary logging for performance optimization
+    Write-Verbose "[$functionName] Completed processing $authProcessedCount auth settings ($authBooleanCount boolean, $authOverrideCount overrides)"
     
     return @{ Auth = $auth }
 }
@@ -275,37 +333,65 @@ function Initialize-GlobalSettings()
     
     Write-Verbose "[$functionName] Processing $($GlobalConfigData.PSObject.Properties.Name.count) global settings"
     Write-Log -logFile $logFile -Message "Processing $($GlobalConfigData.PSObject.Properties.Name.count) global settings" -module $functionName -logLevel "Information"
+    
+    # Batch processing counters for performance optimization
+    $processedCount = 0
+    $booleanCount = 0
+    $overrideCount = 0
+    
     foreach ($key in $GlobalConfigData.PSObject.Properties.Name)
     {
-        Write-Verbose "[$functionName] Processing global setting: $key"
-        Write-Log -logFile $logFile -Message "Processing global setting: $key" -module $functionName -logLevel "Information"
+        # Conditional verbose logging - only log individual settings when explicit verbose is used
+        if ($VerbosePreference -eq 'Continue') {
+            Write-Verbose "[$functionName] Processing global setting: $key"
+        }
+        Write-Log -logFile $logFile -Message "Processing global setting: $key" -module $functionName -logLevel "Verbose"
+        
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key)
         {
-            Write-Verbose "[$functionName] Checking if $key is a boolean"
-            Write-Log -logFile $logFile -Message "Checking if $key is a boolean" -module $functionName -logLevel "Information"
+            if ($VerbosePreference -eq 'Continue') {
+                Write-Verbose "[$functionName] Checking if $key is a boolean"
+            }
+            Write-Log -logFile $logFile -Message "Checking if $key is a boolean" -module $functionName -logLevel "Verbose"
+            
             if ($GlobalConfigData.$key -in ('true', 'false'))
             {
-                Write-Verbose "[$functionName] $key is a boolean"
-                Write-Log -logFile $logFile -Message "$key is a boolean" -module $functionName -logLevel "Information"
+                if ($VerbosePreference -eq 'Continue') {
+                    Write-Verbose "[$functionName] $key is a boolean"
+                }
+                Write-Log -logFile $logFile -Message "$key is a boolean" -module $functionName -logLevel "Verbose"
                 $keyBooleanValue = [bool]::Parse($GlobalConfigData.$key)
                 $globalSettings.add($key, $keyBooleanValue)
-                Write-Verbose "[$functionName] Set global $key to boolean: $keyBooleanValue"
-                Write-Log -logFile $logFile -Message "Set global $key to boolean: $keyBooleanValue" -module $functionName -logLevel "Information"
+                if ($VerbosePreference -eq 'Continue') {
+                    Write-Verbose "[$functionName] Set global $key to boolean: $keyBooleanValue"
+                }
+                Write-Log -logFile $logFile -Message "Set global $key to boolean: $keyBooleanValue" -module $functionName -logLevel "Verbose"
+                $booleanCount++
             }
             else
             {
                 $globalSettings.add($key, $GlobalConfigData.$key)
-                Write-Verbose "[$functionName] Set global $key to: $($GlobalConfigData.$key)"
-                Write-Log -logFile $logFile -Message "Set global $key to: $($GlobalConfigData.$key)" -module $functionName -logLevel "Information"
+                if ($VerbosePreference -eq 'Continue') {
+                    Write-Verbose "[$functionName] Set global $key to: $($GlobalConfigData.$key)"
+                }
+                Write-Log -logFile $logFile -Message "Set global $key to: $($GlobalConfigData.$key)" -module $functionName -logLevel "Verbose"
             }
+            $processedCount++
         }
         elseif ($PSBoundParameters.ContainsKey($key))
         {
             $globalSettings.add($key, $PSBoundParameters[$key])
-            Write-Verbose "[$functionName] Used command-line override for global $key"
-            Write-Log -logFile $logFile -Message "Used command-line override for global $key" -module $functionName -logLevel "Information"
+            if ($VerbosePreference -eq 'Continue') {
+                Write-Verbose "[$functionName] Used command-line override for global $key"
+            }
+            Write-Log -logFile $logFile -Message "Used command-line override for global $key" -module $functionName -logLevel "Verbose"
+            $overrideCount++
         }
     }
+    
+    # Batch summary logging for performance optimization
+    Write-Verbose "[$functionName] Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)"
+    Write-Log -logFile $logFile -Message "Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)" -module $functionName -logLevel "Information"
     
     # Apply overwrite settings to global configuration
     if ($processConfigOverwrite)

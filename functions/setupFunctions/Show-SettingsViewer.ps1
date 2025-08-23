@@ -599,31 +599,49 @@ function Format-SettingValueForDisplay()
     [CmdletBinding()]
     param($Value)
     
-    if ($Value -is [array])
-    {
-        if ($Value.Count -eq 0)
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Add detailed logging for debugging array display issues
+    Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
+    
+    try {
+        if ($Value -is [array])
         {
-            return "(empty array)"
+            Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
+            if ($Value.Count -eq 0)
+            {
+                return "(empty array)"
+            }
+            else
+            {
+                $joinedValue = $Value -join ', '
+                Write-Verbose "[$functionName] Array joined as: '$joinedValue'"
+                return "[$joinedValue]"
+            }
+        }
+        elseif ($Value -is [bool])
+        {
+            Write-Verbose "[$functionName] Processing boolean value: $Value"
+            return $Value.ToString().ToLower()
+        }
+        elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
+        {
+            Write-Verbose "[$functionName] Processing hashtable or PSCustomObject"
+            return "(nested object)"
+        }
+        elseif ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value))
+        {
+            Write-Verbose "[$functionName] Processing null or whitespace value"
+            return "(not set)"
         }
         else
         {
-            return "[$($Value -join ', ')]"
+            Write-Verbose "[$functionName] Processing other type as string: '$Value'"
+            return [string]$Value
         }
     }
-    elseif ($Value -is [bool])
-    {
-        return $Value.ToString().ToLower()
-    }
-    elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
-    {
-        return "(nested object)"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($Value))
-    {
-        return "(not set)"
-    }
-    else
-    {
+    catch {
+        Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
         return $Value.ToString()
     }
 }

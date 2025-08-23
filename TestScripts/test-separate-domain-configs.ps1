@@ -32,6 +32,16 @@ try
     # Initialize unified test environment
     $testContext = Start-UnifiedTest -TestName "Separate Domain Configuration Files" -TestFolder $TestFolder
     
+    # Safety check: Ensure test folder is in temp directory
+    $tempDir = if ($IsWindows) { $env:TEMP } else { "/tmp" }
+    if (-not $testContext.TestFolder.StartsWith($tempDir))
+    {
+        Write-Warning "Test folder is not in temp directory! TestFolder: $($testContext.TestFolder), TempDir: $tempDir"
+        Write-TestResult "Test folder safety check failed - not in temp directory" $false
+        exit 1
+    }
+    Write-TestResult "Test folder safety check passed - using temp directory: $($testContext.TestFolder)" $true
+    
     # Set global variable required by JSON functions
     $global:maxJSONDepth = 10
     

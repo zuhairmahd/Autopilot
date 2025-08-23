@@ -609,31 +609,49 @@ function Format-SettingValueForDisplay()
     [CmdletBinding()]
     param($Value)
     
-    if ($Value -is [array])
-    {
-        if ($Value.Count -eq 0)
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Add detailed logging for debugging array display issues
+    Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
+    
+    try {
+        if ($Value -is [array])
         {
-            return "(empty array)"
+            Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
+            if ($Value.Count -eq 0)
+            {
+                return "(empty array)"
+            }
+            else
+            {
+                $joinedValue = $Value -join ', '
+                Write-Verbose "[$functionName] Array joined as: '$joinedValue'"
+                return "[$joinedValue]"
+            }
+        }
+        elseif ($Value -is [bool])
+        {
+            Write-Verbose "[$functionName] Processing boolean value: $Value"
+            return $Value.ToString().ToLower()
+        }
+        elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
+        {
+            Write-Verbose "[$functionName] Processing hashtable or PSCustomObject"
+            return "(nested object)"
+        }
+        elseif ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value))
+        {
+            Write-Verbose "[$functionName] Processing null or whitespace value"
+            return "(not set)"
         }
         else
         {
-            return "[$($Value -join ', ')]"
+            Write-Verbose "[$functionName] Processing other type as string: '$Value'"
+            return [string]$Value
         }
     }
-    elseif ($Value -is [bool])
-    {
-        return $Value.ToString().ToLower()
-    }
-    elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
-    {
-        return "(nested object)"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($Value))
-    {
-        return "(not set)"
-    }
-    else
-    {
+    catch {
+        Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
         return $Value.ToString()
     }
 }
@@ -1147,7 +1165,7 @@ function Get-ArrayInput()
             {
                 Write-Verbose "[$functionName] User chose to keep current values unchanged"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
-                return $CurrentValue
+                return ,$CurrentValue
             }
         }
     }
@@ -1174,7 +1192,7 @@ function Get-ArrayInput()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current array values" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] User cancelled input, keeping current array values"
-                return $CurrentValue
+                return ,$CurrentValue
             }
             
             $newValues += $input
@@ -1206,8 +1224,15 @@ function Get-ArrayInput()
         $result = @($CurrentValue) + @($newValues)
     }
     
-    # Ensure single values are still treated as arrays
-    if ($result.Count -eq 1)
+    # Ensure result is always an array, even for single elements
+    # This prevents PowerShell from unwrapping single-element arrays
+    if ($result -isnot [array])
+    {
+        $result = @($result)
+        Write-Log -LogFile $logFile -Module $functionName -Message "Converted non-array result to array to maintain type consistency" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Converted non-array result to array to maintain type consistency"
+    }
+    elseif ($result.Count -eq 1)
     {
         # Force single element to remain as array 
         $result = @($result[0])
@@ -1215,9 +1240,19 @@ function Get-ArrayInput()
         Write-Verbose "[$functionName] Single value converted to array to maintain type consistency"
     }
     
-    Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values" -LogLevel "Information"
-    Write-Verbose "[$functionName] Returning array with $($result.Count) values"
-    return $result
+    # Final verification that we're returning an array
+    if ($result -isnot [array])
+    {
+        Write-Warning "[$functionName] Warning: Result is not an array after processing. Type: $($result.GetType().Name)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is not an array after processing. Type: $($result.GetType().Name)" -LogLevel "Warning"
+        $result = @($result)
+    }
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values. Array type verified: $($result -is [array])" -LogLevel "Information"
+    Write-Verbose "[$functionName] Returning array with $($result.Count) values. Array type verified: $($result -is [array])"
+    
+    # Use comma operator to preserve array type, preventing PowerShell from unwrapping single-element arrays
+    return ,$result
 }
 
 function Get-NumberInput()
