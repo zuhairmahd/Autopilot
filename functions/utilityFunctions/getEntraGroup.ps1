@@ -11,6 +11,26 @@ function GetEntraGroup()
     $substringSearch = $false
     Write-Verbose "[$functionName] Starting function to get group from Entra ID"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting function to get group from Entra ID" -LogLevel "Information"
+    
+    # Initialize group cache if it doesn't exist
+    if (-not $global:GroupCache)
+    {
+        $global:GroupCache = @{}
+        Write-Verbose "[$functionName] Initialized group cache"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initialized group cache" -LogLevel "Verbose"
+    }
+    
+    # Create cache key including FindSimilar flag for different search types
+    $cacheKey = "$groupName|$FindSimilar"
+    
+    # Check cache first
+    if ($global:GroupCache.ContainsKey($cacheKey))
+    {
+        Write-Verbose "[$functionName] Found cached result for group: $groupName (FindSimilar: $FindSimilar)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached result for group: $groupName" -LogLevel "Verbose"
+        return $global:GroupCache[$cacheKey]
+    }
+    
     # Validate access token
     if (-not $accessToken)
     {
@@ -28,18 +48,19 @@ function GetEntraGroup()
     $Info = CallGraphAPI -AccessToken $accessToken -ResourcePath $Uri -Filter $filter -ExtraParameters $ExtraParameters
     Write-Verbose "[$functionName] Exact match API response: $($Info | Out-String)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exact match API response: $($Info | Out-String)" -LogLevel "Information"
-    if ($Info -notin 400, 401, 403, 404 -and $info.value.count -gt 0)
+    if ($Info -notin 400, 401, 403, 404 -and $Info.value -and $Info.value.count -gt 0)
     {
         Write-Verbose "[$functionName] Exact match found for group: $groupName"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exact match found for group: $groupName" -LogLevel "Information"
-        Write-Verbose "[$functionName] group found: $($Info.displayName)"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "group found: $($Info.displayName)" -LogLevel "Information"
-        # Create a response object in the same format as Graph API for consistency
-        $exactMatchResponse = [PSCustomObject]@{
-            '@odata.context' = $null
-            value            = @($Info)  # Force array creation even for single item
-        }
-        return $exactMatchResponse, $substringSearch
+        Write-Verbose "[$functionName] group found: $($Info.value[0].displayName)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "group found: $($Info.value[0].displayName)" -LogLevel "Information"
+        # Cache the result before returning
+        $result = $Info, $substringSearch
+        $global:GroupCache[$cacheKey] = $result
+        Write-Verbose "[$functionName] Cached result for group: $groupName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for group: $groupName" -LogLevel "Verbose"
+        # Return the response directly as it's already in the correct format
+        return $result
     }
     
     # Handle error cases - show error message only if FindSimilar is not enabled
@@ -211,7 +232,12 @@ function GetEntraGroup()
             }
             Write-Verbose "[$functionName] Filtered results to $($filteredResponse.value.Count) unique objects after exclusions"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Filtered results to $($filteredResponse.value.Count) unique objects after exclusions" -LogLevel "Information"
-            return $filteredResponse, $substringSearch
+            # Cache the similarity search result before returning
+            $result = $filteredResponse, $substringSearch
+            $global:GroupCache[$cacheKey] = $result
+            Write-Verbose "[$functionName] Cached similarity search result for group: $groupName"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached similarity search result for group: $groupName" -LogLevel "Verbose"
+            return $result
         }
         else        
         {

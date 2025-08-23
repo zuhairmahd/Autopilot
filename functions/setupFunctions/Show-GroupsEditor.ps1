@@ -158,7 +158,7 @@ function Show-GroupsEditor()
         Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
         # Get current group settings with safe defaults
-        $currentIncludeGroups = if ($domainConfig.groupsToInclude) 
+        $currentIncludeGroups = if ($domainConfig.groupsToInclude -and $domainConfig.groupsToInclude.Count -gt 0) 
         { 
             $domainConfig.groupsToInclude 
         } 
@@ -167,7 +167,7 @@ function Show-GroupsEditor()
             @() 
         }
         
-        $currentExcludeGroups = if ($domainConfig.groupsToExclude) 
+        $currentExcludeGroups = if ($domainConfig.groupsToExclude -and $domainConfig.groupsToExclude.Count -gt 0) 
         { 
             $domainConfig.groupsToExclude 
         } 
@@ -873,7 +873,43 @@ function Update-DomainGroupSetting()
                 {
                     $verifyConfig.groupsToExclude 
                 }
-                $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+                
+                # Handle different comparison strategies based on content type
+                $comparisonResult = $null
+                if ($groupsArray.Count -eq 0 -and ($null -eq $actualGroups -or $actualGroups.Count -eq 0))
+                {
+                    # Both are empty - verification successful
+                    $comparisonResult = $null
+                }
+                elseif ($groupsArray.Count -ne $actualGroups.Count)
+                {
+                    # Different counts - verification failed
+                    $comparisonResult = @("Count mismatch")
+                }
+                else
+                {
+                    # Same count, need to compare content
+                    if ($groupsArray.Count -gt 0 -and $groupsArray[0] -is [hashtable])
+                    {
+                        # Hashtable comparison - compare by ID and name
+                        for ($i = 0; $i -lt $groupsArray.Count; $i++)
+                        {
+                            $saved = $groupsArray[$i]
+                            $loaded = $actualGroups[$i]
+                            
+                            if (($saved.name -ne $loaded.name) -or ($saved.id -ne $loaded.id))
+                            {
+                                $comparisonResult = @("Hashtable content mismatch at index $i")
+                                break
+                            }
+                        }
+                    }
+                    else
+                    {
+                        # String or simple object comparison
+                        $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+                    }
+                }
                 
                 if ($null -eq $comparisonResult)
                 {
@@ -883,7 +919,8 @@ function Update-DomainGroupSetting()
                 }
                 else
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType" -LogLevel "Warning"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType. Saved: $($groupsArray.Count) items, Loaded: $($actualGroups.Count) items" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Verification failed for $GroupType. Comparison result: $($comparisonResult -join ', ')"
                     Write-Warning "[$functionName] Verification failed for $GroupType"
                     return $false
                 }
