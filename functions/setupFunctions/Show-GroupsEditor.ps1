@@ -225,13 +225,12 @@ function Show-GroupsEditor()
                     Write-Host "`n══ Groups to Include ══" -ForegroundColor Green
                     Write-Host "Groups in this list will be specifically included in operations." -ForegroundColor Gray
                     Write-Host "Current groups to include:" -ForegroundColor Cyan
-                    Write-Verbose "[$functionName] Current groups to include: $($currentIncludeGroups -join ', ')"
-                    write-log -logFile $logFile -module $functionName -Message "Found $($currentIncludeGroups.Count) Current groups to include: $($currentIncludeGroups -join ', ')"
+                    write-log -logFile $logFile -module $functionName -Message "Found $($currentIncludeGroups.Count) groups to include"
                     Write-Verbose "[$functionName] Current groups to include count: $($currentIncludeGroups.Count)"
                     if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
                     {
                         # Detect format and display accordingly
-                        $firstElement = $currentIncludeGroups[0]
+                        $firstElement = $currentIncludeGroups | Select-Object -First 1
                         Write-Verbose "[$functionName] Current groups to include format: $($firstElement.GetType().Name)"
                         write-log -logFile $logFile -module $functionName -Message "Current groups to include format: $($firstElement.GetType().Name)"
                         if ($firstElement -is [string])
@@ -276,9 +275,15 @@ function Show-GroupsEditor()
                     }
                     
                     $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
+                    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
+                    {
+                        Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
+                        [console]::beep(1000, 500)
+                        $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
+                    }
+
                     if ($choice -eq 'y' -or $choice -eq 'Y')
                     {
-                        
                         $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include" -AccessToken $AccessToken
                         if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
                         {
@@ -316,7 +321,7 @@ function Show-GroupsEditor()
                     if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
                     {
                         # Detect format and display accordingly
-                        $firstElement = $currentExcludeGroups[0]
+                        $firstElement = $currentExcludeGroups | Select-Object -First 1
                         Write-Verbose "[$functionName] Current groups to exclude format: $($firstElement.GetType().Name)"
                         write-log -logFile $logFile -module $functionName -Message "Current groups to exclude format: $($firstElement.GetType().Name)"
                         if ($firstElement -is [string])
@@ -361,6 +366,12 @@ function Show-GroupsEditor()
                     }
                     
                     $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
+                    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
+                    {
+                        Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
+                        [console]::beep(1000, 500)
+                        $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
+                    }
                     if ($choice -eq 'y' -or $choice -eq 'Y')
                     {
                         $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude" -AccessToken $AccessToken
