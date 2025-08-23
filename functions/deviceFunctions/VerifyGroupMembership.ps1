@@ -30,8 +30,8 @@ function VerifyGroupMembership()
         elseif ($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) {
             # Accept hashtables with either name OR id (not requiring both to have values)
             # Just check that the properties exist as keys, regardless of their values
-            $hasNameProperty = $firstElement.PSObject.Properties.Name -contains "name" -or $firstElement.ContainsKey("name")
-            $hasIdProperty = $firstElement.PSObject.Properties.Name -contains "id" -or $firstElement.ContainsKey("id")
+            $hasNameProperty = (($firstElement.PSObject -and $firstElement.PSObject.Properties.Name -contains "name") -or $firstElement.ContainsKey("name"))
+            $hasIdProperty = (($firstElement.PSObject -and $firstElement.PSObject.Properties.Name -contains "id") -or $firstElement.ContainsKey("id"))
             
             if ($hasNameProperty -and $hasIdProperty) {
                 return "HashTableArray"
