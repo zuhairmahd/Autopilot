@@ -182,10 +182,10 @@ $TestRegistry = @{
         Dependencies      = @('syntax', 'core', 'unit')
     }
     'performance'   = @{
-        Description       = 'Performance optimization tests and validation (Phase 1-3)'
+        Description       = 'Performance optimization tests and validation (Phase 1-4)'
         Pattern           = 'test-performance-*.ps1,test-phase*-*.ps1'
         Priority          = 4
-        EstimatedDuration = '3-5 minutes'
+        EstimatedDuration = '4-7 minutes'
         Dependencies      = @('syntax', 'core')
     }
     'regression'    = @{
