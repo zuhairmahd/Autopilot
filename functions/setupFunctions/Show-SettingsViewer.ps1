@@ -594,15 +594,19 @@ function Format-SettingValueForDisplay()
 {
     <#
     .SYNOPSIS
-        Formats a setting value for display in the UI.
+        Formats a setting value for display in the UI with enhanced array and nested object handling.
     #>
     [CmdletBinding()]
     param($Value)
     
     $functionName = $MyInvocation.MyCommand.Name
     
-    # Add detailed logging for debugging array display issues
-    Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
+    # Add detailed logging for debugging array display issues  
+    if ($null -ne $Value) {
+        Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
+    } else {
+        Write-Verbose "[$functionName] Formatting null value for display"
+    }
     
     try {
         if ($Value -is [array])
@@ -614,8 +618,25 @@ function Format-SettingValueForDisplay()
             }
             else
             {
-                $joinedValue = $Value -join ', '
-                Write-Verbose "[$functionName] Array joined as: '$joinedValue'"
+                # Handle nested arrays properly - flatten if needed
+                $flattenedElements = @()
+                foreach ($element in $Value)
+                {
+                    if ($element -is [array])
+                    {
+                        # Handle nested array by flattening it
+                        Write-Verbose "[$functionName] Found nested array element, flattening"
+                        $flattenedElements += $element
+                    }
+                    else
+                    {
+                        $flattenedElements += $element
+                    }
+                }
+                
+                # Join the flattened elements
+                $joinedValue = $flattenedElements -join ', '
+                Write-Verbose "[$functionName] Array elements flattened and joined as: '$joinedValue'"
                 return "[$joinedValue]"
             }
         }
@@ -642,6 +663,11 @@ function Format-SettingValueForDisplay()
     }
     catch {
         Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
+        # Fallback to safe string conversion
+        if ($Value -is [array] -and $Value.Count -gt 0)
+        {
+            return "[$($Value -join ', ')]"
+        }
         return $Value.ToString()
     }
 }
