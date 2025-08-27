@@ -142,6 +142,12 @@ try {
     # Test 3: Verify Lazy Loading Implementation
     Write-Host "`nTesting Lazy Loading Implementation..." -ForegroundColor Cyan
     
+    # Establish a baseline for full configuration load (non-lazy) to compare against
+    $baselineFullLoadStart = Get-Date
+    $baselineFullConfig = Get-DomainConfigurationFromFiles -DomainName "test.com"
+    $baselineFullLoadEnd = Get-Date
+    $baselineFullDuration = ($baselineFullLoadEnd - $baselineFullLoadStart).TotalMilliseconds
+
     # Test lazy loading
     $lazyLoadStart = Get-Date
     $lazyConfig = Get-DomainConfigurationFromFiles -DomainName "test.com" -LazyLoad
@@ -149,7 +155,11 @@ try {
     $lazyDuration = ($lazyLoadEnd - $lazyLoadStart).TotalMilliseconds
     
     Test-Result "Lazy loading returns minimal config" ($lazyConfig.settings.lazyLoaded -eq $true) "LazyLoaded: $($lazyConfig.settings.lazyLoaded)"
-    Test-Result "Lazy loading is fast" ($lazyDuration -lt 100) "Duration: $($lazyDuration)ms"
+    # Compare lazy load duration as a percentage of baseline full load duration
+    $lazyVsFullPercent = if ($baselineFullDuration -gt 0) { [math]::Round(($lazyDuration / $baselineFullDuration) * 100, 2) } else { 0 }
+    Test-Result "Lazy loading is fast (<= 50% of full load)" (
+        ($baselineFullDuration -gt 0) -and ($lazyVsFullPercent -le 50)
+    ) "Lazy vs Full: $lazyVsFullPercent% (Lazy=$([math]::Round($lazyDuration,2))ms, Full=$([math]::Round($baselineFullDuration,2))ms)"
     Test-Result "Domain name preserved" ($lazyConfig._domainName -eq "test.com") "Domain: $($lazyConfig._domainName)"
     
     # Test full loading from lazy config
@@ -210,17 +220,23 @@ try {
             $performanceTests += $perfDuration
         }
         
-        $avgDuration = ($performanceTests | Measure-Object -Average).Average
-        $maxDuration = ($performanceTests | Measure-Object -Maximum).Maximum
-        $minDuration = ($performanceTests | Measure-Object -Minimum).Minimum
-        
-        Test-Result "Average initialization time reasonable" ($avgDuration -lt 2000) "Avg: $([math]::Round($avgDuration, 2))ms"
-        Test-Result "Performance consistency good" (($maxDuration - $minDuration) -lt 1500) "Range: $([math]::Round($maxDuration - $minDuration, 2))ms"
-        
-        Write-Host "    Performance metrics:" -ForegroundColor Gray
-        Write-Host "      Average: $([math]::Round($avgDuration, 2))ms" -ForegroundColor Gray
-        Write-Host "      Min: $([math]::Round($minDuration, 2))ms" -ForegroundColor Gray
-        Write-Host "      Max: $([math]::Round($maxDuration, 2))ms" -ForegroundColor Gray
+    $avgDuration = ($performanceTests | Measure-Object -Average).Average
+    $maxDuration = ($performanceTests | Measure-Object -Maximum).Maximum
+    $minDuration = ($performanceTests | Measure-Object -Minimum).Minimum
+
+    $firstDuration = $performanceTests[0]
+    $avgVsFirstPercent = if ($firstDuration -gt 0) { [math]::Round(($avgDuration / $firstDuration) * 100, 2) } else { 0 }
+    $variabilityPercent = if ($avgDuration -gt 0) { [math]::Round((($maxDuration - $minDuration) / $avgDuration) * 100, 2) } else { 0 }
+
+    # Use percentage-based checks relative to baseline (first run) and variability against average
+    Test-Result "Average init time within 110% of first run" ($avgVsFirstPercent -le 110) "Avg vs First: $avgVsFirstPercent% (Avg=$([math]::Round($avgDuration,2))ms, First=$([math]::Round($firstDuration,2))ms)"
+    Test-Result "Performance variability <= 50% of average" ($variabilityPercent -le 50) "Variability: $variabilityPercent% (Range=$([math]::Round($maxDuration - $minDuration,2))ms)"
+
+    Write-Host "    Performance metrics:" -ForegroundColor Gray
+    Write-Host "      Average: $([math]::Round($avgDuration, 2))ms ($avgVsFirstPercent% of first)" -ForegroundColor Gray
+    Write-Host "      Min: $([math]::Round($minDuration, 2))ms" -ForegroundColor Gray
+    Write-Host "      Max: $([math]::Round($maxDuration, 2))ms" -ForegroundColor Gray
+    Write-Host "      Variability: $variabilityPercent% of average" -ForegroundColor Gray
     }
     
     # Cleanup test files

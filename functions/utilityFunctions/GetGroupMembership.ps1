@@ -7,7 +7,9 @@ function getGroupMembership()
         [Parameter(Mandatory = $true)]
         [string]$userName,
         [Parameter(Mandatory = $true)]
-        [string[]]$groups
+        [string[]]$groups,
+        [ValidateSet("Names", "Ids")]
+        [string]$returnType = "Names"
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -35,18 +37,41 @@ function getGroupMembership()
     }
     Write-Verbose "[$functionName] Resolving group names to IDs..."
     Write-Log -logFile $logFile -module $functionName -Message "Resolving group names to IDs..."
-    $GroupIds = GetGroupIdsByNames -accessToken $accessToken -groupNames $groups
-    Write-Verbose "[$functionName] Resolved group names to IDs: $($GroupIds -join ', ')"
-    Write-Log -logFile $logFile -module $functionName -Message "Resolved group names to IDs: $($GroupIds -join ', ')"
-    if ($groups.count -eq $GroupIds.count)
+    #validate if the first element is a GUID or a name.
+    $isGUID = $false
+    if ($groups[0] -match '^[{(]?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[)}]?$')
     {
-        Write-Verbose "[$functionName] All group names were resolved to IDs."
-        Write-Log -logFile $logFile -module $functionName -Message "All group names were resolved to IDs."
+        Write-Verbose "[$functionName] Detected GUID format for groups."
+        Write-Log -logFile $logFile -module $functionName -Message "Detected GUID format for groups."
+        $isGUID = $true
     }
     else
     {
-        Write-Warning "[$functionName] Some group names could not be resolved to IDs."
-        Write-Log -logFile $logFile -module $functionName -Message "Some group names could not be resolved to IDs." -logLevel "warning"
+        Write-Verbose "[$functionName] Detected Name format for groups."
+        Write-Log -logFile $logFile -module $functionName -Message "Detected Name format for groups."
+    }
+    if (-not $isGUID)
+    {
+        # Convert group names to IDs
+        $GroupIds = GetGroupIdsByNames -accessToken $accessToken -groupNames $groups
+        Write-Verbose "[$functionName] Resolved group names to IDs: $($GroupIds -join ', ')"
+        Write-Log -logFile $logFile -module $functionName -Message "Resolved group names to IDs: $($GroupIds -join ', ')"
+        if ($groups.count -eq $GroupIds.count)
+        {
+            Write-Verbose "[$functionName] All group names were resolved to IDs."
+            Write-Log -logFile $logFile -module $functionName -Message "All group names were resolved to IDs."
+        }
+        else
+        {
+            Write-Warning "[$functionName] Some group names could not be resolved to IDs."
+            Write-Log -logFile $logFile -module $functionName -Message "Some group names could not be resolved to IDs." -logLevel "warning"
+        }
+    }
+    else
+    {
+        $GroupIds = $groups
+        Write-Verbose "[$functionName] Using provided group IDs: $($GroupIds -join ', ')"
+        Write-Log -logFile $logFile -module $functionName -Message "Using provided group IDs: $($GroupIds -join ', ')"
     }
     #build a json object with the group ids
     $body = @{
@@ -62,6 +87,12 @@ function getGroupMembership()
     Write-Log -logFile $logFile -module $functionName -Message "Graph API response: $($response | ConvertTo-Json -Depth 10)"
     Write-Verbose "[$functionName] Resolving group IDs to names..."
     Write-Log -logFile $logFile -module $functionName -Message "Resolving group IDs to names..."
+    if ($returnType -eq "Ids")
+    {
+        Write-Verbose "[$functionName] Returning group IDs."
+        Write-Log -logFile $logFile -module $functionName -Message "Returning group IDs."
+        return $response.value
+    }
     $groupNames = GetGroupIdsByNames -accessToken $accessToken -groupNames $response.value
     Write-Log -logFile $logFile -module $functionName -Message "Resolved group IDs to names: $($groupNames -join ', ')"
     return $groupNames
