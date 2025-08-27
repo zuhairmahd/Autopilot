@@ -53,8 +53,7 @@ function Get-ApplicationDefaults()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Initialize script-level cache if not exists
-    if (-not $script:defaultsCache) {
-        $script:defaultsCache = @{}
+        $script:defaultsCache = New-Object 'System.Collections.Concurrent.ConcurrentDictionary[string,object]'
     }
     
     # Use global version if available, otherwise default
