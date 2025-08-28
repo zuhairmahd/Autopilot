@@ -63,7 +63,7 @@ jobs:
 
       - name: Build executable
         shell: pwsh
-        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -Overwrite
+        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -Overwrite -SkipSigning
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

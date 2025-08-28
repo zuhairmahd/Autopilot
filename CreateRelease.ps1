@@ -69,6 +69,7 @@ param(
     [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
     [switch]$noCleanup,
+    [switch]$SkipSigning,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
@@ -1183,17 +1184,24 @@ else
     Write-Host "Failed to create executable: $OutputFile"
     exit 1
 }
+if (-not $SkipSigning)
+{
+    Write-Host "Signing executable at $OutputFile"
+    if (SignScripts -path "$pwd\build")
+    {
+        Write-Host "Executable signed successfully: $OutputFile"
+    }
+    else
+    {
+        Write-Host "Failed to sign executable: $OutputFile"
+        exit 1
+    }
+}
+else 
+{
+    Write-Host "Skipping signing of executable as per -SkipSigning flag."
+}
 
-Write-Host "Signing executable at $OutputFile"
-if (SignScripts -path "$pwd\build")
-{
-    Write-Host "Executable signed successfully: $OutputFile"
-}
-else
-{
-    Write-Host "Failed to sign executable: $OutputFile"
-    exit 1
-}
 #get the hash for the executable
 $hash = Get-FileHash -Path $OutputFile -Algorithm SHA256
 Write-Host "Executable hash: $($hash.Hash)"
