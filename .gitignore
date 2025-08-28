@@ -51,6 +51,6 @@ temp*
 *.gov.json
 *.org.json
 *.net.json
-
+gemini.md
 .gemini/
 gha-creds-*.json
