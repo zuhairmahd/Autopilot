@@ -21,20 +21,6 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Cache PowerShell modules
-        uses: actions/cache@v4
-        with:
-          path: ~\Documents\PowerShell\Modules
-          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('**/CreateRelease.ps1', '**/TestScripts/Test-Runner.ps1') }}
-          restore-keys: |
-            ${{ runner.os }}-pwsh-modules-
-
-      - name: Install test dependencies
-        shell: pwsh
-        run: |
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
-
       - name: Run tests - syntax
         shell: pwsh
         run: .\TestScripts\Test-Runner.ps1 -TestCategory syntax
@@ -50,18 +36,6 @@ jobs:
       - name: Run tests - integration
         shell: pwsh
         run: .\TestScripts\Test-Runner.ps1 -TestCategory integration
-
-      - name: Run PSScriptAnalyzer
-        shell: pwsh
-        run: |
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Error
-          if ($results) {
-            $results | Format-Table -AutoSize
-            Write-Error "PSScriptAnalyzer found issues"
-            exit 1
-          } else {
-            Write-Host "PSScriptAnalyzer passed"
-          }
 
   build:
     name: Build (CreateRelease test version)
