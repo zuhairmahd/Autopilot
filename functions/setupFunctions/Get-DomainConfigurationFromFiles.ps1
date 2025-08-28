@@ -42,11 +42,30 @@ function Get-DomainConfigurationFromFiles()
         [Parameter(Mandatory = $false)]
         [hashtable]$GlobalSettings = @{},
         [Parameter(Mandatory = $false)]
-        [string]$ConfigurationPath = $pwd
+        [string]$ConfigurationPath = $pwd,
+        [Parameter(Mandatory = $false)]
+        [switch]$LazyLoad = $false
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Loading domain configuration for: $DomainName"
+    
+    # Performance Optimization Phase 2: Lazy Loading Support
+    if ($LazyLoad) {
+        Write-Verbose "[$functionName] Lazy loading mode: returning minimal configuration for domain: $DomainName"
+        return @{
+            settings = @{ 
+                domain = $DomainName
+                lazyLoaded = $true
+                configurationPath = $ConfigurationPath
+            }
+            loaded = $false
+            _domainName = $DomainName
+            _configurationPath = $ConfigurationPath
+            _globalSettings = $GlobalSettings
+        }
+    }
+    
+    Write-Verbose "[$functionName] Full loading domain configuration for: $DomainName"
     Write-Log -LogFile $logFile -Message "Loading domain configuration for: $DomainName" -Module $functionName -LogLevel "Information"
     
     try
@@ -111,4 +130,51 @@ function Get-DomainConfigurationFromFiles()
         
         return $fallbackConfig
     }
+}
+
+function Invoke-LazyDomainConfigurationLoad()
+{
+    <#
+    .SYNOPSIS
+        Loads the full domain configuration from a lazy-loaded configuration object.
+    
+    .DESCRIPTION
+        This function is part of the Performance Optimization Phase 2 implementation.
+        It converts a lazy-loaded domain configuration into a full configuration
+        by loading the actual configuration data from files.
+    
+    .PARAMETER LazyConfiguration
+        The lazy-loaded configuration object returned by Get-DomainConfigurationFromFiles -LazyLoad
+    
+    .OUTPUTS
+        System.Object
+        Returns the fully loaded domain configuration object.
+    
+    .EXAMPLE
+        $lazyConfig = Get-DomainConfigurationFromFiles -DomainName "contoso.com" -LazyLoad
+        $fullConfig = Invoke-LazyDomainConfigurationLoad -LazyConfiguration $lazyConfig
+    
+    .NOTES
+        - Only needed when lazy loading is used during startup optimization
+        - Maintains compatibility with existing domain configuration structure
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Object])]
+    param(
+        [Parameter(Mandatory = $true)]
+        $LazyConfiguration
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Validate that this is a lazy-loaded configuration
+    if (-not $LazyConfiguration.settings.lazyLoaded) {
+        Write-Verbose "[$functionName] Configuration is already fully loaded"
+        return $LazyConfiguration
+    }
+    
+    Write-Verbose "[$functionName] Loading full configuration for lazy-loaded domain: $($LazyConfiguration._domainName)"
+    
+    # Load the full configuration using the stored parameters
+    return Get-DomainConfigurationFromFiles -DomainName $LazyConfiguration._domainName -GlobalSettings $LazyConfiguration._globalSettings -ConfigurationPath $LazyConfiguration._configurationPath
 }

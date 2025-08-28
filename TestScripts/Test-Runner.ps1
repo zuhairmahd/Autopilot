@@ -18,6 +18,8 @@
     - core: Essential functionality tests
     - enhanced: Enhanced functionality tests (new test scripts)
     - specialized: Specialized and advanced functionality tests
+    - performance: Performance optimization tests (Phase 1-3)
+    - regression: Phase 3 regression testing framework
     - specific: Run specific tests by pattern (requires -TestPattern)
 .PARAMETER TestPattern
     Specific pattern to match test files (e.g., "test-menu*", "test-auth*")
@@ -78,7 +80,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized')]
+    [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized', 'performance', 'regression')]
     [string]$TestCategory = 'all',
     [string]$TestPattern = $null,
     [string]$ExcludePattern = "test-helper.ps1,Test-Runner.ps1",
@@ -177,6 +179,20 @@ $TestRegistry = @{
         Pattern           = 'test-*-wizard.ps1,test-appmode-refactored.ps1,test-autoupdate-wizard.ps1,test-firstrun-wizard.ps1,test-mnemonic-navigation.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-device-selection.ps1,test-delegated-auth-update.ps1,test-group-assignment-fixes.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1'
         Priority          = 5
         EstimatedDuration = '4-6 minutes'
+        Dependencies      = @('syntax', 'core', 'unit')
+    }
+    'performance'   = @{
+        Description       = 'Performance optimization tests and validation (Phase 1-4)'
+        Pattern           = 'test-performance-*.ps1,test-phase*-*.ps1'
+        Priority          = 4
+        EstimatedDuration = '4-7 minutes'
+        Dependencies      = @('syntax', 'core')
+    }
+    'regression'    = @{
+        Description       = 'Phase 3 regression testing framework'
+        Pattern           = 'test-phase3-regression.ps1'
+        Priority          = 6
+        EstimatedDuration = '2-4 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
     }
 }

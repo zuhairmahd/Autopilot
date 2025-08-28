@@ -208,72 +208,143 @@ function Show-SettingsViewer()
         Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display" -LogLevel "Information"
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display"
         
-        $settingsCount = 0
+        # Get flattened settings for display (same as editor but read-only)
+        $flattenedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues
+        $totalSettings = $flattenedSettings.Count
         
-        # Display each setting in the template
-        if ($settingsTemplate -is [hashtable])
+        Write-Verbose "[$functionName] Flattened $totalSettings settings for viewing"
+        
+        # Implement paging for large setting lists
+        $pageSize = 10  # Settings per page
+        $totalPages = [Math]::Ceiling($totalSettings / $pageSize)
+        $currentPage = 1
+        
+        if ($totalSettings -gt $pageSize -and -not $Silent)
         {
-            # Handle hashtable (auth settings)
-            foreach ($settingName in $settingsTemplate.Keys)
-            {
-                $defaultValue = $settingsTemplate[$settingName]
-                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName)
-                {
-                    $currentValues.$settingName 
-                }
-                else
-                {
-                    $defaultValue 
-                }
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "Displaying setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Displaying setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
-                
-                if (-not $Silent)
-                {
-                    # Display setting in formatted way
-                    Display-SettingInfo -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
-                }
-                
-                $settingsCount++
-            }
-        }
-        else
-        {
-            # Handle PSCustomObject (global and domain settings)
-            foreach ($setting in $settingsTemplate.PSObject.Properties)
-            {
-                $settingName = $setting.Name
-                $defaultValue = $setting.Value
-                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName)
-                {
-                    $currentValues.$settingName 
-                }
-                else
-                {
-                    $defaultValue 
-                }
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "Displaying setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Displaying setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
-                
-                if (-not $Silent)
-                {
-                    # Display setting in formatted way
-                    Display-SettingInfo -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
-                }
-                
-                $settingsCount++
-            }
+            Write-Host "Total settings: $totalSettings (showing $pageSize per page, $totalPages pages total)" -ForegroundColor Gray
+            Write-Host "Use 'n' for next page, 'p' for previous page, 'q' to quit, or page number to jump" -ForegroundColor Yellow
+            Write-Host ""
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully displayed $settingsCount settings" -LogLevel "Information"
-        Write-Verbose "[$functionName] Successfully displayed $settingsCount settings"
+        do
+        {
+            $startIndex = ($currentPage - 1) * $pageSize
+            $endIndex = [Math]::Min($startIndex + $pageSize - 1, $totalSettings - 1)
+            $pageSettings = $flattenedSettings[$startIndex..$endIndex]
+            
+            if (-not $Silent)
+            {
+                if ($totalPages -gt 1)
+                {
+                    Write-Host "═══ Page $currentPage of $totalPages ═══" -ForegroundColor Cyan
+                    Write-Host "Showing settings $($startIndex + 1) - $($endIndex + 1) of $totalSettings" -ForegroundColor Gray
+                    Write-Host ""
+                }
+            }
+            
+            # Display settings on current page
+            foreach ($settingInfo in $pageSettings)
+            {
+                if (-not $Silent)
+                {
+                    Display-SettingInfoForViewer -SettingInfo $settingInfo
+                }
+            }
+            
+            # Handle paging navigation
+            if ($totalPages -gt 1 -and -not $Silent)
+            {
+                Write-Host "════════════════════════════════════════" -ForegroundColor Cyan
+                Write-Host "Page navigation: [n]ext | [p]revious | [1-$totalPages] jump to page | [q]uit" -ForegroundColor Yellow
+                
+                do
+                {
+                    $userInput = Read-Host "Enter command"
+                    $navigationAction = $null
+                    
+                    switch ($userInput.ToLower())
+                    {
+                        'n'
+                        {
+                            if ($currentPage -lt $totalPages)
+                            {
+                                $currentPage++
+                                $navigationAction = 'continue'
+                            }
+                            else
+                            {
+                                Write-Host "Already on last page" -ForegroundColor Yellow
+                            }
+                        }
+                        'p'
+                        {
+                            if ($currentPage -gt 1)
+                            {
+                                $currentPage--
+                                $navigationAction = 'continue'
+                            }
+                            else
+                            {
+                                Write-Host "Already on first page" -ForegroundColor Yellow
+                            }
+                        }
+                        'q'
+                        {
+                            $navigationAction = 'quit'
+                        }
+                        default
+                        {
+                            # Check if it's a page number
+                            if ($userInput -match '^\d+$')
+                            {
+                                $pageNumber = [int]$userInput
+                                if ($pageNumber -ge 1 -and $pageNumber -le $totalPages)
+                                {
+                                    $currentPage = $pageNumber
+                                    $navigationAction = 'continue'
+                                }
+                                else
+                                {
+                                    Write-Host "Invalid page number. Enter 1-$totalPages" -ForegroundColor Red
+                                }
+                            }
+                            else
+                            {
+                                Write-Host "Invalid command. Use n, p, q, or page number" -ForegroundColor Red
+                            }
+                        }
+                    }
+                    
+                    if ($navigationAction)
+                    {
+                        break
+                    }
+                } while ($true)
+                
+                if ($navigationAction -eq 'quit')
+                {
+                    break
+                }
+                
+                # Clear screen for next page
+                Clear-Host
+                Write-Host "══ $($SettingsType) Settings Viewer ══" -ForegroundColor Cyan
+                if ($SettingsType -eq 'Domain')
+                {
+                    Write-Host "Domain: $DomainName" -ForegroundColor Yellow
+                }
+                Write-Host ""
+            }
+            else
+            {
+                break  # No paging needed or silent mode
+            }
+        } while ($true)
         
-        if (-not $Silent)
+        if (-not $Silent -and $totalPages -le 1)
         {
             Write-Host "`n══════════════════════════════════════" -ForegroundColor Cyan
-            Write-Host "Total settings displayed: $settingsCount" -ForegroundColor White
+            Write-Host "Total settings displayed: $totalSettings" -ForegroundColor White
             Write-Host "Use the settings editor to modify these values." -ForegroundColor Gray
         }
         
@@ -289,11 +360,148 @@ function Show-SettingsViewer()
     }
 }
 
+function Get-FlattenedSettingsForViewing()
+{
+    <#
+    .SYNOPSIS
+        Flattens settings structure for viewing while preserving nested object information.
+    
+    .DESCRIPTION
+        Similar to Get-FlattenedSettingsForEditing but optimized for read-only display.
+        Processes both template and current values to create a flat list of settings
+        with proper path information for nested values.
+    #>
+    [CmdletBinding()]
+    param(
+        $SettingsTemplate,
+        $CurrentValues
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Flattening settings for viewing"
+    
+    $flattenedSettings = @()
+    
+    if ($SettingsTemplate -is [hashtable])
+    {
+        # Handle hashtable (auth settings)
+        foreach ($key in $SettingsTemplate.Keys)
+        {
+            $defaultValue = $SettingsTemplate[$key]
+            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
+            if ($null -eq $currentValue) { $currentValue = $defaultValue }
+            
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            {
+                # Process nested object
+                $nestedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $defaultValue -CurrentValues $currentValue
+                foreach ($nestedSetting in $nestedSettings)
+                {
+                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
+                    $nestedSetting.IsNested = $true
+                }
+                $flattenedSettings += $nestedSettings
+            }
+            else
+            {
+                # Simple value
+                $flattenedSettings += @{
+                    Name = $key
+                    Path = $key
+                    DefaultValue = $defaultValue
+                    CurrentValue = $currentValue
+                    IsNested = $false
+                }
+            }
+        }
+    }
+    else
+    {
+        # Handle PSCustomObject (global and domain settings)
+        foreach ($property in $SettingsTemplate.PSObject.Properties)
+        {
+            $key = $property.Name
+            $defaultValue = $property.Value
+            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
+            if ($null -eq $currentValue) { $currentValue = $defaultValue }
+            
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            {
+                # Process nested object
+                $nestedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $defaultValue -CurrentValues $currentValue
+                foreach ($nestedSetting in $nestedSettings)
+                {
+                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
+                    $nestedSetting.IsNested = $true
+                }
+                $flattenedSettings += $nestedSettings
+            }
+            else
+            {
+                # Simple value
+                $flattenedSettings += @{
+                    Name = $key
+                    Path = $key
+                    DefaultValue = $defaultValue
+                    CurrentValue = $currentValue
+                    IsNested = $false
+                }
+            }
+        }
+    }
+    
+    Write-Verbose "[$functionName] Flattened $($flattenedSettings.Count) settings for viewing"
+    return $flattenedSettings
+}
+
+function Display-SettingInfoForViewer()
+{
+    <#
+    .SYNOPSIS
+        Displays a setting with its value and description in a formatted way for the viewer.
+    #>
+    [CmdletBinding()]
+    param($SettingInfo)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Displaying setting info for: '$($SettingInfo.Path)'"
+    
+    # Get description using existing infrastructure
+    $description = Get-SettingDescription -SettingName $SettingInfo.Name
+    
+    # Format the current value for display
+    $displayValue = Format-SettingValueForDisplay -Value $SettingInfo.CurrentValue
+    
+    # Display the setting with path for nested values
+    $displayName = if ($SettingInfo.IsNested) { $SettingInfo.Path } else { $SettingInfo.Name }
+    
+    Write-Host "Setting: " -NoNewline -ForegroundColor Yellow
+    Write-Host "$displayName" -ForegroundColor White
+    Write-Host "  Value: " -NoNewline -ForegroundColor Cyan
+    Write-Host "$displayValue" -ForegroundColor Green
+    Write-Host "  Description: " -NoNewline -ForegroundColor Gray
+    Write-Host "$description" -ForegroundColor White
+    
+    # Show if value differs from default
+    if ($SettingInfo.CurrentValue -ne $SettingInfo.DefaultValue)
+    {
+        $defaultDisplayValue = Format-SettingValueForDisplay -Value $SettingInfo.DefaultValue
+        Write-Host "  Default: " -NoNewline -ForegroundColor Gray
+        Write-Host "$defaultDisplayValue" -ForegroundColor DarkGray
+    }
+    
+    Write-Host ""  # Empty line for spacing
+}
+
 function Display-SettingInfo()
 {
     <#
     .SYNOPSIS
         Displays a setting with its value and description in a formatted way.
+        
+    .DESCRIPTION
+        Legacy function maintained for backward compatibility.
+        Now uses the improved Format-SettingValueForDisplay function.
     #>
     [CmdletBinding()]
     param(
@@ -308,30 +516,8 @@ function Display-SettingInfo()
     # Get description using existing infrastructure
     $description = Get-SettingDescription -SettingName $SettingName
     
-    # Format the current value for display
-    $displayValue = if ($CurrentValue -is [array])
-    {
-        if ($CurrentValue.Count -eq 0)
-        {
-            "(empty array)"
-        }
-        else
-        {
-            "[$($CurrentValue -join ', ')]"
-        }
-    }
-    elseif ($CurrentValue -is [bool])
-    {
-        $CurrentValue.ToString().ToLower()
-    }
-    elseif ([string]::IsNullOrWhiteSpace($CurrentValue))
-    {
-        "(not set)"
-    }
-    else
-    {
-        $CurrentValue.ToString()
-    }
+    # Format the current value for display using improved function
+    $displayValue = Format-SettingValueForDisplay -Value $CurrentValue
     
     # Display the setting
     Write-Host "Setting: " -NoNewline -ForegroundColor Yellow
@@ -344,29 +530,144 @@ function Display-SettingInfo()
     # Show if value differs from default
     if ($CurrentValue -ne $DefaultValue)
     {
-        $defaultDisplayValue = if ($DefaultValue -is [array])
-        {
-            if ($DefaultValue.Count -eq 0)
-            {
-                "(empty array)"
-            }
-            else
-            {
-                "[$($DefaultValue -join ', ')]"
-            }
-        }
-        elseif ($DefaultValue -is [bool])
-        {
-            $DefaultValue.ToString().ToLower()
-        }
-        else
-        {
-            $DefaultValue.ToString()
-        }
-        
+        $defaultDisplayValue = Format-SettingValueForDisplay -Value $DefaultValue
         Write-Host "  Default: " -NoNewline -ForegroundColor Gray
         Write-Host "$defaultDisplayValue" -ForegroundColor DarkGray
     }
     
     Write-Host ""  # Empty line for spacing
+}
+function Get-NestedValue()
+{
+    <#
+    .SYNOPSIS
+        Gets a value from a nested object using dot notation path.
+    #>
+    [CmdletBinding()]
+    param(
+        $Object,
+        [string]$Path
+    )
+    
+    if (-not $Object -or [string]::IsNullOrWhiteSpace($Path))
+    {
+        return $null
+    }
+    
+    $pathParts = $Path.Split('.')
+    $current = $Object
+    
+    foreach ($part in $pathParts)
+    {
+        if ($current -is [hashtable])
+        {
+            if ($current.ContainsKey($part))
+            {
+                $current = $current[$part]
+            }
+            else
+            {
+                return $null
+            }
+        }
+        elseif ($current -is [PSCustomObject])
+        {
+            if ($current.PSObject.Properties.Name -contains $part)
+            {
+                $current = $current.$part
+            }
+            else
+            {
+                return $null
+            }
+        }
+        else
+        {
+            return $null
+        }
+    }
+    
+    return $current
+}
+
+function Format-SettingValueForDisplay()
+{
+    <#
+    .SYNOPSIS
+        Formats a setting value for display in the UI with enhanced array and nested object handling.
+    #>
+    [CmdletBinding()]
+    param($Value)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Add detailed logging for debugging array display issues  
+    if ($null -ne $Value) {
+        Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
+    } else {
+        Write-Verbose "[$functionName] Formatting null value for display"
+    }
+    
+    try {
+        if ($Value -is [array])
+        {
+            Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
+            if ($Value.Count -eq 0)
+            {
+                return "(empty array)"
+            }
+            else
+            {
+                # Handle nested arrays properly - flatten if needed
+                $flattenedElements = @()
+                foreach ($element in $Value)
+                {
+                    if ($element -is [array])
+                    {
+                        # Handle nested array by flattening it
+                        Write-Verbose "[$functionName] Found nested array element, flattening"
+                        $flattenedElements += $element
+                    }
+                    else
+                    {
+                        $flattenedElements += $element
+                    }
+                }
+                
+                # Join the flattened elements
+                $joinedValue = $flattenedElements -join ', '
+                Write-Verbose "[$functionName] Array elements flattened and joined as: '$joinedValue'"
+                return "[$joinedValue]"
+            }
+        }
+        elseif ($Value -is [bool])
+        {
+            Write-Verbose "[$functionName] Processing boolean value: $Value"
+            return $Value.ToString().ToLower()
+        }
+        elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
+        {
+            Write-Verbose "[$functionName] Processing hashtable or PSCustomObject"
+            return "(nested object)"
+        }
+        elseif ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value))
+        {
+            Write-Verbose "[$functionName] Processing null or whitespace value"
+            return "(not set)"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Processing other type as string: '$Value'"
+            return [string]$Value
+        }
+    }
+    catch {
+        Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
+        # Fallback to safe string conversion
+        if ($Value -is [array] -and $Value.Count -gt 0)
+        {
+            return "[$($Value -join ', ')]"
+        }
+        return $Value.ToString()
+    }
 }

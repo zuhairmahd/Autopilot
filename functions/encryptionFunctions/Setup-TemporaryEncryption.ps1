@@ -62,9 +62,13 @@ function Setup-TemporaryEncryption()
         finally
         {
             # Clean up temporary file
+            Write-Verbose "[$functionName] Cleaning up temporary file: $tempFile"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleaning up temporary file: $tempFile" -LogLevel "Debug"
             if (Test-Path $tempFile)
             {
                 Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+                Write-Verbose "[$functionName] Removed temporary file: $tempFile"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Removed temporary file: $tempFile" -LogLevel "Debug"
             }
         }
     }
@@ -77,6 +81,7 @@ function Setup-TemporaryEncryption()
     finally
     {
         # Clear the temporary encryption key from memory
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Clearing temporary encryption key from memory" -LogLevel "Debug"
         Clear-SecureMemory -Variables @("tempEncryptionKey")
     }
 }

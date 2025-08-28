@@ -30,8 +30,9 @@ jobs:
       - name: Run test suite
         shell: pwsh
         run: |
-          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory "Syntax"
-          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory "Core"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory syntax
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory integration
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory core
 
   code-analysis:
     needs: [tests]

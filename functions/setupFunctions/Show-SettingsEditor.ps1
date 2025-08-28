@@ -208,138 +208,76 @@ function Show-SettingsEditor()
         $updatedSettings = @{}
         $hasChanges = $false
         
-        # Process each setting in the template
-        if ($settingsTemplate -is [hashtable])
+        # Process each setting in the template - with support for nested objects
+        $processedSettings = Get-FlattenedSettingsForEditing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues
+        
+        foreach ($settingInfo in $processedSettings)
         {
-            # Handle hashtable (auth settings)
-            foreach ($settingName in $settingsTemplate.Keys)
+            $settingName = $settingInfo.Name
+            $settingPath = $settingInfo.Path
+            $defaultValue = $settingInfo.DefaultValue
+            $currentValue = $settingInfo.CurrentValue
+            $isNested = $settingInfo.IsNested
+            
+            Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingPath', Current: '$currentValue', Default: '$defaultValue', IsNested: $isNested" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Processing setting: '$settingPath', Current: '$currentValue', Default: '$defaultValue', IsNested: $isNested"
+            
+            # Skip nested container objects that should not be edited directly
+            if ($isNested -and ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject]))
             {
-                $defaultValue = $settingsTemplate[$settingName]
-                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName)
-                {
-                    $currentValues.$settingName 
-                }
-                else
-                {
-                    $defaultValue 
-                }
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
-                
+                Write-Verbose "[$functionName] Skipping nested container object: '$settingPath'"
+                continue
+            }
+            
+            if (-not $Silent)
+            {
+                # Display setting with path for nested values
+                $displayName = if ($isNested) { $settingPath } else { $settingName }
+                Write-Host "Setting: $displayName" -ForegroundColor Yellow
+                Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
+                Write-Host "Current value: $(Format-SettingValueForDisplay -Value $currentValue)" -ForegroundColor Cyan
+            }
+            
+            # Determine setting type and get input
+            $newValue = if ($PresetValues -and $PresetValues.ContainsKey($settingName))
+            {
+                $PresetValues[$settingName]
+            }
+            elseif ($Silent)
+            {
+                $currentValue  # Keep current value in silent mode
+            }
+            else
+            {
+                Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
+            }
+            
+            if ($newValue -ne $currentValue)
+            {
+                # For nested settings, use the path as the key
+                $keyToUse = if ($isNested) { $settingPath } else { $settingName }
+                $updatedSettings[$keyToUse] = $newValue
+                $hasChanges = $true
+                Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingPath' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
+                Write-Verbose "[$functionName] Setting '$settingPath' changed from '$currentValue' to '$newValue'"
                 if (-not $Silent)
                 {
-                    Write-Host "Setting: $settingName" -ForegroundColor Yellow
-                    Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
-                    Write-Host "Current value: $currentValue" -ForegroundColor Cyan
-                }
-                
-                # Determine setting type and get input
-                $newValue = if ($PresetValues -and $PresetValues.ContainsKey($settingName))
-                {
-                    $PresetValues[$settingName]
-                }
-                elseif ($Silent)
-                {
-                    $currentValue  # Keep current value in silent mode
-                }
-                else
-                {
-                    Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
-                }
-                
-                if ($newValue -ne $currentValue)
-                {
-                    $updatedSettings[$settingName] = $newValue
-                    $hasChanges = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Setting '$settingName' changed from '$currentValue' to '$newValue'"
-                    if (-not $Silent)
-                    {
-                        Write-Host "Updated to: $newValue" -ForegroundColor Green
-                    }
-                }
-                else
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' unchanged (value: '$currentValue')" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] Setting '$settingName' unchanged (value: '$currentValue')"
-                    if (-not $Silent)
-                    {
-                        Write-Host "No change" -ForegroundColor Gray
-                    }
-                }
-                
-                if (-not $Silent)
-                {
-                    Write-Host ""
+                    Write-Host "Updated to: $(Format-SettingValueForDisplay -Value $newValue)" -ForegroundColor Green
                 }
             }
-        }
-        else
-        {
-            # Handle PSCustomObject (global and domain settings)
-            foreach ($setting in $settingsTemplate.PSObject.Properties)
+            else
             {
-                $settingName = $setting.Name
-                $defaultValue = $setting.Value
-                $currentValue = if ($currentValues.PSObject.Properties.Name -contains $settingName)
-                {
-                    $currentValues.$settingName 
-                }
-                else
-                {
-                    $defaultValue 
-                }
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Processing setting: '$settingName', Current: '$currentValue', Default: '$defaultValue'"
-                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingPath' unchanged (value: '$currentValue')" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Setting '$settingPath' unchanged (value: '$currentValue')"
                 if (-not $Silent)
                 {
-                    Write-Host "Setting: $settingName" -ForegroundColor Yellow
-                    Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
-                    Write-Host "Current value: $currentValue" -ForegroundColor Cyan
+                    Write-Host "No change" -ForegroundColor Gray
                 }
-                
-                # Determine setting type and get input
-                $newValue = if ($PresetValues -and $PresetValues.ContainsKey($settingName))
-                {
-                    $PresetValues[$settingName]
-                }
-                elseif ($Silent)
-                {
-                    $currentValue  # Keep current value in silent mode
-                }
-                else
-                {
-                    Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
-                }
-                
-                if ($newValue -ne $currentValue)
-                {
-                    $updatedSettings[$settingName] = $newValue
-                    $hasChanges = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Setting '$settingName' changed from '$currentValue' to '$newValue'"
-                    if (-not $Silent)
-                    {
-                        Write-Host "Updated to: $newValue" -ForegroundColor Green
-                    }
-                }
-                else
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingName' unchanged (value: '$currentValue')" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] Setting '$settingName' unchanged (value: '$currentValue')"
-                    if (-not $Silent)
-                    {
-                        Write-Host "No change" -ForegroundColor Gray
-                    }
-                }
-                
-                if (-not $Silent)
-                {
-                    Write-Host ""
-                }
+            }
+            
+            if (-not $Silent)
+            {
+                Write-Host ""
             }
         }
         
@@ -516,6 +454,234 @@ function Get-CurrentSettings()
     }
 }
 
+function Get-FlattenedSettingsForEditing()
+{
+    <#
+    .SYNOPSIS
+        Flattens settings structure for editing while preserving nested object information.
+    
+    .DESCRIPTION
+        Processes both template and current values to create a flat list of editable settings
+        with proper path information for nested values. Handles hashtables and PSCustomObjects.
+    #>
+    [CmdletBinding()]
+    param(
+        $SettingsTemplate,
+        $CurrentValues
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Flattening settings for editing"
+    
+    $flattenedSettings = @()
+    
+    if ($SettingsTemplate -is [hashtable])
+    {
+        # Handle hashtable (auth settings)
+        foreach ($key in $SettingsTemplate.Keys)
+        {
+            $defaultValue = $SettingsTemplate[$key]
+            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
+            if ($null -eq $currentValue) { $currentValue = $defaultValue }
+            
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            {
+                # Process nested object
+                $nestedSettings = Get-FlattenedSettingsForEditing -SettingsTemplate $defaultValue -CurrentValues $currentValue
+                foreach ($nestedSetting in $nestedSettings)
+                {
+                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
+                    $nestedSetting.IsNested = $true
+                }
+                $flattenedSettings += $nestedSettings
+            }
+            else
+            {
+                # Simple value
+                $flattenedSettings += @{
+                    Name = $key
+                    Path = $key
+                    DefaultValue = $defaultValue
+                    CurrentValue = $currentValue
+                    IsNested = $false
+                }
+            }
+        }
+    }
+    else
+    {
+        # Handle PSCustomObject (global and domain settings)
+        foreach ($property in $SettingsTemplate.PSObject.Properties)
+        {
+            $key = $property.Name
+            $defaultValue = $property.Value
+            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
+            if ($null -eq $currentValue) { $currentValue = $defaultValue }
+            
+            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
+            {
+                # Process nested object
+                $nestedSettings = Get-FlattenedSettingsForEditing -SettingsTemplate $defaultValue -CurrentValues $currentValue
+                foreach ($nestedSetting in $nestedSettings)
+                {
+                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
+                    $nestedSetting.IsNested = $true
+                }
+                $flattenedSettings += $nestedSettings
+            }
+            else
+            {
+                # Simple value
+                $flattenedSettings += @{
+                    Name = $key
+                    Path = $key
+                    DefaultValue = $defaultValue
+                    CurrentValue = $currentValue
+                    IsNested = $false
+                }
+            }
+        }
+    }
+    
+    Write-Verbose "[$functionName] Flattened $($flattenedSettings.Count) settings for editing"
+    return $flattenedSettings
+}
+
+function Get-NestedValue()
+{
+    <#
+    .SYNOPSIS
+        Gets a value from a nested object using dot notation path.
+    #>
+    [CmdletBinding()]
+    param(
+        $Object,
+        [string]$Path
+    )
+    
+    if (-not $Object -or [string]::IsNullOrWhiteSpace($Path))
+    {
+        return $null
+    }
+    
+    $pathParts = $Path.Split('.')
+    $current = $Object
+    
+    foreach ($part in $pathParts)
+    {
+        if ($current -is [hashtable])
+        {
+            if ($current.ContainsKey($part))
+            {
+                $current = $current[$part]
+            }
+            else
+            {
+                return $null
+            }
+        }
+        elseif ($current -is [PSCustomObject])
+        {
+            if ($current.PSObject.Properties.Name -contains $part)
+            {
+                $current = $current.$part
+            }
+            else
+            {
+                return $null
+            }
+        }
+        else
+        {
+            return $null
+        }
+    }
+    
+    return $current
+}
+
+function Format-SettingValueForDisplay()
+{
+    <#
+    .SYNOPSIS
+        Formats a setting value for display in the UI with enhanced array and nested object handling.
+    #>
+    [CmdletBinding()]
+    param($Value)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Add detailed logging for debugging array display issues
+    if ($null -ne $Value) {
+        Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
+    } else {
+        Write-Verbose "[$functionName] Formatting null value for display"
+    }
+    
+    try {
+        if ($Value -is [array])
+        {
+            Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
+            if ($Value.Count -eq 0)
+            {
+                return "(empty array)"
+            }
+            else
+            {
+                # Handle nested arrays properly - flatten if needed
+                $flattenedElements = @()
+                foreach ($element in $Value)
+                {
+                    if ($element -is [array])
+                    {
+                        # Handle nested array by flattening it
+                        Write-Verbose "[$functionName] Found nested array element, flattening"
+                        $flattenedElements += $element
+                    }
+                    else
+                    {
+                        $flattenedElements += $element
+                    }
+                }
+                
+                # Join the flattened elements
+                $joinedValue = $flattenedElements -join ', '
+                Write-Verbose "[$functionName] Array elements flattened and joined as: '$joinedValue'"
+                return "[$joinedValue]"
+            }
+        }
+        elseif ($Value -is [bool])
+        {
+            Write-Verbose "[$functionName] Processing boolean value: $Value"
+            return $Value.ToString().ToLower()
+        }
+        elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
+        {
+            Write-Verbose "[$functionName] Processing hashtable or PSCustomObject"
+            return "(nested object)"
+        }
+        elseif ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value))
+        {
+            Write-Verbose "[$functionName] Processing null or whitespace value"
+            return "(not set)"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Processing other type as string: '$Value'"
+            return [string]$Value
+        }
+    }
+    catch {
+        Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
+        # Fallback to safe string conversion
+        if ($Value -is [array] -and $Value.Count -gt 0)
+        {
+            return "[$($Value -join ', ')]"
+        }
+        return $Value.ToString()
+    }
+}
+
 function Get-SettingDescription()
 {
     <#
@@ -563,6 +729,15 @@ function Get-SettingDescription()
         'cacheType'                       = 'Token cache storage method (Memory, File)'
         'secureString'                    = 'Use secure string for password storage'
         'delegated'                       = 'Use delegated permissions (user context) vs application permissions'
+        # Nested object descriptions
+        'repoPath'                        = 'GitHub/GitLab repository owner/organization name'
+        'baseURL'                         = 'Base URL for repository hosting service'
+        'baseSourceURL'                   = 'Base URL for raw file access'
+        'repoName'                        = 'Repository name'
+        'companyName'                     = 'Company or organization name'
+        'supportEmail'                    = 'Support contact email address'
+        'supportPhone'                    = 'Support contact phone number'
+        'helpDeskURL'                     = 'URL for help desk or support portal'
     }
     
     if ($descriptions.ContainsKey($SettingName))
@@ -1016,7 +1191,7 @@ function Get-ArrayInput()
             {
                 Write-Verbose "[$functionName] User chose to keep current values unchanged"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
-                return $CurrentValue
+                return ,$CurrentValue
             }
         }
     }
@@ -1043,7 +1218,7 @@ function Get-ArrayInput()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current array values" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] User cancelled input, keeping current array values"
-                return $CurrentValue
+                return ,$CurrentValue
             }
             
             $newValues += $input
@@ -1075,8 +1250,15 @@ function Get-ArrayInput()
         $result = @($CurrentValue) + @($newValues)
     }
     
-    # Ensure single values are still treated as arrays
-    if ($result.Count -eq 1)
+    # Ensure result is always an array, even for single elements
+    # This prevents PowerShell from unwrapping single-element arrays
+    if ($result -isnot [array])
+    {
+        $result = @($result)
+        Write-Log -LogFile $logFile -Module $functionName -Message "Converted non-array result to array to maintain type consistency" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Converted non-array result to array to maintain type consistency"
+    }
+    elseif ($result.Count -eq 1)
     {
         # Force single element to remain as array 
         $result = @($result[0])
@@ -1084,9 +1266,19 @@ function Get-ArrayInput()
         Write-Verbose "[$functionName] Single value converted to array to maintain type consistency"
     }
     
-    Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values" -LogLevel "Information"
-    Write-Verbose "[$functionName] Returning array with $($result.Count) values"
-    return $result
+    # Final verification that we're returning an array
+    if ($result -isnot [array])
+    {
+        Write-Warning "[$functionName] Warning: Result is not an array after processing. Type: $($result.GetType().Name)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is not an array after processing. Type: $($result.GetType().Name)" -LogLevel "Warning"
+        $result = @($result)
+    }
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Returning array with $($result.Count) values. Array type verified: $($result -is [array])" -LogLevel "Information"
+    Write-Verbose "[$functionName] Returning array with $($result.Count) values. Array type verified: $($result -is [array])"
+    
+    # Use comma operator to preserve array type, preventing PowerShell from unwrapping single-element arrays
+    return ,$result
 }
 
 function Get-NumberInput()
@@ -1184,7 +1376,7 @@ function Save-GlobalSettings()
 {
     <#
     .SYNOPSIS
-        Saves global settings using unified Update-Setting function.
+        Saves global settings using unified Update-Setting function with support for nested settings.
     #>
     [CmdletBinding()]
     param(
@@ -1200,10 +1392,20 @@ function Save-GlobalSettings()
     {
         foreach ($key in $Settings.Keys)
         {
-            Write-Verbose "[$functionName] Updating global setting: $key = $($Settings[$key])"
-            Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $($Settings[$key])" -LogLevel "Verbose"
+            $value = $Settings[$key]
+            Write-Verbose "[$functionName] Updating global setting: $key = $value"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $value" -LogLevel "Verbose"
             
-            $success = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            # Handle nested settings (e.g., repoInfo.repoPath)
+            if ($key.Contains('.'))
+            {
+                $success = Update-NestedSetting -SettingType "Global" -SettingsFile $SettingsFile -SettingPath $key -SettingValue $value
+            }
+            else
+            {
+                $success = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName $key -SettingValue $value
+            }
+            
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update global setting: $key"
@@ -1292,7 +1494,16 @@ function Save-AuthSettings()
             Write-Verbose "[$functionName] Updating auth setting: $key = $($Settings[$key])"
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating auth setting: $key = $($Settings[$key])" -LogLevel "Verbose"
             
-            $success = Update-Setting -SettingType "Auth" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            # Handle nested settings (e.g., nested.property)
+            if ($key.Contains('.'))
+            {
+                $success = Update-NestedSetting -SettingType "Auth" -SettingsFile $SettingsFile -SettingPath $key -SettingValue $Settings[$key]
+            }
+            else
+            {
+                $success = Update-Setting -SettingType "Auth" -SettingsFile $SettingsFile -SettingName $key -SettingValue $Settings[$key]
+            }
+            
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update auth setting: $key"
@@ -1353,6 +1564,113 @@ function Save-DomainSettings()
         Write-Warning "[$functionName] Error saving domain settings: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Error saving domain settings: $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Module $functionName -Message "Error saving domain settings: $($_.Exception.Message)" -LogLevel "Error"
+        return $false
+    }
+}
+function Update-NestedSetting()
+{
+    <#
+    .SYNOPSIS
+        Updates a nested setting using dot notation path.
+        
+    .DESCRIPTION
+        Handles updating nested settings like 'repoInfo.repoPath' by parsing the path
+        and updating the appropriate nested structure in the configuration.
+    #>
+    [CmdletBinding()]
+    param(
+        [string]$SettingType,
+        [string]$SettingsFile,
+        [string]$SettingPath,
+        $SettingValue,
+        [string]$DomainName
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating nested setting: $SettingPath = $SettingValue (Type: $SettingType)"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Updating nested setting: $SettingPath = $SettingValue (Type: $SettingType)" -LogLevel "Information"
+    
+    try
+    {
+        # Load current settings
+        if (-not (Test-Path $SettingsFile))
+        {
+            Write-Warning "[$functionName] Settings file not found: $SettingsFile"
+            return $false
+        }
+        
+        $settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+        
+        # Parse the setting path
+        $pathParts = $SettingPath.Split('.')
+        $currentLevel = $null
+        
+        # Navigate to the correct section based on setting type
+        switch ($SettingType)
+        {
+            'Global'
+            {
+                if (-not $settings.globalSettings)
+                {
+                    $settings | Add-Member -MemberType NoteProperty -Name "globalSettings" -Value (New-Object PSObject)
+                }
+                $currentLevel = $settings.globalSettings
+            }
+            'Auth'
+            {
+                if (-not $settings.auth)
+                {
+                    $settings | Add-Member -MemberType NoteProperty -Name "auth" -Value (New-Object PSObject)
+                }
+                $currentLevel = $settings.auth
+            }
+            'Domain'
+            {
+                # For domain settings, we need to work with separate domain files
+                Write-Warning "[$functionName] Domain nested settings not yet implemented for path-based updates"
+                return $false
+            }
+            default
+            {
+                Write-Warning "[$functionName] Unknown setting type: $SettingType"
+                return $false
+            }
+        }
+        
+        # Navigate through the path, creating objects as needed
+        for ($i = 0; $i -lt $pathParts.Count - 1; $i++)
+        {
+            $part = $pathParts[$i]
+            
+            if (-not ($currentLevel.PSObject.Properties.Name -contains $part))
+            {
+                $currentLevel | Add-Member -MemberType NoteProperty -Name $part -Value (New-Object PSObject)
+            }
+            $currentLevel = $currentLevel.$part
+        }
+        
+        # Set the final value
+        $finalProperty = $pathParts[-1]
+        if ($currentLevel.PSObject.Properties.Name -contains $finalProperty)
+        {
+            $currentLevel.$finalProperty = $SettingValue
+        }
+        else
+        {
+            $currentLevel | Add-Member -MemberType NoteProperty -Name $finalProperty -Value $SettingValue
+        }
+        
+        # Save the updated settings
+        $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile -Encoding UTF8
+        
+        Write-Verbose "[$functionName] Successfully updated nested setting: $SettingPath"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated nested setting: $SettingPath" -LogLevel "Information"
+        return $true
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error updating nested setting ${SettingPath}: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Error updating nested setting ${SettingPath}: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
 }

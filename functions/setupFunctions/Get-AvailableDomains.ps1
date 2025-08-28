@@ -26,6 +26,7 @@ function Get-AvailableDomains()
     .NOTES
         This function supports both the new separate file format and legacy format
         for backward compatibility during transition.
+        Phase 4A Optimization: Uses pre-allocated ArrayList for efficient collection building.
     #>
     [CmdletBinding()]
     [OutputType([System.Array])]
@@ -41,12 +42,19 @@ function Get-AvailableDomains()
     Write-Verbose "[$functionName] Scanning for available domains in: $ConfigurationPath"
     Write-Log -LogFile $logFile -Message "Scanning for available domains in: $ConfigurationPath" -Module $functionName -LogLevel "Information"
     
-    $availableDomains = @()
+    # Phase 4A Optimization: Use pre-allocated ArrayList for efficient collection building
+    $availableDomains = New-Object System.Collections.ArrayList
     
     try
     {
         # First, check for separate domain configuration files
         $domainFiles = Get-ChildItem -Path $ConfigurationPath -Filter "*.json" -ErrorAction SilentlyContinue
+        
+        # Phase 4A Optimization: Pre-allocate capacity if we have an estimate
+        if ($domainFiles.Count -gt 0)
+        {
+            $availableDomains.Capacity = $domainFiles.Count
+        }
         
         foreach ($file in $domainFiles)
         {
@@ -69,7 +77,7 @@ function Get-AvailableDomains()
                     $content.PSObject.Properties.Name -contains 'groupsToExclude' -and 
                     $content.PSObject.Properties.Name -contains 'settings')
                 {
-                    $availableDomains = $availableDomains + @($domainName)
+                    [void]$availableDomains.Add($domainName)
                     Write-Verbose "[$functionName] Found domain configuration: $domainName"
                 }
                 else
@@ -96,7 +104,7 @@ function Get-AvailableDomains()
                     {
                         if ($legacyDomain -notin $availableDomains)
                         {
-                            $availableDomains = $availableDomains + @($legacyDomain)
+                            [void]$availableDomains.Add($legacyDomain)
                             Write-Verbose "[$functionName] Found legacy domain configuration: $legacyDomain"
                         }
                     }
@@ -118,8 +126,8 @@ function Get-AvailableDomains()
             Write-Verbose "[$functionName] Debug: Domain[$i] = '$($availableDomains[$i])' (Length: $($availableDomains[$i].Length))"
         }
         
-        # Ensure we always return an array, even for single items (PowerShell array coercion issue)
-        $resultArray = [System.Array]@($availableDomains)
+        # Phase 4A Optimization: Convert ArrayList to Array for return compatibility
+        $resultArray = [System.Array]$availableDomains.ToArray()
         Write-Verbose "[$functionName] Debug: Final result array type: $($resultArray.GetType().Name), Count: $($resultArray.Count)"
         return $resultArray
     }

@@ -51,7 +51,9 @@ function Get-ApplicationDefaults()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting default values for type: $DefaultType"
+    
+    # Initialize script-level cache if not exists
+    $script:defaultsCache = New-Object 'System.Collections.Concurrent.ConcurrentDictionary[string,object]'
     
     # Use global version if available, otherwise default
     if (-not $Version)
@@ -66,7 +68,15 @@ function Get-ApplicationDefaults()
         }
     }
     
-    Write-Verbose "[$functionName] Using version: $Version"
+    # Create cache key based on parameters
+    $cacheKey = "$DefaultType-$DomainName-$Version"
+    if ($script:defaultsCache.ContainsKey($cacheKey))
+    {
+        Write-Verbose "[$functionName] Returning cached defaults for: $cacheKey"
+        return $script:defaultsCache[$cacheKey]
+    }
+    
+    Write-Verbose "[$functionName] Getting default values for type: $DefaultType (cache miss: $cacheKey)"
     
     # Define all default structures
     $defaults = @{
@@ -283,6 +293,58 @@ function Get-ApplicationDefaults()
                 endpoints = @()
             }
         )
+        
+        # Strings defaults - UI text and localization
+        Strings        = @{
+            Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
+            deviceActions = @{
+                none            = "No action"
+                contactAdmin    = "Contact an Intune administrator"
+                contactHelpdesk = "Contact the helpdesk"
+                WipeOrClean     = "Wipe or clean the device"
+            }
+            deviceStates  = @{
+                Ready    = "The device is ready for the next user"
+                NotReady = "The device is not ready for the next user"
+            }
+            returnValues  = @{
+                "1001"                         = "Some updates were installed"
+                deviceRestartSuccessMessage    = "The device was restarted successfully."
+                deviceNotAssignedMessage       = "The device is not assigned to a deployment profile."
+                userCanceledMessage            = "Operation canceled by user"
+                noUserDeviceFoundMessage       = "No user or device found."
+                EnrollmentFailedMessage        = "The device enrollment failed."
+                noUserFoundInDirectoryMessage  = "This user does not exist"
+                deviceSyncFailedMessage        = "The device sync failed."
+                "1003"                         = "Updates failed to install"
+                noRestartMessage               = "Device not restarted."
+                deviceRestartFailedMessage     = "The device restart failed."
+                serialNumberNotFoundMessage    = "The serial number was not found."
+                InvalidSignatureMessage        = "The signature is invalid. The update will be aborted."
+                deviceUnknownActionMessage     = "The action may still be in progress. You can check the device status in the Intune portal."
+                deviceWipeFailedMessage        = "The device wipe failed."
+                "999"                          = "No updates were found"
+                deviceCleanSuccessMessage      = "The device was cleaned successfully."
+                "1000"                         = "All updates were installed"
+                InvalidFileHash                = "The file hash is invalid. The update will be aborted."
+                UpdateCancelledMessage         = "The update was cancelled."
+                UpdateNotNeededMessage         = "The script is already up to date."
+                noBitLockerKeysFoundMessage    = "No BitLocker keys found for this device."
+                deviceDeleteSuccessMessage     = "The device was deleted successfully."
+                UpdateSuccessMessage           = "The script was updated successfully."
+                deviceAssignmentPendingMessage = "The device is pending assignment to a deployment profile."
+                noGroupFoundInDirectoryMessage = "This group does not exist"
+                deviceAssignedMessage          = "The device is assigned to a deployment profile."
+                noGroupAssignmentsFoundMessage = "No assignments found for the specified group."
+                noDeviceFound                  = "No device found"
+                notContactedMessage            = "The device has not contacted the enrollment service."
+                invalidFileType                = "Invalid file type."
+                PendingResetMessage            = "The device is pending a reset."
+                backoutText                    = "Returning to previous menu"
+                noLAPSFoundMessage             = "No LAPS password found for this device."
+                unknownErrorMessage            = "An unknown error occurred."
+            }
+        }
     }
     
     # Complete settings structure combining all components
@@ -326,32 +388,51 @@ function Get-ApplicationDefaults()
         'Auth'
         {
             Write-Verbose "[$functionName] Returning auth defaults"
-            return $defaults.Auth
+            $result = $defaults.Auth
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Global'
         {
             Write-Verbose "[$functionName] Returning global defaults"
-            return $defaults.Global
+            $result = $defaults.Global
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Domain'
         {
             Write-Verbose "[$functionName] Returning domain template defaults for: $DomainName"
-            return $defaults.Domain
+            $result = $defaults.Domain
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Settings'
         {
             Write-Verbose "[$functionName] Returning complete settings defaults"
-            return $defaults.Settings
+            $result = $defaults.Settings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }
+        'Strings'
+        {
+            Write-Verbose "[$functionName] Returning strings defaults"
+            $result = $defaults.Strings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'Overwrite'
         {
             Write-Verbose "[$functionName] Returning overwrite configuration"
-            return $defaults.Overwrite
+            $result = $defaults.Overwrite
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         'All'
         {
             Write-Verbose "[$functionName] Returning all defaults"
-            return $defaults
+            $result = $defaults
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
         }
         default
         {

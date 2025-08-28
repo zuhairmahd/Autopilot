@@ -74,7 +74,7 @@ function Get-ApplicationMetaDataFromDomain()
     #print verbose all the values that are not null.
     foreach ($key in $appMetaData.Keys)
     {
-        if ($appMetaData[$key] -ne $null)
+        if ($null -ne $appMetaData[$key])
         {
             Write-Verbose "[$functionName] $($key): $($appMetaData[$key])"
             Write-Log -logFile $logFile -module $functionName -Message "$($key): $($appMetaData[$key])"
