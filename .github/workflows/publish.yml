@@ -5,19 +5,14 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
-permissions:
-  contents: read
-
 jobs:
-  tests:
+  build-and-sign:
     name: Run PowerShell Tests (Windows, pwsh)
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Verify PowerShell 7
         shell: pwsh
         run: |
@@ -26,35 +21,43 @@ jobs:
             Write-Error "PowerShell 7+ is required."
             exit 1
           }
-
-      - name: Run test suite
+      
+      - name: Install dependencies
         shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck
+          Install-Module -Name TrustedSigning -Force -SkipPublisherCheck
+          Install-Module -Name ps2exe -Force -SkipPublisherCheck
+      - name: Run test suite
         run: |
           pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory syntax
           pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory integration
           pwsh -NoProfile -ExecutionPolicy Bypass -File .\TestScripts\Test-Runner.ps1 -TestCategory core
-
-  code-analysis:
-    needs: [tests]
-    runs-on: windows-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Install PSScriptAnalyzer
-      shell: powershell
-      run: |
-        Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck
-    
-    - name: Run PSScriptAnalyzer
-      shell: powershell
-      run: |
-        $results = Invoke-ScriptAnalyzer -Path *.ps1 -Recurse -Severity Error
-        if ($results) {
-          $results | Format-Table -AutoSize
-          Write-Error "PSScriptAnalyzer found issues"
-          exit 1
-        } else {
-          Write-Host "PSScriptAnalyzer passed"
-        }
-  
+      
+      - name: Run PSScriptAnalyzer
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path *.ps1 -Recurse -Severity Error
+          if ($results) {
+            $results | Format-Table -AutoSize
+            Write-Error "PSScriptAnalyzer found issues"
+            exit 1
+          } else {
+            Write-Host "PSScriptAnalyzer passed"
+          }
+      - name: build
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\CreateRelease.ps1 -inputFile main.ps1 -Overwrite
+      - name: Sign files with Trusted Signing
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://eus.codesigning.azure.net/
+          trusted-signing-account-name: zuhairmahd
+          certificate-profile-name: Cert1
+          files-folder: ${{ github.workspace }}\build
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
