@@ -139,11 +139,13 @@ function Load-EncryptedConfigFile()
                 {
                     Remove-Item -Path $ConfigFile -Force -ErrorAction SilentlyContinue
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Removed configuration file after decryption failure" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Removed configuration file after decryption failure"
                     $result.ErrorMessage += "`n Removed configuration file due to invalid password attempts. `n Contact your administrator for assistance."
                 }
                 catch
                 {
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to remove configuration file after decryption failure: $($_.Exception.Message)" -LogLevel "Error"
+                    Write-Verbose "[$functionName] Failed to remove configuration file after decryption failure: $($_.Exception.Message)"
                 }                
                 return $result
             }
@@ -158,7 +160,6 @@ function Load-EncryptedConfigFile()
         }
         
         return $result
-        
     }
     catch
     {
