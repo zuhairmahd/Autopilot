@@ -9,7 +9,9 @@ function NewMenu()
         [Parameter(Mandatory = $false)]
         [string]$MenuName,
         [Parameter(Mandatory = $false)]
-        [string]$MenuConfigFile = "$pwd\menu.json"
+        [string]$MenuConfigFile = "$pwd\menu.json",
+        [Parameter(Mandatory = $false)]
+        [switch]$DisableEarlyFiltering
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $LogFile -Module $functionName -Message "Creating new menu - MenuName: '$MenuName', Title: '$Title'" -LogLevel "Debug"
@@ -38,7 +40,22 @@ function NewMenu()
             {
                 Write-Verbose "[$functionName] Adding static menu items from configuration"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Adding $($menuConfig.items.Count) static menu items from configuration" -LogLevel "Debug"
-                foreach ($item in $menuConfig.items)
+                
+                # Apply early filtering based on app mode to improve performance (unless disabled)
+                if ($DisableEarlyFiltering)
+                {
+                    $filteredItems = $menuConfig.items
+                    Write-Verbose "[$functionName] Early filtering disabled, using all $($filteredItems.Count) items"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Early filtering disabled, using all items" -LogLevel "Debug"
+                }
+                else
+                {
+                    $filteredItems = FilterMenuItemsByAppMode -MenuItems $menuConfig.items
+                    Write-Verbose "[$functionName] Filtered to $($filteredItems.Count) items for current app mode"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Filtered to $($filteredItems.Count) items for current app mode" -LogLevel "Debug"
+                }
+                
+                foreach ($item in $filteredItems)
                 {
                     # Create menu item with proper structure for AddMenuItem compatibility
                     $menuItem = @{
