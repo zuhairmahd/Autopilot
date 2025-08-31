@@ -21,7 +21,7 @@ function NewMenu()
     {
         Write-Verbose "[$functionName] Loading menu from configuration: $MenuName"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Loading menu from configuration: $MenuName" -LogLevel "Debug"
-        $menuConfig = Get-MenuConfiguration -MenuName $MenuName -MenuConfigFile $MenuConfigFile
+        $menuConfig = Get-CachedMenuConfiguration -MenuName $MenuName -MenuConfigFile $MenuConfigFile
         
         if ($menuConfig)
         {

@@ -22,8 +22,8 @@ function GetRequiredMenusForAppMode()
         
         try 
         {
-            # Get all menu names from configuration
-            $menuConfig = Get-Content -Path $MenuConfigFile -Raw | ConvertFrom-Json
+            # Get all menu names from cached configuration
+            $menuConfig = Get-CachedMenuConfiguration -MenuConfigFile $MenuConfigFile
             $allMenus = $menuConfig.PSObject.Properties.Name | Where-Object { $_ -notlike "appMode*" -and $_ -notin @("name", "description", "version") }
             Write-Verbose "[$functionName] Found $($allMenus.Count) total menus"
             return $allMenus
@@ -43,7 +43,7 @@ function GetRequiredMenusForAppMode()
         Write-Verbose "[$functionName] App mode hierarchy: [$($hierarchyAllowed -join ', ')]"
         
         # Load menu configuration to analyze dependencies
-        $menuConfig = Get-Content -Path $MenuConfigFile -Raw | ConvertFrom-Json
+        $menuConfig = Get-CachedMenuConfiguration -MenuConfigFile $MenuConfigFile
         
         # Analyze main menu items to find required submenus
         if ($menuConfig.mainMenu -and $menuConfig.mainMenu.items)

@@ -879,13 +879,50 @@ if ($menuConfig)
 }
 
 # Load menus from configuration where possible, fallback to manual creation
+# Use selective loading to only load menus needed for current app mode
+$requiredMenus = GetRequiredMenusForAppMode -CurrentAppMode $settings.appMode
+Write-Verbose "Loading required menus for app mode '$($settings.appMode)': [$($requiredMenus -join ', ')]"
+
+# Always load main menu
 $mainMenu = NewMenu -MenuName "mainMenu"
-$CheckMenu = NewMenu -MenuName "checkMenu"  
-$serialNumberMenu = NewMenu -MenuName "serialNumberMenu"
-$exportMenu = NewMenu -MenuName "exportMenu"
-$settingsMenu = NewMenu -MenuName "settingsMenu"
-$autopilotMenu = NewMenu -MenuName "autopilotMenu"
-$environmentMenu = NewMenu -MenuName "environmentMenu"
+
+# Conditionally load other menus based on app mode requirements
+# Create empty menus for those not needed to prevent script errors
+$CheckMenu = if ($requiredMenus -contains "checkMenu") { 
+    NewMenu -MenuName "checkMenu" 
+} else { 
+    NewMenu -Title "Check Menu" -Description "Device troubleshooting options"
+}
+
+$serialNumberMenu = if ($requiredMenus -contains "serialNumberMenu") { 
+    NewMenu -MenuName "serialNumberMenu" 
+} else { 
+    NewMenu -Title "Serial Number Menu" -Description "Serial number operations"
+}
+
+$exportMenu = if ($requiredMenus -contains "exportMenu") { 
+    NewMenu -MenuName "exportMenu" 
+} else { 
+    NewMenu -Title "Export Menu" -Description "Export options"
+}
+
+$settingsMenu = if ($requiredMenus -contains "settingsMenu") { 
+    NewMenu -MenuName "settingsMenu" 
+} else { 
+    NewMenu -Title "Settings Menu" -Description "Application settings"
+}
+
+$autopilotMenu = if ($requiredMenus -contains "autopilotMenu") { 
+    NewMenu -MenuName "autopilotMenu" 
+} else { 
+    NewMenu -Title "Autopilot Menu" -Description "Autopilot operations"
+}
+
+$environmentMenu = if ($requiredMenus -contains "environmentMenu") { 
+    NewMenu -MenuName "environmentMenu" 
+} else { 
+    NewMenu -Title "Environment Menu" -Description "Environment settings"
+}
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
