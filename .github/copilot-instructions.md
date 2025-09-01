@@ -21,10 +21,6 @@ pwsh -Command "Install-Module -Name TrustedSigning -Force -Scope CurrentUser"
 
 # Verify modules are installed
 pwsh -Command "Get-Module -ListAvailable ps2exe, TrustedSigning"
-
-#install nodejs and npx to run mcp servers
-pwsh -Command "winget install --id OpenJS.NodeJS -e"
-pwsh -Command "npm install -g npx"
 ```
 
 **Note**: The `TrustedSigning` module requires an Azure Trusted Signing account for production builds. For testing and development, mock this functionality by using test builds only.
