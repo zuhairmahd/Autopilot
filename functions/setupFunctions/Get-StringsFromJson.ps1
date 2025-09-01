@@ -1,13 +1,13 @@
 function Get-StringsFromJson
 <#
 .SYNOPSIS
-    Loads localized strings and messages from strings.json with comprehensive fallback support.
+    Loads localized strings and messages from strings.json with comprehensive fallback support and caching.
 
 .DESCRIPTION
     This function loads localized strings, return values, device states, and device actions from
     the strings.json file. It uses the consolidated Get-JsonConfiguration function to provide
     robust JSON handling, validation, and fallback to default values when the file is missing
-    or contains invalid data.
+    or contains invalid data. Implements intelligent caching to minimize file I/O operations.
 
 .PARAMETER StringsFile
     The path to the strings.json file. Defaults to "$PWD\strings.json".
@@ -33,6 +33,7 @@ function Get-StringsFromJson
     - Handles missing files and invalid JSON gracefully
     - Maintains backward compatibility with existing code
     - Includes detailed logging for troubleshooting
+    - Implements intelligent caching based on file timestamps
 #>
 {
     [CmdletBinding()]
@@ -41,7 +42,30 @@ function Get-StringsFromJson
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Attempting to load strings from: $StringsFile"
+    
+    # Initialize script-level strings cache if not exists
+    if (-not $script:stringsCache) {
+        $script:stringsCache = @{}
+        $script:stringsFileTimestamp = @{}
+        Write-Verbose "[$functionName] Initialized strings configuration cache"
+    }
+    
+    # Create cache key based on file path
+    $cacheKey = $StringsFile
+    $fileExists = Test-Path $StringsFile
+    
+    # Check if we have cached data and if file hasn't been modified
+    if ($script:stringsCache.ContainsKey($cacheKey) -and $fileExists) {
+        $currentFileTime = (Get-Item $StringsFile).LastWriteTime
+        $cachedFileTime = $script:stringsFileTimestamp[$cacheKey]
+        
+        if ($cachedFileTime -and $currentFileTime -eq $cachedFileTime) {
+            Write-Verbose "[$functionName] Using cached strings configuration for: $StringsFile"
+            return $script:stringsCache[$cacheKey]
+        }
+    }
+    
+    Write-Verbose "[$functionName] Loading strings from file: $StringsFile"
     # Default fallback values organized by sections - PowerShell 5.1 compatible
     $defaultStringValues = @{
         returnValues  = @{
@@ -99,8 +123,16 @@ function Get-StringsFromJson
         # Use the consolidated configuration loader
         Write-Log -LogFile $LogFile -Module $functionName -Message "Loading strings configuration from: $StringsFile" -LogLevel "Debug"
         $stringsConfig = Get-JsonConfiguration -JsonFile $StringsFile -DefaultValues $defaultStringValues
-        Write-Verbose "[$functionName] Successfully loaded strings configuration"
+        Write-Verbose "[$functionName] Successfully loaded strings configuration from file"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully loaded strings configuration" -LogLevel "Debug"
+        
+        # Cache the configuration and file timestamp (if file exists)
+        if ($fileExists) {
+            $script:stringsCache[$cacheKey] = $stringsConfig
+            $script:stringsFileTimestamp[$cacheKey] = (Get-Item $StringsFile).LastWriteTime
+            Write-Verbose "[$functionName] Cached strings configuration for: $StringsFile"
+        }
+        
         return $stringsConfig
     }
     catch

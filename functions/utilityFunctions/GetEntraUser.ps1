@@ -10,6 +10,26 @@ function GetEntraUser()
     $functionName = $MyInvocation.MyCommand.Name
     $substringSearch = $false
     Write-Verbose "[$functionName] Starting function to get user from Entra ID"
+    
+    # Initialize user cache if it doesn't exist
+    if (-not $global:UserCache)
+    {
+        $global:UserCache = @{}
+        Write-Verbose "[$functionName] Initialized user cache"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Initialized user cache" -LogLevel "Verbose"
+    }
+    
+    # Create cache key including FindSimilar flag for different search types
+    $cacheKey = "$UserName|$FindSimilar"
+    
+    # Check cache first
+    if ($global:UserCache.ContainsKey($cacheKey))
+    {
+        Write-Verbose "[$functionName] Found cached result for user: $UserName (FindSimilar: $FindSimilar)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found cached result for user: $UserName" -LogLevel "Verbose"
+        return $global:UserCache[$cacheKey]
+    }
+    
     # Validate access token
     if (-not $accessToken)
     {
@@ -33,7 +53,13 @@ function GetEntraUser()
             value            = @($userInfo)  # Force array creation even for single item
         }
         
-        return $exactMatchResponse, $substringSearch
+        # Cache the result before returning
+        $result = $exactMatchResponse, $substringSearch
+        $global:UserCache[$cacheKey] = $result
+        Write-Verbose "[$functionName] Cached result for user: $UserName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached result for user: $UserName" -LogLevel "Verbose"
+        
+        return $result
     }
     
     # Handle error cases - show error message only if FindSimilar is not enabled
@@ -124,7 +150,14 @@ function GetEntraUser()
                 value            = @($filteredUsers | Sort-Object -Property userPrincipalName -Unique)  # Force array creation
             }
             Write-Verbose "[$functionName] Filtered results to $($filteredResponse.value.Count) unique users after exclusions"
-            return $filteredResponse, $substringSearch
+            
+            # Cache the result before returning
+            $result = $filteredResponse, $substringSearch
+            $global:UserCache[$cacheKey] = $result
+            Write-Verbose "[$functionName] Cached substring search result for user: $UserName"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Cached substring search result for user: $UserName" -LogLevel "Verbose"
+            
+            return $result
         }
         else        
         {
