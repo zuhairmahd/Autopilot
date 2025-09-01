@@ -32,7 +32,7 @@ function Get-SecurePassword()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure password prompt. RequireConfirmation: $RequireConfirmation, MinLength: $MinLength" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure password prompt. RequireConfirmation: $RequireConfirmation, MinLength: $MinLength" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Prompting user for secure password"
     
     $attemptCount = 0
@@ -71,7 +71,7 @@ function Get-SecurePassword()
                 continue
             }
             
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Password confirmation successful" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Password confirmation successful" -LogLevel "Information"
         }
         
         # Clear plain text passwords from memory

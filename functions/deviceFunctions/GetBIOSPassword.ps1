@@ -8,7 +8,7 @@ function GetBIOSPassword()
     $functionName = $MyInvocation.MyCommand.Name
     $returnObject = @()
     Write-Verbose "[$functionName] Starting BIOS password retrieval. Raw serial input: '$serialNumber'"
-    write-log -logFile $LogFile -module $functionName -message "Starting BIOS password retrieval." -logLevel "Information"
+write-log -logFile $LogFile -module $functionName -message "Starting BIOS password retrieval." -LogLevel "Verbose"
 
     # Normalize and validate input
     $sn = ("$serialNumber").Trim()
@@ -19,7 +19,6 @@ function GetBIOSPassword()
         Write-Error "Serial number is required."
         return $null
     }
-    Write-Verbose "[$functionName] Normalized serial number: '$sn'"
     write-log -logFile $LogFile -module $functionName -message "Normalized serial number: '$sn'" -logLevel "Information"
 
     # Prepare Graph query
@@ -35,7 +34,6 @@ function GetBIOSPassword()
     {
         $resp = (CallGraphAPI -ResourcePath $deviceHardwareDetailsURI -filter $filter -accessToken $accessToken).value
         $sw.Stop()
-        Write-Verbose "[$functionName] Graph call completed in $($sw.ElapsedMilliseconds) ms."
         write-log -logFile $LogFile -module $functionName -message "Graph call completed in $($sw.ElapsedMilliseconds) ms." -logLevel "Information"
         Write-Verbose "[$functionName] Graph returned $($resp.count) records"
         Write-log -logFile $LogFile -module $functionName -message "Graph returned $($resp.count) records." -logLevel "Information"
@@ -65,8 +63,7 @@ function GetBIOSPassword()
         }
         else
         {
-            Write-Verbose "[$functionName] No hardware password details found for serial '$sn'."
-            write-log -logFile $LogFile -module $functionName -message "No hardware password details found for serial '$sn'." -logLevel "Information"
+write-log -logFile $LogFile -module $functionName -message "No hardware password details found for serial '$sn'." -LogLevel "Verbose"
             return $null
         }
         return $returnObject

@@ -56,7 +56,7 @@ function Show-GroupsViewer()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups viewer for domain: '$DomainName'" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups viewer for domain: '$DomainName'" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting groups viewer for domain: '$DomainName'"
     
     try
@@ -67,7 +67,7 @@ function Show-GroupsViewer()
         
         if (-not (Test-Path -Path $SettingsFile))
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Error"
+Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
             return $false
         }
@@ -85,7 +85,7 @@ function Show-GroupsViewer()
             return $false
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')"
         
         # Determine which domains to display (following domain settings viewer pattern)
@@ -96,7 +96,7 @@ function Show-GroupsViewer()
             Write-Verbose "[$functionName] No domain specified, Displaying all domains"
             # Fall back to showing all domains if no passed domain
             $domainsToDisplay = $availableDomains
-            Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, displaying group settings for all $($availableDomains.Count) domains" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, displaying group settings for all $($availableDomains.Count) domains" -LogLevel "Verbose"
             Write-Verbose "[$functionName] No loaded domain found, displaying group settings for all $($availableDomains.Count) domains"
         }
         else
@@ -109,7 +109,7 @@ function Show-GroupsViewer()
             }
             else
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' not found in settings" -LogLevel "Error"
+Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' not found in settings" -LogLevel "Verbose"
                 Write-Warning "[$functionName] Domain '$DomainName' not found in settings"
                 return $false
             }

@@ -12,8 +12,7 @@ function ExportDeviceReport()
     )
 
     $functionName = "ExportDeviceReport"
-    Write-Verbose "[$functionName] Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'" -LogLevel "Verbose"
     # Validate ExportFormat
     if ($ExportFormat -notin @("HTML", "CSV"))
     {
@@ -27,18 +26,15 @@ function ExportDeviceReport()
         if (-not $DeviceName)
         {
             $DeviceName = "Device"
-            Write-Verbose "[$functionName] Using default device name for export"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using default device name for export" -LogLevel "Information"
         }
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $fileName = "$DeviceName`_Report_$timestamp"
-        Write-Verbose "[$functionName] Generated filename: $fileName"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Generated filename: $fileName" -LogLevel "Information"
     }
     else
     {
         $fileName = [System.IO.Path]::GetFileNameWithoutExtension($outputFile)
-        Write-Verbose "[$functionName] Using provided output file name: $fileName"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using provided output file name: $fileName" -LogLevel "Information"
     }
     
@@ -47,7 +43,6 @@ function ExportDeviceReport()
     if ($finalExportFormat -eq "HTML")
     {
         $htmlPath = "$pwd\$fileName.html"
-        Write-Verbose "[$functionName] Exporting to HTML: $htmlPath"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to HTML: $htmlPath" -LogLevel "Information"
         $htmlHeader = @"
 <!DOCTYPE html>
@@ -94,13 +89,11 @@ function ExportDeviceReport()
             $htmlContent = $htmlHeader + $htmlRows + $htmlFooter
             $htmlContent | Out-File -FilePath $htmlPath -Encoding UTF8
             Write-Host "HTML report exported to: $htmlPath" -ForegroundColor Green
-            Write-Verbose "[$functionName] Successfully exported HTML report to $htmlPath"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported HTML report to $htmlPath" -LogLevel "Information"
         }
         catch
         {
             Write-Error "[$functionName] Failed to export HTML report: $($_.Exception.Message)"
-            Write-Verbose "[$functionName] HTML export error details: $($_.Exception)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "HTML export error details: $($_.Exception)" -LogLevel "Error"
             return $false
         }
@@ -108,7 +101,6 @@ function ExportDeviceReport()
     elseif ($finalExportFormat -eq "CSV")
     {
         $csvPath = "$pwd\$fileName.csv"
-        Write-Verbose "[$functionName] Exporting to CSV: $csvPath"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to CSV: $csvPath" -LogLevel "Information"
         try
         {
@@ -121,13 +113,11 @@ function ExportDeviceReport()
             }
             $csvData | Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
             Write-Host "CSV report exported to: $csvPath" -ForegroundColor Green
-            Write-Verbose "[$functionName] Successfully exported CSV report to $csvPath"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully exported CSV report to $csvPath" -LogLevel "Information"
         }
         catch
         {
             Write-Error "[$functionName] Failed to export CSV report: $($_.Exception.Message)"
-            Write-Verbose "[$functionName] CSV export error details: $($_.Exception)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV export error details: $($_.Exception)" -LogLevel "Error"
             return $false
         }
@@ -137,7 +127,6 @@ function ExportDeviceReport()
         Write-Error "[$functionName] Unsupported export format: $finalExportFormat"
         return $false
     }
-    Write-Verbose "[$functionName] Export completed successfully."
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Export completed successfully." -LogLevel "Information"
     return $true
 }

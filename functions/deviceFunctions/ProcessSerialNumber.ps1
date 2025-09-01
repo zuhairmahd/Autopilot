@@ -10,10 +10,8 @@ function ProcessSerialNumber()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Processing device lookup for serial number: $SerialNumber"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing device lookup for serial number: $SerialNumber" -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Validating serial number: $SerialNumber"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Verbose"
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
@@ -25,18 +23,13 @@ function ProcessSerialNumber()
     if ($enrollmentState)
     {
         $success = $true
-        Write-Verbose "[$functionName] Device lookup successful"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup successful" -LogLevel "Information"
         # Display basic device information
         Write-Host "`n=== Device Information ===" -ForegroundColor Green
         Write-Host "Serial Number: $SerialNumber"
-        Write-Verbose "[$scriptName] Device is managed: $($enrollmentState.managed)"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device is managed: $($enrollmentState.managed)" -LogLevel "Information"
-        Write-Verbose "[$scriptName] Has device object: $($enrollmentState.hasDeviceObject)"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Has device object: $($enrollmentState.hasDeviceObject)" -LogLevel "Information"
-        Write-Verbose "[$scriptName] In Autopilot: $($enrollmentState.inAutopilot)"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
-        Write-Verbose "[$scriptName] Device imported: $($enrollmentState.Imported)"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
         if ($CheckUserReadiness)
         {
@@ -72,7 +65,6 @@ function ProcessSerialNumber()
             Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
             Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
             Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-            Write-Verbose "[$functionName] Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)" -LogLevel "Information"
             Write-Host "Press any key to continue"
@@ -82,7 +74,6 @@ function ProcessSerialNumber()
         {
             Write-Host $contactMessage -ForegroundColor Green
             Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-            Write-Verbose "[$functionName] Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
         }
         else
@@ -100,7 +91,6 @@ function ProcessSerialNumber()
                 Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
                 Write-Host "=============================`n" -ForegroundColor Green
                 $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
-                Write-Verbose "[$scriptName] Device assessment state: $DeviceAssessmentState"
                 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
                 Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
             }
@@ -122,9 +112,7 @@ function ProcessSerialNumber()
         }
         if ($enrollmentState.Imported)
         {
-            Write-Verbose "[$scriptName] Imported in Autopilot: $($enrollmentState.inAutopilot)"
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported in Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
-            Write-Verbose "[$scriptName] Imported count: $($enrollmentState.Imported)"
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported count: $($enrollmentState.Imported)" -LogLevel "Information"
             if ($enrollmentState.Imported -gt 1)
             {
@@ -164,7 +152,6 @@ function ProcessSerialNumber()
             Write-Host "Status: Managed by Intune" -ForegroundColor Green
             Write-Host "=============================`n" -ForegroundColor Green
             $pendingActions = getDevicePendingActions -enrollmentState $enrollmentState
-            Write-Verbose "[$functionName] Pending actions: $($pendingActions | ConvertTo-Json -Depth $maxJSONDepth)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Pending actions: $($pendingActions | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
             if ($pendingActions.isPendingAction)
             {
@@ -178,24 +165,19 @@ function ProcessSerialNumber()
             }
             else
             {
-                Write-Verbose "[$functionName] No pending actions for this device."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions for this device." -LogLevel "Information"
             }
             # Create and show device actions menu using main.ps1 menu structure
-            Write-Verbose "[$functionName] Starting device actions menu loop"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Debug"
             $deviceActionsMenu = NewMenu -MenuName "deviceActionsMenu"
             # Update the title to include the actual device name
             $deviceActionsMenu.Title = $deviceActionsMenu.Title -replace '\$deviceName', $deviceName
             
             #region Check device capabilities and remove unavailable menu items
-            Write-Verbose "[$functionName] Checking device capabilities to determine available actions"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking device capabilities to determine available actions" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking device capabilities to determine available actions" -LogLevel "Verbose"
             
             # Check LAPS credentials availability
-            Write-Verbose "[$functionName] Checking if device has LAPS credentials."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device has LAPS credentials." -LogLevel "Verbose"
-            Write-Verbose "[$functionName] LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS credentials count: $($enrollmentState.managedDevice.laps.credentials.count)" -LogLevel "Information"
             if (-not ($enrollmentState.managedDevice.laps.credentials.count -gt 0))
             {
@@ -206,7 +188,6 @@ function ProcessSerialNumber()
             
             # Check BitLocker keys availability
             Write-Verbose "[$functionName] Checking if we have bitlocker keys for this device."
-            Write-Verbose "[$functionName] BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker recovery key count: $($enrollmentState.managedDevice.bitLocker.value.count)" -LogLevel "Information"
             if ($null -eq $enrollmentState.managedDevice.latestBitlockerKey)
             {
@@ -216,8 +197,7 @@ function ProcessSerialNumber()
             }
             
             # Check Hardware Password Details availability
-            Write-Verbose "[$functionName] Checking if device has hardware password details."
-            Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Information"
+Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Verbose"
             if ($null -eq $enrollmentState.managedDevice.hardwarePassword -or $enrollmentState.managedDevice.hardwarePassword.count -eq 0)
             {
                 Write-Verbose "[$functionName] No hardware password details available - removing menu item"
@@ -227,7 +207,6 @@ function ProcessSerialNumber()
             #endregion
             
             #region Assign actions to remaining menu items
-            Write-Verbose "[$functionName] Assigning actions to available menu items"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Assigning actions to available menu items" -LogLevel "Information"
             
             # Always available actions
@@ -271,7 +250,6 @@ function ProcessSerialNumber()
             if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
-                    Write-Verbose "[$scriptName] Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function."
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
                     $bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                     if ($bitlockerKey -ne "`n")
@@ -325,24 +303,20 @@ function ProcessSerialNumber()
             
             $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
                 $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
-                Write-Verbose "[$functionName] Device report: $deviceReport"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report: $deviceReport" -LogLevel "Information"
                 # Handle navigation responses from ShowReport
                 if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
                 {
-                    Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
                     return $returnValues.backoutText
                 }
                 elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
                 {
-                    Write-Verbose "[$scriptName] User selected Main Menu from device selection"
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }
                 elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
                 {
-                    Write-Verbose "[$scriptName] User requested application exit from device selection."
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User requested application exit from device selection." -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }        
@@ -356,7 +330,6 @@ function ProcessSerialNumber()
                     {
                         Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
                     }
-                    Write-Verbose "[$scriptName] ShowDeviceReport returned: $deviceReport"
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
                 }
                 return $returnValues.backoutText
@@ -370,13 +343,10 @@ function ProcessSerialNumber()
             #endregion
             
             # Show the device actions menu with navigation context
-            Write-Verbose "[$functionName] Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Showing device actions menu with Depth: $depth, History count: $($History.Count), MenuHistory count: $($MenuHistory.Count)" -LogLevel "Information"
             $result = ShowMenu -Menu $deviceActionsMenu -CalledBy 'Action'
             #endregion Process devices
-            Write-Verbose "[$functionName] Device actions menu returned result: $result"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device actions menu returned result: $result" -LogLevel "Information"
-            Write-Verbose "[$functionName] Returning from device actions menu with result: $result"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning from device actions menu with result: $result" -LogLevel "Information"
             return $result
         }
@@ -399,8 +369,7 @@ function ProcessSerialNumber()
     else
     {
         # Explicitly return $null if no enrollmentState
-        Write-Verbose "[$functionName] Device lookup failed or no enrollment state found"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Verbose"
         return $null
     }
     

@@ -11,13 +11,10 @@ function getDevicePendingActions()
     $deviceActions = @('wipePending')
     $pendingActions = [PSCustomObject]@{}
     $isPendingAction = $false
-    Write-Verbose "[$functionName] Checking for pending actions on the device..."
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking for pending actions on the device..." -LogLevel "Verbose"
-    Write-Verbose "[$functionName] Device management state: $($enrollmentState.managedDevice.device.managementState)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device management state: $($enrollmentState.managedDevice.device.managementState)" -LogLevel "Information"
     if ($enrollmentState.managedDevice.device.managementState -in $deviceActions)
     {
-        Write-Verbose "[$functionName] The device has pending actions."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device has pending actions." -LogLevel "Information"
         $isPendingAction = $true
         Write-Verbose "Action name $($enrollmentState.managedDevice.device.managementState)"
@@ -29,9 +26,7 @@ function getDevicePendingActions()
     }
     else
     {
-        Write-Verbose "[$functionName] The device has no pending actions."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device has no pending actions." -LogLevel "Information"
-        Write-Verbose "[$functionName] Device management state: $($enrollmentState.managedDevice.device.managementState)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device management state: $($enrollmentState.managedDevice.device.managementState)" -LogLevel "Information"
         $isPendingAction = $false
     }
@@ -49,11 +44,9 @@ function getDevicePendingActions()
             }
         }
     }        
-    Write-Verbose "[$functionName] Is pending action: $isPendingAction"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Is pending action: $isPendingAction" -LogLevel "Information"
     if ($isPendingAction -eq $true)
     {
-        Write-Verbose "[$functionName] There are pending actions for the device."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "There are pending actions for the device." -LogLevel "Information"
         $returnObject.Add('PendingActions', $pendingActions)
         $returnObject.Add('IsPendingAction', $isPendingAction)
@@ -61,8 +54,7 @@ function getDevicePendingActions()
     }
     else
     {
-        Write-Verbose "[$functionName] No pending actions found for the device."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions found for the device." -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions found for the device." -LogLevel "Verbose"
         $returnObject.Add('PendingActions', $null)
         $returnObject.Add('IsPendingAction', $isPendingAction)
         return $returnObject

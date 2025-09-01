@@ -18,7 +18,7 @@ function AddMenuItem()
     
     if ($Action -and $Submenu)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error: Menu item '$Name' cannot have both Action and Submenu" -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Error: Menu item '$Name' cannot have both Action and Submenu" -LogLevel "Warning"
         throw "A menu item cannot have both an Action and a Submenu."
     }
     
@@ -36,7 +36,7 @@ function AddMenuItem()
         {
             $existingItemIndex = $i
             Write-Verbose "[$functionName] Found existing menu item with name: $Name at index $i"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Found existing menu item with name: $Name at index $i, will update instead of adding new" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found existing menu item with name: $Name at index $i, will update instead of adding new" -LogLevel "Verbose"
             break
         }
     }
@@ -52,7 +52,6 @@ function AddMenuItem()
     if ($existingItemIndex -ge 0 -and $Menu.Items[$existingItemIndex].includeInDisplayModes)
     {
         $item.includeInDisplayModes = $Menu.Items[$existingItemIndex].includeInDisplayModes
-        Write-Verbose "[$functionName] Preserving includeInDisplayModes from existing item: $($item.includeInDisplayModes -join ', ')"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Preserving includeInDisplayModes from existing item: $($item.includeInDisplayModes -join ', ')" -LogLevel "Debug"
     }
     
@@ -76,7 +75,7 @@ function AddMenuItem()
     {
         # Update existing item
         Write-Verbose "[$functionName] Updating existing menu item at index $existingItemIndex"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Updating existing menu item '$Name' at index $existingItemIndex" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Updating existing menu item '$Name' at index $existingItemIndex" -LogLevel "Debug"
         $Menu.Items[$existingItemIndex] = $item
     }
     else
@@ -87,7 +86,7 @@ function AddMenuItem()
         $Menu.Items += $item
     }
     
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$Name' successfully added/updated. Total menu items: $($Menu.Items.Count)" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$Name' successfully added/updated. Total menu items: $($Menu.Items.Count)" -LogLevel "Information"
     
     return $Menu
 }

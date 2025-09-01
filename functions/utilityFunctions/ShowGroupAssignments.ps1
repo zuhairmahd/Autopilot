@@ -26,7 +26,6 @@ function ShowGroupAssignments()
         "Unknown" 
     }
     
-    Write-Verbose "[$functionName] Retrieving group assignments for '$groupName'..."
     Write-Log -logFile $LogFile -Module $functionName -Message "Retrieving group assignments for '$groupName'..." -logLevel "Information"
     if (-not $accessToken)
     {
@@ -45,12 +44,12 @@ function ShowGroupAssignments()
     $assignments = GetGroupDirectAssignments -accessToken $accessToken -GroupName $Group -includeBeta
     if ($assignments -eq 'noGroup')
     {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -logLevel "Warning"
+Write-Log -logFile $LogFile -Module $functionName -Message "No group found for name '$groupName'." -LogLevel "Verbose"
         return $returnValues.noGroupFoundMessage
     }   
     if ($null -eq $assignments -or $assignments.AllAssignments.count -eq 0)
     {
-        Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -logLevel "Warning"
+Write-Log -logFile $LogFile -Module $functionName -Message "No assignments found for group '$groupName'." -LogLevel "Verbose"
         return $returnValues.noGroupAssignmentsFoundMessage
     }
     # Cache all assignments to avoid re-query per selection

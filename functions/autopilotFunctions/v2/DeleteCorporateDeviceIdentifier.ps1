@@ -69,23 +69,20 @@ function DeleteCorporateDeviceIdentifier()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceInfo='$($DeviceInfo | ConvertTo-Json -Compress)', IdentifierType='$IdentifierType'"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting DeleteCorporateDeviceIdentifier. DeviceInfo='$($DeviceInfo | ConvertTo-Json -Compress)', IdentifierType='$IdentifierType'" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting DeleteCorporateDeviceIdentifier. DeviceInfo='$($DeviceInfo | ConvertTo-Json -Compress)', IdentifierType='$IdentifierType'" -LogLevel "Verbose"
 
     if ($AccessToken -eq '' -or $null -eq $AccessToken)
     {
-        Write-Verbose "[$functionName] No AccessToken provided. Aborting."
         Write-Log -LogFile $LogFile -Module $functionName -Message "No AccessToken provided. Aborting." -LogLevel "Error"
         return $false
     }
     else
     {
-        Write-Verbose "[$functionName] AccessToken provided."
         Write-Log -LogFile $LogFile -Module $functionName -Message "AccessToken provided." -LogLevel "Debug"
     }
 
     # Microsoft Graph API endpoint for Windows Corporate Device Identifiers
     $uri = "deviceManagement/importedDeviceIdentities"
-    Write-Verbose "[$functionName] Using Graph API endpoint: $uri"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Using Graph API endpoint: $uri" -LogLevel "Debug"
 
     # Handle different identifier types with proper formatting for filtering
@@ -97,21 +94,18 @@ function DeleteCorporateDeviceIdentifier()
         $modelEscaped = $DeviceInfo.Model -replace ',', '\,'
         $serialEscaped = $DeviceInfo.SerialNumber -replace ',', '\,'
         $formattedIdentifier = ("$manufacturerEscaped,$modelEscaped,$serialEscaped" -replace '[^\w,]', '')
-        Write-Verbose "[$functionName] manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)"
         Write-Log -LogFile $LogFile -Module $functionName -Message "manufacturerModelSerial built: Manufacturer='$manufacturerEscaped', Model='$modelEscaped', Serial='$serialEscaped' (commas escaped)" -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'SerialNumber')
     {
         $formattedIdentifier = $DeviceInfo.SerialNumber
         $formattedType = "serialNumber"
-        Write-Verbose "[$functionName] IdentifierType is SerialNumber. formattedType set to 'serialNumber'."
         Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is SerialNumber. formattedType set to 'serialNumber'." -LogLevel "Debug"
     }
     elseif ($IdentifierType -eq 'IMEI')
     {
         $formattedIdentifier = $DeviceInfo.IMEI
         $formattedType = "imei"
-        Write-Verbose "[$functionName] IdentifierType is IMEI. formattedType set to 'imei'."
         Write-Log -LogFile $LogFile -Module $functionName -Message "IdentifierType is IMEI. formattedType set to 'imei'." -LogLevel "Debug"
     }
 
@@ -119,16 +113,13 @@ function DeleteCorporateDeviceIdentifier()
     {
         # First, find the device identifier in the imported device identities
         Write-Host "Searching for device identifier in corporate identifiers..." -ForegroundColor Yellow
-        Write-Verbose "[$functionName] Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Searching for device identifier with type '$formattedType' and value '$formattedIdentifier'" -LogLevel "Verbose"
         
         # Based on Microsoft documentation, filters on importedDeviceIdentities may not work properly
         # Get all devices and filter client-side as recommended when API filters fail
-        Write-Verbose "[$functionName] Getting all imported device identities to filter client-side"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Getting all imported device identities to filter client-side" -LogLevel "Debug"
         
         $allDevices = (CallGraphAPI -AccessToken $AccessToken -ResourcePath $uri).value
-        Write-Verbose "[$functionName] Retrieved $($allDevices.Count) total imported device identities"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieved $($allDevices.Count) total imported device identities" -LogLevel "Debug"
         
         # Filter client-side based on identifier type and value
@@ -170,8 +161,7 @@ function DeleteCorporateDeviceIdentifier()
             }
         }
         
-        Write-Verbose "[$functionName] Found $($existingDevices.Count) matching device(s) after client-side filtering"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($existingDevices.Count) matching device(s) after client-side filtering" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($existingDevices.Count) matching device(s) after client-side filtering" -LogLevel "Verbose"
         
         if ($existingDevices -and $existingDevices.Count -gt 0)
         {
@@ -180,25 +170,21 @@ function DeleteCorporateDeviceIdentifier()
             $deviceId = $deviceToDelete.id
             Write-Host "Found device identifier with ID: $deviceId" -ForegroundColor Green
             Write-Verbose "[$functionName] Device to delete: $($deviceToDelete | ConvertTo-Json -Depth $maxJSONDepth)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Found device identifier to delete with ID: $deviceId" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found device identifier to delete with ID: $deviceId" -LogLevel "Verbose"
             
             # Delete the device identifier
             $deleteUri = "$uri/$deviceId"
-            Write-Verbose "[$functionName] Delete URI: $deleteUri"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Delete URI: $deleteUri" -LogLevel "Debug"
             
             Write-Host "Deleting corporate device identifier..." -ForegroundColor Yellow
-            Write-Verbose "[$functionName] Calling CallGraphAPI with DELETE to $deleteUri"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Calling CallGraphAPI with DELETE to $deleteUri" -LogLevel "Information"
             
             $deleteResponse = CallGraphAPI -AccessToken $AccessToken -ResourcePath $deleteUri -Method DELETE
-            Write-Verbose "[$functionName] Delete response: $($deleteResponse | Out-String)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Delete response: $($deleteResponse | Out-String)" -LogLevel "Debug"
             
             # Verify deletion (Graph API DELETE typically returns null/empty on success)
             if ($null -eq $deleteResponse -or $deleteResponse -eq '')
             {
-                Write-Verbose "[$functionName] Delete request initiated successfully."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Delete request initiated successfully." -LogLevel "Information"
                 return $returnValues.deviceDeleteSuccessMessage
             }
@@ -213,8 +199,7 @@ function DeleteCorporateDeviceIdentifier()
         else
         {
             Write-Host "No corporate device identifier found matching the specified criteria." -ForegroundColor Yellow
-            Write-Verbose "[$functionName] No device found with identifier '$formattedIdentifier' and type '$formattedType'"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "No device found with identifier '$formattedIdentifier' and type '$formattedType'" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $functionName -Message "No device found with identifier '$formattedIdentifier' and type '$formattedType'" -LogLevel "Verbose"
             return $returnValues.noDeviceFound
         }
     }

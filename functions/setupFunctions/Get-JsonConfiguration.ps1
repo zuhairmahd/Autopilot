@@ -62,7 +62,7 @@ function Get-JsonConfiguration()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Attempting to load configuration from: $JsonFile" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Attempting to load configuration from: $JsonFile" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Attempting to load configuration from: $JsonFile"
     Write-Verbose "[$functionName] Configuration Type: $ConfigurationType"
     
@@ -70,7 +70,6 @@ function Get-JsonConfiguration()
     {
         if (Test-Path -Path $JsonFile)
         {
-            Write-Verbose "[$functionName] Loading configuration from JSON file: $JsonFile"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Loading configuration from JSON file: $JsonFile" -LogLevel "Debug"
             $jsonContent = Get-Content -Path $JsonFile -Raw -Force -ErrorAction Stop
             
@@ -78,7 +77,6 @@ function Get-JsonConfiguration()
             try
             {
                 $jsonData = $jsonContent | ConvertFrom-Json -ErrorAction Stop
-                Write-Verbose "[$functionName] JSON file is valid"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "JSON file is valid" -LogLevel "Debug"
             }
             catch

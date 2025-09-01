@@ -11,13 +11,9 @@ function AssessDeviceState()
     )
     $functionName = $MyInvocation.MyCommand.Name
     #region Write verbose log of received parameters.
-    Write-Verbose "[$functionName] Received parameters:"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Received parameters:" -LogLevel "Information"
-    Write-Verbose "[$functionName] Enrollment state: $($enrollmentState | ConvertTo-Json -Depth $maxJSONDepth)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Enrollment state: $($enrollmentState | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
-    Write-Verbose "[$functionName] Assessment type: $AssessmentType"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Assessment type: $AssessmentType" -LogLevel "Information"
-    Write-Verbose "[$functionName] Settings: $($settings | ConvertTo-Json -Depth $maxJSONDepth)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Settings: $($settings | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
     $returnValue = [ordered] @{}
     $readinessState = $null
@@ -25,7 +21,6 @@ function AssessDeviceState()
     $device = $null
     #endregion
 
-    Write-Verbose "[$functionName] Type of assessment: $AssessmentType"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Type of assessment: $AssessmentType" -LogLevel "Information"
     switch ($AssessmentType)
     {
@@ -37,23 +32,19 @@ function AssessDeviceState()
         'NextUserReadiness'
         {
             Write-Host "Checking if the device is ready for the next user..."
-            Write-Verbose "[$functionName] Checking if the device is registered in Autopilot..."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if the device is registered in Autopilot..." -LogLevel "Verbose"
-            Write-Verbose "[$functionName] In Autopilot: $($enrollmentState.inAutopilot)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
                 if (-not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
                 {   
-                    Write-Verbose "[$functionName] Getting managed device properties."
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting managed device properties." -LogLevel "Information"
                     $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
                     $memoryMessage = "`n"
                 }
                 else 
                 {
-                    Write-Verbose "[$functionName] Device enrollment state is 'notContacted', skipping managed device readiness check."
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device enrollment state is 'notContacted', skipping managed device readiness check." -LogLevel "Information"
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
                 }
@@ -61,7 +52,6 @@ function AssessDeviceState()
                 if ($deviceLastContactDate.withinThreshold)
                 {
                     Write-Host "The device last contacted Intune on $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone), $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
-                    Write-Verbose "[$functionName] Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
                 }
                 else
@@ -245,15 +235,10 @@ function AssessDeviceState()
     $returnValue.Add('IssueCount', $allIssues.Count)  # Number of issues found
     $returnValue.Add('IsReady', ($readinessState -eq $deviceStates.ready))  # Boolean readiness check
     
-    Write-Verbose "[$functionName] Returning readiness state: $readinessState"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning readiness state: $readinessState" -LogLevel "Information"
-    Write-Verbose "[$functionName] Returning primary action: $action"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning primary action: $action" -LogLevel "Information"
-    Write-Verbose "[$functionName] Returning device: $device"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning device: $device" -LogLevel "Information"
-    Write-Verbose "[$functionName] Found $($allIssues.Count) issues: $($allIssues -join '; ')"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($allIssues.Count) issues: $($allIssues -join '; ')" -LogLevel "Information"
-    Write-Verbose "[$functionName] All actions needed: $($allActions -join '; ')"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($allIssues.Count) issues: $($allIssues -join '; ')" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "All actions needed: $($allActions -join '; ')" -LogLevel "Information"
     return $returnValue
 }

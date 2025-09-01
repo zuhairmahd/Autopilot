@@ -21,7 +21,7 @@ function Clear-SecureMemory()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure memory cleanup operation" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting secure memory cleanup operation" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Clearing sensitive data from memory"
     
     $clearedVariables = @()
@@ -53,21 +53,18 @@ function Clear-SecureMemory()
         if (Get-Variable -Name "TempEncryptedConfig" -Scope Script -ErrorAction SilentlyContinue)
         {
             Remove-Variable -Name "TempEncryptedConfig" -Scope Script -Force -ErrorAction SilentlyContinue
-            Write-Verbose "[$functionName] Cleared script variable: TempEncryptedConfig"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: TempEncryptedConfig" -LogLevel "Debug"
         }
         
         if (Get-Variable -Name "TempEncryptionKey" -Scope Script -ErrorAction SilentlyContinue)
         {
             Remove-Variable -Name "TempEncryptionKey" -Scope Script -Force -ErrorAction SilentlyContinue
-            Write-Verbose "[$functionName] Cleared script variable: TempEncryptionKey"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: TempEncryptionKey" -LogLevel "Debug"
         }
         
         if (Get-Variable -Name "UserEncryptionPassword" -Scope Script -ErrorAction SilentlyContinue)
         {
             Remove-Variable -Name "UserEncryptionPassword" -Scope Script -Force -ErrorAction SilentlyContinue
-            Write-Verbose "[$functionName] Cleared script variable: UserEncryptionPassword"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared script variable: UserEncryptionPassword" -LogLevel "Debug"
         }
     }
@@ -78,6 +75,6 @@ function Clear-SecureMemory()
     [System.GC]::Collect()
     
     Write-Verbose "[$functionName] Memory cleanup completed"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Memory cleanup completed successfully. Variables cleared: $($clearedVariables.Count)" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Memory cleanup completed successfully. Variables cleared: $($clearedVariables.Count)" -LogLevel "Information"
 }
 

@@ -6,7 +6,7 @@ function GetCorpDeviceIdentifier()
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Entered function. OutputPath: $OutputPath"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting GetCorpDeviceIdentifier. OutputPath: $OutputPath" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting GetCorpDeviceIdentifier. OutputPath: $OutputPath" -LogLevel "Verbose"
 
     # Get computer system information
     try
@@ -43,7 +43,6 @@ function GetCorpDeviceIdentifier()
     Write-Host "Device Manufacturer: $make"
     Write-Host "Device Model: $model"
     Write-Host "Device Serial Number: $serialNumber"
-    Write-Verbose "[$functionName] Outputting device info to host."
     Write-Log -LogFile $LogFile -Module $functionName -Message "Outputting device info to host." -LogLevel "Debug"
 
     $deviceInfo = [PSCustomObject]@{
@@ -52,7 +51,7 @@ function GetCorpDeviceIdentifier()
         SerialNumber = $serialNumber
     }
     Write-Verbose "[$functionName] Returning device info object."
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Returning device info object: $($deviceInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
     return $deviceInfo
 }
 

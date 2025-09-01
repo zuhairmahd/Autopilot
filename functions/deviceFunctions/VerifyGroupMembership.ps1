@@ -14,7 +14,6 @@ function VerifyGroupMembership()
 
     #region Initialize result object and logging
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting VerifyGroupMembership function"
     Write-Log -logFile $logFile -module $functionName -Message "Starting VerifyGroupMembership function" -logLevel "Verbose"
 
     #region Helper functions for format detection and conversion
@@ -213,7 +212,6 @@ function VerifyGroupMembership()
     #endregion
 
     # Create a consistent return object structure that will always be returned
-    Write-Verbose "[$functionName] Initializing result object"
     Write-Log -logFile $logFile -module $functionName -Message "Initializing result object" -logLevel "Information"
     $result = [PSCustomObject]@{
         Success         = $false
@@ -226,7 +224,6 @@ function VerifyGroupMembership()
 
     if (-not $accessToken)
     {
-        Write-Verbose "[$functionName] Access token is empty or null"
         Write-Log -logFile $logFile -module $functionName -Message "Access token is empty or null" -logLevel "Information"
         Write-Host "Access token is required." -ForegroundColor Red
         $result.Error = "Access token is required."
@@ -268,8 +265,7 @@ function VerifyGroupMembership()
         # Check if user was found
         if ($user -is [string] -and $user -match '^\d+$')
         {
-            Write-Verbose "[$functionName] User $userName not found in Azure AD (Error code: $user)"
-            Write-Log -logFile $logFile -module $functionName -Message "User $userName not found in Azure AD (Error code: $user)" -logLevel "Error"
+Write-Log -logFile $logFile -module $functionName -Message "User $userName not found in Azure AD (Error code: $user)" -LogLevel "Verbose"
             Write-Host "The user $userName was not found in Azure AD." -ForegroundColor Red
             Write-Host "Please check the user name and try again." -ForegroundColor Red
             $result.Error = "User not found in Azure AD (Error code: $user)"
@@ -281,7 +277,6 @@ function VerifyGroupMembership()
     }
     catch
     {
-        Write-Verbose "[$functionName] Error getting user information: $_"
         Write-Log -logFile $logFile -module $functionName -Message "Error getting user information: $_" -logLevel "Error"
         Write-Host "Error getting user information: $_" -ForegroundColor Red
         $result.Error = "Error getting user information: $_"
@@ -385,7 +380,6 @@ function VerifyGroupMembership()
             $result.MissingGroups = $missingGroups
             if ($missingGroups.Count -gt 0)
             {
-                Write-Verbose "[$functionName] User $userName is missing membership in the following required groups: $($missingGroups -join ', ')"
                 Write-Log -logFile $logFile -module $functionName -Message "User $userName is missing membership in the following required groups: $($missingGroups -join ', ')" -logLevel "Warning"
             }
         }
@@ -469,14 +463,12 @@ function VerifyGroupMembership()
             $result.ForbiddenGroups = $forbiddenGroups
             if ($result.ForbiddenGroups.Count -gt 0)
             {
-                Write-Verbose "[$functionName] User $userName is a member of the following forbidden groups: $($result.ForbiddenGroups -join ', ')"
                 Write-Log -logFile $logFile -module $functionName -Message "User $userName is a member of the following forbidden groups: $($result.ForbiddenGroups -join ', ')" -logLevel "Warning"
             }
         }
     }
     catch
     {
-        Write-Verbose "[$functionName] Error getting group membership: $_"
         Write-Log -logFile $logFile -module $functionName -Message "Error getting group membership: $_" -logLevel "Error"
         $result.Error = "Error getting group membership: $_"
         return $result
@@ -546,7 +538,6 @@ function VerifyGroupMembership()
             }
             else
             {
-                Write-Verbose "[$functionName] Could not determine domain name for configuration update - migration skipped"
                 Write-Log -logFile $logFile -module $functionName -Message "Could not determine domain name for configuration update - migration skipped" -logLevel "Warning"
             }
         }

@@ -27,7 +27,6 @@ function Test-MenuJsonExists()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Ensuring menu.json exists: $MenuFile"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Ensuring menu.json exists: $MenuFile" -LogLevel "Information"
     
     try
@@ -593,7 +592,7 @@ function Test-MenuJsonExists()
         if (Test-Path -Path $MenuFile)
         {
             Write-Verbose "[$functionName] Menu file exists, checking for missing default values: $MenuFile"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Menu file exists, checking for updates: $MenuFile" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Menu file exists, checking for updates: $MenuFile" -LogLevel "Verbose"
             
             try
             {
@@ -618,11 +617,9 @@ function Test-MenuJsonExists()
                 
                 if ($null -ne $mergedMenus)
                 {
-                    Write-Verbose "[$functionName] Merging default menu configurations into existing file"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Merging default menu configurations into existing file" -LogLevel "Information"
                     $mergedJson = ConvertTo-OrderedJson -InputObject $mergedMenus -Depth $maxJSONDepth
                     Set-Content -Path $MenuFile -Value $mergedJson -Encoding UTF8 -Force
-                    Write-Verbose "[$functionName] Updated menu.json with missing default values"
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Updated menu.json with missing default values" -LogLevel "Information"
                     if (-not $Silent)
                     {
@@ -637,8 +634,7 @@ function Test-MenuJsonExists()
             }
             catch
             {
-                Write-Verbose "[$functionName] Error processing existing menu file: $($_.Exception.Message)"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Error processing existing menu file: $($_.Exception.Message)" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Error processing existing menu file: $($_.Exception.Message)" -LogLevel "Verbose"
                 # Continue with creating new file as fallback
             }
         }

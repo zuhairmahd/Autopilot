@@ -10,36 +10,26 @@ function GetManagedDeviceRelevantProperties()
     $managedDeviceProperties = [ordered] @{}
     if ($null -eq $settings.MinimumDevicePhysicalMemoryInGB -or $settings.MinimumDevicePhysicalMemoryInGB -eq 0)
     {
-        Write-Verbose "[$functionName] No minimum device physical memory specified in settings."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "No minimum device physical memory specified in settings." -LogLevel "Information"
-        Write-Verbose "[$functionName] Setting default value to 16GB."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Setting default value to 16GB." -LogLevel "Information"
         $MinimumDevicePhysicalMemoryInGB = 16
     }
     else
     {
         $MinimumDevicePhysicalMemoryInGB = $settings.MinimumDevicePhysicalMemoryInGB
-        Write-Verbose "[$functionName] Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Minimum device physical memory specified in settings: $MinimumDevicePhysicalMemoryInGB" -LogLevel "Information"
     }
     Write-Host "Checking managed device..."
-    Write-Verbose "[$functionName] Managed device: $($enrollmentState.managed)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device: $($enrollmentState.managed)" -LogLevel "Information"
     if ($enrollmentState.managed)
     {
-        Write-Verbose "[$functionName] Found a managed device."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a managed device." -LogLevel "Information"
-        Write-Verbose "[$functionName] Checking whether this is an orphan device..."
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a managed device." -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether this is an orphan device..." -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)" -LogLevel "Information"
-        Write-Verbose "[$functionName] Managed device id: $($enrollmentState.managedDevice.device.id)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device id: $($enrollmentState.managedDevice.device.id)" -LogLevel "Information"
-        Write-Verbose "[$functionName] Checking if they are the same..."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if they are the same..." -LogLevel "Verbose"
         if ($enrollmentState.managedDevice.device.id -eq $enrollmentState.autopilot.device.managedDeviceId)
         {
-            Write-Verbose "[$functionName] Device Id's match."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device Id's match." -LogLevel "Information"
             Write-Host "The device is not an orphan device."
             $orphanDevice = $false
@@ -58,13 +48,9 @@ function GetManagedDeviceRelevantProperties()
             Write-Host "Checking for a user association on the manage device..."
             if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
             {
-                Write-Verbose "[$functionName] Found a user..."
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a user..." -LogLevel "Information"
-                Write-Verbose "[$functionName] User display name: $($enrollmentState.managedDevice.users.userDisplayName)"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a user..." -LogLevel "Verbose"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User display name: $($enrollmentState.managedDevice.users.userDisplayName)" -LogLevel "Information"
-                Write-Verbose "[$functionName] User id: $($enrollmentState.managedDevice.device.userId)"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User id: $($enrollmentState.managedDevice.device.userId)" -LogLevel "Information"
-                Write-Verbose "[$functionName] User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)" -LogLevel "Information"
                 $hasUser = $true
                 if ($enrollmentState.managedDevice.users.azureUser)
@@ -92,7 +78,6 @@ function GetManagedDeviceRelevantProperties()
             }
             else
             {
-                Write-Verbose "[$functionName] The managed device is not associated with a user."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "The managed device is not associated with a user." -LogLevel "Information"
                 Write-Host "The device is not associated with a user."
                 $hasUser = $false
@@ -101,9 +86,7 @@ function GetManagedDeviceRelevantProperties()
         else
         {
             $orphanDevice = $true
-            Write-Verbose "[$functionName] Device Id's do not match."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device Id's do not match." -LogLevel "Information"
-            Write-Verbose "[$functionName] The device is an orphan device."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device is an orphan device." -LogLevel "Information"
         }
     }
@@ -111,13 +94,11 @@ function GetManagedDeviceRelevantProperties()
     if ($OrphanDevice -eq $false -and $CorrectRam -and -not ($HasUser -and $ValidUser))
     {
         $readyForNextUser = $true
-        Write-Verbose "[$functionName] Device is ready for the next user"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is ready for the next user" -LogLevel "Information"
     }
     else
     {
         $readyForNextUser = $false
-        Write-Verbose "[$functionName] Device is not ready for the next user"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is not ready for the next user" -LogLevel "Information"
     }
     $managedDeviceProperties.Add('OrphanDevice', $orphanDevice)

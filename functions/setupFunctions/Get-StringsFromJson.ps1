@@ -124,7 +124,7 @@ function Get-StringsFromJson
         Write-Log -LogFile $LogFile -Module $functionName -Message "Loading strings configuration from: $StringsFile" -LogLevel "Debug"
         $stringsConfig = Get-JsonConfiguration -JsonFile $StringsFile -DefaultValues $defaultStringValues
         Write-Verbose "[$functionName] Successfully loaded strings configuration from file"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully loaded strings configuration" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully loaded strings configuration" -LogLevel "Information"
         
         # Cache the configuration and file timestamp (if file exists)
         if ($fileExists) {
@@ -138,9 +138,8 @@ function Get-StringsFromJson
     catch
     {
         Write-Warning "[$functionName] Failed to load strings configuration: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Returning default values"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to load strings configuration: $($_.Exception.Message)" -LogLevel "Error"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Returning default values" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Returning default values" -LogLevel "Information"
         return $defaultStringValues
     }
 }

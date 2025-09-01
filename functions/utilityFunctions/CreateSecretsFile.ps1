@@ -10,7 +10,7 @@ function CreateSecretsFile()
     
     #region print verbose log of received parameters
     Write-Verbose "Root folder: $RootFolder"
-    Write-Log -LogFile $LogFile -Module "MiscFunctions" -Message "Processing with root folder: $RootFolder" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module "MiscFunctions" -Message "Processing with root folder: $RootFolder" -LogLevel "Verbose"
     Write-Verbose "SecretsFile: $SecretsFile"
     Write-Log -LogFile $LogFile -Module "MiscFunctions" -Message "Using secrets file: $SecretsFile" -LogLevel "Debug"
     #endregion

@@ -27,10 +27,9 @@ function DecodeJwtToken
     }
     $parts = $Token -split '\.'
     Write-Verbose "[$functionName] Token parts: $($parts.Length)"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing JWT token with $($parts.Length) parts" -LogLevel "Verbose"
     if ($parts.Length -lt 2)
     {
-        Write-Verbose "[$functionName] Invalid JWT token format. Expected at least 2 parts."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Invalid JWT token format. Expected at least 2 parts." -LogLevel "Error"
         return $returnValues.invalidJWTTokenMessage
     }

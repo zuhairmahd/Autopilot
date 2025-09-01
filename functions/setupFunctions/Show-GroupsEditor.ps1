@@ -47,7 +47,7 @@ function Show-GroupsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups editor for domain: '$DomainName'" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups editor for domain: '$DomainName'" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting groups editor for domain: '$DomainName'"
     
     try
@@ -58,7 +58,7 @@ function Show-GroupsEditor()
         
         if (-not (Test-Path -Path $SettingsFile))
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Error"
+Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
             return $false
         }
@@ -77,21 +77,21 @@ function Show-GroupsEditor()
                 $currentDomain = Get-Variable -Name "domain" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
                 if (-not [string]::IsNullOrWhiteSpace($currentDomain))
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] Found loaded domain from scope: '$currentDomain'"
                     $DomainName = $currentDomain
                 }
             }
             catch
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Warning"
                 Write-Verbose "[$functionName] Unable to access domain variable from calling scope: $($_.Exception.Message)"
             }
             
             # If no current domain found, fall back to domain selection
             if ([string]::IsNullOrWhiteSpace($DomainName))
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Warning"
                 Write-Verbose "[$functionName] No loaded domain found, falling back to domain selection"
                 
                 $configPath = Split-Path $SettingsFile -Parent
@@ -149,7 +149,7 @@ function Show-GroupsEditor()
         $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
         if ($null -eq $domainConfig)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Error"
+Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Verbose"
             Write-Warning "[$functionName] Domain '$DomainName' configuration not found"
             return $false
         }
@@ -507,8 +507,7 @@ function Show-GroupsEditor()
                 }
                 # Continue the loop to allow for multiple edits
             }
-            Write-Verbose "[$functionName] User finished editing groups, returning $groupChoice"
-            Write-Log -LogFile $logFile -Module $functionName -Message "User finished editing groups, returning $groupChoice" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "User finished editing groups, returning $groupChoice" -LogLevel "Information"
             if ($null -eq $groupChoice -or $groupChoice -eq 0 -or $groupChoice -eq "0" -or $groupChoice -eq "Back" -or $groupChoice -eq "Main Menu")
             {
                 return $groupChoice
@@ -571,7 +570,6 @@ function Get-GroupArrayInput()
         }
     }
     
-    Write-Verbose "[$functionName] Current groups format: $currentFormat"
     Write-Log -LogFile $logFile -Module $functionName -Message "Current groups format: $currentFormat" -LogLevel "Verbose"
     
     # Display current groups in appropriate format
@@ -853,7 +851,7 @@ function Update-DomainGroupSetting()
             return $false
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
         # Update the specific group setting
@@ -1033,7 +1031,6 @@ function Resolve-SingleGroupInteractive()
         [string]$FunctionName
     )
     
-    Write-Verbose "[$FunctionName] Resolving group: '$GroupName'"
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
     
     if (-not $AccessToken)

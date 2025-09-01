@@ -102,15 +102,13 @@ function DisplayNumericMenu()
             }
             catch
             {
-                Write-Verbose "[$functionName] Error reading key: $_"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Verbose"
                 $selection = $null
             }
         } until ($allValidKeys -contains $selection)
         
         # Echo the selection so user can see what was chosen
         Write-Host $selection -ForegroundColor Green
-        Write-Verbose "[$functionName] Valid key pressed: '$selection'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
     }
     
@@ -124,7 +122,6 @@ function DisplayNumericMenu()
         }
         
         Write-Host $errorMessage -ForegroundColor Red
-        Write-Verbose "[$functionName] Invalid selection: '$selection'"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid selection: '$selection'" -LogLevel "Warning"
         [console]::beep(1000, 500)
         
@@ -173,14 +170,13 @@ function DisplayNumericMenu()
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
         Write-Verbose "[$functionName] Returning choice at index $($index): '$($choices[$index])'"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choices[$index])'" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choices[$index])'" -LogLevel "Debug"
         # Return the selected choice
         return $choices[$index]
     }
     else
     {
         # This should not happen due to validation, but handle as fallback
-        Write-Verbose "[$functionName] Unexpected selection: $selection, defaulting to exit"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Unexpected selection: $selection, defaulting to exit" -LogLevel "Warning"
         return [int]0
     }

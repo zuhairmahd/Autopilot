@@ -9,7 +9,6 @@ function Remove-MenuItem()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Removing menu item: $ItemName from menu: $($Menu.Title)"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing menu item: $ItemName from menu: $($Menu.Title)" -LogLevel "Debug"
     
     # Find and remove the item from the menu items array
@@ -19,13 +18,12 @@ function Remove-MenuItem()
     
     if ($originalCount -gt $newCount)
     {
-        Write-Verbose "[$functionName] Successfully removed menu item: $ItemName"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully removed menu item: $ItemName" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] Menu item not found: $ItemName"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Menu item not found for removal: $ItemName" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Menu item not found for removal: $ItemName" -LogLevel "Verbose"
     }
     
     return $Menu

@@ -78,20 +78,18 @@ function Get-DomainConfigurationFromFiles()
         if (Test-Path $domainConfigFile)
         {
             Write-Verbose "[$functionName] Found existing domain configuration file"
-            Write-Log -LogFile $logFile -Message "Found existing domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Information"
+Write-Log -LogFile $logFile -Message "Found existing domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Verbose"
             
             # Load existing configuration
             $domainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
             
-            Write-Verbose "[$functionName] Successfully loaded domain configuration for $DomainName"
             Write-Log -LogFile $logFile -Message "Successfully loaded domain configuration for $DomainName" -Module $functionName -LogLevel "Information"
             
             return $domainConfig
         }
         else
         {
-            Write-Verbose "[$functionName] Domain configuration file not found, creating new configuration with defaults"
-            Write-Log -LogFile $logFile -Message "Domain configuration file not found, creating new configuration with defaults" -Module $functionName -LogLevel "Information"
+Write-Log -LogFile $logFile -Message "Domain configuration file not found, creating new configuration with defaults" -Module $functionName -LogLevel "Verbose"
             
             # Create new domain configuration with defaults
             $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
@@ -107,7 +105,6 @@ function Get-DomainConfigurationFromFiles()
             # Save the new configuration
             $newDomainConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $domainConfigFile -Force
             
-            Write-Verbose "[$functionName] Created new domain configuration file: $domainConfigFile"
             Write-Log -LogFile $logFile -Message "Created new domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Information"
             
             return $newDomainConfig

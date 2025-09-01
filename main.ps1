@@ -96,31 +96,25 @@ else
 #If the scriptname is a Powershell, change the extension to an exe.
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
-    Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
     Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
     $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
     if (Test-Path "$pwd\$scriptNameExe")
     {
-        Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
         Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
         $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
     }
     else 
     {
-        Write-Verbose "[$scriptName] Executable file '$scriptNameExe' not found."
-        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -logLevel "Verbose"
+Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
     }
 }
 else 
 {
-    Write-Verbose "[$scriptName] Script file '$scriptName' found."
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -logLevel "Information"
+Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"        
 }
-Write-Verbose "[$scriptName] Version: $($version | Out-String)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
 $appMetaData = Get-ApplicationMetaDataFromDomain
-Write-Verbose "[$scriptName] Application metadata retrieved successfully."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
 if (-not $version.version)
 {
@@ -129,12 +123,10 @@ if (-not $version.version)
     if ($appMetaData -and $appMetaData.version)
     {
         $version = $appMetaData.version
-        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
     }
     else 
     {
-        Write-Verbose "[$scriptName] Unable to find version information. Defaulting to 1.0.0.0."
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
         $version = @{
             version     = [System.Version]::Parse('1.0.0.0')
@@ -148,7 +140,6 @@ if (-not $version.version)
 }
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
-    Write-Verbose "[$scriptName] Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
     $version.companyName = $appMetaData.companyName
     Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
@@ -194,7 +185,6 @@ if (Test-Path $configFile)
     if (-not $sessionResult.Success)
     {
         Write-Host "Error: $($sessionResult.ErrorMessage)" -ForegroundColor Red
-        Write-Verbose "[$scriptName] Failed to initialize configuration session: $($sessionResult.ErrorMessage)"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to initialize configuration session: $($sessionResult.ErrorMessage)" -LogLevel "Error"
         Write-Host "Exitting script due to configuration session failure." -ForegroundColor Red
         Write-Log -LogFile $LogFile -FinishLogging
@@ -281,7 +271,7 @@ else
 {
     # Configuration file not found - launch first run wizard
     Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
     
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
@@ -307,7 +297,7 @@ else
             {
                 Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
                 exit 1
             }
             
@@ -399,7 +389,6 @@ $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -Strings
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
-    Write-Verbose "[$scriptName] Configuration initialization failed: $($configResult.ErrorMessage)"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
     exit 1
 }
@@ -432,7 +421,6 @@ Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded s
 #region Define variables
 if ($settings.Repo -eq 'github')
 {
-    Write-Verbose "[$scriptName] Using GitHub repository."
     Write-Log -logFile $LogFile -Module $scriptName -Message "Using GitHub repository." -LogLevel "Information"
     $baseSourceURL = if ($settings.baseSourceURL)
     {
@@ -442,7 +430,6 @@ if ($settings.Repo -eq 'github')
     {
         'https://raw.githubusercontent.com'
     }
-    Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
     Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
     $baseURL = if ($settings.baseURL)
     {
@@ -452,7 +439,6 @@ if ($settings.Repo -eq 'github')
     {
         "https://www.github.com"
     }
-    Write-Verbose "[$scriptName] Base URL: $baseURL"
     Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
     $repoPath = if ($settings.repoPath)
     {
@@ -462,7 +448,6 @@ if ($settings.Repo -eq 'github')
     {
         'zuhairmahd'
     }
-    Write-Verbose "[$scriptName] Repository path: $repoPath"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
     $repoName = if ($settings.repoName)
     {
@@ -472,18 +457,14 @@ if ($settings.Repo -eq 'github')
     {
         'autopilot'
     }
-    Write-Verbose "[$scriptName] Repository name: $repoName"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository name: $repoName" -LogLevel "Information"
     if ($settings.release -eq 'auto')
     {
-        Write-Verbose "[$scriptName] Release is set to 'auto'. Fetching the latest release from GitHub."
         Write-Log -logFile $LogFile -Module $scriptName -Message "Release is set to 'auto'. Fetching the latest release from GitHub." -LogLevel "Information"
         $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
-        Write-Verbose "[$scriptName] Latest release fetched: $latestRelease"
         Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release fetched: $latestRelease" -LogLevel "Information"
         if ($latestRelease)
         {
-            Write-Verbose "[$scriptName] Successfully retrieved the latest release information from GitHub."
             Write-Log -logFile $LogFile -Module $scriptName -Message "Successfully retrieved the latest release information from GitHub." -LogLevel "Information"
             Write-Host "Latest release: $latestRelease" -ForegroundColor Cyan
         }
@@ -497,7 +478,6 @@ if ($settings.Repo -eq 'github')
     }
     else
     {
-        Write-Verbose "[$scriptName] Using specified release: $($settings.release)"
         Write-Log -logFile $LogFile -Module $scriptName -Message "Using specified release: $($settings.release)" -LogLevel "Information"
         $latestRelease = $settings.release
     }
@@ -512,7 +492,6 @@ else
     $repoPath = 'zuhairmahd'
     $repoName = 'autopilot'
     $latestRelease = $defaultBranch
-    Write-Verbose "[$scriptName] Invalid repository specified. Defaulting to GitHub main branch."
     Write-Log -logFile $LogFile -Module $scriptName -Message "Invalid repository specified. Defaulting to GitHub main branch." -LogLevel "Information"
 }
 $global:maxJSONDepth = 100
@@ -558,61 +537,34 @@ $script:DeviceEnrollmentCache = @{}
 #endregion Define variables
 
 #region logging
-Write-Verbose "[$scriptName] Received the following parameters: $($PSBoundParameters | ConvertTo-Json)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)" -LogLevel "Information"
-Write-Verbose "[$scriptName] The current parameter set is $($PSCmdlet.ParameterSetName)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The current parameter set is $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
-Write-Verbose "[$scriptName] Configuration file: $configFile"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Configuration file: $configFile" -LogLevel "Information"
-Write-Verbose "[$scriptName] Initialization file: $InitFile"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initialization file: $InitFile" -LogLevel "Information"
 Write-Verbose "Log filename: $LogFile"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log filename: $LogFile" -LogLevel "Information"
-Write-Verbose "[$scriptName] Show settings: $showSettings"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show settings: $showSettings" -LogLevel "Information"
-Write-Verbose "[$scriptName] Show auth: $showAuth"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
-Write-Verbose "[$scriptName] Log level: $LogLevel"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
-Write-Verbose "[$scriptName] Group tag: $settings.GroupTag"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
-Write-Verbose "[$scriptName] Assigned user: $AssignedUser"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Assigned user: $AssignedUser" -LogLevel "Information"
-Write-Verbose "[$scriptName] Reconfigure: $Reconfigure"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Reconfigure: $Reconfigure" -LogLevel "Information"
-Write-Verbose "[$scriptName] Repository: $settings.Repo"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Repository: $settings.Repo" -LogLevel "Information"
-Write-Verbose "[$scriptName] Release: $settings.Release"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Release: $settings.Release" -LogLevel "Information"
-Write-Verbose "[$scriptName] Domain: $domain"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain: $domain" -LogLevel "Information"
-Write-Verbose "[$scriptName] Max wait time: $settings.maxWaitTime"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Max wait time: $settings.maxWaitTime" -LogLevel "Information"
-Write-Verbose "[$scriptName] Time in seconds: $settings.timeInSeconds"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Time in seconds: $settings.timeInSeconds" -LogLevel "Information"
-Write-Verbose "[$scriptName] Auth type: $auth.AuthType"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auth type: $auth.AuthType" -LogLevel "Information"
-Write-Verbose "[$scriptName] Cache type: $auth.CacheType"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Cache type: $auth.CacheType" -LogLevel "Information"
-Write-Verbose "[$scriptName] Force new token: $auth.ForceNewToken"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new token: $auth.ForceNewToken" -LogLevel "Information"
-Write-Verbose "[$scriptName] Force new refresh token: $auth.ForceNewRefreshToken"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new refresh token: $auth.ForceNewRefreshToken" -LogLevel "Information"
-Write-Verbose "[$scriptName] No save refresh token: $auth.NoSaveRefreshToken"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No save refresh token: $auth.NoSaveRefreshToken" -LogLevel "Information"
-Write-Verbose "[$scriptName] delegated: $auth.delegated"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "delegated: $auth.delegated" -LogLevel "Information"
-Write-Verbose "[$scriptName] Scope: $auth.Scope"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Scope: $auth.Scope" -LogLevel "Information"
-Write-Verbose "[$scriptName] Secure string: $auth.SecureString"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Secure string: $auth.SecureString" -LogLevel "Information"
-Write-Verbose "[$scriptName] App mode: $settings.appMode"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode: $settings.appMode" -LogLevel "Information"
-Write-Verbose "[$scriptName] Functions folder: $functionsFolder"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Functions folder: $functionsFolder" -LogLevel "Information"
-Write-Verbose "[$scriptName] Base source URL: $baseSourceURL"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-Write-Verbose "[$scriptName] Remote version URL: $remoteVersionURL"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: $remoteVersionURL" -LogLevel "Information"
 #endregion logging
 
@@ -647,7 +599,6 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
         Write-Host "The script will now attempt to update itself." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Automatic updates are enabled. The script will now attempt to update itself." -LogLevel "Information"
         $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -noConfirmation
-        Write-Verbose "[$scriptName] Update result: $updateResult"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
         switch ($updateResult)
         {
@@ -681,7 +632,6 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
 }
 else
 {
-    Write-Verbose "[$scriptName] No updates available or current script is up to date."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No updates available or current script is up to date." -LogLevel "Information"
 }
 #endregion banner
@@ -707,53 +657,43 @@ if ($ResetAuth)
 }
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
-Write-Verbose "[$scriptName] Force new token: $($auth.ForceNewToken )"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
-Write-Verbose "[$scriptName] Force new refresh token: $($auth.ForceNewRefreshToken )"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"  
-Write-Verbose "[$scriptName] No save refresh token: $($auth.NoSaveRefreshToken )"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
-Write-Verbose "[$scriptName] Getting access token..."
 Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
 $accessToken = GetGraphAccessToken @getTokenParams
 # Clear the cached user password now that authentication is complete
 if ($script:UserEncryptionPassword)
 {
-    Write-Verbose "[$scriptName] Clearing cached user password after authentication"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Clearing cached user password after authentication" -LogLevel "Information"
     Clear-SecureMemory -Variables @("UserEncryptionPassword")
 }
 
 if ($accessToken)
 {
-    Write-Verbose "[$scriptName] Access token retrieved successfully."
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Access token retrieved successfully." -LogLevel "Information"
     
     # Validate scope availability for the retrieved access token
     if ($settings.validateScopes)
     {
         Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Verbose"
         try
         {
             # Get the current requested scopes for delegated authentication
-            Write-Verbose "[$scriptName] Getting current requested scopes for delegated authentication"
             Write-Log -logFile $LogFile -Module $scriptName -Message "Getting current requested scopes for delegated authentication" -LogLevel "Information"
             $currentRequestedScopes = @()
             if ($auth.Delegated -eq $true)
             {
                 $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
-                Write-Verbose "[$scriptName] Delegated authentication - using required scopes as requested scopes"
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
             }
         
             # Perform scope validation
-            Write-Verbose "[$scriptName] Performing scope validation..."
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Performing scope validation..." -LogLevel "Information"
             $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
             if ($scopeValidation.HasAllRequiredScopes)
             {
-                Write-Verbose "[$scriptName] All required Microsoft Graph scopes are available"
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
             }
             else
@@ -777,12 +717,10 @@ if ($accessToken)
                 }
             
                 Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
-                Write-Verbose "[$scriptName] Recommended action: $($scopeValidation.RecommendedAction)"
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Recommended action: $($scopeValidation.RecommendedAction)" -LogLevel "Information"
                 # For delegated authentication, offer to request additional scopes
                 if ($auth.Delegated -eq $true -and -not ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken))
                 {
-                    Write-Verbose "[$scriptName] Requesting additional scopes..."
                     Write-Log -LogFile $LogFile -Module $scriptName -Message "Requesting additional scopes..." -LogLevel "Information"
                     Write-Host ""
                     $scopeRequest = Request-AdditionalScopes -MissingScopes $scopeValidation.MissingScopes -AuthConfiguration $auth -CurrentScopes $currentRequestedScopes -AuthParams $getTokenParams
@@ -955,7 +893,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
         if ($appsProcessed.AllApps.Count -eq 0)
         {
             Write-Host "No apps found to export." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Verbose"
         }
         else
         {
@@ -1529,13 +1467,11 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
     if ($settings.autoUpdate)
     {
-        Write-Verbose "[$scriptName] Auto Update is currently enabled."
         Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently enabled." -LogLevel "Information"
         $messageString = "Auto Update is currently enabled. Would you like to disable it?"
     }
     else
     {
-        Write-Verbose "[$scriptName] Auto Update is currently disabled."
         Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently disabled." -LogLevel "Information"
         $messageString = "Auto Update is currently disabled. Would you like to enable it?"
     }
@@ -1549,7 +1485,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     }
     if ($choice -in @('no', 'n'))
     {
-        Write-Verbose "[$scriptName] User chose not to change Auto Update setting."
         Write-Log -logFile $LogFile -Module "$scriptName" -Message "User chose not to change Auto Update setting." -LogLevel "Information"
         return $returnValues.backoutText
     }
@@ -1562,12 +1497,9 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         $filesCleaned = cleanupTempFiles
         if ($filesCleaned.AllRemoved)
         {
-            Write-Verbose "[$scriptName] All temporary files were cleaned."
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
-        Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-        Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
     }
     else
@@ -1587,7 +1519,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     # Handle cancellation
     if ($result.cancelled)
     {
-        Write-Verbose "[$scriptName] User chose to cancel app mode change."
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
         Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
         return $returnValues.backoutText
@@ -1597,7 +1528,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     if ($result.currentModeUnchanged)
     {
         Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
-        Write-Verbose "[$scriptName] User selected the same app mode that is already set."
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
         return $returnValues.backoutText
     }
@@ -1620,14 +1550,12 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     
     if ($confirmChoice -in @('no', 'n'))
     {
-        Write-Verbose "[$scriptName] User chose not to change app mode setting."
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
         Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
         return $returnValues.backoutText
     }
     
     # Save the updated app mode setting
-    Write-Verbose "[$scriptName] Updating app mode setting from '$($settings.appMode)' to '$newAppMode'"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
     
     if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
@@ -1639,11 +1567,9 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         $filesCleaned = cleanupTempFiles
         if ($filesCleaned.AllRemoved)
         {
-            Write-Verbose "[$scriptName] All temporary files were cleaned."
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
-        Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
         
         Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
         Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
@@ -2142,7 +2068,6 @@ if ($settings.testMode -eq $false)
     Write-Verbose "Test mode: $($settings.testMode)" 
     if ($null -ne $mainMenu)
     {
-        Write-Verbose "[$scriptName] Showing main menu."
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
         $result = ShowMenu -Menu $mainMenu
     }
@@ -2171,12 +2096,9 @@ Clear-SecureMemory -ClearScriptVariables
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
-    Write-Verbose "[$scriptName] All temporary files were cleaned."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
-Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
 # Finish logging
@@ -2189,12 +2111,9 @@ Clear-SecureMemory -ClearScriptVariables
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
-    Write-Verbose "[$scriptName] All temporary files were cleaned."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
-Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
 # Finish logging
