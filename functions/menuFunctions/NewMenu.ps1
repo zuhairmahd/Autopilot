@@ -64,7 +64,8 @@ function NewMenu()
             if ($menuConfig)
             {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully loaded menu configuration for: $MenuName" -LogLevel "Verbose"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Menu type: $($menuConfig.type), Items count: $($if ($menuConfig.items) { $menuConfig.items.Count } else { 0 })" -LogLevel "Debug"
+                $itemCount = if ($menuConfig.items) { $menuConfig.items.Count } else { 0 }
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Menu type: $($menuConfig.type), Items count: $itemCount" -LogLevel "Debug"
                 
                 # Create menu object from configuration
                 $menu = [ordered]@{

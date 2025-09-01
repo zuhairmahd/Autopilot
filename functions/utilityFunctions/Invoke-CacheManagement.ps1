@@ -443,7 +443,7 @@ function Invoke-CacheManagement()
             }
             
             # Return specific menu configuration
-            if ($cachedConfig -and $cachedConfig.PSObject.Properties.Name -contains $MenuName) {
+            if ($cachedConfig -and $cachedConfig.PSObject.Properties -and ($cachedConfig.PSObject.Properties.Name -contains $MenuName)) {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Found cached configuration for menu: $MenuName" -LogLevel "Debug"
                 return $cachedConfig.$MenuName
             }

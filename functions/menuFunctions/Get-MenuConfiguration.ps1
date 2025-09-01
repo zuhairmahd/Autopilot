@@ -17,6 +17,12 @@ function Get-MenuConfiguration()
         Write-Verbose "[$functionName] Initialized menu configuration cache"
     }
     
+    # Ensure menuFileTimestamp is also initialized (defensive programming)
+    if (-not $script:menuFileTimestamp) {
+        $script:menuFileTimestamp = @{}
+        Write-Verbose "[$functionName] Initialized menu file timestamp cache"
+    }
+    
     # Create cache key based on file path
     $cacheKey = $MenuConfigFile
     $fileExists = Test-Path $MenuConfigFile
@@ -33,7 +39,7 @@ function Get-MenuConfiguration()
             # Return specific menu or all configurations based on request
             if (-not $MenuName) {
                 return $menuConfig
-            } elseif ($menuConfig.PSObject.Properties.Name -contains $MenuName) {
+            } elseif ($menuConfig -and $menuConfig.PSObject.Properties -and ($menuConfig.PSObject.Properties.Name -contains $MenuName)) {
                 return $menuConfig.$MenuName
             } else {
                 Write-Verbose "[$functionName] Menu configuration not found in cache for: $MenuName"
@@ -48,16 +54,16 @@ function Get-MenuConfiguration()
     if (-not $fileExists)
     {
         Write-Verbose "[$functionName] Menu configuration file not found: $MenuConfigFile"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration file not found: $MenuConfigFile, attempting to create with defaults" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Attempting to create with defaults"
         
         # Attempt to create the menu file with defaults
         if (Test-MenuJsonExists -MenuFile $MenuConfigFile -Silent)
         {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully created default menu configuration file" -LogLevel "Information"
+            Write-Verbose "[$functionName] Successfully created default menu configuration file"
         }
         else
         {
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to create default menu configuration file" -LogLevel "Error"
+            Write-Verbose "[$functionName] Failed to create default menu configuration file"
             return $null
         }
     }
@@ -81,20 +87,20 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration f
         }
         
         # Return specific menu configuration
-        if ($menuConfig.PSObject.Properties.Name -contains $MenuName)
+        if ($menuConfig -and $menuConfig.PSObject.Properties -and ($menuConfig.PSObject.Properties.Name -contains $MenuName))
         {
             Write-Verbose "[$functionName] Found configuration for menu: $MenuName"
             return $menuConfig.$MenuName
         }
         else
         {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration not found for: $MenuName" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Menu configuration not found for: $MenuName"
             return $null
         }
     }
     catch
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error loading menu configuration: $_" -LogLevel "Error"
+        Write-Verbose "[$functionName] Error loading menu configuration: $_"
         return $null
     }
 }
