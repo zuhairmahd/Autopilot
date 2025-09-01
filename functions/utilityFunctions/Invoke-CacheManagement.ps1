@@ -16,6 +16,8 @@ function Invoke-CacheManagement()
         - 'GetStatistics': Get cache usage statistics
         - 'ListCaches': List all available caches
         - 'Monitor': Display cache monitoring information
+        - 'GetMenuConfiguration': Get cached menu configuration
+        - 'SetMenuConfiguration': Cache menu configuration
     
     .PARAMETER CacheType
         Specific cache type for ClearSpecific action:
@@ -25,6 +27,18 @@ function Invoke-CacheManagement()
         - 'Users': Entra ID users cache
         - 'Devices': Device ID cache
         - 'Defaults': Application defaults cache
+        
+    .PARAMETER MenuName
+        Specific menu name for GetMenuConfiguration action
+        
+    .PARAMETER MenuConfigFile
+        Path to menu configuration file for GetMenuConfiguration action
+        
+    .PARAMETER ForceReload
+        Force reload of menu configuration for GetMenuConfiguration action
+        
+    .PARAMETER MenuConfiguration
+        Menu configuration object to cache for SetMenuConfiguration action
     
     .PARAMETER ShowDetails
         Show detailed cache information including keys and sizes
@@ -58,17 +72,25 @@ function Invoke-CacheManagement()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Clear', 'ClearSpecific', 'GetStatistics', 'ListCaches', 'Monitor')]
+        [ValidateSet('Clear', 'ClearSpecific', 'GetStatistics', 'ListCaches', 'Monitor', 'GetMenuConfiguration', 'SetMenuConfiguration')]
         [string]$Action,
         
         [ValidateSet('Menu', 'Strings', 'Groups', 'Users', 'Devices', 'Defaults')]
         [string]$CacheType,
         
-        [switch]$ShowDetails
+        [switch]$ShowDetails,
+        
+        [string]$MenuName,
+        
+        [string]$MenuConfigFile = "$pwd\menu.json",
+        
+        [switch]$ForceReload,
+        
+        [PSCustomObject]$MenuConfiguration
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Cache management action: $Action"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Cache management action: $Action" -LogLevel "Debug"
     
     # Initialize cache tracking if not exists
     if (-not $global:CacheStats) {
@@ -93,56 +115,69 @@ function Invoke-CacheManagement()
     
     switch ($Action) {
         'Clear' {
-            Write-Verbose "[$functionName] Clearing all application caches"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Starting comprehensive cache clearing operation" -LogLevel "Verbose"
             $clearedCaches = 0
+            $cacheDetails = @()
             
             # Clear menu configuration cache
             if ($script:menuConfigCache) {
+                $menuCacheSize = $script:menuConfigCache.Count
                 $script:menuConfigCache.Clear()
                 $script:menuFileTimestamp.Clear()
                 $clearedCaches++
-                Write-Verbose "[$functionName] Cleared menu configuration cache"
+                $cacheDetails += "Menu ($menuCacheSize items)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared menu configuration cache ($menuCacheSize items)" -LogLevel "Debug"
             }
             
             # Clear strings cache
             if ($script:stringsCache) {
+                $stringsCacheSize = $script:stringsCache.Count
                 $script:stringsCache.Clear()
                 $script:stringsFileTimestamp.Clear()
                 $clearedCaches++
-                Write-Verbose "[$functionName] Cleared strings cache"
+                $cacheDetails += "Strings ($stringsCacheSize items)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared strings cache ($stringsCacheSize items)" -LogLevel "Debug"
             }
             
             # Clear Graph API caches
             if ($global:GroupCache) {
+                $groupCacheSize = $global:GroupCache.Count
                 $global:GroupCache.Clear()
                 $clearedCaches++
-                Write-Verbose "[$functionName] Cleared groups cache"
+                $cacheDetails += "Groups ($groupCacheSize items)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared groups cache ($groupCacheSize items)" -LogLevel "Debug"
             }
             
             if ($global:UserCache) {
+                $userCacheSize = $global:UserCache.Count
                 $global:UserCache.Clear()
                 $clearedCaches++
-                Write-Verbose "[$functionName] Cleared users cache"
+                $cacheDetails += "Users ($userCacheSize items)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared users cache ($userCacheSize items)" -LogLevel "Debug"
             }
             
             if ($global:DeviceIdCache) {
+                $deviceCacheSize = $global:DeviceIdCache.Count
                 $global:DeviceIdCache.Clear()
                 $clearedCaches++
-                Write-Verbose "[$functionName] Cleared device ID cache"
+                $cacheDetails += "Devices ($deviceCacheSize items)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared device ID cache ($deviceCacheSize items)" -LogLevel "Debug"
             }
             
             # Clear defaults cache
             if ($script:defaultsCache) {
+                $defaultsCacheSize = $script:defaultsCache.Count
                 $script:defaultsCache.Clear()
                 $clearedCaches++
-                Write-Verbose "[$functionName] Cleared application defaults cache"
+                $cacheDetails += "Defaults ($defaultsCacheSize items)"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared application defaults cache ($defaultsCacheSize items)" -LogLevel "Debug"
             }
             
             $global:CacheStats.Operations.Clears++
             Write-Host "Cleared $clearedCaches cache(s)" -ForegroundColor Green
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Cleared $clearedCaches application caches" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Cache clearing completed - Cleared: $clearedCaches caches [$($cacheDetails -join ', ')]" -LogLevel "Information"
             
-            return @{ Action = 'Clear'; CachesCleared = $clearedCaches; Timestamp = Get-Date }
+            return @{ Action = 'Clear'; CachesCleared = $clearedCaches; Details = $cacheDetails; Timestamp = Get-Date }
         }
         
         'ClearSpecific' {
@@ -342,6 +377,124 @@ function Invoke-CacheManagement()
             }
             
             return $stats
+        }
+        
+        'GetMenuConfiguration' {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Getting cached menu configuration for file: $MenuConfigFile" -LogLevel "Debug"
+            
+            # Check if we need to cache or reload the configuration
+            $cacheKey = "MenuConfig_$MenuConfigFile"
+            
+            if (-not $script:menuConfigCache) {
+                $script:menuConfigCache = @{}
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized menu configuration cache" -LogLevel "Debug"
+            }
+            
+            $needsReload = $ForceReload -or 
+                          (-not $script:menuConfigCache.ContainsKey($cacheKey)) -or
+                          (-not $script:menuConfigCache[$cacheKey])
+            
+            if ($needsReload) {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Loading/reloading menu configuration from: $MenuConfigFile" -LogLevel "Verbose"
+                
+                try {
+                    # Load the configuration from file
+                    $menuConfig = Get-MenuConfiguration -MenuConfigFile $MenuConfigFile
+                    
+                    if ($menuConfig) {
+                        # Cache the configuration
+                        $script:menuConfigCache[$cacheKey] = $menuConfig
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration cached successfully for key: $cacheKey" -LogLevel "Verbose"
+                        
+                        # Update cache statistics
+                        if ($global:CacheStats) {
+                            $global:CacheStats.Operations.Misses++
+                            $global:CacheStats.CacheTypes.Menu.Misses++
+                            $global:CacheStats.CacheTypes.Menu.Size = $script:menuConfigCache.Count
+                        }
+                    }
+                    else {
+                        Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to load menu configuration from file: $MenuConfigFile" -LogLevel "Warning"
+                        return $null
+                    }
+                }
+                catch {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Error loading menu configuration: $_" -LogLevel "Error"
+                    return $null
+                }
+            }
+            else {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Using cached menu configuration for key: $cacheKey" -LogLevel "Debug"
+                
+                # Update cache statistics
+                if ($global:CacheStats) {
+                    $global:CacheStats.Operations.Hits++
+                    $global:CacheStats.CacheTypes.Menu.Hits++
+                }
+            }
+            
+            # Get the cached configuration
+            $cachedConfig = $script:menuConfigCache[$cacheKey]
+            
+            # If no specific menu name requested, return all configurations
+            if (-not $MenuName) {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Returning full cached configuration with $($cachedConfig.PSObject.Properties.Count) properties" -LogLevel "Debug"
+                return $cachedConfig
+            }
+            
+            # Return specific menu configuration
+            if ($cachedConfig -and $cachedConfig.PSObject.Properties.Name -contains $MenuName) {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Found cached configuration for menu: $MenuName" -LogLevel "Debug"
+                return $cachedConfig.$MenuName
+            }
+            else {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration not found for: $MenuName" -LogLevel "Warning"
+                return $null
+            }
+        }
+        
+        'SetMenuConfiguration' {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Setting menu configuration in cache for file: $MenuConfigFile" -LogLevel "Debug"
+            
+            if (-not $MenuConfiguration) {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "No menu configuration provided for caching" -LogLevel "Warning"
+                return $null
+            }
+            
+            $cacheKey = "MenuConfig_$MenuConfigFile"
+            
+            if (-not $script:menuConfigCache) {
+                $script:menuConfigCache = @{}
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized menu configuration cache" -LogLevel "Debug"
+            }
+            
+            try {
+                # Cache the configuration
+                $script:menuConfigCache[$cacheKey] = $MenuConfiguration
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration cached successfully for key: $cacheKey" -LogLevel "Verbose"
+                
+                # Update cache statistics
+                if ($global:CacheStats) {
+                    $global:CacheStats.CacheTypes.Menu.Size = $script:menuConfigCache.Count
+                }
+                
+                return @{ 
+                    Action = 'SetMenuConfiguration'
+                    CacheKey = $cacheKey
+                    Success = $true
+                    Timestamp = Get-Date
+                }
+            }
+            catch {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error caching menu configuration: $_" -LogLevel "Error"
+                return @{ 
+                    Action = 'SetMenuConfiguration'
+                    CacheKey = $cacheKey
+                    Success = $false
+                    Error = $_.ToString()
+                    Timestamp = Get-Date
+                }
+            }
         }
     }
 }
