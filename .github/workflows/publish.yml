@@ -70,9 +70,14 @@ jobs:
           Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
           Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
 
+      - name: Ensure bin directory exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path -Path .\bin)) { New-Item -Path .\bin -ItemType Directory }
+
       - name: Build executable
         shell: pwsh
-        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -outputFile .\bin\\main.exe -Overwrite -SkipSigning
+        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -outputFile .\bin\main.exe -Overwrite -SkipSigning
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -121,7 +126,7 @@ jobs:
           endpoint: https://eus.codesigning.azure.net/
           trusted-signing-account-name: zuhairmahd
           certificate-profile-name: Cert1
-          files-folder: ${{ github.workspace }}\bin
+          files-folder: ${{ github.workspace }}/bin
           files-folder-filter: exe,dll
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
