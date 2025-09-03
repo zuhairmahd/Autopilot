@@ -14,8 +14,8 @@
 .PARAMETER Version
     Optional. The version string to use for the build (major.minor.build.revision).
 
-.PARAMETER outputFile
-    Optional. The output path for the generated executable.
+.PARAMETER OutputPath
+    Optional. The output path or directory for the generated executable. If a directory is provided (no file extension), the output filename will be derived from the InputFile with an .exe extension inside that directory.
 
 .PARAMETER SettingsFile
     Optional. Path to the settings.json file.
@@ -63,7 +63,8 @@ param(
     [string]$InputFile,
     [Parameter(Mandatory = $false)]
     [string]$Version,
-    [string]$outputFile = '',
+    [Alias('outputFile')]
+    [string]$OutputPath = '',
     [string]$SettingsFile = "$pwd\settings.json",
     [string]$CompanyName = 'Zuhair Mahmoud',
     [string]$Author = 'Zuhair Mahmoud',
@@ -811,22 +812,42 @@ $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Recurse -Filter "*.p
 $filesToCopy = @('settings.json', 'strings.json', 'init.json') 
 $settingsVersion = (Get-Content -Path "$pwd\settings.json" | ConvertFrom-Json).version
 $stringsVersion = (Get-Content -Path "$pwd\strings.json" | ConvertFrom-Json).version
-$successMessage = "$OutputFile written"
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
-if ($outputFile -eq '')
+# Resolve output file path from -OutputPath (directory or filename)
+$leafName = Split-Path -Leaf $InputFile
+Write-Verbose "[$scriptName] Leaf name is: $leafName"
+$exeName = $leafName.Replace('.ps1', '.exe')
+Write-Verbose "[$scriptName] Executable name is: $exeName"
+
+if ([string]::IsNullOrWhiteSpace($OutputPath))
 {
-    Write-Verbose "[$scriptName] No output file specified. Using default output file name."
-    $leafName = Split-Path -Leaf $InputFile
-    Write-Verbose "[$scriptName] Leaf name is: $leafName"
-    $exeName = $leafName.Replace('.ps1', '.exe')
-    Write-Verbose "[$scriptName] Executable name is: $exeName"
-    $outputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
-    Write-Verbose "[$scriptName] Output file set to: $outputFile"
-    Write-Host "No output file specified. Output file set to: $outputFile"
+    # No output path provided; use default build folder
+    Write-Verbose "[$scriptName] No OutputPath specified. Using default build directory."
+    $OutputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
 }
-$parentFolder = Split-Path -Parent $outputFile
+else
+{
+    # Detect if OutputPath represents a directory (no extension) or a full file path (has extension)
+    $ext = [System.IO.Path]::GetExtension($OutputPath)
+    if ([string]::IsNullOrWhiteSpace($ext))
+    {
+        Write-Verbose "[$scriptName] OutputPath has no extension; treating as directory."
+        $OutputFile = Join-Path -Path $OutputPath -ChildPath $exeName
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] OutputPath includes an extension; treating as full output filename."
+        $OutputFile = $OutputPath
+    }
+}
+Write-Host "Output file resolved to: $OutputFile"
+
+# Initialize success message after resolving OutputFile
+$successMessage = "$OutputFile written"
+
+$parentFolder = Split-Path -Parent $OutputFile
 $destSettingsFile = "$parentFolder\settings.json"
 #endregion
 
@@ -1011,7 +1032,7 @@ if (-not $CreateModule)
         Write-Verbose "[$scriptName] Creating parent folder: $mergeParentFolder"
         New-Item -ItemType Directory -Path $mergeParentFolder -Force | Out-Null
     }
-    if ($InputFile -ne $outputFile)
+    if ($InputFile -ne $OutputFile)
     {
         Write-Verbose "[$scriptName] Copying input file to parent folder: $mergeParentFolder"
         $newscriptFile = "$mergeParentFolder\$($InputFile.Split('\')[-1])"
@@ -1132,9 +1153,9 @@ else
 #endregion
 
 #region Main code
-if (Test-Path $outputFile)
+if (Test-Path $OutputFile)
 {
-    Write-Host "The output file $outputFile already exists. Do you want to replace it? (Y/N)"
+    Write-Host "The output file $OutputFile already exists. Do you want to replace it? (Y/N)"
     $response = Read-Host
     while ($response -ne 'Y' -and $response -ne 'N')
     {
@@ -1149,7 +1170,7 @@ if (Test-Path $outputFile)
     }
     else
     {
-        Write-Host "Replacing $outputFile"
+        Write-Host "Replacing $OutputFile"
     }
 }
 
@@ -1188,7 +1209,7 @@ else
 if (-not $SkipSigning)
 {
     Write-Host "Signing executable at $OutputFile"
-    if (SignScripts -path "$pwd\build")
+    if (SignScripts -path $outputFile)
     {
         Write-Host "Executable signed successfully: $OutputFile"
     }
