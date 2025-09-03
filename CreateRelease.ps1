@@ -1319,7 +1319,7 @@ Write-Host "Build process completed successfully."
 Write-Host "Executable and files are located in $parentFolder"
 
 $response = $null
-if (-not $Overwrite)
+if (-not ($Overwrite -and $SkipSigning))
 {
     Write-Host "Would you like to copy the executable into the current directory? (Y/N)"
     $response = Read-Host "Enter 'y' to copy, 'n' to skip"
@@ -1332,7 +1332,7 @@ if (-not $Overwrite)
     }   
 }
 
-if (($response -eq 'Y' -or $response -eq 'y') -or $Overwrite)
+if (($response -eq 'Y' -or $response -eq 'y') -or $Overwrite -and -not $SkipSigning)
 {
     Write-Verbose "[$scriptName] User chose to copy the executable to the current directory."
     try
