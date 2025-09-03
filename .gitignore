@@ -11,6 +11,7 @@ Desktop.ini
 .mcp.json
 .secrets/
 release/
+build/
 TestReports/
 TestResults/
 .claude/
