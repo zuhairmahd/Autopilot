@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: write
+
 jobs:
   test:
     name: Test (pwsh on Windows)
     runs-on: windows-latest
+    # Skip CI loop commits
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     timeout-minutes: 35
     steps:
       - name: Checkout code
@@ -42,6 +47,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     needs: test
+    # Skip CI loop commits
+    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -69,14 +76,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: autopilot-build
-          path: .
+          path: build
 
   sign:
     name: Code Signing (Trusted Signing)
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Only sign on pushes to master and skip CI loop commits
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && !contains(github.event.head_commit.message, '[skip ci]')
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -84,12 +92,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Ensure we can push back to the same branch
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: autopilot-build
-          path: .
+          path: build
 
       - name: Skip signing (missing secrets)
         if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
@@ -112,3 +124,22 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+
+      - name: Commit signed artifacts to repository
+        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage only the build directory to avoid unrelated changes from the artifact download
+          git add -A build
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            $branch = '${{ github.ref_name }}'
+            git commit -m "chore(build): update signed artifacts [skip ci]"
+            git push origin HEAD:$branch
+            Write-Host "Signed artifacts committed and pushed to $branch"
+          }
+          else {
+            Write-Host "No changes to commit."
+          }
