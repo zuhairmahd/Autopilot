@@ -53,7 +53,7 @@ function Show-SettingsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Verbose"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting settings editor for $SettingsType settings"
     
     try
@@ -93,7 +93,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings ed
             Write-Warning "[$functionName] Failed to get default settings structure"
             return $false
         }
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully retrieved default settings structure"
         
         # Load current settings
@@ -106,7 +106,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retriev
             Write-Warning "[$functionName] Failed to load current settings"
             return $false
         }
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded current settings"
         
         # Get settings template to edit
@@ -151,7 +151,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
                 return $false
             }
             
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
             
             # Get domain settings template from centralized defaults (fixed approach)
@@ -169,7 +169,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
                 }
                 
                 $settingsTemplate = $domainTemplate.settings
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
             catch
@@ -196,12 +196,12 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retriev
         
         if (-not $settingsTemplate)
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Verbose"
             Write-Warning "[$functionName] No settings template found for $SettingsType"
             return $false
         }
         
-Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process"
         
         Write-Host ""
@@ -429,7 +429,7 @@ function Get-CurrentSettings()
     {
         if (-not (Test-Path -Path $SettingsFile))
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
             if (-not (Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent))
             {
@@ -499,11 +499,11 @@ function Get-FlattenedSettingsForEditing()
             {
                 # Simple value
                 $flattenedSettings += @{
-                    Name = $key
-                    Path = $key
+                    Name         = $key
+                    Path         = $key
                     DefaultValue = $defaultValue
                     CurrentValue = $currentValue
-                    IsNested = $false
+                    IsNested     = $false
                 }
             }
         }
@@ -533,11 +533,11 @@ function Get-FlattenedSettingsForEditing()
             {
                 # Simple value
                 $flattenedSettings += @{
-                    Name = $key
-                    Path = $key
+                    Name         = $key
+                    Path         = $key
                     DefaultValue = $defaultValue
                     CurrentValue = $currentValue
-                    IsNested = $false
+                    IsNested     = $false
                 }
             }
         }
@@ -612,13 +612,17 @@ function Format-SettingValueForDisplay()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Add detailed logging for debugging array display issues
-    if ($null -ne $Value) {
+    if ($null -ne $Value)
+    {
         Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
-    } else {
+    }
+    else
+    {
         Write-Verbose "[$functionName] Formatting null value for display"
     }
     
-    try {
+    try
+    {
         if ($Value -is [array])
         {
             Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
@@ -671,7 +675,8 @@ function Format-SettingValueForDisplay()
             return [string]$Value
         }
     }
-    catch {
+    catch
+    {
         Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
         # Fallback to safe string conversion
         if ($Value -is [array] -and $Value.Count -gt 0)
@@ -703,7 +708,6 @@ function Get-SettingDescription()
         'timeInSeconds'                   = 'Default timeout to wait between retries in seconds'
         'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'
         'release'                         = 'Release branch or version to track for updates'
-        'repo'                            = 'Repository source for updates (Github/Gitlab)'
         'testMode'                        = 'Enable test mode with additional debugging features'
         'operatingSystem'                 = 'Target operating system (Windows/macOS/Linux)'
         'autoUpdate'                      = 'Automatically check for and install updates'
@@ -729,7 +733,7 @@ function Get-SettingDescription()
         'secureString'                    = 'Use secure string for password storage'
         'delegated'                       = 'Use delegated permissions (user context) vs application permissions'
         # Nested object descriptions
-        'repoPath'                        = 'GitHub/GitLab repository owner/organization name'
+        'repoPath'                        = 'Repository owner/organization name'
         'baseURL'                         = 'Base URL for repository hosting service'
         'baseSourceURL'                   = 'Base URL for raw file access'
         'repoName'                        = 'Repository name'
@@ -741,12 +745,12 @@ function Get-SettingDescription()
     
     if ($descriptions.ContainsKey($SettingName))
     {
-Write-Log -LogFile $logFile -Module $functionName -Message "Found description for '$SettingName'" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Found description for '$SettingName'" -LogLevel "Verbose"
         return $descriptions[$SettingName]
     }
     else
     {
-Write-Log -LogFile $logFile -Module $functionName -Message "No specific description found for '$SettingName', using generic description" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "No specific description found for '$SettingName', using generic description" -LogLevel "Verbose"
         return "Configuration setting: $SettingName"
     }
 }
@@ -788,11 +792,6 @@ function Get-SettingInput()
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Using cache type input for '$SettingName'" -LogLevel "Verbose"
             return Get-CacheTypeInput -CurrentValue $CurrentValue
-        }
-        'Repo'
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Using repository input for '$SettingName'" -LogLevel "Verbose"
-            return Get-RepoInput -CurrentValue $CurrentValue
         }
         'OperatingSystem'
         {
@@ -1009,18 +1008,6 @@ function Get-CacheTypeInput()
     return Get-EnumeratedInput -Options $types -CurrentValue $CurrentValue -PromptText "cache type"
 }
 
-function Get-RepoInput()
-{
-    [CmdletBinding()]
-    param($CurrentValue)
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Getting repository input for current value: '$CurrentValue'" -LogLevel "Verbose"
-    
-    $repos = @('Github', 'Gitlab')
-    return Get-EnumeratedInput -Options $repos -CurrentValue $CurrentValue -PromptText "repository"
-}
-
 function Get-OperatingSystemInput()
 {
     [CmdletBinding()]
@@ -1156,7 +1143,7 @@ function Get-ArrayInput()
             '3'
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
-                return ,$CurrentValue
+                return , $CurrentValue
             }
         }
     }
@@ -1183,7 +1170,7 @@ function Get-ArrayInput()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current array values" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] User cancelled input, keeping current array values"
-                return ,$CurrentValue
+                return , $CurrentValue
             }
             
             $newValues += $input
@@ -1235,7 +1222,7 @@ function Get-ArrayInput()
     if ($result -isnot [array])
     {
         Write-Warning "[$functionName] Warning: Result is not an array after processing. Type: $($result.GetType().Name)"
-Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is not an array after processing. Type: $($result.GetType().Name)" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is not an array after processing. Type: $($result.GetType().Name)" -LogLevel "Verbose"
         $result = @($result)
     }
     
@@ -1243,7 +1230,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is n
     Write-Verbose "[$functionName] Returning array with $($result.Count) values. Array type verified: $($result -is [array])"
     
     # Use comma operator to preserve array type, preventing PowerShell from unwrapping single-element arrays
-    return ,$result
+    return , $result
 }
 
 function Get-NumberInput()
@@ -1457,7 +1444,7 @@ function Save-AuthSettings()
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update auth setting: $key" -LogLevel "Error"
                 return $false
             }
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated auth setting: $key = $($Settings[$key])" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated auth setting: $key = $($Settings[$key])" -LogLevel "Information"
         }
         Write-Log -LogFile $logFile -Module $functionName -Message "All auth settings saved successfully" -LogLevel "Information"
         return $true

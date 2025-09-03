@@ -105,12 +105,12 @@ if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "Ex
     }
     else 
     {
-Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
     }
 }
 else 
 {
-Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"        
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
@@ -123,7 +123,7 @@ if (-not $version.version)
     if ($appMetaData -and $appMetaData.version)
     {
         $version = $appMetaData.version
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
     }
     else 
     {
@@ -271,7 +271,7 @@ else
 {
     # Configuration file not found - launch first run wizard
     Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
     
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
@@ -297,7 +297,7 @@ Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not
             {
                 Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
                 exit 1
             }
             
@@ -397,7 +397,6 @@ if (-not $configResult.Success)
 $auth = $configResult.Auth
 $globalSettings = $configResult.GlobalSettings  
 $localSettings = $configResult.LocalSettings
-$menus = $configResult.Menus
 $requiredScopes = $configResult.RequiredScopes
 
 # Set auth as a script variable so it can be accessed by functions
@@ -418,83 +417,66 @@ Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 #endregion Load parameters from the configuration file if it exists
 
+
+
 #region Define variables
-if ($settings.Repo -eq 'github')
+#define repo parameters
+$defaultBranch = 'master'
+$baseSourceURL = if ($settings.baseSourceURL)
 {
-    Write-Log -logFile $LogFile -Module $scriptName -Message "Using GitHub repository." -LogLevel "Information"
-    $baseSourceURL = if ($settings.baseSourceURL)
-    {
-        $settings.baseSourceURL
-    }
-    else
-    {
-        'https://raw.githubusercontent.com'
-    }
-    Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-    $baseURL = if ($settings.baseURL)
-    {
-        $settings.baseURL
-    }
-    else
-    {
-        "https://www.github.com"
-    }
-    Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
-    $repoPath = if ($settings.repoPath)
-    {
-        $settings.repoPath
-    }
-    else
-    {
-        'zuhairmahd'
-    }
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
-    $repoName = if ($settings.repoName)
-    {
-        $settings.repoName
-    }
-    else
-    {
-        'autopilot'
-    }
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository name: $repoName" -LogLevel "Information"
-    if ($settings.release -eq 'auto')
-    {
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Release is set to 'auto'. Fetching the latest release from GitHub." -LogLevel "Information"
-        $latestRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release fetched: $latestRelease" -LogLevel "Information"
-        if ($latestRelease)
-        {
-            Write-Log -logFile $LogFile -Module $scriptName -Message "Successfully retrieved the latest release information from GitHub." -LogLevel "Information"
-            Write-Host "Latest release: $latestRelease" -ForegroundColor Cyan
-        }
-        else
-        {
-            Write-Host 'Failed to retrieve the latest release information from GitHub.' -ForegroundColor Red
-            Write-Host "Defaulting to $defaultBranch branch." -ForegroundColor Yellow
-            $latestRelease = $defaultBranch
-            Write-Log -logFile $LogFile -Module $scriptName -Message "Defaulting to $defaultBranch branch." -LogLevel "Information"
-        }
-    }
-    else
-    {
-        Write-Log -logFile $LogFile -Module $scriptName -Message "Using specified release: $($settings.release)" -LogLevel "Information"
-        $latestRelease = $settings.release
-    }
+    $settings.baseSourceURL
 }
 else
 {
-    Write-Host 'Invalid repository specified.' -ForegroundColor Red
-    Write-Host 'Defaulting to the main branch from GitHub.' -ForegroundColor Yellow
-    # Set defaults for GitHub when repository is invalid
-    $baseSourceURL = 'https://raw.githubusercontent.com'
-    $baseURL = "https://www.github.com"
-    $repoPath = 'zuhairmahd'
-    $repoName = 'autopilot'
-    $latestRelease = $defaultBranch
-    Write-Log -logFile $LogFile -Module $scriptName -Message "Invalid repository specified. Defaulting to GitHub main branch." -LogLevel "Information"
+    'https://raw.githubusercontent.com'
 }
-$global:maxJSONDepth = 100
+Write-Log -logFile $LogFile -Module $scriptName -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
+$baseURL = if ($settings.baseURL)
+{
+    $settings.baseURL
+}
+else
+{
+    "https://www.github.com"
+}
+Write-Log -logFile $LogFile -Module $scriptName -Message "Base URL: $baseURL" -LogLevel "Information"
+$repoPath = if ($settings.repoPath)
+{
+    $settings.repoPath
+}
+else
+{
+    'zuhairmahd'
+}
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository path: $repoPath" -LogLevel "Information"
+$repoName = if ($settings.repoName)
+{
+    $settings.repoName
+}
+else
+{
+    'autopilot'
+}
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository name: $repoName" -LogLevel "Information"
+$latestRelease = if ($settings.latestRelease)
+{
+    if ($settings.latestRelease -eq 'auto')
+    {
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release is set to 'auto'. Fetching the latest release from GitHub." -LogLevel "Information"
+        $tempRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
+        Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release fetched: $tempRelease" -LogLevel "Information"
+    }
+    else 
+    {
+        $tempRelease = $settings.latestRelease
+    }
+    $tempRelease
+}
+else
+{
+    $defaultBranch
+}
+$global:maxJSONDepth = 20
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
@@ -677,7 +659,7 @@ if ($accessToken)
     if ($settings.validateScopes)
     {
         Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Verbose"
         try
         {
             # Get the current requested scopes for delegated authentication
@@ -826,39 +808,57 @@ $mainMenu = NewMenu -MenuName "mainMenu"
 
 # Conditionally load other menus based on app mode requirements
 # Create empty menus for those not needed to prevent script errors
-$CheckMenu = if ($requiredMenus -contains "checkMenu") { 
+$CheckMenu = if ($requiredMenus -contains "checkMenu")
+{ 
     NewMenu -MenuName "checkMenu" 
-} else { 
+}
+else
+{ 
     NewMenu -Title "Check Menu" -Description "Device troubleshooting options"
 }
 
-$serialNumberMenu = if ($requiredMenus -contains "serialNumberMenu") { 
+$serialNumberMenu = if ($requiredMenus -contains "serialNumberMenu")
+{ 
     NewMenu -MenuName "serialNumberMenu" 
-} else { 
+}
+else
+{ 
     NewMenu -Title "Serial Number Menu" -Description "Serial number operations"
 }
 
-$exportMenu = if ($requiredMenus -contains "exportMenu") { 
+$exportMenu = if ($requiredMenus -contains "exportMenu")
+{ 
     NewMenu -MenuName "exportMenu" 
-} else { 
+}
+else
+{ 
     NewMenu -Title "Export Menu" -Description "Export options"
 }
 
-$settingsMenu = if ($requiredMenus -contains "settingsMenu") { 
+$settingsMenu = if ($requiredMenus -contains "settingsMenu")
+{ 
     NewMenu -MenuName "settingsMenu" 
-} else { 
+}
+else
+{ 
     NewMenu -Title "Settings Menu" -Description "Application settings"
 }
 
-$autopilotMenu = if ($requiredMenus -contains "autopilotMenu") { 
+$autopilotMenu = if ($requiredMenus -contains "autopilotMenu")
+{ 
     NewMenu -MenuName "autopilotMenu" 
-} else { 
+}
+else
+{ 
     NewMenu -Title "Autopilot Menu" -Description "Autopilot operations"
 }
 
-$environmentMenu = if ($requiredMenus -contains "environmentMenu") { 
+$environmentMenu = if ($requiredMenus -contains "environmentMenu")
+{ 
     NewMenu -MenuName "environmentMenu" 
-} else { 
+}
+else
+{ 
     NewMenu -Title "Environment Menu" -Description "Environment settings"
 }
 
@@ -930,7 +930,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
         if ($appsProcessed.AllApps.Count -eq 0)
         {
             Write-Host "No apps found to export." -ForegroundColor Yellow
-Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "No apps found to export." -LogLevel "Verbose"
         }
         else
         {
@@ -1536,7 +1536,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
     }
     else
@@ -1606,7 +1606,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
         
         Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
         Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
