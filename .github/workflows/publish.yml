@@ -2,9 +2,11 @@ name: test-build-release
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ master ]
+    branches:
+      - '**'
 
 permissions:
   contents: write
@@ -47,8 +49,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     needs: test
-    # Skip CI loop commits
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
+    # Only build on pushes to dev and skip CI loop commits
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !contains(github.event.head_commit.message, '[skip ci]')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -83,8 +85,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    # Only sign on pushes to master and skip CI loop commits
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && !contains(github.event.head_commit.message, '[skip ci]')
+    # Only sign on pushes to dev and skip CI loop commits
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !contains(github.event.head_commit.message, '[skip ci]')
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
