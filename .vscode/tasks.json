@@ -41,6 +41,12 @@
 				"$powershell"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Run test syntax (copilot)",
+			"type": "shell",
+			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}\\TestScripts\\test-syntax.ps1\"",
+			"group": "build"
 		}
 	]
 }

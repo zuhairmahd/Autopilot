@@ -417,8 +417,6 @@ Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 #endregion Load parameters from the configuration file if it exists
 
-
-
 #region Define variables
 #define repo parameters
 $defaultBranch = 'master'
@@ -783,7 +781,7 @@ else
 #region Menu Definitions
 # Load menu configuration for filtering
 $script:menus = @()
-$menuConfig = Get-MenuConfiguration
+$menuConfig = Get-CachedMenuConfiguration
 if ($menuConfig)
 {
     # Convert the flat menu.json structure to array format for Test-MenuItemIncluded
@@ -1068,6 +1066,21 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         Write-Verbose "[$scriptName] Custom import aborted. Returning $($returnValues.backoutText)."
         return $returnValues.backoutText
     }
+}
+$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot" -Action {
+    Write-Verbose "[$scriptName] Import device into Autopilot (standard)."
+    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+    {
+        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+    }
+    else
+    {
+        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+        return $null
+    }
+    $result = PrepareImportDevice -accessToken $accessToken
+    Write-Verbose "[$scriptName] Result of standard import: $result"
 }
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."

@@ -373,8 +373,7 @@ function Test-MenuJsonExists()
                     [ordered]@{
                         name = "Change group inclusion/exclusion"
                         description = "Change the group inclusion/exclusion settings"
-                        blockType = "menu"
-                        menuName = "groupsEditMenu"
+                        blockType = "action"
                         includeInDisplayModes = @("full", "admin")
                     }
                 )

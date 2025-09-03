@@ -11,14 +11,16 @@ function Get-MenuConfiguration()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Initialize script-level menu configuration cache if not exists
-    if (-not $script:menuConfigCache) {
+    if (-not $script:menuConfigCache)
+    {
         $script:menuConfigCache = @{}
         $script:menuFileTimestamp = @{}
         Write-Verbose "[$functionName] Initialized menu configuration cache"
     }
     
     # Ensure menuFileTimestamp is also initialized (defensive programming)
-    if (-not $script:menuFileTimestamp) {
+    if (-not $script:menuFileTimestamp)
+    {
         $script:menuFileTimestamp = @{}
         Write-Verbose "[$functionName] Initialized menu file timestamp cache"
     }
@@ -28,20 +30,27 @@ function Get-MenuConfiguration()
     $fileExists = Test-Path $MenuConfigFile
     
     # Check if we have cached data and if file hasn't been modified
-    if ($script:menuConfigCache.ContainsKey($cacheKey) -and $fileExists) {
+    if ($script:menuConfigCache.ContainsKey($cacheKey) -and $fileExists)
+    {
         $currentFileTime = (Get-Item $MenuConfigFile).LastWriteTime
         $cachedFileTime = $script:menuFileTimestamp[$cacheKey]
         
-        if ($cachedFileTime -and $currentFileTime -eq $cachedFileTime) {
+        if ($cachedFileTime -and $currentFileTime -eq $cachedFileTime)
+        {
             Write-Verbose "[$functionName] Using cached menu configuration for: $MenuConfigFile"
             $menuConfig = $script:menuConfigCache[$cacheKey]
             
             # Return specific menu or all configurations based on request
-            if (-not $MenuName) {
+            if (-not $MenuName)
+            {
                 return $menuConfig
-            } elseif ($menuConfig -and $menuConfig.PSObject.Properties -and ($menuConfig.PSObject.Properties.Name -contains $MenuName)) {
+            }
+            elseif ($menuConfig -and $menuConfig.PSObject.Properties -and ($menuConfig.PSObject.Properties.Name -contains $MenuName))
+            {
                 return $menuConfig.$MenuName
-            } else {
+            }
+            else
+            {
                 Write-Verbose "[$functionName] Menu configuration not found in cache for: $MenuName"
                 return $null
             }

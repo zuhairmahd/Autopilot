@@ -45,24 +45,32 @@ function Get-CachedMenuConfiguration()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Getting cached menu configuration via unified cache management" -LogLevel "Debug"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Parameters - MenuName: '$MenuName', MenuConfigFile: '$MenuConfigFile', ForceReload: $ForceReload" -LogLevel "Debug"
     
-    try {
+    try
+    {
         # Use unified cache management system
         $result = Invoke-CacheManagement -Action GetMenuConfiguration -MenuName $MenuName -MenuConfigFile $MenuConfigFile -ForceReload:$ForceReload
         
-        if ($result) {
+        if ($result)
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully retrieved menu configuration via unified cache management" -LogLevel "Verbose"
-            if ($MenuName) {
+            if ($MenuName)
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Returning specific menu configuration for: $MenuName" -LogLevel "Debug"
-            } else {
+            }
+            else
+            {
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Returning full menu configuration with $($result.PSObject.Properties.Count) properties" -LogLevel "Debug"
             }
-        } else {
+        }
+        else
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "No menu configuration returned from unified cache management" -LogLevel "Warning"
         }
         
         return $result
     }
-    catch {
+    catch
+    {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error using unified cache management: $_" -LogLevel "Error"
         return $null
     }
@@ -95,19 +103,24 @@ function Clear-MenuConfigurationCache()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $LogFile -Module $functionName -Message "Clearing menu configuration cache via unified cache management" -LogLevel "Debug"
     
-    try {
+    try
+    {
         # Use unified cache management system
         $result = Invoke-CacheManagement -Action ClearSpecific -CacheType Menu
         
-        if ($result -and $result.Cleared) {
+        if ($result -and $result.Cleared)
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully cleared menu configuration cache via unified cache management" -LogLevel "Information"
-        } else {
+        }
+        else
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration cache was already empty or not found" -LogLevel "Information"
         }
         
         return $result
     }
-    catch {
+    catch
+    {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error clearing menu configuration cache: $_" -LogLevel "Error"
         return @{ Success = $false; Error = $_.ToString() }
     }

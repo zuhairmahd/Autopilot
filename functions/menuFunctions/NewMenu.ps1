@@ -72,6 +72,7 @@ function NewMenu()
                     Title       = $menuConfig.Title
                     Description = $menuConfig.Description
                     Items       = @()
+                    PreFiltered = $false
                 }
                 
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Created base menu object with title: '$($menu.Title)'" -LogLevel "Debug"
@@ -92,6 +93,7 @@ function NewMenu()
                         Write-Log -LogFile $LogFile -Module $functionName -Message "Applying early filtering optimization to menu items" -LogLevel "Debug"
                         $filteredItems = FilterMenuItemsByAppMode -MenuItems $menuConfig.items
                         Write-Log -LogFile $LogFile -Module $functionName -Message "Early filtering completed: $($menuConfig.items.Count) -> $($filteredItems.Count) items ($(if ($menuConfig.items.Count -gt 0) { [math]::Round((($menuConfig.items.Count - $filteredItems.Count) / $menuConfig.items.Count) * 100, 1) } else { 0 })% reduction)" -LogLevel "Verbose"
+                        $menu.PreFiltered = $true
                     }
                     
                     $itemsProcessed = 0
