@@ -36,9 +36,9 @@ jobs:
         shell: pwsh
         run: .\TestScripts\Test-Runner.ps1 -TestCategory core
 
-      # - name: Run tests - unit
-      #   shell: pwsh
-      #   run: .\TestScripts\Test-Runner.ps1 -TestCategory unit
+      - name: Run tests - unit
+        shell: pwsh
+        run: .\TestScripts\Test-Runner.ps1 -TestCategory unit
 
       - name: Run tests - integration
         shell: pwsh
