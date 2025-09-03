@@ -2,9 +2,11 @@ name: test-build-release
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ master ]
+    branches:
+      - '**'
 
 permissions:
   contents: write
@@ -47,8 +49,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     needs: test
-    # Skip CI loop commits
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
+    # Only build on pushes to dev and skip CI loop commits
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !contains(github.event.head_commit.message, '[skip ci]')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,23 +70,28 @@ jobs:
           Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
           Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
 
+      - name: Ensure bin directory exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path -Path .\bin)) { New-Item -Path .\bin -ItemType Directory }
+
       - name: Build executable
         shell: pwsh
-        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -Overwrite -SkipSigning
+        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: autopilot-build
-          path: build
+          path: bin
 
   sign:
     name: Code Signing (Trusted Signing)
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    # Only sign on pushes to master and skip CI loop commits
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && !contains(github.event.head_commit.message, '[skip ci]')
+    # Only sign on pushes to dev and skip CI loop commits
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !contains(github.event.head_commit.message, '[skip ci]')
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -101,7 +108,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: autopilot-build
-          path: build
+          path: bin
 
       - name: Skip signing (missing secrets)
         if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
@@ -119,7 +126,7 @@ jobs:
           endpoint: https://eus.codesigning.azure.net/
           trusted-signing-account-name: zuhairmahd
           certificate-profile-name: Cert1
-          files-folder: ${{ github.workspace }}\build
+          files-folder: ${{ github.workspace }}/bin
           files-folder-filter: exe,dll
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
@@ -132,7 +139,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Stage only the build directory to avoid unrelated changes from the artifact download
-          git add -A build
+          git add -A bin
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             $branch = '${{ github.ref_name }}'

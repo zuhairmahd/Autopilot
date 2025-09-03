@@ -11,6 +11,7 @@ Desktop.ini
 .mcp.json
 .secrets/
 release/
+build/
 TestReports/
 TestResults/
 .claude/
@@ -53,3 +54,4 @@ temp*
 gemini.md
 .gemini/
 gha-creds-*.json
+main.exe
