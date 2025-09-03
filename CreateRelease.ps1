@@ -1196,6 +1196,7 @@ Write-Host "Building executable from $newscriptFile to $OutputFile"
 Write-Host "parameters used:"
 $params | Format-List | Out-Host
 $result = Invoke-ps2exe @params -ErrorAction Stop
+Write-Host "ps2exe result: $result"
 # Use a regex-escaped pattern to avoid invalid escape sequences (e.g., \\m) in Windows paths
 if ($result -match [regex]::Escape($successMessage))
 {
