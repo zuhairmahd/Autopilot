@@ -34,7 +34,7 @@
 			}
 		},
 		{
-			"label": "Run test syntax",
+			"label": "Run Comprehensive Tests",
 			"type": "shell",
 			"command": "pwsh",
 			"args": [
@@ -42,7 +42,7 @@
 				"-ExecutionPolicy",
 				"Bypass",
 				"-File",
-				"${workspaceFolder}\\TestScripts\\test-syntax.ps1"
+				"${workspaceFolder}\\TestScripts\\test-Runner.ps1"
 			],
 			"isBackground": false,
 			"problemMatcher": [],
