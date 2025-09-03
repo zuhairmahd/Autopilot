@@ -4,8 +4,9 @@
 		{
 			"label": "Create Release",
 			"type": "shell",
-			"command": "powershell.exe",
+			"command": "pwsh",
 			"args": [
+				"-NoProfile",
 				"-ExecutionPolicy",
 				"Bypass",
 				"-File",
@@ -35,17 +36,29 @@
 		{
 			"label": "Run test syntax",
 			"type": "shell",
-			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}\\TestScripts\\test-syntax.ps1\"",
-			"isBackground": false,
-			"problemMatcher": [
-				"$powershell"
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}\\TestScripts\\test-syntax.ps1"
 			],
+			"isBackground": false,
+			"problemMatcher": [],
 			"group": "build"
 		},
 		{
 			"label": "Run test syntax (copilot)",
 			"type": "shell",
-			"command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}\\TestScripts\\test-syntax.ps1\"",
+			"command": "pwsh",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}\\TestScripts\\test-syntax.ps1"
+			],
 			"group": "build"
 		}
 	]
