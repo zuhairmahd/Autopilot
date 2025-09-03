@@ -1332,7 +1332,7 @@ if (-not ($Overwrite -and $SkipSigning))
     }   
 }
 
-if (($response -eq 'Y' -or $response -eq 'y') -or $Overwrite -and -not $SkipSigning)
+if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSigning)
 {
     Write-Verbose "[$scriptName] User chose to copy the executable to the current directory."
     try
