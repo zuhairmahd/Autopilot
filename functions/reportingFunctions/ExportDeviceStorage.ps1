@@ -19,18 +19,14 @@ function ExportDeviceStorage()
     $success = $false
     if ($filter)
     {
-        Write-Verbose "[$functionName] - Using filter: $filter"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using filter: $filter" -LogLevel "Information"
         $managedDeviceFilter = $Filter
     }
     else 
     {
-        Write-Verbose "[$functionName] - No filter provided, using default filter: $managedDeviceFilter"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- No filter provided, using default filter: $managedDeviceFilter" -LogLevel "Information"
     }
-    Write-Verbose "[$functionName] - Starting device memory export process"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device memory export process" -LogLevel "Information"
-    Write-Verbose "[$functionName] - Using batch size of $BatchSize for API requests"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Starting device memory export process" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Using batch size of $BatchSize for API requests" -LogLevel "Information"
     
     # Store all devices in an array
@@ -38,7 +34,6 @@ function ExportDeviceStorage()
     
     try
     {
-        Write-Verbose "[$functionName] - Getting device list from Graph API"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Getting device list from Graph API" -LogLevel "Information"
         $deviceListResponse = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $AccessToken -Filter $managedDeviceFilter -consistencyLevel -extraParameters "top=999"
         
@@ -51,7 +46,6 @@ function ExportDeviceStorage()
         # Add all devices to our collection (pagination already handled by CallGraphApi)
         $deviceListResponse.value | ForEach-Object { $null = $allDevices.Add($_) }
         
-        Write-Verbose "[$functionName] - Retrieved a total of $($allDevices.Count) devices"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Retrieved a total of $($allDevices.Count) devices" -LogLevel "Information"
         
         # Create CSV object to store the results
@@ -82,8 +76,7 @@ function ExportDeviceStorage()
                 }
             }
             
-            Write-Verbose "[$functionName] - Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Sending batch request for devices $batchIndex to $($batchIndex + $batch.Count)" -LogLevel "Debug"
             $batchResponse = CallGraphApi -ResourcePath "`$batch" -accessToken $AccessToken -Method "POST" -Body ($batchRequestBody | ConvertTo-Json -Depth $maxJSONDepth)
             
             # Process batch responses
@@ -174,14 +167,12 @@ function ExportDeviceStorage()
                                 ComplianceState       = $deviceBasic.complianceState
                             }
                             
-                            Write-Verbose "[$functionName] - Processed device: $($deviceBasic.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)"
                             Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Processed device: $($deviceBasic.deviceName) (Memory: $memoryGB GB, Storage: $totalStorageGB GB)" -LogLevel "Information"
                             $null = $CSVObject.Add($exportObject)
                         }
                     }
                     else
                     {
-                        Write-Verbose "[$functionName] - Failed to get details for device ID $($response.id). Status: $($response.status)"
                         Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Failed to get details for device ID $($response.id). Status: $($response.status)" -LogLevel "Error"
                     }
                 }
@@ -194,7 +185,6 @@ function ExportDeviceStorage()
         # Export results to CSV
         if ($CSVObject.Count -gt 0)
         {
-            Write-Verbose "[$functionName] - Exporting data for $($CSVObject.Count) devices to file $OutputFile"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "- Exporting data for $($CSVObject.Count) devices to file $OutputFile" -LogLevel "Information"
             $CSVObject | Export-Csv -Path $OutputFile -NoTypeInformation -Force
             Write-Host "Successfully exported device information to $OutputFile" -ForegroundColor Green

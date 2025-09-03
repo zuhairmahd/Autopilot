@@ -13,8 +13,7 @@ function Test-ScopeAvailability()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting scope availability validation"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting scope availability validation" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting scope availability validation" -LogLevel "Verbose"
     # Initialize the result object
     $result = @{
         HasAllRequiredScopes     = $false
@@ -28,7 +27,6 @@ function Test-ScopeAvailability()
     # Handle empty required scopes - if no scopes are required, all are available
     if ($RequiredScopes.Count -eq 0)
     {
-        Write-Verbose "[$functionName] No required scopes specified - returning success"
         Write-Log -LogFile $LogFile -Module $functionName -Message "No required scopes specified - returning success" -LogLevel "Information"
         $result.HasAllRequiredScopes = $true
         $result.RecommendedAction = "No specific scopes required."
@@ -39,20 +37,17 @@ function Test-ScopeAvailability()
     {
         # Determine if this is delegated or application authentication
         $isDelegated = $AuthConfiguration.Delegated -eq $true
-        Write-Verbose "[$functionName] Authentication type: $(if ($isDelegated) { 'Delegated' } else { 'Application' })"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Authentication type: $(if ($isDelegated) { 'Delegated' } else { 'Application' })" -LogLevel "Information"
         if ($isDelegated)
         {
             # For delegated authentication, use the scopes that were requested during authentication
-            Write-Verbose "[$functionName] Using delegated authentication - checking requested scopes"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Using delegated authentication - checking requested scopes" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Using delegated authentication - checking requested scopes" -LogLevel "Verbose"
             $result.ScopeSource = "Delegated (Requested during authentication)"
             
             # Get the scopes that were actually requested
             if ($RequestedScopes -and $RequestedScopes.Count -gt 0)
             {
                 $result.AvailableScopes = $RequestedScopes
-                Write-Verbose "[$functionName] Available delegated scopes: $($RequestedScopes -join ', ')"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Available delegated scopes: $($RequestedScopes -join ', ')" -LogLevel "Information"
             }
             else
@@ -65,32 +60,27 @@ function Test-ScopeAvailability()
         else
         {
             # For application authentication, decode the JWT token to get actual scopes
-            Write-Verbose "[$functionName] Using application authentication - decoding JWT token"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Using application authentication - decoding JWT token" -LogLevel "Information"
             $result.ScopeSource = "Application (JWT token claims)"
             
             try
             {
                 $decodedToken = DecodeJwtToken -Token $AccessToken -raw
-                Write-Verbose "[$functionName] Successfully decoded JWT token"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully decoded JWT token" -LogLevel "Information"
                 # Extract scopes from the token (they can be in 'scp' or 'roles' claim)
                 $tokenScopes = @()
                 if ($decodedToken.scp)
                 {
                     $tokenScopes += $decodedToken.scp -split ' '
-                    Write-Verbose "[$functionName] Found scopes in 'scp' claim: $($decodedToken.scp)"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found scopes in 'scp' claim: $($decodedToken.scp)" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found scopes in 'scp' claim: $($decodedToken.scp)" -LogLevel "Verbose"
                 }
                 if ($decodedToken.roles)
                 {
                     $tokenScopes += $decodedToken.roles
-                    Write-Verbose "[$functionName] Found roles in 'roles' claim: $($decodedToken.roles -join ', ')"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found roles in 'roles' claim: $($decodedToken.roles -join ', ')" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found roles in 'roles' claim: $($decodedToken.roles -join ', ')" -LogLevel "Verbose"
                 }
                 
                 $result.AvailableScopes = $tokenScopes | Where-Object { $_ -and $_.Trim() } | Sort-Object -Unique
-                Write-Verbose "[$functionName] Available application scopes: $($result.AvailableScopes -join ', ')"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Available application scopes: $($result.AvailableScopes -join ', ')" -LogLevel "Information"
             }
             catch
@@ -111,15 +101,13 @@ function Test-ScopeAvailability()
             $scopeReason = $requiredScope.Reason
             $scopeEndpoints = $requiredScope.Endpoints -join ', '
             
-            Write-Verbose "[$functionName] Checking required scope: $scopeName"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Checking required scope: $scopeName" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Checking required scope: $scopeName" -LogLevel "Verbose"
             
             # Check if this scope is available
             $isAvailable = $result.AvailableScopes -contains $scopeName
             
             if (-not $isAvailable)
             {
-                Write-Verbose "[$functionName] Missing required scope: $scopeName"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Missing required scope: $scopeName" -LogLevel "Warning"
                 $missingScopes += $requiredScope
                 
@@ -133,7 +121,6 @@ function Test-ScopeAvailability()
             }
             else
             {
-                Write-Verbose "[$functionName] Required scope available: $scopeName"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Required scope available: $scopeName" -LogLevel "Information"
             }
         }

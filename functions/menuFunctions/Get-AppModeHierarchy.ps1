@@ -7,7 +7,6 @@ function Get-AppModeHierarchy()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting app mode hierarchy for: $CurrentAppMode"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Getting app mode hierarchy for: $CurrentAppMode" -LogLevel "Debug"
     
     try
@@ -17,7 +16,6 @@ function Get-AppModeHierarchy()
         
         if ($null -eq $menuConfig)
         {
-            Write-Verbose "[$functionName] Menu configuration not available, falling back to current mode only"
             Write-Log -LogFile $LogFile -Module $functionName -Message "Menu configuration not available, falling back to current mode only" -LogLevel "Warning"
             return @($CurrentAppMode)
         }
@@ -31,27 +29,23 @@ function Get-AppModeHierarchy()
             if ($hierarchy.PSObject.Properties.Name -contains $CurrentAppMode)
             {
                 $allowedModes = $hierarchy.$CurrentAppMode
-                Write-Verbose "[$functionName] Found hierarchy for '$CurrentAppMode': [$($allowedModes -join ', ')]"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Found hierarchy for '$CurrentAppMode': [$($allowedModes -join ', ')]" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found hierarchy for '$CurrentAppMode': [$($allowedModes -join ', ')]" -LogLevel "Verbose"
                 return $allowedModes
             }
             else
             {
-                Write-Verbose "[$functionName] No hierarchy defined for '$CurrentAppMode', using current mode only"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "No hierarchy defined for '$CurrentAppMode', using current mode only" -LogLevel "Warning"
                 return @($CurrentAppMode)
             }
         }
         else
         {
-            Write-Verbose "[$functionName] No appModeHierarchy found in menu configuration, using current mode only"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "No appModeHierarchy found in menu configuration, using current mode only" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $functionName -Message "No appModeHierarchy found in menu configuration, using current mode only" -LogLevel "Verbose"
             return @($CurrentAppMode)
         }
     }
     catch
     {
-        Write-Verbose "[$functionName] Error getting app mode hierarchy: $_"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error getting app mode hierarchy: $_" -LogLevel "Error"
         # Fallback to current mode only
         return @($CurrentAppMode)

@@ -52,7 +52,7 @@ function Show-SettingsViewer()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings viewer for $SettingsType settings" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings viewer for $SettingsType settings" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting settings viewer for $SettingsType settings"
     
     try
@@ -92,7 +92,7 @@ function Show-SettingsViewer()
             Write-Warning "[$functionName] Failed to get default settings structure"
             return $false
         }
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully retrieved default settings structure"
         
         # Load current settings
@@ -105,7 +105,7 @@ function Show-SettingsViewer()
             Write-Warning "[$functionName] Failed to load current settings"
             return $false
         }
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded current settings"
         
         # Get settings template and current values to display
@@ -151,7 +151,7 @@ function Show-SettingsViewer()
                 return $false
             }
             
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
             
             # Get domain settings template from centralized defaults (fixed approach)
@@ -169,7 +169,7 @@ function Show-SettingsViewer()
                 }
                 
                 $settingsTemplate = $domainTemplate.settings
-                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
             catch
@@ -200,12 +200,12 @@ function Show-SettingsViewer()
         
         if (-not $settingsTemplate)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Error"
+Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Verbose"
             Write-Warning "[$functionName] No settings template found for $SettingsType"
             return $false
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display" -LogLevel "Information"
+Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display"
         
         # Get flattened settings for display (same as editor but read-only)

@@ -9,8 +9,7 @@ function HasScope()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting scope validation for $($ResourcePath.Count) resource paths"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting scope validation for $($ResourcePath.Count) resource paths" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting scope validation for $($ResourcePath.Count) resource paths" -LogLevel "Verbose"
     
     # Get authorized scopes from the access token
     $tokenData = DecodeJwtToken -Token $accessToken
@@ -102,14 +101,12 @@ function HasScope()
         
         $functionName = $MyInvocation.MyCommand.Name
 
-        Write-Verbose "[$functionName] Testing authorization for required scope: $RequiredScope"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Testing authorization for required scope: $RequiredScope" -LogLevel "Debug"
         
         # Direct match
         if ($AuthorizedScopes -contains $RequiredScope)
         {
-            Write-Verbose "[$functionName] Direct scope match found for: $RequiredScope"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Direct scope match found for: $RequiredScope" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Direct scope match found for: $RequiredScope" -LogLevel "Verbose"
             return $true
         }
         
@@ -126,7 +123,6 @@ function HasScope()
                 if ($includedScopes -contains $RequiredScope)
                 {
                     Write-Verbose "[$functionName]       ✅ MATCH: '$authorizedScope' includes '$RequiredScope'"
-                    Write-Verbose "[$functionName] Hierarchical scope match: '$authorizedScope' includes '$RequiredScope'"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hierarchical scope match: '$authorizedScope' includes '$RequiredScope'" -LogLevel "Debug"
                     return $true
                 }
@@ -142,8 +138,7 @@ function HasScope()
             }
         }
         
-        Write-Verbose "[$functionName] No scope authorization found for: $RequiredScope"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scope authorization found for: $RequiredScope" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "No scope authorization found for: $RequiredScope" -LogLevel "Verbose"
         return $false
     }
     
@@ -153,9 +148,7 @@ function HasScope()
     
     foreach ($uri in $ResourcePath)
     {
-        Write-Verbose "[$functionName] Checking resource path: $uri"
-        Write-Verbose "[$functionName] Checking resource path: $uri"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking resource path: $uri" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking resource path: $uri" -LogLevel "Verbose"
         
         # Normalize $uri to relative path for endpoint comparison
         if ($uri -match 'https?://[^/]+/(v1\.0|beta)/(.+)')
@@ -237,7 +230,7 @@ function HasScope()
         }
         Write-Verbose "[$functionName] Number of matching scopes: $($matchingScopes.Count)"
         Write-Verbose "[$functionName] Matching required scopes: $($matchingScopes | Out-String) scopes."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($matchingScopes.Count) matching scopes for endpoint: $relativeUri" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($matchingScopes.Count) matching scopes for endpoint: $relativeUri" -LogLevel "Verbose"
         
         # For this URI to be authorized, we need at least one matching scope to be satisfied
         # If no scopes are defined for this endpoint, we'll consider it authorized (public endpoint)
@@ -314,7 +307,6 @@ function HasScope()
         # Log summary for this URI
         if ($uriAuthorized)
         {
-            Write-Verbose "[$functionName] URI '$uri' is AUTHORIZED with $($authorizedScopeDetails.Count) satisfied scope(s)"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "URI '$uri' is AUTHORIZED with $($authorizedScopeDetails.Count) satisfied scope(s)" -LogLevel "Information"
         }
         else
@@ -339,11 +331,9 @@ function HasScope()
         }
         
         $returnObjects += $returnObject
-        Write-Verbose "[$functionName] URI '$uri' authorization status: $uriAuthorized"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "URI '$uri' authorization status: $uriAuthorized" -LogLevel "Information"
     }
     
-    Write-Verbose "[$functionName] Overall authorization status: $allScopesAuthorized" 
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overall authorization status: $allScopesAuthorized" -LogLevel "Information"
     
     # Create a summary object for easier consumption

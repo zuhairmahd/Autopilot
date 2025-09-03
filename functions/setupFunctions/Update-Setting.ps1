@@ -138,14 +138,13 @@ function Update-Setting()
                 Write-Log -LogFile $logFile -Message "Converted property '$($property.Name)' to hashtable" -Module $functionName
                 Write-Verbose "[$functionName] Converted property '$($property.Name)' to hashtable"
             }
-            Write-Verbose "[$functionName] Successfully converted $Context to hashtable with $($hashtable.Count) properties"
-            Write-Log -LogFile $logFile -Message "Successfully converted $Context to hashtable with $($hashtable.Count) properties" -Module $functionName -LogLevel "Verbose"
+Write-Log -LogFile $logFile -Message "Successfully converted $Context to hashtable with $($hashtable.Count) properties" -Module $functionName -LogLevel "Debug"
             return $hashtable
         }
         catch
         {
             Write-Warning "[$functionName] Failed to convert $Context to hashtable: $($_.Exception.Message)"
-            Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $($_.Exception.Message)" -Module $functionName -LogLevel "Error"
+Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $($_.Exception.Message)" -Module $functionName -LogLevel "Debug"
             throw
         }
     }
@@ -213,7 +212,6 @@ function Update-Setting()
             Write-Log -LogFile $logFile -Message "SettingName and SettingValue are required for $settingType setting type" -Module $functionName -LogLevel "Warning"
             return $false
         }
-        Write-Verbose "[$functionName] Validation passed for '$SettingName' (type '$settingType')"
         Write-Log -LogFile $logFile -Message "Validation passed for '$SettingName' (type '$settingType')" -Module $functionName -LogLevel "Verbose"
         return $true
     }
@@ -260,7 +258,7 @@ function Update-Setting()
         if (-not (Test-Path -Path $SettingsFile))
         {
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
-            Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -Module $functionName -LogLevel "Warning"
+Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -Module $functionName -LogLevel "Verbose"
             return $false
         }
         
@@ -442,7 +440,6 @@ function Update-Setting()
                     foreach ($key in $Settings.Keys)
                     {
                         $existingSettings[$key] = $Settings[$key]
-                        Write-Verbose "[$functionName] Updated domain setting: $key = $($Settings[$key])"
                         Write-Log -LogFile $logFile -Message "Updated domain setting: $key = $($Settings[$key])" -Module $functionName -LogLevel "Verbose"
                     }
                     
@@ -487,7 +484,6 @@ function Update-Setting()
         }
         
         # Verify the update based on setting type
-        Write-Verbose "[$functionName] Verifying update for SettingType '$SettingType'"
         Write-Log -LogFile $logFile -Message "Verifying update for SettingType '$SettingType'" -Module $functionName -LogLevel "Verbose"
         
         if ($SettingType -ne 'Domain')
@@ -556,7 +552,7 @@ function Update-Setting()
                 else
                 {
                     Write-Warning "[$functionName] Failed to verify auth setting update - property not found"
-                    Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Warning"
+Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Verbose"
                     $false
                 }
             }
@@ -594,7 +590,7 @@ function Update-Setting()
                 else
                 {
                     Write-Warning "[$functionName] Failed to verify domain settings - configuration file not found"
-                    Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Warning"
+Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Verbose"
                     $false
                 }
             }

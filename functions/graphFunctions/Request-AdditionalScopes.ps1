@@ -14,7 +14,7 @@ function Request-AdditionalScopes()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting additional scope request process"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional scope request for $($MissingScopes.Count) missing scopes" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting additional scope request for $($MissingScopes.Count) missing scopes" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting additional scope request for $($MissingScopes.Count) missing scopes (Write-Log not available)"
     
     $result = @{
@@ -27,7 +27,6 @@ function Request-AdditionalScopes()
     # Handle empty missing scopes - nothing to request
     if ($MissingScopes.Count -eq 0)
     {
-        Write-Verbose "[$functionName] No missing scopes - nothing to request"
         Write-Log -LogFile $LogFile -Module $functionName -Message "No missing scopes - nothing to request" -LogLevel "Information"
         $result.Success = $true
         $result.ErrorMessage = "No additional scopes needed."

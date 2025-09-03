@@ -41,7 +41,7 @@ function Invoke-PasswordChangeProcess()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password change process" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password change process" -LogLevel "Verbose"
     if (-not ($setInitialPassword))
     {
         Write-Host "`nPassword Change Required" -ForegroundColor Yellow
@@ -140,7 +140,7 @@ function Invoke-PasswordChangeProcess()
                 else
                 {
                     Write-Warning "changePWOnNextStart setting not found in auth section"
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting not found in auth section" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting not found in auth section" -LogLevel "Verbose"
                 }
             }
             catch
@@ -153,7 +153,7 @@ function Invoke-PasswordChangeProcess()
         else
         {
             Write-Warning "Settings file not found: $SettingsFile"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
         }
         
         # Update stored password in session

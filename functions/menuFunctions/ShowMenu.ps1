@@ -160,16 +160,20 @@ function ShowMenu()
     # Loop through menu items and add to choices (excluding items in exclusion list)
     foreach ($item in $Menu.Items)
     {
-        # Pass the menus configuration if available, otherwise null (which will allow all items)
-        $menusToPass = if ($script:menus)
+        # If this menu was prefiltered at build time, skip additional include checks
+        $includeItem = $false
+        if ($Menu.ContainsKey('PreFiltered') -and $Menu.PreFiltered)
         {
-            $script:menus 
+            $includeItem = $true
+            Write-Verbose "[$functionName] Menu marked PreFiltered; including item '$($item.Name)' without additional checks"
         }
         else
         {
-            $null 
+            # Pass the menus configuration if available, otherwise null (which will allow all items)
+            $menusToPass = if ($script:menus) { $script:menus } else { $null }
+            $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass
         }
-        if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass)
+        if ($includeItem)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
             $choices += $item.Name

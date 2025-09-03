@@ -33,7 +33,7 @@ function Test-FileEncryptionStatus()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting file encryption status check for: $FilePath" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting file encryption status check for: $FilePath" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Checking encryption status of file: $FilePath"
     
     # Initialize result object
@@ -50,8 +50,7 @@ function Test-FileEncryptionStatus()
         if (-not (Test-Path $FilePath))
         {
             $result.ErrorMessage = "File does not exist: $FilePath"
-            Write-Verbose "[$functionName] File not found: $FilePath"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "File not found: $FilePath" -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module $functionName -Message "File not found: $FilePath" -LogLevel "Verbose"
             return $result
         }
         
@@ -60,7 +59,7 @@ function Test-FileEncryptionStatus()
         $result.FileContent = $fileContent
         $result.IsValidFile = $true
         
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read file. Content length: $($fileContent.Length) characters" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read file. Content length: $($fileContent.Length) characters" -LogLevel "Information"
         
         if ([string]::IsNullOrWhiteSpace($fileContent))
         {
@@ -77,14 +76,13 @@ function Test-FileEncryptionStatus()
         {
             $null = ConvertFrom-Json $fileContent -ErrorAction Stop
             $result.IsEncrypted = $false
-            Write-Verbose "[$functionName] File contains valid JSON - not encrypted"
             Write-Log -LogFile $LogFile -Module $functionName -Message "File contains valid JSON - not encrypted" -LogLevel "Debug"
             return $result
         }
         catch
         {
             Write-Verbose "[$functionName] File is not valid JSON, checking if it's encrypted..."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "File is not valid JSON, checking if it's encrypted" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "File is not valid JSON, checking if it's encrypted" -LogLevel "Verbose"
         }
         
         # If not JSON, check if it's Base64 encoded (encrypted)
@@ -95,14 +93,12 @@ function Test-FileEncryptionStatus()
             {
                 # Minimum size for IV + some encrypted content
                 $result.IsEncrypted = $true
-                Write-Verbose "[$functionName] File contains valid Base64 with sufficient length - appears encrypted"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "File contains valid Base64 with sufficient length - appears encrypted" -LogLevel "Debug"
                 return $result
             }
             else
             {
                 $result.ErrorMessage = "File appears to be Base64 but is too short to be properly encrypted"
-                Write-Verbose "[$functionName] Base64 data too short for encryption"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Base64 data too short for encryption" -LogLevel "Warning"
                 return $result
             }
@@ -118,8 +114,7 @@ function Test-FileEncryptionStatus()
     catch
     {
         $result.ErrorMessage = "Error reading file: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Error reading file: $($_.Exception.Message)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading file: $($_.Exception.Message)" -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading file: $($_.Exception.Message)" -LogLevel "Verbose"
         return $result
     }
 }

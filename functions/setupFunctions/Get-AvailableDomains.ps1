@@ -39,7 +39,6 @@ function Get-AvailableDomains()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Scanning for available domains in: $ConfigurationPath"
     Write-Log -LogFile $logFile -Message "Scanning for available domains in: $ConfigurationPath" -Module $functionName -LogLevel "Information"
     
     # Phase 4A Optimization: Use pre-allocated ArrayList for efficient collection building
@@ -116,8 +115,7 @@ function Get-AvailableDomains()
             }
         }
         
-        Write-Verbose "[$functionName] Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')"
-        Write-Log -LogFile $logFile -Message "Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')" -Module $functionName -LogLevel "Information"
+Write-Log -LogFile $logFile -Message "Found $($availableDomains.Count) available domains: $($availableDomains -join ', ')" -Module $functionName -LogLevel "Verbose"
         
         # Debug: Check what we're about to return
         Write-Verbose "[$functionName] Debug: About to return array of type $($availableDomains.GetType().Name) with $($availableDomains.Count) items"

@@ -19,7 +19,7 @@ function Invoke-JsonFileEncryption()
     $functionName = $MyInvocation.MyCommand.Name
     $operationMode = if ($Decrypt) { 'DECRYPT' } else { 'ENCRYPT' }
     
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting JSON file encryption/decryption operation" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting JSON file encryption/decryption operation" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Operation mode: $operationMode" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $functionName -Message "File path: $FilePath" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Backup original: $BackupOriginal" -LogLevel "Debug"
@@ -46,7 +46,7 @@ function Invoke-JsonFileEncryption()
     try
     {
         # Validate file exists and is accessible
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Validating file existence and accessibility" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Validating file existence and accessibility" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Validating file existence and accessibility..."
         if (-not (Test-Path $FilePath))
         {
@@ -64,7 +64,7 @@ function Invoke-JsonFileEncryption()
             Write-Verbose "[$functionName] Size: $($fileInfo.Length) bytes"
             Write-Verbose "[$functionName] Last modified: $($fileInfo.LastWriteTime)"
             Write-Verbose "[$functionName] Is read-only: $($fileInfo.IsReadOnly)"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "File found successfully. Size: $($fileInfo.Length) bytes" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "File found successfully. Size: $($fileInfo.Length) bytes" -LogLevel "Verbose"
         }
         catch
         {
@@ -72,7 +72,6 @@ function Invoke-JsonFileEncryption()
             $errorMsg += "`nError details: $($_.Exception.Message)"
             $errorMsg += "`nPlease verify you have the necessary permissions to access this file."
             Write-Host $errorMsg
-            Write-Verbose "[$functionName] File accessibility check failed: $($_.Exception.Message)"
             Write-Log -LogFile $LogFile -Module $functionName -Message "File accessibility check failed: $($_.Exception.Message)" -LogLevel "Error"
             return @{
                 Success      = $false
@@ -86,13 +85,12 @@ function Invoke-JsonFileEncryption()
         # Get absolute path
         $FilePath = Resolve-Path $FilePath
         Write-Verbose "[$functionName] File path resolved to: $FilePath"
-        Write-Verbose "[$functionName] File validation completed successfully"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "File validation completed successfully" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "File validation completed successfully" -LogLevel "Information"
         $operationStartTime = Get-Date
         Write-Verbose "[$functionName] =========================================="
         Write-Verbose "[$functionName] Starting main processing at $($operationStartTime.ToString('yyyy-MM-dd HH:mm:ss.fff'))"
         Write-Verbose "[$functionName] =========================================="
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Starting main processing" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting main processing" -LogLevel "Verbose"
     
         # Create backup if requested
         if ($BackupOriginal)
@@ -113,7 +111,6 @@ function Invoke-JsonFileEncryption()
             }
             catch
             {
-                Write-Verbose "[$functionName] Backup creation failed: $($_.Exception.Message)"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Backup creation failed: $($_.Exception.Message)" -LogLevel "Error"
             }
         }
@@ -126,18 +123,17 @@ function Invoke-JsonFileEncryption()
     
         # Read file content
         Write-Verbose "[$functionName] Reading source file content..."
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Reading source file content" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Reading source file content" -LogLevel "Verbose"
         try
         {
             $fileContent = Get-Content $FilePath -Raw -Encoding UTF8 -ErrorAction Stop
             Write-Verbose "[$functionName] File content read successfully:"
             Write-Verbose "[$functionName] Content length: $($fileContent.Length) characters"
             Write-Verbose "[$functionName] First 100 characters: $($fileContent.Substring(0, [Math]::Min(100, $fileContent.Length)))"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "File content read successfully. Length: $($fileContent.Length) characters" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "File content read successfully. Length: $($fileContent.Length) characters" -LogLevel "Information"
         }
         catch
         {
-            Write-Verbose "[$functionName] File read failed: $($_.Exception.Message)"
             $errorMsg = "CRITICAL ERROR: Failed to read file '$FilePath'."
             Write-Host $errorMsg
             Write-Log -LogFile $LogFile -Module $functionName -Message "File read failed: $($_.Exception.Message)" -LogLevel "Error"
@@ -622,8 +618,7 @@ function Invoke-JsonFileEncryption()
             try
             {
                 $aes.Dispose()
-                Write-Verbose "[$functionName] AES encryption object disposed successfully"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "AES encryption object disposed successfully" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "AES encryption object disposed successfully" -LogLevel "Information"
             }
             catch
             {
@@ -636,8 +631,7 @@ function Invoke-JsonFileEncryption()
             try
             {
                 $sha256.Dispose()
-                Write-Verbose "[$functionName] SHA256 hash object disposed successfully"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "SHA256 hash object disposed successfully" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "SHA256 hash object disposed successfully" -LogLevel "Information"
             }
             catch
             {
@@ -650,8 +644,7 @@ function Invoke-JsonFileEncryption()
             try
             {
                 $encryptor.Dispose()
-                Write-Verbose "[$functionName] Encryptor object disposed successfully"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Encryptor object disposed successfully" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Encryptor object disposed successfully" -LogLevel "Information"
             }
             catch
             {
@@ -664,8 +657,7 @@ function Invoke-JsonFileEncryption()
             try
             {
                 $decryptor.Dispose()
-                Write-Verbose "[$functionName] Decryptor object disposed successfully"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Decryptor object disposed successfully" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Decryptor object disposed successfully" -LogLevel "Information"
             }
             catch
             {

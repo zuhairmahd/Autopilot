@@ -115,7 +115,6 @@ function Get-ApplicationDefaults()
             maxUserMatchDisplay          = 10
             maxGroupMatchDisplay         = 10
             release                      = "auto"
-            repo                         = "Github"
             repoInfo                     = @{
                 repoName      = "Autopilot"
                 baseSourceURL = "https://raw.githubusercontent.com"
@@ -148,7 +147,6 @@ function Get-ApplicationDefaults()
                 maxUserMatchDisplay             = 10
                 maxGroupMatchDisplay            = 10
                 release                         = "master"
-                repo                            = "Github"
                 repoInfo                        = @{
                     repoName      = "Autopilot"
                     baseSourceURL = "https://raw.githubusercontent.com"

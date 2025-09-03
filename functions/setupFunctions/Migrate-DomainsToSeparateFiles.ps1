@@ -48,8 +48,7 @@ function Migrate-DomainsToSeparateFiles
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting domain migration from: $SettingsFile"
-    Write-Log -LogFile $logFile -Message "Starting domain migration from: $SettingsFile" -Module $functionName -LogLevel "Information"
+Write-Log -LogFile $logFile -Message "Starting domain migration from: $SettingsFile" -Module $functionName -LogLevel "Verbose"
     
     # Initialize result object
     $result = @{
@@ -84,15 +83,13 @@ function Migrate-DomainsToSeparateFiles
         # Check if domains section exists
         if (-not $settingsContent.domains)
         {
-            Write-Verbose "[$functionName] No domains section found in settings file - migration not needed"
-            Write-Log -LogFile $logFile -Message "No domains section found in settings file - migration not needed" -Module $functionName -LogLevel "Information"
+Write-Log -LogFile $logFile -Message "No domains section found in settings file - migration not needed" -Module $functionName -LogLevel "Verbose"
             $result.Success = $true
             return $result
         }
         
         $domainNames = $settingsContent.domains.PSObject.Properties.Name
-        Write-Verbose "[$functionName] Found $($domainNames.Count) domains to migrate: $($domainNames -join ', ')"
-        Write-Log -LogFile $logFile -Message "Found $($domainNames.Count) domains to migrate: $($domainNames -join ', ')" -Module $functionName -LogLevel "Information"
+Write-Log -LogFile $logFile -Message "Found $($domainNames.Count) domains to migrate: $($domainNames -join ', ')" -Module $functionName -LogLevel "Verbose"
         
         # Migrate each domain
         foreach ($domainName in $domainNames)
@@ -116,7 +113,6 @@ function Migrate-DomainsToSeparateFiles
                 if ($saveSuccess)
                 {
                     $result.MigratedDomains += $domainName
-                    Write-Verbose "[$functionName] Successfully migrated domain: $domainName"
                     Write-Log -LogFile $logFile -Message "Successfully migrated domain: $domainName" -Module $functionName -LogLevel "Information"
                 }
                 else
@@ -148,7 +144,6 @@ function Migrate-DomainsToSeparateFiles
                 # Create backup of settings file
                 $backupFile = "$SettingsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
                 Copy-Item -Path $SettingsFile -Destination $backupFile -Force
-                Write-Verbose "[$functionName] Created settings backup: $backupFile"
                 Write-Log -LogFile $logFile -Message "Created settings backup: $backupFile" -Module $functionName -LogLevel "Verbose"
                 
                 # Remove domains property from settings object
@@ -158,7 +153,6 @@ function Migrate-DomainsToSeparateFiles
                 $updatedJson = $settingsContent | ConvertTo-Json -Depth 10
                 $updatedJson | Out-File -FilePath $SettingsFile -Encoding UTF8 -Force
                 
-                Write-Verbose "[$functionName] Successfully removed domains section from settings.json"
                 Write-Log -LogFile $logFile -Message "Successfully removed domains section from settings.json" -Module $functionName -LogLevel "Information"
             }
             catch
@@ -173,7 +167,6 @@ function Migrate-DomainsToSeparateFiles
         # Set overall success based on results
         $result.Success = ($result.FailedDomains.Count -eq 0)
         
-        Write-Verbose "[$functionName] Migration completed. Migrated: $($result.MigratedDomains.Count), Failed: $($result.FailedDomains.Count)"
         Write-Log -LogFile $logFile -Message "Migration completed. Migrated: $($result.MigratedDomains.Count), Failed: $($result.FailedDomains.Count)" -Module $functionName -LogLevel "Information"
         
         return $result

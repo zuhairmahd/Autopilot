@@ -26,17 +26,16 @@ function GetGraphAccessToken()
     
     #region Process config files
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting Graph access token retrieval" -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Starting Graph access token retrieval" -LogLevel "Verbose"
     
     # Read and process configuration file
     if (-not $configFile)
     {
         Write-Error "Config file not found. Please provide a valid config file."
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Config file not found. Please provide a valid config file." -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Config file not found. Please provide a valid config file." -LogLevel "Verbose"
         return $null
     }
 
-    Write-Verbose "[$functionName] Accessing config values from in-memory encrypted config"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Accessing config values from in-memory encrypted config" -LogLevel "Debug"
     $configRefreshToken = $null
     
@@ -47,12 +46,12 @@ function GetGraphAccessToken()
         if ($configRefreshToken)
         {
             Write-Verbose "[$functionName] Found refresh token in encrypted config."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Found refresh token in encrypted config" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "Found refresh token in encrypted config" -LogLevel "Verbose"
         }
         else
         {
             Write-Verbose "[$functionName] No refresh token found in config."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token found in config" -LogLevel "Debug"
+Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token found in config" -LogLevel "Verbose"
         }
     }
     catch

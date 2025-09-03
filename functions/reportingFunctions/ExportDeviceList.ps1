@@ -36,54 +36,43 @@ function ExportDeviceList()
     {
         'autopilot'
         {
-            Write-Verbose "[$functionName] fetching Autopilot devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Autopilot devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken
-            Write-Verbose "[$functionName] Fetched $($devices.value.Count) Autopilot devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) Autopilot devices." -LogLevel "Information"
         }
         'imported'
         {
-            Write-Verbose "[$functionName] fetching Imported Autopilot devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Imported Autopilot devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -extraParameters $importedAutopilotExtraParameters
-            Write-Verbose "[$functionName] Fetched $($devices.value.Count) imported Autopilot devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) imported Autopilot devices." -LogLevel "Information"
         }
         'unmanaged'
         {
-            Write-Verbose "[$functionName] fetching Unmanaged devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Unmanaged devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $unmanagedDeviceUri -accessToken $accessToken -filter $unmanagedDeviceFilter -extraParameters $unmanagedDeviceExtraParameters
-            Write-Verbose "[$functionName] Fetched $($devices.value.Count) unmanaged devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) unmanaged devices." -LogLevel "Information"
         }
         'managed'
         {
-            Write-Verbose "[$functionName] fetching Managed devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "fetching Managed devices." -LogLevel "Information"
             $devices = CallGraphApi -ResourcePath $managedDeviceUri -accessToken $accessToken -filter $managedDeviceFilter -extraParameters $managedDeviceExtraParameters
-            Write-Verbose "[$functionName] Fetched $($devices.value.Count) managed devices."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Fetched $($devices.value.Count) managed devices." -LogLevel "Information"
         }
     }
     
-    Write-Verbose "[$functionName] Processing $($devices.value.Count) $deviceType devices for export."
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing $($devices.value.Count) $deviceType devices for export." -LogLevel "Verbose"
     for ($i = 0; $i -lt $devices.value.count; $i++)
     {
         $device = $devices.value[$i]
         if (-not $device)
         {
-            Write-Verbose "[$functionName] Skipping null or invalid $deviceType device at index $i."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping null or invalid $deviceType device at index $i." -LogLevel "Error"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping null or invalid $deviceType device at index $i." -LogLevel "Debug"
             continue
         }
         switch ($deviceType)
         {
             'autopilot'
             {
-                Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $deviceType device with serial number $($device.serialNumber) for export." -LogLevel "Information"
                 if ($null -ne $device.lastContactedDateTime)
                 {
@@ -102,7 +91,6 @@ function ExportDeviceList()
             }
             'imported'
             {
-                Write-Verbose "[$functionName] Preparing $deviceType device with serial number $($device.serialNumber) for export."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $deviceType device with serial number $($device.serialNumber) for export." -LogLevel "Information"
                 $exportObject = [PSCustomObject] @{
                     serialNumber         = $device.serialNumber
@@ -116,7 +104,6 @@ function ExportDeviceList()
             }
             'unmanaged'
             {
-                Write-Verbose "[$functionName] Preparing $devicetype device with display name $($device.displayName) for export."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $devicetype device with display name $($device.displayName) for export." -LogLevel "Information"
                 $createdDateTime = $device.createdDateTime
                 $registrationDateTime = $device.registrationDateTime
@@ -151,7 +138,6 @@ function ExportDeviceList()
             }
             'managed'
             {
-                Write-Verbose "[$functionName] Preparing $devicetype device object for export."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Preparing $devicetype device object for export." -LogLevel "Information"
                 $enrollmentDate = $device.enrolledDateTime
                 $LastSync = $device.lastSyncDateTime
@@ -190,46 +176,39 @@ function ExportDeviceList()
 
     if ($CSVObject.Count -gt 0)
     {
-        Write-Verbose "[$functionName] exporting $($CSVObject.Count) $deviceType devices to $outputFile."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
         #Check if the file exists and ask if the user wants to overwrite.
         if (Test-Path $outputFile)
         {
             if ($fileMode -eq 'Append')
             {
-                Write-Verbose "[$functionName] Appending to existing file $outputFile."
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append -Encoding UTF8 -Delimiter ','
             }
             else
             {
-                Write-Verbose "[$functionName] Overwriting existing file $outputFile."
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Verbose"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
             }
         }
         else
         {
-            Write-Verbose "[$functionName] Creating new file $outputFile."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new file $outputFile." -LogLevel "Information"
         }
         $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
     }
     else
     {
-        Write-Verbose "[$functionName] No devices found for export."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Information"
+Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
     }
     #check if the csv file exists.
     if (Test-Path $outputFile)
     {
-        Write-Verbose "[$functionName] CSV file $outputFile created successfully."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV file $outputFile created successfully." -LogLevel "Information"
         $success = $true
     }
     else
     {
-        Write-Verbose "[$functionName] Failed to create CSV file $outputFile."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to create CSV file $outputFile." -LogLevel "Error"
         $success = $false
     }

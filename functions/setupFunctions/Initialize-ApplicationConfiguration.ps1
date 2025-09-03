@@ -54,29 +54,43 @@ function Initialize-ApplicationConfiguration()
     Write-Verbose "[$functionName] Domain: $Domain"
     
     # Helper function for batched file validation (Performance Optimization Phase 2)
-    function Test-ConfigurationFilesExist($FilesToCheck) {
+    function Test-ConfigurationFilesExist() 
+    {
+        [CmdletBinding()]
+        param (
+            [array]$FilesToCheck
+        )
+        $functionName = $MyInvocation.MyCommand.Name
         $validationResults = @{}
         $existingCount = 0
         $missingCount = 0
         
         Write-Verbose "[$functionName] Batch validating $($FilesToCheck.Count) configuration files"
-        
-        foreach ($file in $FilesToCheck) {
+        Write-Log -logFile $logFile -module $functionName -Message "Batch validating $($FilesToCheck.Count) configuration files" -logLevel "Information"
+        foreach ($file in $FilesToCheck)
+        {
+            Write-Verbose "[$functionName] Checking $($file.Path)"
+            Write-Log -logFile $logFile -module $functionName -Message "Checking $($file.Path)" -logLevel "Verbose"
             $exists = Test-Path -Path $file.Path
+            Write-Log -logFile $logFile -module $functionName -Message "File $($file.Path) exists: $exists" -logLevel "Verbose"
             $validationResults[$file.Type] = @{
-                Path = $file.Path
+                Path   = $file.Path
                 Exists = $exists
-                Type = $file.Type
+                Type   = $file.Type
             }
             
-            if ($exists) {
+            if ($exists)
+            {
                 $existingCount++
-            } else {
+            }
+            else
+            {
                 $missingCount++
             }
         }
         
         Write-Verbose "[$functionName] File validation complete: $existingCount existing, $missingCount missing"
+        Write-Log -logFile $logFile -module $functionName -Message "File validation complete: $existingCount existing, $missingCount missing" -logLevel "Information"
         return $validationResults
     }
     
@@ -133,14 +147,9 @@ function Initialize-ApplicationConfiguration()
                 $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath -processConfigOverwrite
                 $result.LocalSettings = $localResult.LocalSettings
                 
-                # Step 6: Load menus
-                $result.Menus = $initFileContent.menus
-                Write-Verbose "[$functionName] Loaded $($result.Menus.Count) menus from $InitFile"
-                
-                # Step 7: Process and merge scopes
+                # Step 6: Process and merge scopes
                 $scopeResult = Initialize-RequiredScopes -InitFileContent $initFileContent -Domain $Domain
                 $result.RequiredScopes = $scopeResult.RequiredScopes
-                
             }
             catch
             {
@@ -163,7 +172,6 @@ function Initialize-ApplicationConfiguration()
             # Initialize empty collections for other settings
             $result.GlobalSettings = @{}
             $result.LocalSettings = @{}
-            $result.Menus = @()
             $result.RequiredScopes = @()
         }
         
@@ -266,7 +274,8 @@ function Initialize-AuthConfiguration()
     foreach ($key in $AuthConfiguration.PSObject.Properties.Name)
     {
         # Conditional verbose logging - only log individual settings when explicit verbose is used
-        if ($VerbosePreference -eq 'Continue') {
+        if ($VerbosePreference -eq 'Continue')
+        {
             Write-Verbose "[$functionName] Processing auth key: $key"
         }
         
@@ -276,7 +285,8 @@ function Initialize-AuthConfiguration()
             {
                 $keyBooleanValue = [bool]::Parse($AuthConfiguration.$key)
                 $auth.add($key, $keyBooleanValue)
-                if ($VerbosePreference -eq 'Continue') {
+                if ($VerbosePreference -eq 'Continue')
+                {
                     Write-Verbose "[$functionName] Set $key to boolean value: $keyBooleanValue"
                 }
                 $authBooleanCount++
@@ -284,7 +294,8 @@ function Initialize-AuthConfiguration()
             else
             {
                 $auth.add($key, $AuthConfiguration.$key)
-                if ($VerbosePreference -eq 'Continue') {
+                if ($VerbosePreference -eq 'Continue')
+                {
                     Write-Verbose "[$functionName] Set $key to string value: $($AuthConfiguration.$key)"
                 }
             }
@@ -293,7 +304,8 @@ function Initialize-AuthConfiguration()
         elseif ($PSBoundParameters.ContainsKey($key))
         {
             $auth.add($key, $PSBoundParameters[$key])
-            if ($VerbosePreference -eq 'Continue') {
+            if ($VerbosePreference -eq 'Continue')
+            {
                 Write-Verbose "[$functionName] Used command-line parameter for $key`: $($PSBoundParameters[$key])"
             }
             $authOverrideCount++
@@ -320,19 +332,16 @@ function Initialize-GlobalSettings()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Initializing global settings"
     Write-Log -logFile $logFile -Message "Initializing global settings" -module $functionName -logLevel "Information"
     $globalSettings = @{}
     
     if ($null -eq $GlobalConfigData)
     {
-        Write-Verbose "[$functionName] No global settings found"
-        Write-Log -logFile $logFile -Message "No global settings found" -module $functionName -logLevel "Warning"
+        Write-Log -logFile $logFile -Message "No global settings found" -module $functionName -LogLevel "Verbose"
         return @{ GlobalSettings = $globalSettings }
     }
     
-    Write-Verbose "[$functionName] Processing $($GlobalConfigData.PSObject.Properties.Name.count) global settings"
-    Write-Log -logFile $logFile -Message "Processing $($GlobalConfigData.PSObject.Properties.Name.count) global settings" -module $functionName -logLevel "Information"
+    Write-Log -logFile $logFile -Message "Processing $($GlobalConfigData.PSObject.Properties.Name.count) global settings" -module $functionName -LogLevel "Verbose"
     
     # Batch processing counters for performance optimization
     $processedCount = 0
@@ -342,28 +351,28 @@ function Initialize-GlobalSettings()
     foreach ($key in $GlobalConfigData.PSObject.Properties.Name)
     {
         # Conditional verbose logging - only log individual settings when explicit verbose is used
-        if ($VerbosePreference -eq 'Continue') {
-            Write-Verbose "[$functionName] Processing global setting: $key"
+        if ($VerbosePreference -eq 'Continue')
+        {
         }
         Write-Log -logFile $logFile -Message "Processing global setting: $key" -module $functionName -logLevel "Verbose"
         
         if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key)
         {
-            if ($VerbosePreference -eq 'Continue') {
-                Write-Verbose "[$functionName] Checking if $key is a boolean"
+            if ($VerbosePreference -eq 'Continue')
+            {
             }
             Write-Log -logFile $logFile -Message "Checking if $key is a boolean" -module $functionName -logLevel "Verbose"
             
             if ($GlobalConfigData.$key -in ('true', 'false'))
             {
-                if ($VerbosePreference -eq 'Continue') {
-                    Write-Verbose "[$functionName] $key is a boolean"
+                if ($VerbosePreference -eq 'Continue')
+                {
                 }
                 Write-Log -logFile $logFile -Message "$key is a boolean" -module $functionName -logLevel "Verbose"
                 $keyBooleanValue = [bool]::Parse($GlobalConfigData.$key)
                 $globalSettings.add($key, $keyBooleanValue)
-                if ($VerbosePreference -eq 'Continue') {
-                    Write-Verbose "[$functionName] Set global $key to boolean: $keyBooleanValue"
+                if ($VerbosePreference -eq 'Continue')
+                {
                 }
                 Write-Log -logFile $logFile -Message "Set global $key to boolean: $keyBooleanValue" -module $functionName -logLevel "Verbose"
                 $booleanCount++
@@ -371,8 +380,8 @@ function Initialize-GlobalSettings()
             else
             {
                 $globalSettings.add($key, $GlobalConfigData.$key)
-                if ($VerbosePreference -eq 'Continue') {
-                    Write-Verbose "[$functionName] Set global $key to: $($GlobalConfigData.$key)"
+                if ($VerbosePreference -eq 'Continue')
+                {
                 }
                 Write-Log -logFile $logFile -Message "Set global $key to: $($GlobalConfigData.$key)" -module $functionName -logLevel "Verbose"
             }
@@ -381,8 +390,8 @@ function Initialize-GlobalSettings()
         elseif ($PSBoundParameters.ContainsKey($key))
         {
             $globalSettings.add($key, $PSBoundParameters[$key])
-            if ($VerbosePreference -eq 'Continue') {
-                Write-Verbose "[$functionName] Used command-line override for global $key"
+            if ($VerbosePreference -eq 'Continue')
+            {
             }
             Write-Log -logFile $logFile -Message "Used command-line override for global $key" -module $functionName -logLevel "Verbose"
             $overrideCount++
@@ -390,23 +399,19 @@ function Initialize-GlobalSettings()
     }
     
     # Batch summary logging for performance optimization
-    Write-Verbose "[$functionName] Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)"
-    Write-Log -logFile $logFile -Message "Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)" -module $functionName -logLevel "Information"
+    Write-Log -logFile $logFile -Message "Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)" -module $functionName -LogLevel "Verbose"
     
     # Apply overwrite settings to global configuration
     if ($processConfigOverwrite)
     {
-        Write-Verbose "[$functionName] Applying overwrite configuration to global settings"
         Write-Log -logFile $logFile -Message "Applying overwrite configuration to global settings" -module $functionName -logLevel "Information"
         try
         {
             $overwriteConfig = Get-ApplicationDefaults -DefaultType "Overwrite"
             # Apply global-specific overwrites
-            Write-Verbose "[$functionName] Applying global-specific overwrite configuration"
             Write-Log -logFile $logFile -Message "Applying global-specific overwrite configuration" -module $functionName -logLevel "Information"
             if ($overwriteConfig.GlobalSettings)
             {
-                Write-Verbose "[$functionName] Applying $($overwriteConfig.GlobalSettings.Count) global overwrite settings"
                 Write-Log -logFile $logFile -Message "Applying $($overwriteConfig.GlobalSettings.Count) global overwrite settings" -module $functionName -logLevel "Information"
                 foreach ($overwriteKey in $overwriteConfig.GlobalSettings.Keys)
                 {
@@ -419,16 +424,13 @@ function Initialize-GlobalSettings()
                         "NOT_SET" 
                     }
                     $globalSettings[$overwriteKey] = $overwriteConfig.GlobalSettings[$overwriteKey]
-                    Write-Verbose "[$functionName] Applied global overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.GlobalSettings[$overwriteKey])"
                     Write-Log -LogFile $logFile -Message "Applied global overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.GlobalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
                 }
             }
             # Apply universal overwrites
-            Write-Verbose "[$functionName] Applying universal overwrite configuration"
             Write-Log -logFile $logFile -Message "Applying universal overwrite configuration" -module $functionName -logLevel "Information"
             if ($overwriteConfig.UniversalSettings)
             {
-                Write-Verbose "[$functionName] Applying $($overwriteConfig.UniversalSettings.Count) universal overwrite settings to global"
                 Write-Log -logFile $logFile -Message "Applying $($overwriteConfig.UniversalSettings.Count) universal overwrite settings to global" -module $functionName -logLevel "Information"
                 foreach ($overwriteKey in $overwriteConfig.UniversalSettings.Keys)
                 {
@@ -441,7 +443,6 @@ function Initialize-GlobalSettings()
                         "NOT_SET" 
                     }
                     $globalSettings[$overwriteKey] = $overwriteConfig.UniversalSettings[$overwriteKey]
-                    Write-Verbose "[$functionName] Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])"
                     Write-Log -LogFile $logFile -Message "Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
                 }
             }
@@ -473,13 +474,11 @@ function Initialize-LocalSettings()
     
     $functionName = $MyInvocation.MyCommand.Name
     $localSettings = @{}
-    Write-Verbose "[$functionName] Initializing local settings for domain: $Domain"
     Write-Log -LogFile $logFile -Message "Initializing local settings for domain: $Domain" -Module $functionName -LogLevel "Information"
     # First, check for migration from old format (domains in settings.json)
     if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
     {
-        Write-Verbose "[$functionName] Found domain configuration in settings.json, performing migration"
-        Write-Log -LogFile $logFile -Message "Found domain configuration in settings.json, performing migration" -Module $functionName -LogLevel "Information"
+        Write-Log -LogFile $logFile -Message "Found domain configuration in settings.json, performing migration" -Module $functionName -LogLevel "Verbose"
         $settingsFile = Join-Path $ConfigurationPath "settings.json"
         $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -ConfigurationPath $ConfigurationPath -RemoveFromSettings $true
         if ($migrationResult.Success)
@@ -505,8 +504,7 @@ function Initialize-LocalSettings()
     }
     
     $localConfigData = ConvertFrom-JsonToHashtable -JsonObject $domainConfig
-    Write-Verbose "[$functionName] Processing domain settings for $Domain from separate file"
-    Write-Log -LogFile $logFile -Message "Processing domain settings for $Domain from separate file" -Module $functionName -LogLevel "Information"
+    Write-Log -LogFile $logFile -Message "Processing domain settings for $Domain from separate file" -Module $functionName -LogLevel "Verbose"
     
     # Handle both hashtables and PSCustomObjects correctly
     # Avoid hashtable system properties (IsReadOnly, IsFixedSize, IsSynchronized, Keys, Values, SyncRoot, Count)
@@ -525,8 +523,7 @@ function Initialize-LocalSettings()
     }
     else
     {
-        Write-Verbose "[$functionName] No settings properties found in domain configuration"
-        Write-Log -LogFile $logFile -Message "No settings properties found in domain configuration" -Module $functionName -LogLevel "Warning"
+        Write-Log -LogFile $logFile -Message "No settings properties found in domain configuration" -Module $functionName -LogLevel "Verbose"
     }
     
     Write-Verbose "[$functionName] Processing $($settingsKeys.Count) settings keys"
@@ -558,7 +555,6 @@ function Initialize-LocalSettings()
     # Apply overwrite settings to local/domain configuration
     if ($processConfigOverwrite)
     {
-        Write-Verbose "[$functionName] Applying overwrite configuration to local settings"
         Write-Log -logFile $logFile -Message "Applying overwrite configuration to local settings" -module $functionName -logLevel "Information"
         try
         {
@@ -566,7 +562,6 @@ function Initialize-LocalSettings()
             # Apply local-specific overwrites
             if ($overwriteConfig.LocalSettings)
             {
-                Write-Verbose "[$functionName] Applying $($overwriteConfig.LocalSettings.Count) local overwrite settings"
                 Write-Log -logFile $logFile -Message "Applying $($overwriteConfig.LocalSettings.Count) local overwrite settings" -module $functionName -logLevel "Information"
                 foreach ($overwriteKey in $overwriteConfig.LocalSettings.Keys)
                 {
@@ -579,12 +574,10 @@ function Initialize-LocalSettings()
                         "NOT_SET" 
                     }
                     $localSettings[$overwriteKey] = $overwriteConfig.LocalSettings[$overwriteKey]
-                    Write-Verbose "[$functionName] Applied local overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.LocalSettings[$overwriteKey])"
                     Write-Log -LogFile $logFile -Message "Applied local overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.LocalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
                 }
             }
             # Apply universal overwrites
-            Write-Verbose "[$functionName] Applying universal overwrite configuration to local settings"
             Write-Log -logFile $logFile -Message "Applying universal overwrite configuration to local settings" -module $functionName -logLevel "Information"
             if ($overwriteConfig.UniversalSettings)
             {
@@ -600,7 +593,6 @@ function Initialize-LocalSettings()
                         "NOT_SET" 
                     }
                     $localSettings[$overwriteKey] = $overwriteConfig.UniversalSettings[$overwriteKey]
-                    Write-Verbose "[$functionName] Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])"
                     Write-Log -LogFile $logFile -Message "Applied universal overwrite '$overwriteKey': $oldValue -> $($overwriteConfig.UniversalSettings[$overwriteKey])" -Module $functionName -LogLevel "Information"
                 }
             }

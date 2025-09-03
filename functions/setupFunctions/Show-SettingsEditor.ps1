@@ -53,7 +53,7 @@ function Show-SettingsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Information"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings editor for $SettingsType settings" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting settings editor for $SettingsType settings"
     
     try
@@ -93,7 +93,7 @@ function Show-SettingsEditor()
             Write-Warning "[$functionName] Failed to get default settings structure"
             return $false
         }
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully retrieved default settings structure"
         
         # Load current settings
@@ -106,7 +106,7 @@ function Show-SettingsEditor()
             Write-Warning "[$functionName] Failed to load current settings"
             return $false
         }
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded current settings"
         
         # Get settings template to edit
@@ -151,7 +151,7 @@ function Show-SettingsEditor()
                 return $false
             }
             
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
             
             # Get domain settings template from centralized defaults (fixed approach)
@@ -169,7 +169,7 @@ function Show-SettingsEditor()
                 }
                 
                 $settingsTemplate = $domainTemplate.settings
-                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Verbose"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
             catch
@@ -196,12 +196,12 @@ function Show-SettingsEditor()
         
         if (-not $settingsTemplate)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Verbose"
             Write-Warning "[$functionName] No settings template found for $SettingsType"
             return $false
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process"
         
         Write-Host ""
@@ -429,7 +429,7 @@ function Get-CurrentSettings()
     {
         if (-not (Test-Path -Path $SettingsFile))
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
             if (-not (Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent))
             {
@@ -499,11 +499,11 @@ function Get-FlattenedSettingsForEditing()
             {
                 # Simple value
                 $flattenedSettings += @{
-                    Name = $key
-                    Path = $key
+                    Name         = $key
+                    Path         = $key
                     DefaultValue = $defaultValue
                     CurrentValue = $currentValue
-                    IsNested = $false
+                    IsNested     = $false
                 }
             }
         }
@@ -533,11 +533,11 @@ function Get-FlattenedSettingsForEditing()
             {
                 # Simple value
                 $flattenedSettings += @{
-                    Name = $key
-                    Path = $key
+                    Name         = $key
+                    Path         = $key
                     DefaultValue = $defaultValue
                     CurrentValue = $currentValue
-                    IsNested = $false
+                    IsNested     = $false
                 }
             }
         }
@@ -612,13 +612,17 @@ function Format-SettingValueForDisplay()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Add detailed logging for debugging array display issues
-    if ($null -ne $Value) {
+    if ($null -ne $Value)
+    {
         Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
-    } else {
+    }
+    else
+    {
         Write-Verbose "[$functionName] Formatting null value for display"
     }
     
-    try {
+    try
+    {
         if ($Value -is [array])
         {
             Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
@@ -671,7 +675,8 @@ function Format-SettingValueForDisplay()
             return [string]$Value
         }
     }
-    catch {
+    catch
+    {
         Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
         # Fallback to safe string conversion
         if ($Value -is [array] -and $Value.Count -gt 0)
@@ -692,7 +697,6 @@ function Get-SettingDescription()
     param([string]$SettingName)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting description for setting: '$SettingName'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting description for setting: '$SettingName'" -LogLevel "Verbose"
     
     $descriptions = @{
@@ -704,7 +708,6 @@ function Get-SettingDescription()
         'timeInSeconds'                   = 'Default timeout to wait between retries in seconds'
         'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'
         'release'                         = 'Release branch or version to track for updates'
-        'repo'                            = 'Repository source for updates (Github/Gitlab)'
         'testMode'                        = 'Enable test mode with additional debugging features'
         'operatingSystem'                 = 'Target operating system (Windows/macOS/Linux)'
         'autoUpdate'                      = 'Automatically check for and install updates'
@@ -730,7 +733,7 @@ function Get-SettingDescription()
         'secureString'                    = 'Use secure string for password storage'
         'delegated'                       = 'Use delegated permissions (user context) vs application permissions'
         # Nested object descriptions
-        'repoPath'                        = 'GitHub/GitLab repository owner/organization name'
+        'repoPath'                        = 'Repository owner/organization name'
         'baseURL'                         = 'Base URL for repository hosting service'
         'baseSourceURL'                   = 'Base URL for raw file access'
         'repoName'                        = 'Repository name'
@@ -742,14 +745,12 @@ function Get-SettingDescription()
     
     if ($descriptions.ContainsKey($SettingName))
     {
-        Write-Verbose "[$functionName] Found description for '$SettingName'"
-        Write-Log -LogFile $logFile -Module $functionName -Message "Found description for '$SettingName'" -LogLevel "Debug"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Found description for '$SettingName'" -LogLevel "Verbose"
         return $descriptions[$SettingName]
     }
     else
     {
-        Write-Verbose "[$functionName] No specific description found for '$SettingName', using generic description"
-        Write-Log -LogFile $logFile -Module $functionName -Message "No specific description found for '$SettingName', using generic description" -LogLevel "Debug"
+        Write-Log -LogFile $logFile -Module $functionName -Message "No specific description found for '$SettingName', using generic description" -LogLevel "Verbose"
         return "Configuration setting: $SettingName"
     }
 }
@@ -769,73 +770,56 @@ function Get-SettingInput()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting input for setting '$SettingName'. Current: '$CurrentValue', Default: '$DefaultValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting input for setting '$SettingName'. Current: '$CurrentValue', Default: '$DefaultValue'" -LogLevel "Verbose"
     
     # Determine the type of input needed
     $inputType = Get-SettingInputType -SettingName $SettingName -Value $DefaultValue
-    Write-Verbose "[$functionName] Determined input type: '$inputType' for setting '$SettingName'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Determined input type: '$inputType' for setting '$SettingName'" -LogLevel "Verbose"
     
     switch ($inputType)
     {
         'Boolean'
         {
-            Write-Verbose "[$functionName] Using boolean input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using boolean input for '$SettingName'" -LogLevel "Verbose"
             return Get-BooleanInput -CurrentValue $CurrentValue
         }
         'AppMode'
         {
-            Write-Verbose "[$functionName] Using app mode input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using app mode input for '$SettingName'" -LogLevel "Verbose"
             return Get-AppModeInput -CurrentValue $CurrentValue
         }
         'CacheType'
         {
-            Write-Verbose "[$functionName] Using cache type input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using cache type input for '$SettingName'" -LogLevel "Verbose"
             return Get-CacheTypeInput -CurrentValue $CurrentValue
         }
-        'Repo'
-        {
-            Write-Verbose "[$functionName] Using repository input for '$SettingName'"
-            Write-Log -LogFile $logFile -Module $functionName -Message "Using repository input for '$SettingName'" -LogLevel "Verbose"
-            return Get-RepoInput -CurrentValue $CurrentValue
-        }
         'OperatingSystem'
         {
-            Write-Verbose "[$functionName] Using operating system input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using operating system input for '$SettingName'" -LogLevel "Verbose"
             return Get-OperatingSystemInput -CurrentValue $CurrentValue
         }
         'Browser'
         {
-            Write-Verbose "[$functionName] Using browser input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using browser input for '$SettingName'" -LogLevel "Verbose"
             return Get-BrowserInput -CurrentValue $CurrentValue
         }
         'AuthType'
         {
-            Write-Verbose "[$functionName] Using auth type input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using auth type input for '$SettingName'" -LogLevel "Verbose"
             return Get-AuthTypeInput -CurrentValue $CurrentValue
         }
         'Array'
         {
-            Write-Verbose "[$functionName] Using array input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using array input for '$SettingName'" -LogLevel "Verbose"
             return Get-ArrayInput -CurrentValue $CurrentValue
         }
         'Number'
         {
-            Write-Verbose "[$functionName] Using number input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using number input for '$SettingName'" -LogLevel "Verbose"
             return Get-NumberInput -SettingName $SettingName -CurrentValue $CurrentValue
         }
         default
         {
-            Write-Verbose "[$functionName] Using string input for '$SettingName'"
             Write-Log -LogFile $logFile -Module $functionName -Message "Using string input for '$SettingName'" -LogLevel "Verbose"
             return Get-StringInput -SettingName $SettingName -CurrentValue $CurrentValue
         }
@@ -853,7 +837,6 @@ function Get-SettingInputType()
         $Value
     )
     
-    Write-Verbose "[$functionName] Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)"
     Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
     
     # Check for specific known enumerated types
@@ -918,7 +901,6 @@ function Get-BooleanInput()
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting boolean input. Current value: $CurrentValue"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting boolean input. Current value: $CurrentValue" -LogLevel "Verbose"
     
     Write-Host "Choose option:" -ForegroundColor White
@@ -940,7 +922,6 @@ function Get-BooleanInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
-            Write-Verbose "[$functionName] User chose to keep current boolean value: $CurrentValue"
             Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current boolean value: $CurrentValue" -LogLevel "Verbose"
             return $CurrentValue
         }
@@ -949,20 +930,17 @@ function Get-BooleanInput()
         {
             '1'
             { 
-                Write-Verbose "[$functionName] User selected: True"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected: True" -LogLevel "Information"
                 return $true 
             }
             '2'
             { 
-                Write-Verbose "[$functionName] User selected: False"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected: False" -LogLevel "Information"
                 return $false 
             }
             default
             {
                 Write-Host "Invalid choice. Please enter 1 or 2." -ForegroundColor Red
-                Write-Verbose "[$functionName] Invalid choice entered: '$choice'"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
             }
         }
@@ -978,7 +956,6 @@ function Get-AppModeInput()
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting app mode input. Current value: '$CurrentValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $modes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
@@ -1004,7 +981,6 @@ function Get-AppModeInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
-            Write-Verbose "[$functionName] User chose to keep current app mode: '$CurrentValue'"
             Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode: '$CurrentValue'" -LogLevel "Verbose"
             return $CurrentValue
         }
@@ -1012,13 +988,11 @@ function Get-AppModeInput()
         if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $modes.Count)
         {
             $selectedMode = $modes[[int]$choice - 1]
-            Write-Verbose "[$functionName] User selected app mode: '$selectedMode'"
             Write-Log -LogFile $logFile -Module $functionName -Message "User selected app mode: '$selectedMode'" -LogLevel "Information"
             return $selectedMode
         }
         
         Write-Host "Invalid choice. Please enter a number between 1 and $($modes.Count)." -ForegroundColor Red
-        Write-Verbose "[$functionName] Invalid choice entered: '$choice'"
         Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
     } while ($true)
 }
@@ -1028,24 +1002,10 @@ function Get-CacheTypeInput()
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting cache type input for current value: '$CurrentValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting cache type input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $types = @('Memory', 'File')
     return Get-EnumeratedInput -Options $types -CurrentValue $CurrentValue -PromptText "cache type"
-}
-
-function Get-RepoInput()
-{
-    [CmdletBinding()]
-    param($CurrentValue)
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting repository input for current value: '$CurrentValue'"
-    Write-Log -LogFile $logFile -Module $functionName -Message "Getting repository input for current value: '$CurrentValue'" -LogLevel "Verbose"
-    
-    $repos = @('Github', 'Gitlab')
-    return Get-EnumeratedInput -Options $repos -CurrentValue $CurrentValue -PromptText "repository"
 }
 
 function Get-OperatingSystemInput()
@@ -1054,7 +1014,6 @@ function Get-OperatingSystemInput()
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting operating system input for current value: '$CurrentValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting operating system input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $systems = @('Windows', 'macOS', 'Linux')
@@ -1067,7 +1026,6 @@ function Get-BrowserInput()
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting browser input for current value: '$CurrentValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting browser input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $browsers = @('Chrome', 'Edge', 'Firefox', 'Safari')
@@ -1112,7 +1070,6 @@ function Get-EnumeratedInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
-            Write-Verbose "[$functionName] User chose to keep current value: '$CurrentValue'"
             Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current value: '$CurrentValue'" -LogLevel "Verbose"
             return $CurrentValue
         }
@@ -1120,13 +1077,11 @@ function Get-EnumeratedInput()
         if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $Options.Count)
         {
             $selectedValue = $Options[[int]$choice - 1]
-            Write-Verbose "[$functionName] User selected option $($choice): '$selectedValue'"
             Write-Log -LogFile $logFile -Module $functionName -Message "User selected option $($choice): '$selectedValue'" -LogLevel "Information"
             return $selectedValue
         }
         
         Write-Host "Invalid choice. Please enter a number between 1 and $($Options.Count)." -ForegroundColor Red
-        Write-Verbose "[$functionName] Invalid choice entered: '$choice'"
         Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
     } while ($true)
 }
@@ -1177,21 +1132,18 @@ function Get-ArrayInput()
         {
             '1'
             {
-                Write-Verbose "[$functionName] User chose to replace existing values"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing values" -LogLevel "Information"
                 $shouldReplaceExisting = $true
             }
             '2'
             {
-                Write-Verbose "[$functionName] User chose to add new values to existing ones"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add new values to existing ones" -LogLevel "Information"
                 $shouldReplaceExisting = $false
             }
             '3'
             {
-                Write-Verbose "[$functionName] User chose to keep current values unchanged"
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current values unchanged" -LogLevel "Information"
-                return ,$CurrentValue
+                return , $CurrentValue
             }
         }
     }
@@ -1218,7 +1170,7 @@ function Get-ArrayInput()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current array values" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] User cancelled input, keeping current array values"
-                return ,$CurrentValue
+                return , $CurrentValue
             }
             
             $newValues += $input
@@ -1270,7 +1222,7 @@ function Get-ArrayInput()
     if ($result -isnot [array])
     {
         Write-Warning "[$functionName] Warning: Result is not an array after processing. Type: $($result.GetType().Name)"
-        Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is not an array after processing. Type: $($result.GetType().Name)" -LogLevel "Warning"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Result is not an array after processing. Type: $($result.GetType().Name)" -LogLevel "Verbose"
         $result = @($result)
     }
     
@@ -1278,7 +1230,7 @@ function Get-ArrayInput()
     Write-Verbose "[$functionName] Returning array with $($result.Count) values. Array type verified: $($result -is [array])"
     
     # Use comma operator to preserve array type, preventing PowerShell from unwrapping single-element arrays
-    return ,$result
+    return , $result
 }
 
 function Get-NumberInput()
@@ -1294,7 +1246,6 @@ function Get-NumberInput()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting numeric input for '$SettingName'. Current value: $CurrentValue"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting numeric input for '$SettingName'. Current value: $CurrentValue" -LogLevel "Verbose"
     
     do
@@ -1303,7 +1254,6 @@ function Get-NumberInput()
         
         if ([string]::IsNullOrWhiteSpace($input))
         {
-            Write-Verbose "[$functionName] User chose to keep current numeric value: $CurrentValue"
             Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current numeric value: $CurrentValue" -LogLevel "Verbose"
             return $CurrentValue
         }
@@ -1311,14 +1261,12 @@ function Get-NumberInput()
         if ($input -match '^\d+$')
         {
             $number = [int]$input
-            Write-Verbose "[$functionName] Valid numeric input received: $number"
             Write-Log -LogFile $logFile -Module $functionName -Message "Valid numeric input received: $number" -LogLevel "Verbose"
             
             # Add specific validation for certain settings
             if ($SettingName -eq 'minUsernameLength' -and $number -lt 1)
             {
                 Write-Host "Minimum username length must be at least 1." -ForegroundColor Red
-                Write-Verbose "[$functionName] Validation failed: minimum username length must be at least 1"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Validation failed: minimum username length must be at least 1" -LogLevel "Warning"
                 continue
             }
@@ -1326,18 +1274,15 @@ function Get-NumberInput()
             if ($SettingName -eq 'maxWaitTime' -and $number -lt 1)
             {
                 Write-Host "Maximum wait time must be at least 1 second." -ForegroundColor Red
-                Write-Verbose "[$functionName] Validation failed: maximum wait time must be at least 1 second"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Validation failed: maximum wait time must be at least 1 second" -LogLevel "Warning"
                 continue
             }
             
-            Write-Verbose "[$functionName] Numeric validation passed, returning: $number"
             Write-Log -LogFile $logFile -Module $functionName -Message "Numeric validation passed, returning: $number" -LogLevel "Information"
             return $number
         }
         
         Write-Host "Please enter a valid number." -ForegroundColor Red
-        Write-Verbose "[$functionName] Invalid numeric input: '$input'"
         Write-Log -LogFile $logFile -Module $functionName -Message "Invalid numeric input: '$input'" -LogLevel "Warning"
     } while ($true)
 }
@@ -1355,19 +1300,16 @@ function Get-StringInput()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting string input for '$SettingName'. Current value: '$CurrentValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting string input for '$SettingName'. Current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $input = Read-Host "Enter value (current: '$CurrentValue', press Enter to keep)"
     
     if ([string]::IsNullOrWhiteSpace($input))
     {
-        Write-Verbose "[$functionName] User chose to keep current string value: '$CurrentValue'"
         Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current string value: '$CurrentValue'" -LogLevel "Verbose"
         return $CurrentValue
     }
     
-    Write-Verbose "[$functionName] User entered new string value: '$input'"
     Write-Log -LogFile $logFile -Module $functionName -Message "User entered new string value: '$input'" -LogLevel "Information"
     return $input
 }
@@ -1385,7 +1327,6 @@ function Save-GlobalSettings()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Saving global settings to file: '$SettingsFile'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Saving global settings to file: '$SettingsFile'" -LogLevel "Information"
     
     try
@@ -1393,7 +1334,6 @@ function Save-GlobalSettings()
         foreach ($key in $Settings.Keys)
         {
             $value = $Settings[$key]
-            Write-Verbose "[$functionName] Updating global setting: $key = $value"
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $value" -LogLevel "Verbose"
             
             # Handle nested settings (e.g., repoInfo.repoPath)
@@ -1409,19 +1349,16 @@ function Save-GlobalSettings()
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update global setting: $key"
-                Write-Verbose "[$functionName] Failed to update global setting: $key"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update global setting: $key" -LogLevel "Error"
                 return $false
             }
         }
-        Write-Verbose "[$functionName] All global settings saved successfully"
         Write-Log -LogFile $logFile -Module $functionName -Message "All global settings saved successfully" -LogLevel "Information"
         return $true
     }
     catch
     {
         Write-Warning "[$functionName] Error saving global settings: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Error saving global settings: $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Module $functionName -Message "Error saving global settings: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
@@ -1433,7 +1370,6 @@ function Get-AuthTypeInput()
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Getting authentication type input for current value: '$CurrentValue'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting authentication type input for current value: '$CurrentValue'" -LogLevel "Verbose"
     
     $authTypes = @('PublicAuthFlow', 'PrivateAuthFlow', 'Interactive', 'Device')
@@ -1453,7 +1389,6 @@ function Save-AuthSettings()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Saving auth settings to: $SettingsFile"
     Write-Log -LogFile $logFile -Module $functionName -Message "Saving auth settings to: $SettingsFile" -LogLevel "Information"
     
     try
@@ -1491,7 +1426,6 @@ function Save-AuthSettings()
         
         foreach ($key in $Settings.Keys)
         {
-            Write-Verbose "[$functionName] Updating auth setting: $key = $($Settings[$key])"
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating auth setting: $key = $($Settings[$key])" -LogLevel "Verbose"
             
             # Handle nested settings (e.g., nested.property)
@@ -1507,21 +1441,17 @@ function Save-AuthSettings()
             if (-not $success)
             {
                 Write-Warning "[$functionName] Failed to update auth setting: $key"
-                Write-Verbose "[$functionName] Failed to update auth setting: $key"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update auth setting: $key" -LogLevel "Error"
                 return $false
             }
-            Write-Verbose "[$functionName] Successfully updated auth setting: $key = $($Settings[$key])"
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated auth setting: $key = $($Settings[$key])" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated auth setting: $key = $($Settings[$key])" -LogLevel "Information"
         }
-        Write-Verbose "[$functionName] All auth settings saved successfully"
         Write-Log -LogFile $logFile -Module $functionName -Message "All auth settings saved successfully" -LogLevel "Information"
         return $true
     }
     catch
     {
         Write-Warning "[$functionName] Error saving auth settings: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Error saving auth settings: $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Module $functionName -Message "Error saving auth settings: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
@@ -1541,7 +1471,6 @@ function Save-DomainSettings()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Saving domain settings for domain: '$DomainName' to file: '$SettingsFile'"
     Write-Log -LogFile $logFile -Module $functionName -Message "Saving domain settings for domain: '$DomainName' to file: '$SettingsFile'" -LogLevel "Information"
     
     try
@@ -1549,12 +1478,10 @@ function Save-DomainSettings()
         $success = Update-Setting -SettingType "Domain" -SettingsFile $SettingsFile -DomainName $DomainName -Settings $Settings -MergeSettings
         if ($success)
         {
-            Write-Verbose "[$functionName] Domain settings saved successfully"
             Write-Log -LogFile $logFile -Module $functionName -Message "Domain settings saved successfully" -LogLevel "Information"
         }
         else
         {
-            Write-Verbose "[$functionName] Failed to save domain settings"
             Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save domain settings" -LogLevel "Error"
         }
         return $success
@@ -1562,7 +1489,6 @@ function Save-DomainSettings()
     catch
     {
         Write-Warning "[$functionName] Error saving domain settings: $($_.Exception.Message)"
-        Write-Verbose "[$functionName] Error saving domain settings: $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Module $functionName -Message "Error saving domain settings: $($_.Exception.Message)" -LogLevel "Error"
         return $false
     }
@@ -1587,7 +1513,6 @@ function Update-NestedSetting()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Updating nested setting: $SettingPath = $SettingValue (Type: $SettingType)"
     Write-Log -LogFile $logFile -Module $functionName -Message "Updating nested setting: $SettingPath = $SettingValue (Type: $SettingType)" -LogLevel "Information"
     
     try
@@ -1663,7 +1588,6 @@ function Update-NestedSetting()
         # Save the updated settings
         $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile -Encoding UTF8
         
-        Write-Verbose "[$functionName] Successfully updated nested setting: $SettingPath"
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated nested setting: $SettingPath" -LogLevel "Information"
         return $true
     }
