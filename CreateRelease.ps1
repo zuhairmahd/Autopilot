@@ -1319,7 +1319,7 @@ Write-Host "Build process completed successfully."
 Write-Host "Executable and files are located in $parentFolder"
 
 $response = $null
-if (-not ($Overwrite -and $SkipSigning))
+if (-not $Overwrite -or $SkipSigning)
 {
     Write-Host "Would you like to copy the executable into the current directory? (Y/N)"
     $response = Read-Host "Enter 'y' to copy, 'n' to skip"
