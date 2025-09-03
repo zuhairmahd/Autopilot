@@ -137,7 +137,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             $branch = '${{ github.ref_name }}'
             git commit -m "chore(build): update signed artifacts [skip ci]"
-            git push origin HEAD:$branch
+            git push origin HEAD:$branch --force
             Write-Host "Signed artifacts committed and pushed to $branch"
           }
           else {
