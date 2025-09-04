@@ -16,7 +16,9 @@ jobs:
     name: Test (pwsh on Windows)
     runs-on: windows-latest
     # Skip CI loop commits
-    if: github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]')
+    if: >
+      github.event_name != 'push' ||
+      !contains((github.event.head_commit.message || github.event.pull_request.title || ''), '[skip ci]')
     timeout-minutes: 10
     steps:
       - name: Checkout code
@@ -36,9 +38,9 @@ jobs:
         shell: pwsh
         run: .\TestScripts\Test-Runner.ps1 -TestCategory core
 
-      # - name: Run tests - unit
-      #   shell: pwsh
-      #   run: .\TestScripts\Test-Runner.ps1 -TestCategory unit
+      - name: Run tests - unit
+        shell: pwsh
+        run: .\TestScripts\Test-Runner.ps1 -TestCategory unit
 
       - name: Run tests - integration
         shell: pwsh
@@ -50,7 +52,10 @@ jobs:
     timeout-minutes: 25
     needs: test
     # Only build on pushes to dev and skip CI loop commits
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !contains(github.event.head_commit.message, '[skip ci]')
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/dev' &&
+      !contains((github.event.head_commit.message || ''), '[skip ci]')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -77,7 +82,9 @@ jobs:
 
       - name: Build executable
         shell: pwsh
-        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning
+        run: |
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning 
+          write-host "Build complete. Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -91,7 +98,10 @@ jobs:
     timeout-minutes: 20
     needs: build
     # Only sign on pushes to dev and skip CI loop commits
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !contains(github.event.head_commit.message, '[skip ci]')
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/dev' &&
+      !contains((github.event.head_commit.message || ''), '[skip ci]')
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -132,19 +142,31 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
+      - name: update hash
+        shell: pwsh
+        run: |
+          Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force 
+          Write-Host "Copied .\bin\main.exe to .\main.exe."
+          Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
+          write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -updateHash
+      
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
         shell: pwsh
         run: |
+          if (test-path -Path .\bin\main.exe) { write-host "Signed main.exe exists. Copying to root."; copy-item -Path .\bin\main.exe -Destination .\main.exe -Force }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Stage only the build directory to avoid unrelated changes from the artifact download
+          # Stage only the build directory, lastrun.json and main.exe to avoid unrelated changes from the artifact download
           git add -A bin
+          git add -A main.exe
+          git add -A lastrun.json
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             $branch = '${{ github.ref_name }}'
             git commit -m "chore(build): update signed artifacts [skip ci]"
-            git push origin HEAD:$branch --force
+            git push origin HEAD:$branch
             Write-Host "Signed artifacts committed and pushed to $branch"
           }
           else {
