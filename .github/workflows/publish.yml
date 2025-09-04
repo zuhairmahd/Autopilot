@@ -82,7 +82,10 @@ jobs:
 
       - name: Build executable
         shell: pwsh
-        run: .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning
+        run: 
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning
+          copy-item -path .\lastrun.json -destination .\bin\lastrun.json -Force
+          write-host "Build complete. Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -146,6 +149,8 @@ jobs:
         run: |
           Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force 
           Write-Host "Copied .\bin\main.exe to .\main.exe."
+          Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
+          write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Stage only the build directory, lastrun.json and main.exe to avoid unrelated changes from the artifact download
