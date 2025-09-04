@@ -84,7 +84,6 @@ jobs:
         shell: pwsh
         run: |
           .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning 
-          copy-item -path .\lastrun.json -destination .\bin\lastrun.json -Force
           write-host "Build complete. Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
