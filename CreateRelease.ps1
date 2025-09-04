@@ -845,7 +845,7 @@ function UpdateHash()
     }
     else
     {
-        Write-Error "Failed to write updated hash to $FilePath"
+        Write-Error "Failed to write updated hash to $lastRunPath"
         return $false
     }
 }
