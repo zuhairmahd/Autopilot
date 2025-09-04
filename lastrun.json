@@ -1,8 +1,8 @@
 {
-  "date": "2025-09-04",
-  "stringsVersion": "1.3.0.0",
-  "settingsVersion": "1.3.0.0",
-  "version": "3.3.0.30011",
   "GUID": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-  "hash": "5FCF9F542E4852E7D8EF18A4A89DB42CA81F1E9C827025EDC77ACAA0562F8A61"
+  "hash": "2EC9CE8511732133D75CC0779AAAED101B1F319F1D0B5087572BD25C11FCEE0E",
+  "date": "2025-09-04",
+  "version": "3.3.0.30012",
+  "settingsVersion": "1.3.0.0",
+  "stringsVersion": "1.3.0.0"
 }
