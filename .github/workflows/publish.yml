@@ -148,8 +148,9 @@ jobs:
           Write-Host "Copied .\bin\main.exe to .\main.exe."
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Stage only the build directory to avoid unrelated changes from the artifact download
+          # Stage only the build directory and main.exe to avoid unrelated changes from the artifact download
           git add -A bin
+          git add -A main.exe
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             $branch = '${{ github.ref_name }}'
