@@ -404,7 +404,7 @@ $script:Auth = $auth
 
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
-$settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
 
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
@@ -456,9 +456,9 @@ else
     'autopilot'
 }
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Repository name: $repoName" -LogLevel "Information"
-$latestRelease = if ($settings.latestRelease)
+$latestRelease = if ($settings.Release)
 {
-    if ($settings.latestRelease -eq 'auto')
+    if ($settings.Release -eq 'auto')
     {
         Write-Log -logFile $LogFile -Module $scriptName -Message "Latest release is set to 'auto'. Fetching the latest release from GitHub." -LogLevel "Information"
         $tempRelease = GetLatestGithubRelease -Repository "$repoPath/$repoName"
@@ -466,7 +466,7 @@ $latestRelease = if ($settings.latestRelease)
     }
     else 
     {
-        $tempRelease = $settings.latestRelease
+        $tempRelease = $settings.Release
     }
     $tempRelease
 }

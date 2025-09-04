@@ -92,8 +92,8 @@ function GetUpdates()
     }
     else
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from $updateURL. Please check the URL and try again." -LogLevel "Error"
-        return $response
+        Write-Verbose "[$functionName] Successfully downloaded the update file from the old URL format: $oldUpdateURL"
+        write-log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
     }
     
     $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
