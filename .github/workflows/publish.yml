@@ -145,6 +145,7 @@ jobs:
       - name: update hash
         shell: pwsh
         run: |
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -updateHash
           Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force 
           Write-Host "Copied .\bin\main.exe to .\main.exe."
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
