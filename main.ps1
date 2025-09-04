@@ -476,7 +476,7 @@ else
 }
 $global:maxJSONDepth = 20
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
-$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
+$updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/bin"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
