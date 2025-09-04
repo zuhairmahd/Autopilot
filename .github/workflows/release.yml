@@ -1,0 +1,163 @@
+name: Create and Publish Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (pwsh on Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: |
+          Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
+
+      - name: Run tests - all
+        shell: pwsh
+        run: .\TestScripts\Test-Runner.ps1
+
+  build:
+    name: Build (CreateRelease test version)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    needs: test
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache PowerShell modules
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules
+          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pwsh-modules-
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Ensure bin directory exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path -Path .\bin)) { New-Item -Path .\bin -ItemType Directory }
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning 
+          write-host "Build complete. Executable and lastrun.json are in the bin directory."
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autopilot-build
+          path: bin
+
+  sign:
+    name: Code Signing (Trusted Signing)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: build
+    if: github.event_name == 'release' && github.event.action == 'published'
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: autopilot-build
+          path: bin
+
+      - name: Skip signing (missing secrets)
+        if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
+        shell: pwsh
+        run: |
+          Write-Host "Signing skipped: required Azure Trusted Signing secrets not configured."
+
+      - name: Sign files with Trusted Signing
+        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://eus.codesigning.azure.net/
+          trusted-signing-account-name: zuhairmahd
+          certificate-profile-name: Cert1
+          files-folder: ${{ github.workspace }}/bin
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: update hash
+        shell: pwsh
+        run: |
+          Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force 
+          Write-Host "Copied .\bin\main.exe to .\main.exe."
+          Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
+          write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -updateHash
+      
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-artifacts
+          path: |
+            ./bin/main.exe
+            ./bin/lastrun.json
+
+  release:
+    name: Upload Release Assets
+    runs-on: windows-latest
+    needs: sign
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Download signed artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: signed-artifacts
+          path: ./release-assets
+
+      - name: Upload assets to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./release-assets/main.exe
+          asset_name: main.exe
+          asset_content_type: application/octet-stream
+
+      - name: Upload lastrun.json to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./release-assets/lastrun.json
+          asset_name: lastrun.json
+          asset_content_type: application/json
