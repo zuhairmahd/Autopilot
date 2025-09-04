@@ -1,8 +1,8 @@
 {
-  "version": "3.3.0.30012",
-  "date": "2025-09-04",
-  "GUID": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-  "stringsVersion": "1.3.0.0",
+  "hash": "2401C623111A129610CFEBC14E0410F6C8C68BC895DDC65C742A10F7916EC7F7",
   "settingsVersion": "1.3.0.0",
-  "hash": "2D26865A5896012FAE5506B7E132611655E95CD7552EFA2B84B75C3A19F8410C"
+  "stringsVersion": "1.3.0.0",
+  "GUID": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+  "date": "2025-09-04",
+  "version": "3.3.0.30013"
 }
