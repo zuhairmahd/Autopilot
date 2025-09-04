@@ -71,6 +71,7 @@ param(
     [switch]$CreateModule,
     [switch]$noCleanup,
     [switch]$SkipSigning,
+    [switch]$updateHash,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
@@ -800,6 +801,56 @@ function UpdateSettingsFile()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
     }
 }
+
+function UpdateHash()
+{
+    [CmdletBinding()]
+    param (
+        [string]$executableFilePath,
+        [string]$lastRunPath = "$pwd\lastrun.json"
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
+    Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
+    if (-not (Test-Path $executableFilePath))
+    {
+        Write-Error "File not found: $executableFilePath"
+        Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    if (-not (Test-Path $lastRunPath))
+    {
+        Write-Error "Last run file not found: $lastRunPath"
+        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+
+    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
+    if (-not $lastRunContent)
+    {
+        Write-Error "Failed to read JSON from $lastRunPath"
+        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    
+    # Get the hash of the executable file
+    $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
+    
+    if ($fileHash)
+    {
+        $lastRunContent.hash = $fileHash.Hash
+        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
+        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
+        Write-Host "Hash updated successfully in $lastRunPath"
+        return $true
+    }
+    else
+    {
+        Write-Error "Failed to write updated hash to $FilePath"
+        return $false
+    }
+}
 #endregion helper functions
 
 #region Define variables
@@ -933,6 +984,25 @@ if ($SecretsOnly)
         Write-Log -logFile $logFile -Message "Skipping settings file update." -module $scriptName
     }
     exit 0
+}
+
+if ($updateHash)
+{
+    Write-Host "Updating hash in lastrun file: $lastRunFile"
+    if (UpdateHash -executableFilePath $OutputFile -lastRunPath $lastRunFile)
+    {
+        Write-Host "Hash updated successfully in $lastRunFile"
+        Write-Log -logFile $logFile -Message "Hash updated successfully in $lastRunFile" -module $scriptName
+        Write-Log -logFile $logFile -finishLogging
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to update hash in $lastRunFile"
+        Write-Log -logFile $logFile -Message "Failed to update hash in $lastRunFile" -module $scriptName -LogLevel 'Error'
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
 }
 
 #Check if the initialization file exists.  If not, create it.
