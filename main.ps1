@@ -1937,7 +1937,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         default
         {
             Write-Host "An error has occurred:"
-            Write-Host: "Error message: $($updateResult.Content)"
+            Write-Host "Error message: $($updateResult.Content)"
             Write-Host "Status Code: $($updateResult.StatusCode)"
         }
     }
