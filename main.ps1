@@ -1936,7 +1936,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         }
         default
         {
-            $updateResult
+            Write-Host "An error has occurred:"
+            Write-Host: "Error message: $($updateResult.Content)"
+            Write-Host "Status Code: $($updateResult.StatusCode)"
         }
     }
 }
@@ -2075,7 +2077,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
         }
         else
         {
-            Write-Host "Checksums do not match: The script may have been tampered with.  We recommend you stop using the script immediately." -ForegroundColor Yellow
+            Write-Host "Checksums do not match: The script may have been tampered with. We recommend you stop using the script immediately." -ForegroundColor Yellow
         }
         if ($updateAvailable.version -gt $version.version)
         {

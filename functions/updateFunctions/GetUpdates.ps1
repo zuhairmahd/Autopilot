@@ -12,11 +12,49 @@ function GetUpdates()
     #region define variables and write logs 
     $functionName = $MyInvocation.MyCommand.Name
     $fileName = Split-Path -Path $executableFileName -Leaf
-    $updateURL = "$updateURL/$fileName"
+    $updateURL = "$updateURL/bin/$fileName"
+    $oldUpdateURL = "$updateURL/$fileName"
     $tempUpdateFile = "$env:TEMP\$fileName"
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Verbose "[$functionName] updateURL: $updateURL"
     #endregion
+
+    #helper function to download the remote file.
+    function DownloadRemoteFile()
+    {
+        [cmdletBinding()]
+        param (
+            [string]$url,
+            [string]$outputFile
+        )
+        $functionName = $MyInvocation.MyCommand.Name
+        $returnObject = [PSCustomObject]@{
+            Success    = $false
+            StatusCode = $null
+            Content    = $null
+        }
+        Write-Verbose "[$functionName] Downloading file from $url to $outputFile"
+        write-log -LogFile $LogFile -Module "$functionName" -Message "Downloading file from $url to $outputFile" -LogLevel "Information"
+        try 
+        {
+            $response = Invoke-WebRequest -Uri $url -OutFile $outputFile -Method Get -ErrorAction SilentlyContinue -PassThru
+            Write-Verbose "[$functionName] Response received from $($url): $($response.StatusCode)"
+            $returnObject.Success = $true
+            $returnObject.StatusCode = $response.StatusCode
+            $returnObject.Content = $response.Content
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($url): $($response.StatusCode)" -LogLevel "Information"
+        }   
+        catch 
+        {
+            Write-Verbose "[$functionName] Error downloading file from $($url): $($_.Exception.Message)"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error downloading file from $($url): $($_.Exception.Message)" -LogLevel "Error"
+            $returnObject.Success = $false
+            $returnObject.StatusCode = $_.Exception.Response.StatusCode.Value__
+            $returnObject.Content = $_.Exception.Message
+        }    
+        return $returnObject
+    }
+    
     if ($executableFileName -notmatch 'exe')
     {
         Write-Verbose "[$functionName] The provided executable file name '$executableFileName' does not match 'exe'."
@@ -33,18 +71,31 @@ function GetUpdates()
         Remove-Item -Path $tempUpdateFile -Force
     }
     Write-Verbose "[$functionName] Getting remote file from $updateURL"
-    try 
+    $response = DownloadRemoteFile -url $updateURL -outputFile $tempUpdateFile
+    if (-not $response.Success)
     {
-        $response = Invoke-WebRequest -Uri $updateURL -OutFile $tempUpdateFile -Method Get -ErrorAction SilentlyContinue -PassThru
-        Write-Verbose "[$functionName] Response received from $($updateURL): $($response.StatusCode)"
+        #try the old URL format
+        Write-Verbose "[$functionName] Trying the old URL format: $oldUpdateURL to download the update file."
+        write-log -LogFile $LogFile -Module "$functionName" -Message "Trying the old URL format: $oldUpdateURL to download the update file." -LogLevel "Information"
+        $response = DownloadRemoteFile -url $oldUpdateURL -outputFile $tempUpdateFile
+        if ($response.Success)
+        {
+            Write-Verbose "[$functionName] Successfully downloaded the update file from the old URL format: $oldUpdateURL"
+            write-log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
+        }
+        else
+        {
+            Write-Error "[$functionName] Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again." -LogLevel "Error"
+            return $response
+        }
     }
-    catch 
+    else
     {
-        Write-Verbose "[$functionName] Response: $($remoteVersionResponse)"
-        Write-Verbose "[$functionName] Remote version response content: $($remoteVersionResponse.Content)"
-        Write-Verbose "[$functionName] Remote version status code: $($remoteVersionResponse.StatusCode)"
-        return $null
-    }    
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from $updateURL. Please check the URL and try again." -LogLevel "Error"
+        return $response
+    }
+    
     $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
     Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
