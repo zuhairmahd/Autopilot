@@ -128,50 +128,44 @@ function Get-ApplicationDefaults()
         
         # Domain template defaults - single source of truth for domain structure
         Domain         = @{
-            groupsToInclude  = @()
-            groupsToExclude  = @()
-            settings         = @{
-                domain                          = $DomainName
-                appInfo                         = @{
-                    name        = "Autopilot"
-                    companyName = ""
-                    description = "Autopilot for Windows devices"
-                    version     = $Version
-                }
-                validateScopes                  = $true
-                maxWaitTime                     = 30
-                showLicenseBanner               = $true
-                deviceContactThresholdInDays    = 30
-                appMode                         = "full"
-                timeInSeconds                   = 60
-                maxUserMatchDisplay             = 10
-                maxGroupMatchDisplay            = 10
-                release                         = "master"
-                repoInfo                        = @{
-                    repoName      = "Autopilot"
-                    baseSourceURL = "https://raw.githubusercontent.com"
-                    baseURL       = "https://www.github.com"
-                    repoPath      = "zuhairmahd"
-                }
-                autoUpdate                      = $true
-                deviceNamePrefix                = ""
-                operatingSystem                 = "Windows"
-                minUsernameLength               = 3
-                maxUserNameLength               = 50
-                maxSerialNumberLength           = 50
-                minSerialNumberLength           = 7
-                minimumDevicePhysicalMemoryInGB = 8
-                maxNumberOfDevicesAllowed       = 15
-                preferredBrowser                = "Chrome"
-                privateSession                  = $false
-                userPatternsToExclude           = @( 
-                    "-test",
-                    "onmicrosoft.com"
-                )
-                groupPatternsToExclude          = @()  
-                desiredAutopilotProfiles        = @()
+            groupsToInclude                 = @()
+            groupsToExclude                 = @()
+            domain                          = $DomainName
+            companyName                     = ""
+            version                         = $Version
+            validateScopes                  = $true
+            maxWaitTime                     = 30
+            showLicenseBanner               = $true
+            deviceContactThresholdInDays    = 30
+            appMode                         = "full"
+            timeInSeconds                   = 60
+            maxUserMatchDisplay             = 10
+            maxGroupMatchDisplay            = 10
+            release                         = "master"
+            repoInfo                        = @{
+                repoName      = "Autopilot"
+                baseSourceURL = "https://raw.githubusercontent.com"
+                baseURL       = "https://www.github.com"
+                repoPath      = "zuhairmahd"
             }
-            additionalScopes = @()
+            autoUpdate                      = $true
+            deviceNamePrefix                = ""
+            operatingSystem                 = "Windows"
+            minUsernameLength               = 3
+            maxUserNameLength               = 50
+            maxSerialNumberLength           = 50
+            minSerialNumberLength           = 7
+            minimumDevicePhysicalMemoryInGB = 8
+            maxNumberOfDevicesAllowed       = 15
+            preferredBrowser                = "Chrome"
+            privateSession                  = $false
+            userPatternsToExclude           = @( 
+                "-test",
+                "onmicrosoft.com"
+            )
+            groupPatternsToExclude          = @()  
+            desiredAutopilotProfiles        = @()
+            additionalScopes                = @()
         }
         
         # Required scopes for Microsoft Graph API
@@ -352,8 +346,6 @@ function Get-ApplicationDefaults()
         auth           = $defaults.Auth
         requiredScopes = $defaults.RequiredScopes
         globalSettings = $defaults.Global
-        # Note: domains section is now handled by separate domain configuration files
-        # This structure is maintained for backward compatibility during migration
     }
     
     # Overwrite configurations - centralized force-overwrite settings
@@ -373,8 +365,7 @@ function Get-ApplicationDefaults()
         # Universal settings that apply to both global and local contexts
         # These will be applied to both global and domain settings processing
         UniversalSettings = @{
-            "baseSourceURL" = "https://raw.githubusercontent.com"
-            "baseURL"       = "https://www.github.com"
+            # Enter universal settings here
         }
     }
     

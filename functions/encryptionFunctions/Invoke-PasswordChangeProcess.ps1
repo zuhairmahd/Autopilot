@@ -41,7 +41,7 @@ function Invoke-PasswordChangeProcess()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password change process" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password change process" -LogLevel "Verbose"
     if (-not ($setInitialPassword))
     {
         Write-Host "`nPassword Change Required" -ForegroundColor Yellow
@@ -125,20 +125,18 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password ch
                 $settings = Import-PowerShellDataFile -Path $SettingsFile
                 
                 # Update the changePWOnNextStart setting
-                if ($settings.auth -and $settings.auth.changePWOnNextStart -ne $null)
+                if ($settings.auth -and $null -ne $settings.auth.changePWOnNextStart)
                 {
                     $settings.auth.changePWOnNextStart = $false
-                    
                     # Write updated settings back to file
                     $settings | Export-PowerShellDataFile -Path $SettingsFile
-                    
                     Write-Host "Settings updated successfully" -ForegroundColor Green
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
                 }
                 else
                 {
                     Write-Warning "changePWOnNextStart setting not found in auth section"
-Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting not found in auth section" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting not found in auth section" -LogLevel "Verbose"
                 }
             }
             catch
@@ -151,24 +149,20 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart 
         else
         {
             Write-Warning "Settings file not found: $SettingsFile"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
         }
-        
         # Update stored password in session
         Write-Log -LogFile $LogFile -Module $functionName -Message "Updating session password variables" -LogLevel "Debug"
         $script:UserEncryptionPassword = $newPassword
         $global:UserEncryptionPassword = $newPassword
-        
         # Clean up the new password from memory
         Clear-SecureMemory -Variables @("newPassword")
-        
         # Remove backup file if everything succeeded
         if (Test-Path $backupPath)
         {
             Remove-Item $backupPath -Force -ErrorAction SilentlyContinue
             Write-Log -LogFile $LogFile -Module $functionName -Message "Backup file cleaned up" -LogLevel "Debug"
         }
-
         if (-not ($setInitialPassword))
         {
             Write-Host "Password change completed successfully!" -ForegroundColor Green

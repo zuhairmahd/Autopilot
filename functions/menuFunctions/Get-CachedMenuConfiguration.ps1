@@ -46,24 +46,32 @@ function Get-CachedMenuConfiguration()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Getting menu configuration: MenuName='$MenuName', File='$MenuConfigFile'"
     
-    try {
+    try
+    {
         # Use the optimized unified configuration loader
         $result = Get-MenuConfiguration -MenuName $MenuName -MenuConfigFile $MenuConfigFile
         
-        if ($result) {
+        if ($result)
+        {
             Write-Verbose "[$functionName] Successfully retrieved menu configuration"
-            if ($MenuName) {
+            if ($MenuName)
+            {
                 Write-Verbose "[$functionName] Returning specific menu configuration for: $MenuName"
-            } else {
+            }
+            else
+            {
                 Write-Verbose "[$functionName] Returning full menu configuration"
             }
-        } else {
+        }
+        else
+        {
             Write-Warning "[$functionName] No menu configuration returned"
         }
         
         return $result
     }
-    catch {
+    catch
+    {
         Write-Warning "[$functionName] Error retrieving menu configuration: $($_.Exception.Message)"
         return $null
     }
@@ -91,9 +99,11 @@ function Clear-MenuConfigurationCache()
     [CmdletBinding()]
     param()
     
-    try {
+    try
+    {
         # Clear the configuration cache if it exists
-        if ($script:configurationCache) {
+        if ($script:configurationCache)
+        {
             $script:configurationCache.Clear()
             $script:configurationTimestamps.Clear()
             Write-Verbose "Menu configuration cache cleared successfully"
@@ -101,7 +111,8 @@ function Clear-MenuConfigurationCache()
         }
         return $true
     }
-    catch {
+    catch
+    {
         Write-Warning "Failed to clear menu configuration cache: $($_.Exception.Message)"
         return $false
     }

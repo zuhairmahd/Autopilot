@@ -50,18 +50,19 @@ function Get-DomainConfigurationFromFiles()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Performance Optimization Phase 2: Lazy Loading Support
-    if ($LazyLoad) {
+    if ($LazyLoad)
+    {
         Write-Verbose "[$functionName] Lazy loading mode: returning minimal configuration for domain: $DomainName"
         return @{
-            settings = @{ 
-                domain = $DomainName
-                lazyLoaded = $true
+            settings           = @{ 
+                domain            = $DomainName
+                lazyLoaded        = $true
                 configurationPath = $ConfigurationPath
             }
-            loaded = $false
-            _domainName = $DomainName
+            loaded             = $false
+            _domainName        = $DomainName
             _configurationPath = $ConfigurationPath
-            _globalSettings = $GlobalSettings
+            _globalSettings    = $GlobalSettings
         }
     }
     
@@ -71,17 +72,17 @@ function Get-DomainConfigurationFromFiles()
     try
     {
         # Construct the expected filename for this domain
-        $domainConfigFile = Join-Path $ConfigurationPath "$DomainName.json"
+        $domainConfigFile = Join-Path $ConfigurationPath "$DomainName.psd1"
         
         Write-Verbose "[$functionName] Looking for domain config file: $domainConfigFile"
         
         if (Test-Path $domainConfigFile)
         {
             Write-Verbose "[$functionName] Found existing domain configuration file"
-Write-Log -LogFile $logFile -Message "Found existing domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Message "Found existing domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Verbose"
             
             # Load existing configuration
-            $domainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
+            $domainConfig = Import-PowerShellDataFile -Path $domainConfigFile
             
             Write-Log -LogFile $logFile -Message "Successfully loaded domain configuration for $DomainName" -Module $functionName -LogLevel "Information"
             
@@ -89,25 +90,17 @@ Write-Log -LogFile $logFile -Message "Found existing domain configuration file: 
         }
         else
         {
-Write-Log -LogFile $logFile -Message "Domain configuration file not found, creating new configuration with defaults" -Module $functionName -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Message "Domain configuration file not found, creating new configuration with defaults" -Module $functionName -LogLevel "Verbose"
             
             # Create new domain configuration with defaults
-            $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-            
-            # Create the configuration object
-            $newDomainConfig = [PSCustomObject]@{
-                groupsToInclude  = $domainDefaults.groupsToInclude
-                groupsToExclude  = $domainDefaults.groupsToExclude
-                settings         = $domainDefaults.settings
-                additionalScopes = $domainDefaults.additionalScopes
-            }
+            $global:domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
             
             # Save the new configuration
-            $newDomainConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $domainConfigFile -Force
+            $domainDefaults | Export-PowerShellDataFile -Path $domainConfigFile -Force
             
             Write-Log -LogFile $logFile -Message "Created new domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Information"
             
-            return $newDomainConfig
+            return $domainDefaults
         }
     }
     catch
@@ -119,9 +112,7 @@ Write-Log -LogFile $logFile -Message "Domain configuration file not found, creat
         $fallbackConfig = [PSCustomObject]@{
             groupsToInclude  = @()
             groupsToExclude  = @()
-            settings         = @{
-                domain = $DomainName
-            }
+            domain           = $DomainName
             additionalScopes = @()
         }
         
@@ -165,7 +156,8 @@ function Invoke-LazyDomainConfigurationLoad()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Validate that this is a lazy-loaded configuration
-    if (-not $LazyConfiguration.settings.lazyLoaded) {
+    if (-not $LazyConfiguration.settings.lazyLoaded)
+    {
         Write-Verbose "[$functionName] Configuration is already fully loaded"
         return $LazyConfiguration
     }

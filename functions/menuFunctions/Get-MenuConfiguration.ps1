@@ -1,6 +1,6 @@
 function Get-MenuConfiguration()
 {
-<#
+    <#
 .SYNOPSIS
     Loads menu configuration with support for both JSON and PSD1 formats.
 
@@ -49,68 +49,76 @@ function Get-MenuConfiguration()
     
     # Default menu configuration fallback values
     $defaultMenuValues = @{
-        name = 'menu.psd1'
-        description = 'This file contains the definitions for the menus used in the application.'
-        version = '1.3.0.0'
+        name             = 'menu.psd1'
+        description      = 'This file contains the definitions for the menus used in the application.'
+        version          = '1.3.0.0'
         appModeHierarchy = @{
-            full = @('*')
-            advanced = @('advanced', 'helpdesk', 'registration')
-            helpdesk = @('helpdesk')
-            registration = @('registration')
+            full                 = @('*')
+            advanced             = @('advanced', 'helpdesk', 'registration')
+            helpdesk             = @('helpdesk')
+            registration         = @('registration')
             advancedRegistration = @('advancedRegistration', 'registration')
-            admin = @('admin', 'advanced', 'helpdesk', 'registration')
-            custom = @()
+            admin                = @('admin', 'advanced', 'helpdesk', 'registration')
+            custom               = @()
         }
-        appModeDefaults = @{
-            full = @{
-                description = 'Full administrative access with all features enabled'
+        appModeDefaults  = @{
+            full         = @{
+                description  = 'Full administrative access with all features enabled'
                 capabilities = @('all_menus', 'all_actions', 'settings_management', 'advanced_diagnostics', 'export_all', 'device_management')
             }
-            advanced = @{
-                description = 'Advanced user with helpdesk and configuration capabilities'
+            advanced     = @{
+                description  = 'Advanced user with helpdesk and configuration capabilities'
                 capabilities = @('advanced_features', 'helpdesk_operations', 'device_registration', 'settings_view')
             }
-            helpdesk = @{
-                description = 'Helpdesk operator with device support capabilities'
+            helpdesk     = @{
+                description  = 'Helpdesk operator with device support capabilities'
                 capabilities = @('device_lookup', 'basic_troubleshooting', 'user_assistance')
             }
             registration = @{
-                description = 'Device registration specialist'
+                description  = 'Device registration specialist'
                 capabilities = @('device_registration', 'autopilot_enrollment')
             }
         }
-        menus = @()
+        menus            = @()
     }
     
-    try {
+    try
+    {
         # Use the unified configuration loader (uses .psd1 for performance)
         $menuConfig = Get-ConfigurationData -ConfigurationPath $MenuConfigFile -DefaultValues $defaultMenuValues -EnableCaching
         
         Write-Verbose "[$functionName] Successfully loaded menu configuration"
         
         # Return specific menu or all configurations based on request
-        if (-not $MenuName) {
+        if (-not $MenuName)
+        {
             return $menuConfig
         }
-        elseif ($menuConfig -and $menuConfig.ContainsKey($MenuName)) {
+        elseif ($menuConfig -and $menuConfig.ContainsKey($MenuName))
+        {
             return $menuConfig[$MenuName]
         }
-        else {
+        else
+        {
             Write-Warning "[$functionName] Menu '$MenuName' not found in configuration"
             return $null
         }
     }
-    catch {
+    catch
+    {
         Write-Warning "[$functionName] Failed to load menu configuration: $($_.Exception.Message)"
         Write-Verbose "[$functionName] Returning default menu values"
         
-        if (-not $MenuName) {
+        if (-not $MenuName)
+        {
             return $defaultMenuValues
         }
-        elseif ($defaultMenuValues.ContainsKey($MenuName)) {
+        elseif ($defaultMenuValues.ContainsKey($MenuName))
+        {
             return $defaultMenuValues[$MenuName]
         }
-        else {
+        else
+        {
             return $null
         }
     }

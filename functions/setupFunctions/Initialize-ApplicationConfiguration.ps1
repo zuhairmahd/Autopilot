@@ -101,7 +101,6 @@ function Initialize-ApplicationConfiguration()
             Auth           = @{}
             GlobalSettings = @{}
             LocalSettings  = @{}
-            Menus          = @()
             RequiredScopes = @()
             Success        = $false
             ErrorMessage   = ""
@@ -128,7 +127,6 @@ function Initialize-ApplicationConfiguration()
         if ($fileValidation["Settings"].Exists)
         {
             Write-Verbose "[$functionName] Loading configuration from $InitFile"
-            
             try
             {
                 # Load configuration content
@@ -144,7 +142,7 @@ function Initialize-ApplicationConfiguration()
                 
                 # Step 5: Process domain-specific settings
                 $configurationPath = Split-Path -Parent $InitFile
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath -processConfigOverwrite
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath 
                 $result.LocalSettings = $localResult.LocalSettings
                 
                 # Step 6: Process and merge scopes
@@ -210,13 +208,15 @@ function Initialize-ConfigurationFiles()
         $settingsCreated = $true # Get-ConfigurationData will handle defaults
         if (-not (Test-Path $InitFile))
         {
-            try {
+            try
+            {
                 # Get default settings and save as PSD1
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
                 $defaultSettings | Export-PowerShellDataFile -Path $InitFile
                 Write-Verbose "[$functionName] Created settings.psd1 with defaults"
             }
-            catch {
+            catch
+            {
                 Write-Warning "[$functionName] Failed to create settings.psd1: $($_.Exception.Message)"
                 $settingsCreated = $false
             }
@@ -232,13 +232,15 @@ function Initialize-ConfigurationFiles()
         $stringsCreated = $true # Get-ConfigurationData will handle defaults
         if (-not (Test-Path $StringsFile))
         {
-            try {
+            try
+            {
                 # Get default strings and save as PSD1
                 $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
                 $defaultStrings | Export-PowerShellDataFile -Path $StringsFile
                 Write-Verbose "[$functionName] Created strings.psd1 with defaults"
             }
-            catch {
+            catch
+            {
                 Write-Warning "[$functionName] Failed to create strings.psd1: $($_.Exception.Message)"
                 $stringsCreated = $false
             }
@@ -255,13 +257,15 @@ function Initialize-ConfigurationFiles()
         $menuCreated = $true # Get-ConfigurationData will handle defaults
         if (-not (Test-Path $MenuFile))
         {
-            try {
+            try
+            {
                 # Get default menu and save as PSD1
                 $defaultMenu = Get-ApplicationDefaults -DefaultType "Menu"
                 $defaultMenu | Export-PowerShellDataFile -Path $MenuFile
                 Write-Verbose "[$functionName] Created menu.psd1 with defaults"
             }
-            catch {
+            catch
+            {
                 Write-Warning "[$functionName] Failed to create menu.psd1: $($_.Exception.Message)"
                 $menuCreated = $false
             }
@@ -290,13 +294,12 @@ function Initialize-AuthConfiguration()
     #>
     [CmdletBinding()]
     param(
-        [object]$AuthConfiguration,
+        $AuthConfiguration,
         [hashtable]$PSBoundParameters
     )
-    
     $functionName = $MyInvocation.MyCommand.Name
     $auth = @{}
-    
+    Write-Verbose "[$functionName] Received auth configuration object of type: $($AuthConfiguration.GetType().Name)"
     if ($null -eq $AuthConfiguration)
     {
         Write-Verbose "[$functionName] No auth configuration found, using defaults"
@@ -310,7 +313,7 @@ function Initialize-AuthConfiguration()
     $authBooleanCount = 0
     $authOverrideCount = 0
     
-    foreach ($key in $AuthConfiguration.PSObject.Properties.Name)
+    foreach ($key in $AuthConfiguration.keys)
     {
         # Conditional verbose logging - only log individual settings when explicit verbose is used
         if ($VerbosePreference -eq 'Continue')
@@ -387,7 +390,7 @@ function Initialize-GlobalSettings()
     $booleanCount = 0
     $overrideCount = 0
     
-    foreach ($key in $GlobalConfigData.PSObject.Properties.Name)
+    foreach ($key in $GlobalConfigData.keys)
     {
         # Conditional verbose logging - only log individual settings when explicit verbose is used
         if ($VerbosePreference -eq 'Continue')
@@ -503,7 +506,7 @@ function Initialize-LocalSettings()
     #>
     [CmdletBinding()]
     param(
-        [object]$InitFileContent,
+        $InitFileContent,
         [string]$Domain,
         [hashtable]$PSBoundParameters,
         [hashtable]$GlobalSettings = @{},
@@ -514,73 +517,33 @@ function Initialize-LocalSettings()
     $functionName = $MyInvocation.MyCommand.Name
     $localSettings = @{}
     Write-Log -LogFile $logFile -Message "Initializing local settings for domain: $Domain" -Module $functionName -LogLevel "Information"
-    # First, check for migration from old format (domains in settings.json)
-    if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
-    {
-        Write-Log -LogFile $logFile -Message "Found domain configuration in settings.psd1, performing migration" -Module $functionName -LogLevel "Verbose"
-        $settingsFile = Join-Path $ConfigurationPath "settings.psd1"
-        $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -ConfigurationPath $ConfigurationPath -RemoveFromSettings $true
-        if ($migrationResult.Success)
-        {
-            Write-Verbose "[$functionName] Migration completed successfully"
-            Write-Log -LogFile $logFile -Message "Domain migration completed successfully" -Module $functionName -LogLevel "Information"
-        }
-        else
-        {
-            Write-Warning "[$functionName] Migration had issues: $($migrationResult.ErrorMessages -join '; ')"
-            Write-Log -LogFile $logFile -Message "Domain migration had issues: $($migrationResult.ErrorMessages -join '; ')" -Module $functionName -LogLevel "Warning"
-        }
-    }
     
     # Load domain configuration from separate file
     Write-Verbose "[$functionName] Loading domain configuration from separate file for: $Domain"
     $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -GlobalSettings $GlobalSettings -ConfigurationPath $ConfigurationPath
     
-    if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
+    if ($null -eq $domainConfig)
     {
         Write-Verbose "[$functionName] No domain-specific settings found for $Domain"
         return @{ LocalSettings = $localSettings }
     }
     
-    $localConfigData = ConvertFrom-JsonToHashtable -JsonObject $domainConfig
-    Write-Log -LogFile $logFile -Message "Processing domain settings for $Domain from separate file" -Module $functionName -LogLevel "Verbose"
-    
-    # Handle both hashtables and PSCustomObjects correctly
-    # Avoid hashtable system properties (IsReadOnly, IsFixedSize, IsSynchronized, Keys, Values, SyncRoot, Count)
-    $settingsKeys = @()
-    if ($localConfigData -is [hashtable])
+    Write-Verbose "[$functionName] Processing $($domainConfig.Count) settings keys"
+    Write-Log -LogFile $logFile -Message "Processing $($domainConfig.Count) settings keys: $($domainConfig.Keys -join ', ')" -Module $functionName -LogLevel "Verbose"
+
+    foreach ($key in $domainConfig.Keys)
     {
-        Write-Verbose "[$functionName] Processing hashtable-based domain settings"
-        $settingsKeys = $localConfigData.Keys
-    }
-    elseif ($localConfigData.PSObject.Properties)
-    {
-        Write-Verbose "[$functionName] Processing PSCustomObject-based domain settings"
-        # Filter out hashtable system properties in case they were inadvertently included
-        $unwantedProperties = @('IsReadOnly', 'IsFixedSize', 'IsSynchronized', 'Keys', 'Values', 'SyncRoot', 'Count')
-        $settingsKeys = $localConfigData.PSObject.Properties.Name | Where-Object { $_ -notin $unwantedProperties }
-    }
-    else
-    {
-        Write-Log -LogFile $logFile -Message "No settings properties found in domain configuration" -Module $functionName -LogLevel "Verbose"
-    }
-    
-    Write-Verbose "[$functionName] Processing $($settingsKeys.Count) settings keys"
-    Write-Log -LogFile $logFile -Message "Processing $($settingsKeys.Count) settings keys: $($settingsKeys -join ', ')" -Module $functionName -LogLevel "Verbose"
-    
-    foreach ($key in $settingsKeys)
-    {
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $localConfigData.$key)
+        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $domainConfig[$key])
         {
-            if ($localConfigData.$key -in ('true', 'false'))
+            if ($domainConfig[$key] -in ('true', 'false'))
             {
-                $keyBooleanValue = [bool]::Parse($localConfigData.$key)
+                $keyBooleanValue = [bool]::Parse($domainConfig[$key])
                 $localSettings.add($key, $keyBooleanValue)
                 Write-Verbose "[$functionName] Set local $key to boolean: $keyBooleanValue"
             }
             else
             {
-                $localSettings.add($key, $localConfigData.$key)
+                $localSettings.add($key, $domainConfig.$key)
                 Write-Verbose "[$functionName] Set local $key to: $($localConfigData.$key)"
             }
         }
@@ -653,7 +616,7 @@ function Initialize-RequiredScopes()
     #>
     [CmdletBinding()]
     param(
-        [object]$InitFileContent,
+        $InitFileContent,
         [string]$Domain
     )
     
@@ -670,20 +633,12 @@ function Initialize-RequiredScopes()
     # Get additional scopes for the domain from separate file
     $additionalScopes = $null
     
-    # First check if domain exists in old format (for backward compatibility)
-    if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
+    # Load from separate domain file
+    Write-Verbose "[$functionName] Loading additional scopes from separate domain file for: $Domain"
+    $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -ConfigurationPath $pwd
+    if ($domainConfig -and $domainConfig.additionalScopes)
     {
-        $additionalScopes = $InitFileContent.domains.$Domain.additionalScopes
-    }
-    else
-    {
-        # Load from separate domain file
-        Write-Verbose "[$functionName] Loading additional scopes from separate domain file for: $Domain"
-        $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -ConfigurationPath $pwd
-        if ($domainConfig -and $domainConfig.additionalScopes)
-        {
-            $additionalScopes = $domainConfig.additionalScopes
-        }
+        $additionalScopes = $domainConfig.additionalScopes
     }
     
     if ($null -eq $additionalScopes) 

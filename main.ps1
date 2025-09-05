@@ -202,7 +202,7 @@ if (Test-Path $configFile)
     {
         try 
         {
-            $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+            $initFileContent = Import-PowerShellDataFile -Path $InitFile -ErrorAction Stop
             if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
             {
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
@@ -384,7 +384,7 @@ else
 }
 
 # Initialize configuration with helper function
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
+$global:configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
 
 if (-not $configResult.Success)
 {
@@ -400,7 +400,7 @@ $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 
 # Set auth as a script variable so it can be accessed by functions
-$script:Auth = $auth
+$global:Auth = $auth
 
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
@@ -503,7 +503,7 @@ foreach ($key in $getTokenParams.Keys)
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
-$loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
+$loadedStrings = Import-PowerShellDataFile -Path $stringsFile
 $global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
@@ -785,8 +785,9 @@ $menuConfig = Get-CachedMenuConfiguration
 if ($menuConfig)
 {
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
-    foreach ($menuName in $menuConfig.PSObject.Properties.Name)
+    foreach ($menuName in $menuConfig.keys)
     {
+        Write-Verbose "[$scriptName] Loading menu: $menuName"
         $menu = $menuConfig.$menuName
         if ($menu.items)
         {

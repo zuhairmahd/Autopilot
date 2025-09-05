@@ -3,16 +3,14 @@ param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.psd1",
     [string]$stringsFile = "$pwd\strings.psd1",
-    [string]$menusFile = "$pwd\menu.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
-    [switch]$Reconfigure,
-    [switch]$ReInitialize,
-    [switch]$Update,
     [switch]$showLicenseBanner,
     [switch]$showAuth,
+    [switch]$showVersion,
     [switch]$showSettings,
+    [switch]$OverwriteLogs,
     [switch]$SecureString,
     [switch]$ResetAuth,
     [switch]$ForceNewToken,
@@ -34,10 +32,9 @@ param(
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
-    [string]$LogFile = "$pwd\Logs\Autopilot.log",
+    [string]$LogFilePath = "$pwd\Logs\Autopilot.log",
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
-    [string]$LogLevel = 'Information',
-    [switch]$SkipInit
+    [string]$LogLevel = 'Information'
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
@@ -82,14 +79,81 @@ else
 }
 #endregion import functions.
 
-$global:dt = Get-WhoisInfo -DomainNameOrIPAddress 'arabictutor.com'
-
-exit 0
 #region Initialize script
-$oldExecutableFileName = 'main.exe.old'
 # Set global log level for all Write-Log calls
+$global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
-Write-Log -LogFile $LogFile -StartLogging
+if ($OverwriteLogs)
+{
+    Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
+    Write-Log -LogFile $LogFile -StartLogging -OverwriteLog
+}
+else
+{
+    Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
+    Write-Log -LogFile $LogFile -StartLogging
+}
+#If the scriptname is a Powershell, change the extension to an exe.
+if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
+    $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
+    if (Test-Path "$pwd\$scriptNameExe")
+    {
+        Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
+        $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+    }
+    else 
+    {
+        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+    }
+}
+else 
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
+    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"        
+}
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
+$appMetaData = Get-ApplicationMetaDataFromDomain
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
+    {
+        $version = $appMetaData.version
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+    }
+    else 
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
+}
+if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
+{
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
+    $version.companyName = $appMetaData.companyName
+    Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
+}
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -finishLogging
+    exit 0  
+}
+$oldExecutableFileName = 'main.exe.old'
 if (Test-Path $oldExecutableFileName)
 {
     Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
@@ -121,7 +185,6 @@ if (Test-Path $configFile)
     if (-not $sessionResult.Success)
     {
         Write-Host "Error: $($sessionResult.ErrorMessage)" -ForegroundColor Red
-        Write-Verbose "[$scriptName] Failed to initialize configuration session: $($sessionResult.ErrorMessage)"
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to initialize configuration session: $($sessionResult.ErrorMessage)" -LogLevel "Error"
         Write-Host "Exitting script due to configuration session failure." -ForegroundColor Red
         Write-Log -LogFile $LogFile -FinishLogging
@@ -139,7 +202,7 @@ if (Test-Path $configFile)
     {
         try 
         {
-            $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+            $initFileContent = Import-PowerShellDataFile -Path $InitFile -ErrorAction Stop
             if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
             {
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
@@ -208,7 +271,7 @@ else
 {
     # Configuration file not found - launch first run wizard
     Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
     
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
@@ -234,7 +297,7 @@ else
             {
                 Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Error"
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
                 exit 1
             }
             
@@ -307,198 +370,50 @@ else
         exit 1
     }
 }
-if (Test-Path -Path $InitFile)
+# Initialize application configuration using centralized helper functions
+Write-Verbose "[$scriptName] Initializing application configuration"
+
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain)
 {
-    Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
-    
-    # Ensure settings.psd1 file has all required default values
-    Write-Verbose "[$scriptName] Checking settings.psd1 for missing default values"
-    # Use domain if available, otherwise default to example.com
-    $domainForDefaults = if ($domain)
-    {
-        $domain 
-    }
-    else
-    {
-        "contoso.com" 
-    }
-    $settingsUpdated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent -DomainName $domainForDefaults
-    if ($settingsUpdated)
-    {
-        Write-Verbose "[$scriptName] Settings file checked/updated successfully"
-    }
-    
-    # Ensure strings.psd1 file has all required default values  
-    Write-Verbose "[$scriptName] Checking strings.psd1 for missing default values"
-    $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
-    if ($stringsUpdated)
-    {
-        Write-Verbose "[$scriptName] Strings file checked/updated successfully"
-    }
-    
-    $globalSettings = @{}
-    $localSettings = @{}
-    
-    # Load the init file content (potentially updated with new defaults)
-    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-    # Load auth configuration from init file
-    $authConfiguration = $initFileContent.auth
-    $auth = @{}
-    Write-Verbose "[$scriptName] Loading Auth configuration from init file"
-    foreach ($key in $authConfiguration.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $authConfiguration.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the init file as $($authConfiguration.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($authConfiguration.$key)"
-            if ($authConfiguration.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($authConfiguration.$key)
-                $auth.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($authConfiguration.$key))."
-                $auth.add($key, $authConfiguration.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            $auth.add($key, $PSBoundParameters[$key])
-        }
-    }
-    
-    # Set auth as a script variable so it can be accessed by functions
-    $script:Auth = $auth
-    
-    $globalConfigData = $initFileContent | Select-Object -ExpandProperty 'globalSettings'
-    Write-Verbose "[$scriptName] Reading global settings..."
-    Write-Verbose "[$scriptName] Found $($globalConfigData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $globalConfigData.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $globalConfigData.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($globalConfigData.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($globalConfigData.$key)"
-            if ($globalConfigData.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($globalConfigData.$key)
-                $globalSettings.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($globalConfigData.$key))."
-                $globalSettings.add($key, $globalConfigData.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Got parameter $key from the commandline as $($PSBoundParameters[$key])"
-            $globalSettings.add($key, $PSBoundParameters[$key])
-        }
-    }
-    $localConfigData = ($initFileContent | Select-Object -ExpandProperty "domains").$domain
-    Write-Verbose "[$scriptName] Reading local settings for domain $domain..."
-    Write-Verbose "[$scriptName] Found $($localConfigData.PSObject.Properties.Name.count) configurations."
-    foreach ($key in $localConfigData.PSObject.Properties.Name)
-    {
-        Write-Verbose "[$scriptName] Checking if $($key) was provided on the command line."
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $localConfigData.$key)
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the configuration file as $($localConfigData.$key)"
-            Write-Verbose "[$scriptName] Setting $key to $($localConfigData.$key)"
-            if ($localConfigData.$key -in ('true', 'false'))
-            {
-                Write-Verbose "[$scriptName] Converting $key to boolean."
-                $keyBooleanValue = [bool]::Parse($localConfigData.$key)
-                $localSettings.add($key, $keyBooleanValue)
-                Write-Verbose "[$scriptName] Setting the value of $key to the boolean value ($keybooleanValue)."
-                # Set-Variable -Name $key -Value $keyBooleanValue
-            }
-            else
-            {
-                Write-Verbose "[$scriptName] Setting the value of $key to the string value ($($localConfigData.$key))."
-                # Set-Variable -Name $key -Value $localConfigData.$key
-                $localSettings.add($key, $localConfigData.$key)
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Read parameter $key from the commandline as $($PSBoundParameters[$key])"
-            #add it to the local settings hashtable.
-            $localSettings.add($key, $PSBoundParameters[$key])
-        }
-    }   
-    #merge the local and global settings.
-    $script:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-    #if the appMode is not set, default to 'full', otherwise make sure it is avalid appMode.
-    if (-not $script:settings.appMode)
-    {
-        Write-Verbose "[$scriptName] App mode is not set. Defaulting to 'full'."
-        $script:settings.appMode = 'full'
-    }
-    elseif ($script:settings.appMode -notin @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'))
-    {
-        Write-Host "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -ForegroundColor Red
-        Write-Host "Please specify a valid mode or remove the appMode parameter." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Invalid app mode specified: $($script:settings.appMode). Valid options are: full, helpDesk, advanced, advancedRegistration, registration, admin, custom." -LogLevel "Error"
-        exit 1
-    }
-    #load menus configuration from initFile
-    $menus = $initFileContent.menus
-    Write-Verbose "[$scriptName] Loaded $($($menus.Count)) menus from $InitFile"
-    Write-Log -logFile $LogFile -module $scriptName -Message "Loaded $($($menus.Count)) menus from $InitFile" -logLevel "Information"
-    #region handle scopes
-    $basicScopes = (Get-Content -Path $initFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty 'requiredScopes')     
-    $additionalScopes = (Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json | Select-Object -ExpandProperty "domains").$domain.additionalScopes
-    # Ensure arrays are properly handled and merge them, eliminating duplicates
-    Write-Verbose "[$scriptName] Merging basicScopes and additionalScopes and removing duplicates."
-    # Initialize as empty arrays if null
-    if ($null -eq $basicScopes) 
-    { 
-        Write-Verbose "[$scriptName] No basic scopes found in the configuration file. Initializing as empty array."
-        $basicScopes = @() 
-    }
-    if ($null -eq $additionalScopes) 
-    { 
-        Write-Verbose "[$scriptName] No additional scopes found in the configuration file. Initializing as empty array."
-        $additionalScopes = @() 
-    }
-    # Ensure they are arrays
-    Write-Verbose "[$scriptName] Ensuring basicScopes and additionalScopes are arrays."
-    $basicScopes = @($basicScopes)
-    Write-Verbose "[$scriptName] Basic scopes has $($basicScopes.Count) items."
-    $additionalScopes = @($additionalScopes)
-    Write-Verbose "[$scriptName] Additional scopes has $($additionalScopes.Count) items."
-    # Merge arrays and remove duplicates based on Scope property
-    Write-Verbose "[$scriptName] Merging scopes and removing duplicates."
-    $allScopes = @($basicScopes) + @($additionalScopes)
-    Write-Verbose "[$scriptName] Total scopes before deduplication: $($allScopes.Count)"
-    $requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
-    Write-Verbose "[$scriptName] Merged scopes - Total unique scopes: $($requiredScopes.Count)"
-    #endregion handle scopes
+    $domain 
 }
 else
 {
-    Write-Host "Configuration file $initFile not found. Using default values." -ForegroundColor Yellow
-    
-    $settingsCreated = Test-SettingsJsonExists -SettingsFile $initFile -Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated -DomainName $domain
-    if (-not $settingsCreated)
-    {
-            
-    }
-        
-
-    # Set auth as a script variable so it can be accessed by functions
-    $script:Auth = $auth
+    "contoso.com" 
 }
+# Initialize configuration with helper function
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
+
+if (-not $configResult.Success)
+{
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    exit 1
+}
+
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings  
+$localSettings = $configResult.LocalSettings
+$requiredScopes = $configResult.RequiredScopes
+
+# Set auth as a script variable so it can be accessed by functions
+$script:Auth = $auth
+
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 #endregion Load parameters from the configuration file if it exists
 
 #region Define variables
