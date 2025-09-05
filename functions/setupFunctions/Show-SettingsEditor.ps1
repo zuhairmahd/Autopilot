@@ -2,11 +2,11 @@ function Show-SettingsEditor()
 {
     <#
     .SYNOPSIS
-        Interactive editor for application settings using default values from Test-SettingsJsonExists.
+        Interactive editor for application settings using default values from Get-ApplicationDefaults.
     
     .DESCRIPTION
         Provides an interactive interface for users to modify application settings.
-        Uses the default settings structure from Test-SettingsJsonExists as the source of truth
+        Uses the default settings structure from Get-ApplicationDefaults as the source of truth
         for available settings and their descriptions. Supports different data types including
         boolean, string, array, and enumerated values with proper validation.
     
@@ -14,7 +14,7 @@ function Show-SettingsEditor()
         Specifies whether to edit 'Global', 'Domain', or 'Auth' settings.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file. Defaults to "settings.json".
+        Path to the settings.psd1 file. Defaults to "settings.psd1".
     
     .PARAMETER DomainName
         Required when SettingsType is 'Domain'. Specifies which domain's settings to edit.
@@ -38,7 +38,7 @@ function Show-SettingsEditor()
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Uses unified Update-Setting function for all setting types
-        - Leverages Test-SettingsJsonExists for default settings structure
+        - Leverages Get-ApplicationDefaults for default settings structure
         - Supports auth settings editing with Test-AuthDefaults for validation
     #>
     [CmdletBinding()]
@@ -46,7 +46,7 @@ function Show-SettingsEditor()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingsType,
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
         [switch]$Silent,
         [hashtable]$PresetValues
@@ -83,7 +83,7 @@ function Show-SettingsEditor()
             }
         }
         
-        # Get default settings structure from Test-SettingsJsonExists
+        # Get default settings structure from Get-ApplicationDefaults
         Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Retrieving default settings structure"
         $defaultSettings = Get-DefaultSettingsStructure
@@ -431,10 +431,15 @@ function Get-CurrentSettings()
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
-            if (-not (Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent))
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings file" -LogLevel "Error"
-                Write-Verbose "[$functionName] Failed to create default settings file"
+            # Create default settings file using Get-ConfigurationData which will handle defaults
+            try {
+                $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+                $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
+                Write-Verbose "[$functionName] Created default settings file"
+            }
+            catch {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings file: $($_.Exception.Message)" -LogLevel "Error"
+                Write-Verbose "[$functionName] Failed to create default settings file: $($_.Exception.Message)"
                 return $null
             }
             Write-Log -LogFile $logFile -Module $functionName -Message "Default settings file created" -LogLevel "Information"

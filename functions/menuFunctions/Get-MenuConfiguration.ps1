@@ -5,7 +5,7 @@ function Get-MenuConfiguration()
     Loads menu configuration with support for both JSON and PSD1 formats.
 
 .DESCRIPTION
-    This function loads menu configuration data from either menu.psd1 or menu.json files. 
+    This function loads menu configuration data from menu.psd1 files. 
     It uses the unified Get-ConfigurationData function to provide intelligent format detection, 
     automatic fallback, and performance optimization.
 
@@ -14,14 +14,14 @@ function Get-MenuConfiguration()
 
 .PARAMETER MenuConfigFile
     The path to the menu configuration file (without extension). Defaults to "$pwd\menu".
-    The function will automatically detect and prefer .psd1 format for better performance.
+    The function will automatically detect the .psd1 format for optimal performance.
 
 .OUTPUTS
     System.Collections.Hashtable
     Returns menu configuration hashtable or specific menu section if MenuName is specified.
 
 .EXAMPLE
-    # Load complete menu configuration (prefers menu.psd1)
+    # Load complete menu configuration (uses menu.psd1)
     $menuConfig = Get-MenuConfiguration
 
 .EXAMPLE  
@@ -30,11 +30,11 @@ function Get-MenuConfiguration()
 
 .NOTES
     - Uses the unified Get-ConfigurationData function for optimal performance
-    - Automatically prefers .psd1 format for 89.6% performance improvement
+    - Uses .psd1 format for optimal performance
     - Provides comprehensive default menu configuration
     - Handles missing files and invalid configuration gracefully
     - Maintains full backward compatibility with existing code
-    - No longer requires JSON-specific handling or caching
+    - Native PowerShell Data File processing
 #>
     [CmdletBinding()]
     param (
@@ -83,7 +83,7 @@ function Get-MenuConfiguration()
     }
     
     try {
-        # Use the unified configuration loader (automatically prefers .psd1 for performance)
+        # Use the unified configuration loader (uses .psd1 for performance)
         $menuConfig = Get-ConfigurationData -ConfigurationPath $MenuConfigFile -DefaultValues $defaultMenuValues -EnableCaching
         
         Write-Verbose "[$functionName] Successfully loaded menu configuration"

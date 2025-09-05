@@ -18,7 +18,7 @@
     Optional. The output path or directory for the generated executable. If a directory is provided (no file extension), the output filename will be derived from the InputFile with an .exe extension inside that directory.
 
 .PARAMETER SettingsFile
-    Optional. Path to the settings.json file.
+    Optional. Path to the settings.psd1 file.
 
 .PARAMETER CompanyName
     Optional. Company name for the executable metadata.
@@ -63,7 +63,7 @@ param(
     [string]$Version,
     [Alias('outputFile')]
     [string]$OutputPath = '',
-    [string]$SettingsFile = "$pwd\settings.json",
+    [string]$SettingsFile = "$pwd\settings.psd1",
     [string]$CompanyName = 'Zuhair Mahmoud',
     [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
@@ -746,12 +746,11 @@ function UpdateSettingsFile()
         {
             Write-Verbose "[$functionName] Reading settings file content."
             Write-Log -LogFile $LogFile -Module $functionName -Message "Reading settings file content." -LogLevel "Information"
-            $settingsContent = Get-Content -Path $SettingsFile -Raw -Encoding UTF8
-            $settings = ConvertFrom-Json $settingsContent
+            $settings = Import-PowerShellDataFile -Path $SettingsFilePath
             # Update the changePWOnNextStart setting
             Write-Verbose "[$functionName] Checking for changePWOnNextStart setting."
             Write-Log -LogFile $LogFile -Module $functionName -Message "Checking for changePWOnNextStart setting." -LogLevel "Information"
-            if ($settings.auth -and $settings.auth.PSObject.Properties.Name -contains 'changePWOnNextStart')
+            if ($settings.auth -and $settings.auth.changePWOnNextStart -ne $null)
             {
                 Write-Verbose "[$functionName] changePWOnNextStart setting found. Setting it to true."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting found. Setting it to true." -LogLevel "Information"
@@ -765,12 +764,11 @@ function UpdateSettingsFile()
                 # Write updated settings back to file
                 Write-Verbose "[$functionName] Writing updated settings back to file."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
-                $updatedSettingsJson = ConvertTo-Json $settings -Depth 100
                 try
                 {
-                    Set-Content -Path $SettingsFilePath -Value $updatedSettingsJson -Encoding UTF8    
+                    $settings | Export-PowerShellDataFile -Path $SettingsFilePath
                     Write-Host "Settings updated successfully" -ForegroundColor Green
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
                 }
                 catch
                 {
@@ -805,7 +803,7 @@ function UpdateHash()
     [CmdletBinding()]
     param (
         [string]$executableFilePath,
-        [string]$lastRunPath = "$pwd\lastrun.json"
+        [string]$lastRunPath = "$pwd\lastrun.psd1"
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -852,15 +850,15 @@ function UpdateHash()
 #endregion helper functions
 
 #region Define variables
-$initFile = "init.json"
-$lastRunFile = "$pwd\lastrun.json"
+$initFile = "init.psd1"
+$lastRunFile = "$pwd\lastrun.psd1"
 $lastRun = Get-Content -Path $lastRunFile | ConvertFrom-Json
 $maintainCurrentVersion = $false
-$SettingsFile = "$pwd\settings.json"
+$SettingsFile = "$pwd\settings.psd1"
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.json', 'strings.json', 'init.json', 'lastrun.json') 
-$settingsVersion = (Get-Content -Path "$pwd\settings.json" | ConvertFrom-Json).version
-$stringsVersion = (Get-Content -Path "$pwd\strings.json" | ConvertFrom-Json).version
+$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'lastrun.psd1') 
+$settingsVersion = (Import-PowerShellDataFile -Path "$pwd\settings.psd1").version
+$stringsVersion = (Import-PowerShellDataFile -Path "$pwd\strings.psd1").version
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
@@ -897,7 +895,7 @@ Write-Host "Output file resolved to: $OutputFile"
 $successMessage = "$OutputFile written"
 
 $parentFolder = Split-Path -Parent $OutputFile
-$destSettingsFile = "$parentFolder\settings.json"
+$destSettingsFile = "$parentFolder\settings.psd1"
 #endregion
 
 #region initial checks

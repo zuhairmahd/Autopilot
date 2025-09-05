@@ -1,9 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
-    [string]$InitFile = "$pwd\settings.json",
-    [string]$stringsFile = "$pwd\menus.json",
-    [string]$menusFile = "$pwd\menus.json",
+    [string]$InitFile = "$pwd\settings.psd1",
+    [string]$stringsFile = "$pwd\strings.psd1",
+    [string]$menusFile = "$pwd\menu.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -213,7 +213,7 @@ else
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
     # Launch the first run wizard
-    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
+    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1"
     
     if ($wizardResult)
     {
@@ -311,8 +311,8 @@ if (Test-Path -Path $InitFile)
 {
     Write-Verbose "[$scriptName] Loading configuration values from $(Split-Path -Path $initFile -Leaf)"
     
-    # Ensure settings.json file has all required default values
-    Write-Verbose "[$scriptName] Checking settings.json for missing default values"
+    # Ensure settings.psd1 file has all required default values
+    Write-Verbose "[$scriptName] Checking settings.psd1 for missing default values"
     # Use domain if available, otherwise default to example.com
     $domainForDefaults = if ($domain)
     {
@@ -328,8 +328,8 @@ if (Test-Path -Path $InitFile)
         Write-Verbose "[$scriptName] Settings file checked/updated successfully"
     }
     
-    # Ensure strings.json file has all required default values  
-    Write-Verbose "[$scriptName] Checking strings.json for missing default values"
+    # Ensure strings.psd1 file has all required default values  
+    Write-Verbose "[$scriptName] Checking strings.psd1 for missing default values"
     $stringsUpdated = Test-StringsJsonExists -StringsFile $stringsFile -Silent
     if ($stringsUpdated)
     {

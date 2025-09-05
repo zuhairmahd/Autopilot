@@ -79,13 +79,13 @@ $countAfterRemoval = $testMenu.Items.Count
 
 Test-Assert ($countBeforeRemoval -eq $countAfterRemoval) "Menu unchanged when removing non-existent item"
 
-# Test 3: NewMenu loads items from menu.json correctly
+# Test 3: NewMenu loads items from menu.psd1 correctly
 Write-Host "`nTest 3: NewMenu loads deviceActionsMenu correctly" -ForegroundColor Yellow
 
 try {
-    # Check if menu.json exists first
-    $menuJsonPath = Join-Path $projectRoot "menu.json"
-    if (Test-Path $menuJsonPath) {
+    # Check if menu.psd1 exists first
+    $menuPsd1Path = Join-Path $projectRoot "menu.psd1"
+    if (Test-Path $menuPsd1Path) {
         $deviceActionsMenu = NewMenu -MenuName "deviceActionsMenu"
         Test-Assert ($null -ne $deviceActionsMenu) "deviceActionsMenu created successfully"
         Test-Assert ($deviceActionsMenu.Items.Count -gt 0) "deviceActionsMenu has items"
@@ -96,7 +96,7 @@ try {
         Test-Assert ("Get BitLocker Recovery Key" -in $itemNames) "BitLocker Recovery Key item exists in default menu"
         Test-Assert ("Get Hardware Password Details" -in $itemNames) "Hardware Password Details item exists in default menu"
     } else {
-        Test-Assert $false "menu.json file not found at $menuJsonPath"
+        Test-Assert $false "menu.psd1 file not found at $menuPsd1Path"
     }
 }
 catch {
@@ -107,8 +107,8 @@ catch {
 Write-Host "`nTest 4: Conditional item removal works correctly" -ForegroundColor Yellow
 
 try {
-    $menuJsonPath = Join-Path $projectRoot "menu.json"
-    if (Test-Path $menuJsonPath) {
+    $menuPsd1Path = Join-Path $projectRoot "menu.psd1"
+    if (Test-Path $menuPsd1Path) {
         $testDeviceMenu = NewMenu -MenuName "deviceActionsMenu"
         
         # Simulate device without LAPS credentials
@@ -142,8 +142,8 @@ catch {
 Write-Host "`nTest 5: Menu ordering preserved after removal" -ForegroundColor Yellow
 
 try {
-    $menuJsonPath = Join-Path $projectRoot "menu.json"
-    if (Test-Path $menuJsonPath) {
+    $menuPsd1Path = Join-Path $projectRoot "menu.psd1"
+    if (Test-Path $menuPsd1Path) {
         $orderTestMenu = NewMenu -MenuName "deviceActionsMenu"
         $originalOrder = $orderTestMenu.Items | ForEach-Object { $_.Name }
         

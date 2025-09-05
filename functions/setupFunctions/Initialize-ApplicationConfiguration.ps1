@@ -5,15 +5,15 @@ function Initialize-ApplicationConfiguration()
         Initializes application configuration from settings files or defaults.
     
     .DESCRIPTION
-        Centralized function to handle configuration loading, including settings.json and strings.json 
+        Centralized function to handle configuration loading, including settings.psd1 and strings.psd1 
         file validation, auth configuration processing, and scope merging. Eliminates code duplication
         and provides robust error handling.
     
     .PARAMETER InitFile
-        Path to the settings.json file.
+        Path to the settings.psd1 file.
     
     .PARAMETER StringsFile
-        Path to the strings.json file.
+        Path to the strings.psd1 file.
     
     .PARAMETER Domain
         The domain name for configuration defaults.
@@ -119,12 +119,12 @@ function Initialize-ApplicationConfiguration()
         $filesToValidate = @(
             @{ Path = $InitFile; Type = "Settings" }
             @{ Path = $StringsFile; Type = "Strings" }
-            @{ Path = "$([System.IO.Path]::GetDirectoryName($InitFile))\menu.json"; Type = "Menu" }
+            @{ Path = "$([System.IO.Path]::GetDirectoryName($InitFile))\menu.psd1"; Type = "Menu" }
         )
         
         $fileValidation = Test-ConfigurationFilesExist $filesToValidate
         
-        # Step 3: Load and process configuration if settings.json exists
+        # Step 3: Load and process configuration if settings.psd1 exists
         if ($fileValidation["Settings"].Exists)
         {
             Write-Verbose "[$functionName] Loading configuration from $InitFile"
@@ -132,7 +132,7 @@ function Initialize-ApplicationConfiguration()
             try
             {
                 # Load configuration content
-                $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+                $initFileContent = Import-PowerShellDataFile -Path $InitFile
                 
                 # Step 3: Process auth configuration
                 $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -PSBoundParameters $PSBoundParameters
@@ -205,31 +205,70 @@ function Initialize-ConfigurationFiles()
     
     try
     {
-        # Ensure settings.json exists with defaults
-        Write-Verbose "[$functionName] Ensuring settings.json exists with defaults"
-        $settingsCreated = Test-SettingsJsonExists -SettingsFile $InitFile -Silent
+        # Ensure settings.psd1 exists with defaults
+        Write-Verbose "[$functionName] Ensuring settings.psd1 exists with defaults"
+        $settingsCreated = $true # Get-ConfigurationData will handle defaults
+        if (-not (Test-Path $InitFile))
+        {
+            try {
+                # Get default settings and save as PSD1
+                $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+                $defaultSettings | Export-PowerShellDataFile -Path $InitFile
+                Write-Verbose "[$functionName] Created settings.psd1 with defaults"
+            }
+            catch {
+                Write-Warning "[$functionName] Failed to create settings.psd1: $($_.Exception.Message)"
+                $settingsCreated = $false
+            }
+        }
         if (-not $settingsCreated)
         {
-            $result.ErrorMessage = "Failed to create or validate settings.json file"
+            $result.ErrorMessage = "Failed to create or validate settings.psd1 file"
             return $result
         }
         
-        # Ensure strings.json exists with defaults
-        Write-Verbose "[$functionName] Ensuring strings.json exists with defaults"
-        $stringsCreated = Test-StringsJsonExists -StringsFile $StringsFile -Silent
+        # Ensure strings.psd1 exists with defaults
+        Write-Verbose "[$functionName] Ensuring strings.psd1 exists with defaults"
+        $stringsCreated = $true # Get-ConfigurationData will handle defaults
+        if (-not (Test-Path $StringsFile))
+        {
+            try {
+                # Get default strings and save as PSD1
+                $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
+                $defaultStrings | Export-PowerShellDataFile -Path $StringsFile
+                Write-Verbose "[$functionName] Created strings.psd1 with defaults"
+            }
+            catch {
+                Write-Warning "[$functionName] Failed to create strings.psd1: $($_.Exception.Message)"
+                $stringsCreated = $false
+            }
+        }
         if (-not $stringsCreated)
         {
-            $result.ErrorMessage = "Failed to create or validate strings.json file"
+            $result.ErrorMessage = "Failed to create or validate strings.psd1 file"
             return $result
         }
         
-        # Ensure menu.json exists with defaults
-        Write-Verbose "[$functionName] Ensuring menu.json exists with defaults"
-        $MenuFile = "$pwd\menu.json"
-        $menuCreated = Test-MenuJsonExists -MenuFile $MenuFile -Silent
+        # Ensure menu.psd1 exists with defaults
+        Write-Verbose "[$functionName] Ensuring menu.psd1 exists with defaults"
+        $MenuFile = "$pwd\menu.psd1"
+        $menuCreated = $true # Get-ConfigurationData will handle defaults
+        if (-not (Test-Path $MenuFile))
+        {
+            try {
+                # Get default menu and save as PSD1
+                $defaultMenu = Get-ApplicationDefaults -DefaultType "Menu"
+                $defaultMenu | Export-PowerShellDataFile -Path $MenuFile
+                Write-Verbose "[$functionName] Created menu.psd1 with defaults"
+            }
+            catch {
+                Write-Warning "[$functionName] Failed to create menu.psd1: $($_.Exception.Message)"
+                $menuCreated = $false
+            }
+        }
         if (-not $menuCreated)
         {
-            $result.ErrorMessage = "Failed to create or validate menu.json file"
+            $result.ErrorMessage = "Failed to create or validate menu.psd1 file"
             return $result
         }
         
@@ -478,8 +517,8 @@ function Initialize-LocalSettings()
     # First, check for migration from old format (domains in settings.json)
     if ($InitFileContent.domains -and $InitFileContent.domains.$Domain)
     {
-        Write-Log -LogFile $logFile -Message "Found domain configuration in settings.json, performing migration" -Module $functionName -LogLevel "Verbose"
-        $settingsFile = Join-Path $ConfigurationPath "settings.json"
+        Write-Log -LogFile $logFile -Message "Found domain configuration in settings.psd1, performing migration" -Module $functionName -LogLevel "Verbose"
+        $settingsFile = Join-Path $ConfigurationPath "settings.psd1"
         $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -ConfigurationPath $ConfigurationPath -RemoveFromSettings $true
         if ($migrationResult.Success)
         {

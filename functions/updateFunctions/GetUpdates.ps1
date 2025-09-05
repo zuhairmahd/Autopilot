@@ -5,7 +5,7 @@ function GetUpdates()
         [string]$executableFileName = "$pwd\main.exe",
         [Parameter(Mandatory = $true)]
         [string]$updateURL,
-        [string]$metaDataURL = "$updateURL/lastrun.json",
+        [string]$metaDataURL = "$updateURL/lastrun.psd1",
         [switch]$noConfirmation
     )
 

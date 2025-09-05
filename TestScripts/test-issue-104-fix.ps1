@@ -78,20 +78,20 @@ catch {
     $failedTests++
 }
 
-# Test 3: Verify the new helper function exists
+# Test 3: Verify the new helper function exists and JSON functions removed
 Write-Host "`nTest 3: Verifying Initialize-ApplicationConfiguration helper function exists..." -ForegroundColor Yellow
 
 $helperExists = Test-Path "functions/setupFunctions/Initialize-ApplicationConfiguration.ps1"
-$originalFunctionsExist = (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1") -and (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-StringsJsonExists.ps1")
+$jsonFunctionsRemoved = -not (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1") -and -not (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-StringsJsonExists.ps1")
 
-if ($helperExists -and $originalFunctionsExist) {
+if ($helperExists -and $jsonFunctionsRemoved) {
     Write-Host "  ✓ Initialize-ApplicationConfiguration.ps1 helper function exists" -ForegroundColor Green
-    Write-Host "  ✓ Original Test-SettingsJsonExists.ps1 and Test-StringsJsonExists.ps1 still exist for reuse" -ForegroundColor Green
+    Write-Host "  ✓ JSON-specific functions successfully removed (legacy code cleanup)" -ForegroundColor Green
     $passedTests++
 } else {
-    Write-Host "  ✗ Required function files missing" -ForegroundColor Red
+    Write-Host "  ✗ Required changes not complete" -ForegroundColor Red
     Write-Host "    Initialize-ApplicationConfiguration.ps1 exists: $helperExists" -ForegroundColor Red
-    Write-Host "    Original functions exist: $originalFunctionsExist" -ForegroundColor Red
+    Write-Host "    JSON functions removed: $jsonFunctionsRemoved" -ForegroundColor Red
     $failedTests++
 }
 

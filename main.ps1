@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
-    [string]$InitFile = "$pwd\settings.json",
-    [string]$stringsFile = "$pwd\strings.json",
+    [string]$InitFile = "$pwd\settings.psd1",
+    [string]$stringsFile = "$pwd\strings.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -276,7 +276,7 @@ else
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
     # Launch the first run wizard
-    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
+    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1"
     
     if ($wizardResult)
     {
@@ -475,7 +475,7 @@ else
     $defaultBranch
 }
 $global:maxJSONDepth = 20
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.psd1"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $groupsToInclude = $settings.groupsToInclude
@@ -784,7 +784,7 @@ $script:menus = @()
 $menuConfig = Get-CachedMenuConfiguration
 if ($menuConfig)
 {
-    # Convert the flat menu.json structure to array format for Test-MenuItemIncluded
+    # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
     foreach ($menuName in $menuConfig.PSObject.Properties.Name)
     {
         $menu = $menuConfig.$menuName
@@ -1511,7 +1511,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials"
         Write-Host "Please check the logs for more information." -ForegroundColor Red
     }
 }
-# Auto Update settings action - matches menu.json item "Change Auto Update settings"
+# Auto Update settings action - matches menu.psd1 item "Change Auto Update settings"
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settings" -Action {
     Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
@@ -1558,7 +1558,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
 }
-# App Mode settings action - matches menu.json item "Change App Mode settings"  
+# App Mode settings action - matches menu.psd1 item "Change App Mode settings"  
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings" -Action {
     Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"

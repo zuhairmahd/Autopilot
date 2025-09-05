@@ -11,7 +11,7 @@ function Start-FirstRunWizard()
         - Authentication type selection (delegated vs application)
         - App secret or certificate thumbprint for delegated authentication
         - Configuration file creation and encryption
-        - Default settings.json and strings.json creation if missing
+        - Default settings.psd1 and strings.psd1 creation if missing
     
     .PARAMETER ConfigFile
         Path to the config.json file to be created. Defaults to ".secrets\config.json".
@@ -20,7 +20,7 @@ function Start-FirstRunWizard()
         Path to the settings.json file. Defaults to "settings.json".
     
     .PARAMETER StringsFile
-        Path to the strings.json file. Defaults to "strings.json".
+        Path to the strings.psd1 file. Defaults to "strings.psd1".
     
     .PARAMETER Silent
         If specified, skips interactive prompts and uses default values where possible.
@@ -49,7 +49,7 @@ function Start-FirstRunWizard()
     param(
         [string]$ConfigFile = "$PWD\.secrets\config.json",
         [string]$SettingsFile = "$PWD\settings.json",  
-        [string]$StringsFile = "$PWD\strings.json",
+        [string]$StringsFile = "$PWD\strings.psd1",
         [switch]$Silent,
         [switch]$authOnly
     )
@@ -160,18 +160,32 @@ function Start-FirstRunWizard()
             return $true
         }
         
-        # Step 5: Ensure settings.json exists with defaults
-        Write-SafeLog "Ensuring settings.json exists with defaults" "Information"
-        $settingsCreated = Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent:$Silent -AuthType $authConfig.AuthType -IsDelegated $authConfig.IsDelegated
+        # Step 5: Ensure settings.psd1 exists with defaults
+        Write-SafeLog "Ensuring settings.psd1 exists with defaults" "Information"
+        $settingsCreated = $true # Get-ConfigurationData will handle defaults
+        if (-not (Test-Path $SettingsFile))
+        {
+            try {
+                $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+                $defaultSettings.auth.delegated = $authConfig.IsDelegated
+                $defaultSettings.auth.authType = $authConfig.AuthType
+                $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
+                Write-SafeLog "Created settings.psd1 with defaults" "Information"
+            }
+            catch {
+                Write-SafeLog "Failed to create settings.psd1: $($_.Exception.Message)" "Warning"
+                $settingsCreated = $false
+            }
+        }
         
         if (-not $settingsCreated)
         {
-            Write-SafeLog "Failed to ensure settings.json exists" "Warning"
+            Write-SafeLog "Failed to ensure settings.psd1 exists" "Warning"
         }
         else
         {
-            # Step 5.1: Update authentication setting in settings.json
-            Write-SafeLog "Updating authentication setting in settings.json" "Information"
+            # Step 5.1: Update authentication setting in settings.psd1
+            Write-SafeLog "Updating authentication setting in settings.psd1" "Information"
             $authUpdateSuccess = Update-Setting -SettingType "Auth" -SettingsFile $SettingsFile -SettingName "Delegated" -SettingValue $authConfig.IsDelegated
             
             if ($authUpdateSuccess)
@@ -196,8 +210,8 @@ function Start-FirstRunWizard()
                 Write-SafeLog "Failed to update autoUpdate setting" "Warning"
             }
             
-            # Step 5.6: Update app mode setting in settings.json
-            Write-SafeLog "Updating app mode setting in settings.json" "Information"
+            # Step 5.3: Update app mode setting in settings.psd1
+            Write-SafeLog "Updating app mode setting in settings.psd1" "Information"
             $appModeSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $appModeConfig.appMode
             
             if ($appModeSuccess)
@@ -210,23 +224,47 @@ function Start-FirstRunWizard()
             }
         }
         
-        # Step 6: Ensure strings.json exists with defaults
-        Write-SafeLog "Ensuring strings.json exists with defaults" "Information"
-        $stringsCreated = Test-StringsJsonExists -StringsFile $StringsFile -Silent:$Silent
+        # Step 6: Ensure strings.psd1 exists with defaults
+        Write-SafeLog "Ensuring strings.psd1 exists with defaults" "Information"
+        $stringsCreated = $true # Get-ConfigurationData will handle defaults
+        if (-not (Test-Path $StringsFile))
+        {
+            try {
+                $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
+                $defaultStrings | Export-PowerShellDataFile -Path $StringsFile
+                Write-SafeLog "Created strings.psd1 with defaults" "Information"
+            }
+            catch {
+                Write-SafeLog "Failed to create strings.psd1: $($_.Exception.Message)" "Warning"
+                $stringsCreated = $false
+            }
+        }
         
         if (-not $stringsCreated)
         {
-            Write-SafeLog "Failed to ensure strings.json exists" "Warning"
+            Write-SafeLog "Failed to ensure strings.psd1 exists" "Warning"
         }
         
-        # Step 7: Ensure menu.json exists with defaults
-        Write-SafeLog "Ensuring menu.json exists with defaults" "Information"
-        $MenuFile = "$pwd\menu.json"
-        $menuCreated = Test-MenuJsonExists -MenuFile $MenuFile -Silent:$Silent
+        # Step 7: Ensure menu.psd1 exists with defaults
+        Write-SafeLog "Ensuring menu.psd1 exists with defaults" "Information"
+        $MenuFile = "$pwd\menu.psd1"
+        $menuCreated = $true # Get-ConfigurationData will handle defaults
+        if (-not (Test-Path $MenuFile))
+        {
+            try {
+                $defaultMenu = Get-ApplicationDefaults -DefaultType "Menu"
+                $defaultMenu | Export-PowerShellDataFile -Path $MenuFile
+                Write-SafeLog "Created menu.psd1 with defaults" "Information"
+            }
+            catch {
+                Write-SafeLog "Failed to create menu.psd1: $($_.Exception.Message)" "Warning"
+                $menuCreated = $false
+            }
+        }
         
         if (-not $menuCreated)
         {
-            Write-SafeLog "Failed to ensure menu.json exists" "Warning"
+            Write-SafeLog "Failed to ensure menu.psd1 exists" "Warning"
         }
         
         # Step 8: Display completion message

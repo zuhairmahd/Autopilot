@@ -11,7 +11,7 @@ function Show-GroupsEditor()
         infrastructure to maintain consistency with other settings management.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file. Defaults to "settings.json".
+        Path to the settings.psd1 file. Defaults to "settings.psd1".
     
     .PARAMETER DomainName
         The domain name for which to edit group settings. If not provided, will attempt 
@@ -29,7 +29,7 @@ function Show-GroupsEditor()
         Show-GroupsEditor -DomainName "contoso.com"
     
     .EXAMPLE
-        Show-GroupsEditor -SettingsFile "settings.json"
+        Show-GroupsEditor -SettingsFile "settings.psd1"
     
     .NOTES
         - Maintains PowerShell 5.1 compatibility
@@ -40,7 +40,7 @@ function Show-GroupsEditor()
     #>
     [CmdletBinding()]
     param(
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
         [string]$AccessToken,
         [switch]$Silent

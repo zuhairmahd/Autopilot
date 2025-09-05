@@ -7,7 +7,7 @@ function Invoke-PasswordChangeProcess()
     .DESCRIPTION
     This function handles the password change process when auth.changePWOnNextStart is true.
     It prompts the user for a new password, re-encrypts the config file with the new password,
-    and updates the settings.json file to set changePWOnNextStart to false.
+    and updates the settings.psd1 file to set changePWOnNextStart to false.
     
     .PARAMETER ConfigFile
     Path to the encrypted configuration file to re-encrypt.
@@ -16,7 +16,7 @@ function Invoke-PasswordChangeProcess()
     The decrypted configuration content to re-encrypt.
     
     .PARAMETER SettingsFile
-    Path to the settings.json file to update.
+    Path to the settings.psd1 file to update.
     
     .PARAMETER NewPassword
     Optional parameter for testing - if provided, skips interactive password prompt.
@@ -114,28 +114,26 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting password ch
             }
         }
         
-        # Update settings.json to set changePWOnNextStart to false
+        # Update settings.psd1 to set changePWOnNextStart to false
         Write-Host "Updating settings..." -ForegroundColor Cyan
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Updating settings.json to disable changePWOnNextStart" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Updating settings.psd1 to disable changePWOnNextStart" -LogLevel "Information"
         
         if (Test-Path $SettingsFile)
         {
             try
             {
-                $settingsContent = Get-Content -Path $SettingsFile -Raw -Encoding UTF8
-                $settings = ConvertFrom-Json $settingsContent
+                $settings = Import-PowerShellDataFile -Path $SettingsFile
                 
                 # Update the changePWOnNextStart setting
-                if ($settings.auth -and $settings.auth.PSObject.Properties.Name -contains 'changePWOnNextStart')
+                if ($settings.auth -and $settings.auth.changePWOnNextStart -ne $null)
                 {
                     $settings.auth.changePWOnNextStart = $false
                     
                     # Write updated settings back to file
-                    $updatedSettingsJson = ConvertTo-Json $settings -Depth $maxJSONDepth
-                    Set-Content -Path $SettingsFile -Value $updatedSettingsJson -Encoding UTF8
+                    $settings | Export-PowerShellDataFile -Path $SettingsFile
                     
                     Write-Host "Settings updated successfully" -ForegroundColor Green
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.json updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
                 }
                 else
                 {
