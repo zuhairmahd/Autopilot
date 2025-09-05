@@ -14,8 +14,8 @@
 .PARAMETER Version
     Optional. The version string to use for the build (major.minor.build.revision).
 
-.PARAMETER outputFile
-    Optional. The output path for the generated executable.
+.PARAMETER OutputPath
+    Optional. The output path or directory for the generated executable. If a directory is provided (no file extension), the output filename will be derived from the InputFile with an .exe extension inside that directory.
 
 .PARAMETER SettingsFile
     Optional. Path to the settings.json file.
@@ -54,8 +54,6 @@
     - Running the script requires an active Azure Trusted Signing account.  For testing, this functionality should be mocked.
     - See project documentation for full release workflow.
 #>
-#requires -module TrustedSigning
-#requires -module ps2exe
 
 [CmdletBinding()]
 param(
@@ -63,12 +61,15 @@ param(
     [string]$InputFile,
     [Parameter(Mandatory = $false)]
     [string]$Version,
-    [string]$outputFile = '',
+    [Alias('outputFile')]
+    [string]$OutputPath = '',
     [string]$SettingsFile = "$pwd\settings.json",
     [string]$CompanyName = 'Zuhair Mahmoud',
     [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
     [switch]$noCleanup,
+    [switch]$SkipSigning,
+    [switch]$updateHash,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
@@ -798,6 +799,56 @@ function UpdateSettingsFile()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
     }
 }
+
+function UpdateHash()
+{
+    [CmdletBinding()]
+    param (
+        [string]$executableFilePath,
+        [string]$lastRunPath = "$pwd\lastrun.json"
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
+    Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
+    if (-not (Test-Path $executableFilePath))
+    {
+        Write-Error "File not found: $executableFilePath"
+        Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    if (-not (Test-Path $lastRunPath))
+    {
+        Write-Error "Last run file not found: $lastRunPath"
+        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+
+    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
+    if (-not $lastRunContent)
+    {
+        Write-Error "Failed to read JSON from $lastRunPath"
+        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    
+    # Get the hash of the executable file
+    $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
+    
+    if ($fileHash)
+    {
+        $lastRunContent.hash = $fileHash.Hash
+        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
+        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
+        Write-Host "Hash updated successfully in $lastRunPath"
+        return $true
+    }
+    else
+    {
+        Write-Error "Failed to write updated hash to $lastRunPath"
+        return $false
+    }
+}
 #endregion helper functions
 
 #region Define variables
@@ -807,25 +858,45 @@ $lastRun = Get-Content -Path $lastRunFile | ConvertFrom-Json
 $maintainCurrentVersion = $false
 $SettingsFile = "$pwd\settings.json"
 $functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.json', 'strings.json', 'init.json') 
+$filesToCopy = @('settings.json', 'strings.json', 'init.json', 'lastrun.json') 
 $settingsVersion = (Get-Content -Path "$pwd\settings.json" | ConvertFrom-Json).version
 $stringsVersion = (Get-Content -Path "$pwd\strings.json" | ConvertFrom-Json).version
-$successMessage = "$OutputFile written"
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
-if ($outputFile -eq '')
+# Resolve output file path from -OutputPath (directory or filename)
+$leafName = Split-Path -Leaf $InputFile
+Write-Verbose "[$scriptName] Leaf name is: $leafName"
+$exeName = $leafName.Replace('.ps1', '.exe')
+Write-Verbose "[$scriptName] Executable name is: $exeName"
+
+if ([string]::IsNullOrWhiteSpace($OutputPath))
 {
-    Write-Verbose "[$scriptName] No output file specified. Using default output file name."
-    $leafName = Split-Path -Leaf $InputFile
-    Write-Verbose "[$scriptName] Leaf name is: $leafName"
-    $exeName = $leafName.Replace('.ps1', '.exe')
-    Write-Verbose "[$scriptName] Executable name is: $exeName"
-    $outputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
-    Write-Verbose "[$scriptName] Output file set to: $outputFile"
-    Write-Host "No output file specified. Output file set to: $outputFile"
+    # No output path provided; use default build folder
+    Write-Verbose "[$scriptName] No OutputPath specified. Using default build directory."
+    $OutputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
 }
-$parentFolder = Split-Path -Parent $outputFile
+else
+{
+    # Detect if OutputPath represents a directory (no extension) or a full file path (has extension)
+    $ext = [System.IO.Path]::GetExtension($OutputPath)
+    if ([string]::IsNullOrWhiteSpace($ext))
+    {
+        Write-Verbose "[$scriptName] OutputPath has no extension; treating as directory."
+        $OutputFile = Join-Path -Path $OutputPath -ChildPath $exeName
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] OutputPath includes an extension; treating as full output filename."
+        $OutputFile = $OutputPath
+    }
+}
+Write-Host "Output file resolved to: $OutputFile"
+
+# Initialize success message after resolving OutputFile
+$successMessage = "$OutputFile written"
+
+$parentFolder = Split-Path -Parent $OutputFile
 $destSettingsFile = "$parentFolder\settings.json"
 #endregion
 
@@ -911,6 +982,25 @@ if ($SecretsOnly)
         Write-Log -logFile $logFile -Message "Skipping settings file update." -module $scriptName
     }
     exit 0
+}
+
+if ($updateHash)
+{
+    Write-Host "Updating hash in lastrun file: $lastRunFile"
+    if (UpdateHash -executableFilePath $OutputFile -lastRunPath $lastRunFile)
+    {
+        Write-Host "Hash updated successfully in $lastRunFile"
+        Write-Log -logFile $logFile -Message "Hash updated successfully in $lastRunFile" -module $scriptName
+        Write-Log -logFile $logFile -finishLogging
+        exit 0
+    }
+    else
+    {
+        Write-Host "Failed to update hash in $lastRunFile"
+        Write-Log -logFile $logFile -Message "Failed to update hash in $lastRunFile" -module $scriptName -LogLevel 'Error'
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
 }
 
 #Check if the initialization file exists.  If not, create it.
@@ -1010,7 +1100,7 @@ if (-not $CreateModule)
         Write-Verbose "[$scriptName] Creating parent folder: $mergeParentFolder"
         New-Item -ItemType Directory -Path $mergeParentFolder -Force | Out-Null
     }
-    if ($InputFile -ne $outputFile)
+    if ($InputFile -ne $OutputFile)
     {
         Write-Verbose "[$scriptName] Copying input file to parent folder: $mergeParentFolder"
         $newscriptFile = "$mergeParentFolder\$($InputFile.Split('\')[-1])"
@@ -1131,9 +1221,9 @@ else
 #endregion
 
 #region Main code
-if (Test-Path $outputFile)
+if (Test-Path $OutputFile)
 {
-    Write-Host "The output file $outputFile already exists. Do you want to replace it? (Y/N)"
+    Write-Host "The output file $OutputFile already exists. Do you want to replace it? (Y/N)"
     $response = Read-Host
     while ($response -ne 'Y' -and $response -ne 'N')
     {
@@ -1148,7 +1238,7 @@ if (Test-Path $outputFile)
     }
     else
     {
-        Write-Host "Replacing $outputFile"
+        Write-Host "Replacing $OutputFile"
     }
 }
 
@@ -1174,7 +1264,9 @@ Write-Host "Building executable from $newscriptFile to $OutputFile"
 Write-Host "parameters used:"
 $params | Format-List | Out-Host
 $result = Invoke-ps2exe @params -ErrorAction Stop
-if ($result -match $successMessage)
+Write-Host "ps2exe result: $result"
+# Use a regex-escaped pattern to avoid invalid escape sequences (e.g., \\m) in Windows paths
+if ($result -match [regex]::Escape($successMessage))
 {
     Write-Host "Executable created successfully: $OutputFile"
 }
@@ -1183,17 +1275,24 @@ else
     Write-Host "Failed to create executable: $OutputFile"
     exit 1
 }
+if (-not $SkipSigning)
+{
+    Write-Host "Signing executable at $OutputFile"
+    if (SignScripts -path $outputFile)
+    {
+        Write-Host "Executable signed successfully: $OutputFile"
+    }
+    else
+    {
+        Write-Host "Failed to sign executable: $OutputFile"
+        exit 1
+    }
+}
+else 
+{
+    Write-Host "Skipping signing of executable as per -SkipSigning flag."
+}
 
-Write-Host "Signing executable at $OutputFile"
-if (SignScripts -path "$pwd\build")
-{
-    Write-Host "Executable signed successfully: $OutputFile"
-}
-else
-{
-    Write-Host "Failed to sign executable: $OutputFile"
-    exit 1
-}
 #get the hash for the executable
 $hash = Get-FileHash -Path $OutputFile -Algorithm SHA256
 Write-Host "Executable hash: $($hash.Hash)"
@@ -1301,7 +1400,7 @@ if (-not $Overwrite)
     }   
 }
 
-if (($response -eq 'Y' -or $response -eq 'y') -or $Overwrite)
+if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSigning)
 {
     Write-Verbose "[$scriptName] User chose to copy the executable to the current directory."
     try

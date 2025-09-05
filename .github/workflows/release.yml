@@ -27,7 +27,7 @@ jobs:
         run: .\TestScripts\Test-Runner.ps1
 
   build:
-    name: Build (CreateRelease test version)
+    name: Build (CreateRelease executable)
     runs-on: windows-latest
     timeout-minutes: 25
     needs: test
