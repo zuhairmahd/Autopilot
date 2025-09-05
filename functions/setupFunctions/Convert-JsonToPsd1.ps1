@@ -91,11 +91,17 @@ function Convert-JsonToPsd1() {
         # Convert to hashtable if PSCustomObject
         if ($configData -is [PSCustomObject]) {
             $configData = ConvertTo-HashtableFromPSCustomObject -InputObject $configData
+        } elseif ($configData -is [System.Array]) {
+            $configData = ConvertTo-HashtableFromPSCustomObject -InputObject $configData
         }
         
         # Convert to PSD1 format
         Write-Verbose "[$functionName] Converting to PSD1 format"
-        $psd1Content = ConvertTo-Psd1String -Configuration $configData
+        if ($configData -is [System.Array]) {
+            $psd1Content = ConvertTo-Psd1ArrayString -InputArray $configData
+        } else {
+            $psd1Content = ConvertTo-Psd1String -Configuration $configData
+        }
         
         # Validate if requested
         if ($Validate) {
@@ -187,7 +193,7 @@ function ConvertTo-Psd1String {
     
     foreach ($key in $Configuration.Keys) {
         $value = $Configuration[$key]
-        $result += "$childIndent$key = "
+        $result += "$childIndent'$key' = "
         
         if ($value -is [hashtable]) {
             $result += (ConvertTo-Psd1String -Configuration $value -IndentLevel ($IndentLevel + 1))
@@ -201,6 +207,12 @@ function ConvertTo-Psd1String {
                 elseif ($item -is [string]) {
                     $escapedItem = $item -replace "'", "''"
                     $result += "$childIndent    '$escapedItem',`n"
+                }
+                elseif ($item -is [bool]) {
+                    $result += "$childIndent    " + (if ($item) { '$true' } else { '$false' }) + ",`n"
+                }
+                elseif ($item -eq $null) {
+                    $result += "$childIndent    `$null,`n"
                 }
                 else {
                     $result += "$childIndent    $item,`n"
@@ -226,5 +238,46 @@ function ConvertTo-Psd1String {
     }
     
     $result += "$indent}"
+    return $result
+}
+
+function ConvertTo-Psd1ArrayString {
+    <#
+    .SYNOPSIS
+        Converts an array to properly formatted PSD1 array string content.
+    #>
+    param(
+        [System.Array]$InputArray,
+        [int]$IndentLevel = 0
+    )
+    
+    $indent = "    " * $IndentLevel
+    $childIndent = "    " * ($IndentLevel + 1)
+    $result = "@(`n"
+    
+    foreach ($item in $InputArray) {
+        if ($item -is [hashtable]) {
+            $result += "$childIndent" + (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 1)) + ",`n"
+        }
+        elseif ($item -is [System.Array]) {
+            $result += "$childIndent" + (ConvertTo-Psd1ArrayString -InputArray $item -IndentLevel ($IndentLevel + 1)) + ",`n"
+        }
+        elseif ($item -is [string]) {
+            $escapedItem = $item -replace "'", "''"
+            $result += "$childIndent'$escapedItem',`n"
+        }
+        elseif ($item -is [bool]) {
+            $result += "$childIndent" + (if ($item) { '$true' } else { '$false' }) + ",`n"
+        }
+        elseif ($item -eq $null) {
+            $result += "$childIndent`$null,`n"
+        }
+        else {
+            $result += "$childIndent$item,`n"
+        }
+    }
+    
+    # Remove trailing comma and newline
+    $result = $result.TrimEnd(",`n") + "`n$indent)"
     return $result
 }

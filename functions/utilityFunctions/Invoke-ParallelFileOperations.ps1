@@ -23,9 +23,9 @@ function Invoke-ParallelFileOperations()
     
     .EXAMPLE
         $operations = @(
-            @{ Type = "Validate"; Path = "settings.json"; Function = "Test-SettingsJsonExists" }
-            @{ Type = "Validate"; Path = "strings.json"; Function = "Test-StringsJsonExists" }
-            @{ Type = "Validate"; Path = "menu.json"; Function = "Test-MenuJsonExists" }
+            @{ Type = "Validate"; Path = "settings.psd1"; Function = "Test-SettingsPsd1Exists" }
+            @{ Type = "Validate"; Path = "strings.psd1"; Function = "Test-StringsPsd1Exists" }
+            @{ Type = "Validate"; Path = "menu.psd1"; Function = "Test-MenuPsd1Exists" }
         )
         $results = Invoke-ParallelFileOperations -Operations $operations
     

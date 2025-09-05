@@ -41,7 +41,7 @@ function NewMenu()
         [Parameter(Mandatory = $false)]
         [string]$MenuName,
         [Parameter(Mandatory = $false)]
-        [string]$MenuConfigFile = "$pwd\menu.json",
+        [string]$MenuConfigFile = "$pwd\menu",
         [Parameter(Mandatory = $false)]
         [switch]$DisableEarlyFiltering
     )
