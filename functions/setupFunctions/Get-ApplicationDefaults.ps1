@@ -337,6 +337,118 @@ function Get-ApplicationDefaults()
                 unknownErrorMessage            = "An unknown error occurred."
             }
         }
+        
+        # Menu defaults - complete menu structure 
+        Menus          = @{
+            version         = $Version
+            name            = 'menu.psd1'
+            description     = 'This file contains the definitions for the menus used in the application.'
+            appModeHierarchy = @{
+                full                 = @('*')
+                advanced             = @('advanced', 'helpdesk', 'registration')
+                helpdesk             = @('helpdesk')
+                registration         = @('registration')
+                advancedRegistration = @('advancedRegistration', 'registration')
+                admin                = @('admin', 'advanced', 'helpdesk', 'registration')
+                custom               = @()
+            }
+            appModeDefaults = @{
+                full                = @{
+                    description  = 'Full administrative access with all features enabled'
+                    capabilities = @('all_menus', 'all_actions', 'settings_management', 'advanced_diagnostics', 'export_all', 'device_management')
+                }
+                advanced            = @{
+                    description  = 'Advanced user with helpdesk and configuration capabilities'
+                    capabilities = @('advanced_features', 'helpdesk_operations', 'device_registration', 'settings_view', 'advanced_exports')
+                }
+                helpdesk            = @{
+                    description  = 'Helpdesk operator with device troubleshooting and user assignment capabilities'
+                    capabilities = @('device_assignment', 'device_troubleshooting', 'basic_exports', 'device_actions', 'user_management')
+                }
+                registration        = @{
+                    description  = 'Device registration specialist with Autopilot enrollment capabilities'
+                    capabilities = @('autopilot_registration', 'device_import', 'basic_exports', 'device_status_check')
+                }
+                advancedRegistration = @{
+                    description  = 'Advanced registration specialist with administrative Autopilot capabilities'
+                    capabilities = @('advanced_autopilot', 'custom_import', 'device_preparation', 'advanced_device_actions')
+                }
+                admin               = @{
+                    description  = 'System administrator with full configuration and management capabilities'
+                    capabilities = @('system_administration', 'advanced_features', 'helpdesk_operations', 'device_registration', 'full_configuration')
+                }
+                custom              = @{
+                    description  = 'Customizable mode where users define their own access patterns'
+                    capabilities = @('user_defined')
+                }
+            }
+            mainMenu        = @{
+                Title               = 'Main Menu'
+                Description         = 'Please choose from one of the following options'
+                type                = 'static'
+                includeInDisplayModes = @()
+                items               = @(
+                    @{
+                        name                   = 'Give a device to a user'
+                        description            = 'Start the user and device readiness check'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Check device status'
+                        description            = 'Troubleshoot a device'
+                        blockType              = 'menu'
+                        menuName               = 'checkMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Autopilot menu'
+                        description            = 'Import a device into Autopilot and perform related actions'
+                        blockType              = 'menu'
+                        menuName               = 'autopilotMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Change application settings'
+                        description            = 'Modify the application settings'
+                        blockType              = 'menu'
+                        menuName               = 'settingsMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Check for script updates'
+                        description            = 'Check if there are any updates available for the scripts'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Restart the device'
+                        description            = 'Restart the device'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Show Group Assignments'
+                        description            = 'Show the group assignments for the device'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Export Menu'
+                        description            = 'Export device information'
+                        blockType              = 'menu'
+                        menuName               = 'exportMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration')
+                    },
+                    @{
+                        name                   = 'About'
+                        description            = 'Learn more about this application'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
+        }
     }
     
     # Complete settings structure combining all components
@@ -406,6 +518,13 @@ function Get-ApplicationDefaults()
         {
             Write-Verbose "[$functionName] Returning strings defaults"
             $result = $defaults.Strings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }
+        'Menus'
+        {
+            Write-Verbose "[$functionName] Returning menu defaults"
+            $result = $defaults.Menus
             $script:defaultsCache[$cacheKey] = $result
             return $result
         }

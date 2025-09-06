@@ -108,6 +108,15 @@ function Get-ConfigurationData()
                             $createdFromDefaults = $true
                         }
                     }
+                    'menu' 
+                    {
+                        $defaultData = Get-ApplicationDefaults -DefaultType "Menus"
+                        if ($defaultData) {
+                            Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
+                            Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
+                            $createdFromDefaults = $true
+                        }
+                    }
                     'init' 
                     {
                         # For init files, create from the structure used in InitializeConfiguration

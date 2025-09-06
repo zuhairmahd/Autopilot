@@ -387,14 +387,14 @@ function New-MockSettingsFile()
 {
     <#
     .SYNOPSIS
-        Creates a mock settings.json file in the test folder
+        Creates a mock settings.psd1 file in the test folder
     .DESCRIPTION
         Creates a properly formatted settings file with optional content for testing
     #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$TestFolder,
-        [string]$FileName = "test-settings.json",
+        [string]$FileName = "test-settings.psd1",
         [hashtable]$CustomContent = @{},
         [switch]$IncludeAuth
     )
@@ -430,10 +430,48 @@ function New-MockSettingsFile()
         $settings[$key] = $CustomContent[$key]
     }
     
-    # Write to file
-    $settings | ConvertTo-Json -Depth 10 | Set-Content -Path $filePath -Force
-    
-    return $filePath
+    # Export to PSD1 format using Export-PowerShellDataFile
+    try {
+        $exportResult = Export-PowerShellDataFile -InputObject $settings -Path $filePath -Force
+        if ($exportResult) {
+            return $filePath
+        } else {
+            throw "Export-PowerShellDataFile failed"
+        }
+    }
+    catch {
+        # Fallback: create using direct PSD1 content
+        $psd1Content = "@{`n"
+        $psd1Content += "    description = '$($settings.description)'`n"
+        $psd1Content += "    version = '$($settings.version)'`n"
+        $psd1Content += "    globalSettings = @{`n"
+        $psd1Content += "        appMode = '$($settings.globalSettings.appMode)'`n"
+        $psd1Content += "    }`n"
+        
+        if ($IncludeAuth) {
+            $psd1Content += "    auth = @{`n"
+            $psd1Content += "        changePwOnNextStart = `$$($settings.auth.changePwOnNextStart)`n"
+            $psd1Content += "        authType = '$($settings.auth.authType)'`n"
+            $psd1Content += "        noSaveRefreshToken = `$$($settings.auth.noSaveRefreshToken)`n"
+            $psd1Content += "        forceNewToken = `$$($settings.auth.forceNewToken)`n"
+            $psd1Content += "        renewalLeadTime = $($settings.auth.renewalLeadTime)`n"
+            $psd1Content += "        scope = @(`n"
+            foreach ($scope in $settings.auth.scope) {
+                $psd1Content += "            '$scope',`n"
+            }
+            $psd1Content = $psd1Content.TrimEnd(",`n") + "`n"
+            $psd1Content += "        )`n"
+            $psd1Content += "        cacheType = '$($settings.auth.cacheType)'`n"
+            $psd1Content += "        secureString = `$$($settings.auth.secureString)`n"
+            $psd1Content += "        delegated = `$$($settings.auth.delegated)`n"
+            $psd1Content += "    }`n"
+        }
+        
+        $psd1Content += "}"
+        
+        Set-Content -Path $filePath -Value $psd1Content -Force
+        return $filePath
+    }
 }
 
 function Test-FunctionExists()

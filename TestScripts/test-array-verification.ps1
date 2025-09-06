@@ -68,7 +68,7 @@ try
     }
     
     # Create a test settings file with auth section using the helper
-    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.json" -IncludeAuth
+    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.psd1" -IncludeAuth
     Write-TestResult "Test settings file created at: $testSettingsFile" -Success $true
     
     # Test 1: Update with identical array
