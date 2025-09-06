@@ -1,43 +1,39 @@
 ﻿@{
-    companyName                       = 'ArabicTutor'
-    version                           = '1.0.0'
-    'additionalScopes'                = @{
-    }
-    'groupsToExclude'                 = @{
-    }
-    'groupsToInclude'                 = @(
-        @{
-            'id'   = $null
-            'name' = 'autopilot'
-        }
-    )
-    'operatingSystem'                 = 'Windows'
-    'repo'                            = 'Github'
-    'minUsernameLength'               = 3
-    'timeInSeconds'                   = '60'
-    'desiredAutopilotProfiles'        = @(
-    )
-    'maxSerialNumberLength'           = 50
-    'maxUserMatchDisplay'             = '10'
-    'maxWaitTime'                     = '30'
-    'showLicenseBanner'               = $false
-    'autoUpdate'                      = $true
-    'minimumDevicePhysicalMemoryInGB' = 8
-    'maxUserNameLength'               = 50
-    'domain'                          = 'arabictutor.com'
-    'preferredBrowser'                = 'Chrome'
-    'appMode'                         = 'full'
-    'groupPatternsToExclude'          = @(
-    )
-    'maxGroupMatchDisplay'            = 10
-    'deviceNamePrefix'                = ''
-    'privateSession'                  = $false
-    'maxNumberOfDevicesAllowed'       = 15
-    'userPatternsToExclude'           = @(
+    privateSession = $false
+    groupsToExclude = @{}
+    desiredAutopilotProfiles = @()
+    maxUserMatchDisplay = '10'
+    appMode = 'full'
+    userPatternsToExclude = @(
         '-test',
         'onmicrosoft.com'
     )
-    'release'                         = 'master'
-    'minSerialNumberLength'           = 7
-    'deviceContactThresholdInDays'    = 30
+    minimumDevicePhysicalMemoryInGB = 8
+    maxNumberOfDevicesAllowed = 15
+    maxGroupMatchDisplay = 10
+    autoUpdate = $true
+    preferredBrowser = 'Chrome'
+    minUsernameLength = 3
+    version = '1.0.0'
+    operatingSystem = 'Windows'
+    showLicenseBanner = $false
+    maxUserNameLength = 50
+    release = 'master'
+    groupsToInclude = @(
+        @{
+            id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
+            name = 'Cloud Managed PC User 3.26.2023_18:43:44'
+        }
+    )
+    repo = 'Github'
+    groupPatternsToExclude = @()
+    timeInSeconds = '60'
+    deviceContactThresholdInDays = 30
+    additionalScopes = @{}
+    minSerialNumberLength = 7
+    companyName = 'ArabicTutor'
+    maxSerialNumberLength = 50
+    maxWaitTime = '30'
+    domain = 'arabictutor.com'
+    deviceNamePrefix = ''
 }

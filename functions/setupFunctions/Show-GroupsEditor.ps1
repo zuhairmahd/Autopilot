@@ -47,7 +47,7 @@ function Show-GroupsEditor()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups editor for domain: '$DomainName'" -LogLevel "Verbose"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups editor for domain: '$DomainName'" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting groups editor for domain: '$DomainName'"
     
     try
@@ -58,7 +58,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Starting groups edit
         
         if (-not (Test-Path -Path $SettingsFile))
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Verbose"
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
             return $false
         }
@@ -77,21 +77,21 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not fo
                 $currentDomain = Get-Variable -Name "domain" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
                 if (-not [string]::IsNullOrWhiteSpace($currentDomain))
                 {
-Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Verbose"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Verbose"
                     Write-Verbose "[$functionName] Found loaded domain from scope: '$currentDomain'"
                     $DomainName = $currentDomain
                 }
             }
             catch
             {
-Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Warning"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Warning"
                 Write-Verbose "[$functionName] Unable to access domain variable from calling scope: $($_.Exception.Message)"
             }
             
             # If no current domain found, fall back to domain selection
             if ([string]::IsNullOrWhiteSpace($DomainName))
             {
-Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Warning"
+                Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Warning"
                 Write-Verbose "[$functionName] No loaded domain found, falling back to domain selection"
                 
                 $configPath = Split-Path $SettingsFile -Parent
@@ -149,7 +149,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain fou
         $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
         if ($null -eq $domainConfig)
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' configuration not found" -LogLevel "Verbose"
             Write-Warning "[$functionName] Domain '$DomainName' configuration not found"
             return $false
         }
@@ -507,7 +507,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName'
                 }
                 # Continue the loop to allow for multiple edits
             }
-Write-Log -LogFile $logFile -Module $functionName -Message "User finished editing groups, returning $groupChoice" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "User finished editing groups, returning $groupChoice" -LogLevel "Information"
             if ($null -eq $groupChoice -or $groupChoice -eq 0 -or $groupChoice -eq "0" -or $groupChoice -eq "Back" -or $groupChoice -eq "Main Menu")
             {
                 return $groupChoice
@@ -768,8 +768,30 @@ function Compare-ArrayContents()
     }
     
     # Detect array formats
-    $format1 = if ($Array1[0] -is [string]) { "String" } elseif ($Array1[0].name -and $Array1[0].id) { "HashTable" } else { "Unknown" }
-    $format2 = if ($Array2[0] -is [string]) { "String" } elseif ($Array2[0].name -and $Array2[0].id) { "HashTable" } else { "Unknown" }
+    $format1 = if ($Array1[0] -is [string])
+    {
+        "String" 
+    }
+    elseif ($Array1[0].name -and $Array1[0].id)
+    {
+        "HashTable" 
+    }
+    else
+    {
+        "Unknown" 
+    }
+    $format2 = if ($Array2[0] -is [string])
+    {
+        "String" 
+    }
+    elseif ($Array2[0].name -and $Array2[0].id)
+    {
+        "HashTable" 
+    }
+    else
+    {
+        "Unknown" 
+    }
     
     Write-Verbose "[$functionName] Array1 format: $format1, Array2 format: $format2"
     
@@ -851,7 +873,7 @@ function Update-DomainGroupSetting()
             return $false
         }
         
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
         
         # Update the specific group setting
@@ -901,10 +923,14 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
                 }
                 
                 # Enhanced logging for debugging array handling issues - handle null cases
-                $rawType = if ($null -eq $rawActualGroups) { "null" } else { $rawActualGroups.GetType().Name }
-                $rawJson = if ($null -eq $rawActualGroups) { "null" } else { $rawActualGroups | ConvertTo-Json -Compress }
-                Write-Log -LogFile $logFile -Module $functionName -Message "Raw data from config: Type=$rawType, Value=$rawJson" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Raw data: Type=$rawType, IsNull=$($null -eq $rawActualGroups), IsArray=$($rawActualGroups -is [array])"
+                $rawType = if ($null -eq $rawActualGroups)
+                {
+                    "null" 
+                }
+                else
+                {
+                    $rawActualGroups.GetType().Name 
+                }
                 
                 # Ensure actualGroups is always an array for consistent comparison
                 # This handles the JSON serialization issue where single items become individual objects
@@ -923,11 +949,47 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
                 }
                 
                 # Enhanced logging for array conversion results - use safe count methods
-                $actualGroupsCount = if ($actualGroups -is [array]) { $actualGroups.Count } elseif ($null -eq $actualGroups) { 0 } else { 1 }
-                $groupsArrayCount = if ($groupsArray -is [array]) { $groupsArray.Count } elseif ($null -eq $groupsArray) { 0 } else { 1 }
+                $actualGroupsCount = if ($actualGroups -is [array])
+                {
+                    $actualGroups.Count 
+                }
+                elseif ($null -eq $actualGroups)
+                {
+                    0 
+                }
+                else
+                {
+                    1 
+                }
+                $groupsArrayCount = if ($groupsArray -is [array])
+                {
+                    $groupsArray.Count 
+                }
+                elseif ($null -eq $groupsArray)
+                {
+                    0 
+                }
+                else
+                {
+                    1 
+                }
                 
-                $actualType = if ($null -eq $actualGroups) { "null" } else { $actualGroups.GetType().Name }
-                $actualJson = if ($null -eq $actualGroups) { "null" } else { $actualGroups | ConvertTo-Json -Compress }
+                $actualType = if ($null -eq $actualGroups)
+                {
+                    "null" 
+                }
+                else
+                {
+                    $actualGroups.GetType().Name 
+                }
+                $actualJson = if ($null -eq $actualGroups)
+                {
+                    "null" 
+                }
+                else
+                {
+                    $actualGroups | ConvertTo-Json -Compress 
+                }
                 Write-Log -LogFile $logFile -Module $functionName -Message "After array conversion: Type=$actualType, SafeCount=$actualGroupsCount, Value=$actualJson" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] After conversion: Type=$actualType, SafeCount=$actualGroupsCount"
                 
@@ -944,8 +1006,22 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
                 elseif ($groupsArrayCount -ne $actualGroupsCount)
                 {
                     # Different counts - verification failed
-                    $savedType = if ($null -eq $groupsArray) { "null" } else { $groupsArray.GetType().Name }
-                    $loadedType = if ($null -eq $actualGroups) { "null" } else { $actualGroups.GetType().Name }
+                    $savedType = if ($null -eq $groupsArray)
+                    {
+                        "null" 
+                    }
+                    else
+                    {
+                        $groupsArray.GetType().Name 
+                    }
+                    $loadedType = if ($null -eq $actualGroups)
+                    {
+                        "null" 
+                    }
+                    else
+                    {
+                        $actualGroups.GetType().Name 
+                    }
                     Write-Log -LogFile $logFile -Module $functionName -Message "Count mismatch detected: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType" -LogLevel "Warning"
                     Write-Verbose "[$functionName] Count mismatch: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType"
                     $comparisonResult = @("Count mismatch: saved $groupsArrayCount, loaded $actualGroupsCount")
@@ -962,8 +1038,22 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
                             $loaded = $actualGroups[$i]
                             
                             # Handle case where loaded item might be PSCustomObject instead of hashtable
-                            $loadedName = if ($loaded -is [hashtable]) { $loaded.name } else { $loaded.name }
-                            $loadedId = if ($loaded -is [hashtable]) { $loaded.id } else { $loaded.id }
+                            $loadedName = if ($loaded -is [hashtable])
+                            {
+                                $loaded.name 
+                            }
+                            else
+                            {
+                                $loaded.name 
+                            }
+                            $loadedId = if ($loaded -is [hashtable])
+                            {
+                                $loaded.id 
+                            }
+                            else
+                            {
+                                $loaded.id 
+                            }
                             
                             if (($saved.name -ne $loadedName) -or ($saved.id -ne $loadedId))
                             {
