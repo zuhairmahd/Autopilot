@@ -88,9 +88,9 @@ function Export-PowerShellDataFile ()
         else
         {
             $configData = $InputObject
-            if (-not $Psd1FilePath)
+            if (-not $Path)
             {
-                throw "Psd1FilePath is required when using InputObject parameter"
+                throw "Path is required when using InputObject parameter"
             }
         }
         
@@ -124,11 +124,10 @@ function Export-PowerShellDataFile ()
         }
         
         # Save the PSD1 file
-        Write-Verbose "[$functionName] Saving PSD1 file: $Psd1FilePath"
-        $psd1Content | Set-Content -Path $Psd1FilePath -Encoding UTF8 -ErrorAction Stop
-        
-        Write-Verbose "[$functionName] Conversion completed successfully"
-        return $Psd1FilePath
+        Write-Verbose "[$functionName] Saving PSD1 file: $Path"
+        $psd1Content | Set-Content -Path $Path -Encoding UTF8 -ErrorAction Stop
+        Write-Verbose "[$functionName] Conversion completed successfully to $Path"
+        return $Path
     }
     catch
     {
@@ -143,34 +142,43 @@ function ConvertTo-HashtableFromPSCustomObject()
     .SYNOPSIS
         Recursively converts PSCustomObject to hashtable for PowerShell 5.1 compatibility.
     #>
+    [CmdletBinding()]
     param([object]$InputObject)
-    
+    $functionName = $MyInvocation.MyCommand.Name
     if ($InputObject -is [PSCustomObject])
     {
+        Write-Verbose "[$functionName] Converting PSCustomObject to hashtable"
         $hashtable = @{}
         foreach ($property in $InputObject.PSObject.Properties)
         {
+            Write-Verbose "[$functionName] Processing property: $($property.Name)"
             if ($property.Value -is [PSCustomObject])
             {
+                Write-Verbose "[$functionName] Recursively converting property: $($property.Name)"
                 $hashtable[$property.Name] = ConvertTo-HashtableFromPSCustomObject -InputObject $property.Value
             }
             elseif ($property.Value -is [System.Array])
             {
+                Write-Verbose "[$functionName] Processing array property: $($property.Name)"    
                 $hashtable[$property.Name] = @()
                 foreach ($item in $property.Value)
                 {
+                    Write-Verbose "[$functionName] Processing array item $item"
                     if ($item -is [PSCustomObject])
                     {
+                        Write-Verbose "[$functionName] Recursively converting array item $item"
                         $hashtable[$property.Name] += ConvertTo-HashtableFromPSCustomObject -InputObject $item
                     }
                     else
                     {
+                        Write-Verbose "[$functionName] Adding array item $item"
                         $hashtable[$property.Name] += $item
                     }
                 }
             }
             else
             {
+                Write-Verbose "[$functionName] Adding property: $($property.Name)"
                 $hashtable[$property.Name] = $property.Value
             }
         }
@@ -178,15 +186,19 @@ function ConvertTo-HashtableFromPSCustomObject()
     }
     elseif ($InputObject -is [System.Array])
     {
+        Write-Verbose "[$functionName] Processing array input"
         $array = @()
         foreach ($item in $InputObject)
         {
+            Write-Verbose "[$functionName] Processing array item $item"
             if ($item -is [PSCustomObject])
             {
+                Write-Verbose "[$functionName] Recursively converting array item $item"
                 $array += ConvertTo-HashtableFromPSCustomObject -InputObject $item
             }
             else
             {
+                Write-Verbose "[$functionName] Adding array item $item"
                 $array += $item
             }
         }
@@ -194,6 +206,7 @@ function ConvertTo-HashtableFromPSCustomObject()
     }
     else
     {
+        Write-Verbose "[$functionName] Input is neither PSCustomObject nor array, returning as-is"
         return $InputObject
     }
 }
@@ -204,40 +217,48 @@ function ConvertTo-Psd1String()
     .SYNOPSIS
         Converts a hashtable to properly formatted PSD1 string content.
     #>
+    [CmdletBinding()]
     param(
         [hashtable]$Configuration,
         [int]$IndentLevel = 0
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name
     $indent = "    " * $IndentLevel
     $childIndent = "    " * ($IndentLevel + 1)
     $result = "@{`n"
-    
+    Write-Verbose "[$functionName] Converting hashtable to PSD1 string at indent level $IndentLevel"
     foreach ($key in $Configuration.Keys)
     {
         $value = $Configuration[$key]
         $result += "$childIndent$key = "
-        
+        Write-Verbose "[$functionName] Processing key: $key with value type: $($value.GetType().Name)"
         if ($value -is [hashtable])
         {
+            Write-Verbose "[$functionName] Processing nested hashtable"
             $result += (ConvertTo-Psd1String -Configuration $value -IndentLevel ($IndentLevel + 1))
         }
         elseif ($value -is [System.Array])
         {
+            Write-Verbose "[$functionName] Processing array"
             $result += "@(`n"
             foreach ($item in $value)
             {
+                Write-Verbose "[$functionName] Processing array item $item"
                 if ($item -is [hashtable])
                 {
+                    Write-Verbose "[$functionName] Processing nested hashtable in array"
                     $result += "$childIndent    " + (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 2)) + ",`n"
                 }
                 elseif ($item -is [string])
                 {
+                    Write-Verbose "[$functionName] Processing string in array"
                     $escapedItem = $item -replace "'", "''"
+                    Write-Verbose "[$functionName] Escaped string: $escapedItem"
                     $result += "$childIndent    '$escapedItem',`n"
                 }
                 else
                 {
+                    Write-Verbose "[$functionName] Processing other type in array"
                     $result += "$childIndent    $item,`n"
                 }
             }
@@ -245,11 +266,14 @@ function ConvertTo-Psd1String()
         }
         elseif ($value -is [string])
         {
+            Write-Verbose "[$functionName] Processing string"
             $escapedValue = $value -replace "'", "''"
+            Write-Verbose "[$functionName] Escaped string: $escapedValue"
             $result += "'$escapedValue'"
         }
         elseif ($value -is [bool])
         {
+            Write-Verbose "[$functionName] Processing boolean"  
             $result += if ($value)
             {
                 '$true' 
@@ -261,16 +285,18 @@ function ConvertTo-Psd1String()
         }
         elseif ($null -eq $value)
         {
+            Write-Verbose "[$functionName] Processing null value"
             $result += '$null'
         }
         else
         {
+            Write-Verbose "[$functionName] Processing other type"
             $result += $value
         }
         
         $result += "`n"
     }
-    
     $result += "$indent}"
+    Write-Verbose "[$functionName] Finished converting hashtable to PSD1 string at indent level $IndentLevel"
     return $result
 }
