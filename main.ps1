@@ -274,51 +274,42 @@ if (Test-Path $configFile)
     $name = $sessionResult.Name
     
     # Check if password change is required
-    if (Test-Path $InitFile)
+    # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
+    $initDefaults = @{}
+    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
+    
+    if ($initFileContent -and $initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
     {
-        try 
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+        
+        # Invoke password change process
+        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+        
+        if ($passwordChangeResult)
         {
-            $initFileContent = Import-PowerShellDataFile -Path $InitFile -ErrorAction Stop
-            if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
-            {
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-                
-                # Invoke password change process
-                $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-                
-                if ($passwordChangeResult)
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+            
+            # Reload the configuration with new password
+            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
+            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
+                if ($reloadResult.Success)
                 {
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-                    
-                    # Reload the configuration with new password
-                    Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-                    $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-                    
-                    if ($reloadResult.Success)
-                    {
-                        # Update configContent for this session
-                        $configContent = $reloadResult.ConfigContent
-                    }
-                    else
-                    {
-                        Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                        exit 1
-                    }
+                    # Update configContent for this session
+                    $configContent = $reloadResult.ConfigContent
                 }
                 else
                 {
-                    Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+                    Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                    exit 1
                 }
             }
+            else
+            {
+                Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+            }
         }
-        catch
-        {
-            Write-Warning "Failed to check password change requirement: $($_.Exception.Message)"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement: $($_.Exception.Message)" -LogLevel "Warning"
-        }
-    }
     
     if (-not ($sessionResult.encrypted))
     {
@@ -579,7 +570,8 @@ foreach ($key in $getTokenParams.Keys)
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
-$loadedStrings = Import-PowerShellDataFile -Path $stringsFile
+$stringsDefaults = Get-ApplicationDefaults -DefaultType "Strings"
+$loadedStrings = Get-ConfigurationData -ConfigurationPath $stringsFile -DefaultValues $stringsDefaults
 $global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions

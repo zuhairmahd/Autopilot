@@ -48,7 +48,7 @@ function Start-FirstRunWizard()
     [CmdletBinding()]
     param(
         [string]$ConfigFile = "$PWD\.secrets\config.json",
-        [string]$SettingsFile = "$PWD\settings.json",  
+        [string]$SettingsFile = "$PWD\settings.psd1",  
         [string]$StringsFile = "$PWD\strings.psd1",
         [switch]$Silent,
         [switch]$authOnly
@@ -197,8 +197,8 @@ function Start-FirstRunWizard()
                 Write-SafeLog "Failed to update Delegated setting" "Warning"
             }
             
-            # Step 5.5: Update autoUpdate setting in settings.json
-            Write-SafeLog "Updating autoUpdate setting in settings.json" "Information"
+            # Step 5.5: Update autoUpdate setting in settings.psd1
+            Write-SafeLog "Updating autoUpdate setting in settings.psd1" "Information"
             $autoUpdateSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "autoUpdate" -SettingValue $autoUpdateConfig.autoUpdate
             
             if ($autoUpdateSuccess)
@@ -245,26 +245,18 @@ function Start-FirstRunWizard()
             Write-SafeLog "Failed to ensure strings.psd1 exists" "Warning"
         }
         
-        # Step 7: Ensure menu.psd1 exists with defaults
-        Write-SafeLog "Ensuring menu.psd1 exists with defaults" "Information"
+        # Step 7: Check if menu.psd1 exists (use existing or copy from repository)
+        Write-SafeLog "Checking menu.psd1 exists" "Information"
         $MenuFile = "$pwd\menu.psd1"
-        $menuCreated = $true # Get-ConfigurationData will handle defaults
+        $menuCreated = $true
         if (-not (Test-Path $MenuFile))
         {
-            try {
-                $defaultMenu = Get-ApplicationDefaults -DefaultType "Menu"
-                $defaultMenu | Export-PowerShellDataFile -Path $MenuFile
-                Write-SafeLog "Created menu.psd1 with defaults" "Information"
-            }
-            catch {
-                Write-SafeLog "Failed to create menu.psd1: $($_.Exception.Message)" "Warning"
-                $menuCreated = $false
-            }
+            Write-SafeLog "menu.psd1 not found - this is expected for new installations" "Information"
+            Write-SafeLog "The application will use built-in menu configuration" "Information"
         }
-        
-        if (-not $menuCreated)
+        else
         {
-            Write-SafeLog "Failed to ensure menu.psd1 exists" "Warning"
+            Write-SafeLog "menu.psd1 found - using existing menu configuration" "Information"
         }
         
         # Step 8: Display completion message
@@ -279,7 +271,11 @@ function Start-FirstRunWizard()
             Write-Host "• $ConfigFile (encrypted)" -ForegroundColor Green
             Write-Host "• $SettingsFile" -ForegroundColor Green
             Write-Host "• $StringsFile" -ForegroundColor Green
-            Write-Host "• $MenuFile" -ForegroundColor Green
+            if (Test-Path $MenuFile) {
+                Write-Host "• $MenuFile (existing)" -ForegroundColor Green
+            } else {
+                Write-Host "• Menu configuration (built-in)" -ForegroundColor Yellow
+            }
             Write-Host "`nConfiguration Summary:" -ForegroundColor White
             Write-Host "• Domain: $($config.domain)" -ForegroundColor Cyan
             Write-Host "• Authentication: $($authConfig.AuthType)" -ForegroundColor Cyan

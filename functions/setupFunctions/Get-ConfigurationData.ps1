@@ -76,8 +76,86 @@ function Get-ConfigurationData()
         if (-not (Test-Path $psd1Path))
         {
             Write-Warning "[$functionName] Configuration file not found: $psd1Path"
-            Write-Verbose "[$functionName] Returning default values"
-            return $DefaultValues
+            
+            # Attempt to create missing configuration files from defaults
+            $fileName = Split-Path $psd1Path -Leaf
+            $configType = $fileName -replace '\.psd1$', ''
+            
+            Write-Verbose "[$functionName] Attempting to create missing file: $psd1Path"
+            
+            try 
+            {
+                $createdFromDefaults = $false
+                
+                # Try to create from Get-ApplicationDefaults based on file type
+                switch ($configType.ToLower()) 
+                {
+                    'settings' 
+                    {
+                        $defaultData = Get-ApplicationDefaults -DefaultType "Settings"
+                        if ($defaultData) {
+                            Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
+                            Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
+                            $createdFromDefaults = $true
+                        }
+                    }
+                    'strings' 
+                    {
+                        $defaultData = Get-ApplicationDefaults -DefaultType "Strings"
+                        if ($defaultData) {
+                            Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
+                            Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
+                            $createdFromDefaults = $true
+                        }
+                    }
+                    'init' 
+                    {
+                        # For init files, create from the structure used in InitializeConfiguration
+                        $initVars = @(
+                            @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; devdefault = ".\\.secrets\\config.json"; reldefault = ".\\.secrets\\config.json"; default = ".\\.secrets\\config.json"; type = 'string'},
+                            @{name = 'configuration'; value = "settings.psd1"; description = "The path to the configuration file."; devdefault = 'settings.psd1'; reldefault = 'settings.psd1'; default = 'settings.psd1'; type = 'string'},
+                            @{name = 'ShowAdvancedOptions'; value = @('True', 'False'); description = "Show advanced options in the GUI."; devdefault = 'True'; reldefault = 'True'; default = 'False'; type = 'array'},
+                            @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; devdefault = "MSB01"; reldefault = "MSB01"; default = ''; type = 'string'},
+                            @{name = 'maxWaitTime'; value = '60'; description = 'How long to wait before giving up on importing a device.'; devdefault = '60'; reldefault = '60'; default = '30'; type = 'string'},
+                            @{name = 'timeInSeconds'; value = '60'; description = 'How long to wait before initiating another check.'; devdefault = '60'; reldefault = '60'; default = '30'; type = 'string'},
+                            @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; devdefault = 'Github'; reldefault = 'Github'; default = 'Github'; type = 'array'}, 
+                            @{name = 'Release'; value = "2.2"; description = 'The release branch to use.'; devdefault = 'main'; reldefault = '2.2'; default = 'main'; type = 'string'}
+                        )
+                        Export-PowerShellDataFile -InputObject $initVars -Path $psd1Path -Force
+                        Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
+                        $createdFromDefaults = $true
+                    }
+                    default 
+                    {
+                        Write-Verbose "[$functionName] No default template available for: $configType"
+                    }
+                }
+                
+                # If we couldn't create from application defaults, use provided defaults
+                if (-not $createdFromDefaults -and $DefaultValues -and $DefaultValues.Count -gt 0)
+                {
+                    Export-PowerShellDataFile -InputObject $DefaultValues -Path $psd1Path -Force
+                    Write-Host "Created missing $psd1Path from provided defaults" -ForegroundColor Yellow
+                    $createdFromDefaults = $true
+                }
+                
+                # If we successfully created the file, continue with loading it
+                if ($createdFromDefaults -and (Test-Path $psd1Path))
+                {
+                    Write-Verbose "[$functionName] Successfully created missing file, proceeding to load it"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Could not create missing file, returning provided defaults"
+                    return $DefaultValues
+                }
+            }
+            catch 
+            {
+                Write-Warning "[$functionName] Failed to create missing configuration file: $($_.Exception.Message)"
+                Write-Verbose "[$functionName] Returning provided default values"
+                return $DefaultValues
+            }
         }
         
         # Initialize caching if enabled

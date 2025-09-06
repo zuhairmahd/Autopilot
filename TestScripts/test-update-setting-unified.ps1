@@ -146,15 +146,23 @@ try {
     $result = Update-Setting -SettingType "Domain" -SettingsFile $TestSettingsFile -DomainName "test.com" -Settings $newDomainSettings -MergeSettings
     
     if ($result) {
-        # Check domain settings in the separate domain file (new architecture)
-        $domainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.json"
+        # Check domain settings in the separate domain file (new PSD1 architecture)
+        $domainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.psd1"
         if (Test-Path $domainConfigFile) {
-            $domainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
-            $domainSettings = $domainConfig.settings
+            $domainConfig = Import-PowerShellDataFile -Path $domainConfigFile
+            # For domain config files, settings are at the root level, not nested under 'settings'
+            $domainSettings = $domainConfig
         } else {
-            # Fallback to old format for backward compatibility
-            $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
-            $domainSettings = $verifySettings.domains."test.com".settings
+            # Fallback to JSON format for backward compatibility
+            $domainJsonFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.json"
+            if (Test-Path $domainJsonFile) {
+                $domainConfig = Get-Content -Path $domainJsonFile -Raw | ConvertFrom-Json
+                $domainSettings = $domainConfig.settings
+            } else {
+                # Fallback to old format in main settings file
+                $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
+                $domainSettings = $verifySettings.domains."test.com".settings
+            }
         }
         
         if ($domainSettings.GroupTag -eq "MERGED-GROUP" -and 
@@ -184,15 +192,23 @@ try {
     $result = Update-Setting -SettingType "Domain" -SettingsFile $TestSettingsFile -DomainName "test.com" -Settings $replaceDomainSettings
     
     if ($result) {
-        # Check domain settings in the separate domain file (new architecture)
-        $domainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.json"
+        # Check domain settings in the separate domain file (new PSD1 architecture)
+        $domainConfigFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.psd1"
         if (Test-Path $domainConfigFile) {
-            $domainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
-            $domainSettings = $domainConfig.settings
+            $domainConfig = Import-PowerShellDataFile -Path $domainConfigFile
+            # For domain config files, settings are at the root level, not nested under 'settings'
+            $domainSettings = $domainConfig
         } else {
-            # Fallback to old format for backward compatibility
-            $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
-            $domainSettings = $verifySettings.domains."test.com".settings
+            # Fallback to JSON format for backward compatibility
+            $domainJsonFile = Join-Path (Split-Path $TestSettingsFile -Parent) "test.com.json"
+            if (Test-Path $domainJsonFile) {
+                $domainConfig = Get-Content -Path $domainJsonFile -Raw | ConvertFrom-Json
+                $domainSettings = $domainConfig.settings
+            } else {
+                # Fallback to old format in main settings file
+                $verifySettings = Get-Content -Path $TestSettingsFile -Raw | ConvertFrom-Json
+                $domainSettings = $verifySettings.domains."test.com".settings
+            }
         }
         
         if ($domainSettings.GroupTag -eq "REPLACED-GROUP" -and 
