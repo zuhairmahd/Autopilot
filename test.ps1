@@ -78,7 +78,26 @@ else
     exit 1
 }
 #endregion import functions.
+# A sample object to export
+$myObject = [PSCustomObject]@{
+    ComputerName    = 'Server01'
+    OperatingSystem = 'Windows Server 2025'
+    LastReboot      = (Get-Date).ToString()
+    InstalledApps   = @('AppA', 'AppB', 'AppC')
+}
 
+# Convert the object to a hashtable for writing to the file
+$exportData = @{
+    ComputerName    = $myObject.ComputerName
+    OperatingSystem = $myObject.OperatingSystem
+    LastReboot      = $myObject.LastReboot
+    InstalledApps   = $myObject.InstalledApps
+}
+
+# Write the hashtable to a .psd1 file
+$exportData | Out-File -FilePath 'mydata.psd1'
+
+exit 0
 #region Initialize script
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath

@@ -1,5 +1,6 @@
-function Convert-JsonToPsd1() {
-<#
+function Export-PowerShellDataFile ()
+{
+    <#
 .SYNOPSIS
     Converts JSON configuration files to PowerShell Data File (.psd1) format.
 
@@ -45,13 +46,10 @@ function Convert-JsonToPsd1() {
     param(
         [Parameter(Mandatory = $false, ParameterSetName = 'FromFile')]
         [string]$JsonFilePath,
-        
         [Parameter(Mandatory = $false)]
-        [string]$Psd1FilePath,
-        
-        [Parameter(Mandatory = $false, ParameterSetName = 'FromObject')]
+        [string]$Path,
+        [Parameter(Mandatory = $false, ParameterSetName = 'FromObject', ValueFromPipeline = $true)]
         [object]$InputObject,
-        
         [switch]$Validate,
         [switch]$CreateBackup
     )
@@ -59,10 +57,13 @@ function Convert-JsonToPsd1() {
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Starting JSON to PSD1 conversion"
     
-    try {
+    try
+    {
         # Load configuration data
-        if ($PSCmdlet.ParameterSetName -eq 'FromFile') {
-            if (-not (Test-Path $JsonFilePath)) {
+        if ($PSCmdlet.ParameterSetName -eq 'FromFile')
+        {
+            if (-not (Test-Path $JsonFilePath))
+            {
                 throw "JSON file not found: $JsonFilePath"
             }
             
@@ -71,25 +72,31 @@ function Convert-JsonToPsd1() {
             $configData = $jsonContent | ConvertFrom-Json -ErrorAction Stop
             
             # Set default output path if not specified
-            if (-not $Psd1FilePath) {
+            if (-not $Psd1FilePath)
+            {
                 $Psd1FilePath = $JsonFilePath -replace '\.json$', '.psd1'
             }
             
             # Create backup if requested
-            if ($CreateBackup) {
+            if ($CreateBackup)
+            {
                 $backupPath = $JsonFilePath + ".backup"
                 Copy-Item -Path $JsonFilePath -Destination $backupPath -Force
                 Write-Verbose "[$functionName] Created backup: $backupPath"
             }
-        } else {
+        }
+        else
+        {
             $configData = $InputObject
-            if (-not $Psd1FilePath) {
+            if (-not $Psd1FilePath)
+            {
                 throw "Psd1FilePath is required when using InputObject parameter"
             }
         }
         
         # Convert to hashtable if PSCustomObject
-        if ($configData -is [PSCustomObject]) {
+        if ($configData -is [PSCustomObject])
+        {
             $configData = ConvertTo-HashtableFromPSCustomObject -InputObject $configData
         }
         
@@ -98,9 +105,11 @@ function Convert-JsonToPsd1() {
         $psd1Content = ConvertTo-Psd1String -Configuration $configData
         
         # Validate if requested
-        if ($Validate) {
+        if ($Validate)
+        {
             Write-Verbose "[$functionName] Validating PSD1 content"
-            try {
+            try
+            {
                 # Test the content by trying to load it
                 $tempFile = [System.IO.Path]::GetTempFileName()
                 $psd1Content | Set-Content -Path $tempFile -Encoding UTF8
@@ -108,7 +117,8 @@ function Convert-JsonToPsd1() {
                 Remove-Item -Path $tempFile -Force
                 Write-Verbose "[$functionName] PSD1 validation successful"
             }
-            catch {
+            catch
+            {
                 throw "PSD1 validation failed: $($_.Exception.Message)"
             }
         }
@@ -120,58 +130,76 @@ function Convert-JsonToPsd1() {
         Write-Verbose "[$functionName] Conversion completed successfully"
         return $Psd1FilePath
     }
-    catch {
+    catch
+    {
         Write-Error "[$functionName] Conversion failed: $($_.Exception.Message)"
         throw
     }
 }
 
-function ConvertTo-HashtableFromPSCustomObject {
+function ConvertTo-HashtableFromPSCustomObject()
+{
     <#
     .SYNOPSIS
         Recursively converts PSCustomObject to hashtable for PowerShell 5.1 compatibility.
     #>
     param([object]$InputObject)
     
-    if ($InputObject -is [PSCustomObject]) {
+    if ($InputObject -is [PSCustomObject])
+    {
         $hashtable = @{}
-        foreach ($property in $InputObject.PSObject.Properties) {
-            if ($property.Value -is [PSCustomObject]) {
+        foreach ($property in $InputObject.PSObject.Properties)
+        {
+            if ($property.Value -is [PSCustomObject])
+            {
                 $hashtable[$property.Name] = ConvertTo-HashtableFromPSCustomObject -InputObject $property.Value
             }
-            elseif ($property.Value -is [System.Array]) {
+            elseif ($property.Value -is [System.Array])
+            {
                 $hashtable[$property.Name] = @()
-                foreach ($item in $property.Value) {
-                    if ($item -is [PSCustomObject]) {
+                foreach ($item in $property.Value)
+                {
+                    if ($item -is [PSCustomObject])
+                    {
                         $hashtable[$property.Name] += ConvertTo-HashtableFromPSCustomObject -InputObject $item
-                    } else {
+                    }
+                    else
+                    {
                         $hashtable[$property.Name] += $item
                     }
                 }
             }
-            else {
+            else
+            {
                 $hashtable[$property.Name] = $property.Value
             }
         }
         return $hashtable
     }
-    elseif ($InputObject -is [System.Array]) {
+    elseif ($InputObject -is [System.Array])
+    {
         $array = @()
-        foreach ($item in $InputObject) {
-            if ($item -is [PSCustomObject]) {
+        foreach ($item in $InputObject)
+        {
+            if ($item -is [PSCustomObject])
+            {
                 $array += ConvertTo-HashtableFromPSCustomObject -InputObject $item
-            } else {
+            }
+            else
+            {
                 $array += $item
             }
         }
         return $array
     }
-    else {
+    else
+    {
         return $InputObject
     }
 }
 
-function ConvertTo-Psd1String {
+function ConvertTo-Psd1String()
+{
     <#
     .SYNOPSIS
         Converts a hashtable to properly formatted PSD1 string content.
@@ -185,40 +213,58 @@ function ConvertTo-Psd1String {
     $childIndent = "    " * ($IndentLevel + 1)
     $result = "@{`n"
     
-    foreach ($key in $Configuration.Keys) {
+    foreach ($key in $Configuration.Keys)
+    {
         $value = $Configuration[$key]
         $result += "$childIndent$key = "
         
-        if ($value -is [hashtable]) {
+        if ($value -is [hashtable])
+        {
             $result += (ConvertTo-Psd1String -Configuration $value -IndentLevel ($IndentLevel + 1))
         }
-        elseif ($value -is [System.Array]) {
+        elseif ($value -is [System.Array])
+        {
             $result += "@(`n"
-            foreach ($item in $value) {
-                if ($item -is [hashtable]) {
+            foreach ($item in $value)
+            {
+                if ($item -is [hashtable])
+                {
                     $result += "$childIndent    " + (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 2)) + ",`n"
                 }
-                elseif ($item -is [string]) {
+                elseif ($item -is [string])
+                {
                     $escapedItem = $item -replace "'", "''"
                     $result += "$childIndent    '$escapedItem',`n"
                 }
-                else {
+                else
+                {
                     $result += "$childIndent    $item,`n"
                 }
             }
             $result = $result.TrimEnd(",`n") + "`n$childIndent)"
         }
-        elseif ($value -is [string]) {
+        elseif ($value -is [string])
+        {
             $escapedValue = $value -replace "'", "''"
             $result += "'$escapedValue'"
         }
-        elseif ($value -is [bool]) {
-            $result += if ($value) { '$true' } else { '$false' }
+        elseif ($value -is [bool])
+        {
+            $result += if ($value)
+            {
+                '$true' 
+            }
+            else
+            {
+                '$false' 
+            }
         }
-        elseif ($value -eq $null) {
+        elseif ($null -eq $value)
+        {
             $result += '$null'
         }
-        else {
+        else
+        {
             $result += $value
         }
         
