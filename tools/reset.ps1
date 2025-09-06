@@ -139,7 +139,7 @@ function Write-Log()
             }
             
             # Write to console
-            if ($OutputToConsole)
+            if ($WriteToConsole)
             {
                 Write-Host $separatorLine
             }
