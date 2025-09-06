@@ -83,7 +83,82 @@ $scriptName = $MyInvocation.MyCommand.Name
 $logFile = "$pwd\logs\createRelease.log"
 
 #region import functions.
-$functionsFolder = "$PWD\functions"
+function Find-FolderPath()
+{
+    <#
+    .SYNOPSIS
+        Searches upward from the given path for a folder with the specified name.
+    .PARAMETER Path
+        The starting path to begin searching from.
+    .PARAMETER FolderName
+        The name of the folder to search for.
+    .OUTPUTS
+        Returns the full path to the folder if found, otherwise $null.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$FolderName
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #write verbose log of received parameters
+    Write-Verbose "[$functionName] Find-FolderPath called with Path: $Path, FolderName: $FolderName"
+    try
+    {
+        $currentPath = (Resolve-Path -Path $Path).Path
+        Write-Verbose "[$functionName] Current path resolved to: $currentPath"
+
+        # 1. Search children (recursively) of the starting path
+        Write-Verbose "[$functionName] Searching children of $currentPath for folder named $FolderName"
+        $childMatch = Get-ChildItem -Path $currentPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+        Write-Verbose "[$functionName] Checking child match: $($childMatch.FullName)"
+        if ($childMatch)
+        {
+            Write-Verbose "[$functionName] Found folder in children: $($childMatch.FullName)"
+            return $childMatch.FullName
+        }
+        # Also check if the starting path itself matches
+        if ((Split-Path -Path $currentPath -Leaf) -ieq $FolderName)
+        {
+            Write-Verbose "[$functionName] Starting path itself matches: $currentPath"
+            return $currentPath
+        }
+
+        # 2. Search up the parent chain, at each level search its children for the folder
+        while ($currentPath)
+        {
+            $parent = Split-Path -Path $currentPath -Parent
+            if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
+            {
+                break 
+            } # Reached root
+            Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
+            $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+            if ($siblingMatch)
+            {
+                Write-Verbose "[$functionName] Found folder in parent: $($siblingMatch.FullName)"
+                return $siblingMatch.FullName
+            }
+            # Also check if the parent itself matches
+            if ((Split-Path -Path $parent -Leaf) -ieq $FolderName)
+            {
+                Write-Verbose "[$functionName] Parent itself matches: $parent"
+                return $parent
+            }
+            $currentPath = $parent
+        }
+        Write-Verbose "[$functionName] No folder found with name $FolderName in children or parent hierarchy."
+        return $null
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error occurred while searching for folder: $_"
+        return $null
+    }
+}
+$functionsFolder = Find-FolderPath -Path $PSScriptRoot -FolderName 'functions'
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
@@ -104,6 +179,59 @@ else
 Write-Log -logFile $logFile -startLogging
 
 #region helper functions
+function Get-LastRunObject()
+{
+    [CmdletBinding()]
+    param (
+        [string]$LastRunFile
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    if (Test-Path -Path $LastRunFile)
+    {
+        Write-Verbose "[$functionName] Last run file found: $lastRunFile"
+        $lastRun = Get-Content -Path $lastRunFile -Raw | ConvertFrom-Json
+    }
+    else
+    {
+        Write-Verbose "[$functionName] Last run file not found: $lastRunFile"
+        $lastRun = [ordered]@{
+            date            = ''
+            version         = ''
+            guid            = ''
+            hash            = ''
+            stringsVersion  = ''
+            settingsVersion = ''
+        }
+    }
+    return $lastRun
+}
+
+function update-LastRunObject()
+{
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory = $true)]
+        [hashtable]$LastRun,
+        [Parameter(Mandatory = $true)]
+        [string]$LastRunFile
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating last run file: $LastRunFile with version: $Version"
+    try
+    {
+        $lastRun | ConvertTo-Json -Depth 3 | Set-Content -Path $LastRunFile -Force
+        Write-Verbose "[$functionName] Last run file updated successfully."
+        return $true
+    }
+    catch
+    {
+        Write-Error "[$functionName] Failed to update last run file: $_"
+        return $false
+    }
+}
+
 function SignScripts()
 {
     [CmdletBinding()]
@@ -235,124 +363,215 @@ function CopyFiles()
     return $success
 }
 
-function IncrementLastrunVersion()
+function Update-LastRunVersion()
 {
     param (
+        [Parameter(Mandatory = $true)]
         [string]$Version,
-        [string]$LastRunFile
+        [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
+        [string]$PartToIncrement = 'Revision',
+        [Parameter(Mandatory = $true)]
+        [hashtable]$LastRun
     )
 
-    function IncrementRevision()
+    $functionName = $MyInvocation.MyCommand.Name
+    # 1. Normalize & validate supplied version (may be empty)
+    $originalSupplied = $Version
+    if (-not [string]::IsNullOrWhiteSpace($Version))
     {
-        [CmdletBinding()]
-        param(
-            [Parameter(Mandatory = $true)]
-            [string]$Version,
-            [Parameter(Mandatory = $false)]
-            [int]$IncrementBy = 1
-        )
-
-        $functionName = $MyInvocation.MyCommand.Name
-        Write-Verbose "[$functionName] Incrementing revision for version: $Version by $IncrementBy"
-    
-        try
+        if ($Version -notmatch '^[\d\.]+$')
         {
-            $versionObj = [System.Version]::Parse($Version)
-            $newRevision = $versionObj.Revision + $IncrementBy
-            $newVersion = New-Object System.Version($versionObj.Major, $versionObj.Minor, $versionObj.Build, $newRevision)
-            Write-Verbose "[$functionName] New version: $newVersion"
-            return $newVersion.ToString()
-        }
-        catch
-        {
-            Write-Error "Failed to increment revision: $_"
+            Write-Error 'Invalid version format (only digits and periods allowed).'
             return $null
         }
+        $versionParts = $Version.Split('.')
+        while ($versionParts.Count -lt 4)
+        {
+            $versionParts += '0' 
+        }
+        $Version = ($versionParts[0..3]) -join '.'
     }
-    
-    $functionName = $MyInvocation.MyCommand.Name
+
+    # 2. Normalize last run version if present
+    $lastRunVersion = $null
+    if (-not [string]::IsNullOrWhiteSpace($LastRun.version) -and $LastRun.version -match '^[\d\.]+$')
+    {
+        $lrParts = $LastRun.version.Split('.')
+        while ($lrParts.Count -lt 4)
+        {
+            $lrParts += '0' 
+        }
+        $lastRunVersion = ($lrParts[0..3]) -join '.'
+    }
+
+    # 3. Determine base version via interactive logic (preserve existing behavior)
     $updatedVersion = $Version
-    if (Test-Path -Path $LastRunFile)
+    if ([string]::IsNullOrWhiteSpace($updatedVersion) -and [string]::IsNullOrWhiteSpace($lastRunVersion))
     {
-        Write-Verbose "[$functionName] Last run file found: $lastRunFile"
-        $lastRun = Get-Content -Path $lastRunFile -Raw | ConvertFrom-Json
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Last run file not found: $lastRunFile"
-        $lastRun = @{}
-    }
-    Write-Host "Last run date: $($lastRun.date)"
-    Write-Host "Last run version: $($lastRun.version)"
-    Write-Host "GUID: $($lastRun.guid)"
-    if ([string]::IsNullOrWhiteSpace($updatedVersion) -and [string]::IsNullOrWhiteSpace($lastRun.Version))
-    {
-        Write-Host "What version number would you like to use for this build?"
-        Write-Host "Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)"
-        $updatedVersion = Read-Host "Enter version number"
+        Write-Host 'What version number would you like to use for this build?'
+        Write-Host 'Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)'
+        $updatedVersion = Read-Host 'Enter version number'
         while ($updatedVersion -notmatch '^\d+\.\d+\.\d+\.\d+$')
         {
-            Write-Host "Invalid version format. Please use the format xx.yy.zz"
-            [console]::beep(1000, 500)
-            $updatedVersion = Read-Host "Enter a valid version number"
+            Write-Host 'Invalid version format. Please use n.n.n.n'
+            [console]::Beep(1000, 500)
+            $updatedVersion = Read-Host 'Enter a valid version number'
         }
         $maintainCurrentVersion = $true
     }
-    elseif (-not ([string]::IsNullOrWhiteSpace($updatedVersion)) -and -not ([string]::IsNullOrWhiteSpace($lastRun.Version)))
+    elseif (-not [string]::IsNullOrWhiteSpace($updatedVersion) -and -not [string]::IsNullOrWhiteSpace($lastRunVersion))
     {
+        # Both supplied & last run available – ask user which to use (keep behavior), show comparison
+        $supObj = [Version]$updatedVersion
+        $lastObj = [Version]$lastRunVersion
+        $cmp = $supObj.CompareTo($lastObj)
+        $relation = if ($cmp -gt 0)
+        {
+            'greater than' 
+        }
+        elseif ($cmp -lt 0)
+        {
+            'less than' 
+        }
+        else
+        {
+            'equal to' 
+        }
         Write-Host "Supplied version: $updatedVersion"
-        Write-Host "Last run version: $($lastRun.version)"
-        Write-Host "Which version would you like to use? (S for supplied, L for last run)"
-        $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
+        Write-Host "Last run version: $lastRunVersion"
+        Write-Host "Supplied version is $relation last run version."
+        Write-Host 'Which version would you like to use? (S for supplied, L for last run)'
+        $response = Read-Host 'Enter S for supplied version, L for last run version, or E to exit'
         while ($response -notin 'S', 'L', 'E')
         {
-            Write-Host "Invalid response. Please enter S, L, or E."
-            [console]::beep(1000, 500)
-            $response = Read-Host "Enter S for supplied version, L for last run version, or E to exit"
-        }   
+            Write-Host 'Invalid response. Please enter S, L, or E.'
+            [console]::Beep(1000, 500)
+            $response = Read-Host 'Enter S for supplied version, L for last run version, or E to exit'
+        }
         switch ($response)
         {
-            S
+            'S'
             {
-                Write-Host "Using supplied version: $updatedVersion"
-                $maintainCurrentVersion = $true
+                Write-Host "Using supplied version: $updatedVersion"; $maintainCurrentVersion = $true 
             }
-            L
+            'L'
             {
-                Write-Host "Using last run version: $($lastRun.version)"
-                $updatedVersion = $lastRun.version
+                Write-Host "Using last run version: $lastRunVersion"; $updatedVersion = $lastRunVersion 
             }
-            E
+            'E'
             {
-                Write-Host "Exiting script."
-                exit 0
+                Write-Host 'Exiting script.'; exit 0 
             }
         }
     }
-    elseif (-not ([string]::IsNullOrWhiteSpace($lastRun.Version)) -and [string]::IsNullOrWhiteSpace($updatedVersion))
+    elseif (-not [string]::IsNullOrWhiteSpace($lastRunVersion) -and [string]::IsNullOrWhiteSpace($updatedVersion))
     {
-        Write-Host "No version supplied. Using last run version: $($lastRun.version)"
-        $updatedVersion = $lastRun.version
+        Write-Host "No version supplied. Using last run version: $lastRunVersion"
+        $updatedVersion = $lastRunVersion
     }
     else
     {
+        # Only supplied version exists
         Write-Host "Using supplied version: $updatedVersion"
         $maintainCurrentVersion = $true
-    } 
-    Write-Host "Current version: $updatedVersion"
+    }
+
+    # 4. Show context
+    Write-Host "Last run date: $($lastRun.date)"
+    Write-Host "GUID: $($lastRun.guid)"
+    Write-Host "Part to increment: $PartToIncrement"
+    Write-Host "Current base version: $updatedVersion"
     Write-Host "Maintain current version: $maintainCurrentVersion"
-    Write-Verbose "[$functionName] No version update: $NoVersionUpdate"
-    if ($maintainCurrentVersion -or $NoVersionUpdate)
+    Write-Verbose "[$functionName] No version update switch state: $NoVersionUpdate"
+
+    # 5. Increment if allowed
+    $finalVersion = $updatedVersion
+    if (-not $maintainCurrentVersion -and -not $NoVersionUpdate)
     {
-        Write-Host "Maintaining current version: $updatedVersion"
+        $parts = $finalVersion.Split('.')
+        # Ensure exactly 4 parts (defensive)
+        while ($parts.Count -lt 4)
+        {
+            $parts += '0' 
+        }
+        switch ($PartToIncrement)
+        {
+            'Major'
+            {
+                $parts[0] = ([int]$parts[0] + 1); $parts[1] = 0; $parts[2] = 0; $parts[3] = 0 
+            }
+            'Minor'
+            {
+                $parts[1] = ([int]$parts[1] + 1); $parts[2] = 0; $parts[3] = 0 
+            }
+            'Build'
+            {
+                $parts[2] = ([int]$parts[2] + 1); $parts[3] = 0 
+            }
+            'Revision'
+            {
+                $parts[3] = ([int]$parts[3] + 1) 
+            }
+        }
+        $finalVersion = ($parts[0..3]) -join '.'
+        Write-Host "Incremented $PartToIncrement: $updatedVersion -> $finalVersion"
+    }
+    elseif ($maintainCurrentVersion -or $NoVersionUpdate)
+    {
+        Write-Host "Maintaining version without increment: $finalVersion"
+    }
+
+    return $finalVersion
+}
+
+function UpdateHash()
+{
+    [CmdletBinding()]
+    param (
+        [string]$executableFilePath,
+        [string]$lastRunPath = "$pwd\lastrun.json"
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
+    Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
+    if (-not (Test-Path $executableFilePath))
+    {
+        Write-Error "File not found: $executableFilePath"
+        Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    if (-not (Test-Path $lastRunPath))
+    {
+        Write-Error "Last run file not found: $lastRunPath"
+        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+
+    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
+    if (-not $lastRunContent)
+    {
+        Write-Error "Failed to read JSON from $lastRunPath"
+        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    
+    # Get the hash of the executable file
+    $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
+    
+    if ($fileHash)
+    {
+        $lastRunContent.hash = $fileHash.Hash
+        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
+        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
+        Write-Host "Hash updated successfully in $lastRunPath"
+        return $true
     }
     else
     {
-        Write-Host "Incrementing revision number for version: $updatedVersion"
-        $updatedVersion = IncrementRevision -Version $updatedVersion
-        Write-Host "New version: $updatedVersion"
+        Write-Error "Failed to write updated hash to $lastRunPath"
+        return $false
     }
-    return $updatedVersion
 }
 
 function MergeFunctions()
@@ -766,7 +985,7 @@ function UpdateSettingsFile()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
                 try
                 {
-                    $settings | Export-PowerShellDataFile -Path $SettingsFilePath
+                    $settings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate
                     Write-Host "Settings updated successfully" -ForegroundColor Green
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
                 }
@@ -797,66 +1016,16 @@ function UpdateSettingsFile()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
     }
 }
-
-function UpdateHash()
-{
-    [CmdletBinding()]
-    param (
-        [string]$executableFilePath,
-        [string]$lastRunPath = "$pwd\lastrun.psd1"
-    )
-
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
-    Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
-    if (-not (Test-Path $executableFilePath))
-    {
-        Write-Error "File not found: $executableFilePath"
-        Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
-        return $false
-    }
-    if (-not (Test-Path $lastRunPath))
-    {
-        Write-Error "Last run file not found: $lastRunPath"
-        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
-        return $false
-    }
-
-    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
-    if (-not $lastRunContent)
-    {
-        Write-Error "Failed to read JSON from $lastRunPath"
-        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
-        return $false
-    }
-    
-    # Get the hash of the executable file
-    $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
-    
-    if ($fileHash)
-    {
-        $lastRunContent.hash = $fileHash.Hash
-        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
-        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
-        Write-Host "Hash updated successfully in $lastRunPath"
-        return $true
-    }
-    else
-    {
-        Write-Error "Failed to write updated hash to $lastRunPath"
-        return $false
-    }
-}
 #endregion helper functions
 
 #region Define variables
 $initFile = "init.psd1"
-$lastRunFile = "$pwd\lastrun.psd1"
-$lastRun = Get-Content -Path $lastRunFile | ConvertFrom-Json
+$lastRunFile = "$pwd\lastrun.json"
+$lastRun = get-lastrun -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
 $SettingsFile = "$pwd\settings.psd1"
-$functionsToMerge = @(Get-ChildItem -Path "$pwd\functions" -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'lastrun.psd1') 
+$functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
+$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'lastrun.json') 
 $settingsVersion = (Import-PowerShellDataFile -Path "$pwd\settings.psd1").version
 $stringsVersion = (Import-PowerShellDataFile -Path "$pwd\strings.psd1").version
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
@@ -867,7 +1036,6 @@ $leafName = Split-Path -Leaf $InputFile
 Write-Verbose "[$scriptName] Leaf name is: $leafName"
 $exeName = $leafName.Replace('.ps1', '.exe')
 Write-Verbose "[$scriptName] Executable name is: $exeName"
-
 if ([string]::IsNullOrWhiteSpace($OutputPath))
 {
     # No output path provided; use default build folder
@@ -890,10 +1058,8 @@ else
     }
 }
 Write-Host "Output file resolved to: $OutputFile"
-
 # Initialize success message after resolving OutputFile
 $successMessage = "$OutputFile written"
-
 $parentFolder = Split-Path -Parent $OutputFile
 $destSettingsFile = "$parentFolder\settings.psd1"
 #endregion
@@ -1001,27 +1167,7 @@ if ($updateHash)
     }
 }
 
-#Check if the initialization file exists.  If not, create it.
-if (-not (Test-Path -Path $initFile))
-{
-    Write-Host "Cannot find the initialization file $($initFile). Creating..."
-    if (InitializeConfiguration -rootFolder $PSScriptRoot)
-    {
-        Write-Host 'Initialization file created successfully.'
-    }
-    else
-    {
-        Write-Host 'Failed to create initialization file.'
-        Write-Host 'Run the script with the -verbose switch for more information.'
-        exit 1
-    }
-}
-else
-{
-    Write-Host "Found initialization file $($initFile)..."
-}
-
-$version = IncrementLastrunVersion -version $version -LastRunFile $lastRunFile
+$version = Update-LastRunVersion
 Write-Host "Incrementing Last run version to: $version"
 if ($null -ne $version)
 {
