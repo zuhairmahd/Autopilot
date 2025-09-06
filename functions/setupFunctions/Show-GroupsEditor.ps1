@@ -906,9 +906,7 @@ function Update-DomainGroupSetting()
             Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved updated domain configuration" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully saved updated domain configuration"
             
-            # Simplified verification by reloading configuration and comparing arrays
-            Write-Log -LogFile $logFile -Module $functionName -Message "Verifying update by reloading domain configuration" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Verifying update by reloading domain configuration"
+            # Verification approach updated: Previously, verification involved direct file inspection and manual parsing of the configuration file,
             
             $verifyConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             if ($verifyConfig)
