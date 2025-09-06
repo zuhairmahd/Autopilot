@@ -95,8 +95,7 @@ $exportData = @{
 }
 
 # Write the hashtable to a .psd1 file
-$exportData | Out-File -FilePath 'mydata.psd1'
-
+Export-PowerShellDataFile -InputObject $exportData -Path 'mydata.psd1'
 exit 0
 #region Initialize script
 # Set global log level for all Write-Log calls
