@@ -161,28 +161,28 @@ function Write-Log()
                 {
                     "Error"
                     {
-                        if ($OutputToConsole)
+                        if ($WriteToConsole)
                         {
                             Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
                         }
                     }
                     "Warning"
                     {
-                        if ($OutputToConsole)
+                        if ($WriteToConsole)
                         {
                             Write-Warning "[$Module] $Message" 
                         }
                     }
                     "Verbose"
                     {
-                        if ($OutputToConsole)
+                        if ($WriteToConsole)
                         {
                             Write-Verbose "[$Module] $Message" 
                         }
                     }
                     "Debug"
                     {
-                        if ($OutputToConsole)
+                        if ($WriteToConsole)
                         {
                             Write-Debug "[$Module] $Message" 
                         }
