@@ -906,170 +906,72 @@ function Update-DomainGroupSetting()
             Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved updated domain configuration" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully saved updated domain configuration"
             
-            # Verify the update by reloading
+            # Simplified verification by reloading configuration and comparing arrays
             Write-Log -LogFile $logFile -Module $functionName -Message "Verifying update by reloading domain configuration" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Verifying update by reloading domain configuration"
             
             $verifyConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             if ($verifyConfig)
             {
-                $rawActualGroups = if ($GroupType -eq 'groupsToInclude')
+                # Convert to hashtable if needed for consistent access
+                $verifyConfigHash = Test-IsHashtableOrConvert -InputObject $verifyConfig
+                
+                # Get the actual saved groups
+                $actualGroups = if ($GroupType -eq 'groupsToInclude')
                 {
-                    $verifyConfig.groupsToInclude 
+                    $verifyConfigHash['groupsToInclude']
                 }
                 else
                 {
-                    $verifyConfig.groupsToExclude 
+                    $verifyConfigHash['groupsToExclude']
                 }
                 
-                # Enhanced logging for debugging array handling issues - handle null cases
-                $rawType = if ($null -eq $rawActualGroups)
-                {
-                    "null" 
-                }
-                else
-                {
-                    $rawActualGroups.GetType().Name 
-                }
+                # Ensure actualGroups is always an array
+                $actualGroups = @($actualGroups)
                 
-                # Ensure actualGroups is always an array for consistent comparison
-                # This handles the JSON serialization issue where single items become individual objects
-                $actualGroups = if ($null -eq $rawActualGroups)
-                {
-                    @()
-                }
-                elseif ($rawActualGroups -is [array])
-                {
-                    $rawActualGroups
-                }
-                else
-                {
-                    # Single item was deserialized as individual object - wrap in array
-                    @($rawActualGroups)
-                }
+                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups"
                 
-                # Enhanced logging for array conversion results - use safe count methods
-                $actualGroupsCount = if ($actualGroups -is [array])
-                {
-                    $actualGroups.Count 
-                }
-                elseif ($null -eq $actualGroups)
-                {
-                    0 
-                }
-                else
-                {
-                    1 
-                }
-                $groupsArrayCount = if ($groupsArray -is [array])
-                {
-                    $groupsArray.Count 
-                }
-                elseif ($null -eq $groupsArray)
-                {
-                    0 
-                }
-                else
-                {
-                    1 
-                }
+                # Use simplified comparison approach similar to Update-Setting.ps1
+                $verificationResult = $false
                 
-                $actualType = if ($null -eq $actualGroups)
-                {
-                    "null" 
-                }
-                else
-                {
-                    $actualGroups.GetType().Name 
-                }
-                $actualJson = if ($null -eq $actualGroups)
-                {
-                    "null" 
-                }
-                else
-                {
-                    $actualGroups | ConvertTo-Json -Compress 
-                }
-                Write-Log -LogFile $logFile -Module $functionName -Message "After array conversion: Type=$actualType, SafeCount=$actualGroupsCount, Value=$actualJson" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] After conversion: Type=$actualType, SafeCount=$actualGroupsCount"
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $groupsArrayCount groups, Loaded $actualGroupsCount groups" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Verification: Saved $groupsArrayCount groups, Loaded $actualGroupsCount groups"
-                
-                # Handle different comparison strategies based on content type
-                $comparisonResult = $null
-                if ($groupsArrayCount -eq 0 -and $actualGroupsCount -eq 0)
+                if ($groupsArray.Count -eq 0 -and $actualGroups.Count -eq 0)
                 {
                     # Both are empty - verification successful
-                    $comparisonResult = $null
+                    $verificationResult = $true
                 }
-                elseif ($groupsArrayCount -ne $actualGroupsCount)
+                elseif ($groupsArray.Count -eq $actualGroups.Count)
                 {
-                    # Different counts - verification failed
-                    $savedType = if ($null -eq $groupsArray)
-                    {
-                        "null" 
-                    }
-                    else
-                    {
-                        $groupsArray.GetType().Name 
-                    }
-                    $loadedType = if ($null -eq $actualGroups)
-                    {
-                        "null" 
-                    }
-                    else
-                    {
-                        $actualGroups.GetType().Name 
-                    }
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Count mismatch detected: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType" -LogLevel "Warning"
-                    Write-Verbose "[$functionName] Count mismatch: savedCount=$groupsArrayCount, loadedCount=$actualGroupsCount, savedType=$savedType, loadedType=$loadedType"
-                    $comparisonResult = @("Count mismatch: saved $groupsArrayCount, loaded $actualGroupsCount")
-                }
-                else
-                {
-                    # Same count, need to compare content
-                    if ($groupsArrayCount -gt 0 -and $groupsArray[0] -is [hashtable])
+                    # Same count, compare content
+                    if ($groupsArray.Count -gt 0 -and $groupsArray[0] -is [hashtable])
                     {
                         # Hashtable comparison - compare by ID and name
-                        for ($i = 0; $i -lt $groupsArrayCount; $i++)
+                        $verificationResult = $true
+                        for ($i = 0; $i -lt $groupsArray.Count; $i++)
                         {
                             $saved = $groupsArray[$i]
                             $loaded = $actualGroups[$i]
                             
-                            # Handle case where loaded item might be PSCustomObject instead of hashtable
-                            $loadedName = if ($loaded -is [hashtable])
-                            {
-                                $loaded.name 
-                            }
-                            else
-                            {
-                                $loaded.name 
-                            }
-                            $loadedId = if ($loaded -is [hashtable])
-                            {
-                                $loaded.id 
-                            }
-                            else
-                            {
-                                $loaded.id 
-                            }
+                            # Convert loaded item to hashtable if needed
+                            $loadedHash = Test-IsHashtableOrConvert -InputObject $loaded
                             
-                            if (($saved.name -ne $loadedName) -or ($saved.id -ne $loadedId))
+                            if (($saved.name -ne $loadedHash.name) -or ($saved.id -ne $loadedHash.id))
                             {
-                                $comparisonResult = @("Hashtable content mismatch at index $i`: saved($($saved.name),$($saved.id)) vs loaded($loadedName,$loadedId)")
+                                Write-Log -LogFile $logFile -Module $functionName -Message "Content mismatch at index $i`: saved($($saved.name),$($saved.id)) vs loaded($($loadedHash.name),$($loadedHash.id))" -LogLevel "Verbose"
+                                $verificationResult = $false
                                 break
                             }
                         }
                     }
                     else
                     {
-                        # String or simple object comparison
+                        # Simple array comparison
                         $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
+                        $verificationResult = ($null -eq $comparisonResult)
                     }
                 }
                 
-                if ($null -eq $comparisonResult)
+                if ($verificationResult)
                 {
                     Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated and verified $GroupType" -LogLevel "Information"
                     Write-Verbose "[$functionName] Successfully updated and verified $GroupType"
@@ -1077,9 +979,8 @@ function Update-DomainGroupSetting()
                 }
                 else
                 {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType. Details: $($comparisonResult -join ', ')" -LogLevel "Warning"
-                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $groupsArrayCount items, Loaded: $actualGroupsCount items"
-                    Write-Verbose "[$functionName] Verification failed for $GroupType. Comparison result: $($comparisonResult -join ', ')"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType" -LogLevel "Warning"
+                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $($groupsArray.Count) items, Loaded: $($actualGroups.Count) items"
                     Write-Warning "[$functionName] Verification failed for $GroupType"
                     return $false
                 }
