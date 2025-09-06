@@ -1,8 +1,8 @@
 {
   "testMenu": {
     "type": "static",
-    "Title": "Test Menu",
     "items": [],
-    "Description": "Test menu for caching"
+    "Description": "Test menu for caching",
+    "Title": "Test Menu"
   }
 }
