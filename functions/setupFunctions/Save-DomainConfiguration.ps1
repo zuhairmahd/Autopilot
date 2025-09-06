@@ -2,10 +2,10 @@ function Save-DomainConfiguration
 {
     <#
     .SYNOPSIS
-        Saves domain-specific configuration to a separate JSON file.
+        Saves domain-specific configuration to a separate PSD1 file.
     
     .DESCRIPTION
-        Saves domain configuration to a file named after the domain (e.g., contoso.com.json).
+        Saves domain configuration to a PowerShell Data File named after the domain (e.g., contoso.com.psd1).
         Creates timestamped backups before modifying existing files.
     
     .PARAMETER DomainName
@@ -16,7 +16,7 @@ function Save-DomainConfiguration
     
     .PARAMETER ConfigurationPath
         The directory path where domain configuration files are stored.
-        Defaults to the same directory as settings.json.
+        Defaults to the current working directory.
     
     .PARAMETER CreateBackup
         Whether to create a timestamped backup before overwriting existing files.
@@ -31,7 +31,8 @@ function Save-DomainConfiguration
     
     .NOTES
         Creates the configuration directory if it doesn't exist.
-        Uses UTF-8 encoding for the JSON file.
+        Uses PowerShell Data File (.psd1) format for optimal performance.
+        Maintains PowerShell 5.1 compatibility.
     #>
     [CmdletBinding()]
     param(
@@ -61,8 +62,8 @@ function Save-DomainConfiguration
             New-Item -Path $ConfigurationPath -ItemType Directory -Force | Out-Null
         }
         
-        # Construct the domain configuration file path
-        $domainConfigFile = Join-Path $ConfigurationPath "$DomainName.json"
+        # Construct the domain configuration file path (using .psd1 format)
+        $domainConfigFile = Join-Path $ConfigurationPath "$DomainName.psd1"
         Write-Verbose "[$functionName] Domain config file path: $domainConfigFile"
         
         # Create backup if file exists and backup is requested
@@ -74,31 +75,27 @@ function Save-DomainConfiguration
             Write-Log -LogFile $logFile -Message "Created backup: $backupFile" -Module $functionName -LogLevel "Verbose"
         }
         
-        # Convert configuration to JSON with proper formatting
-        # Ensure arrays are preserved during JSON serialization (PowerShell 5.1 compatibility)
-        $jsonContent = $DomainConfiguration | ConvertTo-Json -Depth 10 -Compress:$false
-        
-        # Save to file
-        $jsonContent | Out-File -FilePath $domainConfigFile -Encoding UTF8 -Force
+        # Save using Export-PowerShellDataFile for PSD1 format
+        $exportResult = Export-PowerShellDataFile -InputObject $DomainConfiguration -Path $domainConfigFile -Force
         
         # Verify the file was saved successfully
-        if (Test-Path $domainConfigFile)
+        if ($exportResult -and (Test-Path $domainConfigFile))
         {
             Write-Verbose "[$functionName] Successfully saved domain configuration to: $domainConfigFile"
             Write-Log -LogFile $logFile -Message "Successfully saved domain configuration to: $domainConfigFile" -Module $functionName -LogLevel "Information"
             
-            # Validate the saved JSON
+            # Validate the saved PSD1
             try
             {
-                $verifyContent = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
-                Write-Verbose "[$functionName] Verified saved JSON is valid"
-                Write-Log -LogFile $logFile -Message "Verified saved JSON is valid for domain: $DomainName" -Module $functionName -LogLevel "Verbose"
+                $verifyContent = Import-PowerShellDataFile -Path $domainConfigFile -ErrorAction Stop
+                Write-Verbose "[$functionName] Verified saved PSD1 is valid"
+                Write-Log -LogFile $logFile -Message "Verified saved PSD1 is valid for domain: $DomainName" -Module $functionName -LogLevel "Verbose"
                 return $true
             }
             catch
             {
-                Write-Warning "[$functionName] Saved JSON file is invalid: $($_.Exception.Message)"
-                Write-Log -LogFile $logFile -Message "Saved JSON file is invalid: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
+                Write-Warning "[$functionName] Saved PSD1 file is invalid: $($_.Exception.Message)"
+                Write-Log -LogFile $logFile -Message "Saved PSD1 file is invalid: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
                 return $false
             }
         }

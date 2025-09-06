@@ -14,7 +14,7 @@ function Show-SettingsViewer()
         Specifies whether to view 'Global', 'Domain', or 'Auth' settings.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file. Defaults to "settings.json".
+        Path to the settings.psd1 file. Defaults to "settings.psd1".
     
     .PARAMETER DomainName
         Required when SettingsType is 'Domain'. Specifies which domain's settings to view.
@@ -46,7 +46,7 @@ function Show-SettingsViewer()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingsType,
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
         [switch]$Silent
     )

@@ -448,6 +448,324 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
+            checkMenu        = @{
+                Title               = 'Check Device Status'
+                Description         = 'How would you like to lookup the device?'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk')
+                items               = @(
+                    @{
+                        name                   = 'Lookup device by Serial Number'
+                        description            = 'Lookup a device by its serial number'
+                        blockType              = 'menu'
+                        menuName               = 'serialNumberMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Lookup device by User'
+                        description            = 'Lookup a device by the user id or email address'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    }
+                )
+            }
+            autopilotMenu    = @{
+                Title               = 'Autopilot Menu'
+                Description         = 'Import a device into Autopilot and perform related actions'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                items               = @(
+                    @{
+                        name                   = 'Import device into Autopilot'
+                        description            = 'Import a device into Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Custom import device into Autopilot (requires admin rights)'
+                        description            = 'Custom import a device into Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Import Corporate Device Identifier for Device Preparation (requires admin rights)'
+                        description            = 'Import a Corporate Device Identifier for Device Preparation'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)'
+                        description            = 'Export a Corporate Device Identifier for manual upload to Device Preparation'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Get device hash for manual upload to Autopilot (requires admin rights)'
+                        description            = 'Get the device hash for manual upload to Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Download and install latest Windows updates(requires admin rights)'
+                        description            = 'Download and install the latest Windows updates'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Check device Autopilot status'
+                        description            = 'Check if a device is registered in Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Delete device from Autopilot'
+                        description            = 'Delete a device from Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Quick Import device into Autopilot (requires admin rights)'
+                        description            = 'Quick import a device into Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Delete Corporate Device Identifier from Device Preparation (requires admin rights)'
+                        description            = 'Delete a Corporate Device Identifier from Device Preparation'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    }
+                )
+            }
+            settingsMenu     = @{
+                Title               = 'Settings menu'
+                Description         = 'Make changes to the application settings'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                items               = @(
+                    @{
+                        name                   = 'Change environment settings'
+                        description            = 'Change the environment settings'
+                        blockType              = 'menu'
+                        menuName               = 'environmentMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change Entra Credentials'
+                        description            = 'Change the Entra credentials'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change Auto Update settings'
+                        description            = 'Change the Auto Update settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change App Mode settings'
+                        description            = 'Change the App Mode settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    }
+                )
+            }
+            exportMenu       = @{
+                Title               = 'Export Menu'
+                Description         = 'Choose what you would like to export'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Export Autopilot Devices'
+                        description            = 'Export Autopilot devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Export Imported Autopilot Devices'
+                        description            = 'Export imported Autopilot devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Export Managed Windows Devices'
+                        description            = 'Export managed Windows devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Export Unmanaged Windows Devices'
+                        description            = 'Export unmanaged Windows devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Export device storage report'
+                        description            = 'Export a report of device storage to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Export Application Assignments'
+                        description            = 'Export application assignments to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    }
+                )
+            }
+            serialNumberMenu = @{
+                Title               = 'Lookup by Serial Number'
+                Description         = 'How would you like to enter the serial number?'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk')
+                items               = @(
+                    @{
+                        name                   = 'Enter a serial number'
+                        description            = 'Lookup a device by its serial number'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Use this device''s serial number'
+                        description            = 'Lookup the device the application is running on'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    }
+                )
+            }
+            environmentMenu  = @{
+                Title               = 'Change Environment Menu'
+                Description         = 'Manage your environment settings and configurations'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                items               = @(
+                    @{
+                        name                   = 'View global environment settings'
+                        description            = 'View the global environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'View domain specific environment settings'
+                        description            = 'View the domain specific environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'View group inclusion/exclusion settings for all domains'
+                        description            = 'View the group inclusion/exclusion settings for all domains'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change global environment settings'
+                        description            = 'Change the global environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Change domain specific settings'
+                        description            = 'Change the domain specific environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Change authentication settings'
+                        description            = 'Change the authentication settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Change group inclusion/exclusion'
+                        description            = 'Change the group inclusion/exclusion settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    }
+                )
+            }
+            # Dynamic menus (these are created programmatically)
+            userMenu         = @{
+                type                  = 'dynamic'
+                Title                 = 'Select a user'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                Description           = 'Did you mean:'
+            }
+            deviceMenu       = @{
+                type                  = 'dynamic'
+                Title                 = 'Device Selection'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                Description           = 'Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))'
+            }
+            groupMenu        = @{
+                type                  = 'dynamic'
+                Title                 = 'Select a group'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                Description           = 'Did you mean:'
+            }
+            # Additional menus for various workflows
+            deviceActionsMenu = @{
+                Title               = 'Device Actions for $deviceName'
+                Description         = 'Select an action to perform on this device:'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Wipe Device'
+                        description            = 'Wipe the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Clean Device'
+                        description            = 'Clean the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Sync Device'
+                        description            = 'Sync the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Get LAPS Password'
+                        description            = 'Retrieve the LAPS password for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Get BitLocker Recovery Key'
+                        description            = 'Retrieve the BitLocker recovery key for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Get Hardware Password Details'
+                        description            = 'Retrieve the BIOS password details for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Restart Device'
+                        description            = 'Restart the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Show Device Health Status'
+                        description            = 'Show the health status of the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Check next user readiness state'
+                        description            = 'Check the next user readiness state for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
         }
     }
     

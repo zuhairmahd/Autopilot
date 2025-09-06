@@ -47,39 +47,49 @@ function Get-MenuConfiguration()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Loading menu configuration from: $MenuConfigFile"
     
-    # Default menu configuration fallback values
-    $defaultMenuValues = @{
-        name             = 'menu.psd1'
-        description      = 'This file contains the definitions for the menus used in the application.'
-        version          = '1.3.0.0'
-        appModeHierarchy = @{
-            full                 = @('*')
-            advanced             = @('advanced', 'helpdesk', 'registration')
-            helpdesk             = @('helpdesk')
-            registration         = @('registration')
-            advancedRegistration = @('advancedRegistration', 'registration')
-            admin                = @('admin', 'advanced', 'helpdesk', 'registration')
-            custom               = @()
+    # Use comprehensive defaults from Get-ApplicationDefaults instead of minimal fallback
+    try 
+    {
+        $defaultMenuValues = Get-ApplicationDefaults -DefaultType "Menus"
+        Write-Verbose "[$functionName] Using comprehensive menu defaults from Get-ApplicationDefaults"
+    }
+    catch 
+    {
+        Write-Warning "[$functionName] Failed to get comprehensive defaults, using minimal fallback"
+        # Minimal fallback if Get-ApplicationDefaults fails
+        $defaultMenuValues = @{
+            name             = 'menu.psd1'
+            description      = 'This file contains the definitions for the menus used in the application.'
+            version          = '1.3.0.0'
+            appModeHierarchy = @{
+                full                 = @('*')
+                advanced             = @('advanced', 'helpdesk', 'registration')
+                helpdesk             = @('helpdesk')
+                registration         = @('registration')
+                advancedRegistration = @('advancedRegistration', 'registration')
+                admin                = @('admin', 'advanced', 'helpdesk', 'registration')
+                custom               = @()
+            }
+            appModeDefaults  = @{
+                full         = @{
+                    description  = 'Full administrative access with all features enabled'
+                    capabilities = @('all_menus', 'all_actions', 'settings_management', 'advanced_diagnostics', 'export_all', 'device_management')
+                }
+                advanced     = @{
+                    description  = 'Advanced user with helpdesk and configuration capabilities'
+                    capabilities = @('advanced_features', 'helpdesk_operations', 'device_registration', 'settings_view')
+                }
+                helpdesk     = @{
+                    description  = 'Helpdesk operator with device support capabilities'
+                    capabilities = @('device_lookup', 'basic_troubleshooting', 'user_assistance')
+                }
+                registration = @{
+                    description  = 'Device registration specialist'
+                    capabilities = @('device_registration', 'autopilot_enrollment')
+                }
+            }
+            menus            = @()
         }
-        appModeDefaults  = @{
-            full         = @{
-                description  = 'Full administrative access with all features enabled'
-                capabilities = @('all_menus', 'all_actions', 'settings_management', 'advanced_diagnostics', 'export_all', 'device_management')
-            }
-            advanced     = @{
-                description  = 'Advanced user with helpdesk and configuration capabilities'
-                capabilities = @('advanced_features', 'helpdesk_operations', 'device_registration', 'settings_view')
-            }
-            helpdesk     = @{
-                description  = 'Helpdesk operator with device support capabilities'
-                capabilities = @('device_lookup', 'basic_troubleshooting', 'user_assistance')
-            }
-            registration = @{
-                description  = 'Device registration specialist'
-                capabilities = @('device_registration', 'autopilot_enrollment')
-            }
-        }
-        menus            = @()
     }
     
     try
