@@ -38,9 +38,7 @@ TestResults/
 *.snupkg
 
 # Misc. files.
-*.bat
 *.csv
-*.cmd
 *.backup.*
 config.json
 *.zuh
