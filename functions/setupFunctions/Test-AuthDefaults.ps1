@@ -2,15 +2,15 @@ function Test-AuthDefaults()
 {
     <#
     .SYNOPSIS
-        Ensures that auth section in settings.json has all required default values.
+        Ensures that auth section in settings.psd1 has all required default values.
     
     .DESCRIPTION
-        Checks if the auth section in settings.json contains all required settings,
+        Checks if the auth section in settings.psd1 contains all required settings,
         and if not, adds the missing default values. This function follows the same
         pattern as Test-SettingsJsonExists but focuses specifically on the auth section.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file.
+        Path to the settings.psd1 file.
     
     .PARAMETER Silent
         If specified, skips confirmation prompts.
@@ -20,15 +20,16 @@ function Test-AuthDefaults()
         Returns $true if the auth section exists and was updated with defaults, $false otherwise.
     
     .EXAMPLE
-        Test-AuthDefaults -SettingsFile "settings.json"
+        Test-AuthDefaults -SettingsFile "settings.psd1"
     
     .EXAMPLE
-        Test-AuthDefaults -SettingsFile "custom-settings.json" -Silent
+        Test-AuthDefaults -SettingsFile "custom-settings.psd1" -Silent
     
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Creates backup before modification for safety
         - Uses the exact default auth structure provided in requirements
+        - Uses PowerShell Data File (.psd1) format for optimal performance
     #>
     [CmdletBinding()]
     param(
@@ -80,29 +81,35 @@ function Test-AuthDefaults()
             return $false
         }
         
-        # Load existing settings
-        $jsonContent = Get-Content -Path $SettingsFile -Raw -Force
-        $settings = $jsonContent | ConvertFrom-Json
+        # Load existing settings (use PSD1 format)
+        $settings = Import-PowerShellDataFile -Path $SettingsFile -ErrorAction Stop
         
-        Write-Verbose "[$functionName] Loaded existing settings from file"
-        Write-SafeLogFallback "Loaded existing settings from file" "Verbose"
+        Write-Verbose "[$functionName] Loaded existing settings from PSD1 file"
+        Write-SafeLogFallback "Loaded existing settings from PSD1 file" "Verbose"
         
-        # Convert to hashtable for easier manipulation
-        $settingsHash = @{}
-        foreach ($property in $settings.PSObject.Properties)
+        # Convert to hashtable if needed for easier manipulation
+        if ($settings -is [hashtable])
         {
-            if ($property.Value -is [PSCustomObject])
+            $settingsHash = $settings
+        }
+        else
+        {
+            $settingsHash = @{}
+            foreach ($property in $settings.PSObject.Properties)
             {
-                $nestedHash = @{}
-                foreach ($nestedProp in $property.Value.PSObject.Properties)
+                if ($property.Value -is [PSCustomObject])
                 {
-                    $nestedHash[$nestedProp.Name] = $nestedProp.Value
+                    $nestedHash = @{}
+                    foreach ($nestedProp in $property.Value.PSObject.Properties)
+                    {
+                        $nestedHash[$nestedProp.Name] = $nestedProp.Value
+                    }
+                    $settingsHash[$property.Name] = $nestedHash
                 }
-                $settingsHash[$property.Name] = $nestedHash
-            }
-            else
-            {
-                $settingsHash[$property.Name] = $property.Value
+                else
+                {
+                    $settingsHash[$property.Name] = $property.Value
+                }
             }
         }
         
@@ -149,30 +156,24 @@ function Test-AuthDefaults()
             Write-Verbose "[$functionName] Created backup: $backupFile"
             Write-SafeLogFallback "Created backup: $backupFile" "Information"
             
-            # Convert hashtable back to PSCustomObject for JSON output
-            $outputSettings = [PSCustomObject]@{}
-            foreach ($key in $settingsHash.Keys)
+            # Save updated settings using Export-PowerShellDataFile for PSD1 format
+            $exportResult = Export-PowerShellDataFile -InputObject $settingsHash -Path $SettingsFile -Force
+            
+            if ($exportResult)
             {
-                if ($settingsHash[$key] -is [hashtable])
+                Write-Verbose "[$functionName] Auth defaults updated successfully in PSD1 format"
+                Write-SafeLogFallback "Auth defaults updated successfully in PSD1 format" "Information"
+                
+                if (-not $Silent)
                 {
-                    $outputSettings | Add-Member -MemberType NoteProperty -Name $key -Value ([PSCustomObject]$settingsHash[$key])
-                }
-                else
-                {
-                    $outputSettings | Add-Member -MemberType NoteProperty -Name $key -Value $settingsHash[$key]
+                    Write-Host "Auth section updated with default values." -ForegroundColor Green
                 }
             }
-            
-            # Save updated settings
-            $jsonOutput = $outputSettings | ConvertTo-Json -Depth $global:maxJSONDepth
-            Set-Content -Path $SettingsFile -Value $jsonOutput -Force
-            
-            Write-Verbose "[$functionName] Auth defaults updated successfully"
-            Write-SafeLogFallback "Auth defaults updated successfully" "Information"
-            
-            if (-not $Silent)
+            else
             {
-                Write-Host "Auth section updated with default values." -ForegroundColor Green
+                Write-Warning "[$functionName] Failed to save updated settings to PSD1 file"
+                Write-SafeLogFallback "Failed to save updated settings to PSD1 file" "Error"
+                return $false
             }
         }
         else

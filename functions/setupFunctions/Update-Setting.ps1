@@ -195,13 +195,19 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
         Write-Log -LogFile $logFile -Message "Loading existing settings from $SettingsFile" -Module $functionName
         $settingsObj = Import-PowerShellDataFile -Path $SettingsFile -ErrorAction Stop
         
+        # Debug: Check what type we got
+        Write-Verbose "[$functionName] DEBUG: settingsObj type is $($settingsObj.GetType().Name)"
+        Write-Log -LogFile $logFile -Message "DEBUG: settingsObj type is $($settingsObj.GetType().Name)" -Module $functionName
+        
         # Convert PSCustomObject to hashtable for easier manipulation
-        if ($settingsObj -is [PSCustomObject])
+        if ($settingsObj.GetType().Name -eq "PSCustomObject")
         {
+            Write-Verbose "[$functionName] DEBUG: Converting PSCustomObject to hashtable"
             $settingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj -Context "main settings"
         }
         else
         {
+            Write-Verbose "[$functionName] DEBUG: Using object as-is (should be hashtable)"
             $settingsHash = $settingsObj
         }
         

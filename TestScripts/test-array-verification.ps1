@@ -91,7 +91,7 @@ try
     
     # Test 4: Verify final state
     Write-TestSubSection "Test 4: Verify final state"
-    $finalContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+    $finalContent = Import-PowerShellDataFile -Path $testSettingsFile
     $finalScope = $finalContent.auth.scope
     $isCorrectType = $finalScope -is [array]
     $hasCorrectValue = $finalScope.Count -eq 1 -and $finalScope[0] -eq "offline_access"

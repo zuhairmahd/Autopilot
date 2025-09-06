@@ -67,7 +67,7 @@ try {
     Write-TestSection "Testing Test-AuthDefaults function"
     
     # Create a test settings file using helper
-    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.json"
+    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.psd1"
     Write-TestResult "Basic settings file created at: $testSettingsFile" -Success $true
     
     # Test adding auth defaults
@@ -79,7 +79,7 @@ try {
             $passedTests++
             
             # Verify auth section was added
-            $settingsContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+            $settingsContent = Import-PowerShellDataFile -Path $testSettingsFile
             
             if ($settingsContent.auth) {
                 Write-TestResult "Auth section was added" -Success $true
@@ -181,7 +181,7 @@ try {
             $passedTests++
             
             # Verify the preset values were applied
-            $settingsContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+            $settingsContent = Import-PowerShellDataFile -Path $testSettingsFile
             
             if ($settingsContent.auth.authType -eq 'PublicAuthFlow' -and 
                 $settingsContent.auth.delegated -eq $true -and
@@ -214,7 +214,7 @@ try {
             $passedTests++
             
             # Verify the update
-            $settingsContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+            $settingsContent = Import-PowerShellDataFile -Path $testSettingsFile
             
             if ($settingsContent.auth.renewalLeadTime -eq 10) {
                 Write-TestResult "Auth setting update verified" -Success $true
@@ -241,7 +241,7 @@ try {
         $updateSuccess = Update-Setting -SettingType "Auth" -SettingsFile $testSettingsFile -SettingName "scope" -SettingValue $singleItemArray
         
         if ($updateSuccess) {
-            $settingsContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+            $settingsContent = Import-PowerShellDataFile -Path $testSettingsFile
             
             if ($settingsContent.auth.scope -is [array] -and $settingsContent.auth.scope.Count -eq 1) {
                 Write-TestResult "Single-item array preserved as array" -Success $true
