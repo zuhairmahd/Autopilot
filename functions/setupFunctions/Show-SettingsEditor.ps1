@@ -144,7 +144,7 @@ function Show-SettingsEditor()
             
             $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             
-            if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
+            if ($null -eq $domainConfig)
             {
                 Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for: $DomainName" -LogLevel "Warning"
@@ -153,7 +153,7 @@ function Show-SettingsEditor()
             
             Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
-            
+
             # Get domain settings template from centralized defaults (fixed approach)
             Write-Log -LogFile $logFile -Module $functionName -Message "Getting domain settings template from centralized defaults for domain: '$DomainName'" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Getting domain settings template from centralized defaults for domain: '$DomainName'"
@@ -161,14 +161,14 @@ function Show-SettingsEditor()
             try
             {
                 $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings)
+                if ($null -eq $domainTemplate)
                 {
                     Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
                     Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
                     return $false
                 }
                 
-                $settingsTemplate = $domainTemplate.settings
+                $settingsTemplate = $domainTemplate
                 Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
@@ -232,7 +232,14 @@ function Show-SettingsEditor()
             if (-not $Silent)
             {
                 # Display setting with path for nested values
-                $displayName = if ($isNested) { $settingPath } else { $settingName }
+                $displayName = if ($isNested)
+                {
+                    $settingPath 
+                }
+                else
+                {
+                    $settingName 
+                }
                 Write-Host "Setting: $displayName" -ForegroundColor Yellow
                 Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
                 Write-Host "Current value: $(Format-SettingValueForDisplay -Value $currentValue)" -ForegroundColor Cyan
@@ -255,7 +262,14 @@ function Show-SettingsEditor()
             if ($newValue -ne $currentValue)
             {
                 # For nested settings, use the path as the key
-                $keyToUse = if ($isNested) { $settingPath } else { $settingName }
+                $keyToUse = if ($isNested)
+                {
+                    $settingPath 
+                }
+                else
+                {
+                    $settingName 
+                }
                 $updatedSettings[$keyToUse] = $newValue
                 $hasChanges = $true
                 Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingPath' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
@@ -432,12 +446,14 @@ function Get-CurrentSettings()
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
             # Create default settings file using Get-ConfigurationData which will handle defaults
-            try {
+            try
+            {
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
                 $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
                 Write-Verbose "[$functionName] Created default settings file"
             }
-            catch {
+            catch
+            {
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings file: $($_.Exception.Message)" -LogLevel "Error"
                 Write-Verbose "[$functionName] Failed to create default settings file: $($_.Exception.Message)"
                 return $null
@@ -487,7 +503,10 @@ function Get-FlattenedSettingsForEditing()
         {
             $defaultValue = $SettingsTemplate[$key]
             $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue) { $currentValue = $defaultValue }
+            if ($null -eq $currentValue)
+            {
+                $currentValue = $defaultValue 
+            }
             
             if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
             {
@@ -521,7 +540,10 @@ function Get-FlattenedSettingsForEditing()
             $key = $property.Name
             $defaultValue = $property.Value
             $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue) { $currentValue = $defaultValue }
+            if ($null -eq $currentValue)
+            {
+                $currentValue = $defaultValue 
+            }
             
             if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
             {
@@ -1498,6 +1520,7 @@ function Save-DomainSettings()
         return $false
     }
 }
+
 function Update-NestedSetting()
 {
     <#

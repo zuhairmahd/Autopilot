@@ -12,6 +12,7 @@ Desktop.ini
 .secrets/
 release/
 build/
+test/
 TestReports/
 TestResults/
 .claude/

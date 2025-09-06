@@ -93,7 +93,7 @@ function Get-DomainConfigurationFromFiles()
             Write-Log -LogFile $logFile -Message "Domain configuration file not found, creating new configuration with defaults" -Module $functionName -LogLevel "Verbose"
             
             # Create new domain configuration with defaults
-            $global:domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
+            $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
             
             # Save the new configuration
             $domainDefaults | Export-PowerShellDataFile -Path $domainConfigFile -Force

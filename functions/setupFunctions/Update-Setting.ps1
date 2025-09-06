@@ -202,7 +202,7 @@ function Update-Setting()
         if (-not (Test-Path -Path $SettingsFile))
         {
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
-Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -Module $functionName -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -Module $functionName -LogLevel "Verbose"
             return $false
         }
         
@@ -216,7 +216,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
         Write-Log -LogFile $logFile -Message "DEBUG: settingsObj type is $($settingsObj.GetType().Name)" -Module $functionName
         
         # Convert PSCustomObject to hashtable for easier manipulation
-        if ($settingsObj -is [PSCustomObject])
+        if (-not $settingsObj -is [hashtable])
         {
             Write-Verbose "[$functionName] DEBUG: Converting PSCustomObject to hashtable"
             $settingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj -Context "main settings"
@@ -250,7 +250,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
             }
         }
         
-        if (-not $settingsHash.ContainsKey($requiredSection))
+        if (-not $settingsHash.ContainsKey($requiredSection) -and $SettingType -ne 'Domain')
         {
             Write-Warning "[$functionName] Settings file does not contain $requiredSection section"
             Write-Log -LogFile $logFile -Message "Settings file does not contain $requiredSection section" -Module $functionName -LogLevel "Warning"    
@@ -282,7 +282,6 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                 Write-Verbose "[$functionName] Updated globalSettings.$SettingName = $SettingValue"
                 Write-Log -LogFile $logFile -Message "Updated globalSettings.$SettingName = $SettingValue" -Module $functionName
             }
-            
             'Auth'
             {
                 # Ensure auth is a hashtable
@@ -305,86 +304,13 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                 Write-Verbose "[$functionName] Updated auth.$SettingName = $SettingValue"
                 Write-Log -LogFile $logFile -Message "Updated auth.$SettingName = $SettingValue" -Module $functionName
             }
-            
             'Domain'
             {
                 # Use new separate domain configuration file approach
                 Write-Verbose "[$functionName] Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)"
                 Write-Log -LogFile $logFile -Message "Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)" -Module $functionName
                 
-                # Check if domain exists in main settings.psd1 and migrate if needed
                 $configPath = Split-Path $SettingsFile -Parent
-                $domainConfigFile = Join-Path $configPath "$DomainName.psd1"
-                
-                if (-not (Test-Path $domainConfigFile) -and $settingsHash['domains'] -and $settingsHash['domains'].ContainsKey($DomainName))
-                {
-                    Write-Verbose "[$functionName] Found domain '$DomainName' in main settings file, migrating to separate file"
-                    Write-Log -LogFile $logFile -Message "Found domain '$DomainName' in main settings file, migrating to separate file" -Module $functionName
-                    
-                    # Get the existing domain configuration from main settings
-                    $existingDomainConfig = $settingsHash['domains'][$DomainName]
-                    
-                    # Convert to hashtable for easier manipulation
-                    $domainConfigHash = @{
-                        groupsToInclude  = if ($existingDomainConfig['groupsToInclude'])
-                        {
-                            $existingDomainConfig['groupsToInclude'] 
-                        }
-                        else
-                        {
-                            @() 
-                        }
-                        groupsToExclude  = if ($existingDomainConfig['groupsToExclude'])
-                        {
-                            $existingDomainConfig['groupsToExclude'] 
-                        }
-                        else
-                        {
-                            @() 
-                        }
-                        settings         = if ($existingDomainConfig['settings'])
-                        { 
-                            if ($existingDomainConfig['settings'] -is [PSCustomObject])
-                            {
-                                $settingsHash = @{}
-                                $existingDomainConfig['settings'].PSObject.Properties | ForEach-Object {
-                                    $settingsHash[$_.Name] = $_.Value
-                                }
-                                $settingsHash
-                            }
-                            else
-                            {
-                                $existingDomainConfig['settings']
-                            }
-                        }
-                        else
-                        {
-                            @{} 
-                        }
-                        additionalScopes = if ($existingDomainConfig['additionalScopes'])
-                        {
-                            $existingDomainConfig['additionalScopes'] 
-                        }
-                        else
-                        {
-                            @() 
-                        }
-                    }
-                    
-                    # Save the migrated domain configuration to separate file
-                    $saveResult = Save-DomainConfiguration -DomainName $DomainName -DomainConfiguration $domainConfigHash -ConfigurationPath $configPath
-                    if ($saveResult)
-                    {
-                        Write-Verbose "[$functionName] Successfully migrated domain '$DomainName' to separate file"
-                        Write-Log -LogFile $logFile -Message "Successfully migrated domain '$DomainName' to separate file" -Module $functionName
-                    }
-                    else
-                    {
-                        Write-Warning "[$functionName] Failed to save migrated domain configuration for '$DomainName'"
-                        Write-Log -LogFile $logFile -Message "Failed to save migrated domain configuration for '$DomainName'" -Module $functionName -LogLevel "Warning"
-                    }
-                }
-                
                 # Load existing domain configuration
                 $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
                 
@@ -396,7 +322,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                 }
                 
                 # Update domain settings
-                if ($MergeSettings -and $domainConfig['settings'])
+                if ($MergeSettings -and $domainConfig)
                 {
                     # Merge with existing settings
                     Write-Verbose "[$functionName] Merging settings with existing domain configuration"
@@ -404,16 +330,16 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                     
                     # Convert PSCustomObject to hashtable for easier manipulation
                     $existingSettings = @{}
-                    if ($domainConfig['settings'] -is [PSCustomObject])
+                    if (-not $domainConfig -is [hashtable])
                     {
-                        foreach ($prop in $domainConfig['settings'].PSObject.Properties)
+                        foreach ($prop in $domainConfig.PSObject.Properties)
                         {
                             $existingSettings[$prop.Name] = $prop.Value
                         }
                     }
                     else
                     {
-                        $existingSettings = $domainConfig['settings']
+                        $existingSettings = $domainConfig
                     }
                     
                     # Merge new settings
@@ -424,14 +350,14 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                     }
                     
                     # Update domain config
-                    $domainConfig['settings'] = $existingSettings
+                    $domainConfig = $existingSettings
                 }
                 else
                 {
                     # Replace entire settings section
                     Write-Verbose "[$functionName] Replacing entire settings section for domain"
                     Write-Log -LogFile $logFile -Message "Replacing entire settings section for domain '$DomainName'" -Module $functionName
-                    $domainConfig['settings'] = $Settings
+                    $domainConfig = $Settings
                 }
                 
                 # Save the updated domain configuration
@@ -548,7 +474,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                 else
                 {
                     Write-Warning "[$functionName] Failed to verify auth setting update - property not found"
-Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Verbose"
+                    Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Verbose"
                     $false
                 }
             }
@@ -563,7 +489,7 @@ Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - pro
                     try
                     {
                         $verifyDomainConfig = Import-PowerShellDataFile -Path $domainConfigFile -ErrorAction Stop
-                        if ($verifyDomainConfig -and ($verifyDomainConfig['settings'] -or $verifyDomainConfig.settings))
+                        if ($verifyDomainConfig)
                         {
                             Write-Verbose "[$functionName] Successfully updated and verified domain settings in separate file"
                             Write-Log -LogFile $logFile -Message "Successfully updated and verified domain settings for '$DomainName' in separate file" -Module $functionName
@@ -586,7 +512,7 @@ Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - pro
                 else
                 {
                     Write-Warning "[$functionName] Failed to verify domain settings - configuration file not found"
-Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Verbose"
+                    Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Verbose"
                     $false
                 }
             }

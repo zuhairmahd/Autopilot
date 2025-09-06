@@ -292,24 +292,24 @@ if (Test-Path $configFile)
             # Reload the configuration with new password
             Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
             $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-                if ($reloadResult.Success)
-                {
-                    # Update configContent for this session
-                    $configContent = $reloadResult.ConfigContent
-                }
-                else
-                {
-                    Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                    exit 1
-                }
+            if ($reloadResult.Success)
+            {
+                # Update configContent for this session
+                $configContent = $reloadResult.ConfigContent
             }
             else
             {
-                Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                exit 1
             }
         }
+        else
+        {
+            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+        }
+    }
     
     if (-not ($sessionResult.encrypted))
     {
@@ -451,7 +451,7 @@ else
 }
 
 # Initialize configuration with helper function
-$global:configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
 
 if (-not $configResult.Success)
 {
