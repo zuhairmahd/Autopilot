@@ -90,8 +90,8 @@ try {
 
     Write-TestSection "Test 3: Auth Defaults Creation"
     
-    # Create basic settings file using helper
-    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "validation-settings.json" -CustomContent @{
+    # Create basic settings file using helper (PSD1 format)
+    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "validation-settings.psd1" -CustomContent @{
         globalSettings = @{
             appMode = "test"
             autoUpdate = $true
@@ -116,14 +116,20 @@ try {
             Write-TestResult "Test-AuthDefaults executed successfully" $true
             
             # Verify auth section
-            $content = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+            $content = Import-PowerShellDataFile -Path $testSettingsFile
             if ($content.auth) {
                 $requiredProps = @('changePwOnNextStart', 'authType', 'noSaveRefreshToken', 'forceNewToken', 'renewalLeadTime', 'scope', 'cacheType', 'secureString', 'delegated')
                 $missingProps = @()
                 
                 foreach ($prop in $requiredProps) {
-                    if (-not ($content.auth.PSObject.Properties.Name -contains $prop)) {
-                        $missingProps += $prop
+                    if ($content.auth -is [hashtable]) {
+                        if (-not $content.auth.ContainsKey($prop)) {
+                            $missingProps += $prop
+                        }
+                    } else {
+                        if (-not ($content.auth.PSObject.Properties.Name -contains $prop)) {
+                            $missingProps += $prop
+                        }
                     }
                 }
                 
