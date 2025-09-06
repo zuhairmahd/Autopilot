@@ -13,6 +13,7 @@
 $ErrorActionPreference = "Stop"
 $VerbosePreference = "Continue"
 
+
 # Test configuration - create all artifacts in temp folder
 $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
 $TestConfigFolder = Join-Path $tempPath "update-setting-simplified-$(Get-Date -Format 'yyyyMMddHHmmss')"
@@ -31,8 +32,8 @@ try {
     Write-Host "Loading functions..." -ForegroundColor Gray
     $functionCount = 0
     $functionErrors = 0
-    
-    Get-ChildItem -Path "/home/runner/work/Autopilot/Autopilot/functions" -Recurse -Filter "*.ps1" | ForEach-Object {
+    Write-Host "The script root folder is $psscriptroot"
+    Get-ChildItem -Path "$PSScriptRoot/../functions" -Recurse -Filter "*.ps1" | ForEach-Object {
         try {
             . $_.FullName
             $functionCount++
