@@ -93,52 +93,6 @@ function Update-Setting()
     Write-Verbose "[$functionName] Updating $SettingType setting(s) in file: $SettingsFile"
     Write-Log -LogFile $logFile -Message "Updating $SettingType setting(s) in file: $SettingsFile" -Module $functionName
 
-    function ConvertTo-HashtableFromPSObject()
-    {
-        param(
-            [Parameter(Mandatory = $true)]
-            $PSObject,
-            [string]$Context = "object"
-        )
-        $functionName = $MyInvocation.MyCommand.Name
-        Write-Verbose "[$functionName] Converting $Context to hashtable"
-        Write-Log -LogFile $logFile -Message "Converting $Context to hashtable" -Module $functionName
-        
-        # If it's already a hashtable, return it as-is
-        if ($PSObject -is [hashtable])
-        {
-            Write-Verbose "[$functionName] Input is already a hashtable, returning as-is"
-            return $PSObject
-        }
-        
-        try
-        {
-            $hashtable = @{}
-            foreach ($property in $PSObject.PSObject.Properties)
-            {
-                # Only include NoteProperty types to exclude system properties
-                if ($property.MemberType -eq 'NoteProperty')
-                {
-                    $hashtable[$property.Name] = $property.Value
-                    Write-Log -LogFile $logFile -Message "Converted property '$($property.Name)' to hashtable" -Module $functionName
-                    Write-Verbose "[$functionName] Converted property '$($property.Name)' to hashtable"
-                }
-                else
-                {
-                    Write-Verbose "[$functionName] Skipping non-NoteProperty: '$($property.Name)' (Type: $($property.MemberType))"
-                }
-            }
-            Write-Log -LogFile $logFile -Message "Successfully converted $Context to hashtable with $($hashtable.Count) properties" -Module $functionName -LogLevel "Debug"
-            return $hashtable
-        }
-        catch
-        {
-            Write-Warning "[$functionName] Failed to convert $Context to hashtable: $($_.Exception.Message)"
-            Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $($_.Exception.Message)" -Module $functionName -LogLevel "Debug"
-            throw
-        }
-    }
-    
     function Test-SettingNameAndValue()
     {
         param(
@@ -215,11 +169,11 @@ function Update-Setting()
         Write-Verbose "[$functionName] DEBUG: settingsObj type is $($settingsObj.GetType().Name)"
         Write-Log -LogFile $logFile -Message "DEBUG: settingsObj type is $($settingsObj.GetType().Name)" -Module $functionName
         
-        # Convert PSCustomObject to hashtable for easier manipulation
+        # Convert to hashtable for easier manipulation using optimized utility
         if (-not $settingsObj -is [hashtable])
         {
-            Write-Verbose "[$functionName] DEBUG: Converting PSCustomObject to hashtable"
-            $settingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj -Context "main settings"
+            Write-Verbose "[$functionName] DEBUG: Converting object to hashtable using optimized utility"
+            $settingsHash = ConvertTo-HashtableOptimized -InputObject $settingsObj -Context "main settings"
         }
         else
         {
@@ -262,17 +216,8 @@ function Update-Setting()
         {
             'Global'
             {
-                # Ensure globalSettings is a hashtable
-                if ($settingsHash['globalSettings'] -is [PSCustomObject])
-                {
-                    Write-Verbose "[$functionName] Converting globalSettings to hashtable"
-                    Write-Log -LogFile $logFile -Message "Converting globalSettings to hashtable" -Module $functionName
-                    $globalSettingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsHash['globalSettings'] -Context "globalSettings"
-                }
-                else
-                {
-                    $globalSettingsHash = $settingsHash['globalSettings']
-                }
+                # Ensure globalSettings is a hashtable using optimized utility
+                $globalSettingsHash = Test-IsHashtableOrConvert -InputObject $settingsHash['globalSettings']
                 
                 # Update the specific setting
                 Write-Verbose "[$functionName] Updating globalSettings.$SettingName = $SettingValue"
@@ -284,17 +229,8 @@ function Update-Setting()
             }
             'Auth'
             {
-                # Ensure auth is a hashtable
-                if ($settingsHash['auth'] -is [PSCustomObject])
-                {
-                    Write-Verbose "[$functionName] Converting auth to hashtable"
-                    Write-Log -LogFile $logFile -Message "Converting auth to hashtable" -Module $functionName
-                    $authSettingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsHash['auth'] -Context "auth"
-                }
-                else
-                {
-                    $authSettingsHash = $settingsHash['auth']
-                }
+                # Ensure auth is a hashtable using optimized utility
+                $authSettingsHash = Test-IsHashtableOrConvert -InputObject $settingsHash['auth']
                 
                 # Update the specific setting
                 Write-Verbose "[$functionName] Updating auth.$SettingName = $SettingValue"
@@ -328,19 +264,8 @@ function Update-Setting()
                     Write-Verbose "[$functionName] Merging settings with existing domain configuration"
                     Write-Log -LogFile $logFile -Message "Merging provided settings into existing domain configuration for '$DomainName'" -Module $functionName
                     
-                    # Convert PSCustomObject to hashtable for easier manipulation
-                    $existingSettings = @{}
-                    if (-not $domainConfig -is [hashtable])
-                    {
-                        foreach ($prop in $domainConfig.PSObject.Properties)
-                        {
-                            $existingSettings[$prop.Name] = $prop.Value
-                        }
-                    }
-                    else
-                    {
-                        $existingSettings = $domainConfig
-                    }
+                    # Convert to hashtable for easier manipulation using optimized utility
+                    $existingSettings = Test-IsHashtableOrConvert -InputObject $domainConfig
                     
                     # Merge new settings
                     foreach ($key in $Settings.Keys)
@@ -403,15 +328,8 @@ function Update-Setting()
         if ($SettingType -ne 'Domain')
         {
             $verifySettings = Import-PowerShellDataFile -Path $SettingsFile -ErrorAction Stop
-            # Convert to hashtable if needed
-            if ($verifySettings -is [PSCustomObject])
-            {
-                $verifySettingsHash = ConvertTo-HashtableFromPSObject -PSObject $verifySettings -Context "verification"
-            }
-            else
-            {
-                $verifySettingsHash = $verifySettings
-            }
+            # Convert to hashtable if needed using optimized utility
+            $verifySettingsHash = Test-IsHashtableOrConvert -InputObject $verifySettings
         }
         
         $verificationResult = switch ($SettingType)

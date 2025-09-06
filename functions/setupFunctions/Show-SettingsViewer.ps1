@@ -208,8 +208,9 @@ function Show-SettingsViewer()
         Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display"
         
-        # Get flattened settings for display (same as editor but read-only)
-        $flattenedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues
+        # Get flattened settings for display (exclude GroupsToInclude/GroupsToExclude as they have dedicated viewers)
+        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude')
+        $flattenedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         $totalSettings = $flattenedSettings.Count
         
         Write-Verbose "[$functionName] Flattened $totalSettings settings for viewing"
@@ -360,105 +361,6 @@ function Show-SettingsViewer()
     }
 }
 
-function Get-FlattenedSettingsForViewing()
-{
-    <#
-    .SYNOPSIS
-        Flattens settings structure for viewing while preserving nested object information.
-    
-    .DESCRIPTION
-        Similar to Get-FlattenedSettingsForEditing but optimized for read-only display.
-        Processes both template and current values to create a flat list of settings
-        with proper path information for nested values.
-    #>
-    [CmdletBinding()]
-    param(
-        $SettingsTemplate,
-        $CurrentValues
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Flattening settings for viewing"
-    
-    $flattenedSettings = @()
-    
-    if ($SettingsTemplate -is [hashtable])
-    {
-        # Handle hashtable (auth settings)
-        foreach ($key in $SettingsTemplate.Keys)
-        {
-            $defaultValue = $SettingsTemplate[$key]
-            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue)
-            {
-                $currentValue = $defaultValue 
-            }
-            
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
-            {
-                # Process nested object
-                $nestedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $defaultValue -CurrentValues $currentValue
-                foreach ($nestedSetting in $nestedSettings)
-                {
-                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
-                    $nestedSetting.IsNested = $true
-                }
-                $flattenedSettings += $nestedSettings
-            }
-            else
-            {
-                # Simple value
-                $flattenedSettings += @{
-                    Name         = $key
-                    Path         = $key
-                    DefaultValue = $defaultValue
-                    CurrentValue = $currentValue
-                    IsNested     = $false
-                }
-            }
-        }
-    }
-    else
-    {
-        # Handle PSCustomObject (global and domain settings)
-        foreach ($property in $SettingsTemplate.PSObject.Properties)
-        {
-            $key = $property.Name
-            $defaultValue = $property.Value
-            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue)
-            {
-                $currentValue = $defaultValue 
-            }
-            
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
-            {
-                # Process nested object
-                $nestedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $defaultValue -CurrentValues $currentValue
-                foreach ($nestedSetting in $nestedSettings)
-                {
-                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
-                    $nestedSetting.IsNested = $true
-                }
-                $flattenedSettings += $nestedSettings
-            }
-            else
-            {
-                # Simple value
-                $flattenedSettings += @{
-                    Name         = $key
-                    Path         = $key
-                    DefaultValue = $defaultValue
-                    CurrentValue = $currentValue
-                    IsNested     = $false
-                }
-            }
-        }
-    }
-    
-    Write-Verbose "[$functionName] Flattened $($flattenedSettings.Count) settings for viewing"
-    return $flattenedSettings
-}
 
 function Display-SettingInfoForViewer()
 {
@@ -549,59 +451,6 @@ function Display-SettingInfo()
     }
     
     Write-Host ""  # Empty line for spacing
-}
-
-function Get-NestedValue()
-{
-    <#
-    .SYNOPSIS
-        Gets a value from a nested object using dot notation path.
-    #>
-    [CmdletBinding()]
-    param(
-        $Object,
-        [string]$Path
-    )
-    
-    if (-not $Object -or [string]::IsNullOrWhiteSpace($Path))
-    {
-        return $null
-    }
-    
-    $pathParts = $Path.Split('.')
-    $current = $Object
-    
-    foreach ($part in $pathParts)
-    {
-        if ($current -is [hashtable])
-        {
-            if ($current.ContainsKey($part))
-            {
-                $current = $current[$part]
-            }
-            else
-            {
-                return $null
-            }
-        }
-        elseif ($current -is [PSCustomObject])
-        {
-            if ($current.PSObject.Properties.Name -contains $part)
-            {
-                $current = $current.$part
-            }
-            else
-            {
-                return $null
-            }
-        }
-        else
-        {
-            return $null
-        }
-    }
-    
-    return $current
 }
 
 function Format-SettingValueForDisplay()
