@@ -122,19 +122,25 @@ function Export-PowerShellDataFile ()
             $configData = $InputObject
         }
         
-        # Convert to hashtable if PSCustomObject
-        if ($configData -is [PSCustomObject])
+        # Debug the input type
+        Write-Verbose "[$functionName] InputObject type: $($configData.GetType().FullName)"
+        Write-Verbose "[$functionName] InputObject is PSCustomObject: $($configData -is [PSCustomObject])"
+        Write-Verbose "[$functionName] InputObject is Hashtable: $($configData -is [hashtable])"
+        
+        # Convert to hashtable if PSCustomObject (check hashtable FIRST since PowerShell considers hashtables as both)
+        if ($configData -is [hashtable])
+        {
+            Write-Verbose "[$functionName] InputObject is a hashtable"
+            # No conversion needed
+        }
+        elseif ($configData -is [PSCustomObject])
         {
             Write-Verbose "[$functionName] Converting PSCustomObject to hashtable"
             $configData = ConvertTo-HashtableFromPSCustomObject -InputObject $configData
         }
-        elseif ($configData -isnot [hashtable])
-        {
-            throw "InputObject must be a hashtable or PSCustomObject, got: $($configData.GetType().Name)"
-        }
         else
         {
-            Write-Verbose "[$functionName] InputObject is already a hashtable"
+            throw "InputObject must be a hashtable or PSCustomObject, got: $($configData.GetType().Name)"
         }
         
         # Convert to PSD1 format
@@ -183,48 +189,50 @@ function ConvertTo-HashtableFromPSCustomObject()
     [CmdletBinding()]
     param([object]$InputObject)
     $functionName = $MyInvocation.MyCommand.Name
+    
     if ($InputObject -is [PSCustomObject])
     {
         Write-Verbose "[$functionName] Converting PSCustomObject to hashtable"
         $hashtable = @{}
         foreach ($property in $InputObject.PSObject.Properties)
         {
-            # Skip system properties that aren't data
-            if ($property.Name -in @('IsReadOnly', 'IsFixedSize', 'IsSynchronized', 'Keys', 'Values', 'SyncRoot', 'Count'))
+            # Only process NoteProperty members, skip system properties
+            if ($property.MemberType -eq 'NoteProperty')
             {
-                Write-Verbose "[$functionName] Skipping system property: $($property.Name)"
-                continue
-            }
-            
-            Write-Verbose "[$functionName] Processing property: $($property.Name)"
-            if ($property.Value -is [PSCustomObject])
-            {
-                Write-Verbose "[$functionName] Recursively converting property: $($property.Name)"
-                $hashtable[$property.Name] = ConvertTo-HashtableFromPSCustomObject -InputObject $property.Value
-            }
-            elseif ($property.Value -is [System.Array])
-            {
-                Write-Verbose "[$functionName] Processing array property: $($property.Name)"    
-                $hashtable[$property.Name] = @()
-                foreach ($item in $property.Value)
+                Write-Verbose "[$functionName] Processing property: $($property.Name)"
+                if ($property.Value -is [PSCustomObject])
                 {
-                    Write-Verbose "[$functionName] Processing array item $item"
-                    if ($item -is [PSCustomObject])
+                    Write-Verbose "[$functionName] Recursively converting property: $($property.Name)"
+                    $hashtable[$property.Name] = ConvertTo-HashtableFromPSCustomObject -InputObject $property.Value
+                }
+                elseif ($property.Value -is [System.Array])
+                {
+                    Write-Verbose "[$functionName] Processing array property: $($property.Name)"    
+                    $hashtable[$property.Name] = @()
+                    foreach ($item in $property.Value)
                     {
-                        Write-Verbose "[$functionName] Recursively converting array item $item"
-                        $hashtable[$property.Name] += ConvertTo-HashtableFromPSCustomObject -InputObject $item
+                        Write-Verbose "[$functionName] Processing array item $item"
+                        if ($item -is [PSCustomObject])
+                        {
+                            Write-Verbose "[$functionName] Recursively converting array item $item"
+                            $hashtable[$property.Name] += ConvertTo-HashtableFromPSCustomObject -InputObject $item
+                        }
+                        else
+                        {
+                            Write-Verbose "[$functionName] Adding array item $item"
+                            $hashtable[$property.Name] += $item
+                        }
                     }
-                    else
-                    {
-                        Write-Verbose "[$functionName] Adding array item $item"
-                        $hashtable[$property.Name] += $item
-                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Adding property: $($property.Name)"
+                    $hashtable[$property.Name] = $property.Value
                 }
             }
             else
             {
-                Write-Verbose "[$functionName] Adding property: $($property.Name)"
-                $hashtable[$property.Name] = $property.Value
+                Write-Verbose "[$functionName] Skipping non-NoteProperty: $($property.Name) (Type: $($property.MemberType))"
             }
         }
         return $hashtable

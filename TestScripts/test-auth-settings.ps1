@@ -89,8 +89,14 @@ try {
                 $missingProps = @()
                 
                 foreach ($prop in $requiredProps) {
-                    if (-not ($settingsContent.auth.PSObject.Properties.Name -contains $prop)) {
-                        $missingProps += $prop
+                    if ($settingsContent.auth -is [hashtable]) {
+                        if (-not $settingsContent.auth.ContainsKey($prop)) {
+                            $missingProps += $prop
+                        }
+                    } else {
+                        if (-not ($settingsContent.auth.PSObject.Properties.Name -contains $prop)) {
+                            $missingProps += $prop
+                        }
                     }
                 }
                 

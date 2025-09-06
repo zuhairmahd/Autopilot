@@ -97,28 +97,44 @@ function Update-Setting()
     {
         param(
             [Parameter(Mandatory = $true)]
-            [PSCustomObject]$PSObject,
+            $PSObject,
             [string]$Context = "object"
         )
         $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Converting $Context to hashtable"
         Write-Log -LogFile $logFile -Message "Converting $Context to hashtable" -Module $functionName
+        
+        # If it's already a hashtable, return it as-is
+        if ($PSObject -is [hashtable])
+        {
+            Write-Verbose "[$functionName] Input is already a hashtable, returning as-is"
+            return $PSObject
+        }
+        
         try
         {
             $hashtable = @{}
             foreach ($property in $PSObject.PSObject.Properties)
             {
-                $hashtable[$property.Name] = $property.Value
-                Write-Log -LogFile $logFile -Message "Converted property '$($property.Name)' to hashtable" -Module $functionName
-                Write-Verbose "[$functionName] Converted property '$($property.Name)' to hashtable"
+                # Only include NoteProperty types to exclude system properties
+                if ($property.MemberType -eq 'NoteProperty')
+                {
+                    $hashtable[$property.Name] = $property.Value
+                    Write-Log -LogFile $logFile -Message "Converted property '$($property.Name)' to hashtable" -Module $functionName
+                    Write-Verbose "[$functionName] Converted property '$($property.Name)' to hashtable"
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Skipping non-NoteProperty: '$($property.Name)' (Type: $($property.MemberType))"
+                }
             }
-Write-Log -LogFile $logFile -Message "Successfully converted $Context to hashtable with $($hashtable.Count) properties" -Module $functionName -LogLevel "Debug"
+            Write-Log -LogFile $logFile -Message "Successfully converted $Context to hashtable with $($hashtable.Count) properties" -Module $functionName -LogLevel "Debug"
             return $hashtable
         }
         catch
         {
             Write-Warning "[$functionName] Failed to convert $Context to hashtable: $($_.Exception.Message)"
-Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $($_.Exception.Message)" -Module $functionName -LogLevel "Debug"
+            Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $($_.Exception.Message)" -Module $functionName -LogLevel "Debug"
             throw
         }
     }
@@ -200,7 +216,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
         Write-Log -LogFile $logFile -Message "DEBUG: settingsObj type is $($settingsObj.GetType().Name)" -Module $functionName
         
         # Convert PSCustomObject to hashtable for easier manipulation
-        if ($settingsObj.GetType().Name -eq "PSCustomObject")
+        if ($settingsObj -is [PSCustomObject])
         {
             Write-Verbose "[$functionName] DEBUG: Converting PSCustomObject to hashtable"
             $settingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj -Context "main settings"

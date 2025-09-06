@@ -446,7 +446,7 @@ function Get-CurrentSettings()
             Write-Verbose "[$functionName] Default settings file created"
         }
         
-        $content = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
+        $content = Import-PowerShellDataFile -Path $SettingsFile
         Write-Log -LogFile $logFile -Module $functionName -Message "Settings file loaded successfully" -LogLevel "Information"
         Write-Verbose "[$functionName] Settings file loaded successfully"
         return $content
@@ -1529,7 +1529,7 @@ function Update-NestedSetting()
             return $false
         }
         
-        $settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+        $settings = Import-PowerShellDataFile -Path $SettingsFile
         
         # Parse the setting path
         $pathParts = $SettingPath.Split('.')
@@ -1590,8 +1590,8 @@ function Update-NestedSetting()
             $currentLevel | Add-Member -MemberType NoteProperty -Name $finalProperty -Value $SettingValue
         }
         
-        # Save the updated settings
-        $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile -Encoding UTF8
+        # Save the updated settings using Export-PowerShellDataFile
+        Export-PowerShellDataFile -InputObject $settings -Path $SettingsFile -Force
         
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated nested setting: $SettingPath" -LogLevel "Information"
         return $true
