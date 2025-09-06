@@ -58,9 +58,9 @@ try {
     $configFunctions = @(
         "InitializeConfiguration",
         "MergeSettings",
-        "Test-SettingsJsonExists",
+        "Get-ConfigurationData",
         "CreateConfiguration",
-        "Get-JsonConfiguration",
+        "Get-ConfigurationData",
         "Update-Setting"
     )
     
@@ -138,42 +138,35 @@ try {
         Write-TestResult "MergeSettings function not available - skipping merge test" $true
     }
     
-    Write-TestSection "Test 3: Settings File Creation and Validation"
+    Write-TestSection "Test 3: Configuration Data Loading and Validation"
     
-    # Test Test-SettingsJsonExists function
-    if (Get-Command "Test-SettingsJsonExists" -ErrorAction SilentlyContinue) {
-        Write-Host "Testing settings file creation..." -ForegroundColor Cyan
+    # Test Get-ConfigurationData function
+    if (Get-Command "Get-ConfigurationData" -ErrorAction SilentlyContinue) {
+        Write-Host "Testing configuration data loading..." -ForegroundColor Cyan
         
         try {
-            $testSettingsPath = Join-Path $testContext.TestFolder "test-settings.json"
+            $testSettingsPath = Join-Path $testContext.TestFolder "test-settings"
             
-            # Test settings file creation
-            $created = Test-SettingsJsonExists -SettingsFile $testSettingsPath -Silent -DomainName "test.example.com"
+            # Test configuration file loading with defaults
+            $configData = Get-ConfigurationData -ConfigurationPath $testSettingsPath -DefaultValues @{test = "value"} -ErrorAction SilentlyContinue
             
-            if ($created) {
-                Write-TestResult "Settings file creation works" $true
+            if ($configData) {
+                Write-TestResult "Configuration data loading works" $true
                 
-                # Verify file exists and is valid JSON
-                if (Test-Path $testSettingsPath) {
-                    $settingsContent = Get-Content $testSettingsPath -Raw | ConvertFrom-Json
-                    
-                    if ($settingsContent.domains -and $settingsContent.domains."test.example.com") {
-                        Write-TestResult "Domain-specific settings structure created correctly" $true
-                    } else {
-                        Write-TestResult "Domain-specific settings structure not created correctly" $false
-                    }
+                # Verify default values are applied when file doesn't exist
+                if ($configData.test -eq "value") {
+                    Write-TestResult "Default values applied correctly when file doesn't exist" $true
                 } else {
-                    Write-TestResult "Settings file was not created on disk" $false
+                    Write-TestResult "Default values not applied correctly" $false
                 }
             } else {
-                Write-TestResult "Settings file creation failed" $false
+                Write-TestResult "Configuration data loading failed" $false
             }
-        }
-        catch {
-            Write-TestResult "Settings file creation test failed: $($_.Exception.Message)" $false
+        } catch {
+            Write-TestResult "Configuration data loading test failed: $($_.Exception.Message)" $false
         }
     } else {
-        Write-TestResult "Test-SettingsJsonExists function not available - skipping settings creation test" $true
+        Write-TestResult "Get-ConfigurationData function not available - skipping configuration data test" $true
     }
     
     Write-TestSection "Test 4: Configuration Initialization"
@@ -266,8 +259,8 @@ try {
     $utilityFunctions = @(
         "ConvertFrom-JsonToHashtable",
         "ConvertTo-OrderedJson",
-        "Get-StringsFromJson",
-        "Set-SettingsJsonStructure"
+        "Export-PowerShellDataFile",
+        "Get-ConfigurationData"
     )
     
     $utilityFunctionResults = @()
@@ -292,7 +285,7 @@ try {
     
     if ($allConfigFunctionsAvailable) { $passedTests++ }
     if (Get-Command "MergeSettings" -ErrorAction SilentlyContinue) { $passedTests++ }
-    if (Get-Command "Test-SettingsJsonExists" -ErrorAction SilentlyContinue) { $passedTests++ }
+    if (Get-Command "Get-ConfigurationData" -ErrorAction SilentlyContinue) { $passedTests++ }
     if (Get-Command "InitializeConfiguration" -ErrorAction SilentlyContinue) { $passedTests++ }
     if ($allWizardFunctionsAvailable) { $passedTests++ }
     if (Get-Command "Update-Setting" -ErrorAction SilentlyContinue) { $passedTests++ }
