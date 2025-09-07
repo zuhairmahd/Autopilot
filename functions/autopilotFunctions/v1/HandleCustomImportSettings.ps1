@@ -13,6 +13,7 @@ function HandleCustomImportSettings()
     )
     
     Write-Verbose "[$functionName] Handling custom import settings"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Entering HandleCustomImportSettings (current maxWait=$($maxWaitTimeRef.Value) timeInSeconds=$($timeInSecondsRef.Value))" -LogLevel "Information"
     $maxWaitTime = $maxWaitTimeRef.Value
     $timeInSeconds = $timeInSecondsRef.Value
     
@@ -24,12 +25,14 @@ function HandleCustomImportSettings()
     if ($customMaxWaitTime -eq '0')
     {
         Write-Host "Skipping the wait for profile assignment."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User chose to skip profile assignment wait (maxWait=0)" -LogLevel "Information"
         return $returnValues.deviceImportSuccessMessage
     }
     elseif ($customMaxWaitTime -as [int] -and [int]$customMaxWaitTime -ge 0 -and [int]$customMaxWaitTime -le 60)
     {
         $maxWaitTimeRef.Value = [int]$customMaxWaitTime
         Write-Host "Will check $($maxWaitTimeRef.Value) times for proper profile assignment."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Updated maxWaitTime to $($maxWaitTimeRef.Value)" -LogLevel "Verbose"
     }
     else
     {
@@ -48,12 +51,14 @@ function HandleCustomImportSettings()
     if ($customTimeInSeconds -eq '0')
     {
         Write-Host "Skipping the wait for profile assignment."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User chose to skip wait between checks (timeInSeconds=0)" -LogLevel "Information"
         return $returnValues.deviceImportSuccessMessage
     }
     elseif ($customTimeInSeconds -as [int] -and [int]$customTimeInSeconds -ge 0 -and [int]$customTimeInSeconds -le 60)
     {
         $timeInSecondsRef.Value = [int]$customTimeInSeconds
         Write-Host "Will check every $($timeInSecondsRef.Value) seconds for proper profile assignment."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Updated timeInSeconds to $($timeInSecondsRef.Value)" -LogLevel "Verbose"
     }
     else
     {
@@ -65,6 +70,7 @@ function HandleCustomImportSettings()
     }
     
     Write-Host "The device will be checked $($maxWaitTimeRef.Value) times with a wait of $($timeInSecondsRef.Value) seconds between each check."
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Final settings: maxWait=$($maxWaitTimeRef.Value) waitSeconds=$($timeInSecondsRef.Value)" -LogLevel "Information"
     return $null
 }
 
