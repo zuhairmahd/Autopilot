@@ -212,7 +212,7 @@ function Initialize-ConfigurationFiles()
             {
                 # Get default settings and save as PSD1
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
-                Write-Host "Saving to path $InitFile"
+                Write-Verbose "[$functionName] Saving to path $InitFile"
                 $defaultSettings | Export-PowerShellDataFile -Path $InitFile -validate -Force
                 Write-Verbose "[$functionName] Created settings.psd1 with defaults"
             }
