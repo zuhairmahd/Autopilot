@@ -405,6 +405,7 @@ try
     {
         Write-Host "Resetting password..."
         Move-Item -Path $candidate.FullName -Destination $dest -Force
+        Move-Item -Path "$candidateParent\settings.psd1" -Destination $PSScriptRoot -Force
         Write-Verbose "[$scriptName] Moved $secretsFolderName folder to $dest"
         Write-Log -LogFile $logFile -Message "Moved $secretsFolderName folder to $dest" -Module $scriptName -LogLevel "Information"
         if ($fullReset)
@@ -420,7 +421,6 @@ try
                 Write-Verbose "[$scriptName] Moved $($file.Name) to $PSScriptRoot"
             }
         }
-        
     }
     catch
     {
