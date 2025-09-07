@@ -2,19 +2,19 @@ function Update-Setting()
 {
     <#
 .SYNOPSIS
-    Updates settings in the settings.json file with unified logic for all setting types.
+    Updates settings in the settings.psd1 file with unified logic for all setting types.
 
 .DESCRIPTION
     This function consolidates the functionality of Update-GlobalSetting, Update-DomainSettings,
-    and Update-AuthSetting into a single unified function. It loads the existing settings.json file,
-    updates the specified setting(s), and saves the file back. This allows for granular
-    updates without overwriting the entire configuration structure.
+    and Update-AuthSetting into a single unified function. It loads the existing settings.psd1 file,
+    updates the specified setting(s), and saves the file back using Export-PowerShellDataFile. 
+    This allows for granular updates without overwriting the entire configuration structure.
 
 .PARAMETER SettingType
     The type of setting to update. Valid values: 'Global', 'Domain', 'Auth'.
 
 .PARAMETER SettingsFile
-    The path to the settings.json file. Defaults to "settings.json".
+    The path to the settings.psd1 file. Defaults to "settings.psd1".
 
 .PARAMETER SettingName
     The name of the setting to update. Required for Global and Auth types.
@@ -59,16 +59,16 @@ function Update-Setting()
     - Maintains PowerShell 5.1 compatibility
     - Preserves all other settings in the file
     - Creates backup before modification for safety
-    - Validates JSON structure before and after update
+    - Validates PSD1 structure before and after update
     - Includes enhanced array comparison logic for auth settings
     - Supports merge capability for domain settings
-    - Preserves single-element arrays during JSON serialization
+    - Uses Export-PowerShellDataFile for proper PSD1 format preservation
     
     Error Handling:
     - Returns $false if settings file is not found
     - Returns $false if required parameters are missing for the specified SettingType
-    - Returns $false if the settings file lacks the required JSON structure section
-    - Returns $false if JSON parsing fails during load or save operations
+    - Returns $false if the settings file lacks the required PSD1 structure section
+    - Returns $false if PSD1 parsing fails during load or save operations
     - Returns $false if backup creation fails
     - Returns $false if post-update verification fails (value mismatch)
     - Provides detailed verbose logging for troubleshooting all failure scenarios
@@ -81,7 +81,7 @@ function Update-Setting()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingType,
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$SettingName,
         $SettingValue,
         [hashtable]$Settings,
@@ -93,108 +93,6 @@ function Update-Setting()
     Write-Verbose "[$functionName] Updating $SettingType setting(s) in file: $SettingsFile"
     Write-Log -LogFile $logFile -Message "Updating $SettingType setting(s) in file: $SettingsFile" -Module $functionName
 
-    function ConvertTo-JsonWithArrayPreservation()
-    {
-        <#
-        .SYNOPSIS
-            Converts PowerShell objects to JSON while preserving single-element arrays.
-        .DESCRIPTION
-            PowerShell's ConvertTo-Json converts single-element arrays to strings. This function
-            ensures that arrays remain arrays in the JSON output by using a custom approach.
-        #>
-        param(
-            [Parameter(Mandatory = $true)]
-            $InputObject,
-            [int]$Depth = 10
-        )
-        
-        # For PowerShell 7+, we can use -AsArray parameter
-        if ($PSVersionTable.PSVersion.Major -ge 7)
-        {
-            return ($InputObject | ConvertTo-Json -Depth $Depth -AsArray)
-        }
-        
-        # For PowerShell 5.1, use the standard approach with post-processing
-        # The arrays will be handled by ensuring proper structure before conversion
-        return ($InputObject | ConvertTo-Json -Depth $Depth)
-    }
-
-    function ConvertTo-HashtableFromPSObject()
-    {
-        param(
-            [Parameter(Mandatory = $true)]
-            [PSCustomObject]$PSObject,
-            [string]$Context = "object"
-        )
-        $functionName = $MyInvocation.MyCommand.Name
-        Write-Verbose "[$functionName] Converting $Context to hashtable"
-        Write-Log -LogFile $logFile -Message "Converting $Context to hashtable" -Module $functionName
-        try
-        {
-            $hashtable = @{}
-            foreach ($property in $PSObject.PSObject.Properties)
-            {
-                $hashtable[$property.Name] = $property.Value
-                Write-Log -LogFile $logFile -Message "Converted property '$($property.Name)' to hashtable" -Module $functionName
-                Write-Verbose "[$functionName] Converted property '$($property.Name)' to hashtable"
-            }
-Write-Log -LogFile $logFile -Message "Successfully converted $Context to hashtable with $($hashtable.Count) properties" -Module $functionName -LogLevel "Debug"
-            return $hashtable
-        }
-        catch
-        {
-            Write-Warning "[$functionName] Failed to convert $Context to hashtable: $($_.Exception.Message)"
-Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $($_.Exception.Message)" -Module $functionName -LogLevel "Debug"
-            throw
-        }
-    }
-    
-    function ConvertTo-PSObjectFromHashtable()
-    {
-        param(
-            [Parameter(Mandatory = $true)]
-            [hashtable]$DomainsHash
-        )
-        $functionName = $MyInvocation.MyCommand.Name
-        Write-Verbose "[$functionName] Converting domains hashtable to PSCustomObject"
-        Write-Log -LogFile $logFile -Message "Converting domains hashtable to PSCustomObject" -Module $functionName
-        try
-        {
-            $newDomainsObj = [PSCustomObject]@{}
-            foreach ($domainKey in $DomainsHash.Keys)
-            {
-                $domainValue = $DomainsHash[$domainKey]
-                Write-Verbose "[$functionName] Converting domain '$domainKey' to PSCustomObject"
-                Write-Log -LogFile $logFile -Message "Converting domain '$domainKey' to PSCustomObject" -Module $functionName
-                # Validate domain structure
-                if (-not $domainValue.ContainsKey('groupsToInclude') -or 
-                    -not $domainValue.ContainsKey('groupsToExclude') -or 
-                    -not $domainValue.ContainsKey('settings'))
-                {
-                    Write-Warning "[$functionName] Domain '$domainKey' missing required properties"
-                    Write-Log -LogFile $logFile -Message "Invalid domain structure for '$domainKey'" -Module $functionName -LogLevel "Error"
-                    throw "Invalid domain structure for '$domainKey'"
-                }
-                
-                $domainObj = [PSCustomObject]@{
-                    "groupsToInclude" = $domainValue['groupsToInclude']
-                    "groupsToExclude" = $domainValue['groupsToExclude']
-                    "settings"        = [PSCustomObject]$domainValue['settings']
-                }
-                $newDomainsObj | Add-Member -MemberType NoteProperty -Name $domainKey -Value $domainObj
-            }
-            Write-Verbose "[$functionName] Successfully converted domains hashtable to PSCustomObject with $($DomainsHash.Count) domains"
-            Write-Log -LogFile $logFile -Message "Successfully converted domains hashtable to PSCustomObject with $($DomainsHash.Count) domains" -Module $functionName
-            return $newDomainsObj
-        }
-        catch
-        {
-            Write-Warning "[$functionName] Failed to convert domains hashtable to PSCustomObject: $($_.Exception.Message)"
-            Write-Log -LogFile $logFile -Message "Failed to convert domains hashtable to PSCustomObject: $($_.Exception.Message)" -Module $functionName -LogLevel "Error"   
-            throw
-        }
-    }
-    
     function Test-SettingNameAndValue()
     {
         param(
@@ -258,15 +156,30 @@ Write-Log -LogFile $logFile -Message "Failed to convert $Context to hashtable: $
         if (-not (Test-Path -Path $SettingsFile))
         {
             Write-Warning "[$functionName] Settings file not found: $SettingsFile"
-Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -Module $functionName -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -Module $functionName -LogLevel "Verbose"
             return $false
         }
         
         # Load existing settings
         Write-Verbose "[$functionName] Loading existing settings from $SettingsFile"
         Write-Log -LogFile $logFile -Message "Loading existing settings from $SettingsFile" -Module $functionName
-        $jsonContent = Get-Content -Path $SettingsFile -Raw -Force
-        $settingsObj = $jsonContent | ConvertFrom-Json
+        $settingsObj = Import-PowerShellDataFile -Path $SettingsFile -ErrorAction Stop
+        
+        # Debug: Check what type we got
+        Write-Verbose "[$functionName] DEBUG: settingsObj type is $($settingsObj.GetType().Name)"
+        Write-Log -LogFile $logFile -Message "DEBUG: settingsObj type is $($settingsObj.GetType().Name)" -Module $functionName
+        
+        # Convert to hashtable for easier manipulation using optimized utility
+        if (-not $settingsObj -is [hashtable])
+        {
+            Write-Verbose "[$functionName] DEBUG: Converting object to hashtable using optimized utility"
+            $settingsHash = ConvertTo-HashtableOptimized -InputObject $settingsObj -Context "main settings"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] DEBUG: Using object as-is (should be hashtable)"
+            $settingsHash = $settingsObj
+        }
         
         # Validate structure based on setting type
         $requiredSection = switch ($SettingType)
@@ -291,7 +204,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
             }
         }
         
-        if (-not $settingsObj.PSObject.Properties.Name -contains $requiredSection)
+        if (-not $settingsHash.ContainsKey($requiredSection) -and $SettingType -ne 'Domain')
         {
             Write-Warning "[$functionName] Settings file does not contain $requiredSection section"
             Write-Log -LogFile $logFile -Message "Settings file does not contain $requiredSection section" -Module $functionName -LogLevel "Warning"    
@@ -303,115 +216,37 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
         {
             'Global'
             {
-                # Convert PSCustomObject to hashtable using helper function
-                Write-Verbose "[$functionName] Converting globalSettings to hashtable"
-                Write-Log -LogFile $logFile -Message "Converting globalSettings to hashtable" -Module $functionName
-                $globalSettingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj.globalSettings -Context "globalSettings"
+                # Ensure globalSettings is a hashtable using optimized utility
+                $globalSettingsHash = Test-IsHashtableOrConvert -InputObject $settingsHash['globalSettings']
                 
                 # Update the specific setting
                 Write-Verbose "[$functionName] Updating globalSettings.$SettingName = $SettingValue"
                 Write-Log -LogFile $logFile -Message "Updating globalSettings.$SettingName = $SettingValue" -Module $functionName
                 $globalSettingsHash[$SettingName] = $SettingValue
+                $settingsHash['globalSettings'] = $globalSettingsHash
                 Write-Verbose "[$functionName] Updated globalSettings.$SettingName = $SettingValue"
                 Write-Log -LogFile $logFile -Message "Updated globalSettings.$SettingName = $SettingValue" -Module $functionName
-
-                # Convert back to PSCustomObject structure
-                Write-Log -LogFile $logFile -Message "Converting hashtable back to PSCustomObject for globalSettings" -Module $functionName
-                Write-Verbose "[$functionName] Converting hashtable back to PSCustomObject for globalSettings"
-                $settingsObj.globalSettings = [PSCustomObject]$globalSettingsHash
             }
-            
             'Auth'
             {
-                # Convert PSCustomObject to hashtable using helper function
-                Write-Verbose "[$functionName] Converting auth to hashtable"
-                Write-Log -LogFile $logFile -Message "Converting auth to hashtable" -Module $functionName
-                $authSettingsHash = ConvertTo-HashtableFromPSObject -PSObject $settingsObj.auth -Context "auth"
+                # Ensure auth is a hashtable using optimized utility
+                $authSettingsHash = Test-IsHashtableOrConvert -InputObject $settingsHash['auth']
                 
                 # Update the specific setting
                 Write-Verbose "[$functionName] Updating auth.$SettingName = $SettingValue"
                 Write-Log -LogFile $logFile -Message "Updating auth.$SettingName = $SettingValue" -Module $functionName
                 $authSettingsHash[$SettingName] = $SettingValue
+                $settingsHash['auth'] = $authSettingsHash
                 Write-Verbose "[$functionName] Updated auth.$SettingName = $SettingValue"
                 Write-Log -LogFile $logFile -Message "Updated auth.$SettingName = $SettingValue" -Module $functionName
-                # Convert back to PSCustomObject structure
-                Write-Verbose "[$functionName] Converting hashtable back to PSCustomObject for auth"
-                Write-Log -LogFile $logFile -Message "Converting hashtable back to PSCustomObject for auth" -Module $functionName
-                $settingsObj.auth = [PSCustomObject]$authSettingsHash
             }
-            
             'Domain'
             {
                 # Use new separate domain configuration file approach
                 Write-Verbose "[$functionName] Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)"
                 Write-Log -LogFile $logFile -Message "Processing domain settings for '$DomainName' using separate configuration file (Merge=$MergeSettings)" -Module $functionName
                 
-                # Check if domain exists in main settings.json and migrate if needed
                 $configPath = Split-Path $SettingsFile -Parent
-                $domainConfigFile = Join-Path $configPath "$DomainName.json"
-                
-                if (-not (Test-Path $domainConfigFile) -and $settingsObj.domains -and $settingsObj.domains.PSObject.Properties.Name -contains $DomainName)
-                {
-                    Write-Verbose "[$functionName] Found domain '$DomainName' in main settings file, migrating to separate file"
-                    Write-Log -LogFile $logFile -Message "Found domain '$DomainName' in main settings file, migrating to separate file" -Module $functionName
-                    
-                    # Get the existing domain configuration from main settings
-                    $existingDomainConfig = $settingsObj.domains.$DomainName
-                    
-                    # Convert to hashtable for easier manipulation
-                    $domainConfigHash = @{
-                        groupsToInclude  = if ($existingDomainConfig.groupsToInclude)
-                        {
-                            $existingDomainConfig.groupsToInclude 
-                        }
-                        else
-                        {
-                            @() 
-                        }
-                        groupsToExclude  = if ($existingDomainConfig.groupsToExclude)
-                        {
-                            $existingDomainConfig.groupsToExclude 
-                        }
-                        else
-                        {
-                            @() 
-                        }
-                        settings         = if ($existingDomainConfig.settings)
-                        { 
-                            $settingsHash = @{}
-                            $existingDomainConfig.settings.PSObject.Properties | ForEach-Object {
-                                $settingsHash[$_.Name] = $_.Value
-                            }
-                            $settingsHash
-                        }
-                        else
-                        {
-                            @{} 
-                        }
-                        additionalScopes = if ($existingDomainConfig.additionalScopes)
-                        {
-                            $existingDomainConfig.additionalScopes 
-                        }
-                        else
-                        {
-                            @() 
-                        }
-                    }
-                    
-                    # Save the migrated domain configuration to separate file
-                    $saveResult = Save-DomainConfiguration -DomainName $DomainName -DomainConfiguration $domainConfigHash -ConfigurationPath $configPath
-                    if ($saveResult)
-                    {
-                        Write-Verbose "[$functionName] Successfully migrated domain '$DomainName' to separate file"
-                        Write-Log -LogFile $logFile -Message "Successfully migrated domain '$DomainName' to separate file" -Module $functionName
-                    }
-                    else
-                    {
-                        Write-Warning "[$functionName] Failed to save migrated domain configuration for '$DomainName'"
-                        Write-Log -LogFile $logFile -Message "Failed to save migrated domain configuration for '$DomainName'" -Module $functionName -LogLevel "Warning"
-                    }
-                }
-                
                 # Load existing domain configuration
                 $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
                 
@@ -423,18 +258,14 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                 }
                 
                 # Update domain settings
-                if ($MergeSettings -and $domainConfig.settings)
+                if ($MergeSettings -and $domainConfig)
                 {
                     # Merge with existing settings
                     Write-Verbose "[$functionName] Merging settings with existing domain configuration"
                     Write-Log -LogFile $logFile -Message "Merging provided settings into existing domain configuration for '$DomainName'" -Module $functionName
                     
-                    # Convert PSCustomObject to hashtable for easier manipulation
-                    $existingSettings = @{}
-                    foreach ($prop in $domainConfig.settings.PSObject.Properties)
-                    {
-                        $existingSettings[$prop.Name] = $prop.Value
-                    }
+                    # Convert to hashtable for easier manipulation using optimized utility
+                    $existingSettings = Test-IsHashtableOrConvert -InputObject $domainConfig
                     
                     # Merge new settings
                     foreach ($key in $Settings.Keys)
@@ -443,15 +274,15 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                         Write-Log -LogFile $logFile -Message "Updated domain setting: $key = $($Settings[$key])" -Module $functionName -LogLevel "Verbose"
                     }
                     
-                    # Convert back to PSCustomObject
-                    $domainConfig.settings = [PSCustomObject]$existingSettings
+                    # Update domain config
+                    $domainConfig = $existingSettings
                 }
                 else
                 {
                     # Replace entire settings section
                     Write-Verbose "[$functionName] Replacing entire settings section for domain"
                     Write-Log -LogFile $logFile -Message "Replacing entire settings section for domain '$DomainName'" -Module $functionName
-                    $domainConfig.settings = [PSCustomObject]$Settings
+                    $domainConfig = $Settings
                 }
                 
                 # Save the updated domain configuration
@@ -476,11 +307,19 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
             Write-Verbose "[$functionName] Created backup: $backupFile"
             Write-Log -LogFile $logFile -Message "Created backup: $backupFile" -Module $functionName
             
-            # Save updated settings
-            $jsonOutput = ConvertTo-JsonWithArrayPreservation -InputObject $settingsObj -Depth $global:maxJSONDepth
-            $jsonOutput | Set-Content -Path $SettingsFile -Force
-            Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
-            Write-Log -LogFile $logFile -Message "Saved updated settings to $SettingsFile" -Module $functionName
+            # Save updated settings using Export-PowerShellDataFile
+            $exportResult = Export-PowerShellDataFile -InputObject $settingsHash -Path $SettingsFile -Force
+            if ($exportResult)
+            {
+                Write-Verbose "[$functionName] Saved updated settings to $SettingsFile"
+                Write-Log -LogFile $logFile -Message "Saved updated settings to $SettingsFile" -Module $functionName
+            }
+            else
+            {
+                Write-Warning "[$functionName] Failed to save settings file"
+                Write-Log -LogFile $logFile -Message "Failed to save settings file" -Module $functionName -LogLevel "Warning"
+                return $false
+            }
         }
         
         # Verify the update based on setting type
@@ -488,16 +327,17 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
         
         if ($SettingType -ne 'Domain')
         {
-            $verifyContent = Get-Content -Path $SettingsFile -Raw -Force
-            $verifySettings = $verifyContent | ConvertFrom-Json
+            $verifySettings = Import-PowerShellDataFile -Path $SettingsFile -ErrorAction Stop
+            # Convert to hashtable if needed using optimized utility
+            $verifySettingsHash = Test-IsHashtableOrConvert -InputObject $verifySettings
         }
         
         $verificationResult = switch ($SettingType)
         {
             'Global'
             {
-                if ($verifySettings.globalSettings.PSObject.Properties.Name -contains $SettingName -and
-                    $verifySettings.globalSettings.$SettingName -eq $SettingValue)
+                if ($verifySettingsHash['globalSettings'] -and $verifySettingsHash['globalSettings'].ContainsKey($SettingName) -and
+                    $verifySettingsHash['globalSettings'][$SettingName] -eq $SettingValue)
                 {
                     Write-Verbose "[$functionName] Successfully updated and verified global setting"
                     Write-Log -LogFile $logFile -Message "Successfully updated and verified global setting '$SettingName'" -Module $functionName
@@ -512,9 +352,9 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
             }
             'Auth'
             {
-                if ($verifySettings.auth.PSObject.Properties.Name -contains $SettingName)
+                if ($verifySettingsHash['auth'] -and $verifySettingsHash['auth'].ContainsKey($SettingName))
                 {
-                    $actualValue = $verifySettings.auth.$SettingName
+                    $actualValue = $verifySettingsHash['auth'][$SettingName]
                     
                     # Handle array comparison specially (preserved from Update-AuthSetting)
                     if ($SettingValue -is [array] -and $actualValue -is [array])
@@ -552,7 +392,7 @@ Write-Log -LogFile $logFile -Message "Settings file not found: $SettingsFile" -M
                 else
                 {
                     Write-Warning "[$functionName] Failed to verify auth setting update - property not found"
-Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Verbose"
+                    Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Verbose"
                     $false
                 }
             }
@@ -560,14 +400,14 @@ Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - pro
             {
                 # Verify domain configuration was saved to separate file
                 $configPath = Split-Path $SettingsFile -Parent
-                $domainConfigFile = Join-Path $configPath "$DomainName.json"
+                $domainConfigFile = Join-Path $configPath "$DomainName.psd1"
                 
                 if (Test-Path $domainConfigFile)
                 {
                     try
                     {
-                        $verifyDomainConfig = Get-Content -Path $domainConfigFile -Raw | ConvertFrom-Json
-                        if ($verifyDomainConfig.settings)
+                        $verifyDomainConfig = Import-PowerShellDataFile -Path $domainConfigFile -ErrorAction Stop
+                        if ($verifyDomainConfig)
                         {
                             Write-Verbose "[$functionName] Successfully updated and verified domain settings in separate file"
                             Write-Log -LogFile $logFile -Message "Successfully updated and verified domain settings for '$DomainName' in separate file" -Module $functionName
@@ -590,7 +430,7 @@ Write-Log -LogFile $logFile -Message "Failed to verify auth setting update - pro
                 else
                 {
                     Write-Warning "[$functionName] Failed to verify domain settings - configuration file not found"
-Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Verbose"
+                    Write-Log -LogFile $logFile -Message "Failed to verify domain settings - configuration file not found for '$DomainName'" -Module $functionName -LogLevel "Verbose"
                     $false
                 }
             }

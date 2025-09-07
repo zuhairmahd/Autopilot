@@ -14,7 +14,7 @@ function Show-SettingsViewer()
         Specifies whether to view 'Global', 'Domain', or 'Auth' settings.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file. Defaults to "settings.json".
+        Path to the settings.psd1 file. Defaults to "settings.psd1".
     
     .PARAMETER DomainName
         Required when SettingsType is 'Domain'. Specifies which domain's settings to view.
@@ -46,13 +46,13 @@ function Show-SettingsViewer()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingsType,
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
         [switch]$Silent
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings viewer for $SettingsType settings" -LogLevel "Verbose"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings viewer for $SettingsType settings" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Starting settings viewer for $SettingsType settings"
     
     try
@@ -60,7 +60,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings vi
         # Validate parameters
         if ($SettingsType -eq 'Domain' -and [string]::IsNullOrWhiteSpace($DomainName))
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "DomainName is required when viewing Domain settings" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $functionName -Message "DomainName is required when viewing Domain settings " -LogLevel "Error"
             Write-Warning "[$functionName] DomainName is required when viewing Domain settings"
             return $false
         }
@@ -92,7 +92,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Starting settings vi
             Write-Warning "[$functionName] Failed to get default settings structure"
             return $false
         }
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved default settings structure" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully retrieved default settings structure"
         
         # Load current settings
@@ -105,7 +105,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retriev
             Write-Warning "[$functionName] Failed to load current settings"
             return $false
         }
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Information"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded current settings" -LogLevel "Information"
         Write-Verbose "[$functionName] Successfully loaded current settings"
         
         # Get settings template and current values to display
@@ -144,14 +144,14 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
             
             $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             
-            if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
+            if ($null -eq $domainConfig)
             {
                 Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for: $DomainName" -LogLevel "Warning"
                 return $false
             }
             
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
             
             # Get domain settings template from centralized defaults (fixed approach)
@@ -161,15 +161,15 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded 
             try
             {
                 $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings)
+                if ($null -eq $domainTemplate)
                 {
                     Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
                     Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
                     return $false
                 }
                 
-                $settingsTemplate = $domainTemplate.settings
-Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
+                $settingsTemplate = $domainTemplate
+                Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
             catch
@@ -180,7 +180,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retriev
             }
             
             # Use the actual domain configuration for current values
-            $currentValues = $domainConfig.settings
+            $currentValues = $domainConfig
             Write-Log -LogFile $logFile -Module $functionName -Message "Using current domain settings with $($currentValues.PSObject.Properties.Count) properties" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Using current domain settings with $($currentValues.PSObject.Properties.Count) properties"
             
@@ -193,23 +193,24 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retriev
                 Write-Host "$DomainName" -ForegroundColor Yellow -BackgroundColor DarkMagenta
                 Write-Host "These settings override global settings for this specific domain.`n" -ForegroundColor Gray
                 Write-Host "Configuration loaded from: " -NoNewline -ForegroundColor Gray
-                Write-Host "$DomainName.json" -ForegroundColor Yellow
+                Write-Host "$DomainName.psd1" -ForegroundColor Yellow
                 Write-Host ""
             }
         }
         
         if (-not $settingsTemplate)
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No settings template found for $SettingsType" -LogLevel "Verbose"
             Write-Warning "[$functionName] No settings template found for $SettingsType"
             return $false
         }
         
-Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to display"
         
-        # Get flattened settings for display (same as editor but read-only)
-        $flattenedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues
+        # Get flattened settings for display (exclude GroupsToInclude/GroupsToExclude as they have dedicated viewers)
+        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude')
+        $flattenedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         $totalSettings = $flattenedSettings.Count
         
         Write-Verbose "[$functionName] Flattened $totalSettings settings for viewing"
@@ -360,99 +361,6 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Settings template lo
     }
 }
 
-function Get-FlattenedSettingsForViewing()
-{
-    <#
-    .SYNOPSIS
-        Flattens settings structure for viewing while preserving nested object information.
-    
-    .DESCRIPTION
-        Similar to Get-FlattenedSettingsForEditing but optimized for read-only display.
-        Processes both template and current values to create a flat list of settings
-        with proper path information for nested values.
-    #>
-    [CmdletBinding()]
-    param(
-        $SettingsTemplate,
-        $CurrentValues
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Flattening settings for viewing"
-    
-    $flattenedSettings = @()
-    
-    if ($SettingsTemplate -is [hashtable])
-    {
-        # Handle hashtable (auth settings)
-        foreach ($key in $SettingsTemplate.Keys)
-        {
-            $defaultValue = $SettingsTemplate[$key]
-            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue) { $currentValue = $defaultValue }
-            
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
-            {
-                # Process nested object
-                $nestedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $defaultValue -CurrentValues $currentValue
-                foreach ($nestedSetting in $nestedSettings)
-                {
-                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
-                    $nestedSetting.IsNested = $true
-                }
-                $flattenedSettings += $nestedSettings
-            }
-            else
-            {
-                # Simple value
-                $flattenedSettings += @{
-                    Name = $key
-                    Path = $key
-                    DefaultValue = $defaultValue
-                    CurrentValue = $currentValue
-                    IsNested = $false
-                }
-            }
-        }
-    }
-    else
-    {
-        # Handle PSCustomObject (global and domain settings)
-        foreach ($property in $SettingsTemplate.PSObject.Properties)
-        {
-            $key = $property.Name
-            $defaultValue = $property.Value
-            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue) { $currentValue = $defaultValue }
-            
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
-            {
-                # Process nested object
-                $nestedSettings = Get-FlattenedSettingsForViewing -SettingsTemplate $defaultValue -CurrentValues $currentValue
-                foreach ($nestedSetting in $nestedSettings)
-                {
-                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
-                    $nestedSetting.IsNested = $true
-                }
-                $flattenedSettings += $nestedSettings
-            }
-            else
-            {
-                # Simple value
-                $flattenedSettings += @{
-                    Name = $key
-                    Path = $key
-                    DefaultValue = $defaultValue
-                    CurrentValue = $currentValue
-                    IsNested = $false
-                }
-            }
-        }
-    }
-    
-    Write-Verbose "[$functionName] Flattened $($flattenedSettings.Count) settings for viewing"
-    return $flattenedSettings
-}
 
 function Display-SettingInfoForViewer()
 {
@@ -473,7 +381,14 @@ function Display-SettingInfoForViewer()
     $displayValue = Format-SettingValueForDisplay -Value $SettingInfo.CurrentValue
     
     # Display the setting with path for nested values
-    $displayName = if ($SettingInfo.IsNested) { $SettingInfo.Path } else { $SettingInfo.Name }
+    $displayName = if ($SettingInfo.IsNested)
+    {
+        $SettingInfo.Path 
+    }
+    else
+    {
+        $SettingInfo.Name 
+    }
     
     Write-Host "Setting: " -NoNewline -ForegroundColor Yellow
     Write-Host "$displayName" -ForegroundColor White
@@ -537,58 +452,6 @@ function Display-SettingInfo()
     
     Write-Host ""  # Empty line for spacing
 }
-function Get-NestedValue()
-{
-    <#
-    .SYNOPSIS
-        Gets a value from a nested object using dot notation path.
-    #>
-    [CmdletBinding()]
-    param(
-        $Object,
-        [string]$Path
-    )
-    
-    if (-not $Object -or [string]::IsNullOrWhiteSpace($Path))
-    {
-        return $null
-    }
-    
-    $pathParts = $Path.Split('.')
-    $current = $Object
-    
-    foreach ($part in $pathParts)
-    {
-        if ($current -is [hashtable])
-        {
-            if ($current.ContainsKey($part))
-            {
-                $current = $current[$part]
-            }
-            else
-            {
-                return $null
-            }
-        }
-        elseif ($current -is [PSCustomObject])
-        {
-            if ($current.PSObject.Properties.Name -contains $part)
-            {
-                $current = $current.$part
-            }
-            else
-            {
-                return $null
-            }
-        }
-        else
-        {
-            return $null
-        }
-    }
-    
-    return $current
-}
 
 function Format-SettingValueForDisplay()
 {
@@ -602,13 +465,17 @@ function Format-SettingValueForDisplay()
     $functionName = $MyInvocation.MyCommand.Name
     
     # Add detailed logging for debugging array display issues  
-    if ($null -ne $Value) {
+    if ($null -ne $Value)
+    {
         Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
-    } else {
+    }
+    else
+    {
         Write-Verbose "[$functionName] Formatting null value for display"
     }
     
-    try {
+    try
+    {
         if ($Value -is [array])
         {
             Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
@@ -661,7 +528,8 @@ function Format-SettingValueForDisplay()
             return [string]$Value
         }
     }
-    catch {
+    catch
+    {
         Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
         # Fallback to safe string conversion
         if ($Value -is [array] -and $Value.Count -gt 0)

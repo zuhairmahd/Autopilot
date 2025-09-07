@@ -7,7 +7,7 @@
 .DESCRIPTION
     Validates that the new caching layers (menu configuration, string resources, 
     Graph API entities) work correctly and provide the expected performance improvements.
-    Tests caching in Get-MenuConfiguration, Get-StringsFromJson, GetEntraUser, 
+    Tests caching in Get-MenuConfiguration, Get-ConfigurationData, GetEntraUser, 
     GetEntraGroup, GetDeviceIdFromSerial, and the unified cache management system.
 
 .NOTES
@@ -147,28 +147,28 @@ Write-Host ""
 Write-Host "Test 2: String Resources Caching" -ForegroundColor Cyan
 
 try {
-    # Import the function
-    . "$PSScriptRoot/../functions/setupFunctions/Get-StringsFromJson.ps1"
+    # Load the current functions
+    . "$PSScriptRoot/../functions/setupFunctions/Get-ConfigurationData.ps1"
     
     # Clear any existing cache
-    if (Get-Variable -Name "script:stringsCache" -Scope Script -ErrorAction SilentlyContinue) {
-        Remove-Variable -Name "script:stringsCache" -Scope Script
+    if (Get-Variable -Name "script:configurationCache" -Scope Script -ErrorAction SilentlyContinue) {
+        $script:configurationCache.Clear()
     }
-    if (Get-Variable -Name "script:stringsFileTimestamp" -Scope Script -ErrorAction SilentlyContinue) {
-        Remove-Variable -Name "script:stringsFileTimestamp" -Scope Script
+    if (Get-Variable -Name "script:configurationTimestamps" -Scope Script -ErrorAction SilentlyContinue) {
+        $script:configurationTimestamps.Clear()
     }
     
-    # Use default strings file
-    $testStringsFile = "$PSScriptRoot/../strings.json"
+    # Use current strings file (PSD1 format)
+    $testStringsFile = "$PSScriptRoot/../strings"
     
     # First call - should create cache
     $start1 = Get-Date
-    $result1 = Get-StringsFromJson -StringsFile $testStringsFile
+    $result1 = Get-ConfigurationData -ConfigurationPath $testStringsFile -DefaultValues @{test = "value"}
     $duration1 = (Get-Date) - $start1
     
     # Second call - should use cache
     $start2 = Get-Date
-    $result2 = Get-StringsFromJson -StringsFile $testStringsFile
+    $result2 = Get-ConfigurationData -ConfigurationPath $testStringsFile -DefaultValues @{test = "value"}
     $duration2 = (Get-Date) - $start2
     
     # Verify results are identical

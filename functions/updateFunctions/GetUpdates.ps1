@@ -34,7 +34,7 @@ function GetUpdates()
             Content    = $null
         }
         Write-Verbose "[$functionName] Downloading file from $url to $outputFile"
-        write-log -LogFile $LogFile -Module "$functionName" -Message "Downloading file from $url to $outputFile" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading file from $url to $outputFile" -LogLevel "Information"
         try 
         {
             $response = Invoke-WebRequest -Uri $url -OutFile $outputFile -Method Get -ErrorAction SilentlyContinue -PassThru
@@ -76,12 +76,12 @@ function GetUpdates()
     {
         #try the old URL format
         Write-Verbose "[$functionName] Trying the old URL format: $oldUpdateURL to download the update file."
-        write-log -LogFile $LogFile -Module "$functionName" -Message "Trying the old URL format: $oldUpdateURL to download the update file." -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Trying the old URL format: $oldUpdateURL to download the update file." -LogLevel "Information"
         $response = DownloadRemoteFile -url $oldUpdateURL -outputFile $tempUpdateFile
         if ($response.Success)
         {
             Write-Verbose "[$functionName] Successfully downloaded the update file from the old URL format: $oldUpdateURL"
-            write-log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
         }
         else
         {
@@ -93,7 +93,7 @@ function GetUpdates()
     else
     {
         Write-Verbose "[$functionName] Successfully downloaded the update file from the old URL format: $oldUpdateURL"
-        write-log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
     }
     
     $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version

@@ -14,7 +14,9 @@ try
     # Load essential functions directly
     . "$PSScriptRoot\..\functions\setupFunctions\Get-DomainConfigurationFromFiles.ps1"
     . "$PSScriptRoot\..\functions\setupFunctions\Save-DomainConfiguration.ps1"
-    . "$PSScriptRoot\..\functions\setupFunctions\Migrate-DomainsToSeparateFiles.ps1"
+    . "$PSScriptRoot\..\functions\setupFunctions\Get-ApplicationDefaults.ps1"
+    . "$PSScriptRoot\..\functions\setupFunctions\Get-ConfigurationData.ps1"
+    . "$PSScriptRoot\..\functions\utilityFunctions\Export-PowerShellDataFile.ps1"
     . "$PSScriptRoot\..\functions\utilityFunctions\Write-Log.ps1"
     
     # Initialize unified test environment
@@ -61,59 +63,52 @@ try
     $testSettings | ConvertTo-Json -Depth 10 | Out-File -FilePath $settingsFile -Encoding UTF8
     Write-TestResult "Created test settings file with domains" $true
     
-    Write-TestSection "Testing migration functionality"
+    Write-TestSection "Testing PSD1 domain configuration functionality"
     
-    # Test migration
-    $migrationResult = Migrate-DomainsToSeparateFiles -SettingsFile $settingsFile -ConfigurationPath $testContext.TestFolder -RemoveFromSettings $true
+    # Test creating domain configuration with defaults
+    $testDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName "testdomain.com"
+    $domainPsd1File = Join-Path $testContext.TestFolder "testdomain.com.psd1"
     
-    if ($migrationResult.Success)
+    # Export domain configuration to PSD1
+    Export-PowerShellDataFile -InputObject $testDefaults -Path $domainPsd1File
+    
+    if (Test-Path $domainPsd1File)
     {
-        Write-TestResult "Migration completed successfully" $true
+        Write-TestResult "Domain PSD1 file created successfully" $true
         
-        # Check if domain file was created
-        $domainFile = Join-Path $testContext.TestFolder "testdomain.com.json"
-        if (Test-Path $domainFile)
+        # Test loading the domain configuration
+        $loadedDomainConfig = Get-ConfigurationData -ConfigurationPath $domainPsd1File -DefaultValues @{}
+        
+        if ($loadedDomainConfig -and $loadedDomainConfig.domain -eq "testdomain.com")
         {
-            Write-TestResult "Domain file created successfully" $true
-            
-            # Verify content
-            $domainContent = Get-Content $domainFile -Raw | ConvertFrom-Json
-            if ($domainContent.settings.deviceNamePrefix -eq "TEST-" -and 
-                $domainContent.groupsToInclude -contains "Test-Group-1")
-            {
-                Write-TestResult "Domain file contains correct data" $true
-            }
-            else
-            {
-                Write-TestResult "Domain file missing expected data" $false
-            }
+            Write-TestResult "Domain PSD1 file contains correct data" $true
         }
         else
         {
-            Write-TestResult "Domain file was not created" $false
+            Write-TestResult "Domain PSD1 file missing expected data" $false
         }
     }
     else
     {
-        Write-TestResult "Migration failed: $($migrationResult.ErrorMessages -join '; ')" $false
+        Write-TestResult "Domain PSD1 file was not created" $false
     }
     
     Write-TestSection "Testing load functionality"
     
-    # Test loading the domain configuration
-    $loadedConfig = Get-DomainConfigurationFromFiles -DomainName "testdomain.com" -ConfigurationPath $testContext.TestFolder
+    # Test loading the domain configuration using Get-ConfigurationData 
+    $loadedConfig = Get-ConfigurationData -ConfigurationPath $domainPsd1File -DefaultValues @{}
     
     if ($loadedConfig)
     {
-        Write-TestResult "Successfully loaded domain configuration" $true
+        Write-TestResult "Successfully loaded domain configuration via Get-ConfigurationData" $true
         
-        if ($loadedConfig.settings.deviceNamePrefix -eq "TEST-")
+        if ($loadedConfig.domain -eq "testdomain.com")
         {
-            Write-TestResult "Loaded configuration has correct settings" $true
+            Write-TestResult "Loaded configuration has correct domain name" $true
         }
         else
         {
-            Write-TestResult "Loaded configuration has incorrect settings" $false
+            Write-TestResult "Loaded configuration has incorrect domain name" $false
         }
     }
     else
@@ -123,20 +118,20 @@ try
     
     Write-TestSection "Testing save functionality"
     
-    # Test updating and saving
-    $loadedConfig.settings | Add-Member -MemberType NoteProperty -Name "testUpdate" -Value "success" -Force
-    $loadedConfig.groupsToInclude += "New-Test-Group"
+    # Test updating and saving using Export-PowerShellDataFile
+    $loadedConfig.minUsernameLength = 5  # Update a value
+    $loadedConfig.groupsToExclude += "New-Exclude-Group"  # Add to array
     
-    $saveResult = Save-DomainConfiguration -DomainName "testdomain.com" -DomainConfiguration $loadedConfig -ConfigurationPath $testContext.TestFolder
+    $saveResult = Export-PowerShellDataFile -InputObject $loadedConfig -Path $domainPsd1File -Force
     
     if ($saveResult)
     {
         Write-TestResult "Successfully saved updated configuration" $true
         
         # Verify the save
-        $verifyConfig = Get-DomainConfigurationFromFiles -DomainName "testdomain.com" -ConfigurationPath $testContext.TestFolder
-        if ($verifyConfig.settings.testUpdate -eq "success" -and 
-            $verifyConfig.groupsToInclude -contains "New-Test-Group")
+        $verifyConfig = Get-ConfigurationData -ConfigurationPath $domainPsd1File -DefaultValues @{}
+        if ($verifyConfig.minUsernameLength -eq 5 -and 
+            $verifyConfig.groupsToExclude -contains "New-Exclude-Group")
         {
             Write-TestResult "Saved changes verified successfully" $true
         }
@@ -150,32 +145,38 @@ try
         Write-TestResult "Failed to save updated configuration" $false
     }
     
-    Write-TestSection "Testing new domain creation"
+    Write-TestSection "Testing new domain creation from defaults"
     
-    # Test creating a new domain from scratch
-    $newDomainConfig = Get-DomainConfigurationFromFiles -DomainName "newdomain.com" -GlobalSettings $testSettings.globalSettings -ConfigurationPath $testContext.TestFolder
-
-    if ($newDomainConfig)
+    # Test creating a new domain configuration from application defaults
+    $newDomainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName "newdomain.com"
+    $newDomainFile = Join-Path $testContext.TestFolder "newdomain.com.psd1"
+    
+    # Create the new domain configuration file
+    Export-PowerShellDataFile -InputObject $newDomainDefaults -Path $newDomainFile
+    
+    if (Test-Path $newDomainFile)
     {
-        Write-TestResult "Successfully created new domain configuration" $true
+        Write-TestResult "New domain PSD1 file was created" $true
         
-        $newDomainFile = Join-Path $testContext.TestFolder "newdomain.com.json"
-        if (Test-Path $newDomainFile)
+        # Test loading the new domain config  
+        $newDomainConfig = Get-ConfigurationData -ConfigurationPath $newDomainFile -DefaultValues @{}
+        
+        if ($newDomainConfig -and $newDomainConfig.domain -eq "newdomain.com")
         {
-            Write-TestResult "New domain file was created" $true
+            Write-TestResult "New domain configuration has correct domain name" $true
         }
         else
         {
-            Write-TestResult "New domain file was not created" $false
+            Write-TestResult "New domain configuration has incorrect domain name" $false
         }
     }
     else
     {
-        Write-TestResult "Failed to create new domain configuration" $false
+        Write-TestResult "New domain file was not created" $false
     }
     
     Write-TestSection "Test Summary"
-    Write-TestResult "Domain configuration separation functionality working correctly" $true
+    Write-TestResult "PSD1-based domain configuration functionality working correctly" $true
     
 }
 catch
