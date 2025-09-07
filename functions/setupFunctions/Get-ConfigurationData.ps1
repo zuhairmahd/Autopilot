@@ -94,7 +94,7 @@ function Get-ConfigurationData()
                     {
                         $defaultData = Get-ApplicationDefaults -DefaultType "Settings"
                         if ($defaultData) {
-                            Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
+                            $null = Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
                             Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                             $createdFromDefaults = $true
                         }
@@ -103,7 +103,7 @@ function Get-ConfigurationData()
                     {
                         $defaultData = Get-ApplicationDefaults -DefaultType "Strings"
                         if ($defaultData) {
-                            Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
+                            $null = Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
                             Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                             $createdFromDefaults = $true
                         }
@@ -112,7 +112,7 @@ function Get-ConfigurationData()
                     {
                         $defaultData = Get-ApplicationDefaults -DefaultType "Menus"
                         if ($defaultData) {
-                            Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
+                            $null = Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
                             Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                             $createdFromDefaults = $true
                         }
@@ -130,7 +130,7 @@ function Get-ConfigurationData()
                             @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; devdefault = 'Github'; reldefault = 'Github'; default = 'Github'; type = 'array'}, 
                             @{name = 'Release'; value = "2.2"; description = 'The release branch to use.'; devdefault = 'main'; reldefault = '2.2'; default = 'main'; type = 'string'}
                         )
-                        Export-PowerShellDataFile -InputObject $initVars -Path $psd1Path -Force
+                        $null = Export-PowerShellDataFile -InputObject $initVars -Path $psd1Path -Force
                         Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                         $createdFromDefaults = $true
                     }
@@ -140,10 +140,9 @@ function Get-ConfigurationData()
                     }
                 }
                 
-                # If we couldn't create from application defaults, use provided defaults
                 if (-not $createdFromDefaults -and $DefaultValues -and $DefaultValues.Count -gt 0)
                 {
-                    Export-PowerShellDataFile -InputObject $DefaultValues -Path $psd1Path -Force
+                    $null = Export-PowerShellDataFile -InputObject $DefaultValues -Path $psd1Path -Force
                     Write-Host "Created missing $psd1Path from provided defaults" -ForegroundColor Yellow
                     $createdFromDefaults = $true
                 }
