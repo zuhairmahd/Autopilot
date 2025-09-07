@@ -766,6 +766,79 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
+            # Additional dynamic and static menus that exist in the committed menu.psd1
+            appModeMenu = @{
+                type                  = 'dynamic'
+                Title                 = '$menuTitle'
+                includeInDisplayModes = @('full', 'admin')
+                Description           = '$menuDescription'
+            }
+            groupAssignmentsMenu = @{
+                type                  = 'dynamic'
+                Title                 = 'Group Assignments for $groupName'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                Description           = 'What type of assignments would you like to see?'
+            }
+            deviceWaitMenu = @{
+                Title               = 'Device Wait Menu'
+                Description         = 'Choose what you would like to do with this device:'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Restart the device'
+                        Description            = 'Restart the device'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
+            groupsEditMenu = @{
+                Title               = 'Groups Edit Menu'
+                Description         = 'Select which group settings you want to modify:'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin')
+                items               = @(
+                    @{
+                        name                   = 'Edit Groups to Include'
+                        description            = 'Modify the groups that are included'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Edit Groups to Exclude'
+                        description            = 'Modify the groups that are excluded'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'View Current Group Settings'
+                        description            = 'View the current group settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    }
+                )
+            }
+            reportExportMenu = @{
+                Title               = 'Report Export Menu'
+                Description         = 'Select the format to which you would like to export the report'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Export in HTML format'
+                        Description            = 'Export the report in HTML format'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Export in CSV format'
+                        Description            = 'Export the report in CSV format'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
         }
     }
     
