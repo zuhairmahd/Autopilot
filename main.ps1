@@ -377,7 +377,8 @@ else
             {
                 try 
                 {
-                    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+                    $initDefaults = @{}
+                    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
                     if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
                     {
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required after wizard (changePWOnNextStart=true)" -LogLevel "Information"
