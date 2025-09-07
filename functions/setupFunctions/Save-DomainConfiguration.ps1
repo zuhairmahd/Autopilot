@@ -76,7 +76,7 @@ function Save-DomainConfiguration
         }
         
         # Save using Export-PowerShellDataFile for PSD1 format
-        $exportResult = Export-PowerShellDataFile -InputObject $DomainConfiguration -Path $domainConfigFile -Force
+        $exportResult = Export-PowerShellDataFile -InputObject $DomainConfiguration -Path $domainConfigFile
         
         # Verify the file was saved successfully
         if ($exportResult -and (Test-Path $domainConfigFile))

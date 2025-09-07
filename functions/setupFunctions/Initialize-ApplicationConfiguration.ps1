@@ -213,7 +213,7 @@ function Initialize-ConfigurationFiles()
                 # Get default settings and save as PSD1
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
                 Write-Host "Saving to path $InitFile"
-                $defaultSettings | Export-PowerShellDataFile -Path $InitFile -validate
+                $defaultSettings | Export-PowerShellDataFile -Path $InitFile -validate -Force
                 Write-Verbose "[$functionName] Created settings.psd1 with defaults"
             }
             catch
@@ -237,7 +237,7 @@ function Initialize-ConfigurationFiles()
             {
                 # Get default strings and save as PSD1
                 $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
-                $defaultStrings | Export-PowerShellDataFile -Path $StringsFile -validate
+                $defaultStrings | Export-PowerShellDataFile -Path $StringsFile -validate -Force
                 Write-Verbose "[$functionName] Created strings.psd1 with defaults"
             }
             catch

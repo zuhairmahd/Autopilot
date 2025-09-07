@@ -451,7 +451,7 @@ function Get-CurrentSettings()
             try
             {
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
-                $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
+                $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile -force -validate   
                 Write-Verbose "[$functionName] Created default settings file"
             }
             catch

@@ -96,7 +96,7 @@ function Get-DomainConfigurationFromFiles()
             $domainDefaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
             
             # Save the new configuration
-            $domainDefaults | Export-PowerShellDataFile -Path $domainConfigFile -Force
+            $domainDefaults | Export-PowerShellDataFile -Path $domainConfigFile -Validate -Force
             
             Write-Log -LogFile $logFile -Message "Created new domain configuration file: $domainConfigFile" -Module $functionName -LogLevel "Information"
             

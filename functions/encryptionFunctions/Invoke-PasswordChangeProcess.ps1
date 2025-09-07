@@ -129,7 +129,7 @@ function Invoke-PasswordChangeProcess()
                 {
                     $settings.auth.changePWOnNextStart = $false
                     # Write updated settings back to file
-                    $settings | Export-PowerShellDataFile -Path $SettingsFile
+                    $settings | Export-PowerShellDataFile -Path $SettingsFile -validate -force 
                     Write-Host "Settings updated successfully" -ForegroundColor Green
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to false" -LogLevel "Information"
                 }

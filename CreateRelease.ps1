@@ -187,6 +187,7 @@ function Get-LastRunObject()
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $lastRun = [ordered]@{}
     if (Test-Path -Path $LastRunFile)
     {
         Write-Verbose "[$functionName] Last run file found: $lastRunFile"
@@ -212,7 +213,7 @@ function update-LastRunObject()
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
-        [hashtable]$LastRun,
+        $LastRun,
         [Parameter(Mandatory = $true)]
         [string]$LastRunFile
     )
@@ -234,15 +235,17 @@ function update-LastRunObject()
 
 function Update-LastRunVersion()
 {
+    [CmdletBinding()]
     param (
         [string]$Version = $null,
         [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
         [string]$PartToIncrement = 'Revision',
         [Parameter(Mandatory = $true)]
-        [hashtable]$LastRun
+        $LastRun
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $lastRunObject = [ordered]@{}
     # 1. Normalize & validate supplied version (may be empty)
     if (-not [string]::IsNullOrWhiteSpace($Version))
     {
@@ -386,19 +389,30 @@ function Update-LastRunVersion()
     {
         Write-Host "Maintaining version without increment: $finalVersion"
     }
-
-    return $finalVersion
+    $LastRun.version = $finalVersion
+    $lastRunObject = $LastRun
+    return $lastRunObject
 }
 
 function UpdateHash()
 {
     [CmdletBinding()]
     param (
+        [Parameter(Mandatory = $true)]
         [string]$executableFilePath,
-        [string]$lastRunPath = "$pwd\lastrun.json"
+        [Parameter(Mandatory = $true)]
+        $lastRunContent
     )
 
     $functionName = $MyInvocation.MyCommand.Name
+    $lastRunContent = [ordered]@{
+        date            = $lastRunContent.date
+        version         = $lastRunContent.version
+        guid            = $lastRunContent.guid
+        hash            = $lastRunContent.hash
+        stringsVersion  = $lastRunContent.stringsVersion
+        settingsVersion = $lastRunContent.settingsVersion
+    }
     Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
     Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
     if (-not (Test-Path $executableFilePath))
@@ -407,37 +421,24 @@ function UpdateHash()
         Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
         return $false
     }
-    if (-not (Test-Path $lastRunPath))
-    {
-        Write-Error "Last run file not found: $lastRunPath"
-        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
-        return $false
-    }
-
-    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
-    if (-not $lastRunContent)
-    {
-        Write-Error "Failed to read JSON from $lastRunPath"
-        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
-        return $false
-    }
     
     # Get the hash of the executable file
     $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
     
     if ($fileHash)
     {
+        Write-Host "File hash (SHA256) of $($executableFilePath): $($fileHash.Hash)"
+        Write-Log -logFile $logFile -Message "File hash (SHA256) of $($executableFilePath): $($fileHash.Hash)" -module $functionName
         $lastRunContent.hash = $fileHash.Hash
-        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
-        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
-        Write-Host "Hash updated successfully in $lastRunPath"
-        return $true
+        $lastRunContent.add('hashUpdated', $true)
     }
     else
     {
         Write-Error "Failed to write updated hash to $lastRunPath"
-        return $false
+        Write-Log -logFile $logFile -Message "Failed to write updated hash to $lastRunPath" -module $functionName -logLevel "Error"
+        $lastRunContent.add('hashUpdated', $false)
     }
+    return $lastRunContent
 }
 
 function SignScripts()
@@ -982,7 +983,7 @@ function UpdateSettingsFile()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
                 try
                 {
-                    $settings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate
+                    $settings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate -force
                     Write-Host "Settings updated successfully" -ForegroundColor Green
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
                 }
@@ -1017,11 +1018,11 @@ function UpdateSettingsFile()
 
 #region Define variables
 $lastRunFile = "$pwd\lastrun.json"
-$lastRun = get-lastrun -LastRunFile $lastRunFile
+$lastRun = Get-LastRunObject -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
 $SettingsFile = "$pwd\settings.psd1"
 $functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'lastrun.json') 
+$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1', 'lastrun.json') 
 $settingsVersion = (Import-PowerShellDataFile -Path "$pwd\settings.psd1").version
 $stringsVersion = (Import-PowerShellDataFile -Path "$pwd\strings.psd1").version
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
@@ -1147,10 +1148,24 @@ if ($SecretsOnly)
 if ($updateHash)
 {
     Write-Host "Updating hash in lastrun file: $lastRunFile"
-    if (UpdateHash -executableFilePath $OutputFile -lastRunPath $lastRunFile)
+    $updatedHash = UpdateHash -executableFilePath $OutputFile -lastRunContent $lastRun
+    if ($updatedHash.hashUpdated)
     {
         Write-Host "Hash updated successfully in $lastRunFile"
         Write-Log -logFile $logFile -Message "Hash updated successfully in $lastRunFile" -module $scriptName
+        Write-Host "Saving lastrun file: $lastRunFile"
+        if (Update-LastRunObject -LastRunFile $lastRunFile -LastRun $updatedHash)
+        {
+            Write-Host "lastrun file saved successfully."
+            Write-Log -logFile $logFile -Message "lastrun file saved successfully." -module $scriptName
+        }
+        else
+        {
+            Write-Host "Failed to save lastrun file: $lastRunFile"
+            Write-Log -logFile $logFile -Message "Failed to save lastrun file: $lastRunFile" -module $scriptName -LogLevel 'Error'
+            Write-Log -logFile $logFile -finishLogging
+            exit 1
+        }
         Write-Log -logFile $logFile -finishLogging
         exit 0
     }
@@ -1163,9 +1178,10 @@ if ($updateHash)
     }
 }
 
-$version = Update-LastRunVersion
-Write-Host "Incrementing Last run version to: $version"
-if ($null -ne $version)
+Write-Verbose "[$scriptName] Updating last run version..."
+$updatedVersion = Update-LastRunVersion -version $version -PartToIncrement 'Revision' -LastRun $LastRun
+Write-Verbose "[$scriptName] Last run version after update: $($updatedVersion.version)"
+if ($updatedVersion.version -ne $version)
 {
     Write-Host "Incremented last run version..."
     Write-Log -logFile $logFile -Message "Incremented last run version to $version" -module $scriptName
@@ -1175,6 +1191,7 @@ else
     Write-Host "No last run version incremented."
     Write-Log -logFile $logFile -Message "No last run version incremented." -module $scriptName
 }
+$version = $updatedVersion.version
 
 if (-not $Overwrite)
 {
@@ -1434,27 +1451,31 @@ else
 }
 
 #get the hash for the executable
-$hash = Get-FileHash -Path $OutputFile -Algorithm SHA256
-Write-Host "Executable hash: $($hash.Hash)"
-#write the new version to the lastrun file.
-Write-Host "Writing last run information to $lastRunFile"
-$lastRun = @{
-    date            = $todaysDate
-    version         = $Version
-    hash            = $hash.Hash
-    GUID            = $guid
-    settingsVersion = $settingsVersion
-    stringsVersion  = $stringsVersion
-}
-try
+$Hash = UpdateHash -executableFilePath $OutputFile -lastRunContent $lastRun
+if ($Hash.hashUpdated)
 {
-    $lastRun | ConvertTo-Json | Set-Content -Path $lastRunFile -Force
-    Write-Host "Last run information written successfully to $lastRunFile"
+    Write-Host "Got the hash for $($OutputFile): $($Hash.hash)"
+    Write-Log -logFile $logFile -Message "Got the hash for $($OutputFile): $($Hash.hash)" -module $scriptName
+    $lastrun = $Hash
 }
-catch
+else
 {
-    Write-Host "Failed to write last run information to $lastRunFile"
-    Write-Error $_
+    Write-Host "Failed to update hash in $lastRunFile"
+    exit 1
+}
+
+#save the lastrun file
+if (Update-LastRunObject -LastRunFile $lastRunFile -LastRun $lastRun)
+{
+    Write-Host "lastrun file saved successfully."
+    Write-Log -logFile $logFile -Message "lastrun file saved successfully." -module $scriptName
+}
+else
+{
+    Write-Host "Failed to save lastrun file: $lastRunFile"
+    Write-Log -logFile $logFile -Message "Failed to save lastrun file: $lastRunFile" -module $scriptName -LogLevel 'Error'
+    Write-Log -logFile $logFile -finishLogging
+    exit 1
 }
 
 if (CopyFiles -Source $filesToCopy -Destination $parentFolder)
