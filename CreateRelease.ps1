@@ -66,6 +66,7 @@ param(
     [Alias('outputFile')]
     [string]$OutputPath = '',
     [string]$SettingsFile = "$pwd\settings.psd1",
+    [string]$Log = "$pwd\logs\createRelease.log",
     [string]$CompanyName = 'Zuhair Mahmoud',
     [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
@@ -78,11 +79,11 @@ param(
     [switch]$SecretsOnly,
     [switch]$AddDebug,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
-    [switch]$UpdateSettings
+    [switch]$NoPasswordChange
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
-$logFile = "$pwd\logs\createRelease.log"
+$logFile = $Log
 
 #region import functions.
 function Find-FolderPath()
@@ -789,7 +790,7 @@ function CopySecrets()
             }
             else
             {
-                Write-Host 'Exiting without copying secrets.'
+                Write-Host 'Secrets will not be copied.'
                 Write-Log -logFile $logFile -Message "User chose not to overwrite. Exiting without copying secrets." -module $functionName
                 return $false
             }   
@@ -954,11 +955,29 @@ function UpdateSettingsFile()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [string]$SettingsFilePath
+        [string]$SettingsFilePath,
+        [switch]$confirm
     )
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating settings file at: $SettingsFilePath"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Updating settings file at: $SettingsFilePath" -LogLevel "Information"
+    if ($confirm)
+    {
+        $response = Read-Host "Are you sure you want to change the default password? (Y/N)"
+        while ($response -notin 'Y', 'N', 'yes', 'no')
+        {
+            $response = Read-Host 'Invalid input. Please enter Y or N: '
+            Write-Verbose "[$functionName] User response: $response"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "User response: $response" -LogLevel "Information"
+            [console]::beep(500, 300)
+        }
+        if ($response -eq 'N' -or $response -eq 'no')
+        {
+            Write-Host 'Exiting without updating settings file.'
+            Write-Log -LogFile $LogFile -Module $functionName -Message "User chose not to update settings file. Exiting." -LogLevel "Information"
+            return $false
+        }   
+    }
     if (Test-Path $SettingsFilePath)
     {
         try
@@ -1082,7 +1101,13 @@ if ($CreateModule)
 if ($SecretsOnly)
 {
     Write-Host "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets"
-    if ($UpdateSettings)
+    if ($NoPasswordChange)
+    {
+        Write-Verbose "[$scriptName] Skipping settings file update to avoid password change."
+        Write-Log -logFile $logFile -Message "Skipping settings file update to avoid password change." -module $scriptName
+        $settingsUpdate = $false
+    }
+    else
     {
         Write-Verbose "[$scriptName] Updating settings file to force password change."
         Write-Log -logFile $logFile -Message "Updating settings file to force password  change." -module $scriptName
@@ -1113,7 +1138,7 @@ if ($SecretsOnly)
         Write-Host "No secrets were copied."
     }
     Write-Host "Checking whether to update settings file to force password change."
-    if ($settingsUpdate -eq $true)
+    if (-not $NoPasswordChange)
     {
         Write-Log -logFile $logFile -Message "Updating settings file to force password change." -module $scriptName
         Write-Verbose "[$scriptName] Updating settings file to force password change."
@@ -1128,7 +1153,17 @@ if ($SecretsOnly)
             Write-Host "Found settings file at $destSettingsFile."
             Write-Log -logFile $logFile -Message "Found settings file at $destSettingsFile." -module $scriptName
         }
-        if (UpdateSettingsFile -SettingsFilePath $destSettingsFile)
+        if ($Overwrite)
+        {
+            Write-Log -logFile $logFile -Message "Overwrite is set to true. Updating settings file without confirmation." -module $scriptName
+            $settingsUpdated = UpdateSettingsFile -SettingsFilePath $destSettingsFile
+        }
+        else
+        {
+            Write-Log -logFile $logFile -Message "Prompting user for confirmation before updating settings file." -module $scriptName
+            $settingsUpdated = UpdateSettingsFile -SettingsFilePath $destSettingsFile -confirm
+        }
+        if ($settingsUpdated)
         {
             Write-Host "Settings file $destSettingsFile updated successfully."
             Write-Log -logFile $logFile -Message "Settings file $destSettingsFile updated successfully." -module $scriptName
@@ -1509,7 +1544,16 @@ else
 }
 
 Write-Host "Updating settings file to force password change."
-$null = UpdateSettingsFile -SettingsFilePath $destSettingsFile
+if ($Overwrite)
+{
+    Write-Host "Overwriting settings file without confirmation."
+    $null = UpdateSettingsFile -SettingsFilePath $destSettingsFile
+}
+else
+{
+    Write-Host "Prompting for confirmation before updating settings file."
+    $null = UpdateSettingsFile -SettingsFilePath $destSettingsFile -confirm
+}
 
 if (-not $noCleanup)
 {

@@ -57,13 +57,29 @@ function ProcessDevice()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment check returned: $deviceAssignment" -LogLevel "Information"
             if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
-                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
-                Write-Verbose "[$functionName] Device assignment status: $isAssigned"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment status: $isAssigned" -LogLevel "Information"
-                if ($isAssigned)
+                $assignmentStatusObject = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                Write-Verbose "[$functionName] Device assignment object: $($assignmentStatusObject | ConvertTo-Json -Depth 4)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment object IsAssigned=$($assignmentStatusObject.IsAssigned) Status=$($assignmentStatusObject.AssignmentStatus) Category=$($assignmentStatusObject.StatusCategory)" -LogLevel "Information"
+                if ($assignmentStatusObject.IsAssigned)
                 {
                     return $returnValues.deviceAssignedMessage
                 }
+                else
+                {
+                    switch ($deviceAssignment.deploymentProfileAssignmentStatus)
+                    {
+                        'unassigned'
+                        {
+                            return $returnValues.deviceNotAssignedMessage
+                        }
+                        'pending'
+                        {
+                            return $returnValues.deviceAssignmentPendingMessage
+                        }
+                    }
+                    Write-Host "The device is in Intune but not assigned to a profile." 
+                }
+                return $returnValues.deviceIsInIntuneMessage 
             }
             else
             {
@@ -85,7 +101,8 @@ function ProcessDevice()
                 return $returnValues.backoutText
             }
             $importStart = Get-Date
-            $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $GroupTag -AssignedUser $AssignedUser -TimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime -CustomImport $CustomImport
+            $device = ImportAutopilotDevice -DeviceObject $deviceObject -AccessToken $accessToken -GroupTag $settings.GroupTag -AssignedUser $settings.AssignedUser -TimeInSeconds $settings.timeInSeconds -maxWaitTime $settings.maxWaitTime -CustomImport $CustomImport
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "ImportAutopilotDevice function returned: $device" -LogLevel "Information"
             if ($device -eq $returnValues.backoutText)
             {
                 Write-Verbose "[$functionName] The import function returned $device."
@@ -97,9 +114,10 @@ function ProcessDevice()
             {
                 return $importResult
             }
-            Write-Host "Waiting for $timeInSeconds seconds to allow for profile assignment."
-            Start-Sleep -Seconds $timeInSeconds
-            $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+            Write-Host "Waiting for $($settings.timeInSeconds) seconds to allow for profile assignment."
+            Start-Sleep -Seconds $settings.timeInSeconds
+            $assignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -WaitForAssignment -waitTimeInSeconds $settings.timeInSeconds -maxWaitTime $settings.maxWaitTime
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "CheckDeviceAssignment function returned: $assignment" -LogLevel "Information"
             return ProcessAssignmentResult -assignment $assignment -importStart $importStart -returnValues $returnValues
             #endregion Add the device to Intune.
         }
@@ -109,10 +127,9 @@ function ProcessDevice()
             $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken
             if ($null -ne $deviceAssignment -and $deviceAssignment -notin $returnValues.values)
             {
-                $isAssigned = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
-                if ($isAssigned)
+                $assignmentStatusObject = DisplayDeviceAssignmentStatus -deviceAssignment $deviceAssignment 
+                if ($assignmentStatusObject.IsAssigned)
                 {
-                    # Handle enrollment state for assigned devices
                     return HandleDeviceEnrollmentState -deviceAssignment $deviceAssignment -serialNumber $serialNumber -accessToken $accessToken -returnValues $returnValues -domain $domain
                 }
                 else
@@ -133,10 +150,13 @@ function ProcessDevice()
                     Write-Host "What would you like to do?"
                     # Create device wait menu from configuration
                     $deviceWaitMenu = NewMenu -MenuName "deviceWaitMenu"
-                    if (-not $deviceWaitMenu) {
+                    if (-not $deviceWaitMenu)
+                    {
                         # Fallback to manual creation if config not found
                         $deviceWaitMenu = NewMenu -Title "Options for Device With Serial Number $serialNumber" -Description "Choose what you would like to do with this device:"
-                    } else {
+                    }
+                    else
+                    {
                         # Update title with actual serial number
                         $deviceWaitMenu.Title = $deviceWaitMenu.Title -replace '\$serialNumber', $serialNumber
                     }
@@ -154,7 +174,7 @@ function ProcessDevice()
                     }
                     $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
                         Write-Host "Continuing to wait for profile assignment..."
-                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $timeInSeconds -maxWaitTime $maxWaitTime
+                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $settings.timeInSeconds -maxWaitTime $settings.maxWaitTime
                         return $deviceAssignment
                     }
                     $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {

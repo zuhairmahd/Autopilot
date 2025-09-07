@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Log = "$PSScriptRoot\logs\reset.log",
-    [string]$ScriptArchive = "$pwd\script.zip"
+    [string]$ScriptArchive = "$pwd\script.zip",
+    [switch]$fullReset
 )
 
 function Write-Log()
@@ -139,11 +140,11 @@ function Write-Log()
             }
             
             # Write to console
-<<<<<<< HEAD
+            <<<<<<< HEAD
             if ($WriteToConsole)
-=======
+            =======
             if ($OutputToConsole)
->>>>>>> origin/dev
+            >>>>>>> origin/dev
             {
                 Write-Host $separatorLine
             }
@@ -165,44 +166,44 @@ function Write-Log()
                 {
                     "Error"
                     {
-<<<<<<< HEAD
+                        <<<<<<< HEAD
                         if ($WriteToConsole)
-=======
+                        =======
                         if ($OutputToConsole)
->>>>>>> origin/dev
+                        >>>>>>> origin/dev
                         {
                             Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
                         }
                     }
                     "Warning"
                     {
-<<<<<<< HEAD
+                        <<<<<<< HEAD
                         if ($WriteToConsole)
-=======
+                        =======
                         if ($OutputToConsole)
->>>>>>> origin/dev
+                        >>>>>>> origin/dev
                         {
                             Write-Warning "[$Module] $Message" 
                         }
                     }
                     "Verbose"
                     {
-<<<<<<< HEAD
+                        <<<<<<< HEAD
                         if ($WriteToConsole)
-=======
+                        =======
                         if ($OutputToConsole)
->>>>>>> origin/dev
+                        >>>>>>> origin/dev
                         {
                             Write-Verbose "[$Module] $Message" 
                         }
                     }
                     "Debug"
                     {
-<<<<<<< HEAD
+                        <<<<<<< HEAD
                         if ($WriteToConsole)
-=======
+                        =======
                         if ($OutputToConsole)
->>>>>>> origin/dev
+                        >>>>>>> origin/dev
                         {
                             Write-Debug "[$Module] $Message" 
                         }
@@ -414,10 +415,6 @@ try
     Write-Verbose "[$scriptName] Secrets destination folder: $dest"
     $candidateParent = Split-Path -Path $candidate.FullName -Parent
     Write-Verbose "[$scriptName] Script files folder: $candidateParent"
-    $otherFilesToMove = Get-ChildItem -Path $candidateParent -Filter *.json -Force
-    Write-Log -LogFile $logFile -Module $scriptName -Message "Script files folder: $candidateParent and destination secrets folder: $dest" -LogLevel "Debug"
-    Write-Log -LogFile $logFile -Message "Found $($otherFilesToMove.Count) additional JSON files to move." -Module $scriptName -LogLevel "Debug"
-    Write-Verbose "[$scriptName] Found $($otherFilesToMove.Count) additional JSON files to move."
     if (Test-Path -LiteralPath $dest) 
     { 
         Write-Verbose "[$scriptName] Removing existing $dest folder before move."
@@ -430,13 +427,20 @@ try
         Move-Item -Path $candidate.FullName -Destination $dest -Force
         Write-Verbose "[$scriptName] Moved $secretsFolderName folder to $dest"
         Write-Log -LogFile $logFile -Message "Moved $secretsFolderName folder to $dest" -Module $scriptName -LogLevel "Information"
-        Write-Host "Resetting menus and other settings..."
-        foreach ($file in $otherFilesToMove)
+        if ($fullReset)
         {
-            $destinationPath = Join-Path $PSScriptRoot $file.Name
-            Move-Item -Path $file.FullName -Destination $destinationPath -Force
-            Write-Verbose "[$scriptName] Moved $($file.Name) to $PSScriptRoot"
+            Write-Host "Resetting menus and other settings..."
+            $allPSDFiles = Get-ChildItem -Path $candidateParent -Filter *.psd1 -Force
+            Write-Verbose "[$scriptName] Performing full reset of all $($allPSDFiles.count) PSD files."
+            Write-Log -LogFile $logFile -Message "Performing full reset of all $($allPSDFiles.count) PSD files." -Module $scriptName -LogLevel "Information"
+            foreach ($file in $allPSDFiles)
+            {
+                $destinationPath = Join-Path $PSScriptRoot $file.Name
+                Move-Item -Path $file.FullName -Destination $destinationPath -Force
+                Write-Verbose "[$scriptName] Moved $($file.Name) to $PSScriptRoot"
+            }
         }
+        
     }
     catch
     {
