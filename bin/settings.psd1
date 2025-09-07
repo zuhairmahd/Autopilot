@@ -1,6 +1,143 @@
 @{
+    description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    requiredScopes = @(
+        @{
+            Reason = 'Required to read user profiles, group memberships, and registered devices.'
+            Endpoints = @(
+                '/users',
+                'users/{id}',
+                'users/{id}/memberOf',
+                'users/{id}/registeredDevices'
+            )
+            Scope = 'User.Read.All'
+        },
+        @{
+            Reason = 'Required to read Microsoft Entra ID device objects.'
+            Endpoints = @(
+                'devices'
+            )
+            Scope = 'Device.Read.All'
+        },
+        @{
+            Reason = 'Required to read application information and manage app assignments.'
+            Endpoints = @(
+                'deviceAppManagement/mobileApps',
+                'deviceAppManagement/mobileApps/{id}/assignments'
+            )
+            Scope = 'DeviceManagementApps.ReadWrite.All'
+        },
+        @{
+            Reason = 'Required to read Intune device configuration policies.'
+            Endpoints = @(
+                'deviceManagement/deviceConfigurations'
+            )
+            Scope = 'DeviceManagementConfiguration.Read.All'
+        },
+        @{
+            Reason = 'Required to read Intune managed device properties.'
+            Endpoints = @(
+                '/deviceManagement/managedDevices',
+                'deviceManagement/managedDevices/{id}'
+            )
+            Scope = 'DeviceManagementManagedDevices.Read.All'
+        },
+        @{
+            Reason = 'Required for highly privileged operations, specifically to read local admin (LAPS) passwords.'
+            Endpoints = @(
+                'directory/deviceLocalCredentials'
+            )
+            Scope = 'DeviceManagementManagedDevices.PrivilegedOperations.All'
+        },
+        @{
+            Reason = 'Required to read Autopilot events and to read and manage Autopilot device identities.'
+            Endpoints = @(
+                'deviceManagement/autopilotEvents',
+                'deviceManagement/importedWindowsAutopilotDeviceIdentities',
+                'deviceManagement/windowsAutopilotDeviceIdentities'
+            )
+            Scope = 'DeviceManagementServiceConfig.ReadWrite.All'
+        },
+        @{
+            Reason = 'Required to read BitLocker recovery keys for all devices.'
+            Endpoints = @(
+                'informationProtection/bitlocker/recoveryKeys'
+            )
+            Scope = 'BitlockerKey.Read.All'
+        },
+        @{
+            Reason = 'Standard scope required for user sign-in with OpenID Connect.'
+            Endpoints = @()
+            Scope = 'openid'
+        },
+        @{
+            Reason = 'Standard scope to get basic user profile information during sign-in.'
+            Endpoints = @()
+            Scope = 'profile'
+        },
+        @{
+            reason = 'Required to create, update, and delete Intune device configuration policies.'
+            endpoints = @(
+                'deviceManagement/deviceConfigurations'
+            )
+            scope = 'DeviceManagementConfiguration.ReadWrite.All'
+        },
+        @{
+            reason = 'Required to read application information in Intune.'
+            endpoints = @(
+                'deviceAppManagement/mobileApps'
+            )
+            scope = 'DeviceManagementApps.Read.All'
+        },
+        @{
+            reason = 'Required to create, update, and delete Intune managed device properties.'
+            endpoints = @(
+                'deviceManagement/managedDevices'
+            )
+            scope = 'DeviceManagementManagedDevices.ReadWrite.All'
+        },
+        @{
+            reason = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
+            endpoints = @()
+            scope = 'offline_access'
+        }
+    )
+    version = '1.3.0.0'
+    globalSettings = @{
+        deviceContactThresholdInDays = 30
+        validateScopes = $false
+        maxUserMatchDisplay = 10
+        autoUpdate = $true
+        maxGroupMatchDisplay = 10
+        testMode = $false
+        appMode = 'full'
+        release = 'master'
+        operatingSystem = 'Windows'
+        showLicenseBanner = $false
+        appInfo = @{
+            companyName = 'Zuhair Mahmoud'
+            description = 'Autopilot for Windows devices'
+            name = 'Autopilot'
+        }
+        repo = 'Github'
+        repoInfo = @{
+            repoPath = 'zuhairmahd'
+            baseURL = 'https://www.github.com'
+            baseSourceURL = 'https://raw.githubusercontent.com'
+            repoName = 'Autopilot'
+        }
+        configFile = '.\.secrets\config.json'
+        timeInSeconds = 60
+        maxWaitTime = 30
+    }
     auth = @{
+        forceNewToken = $false
         authType = 'PublicAuthFlow'
+        secureString = $false
+        validateScopes = $true
+        noSaveRefreshToken = $false
+        delegated = $true
+        cacheType = 'Memory'
+        renewalLeadTime = 5
         scope = @(
             'offline_access',
             'openid',
@@ -11,143 +148,6 @@
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        delegated = $true
-        secureString = $false
         changePwOnNextStart = $true
-        forceNewToken = $false
-        renewalLeadTime = 5
-        cacheType = 'Memory'
-        validateScopes = $true
-        noSaveRefreshToken = $false
     }
-    globalSettings = @{
-        testMode = $false
-        validateScopes = $false
-        timeInSeconds = 60
-        maxUserMatchDisplay = 10
-        repoInfo = @{
-            baseSourceURL = 'https://raw.githubusercontent.com'
-            repoName = 'Autopilot'
-            baseURL = 'https://www.github.com'
-            repoPath = 'zuhairmahd'
-        }
-        showLicenseBanner = $false
-        maxGroupMatchDisplay = 10
-        release = 'master'
-        maxWaitTime = 30
-        deviceContactThresholdInDays = 30
-        configFile = '.\.secrets\config.json'
-        autoUpdate = $true
-        operatingSystem = 'Windows'
-        repo = 'Github'
-        appMode = 'full'
-        appInfo = @{
-            name = 'Autopilot'
-            companyName = 'Zuhair Mahmoud'
-            description = 'Autopilot for Windows devices'
-        }
-    }
-    requiredScopes = @(
-        @{
-            Scope = 'User.Read.All'
-            Reason = 'Required to read user profiles, group memberships, and registered devices.'
-            Endpoints = @(
-                '/users',
-                'users/{id}',
-                'users/{id}/memberOf',
-                'users/{id}/registeredDevices'
-            )
-        },
-        @{
-            Scope = 'Device.Read.All'
-            Reason = 'Required to read Microsoft Entra ID device objects.'
-            Endpoints = @(
-                'devices'
-            )
-        },
-        @{
-            Scope = 'DeviceManagementApps.ReadWrite.All'
-            Reason = 'Required to read application information and manage app assignments.'
-            Endpoints = @(
-                'deviceAppManagement/mobileApps',
-                'deviceAppManagement/mobileApps/{id}/assignments'
-            )
-        },
-        @{
-            Scope = 'DeviceManagementConfiguration.Read.All'
-            Reason = 'Required to read Intune device configuration policies.'
-            Endpoints = @(
-                'deviceManagement/deviceConfigurations'
-            )
-        },
-        @{
-            Scope = 'DeviceManagementManagedDevices.Read.All'
-            Reason = 'Required to read Intune managed device properties.'
-            Endpoints = @(
-                '/deviceManagement/managedDevices',
-                'deviceManagement/managedDevices/{id}'
-            )
-        },
-        @{
-            Scope = 'DeviceManagementManagedDevices.PrivilegedOperations.All'
-            Reason = 'Required for highly privileged operations, specifically to read local admin (LAPS) passwords.'
-            Endpoints = @(
-                'directory/deviceLocalCredentials'
-            )
-        },
-        @{
-            Scope = 'DeviceManagementServiceConfig.ReadWrite.All'
-            Reason = 'Required to read Autopilot events and to read and manage Autopilot device identities.'
-            Endpoints = @(
-                'deviceManagement/autopilotEvents',
-                'deviceManagement/importedWindowsAutopilotDeviceIdentities',
-                'deviceManagement/windowsAutopilotDeviceIdentities'
-            )
-        },
-        @{
-            Scope = 'BitlockerKey.Read.All'
-            Reason = 'Required to read BitLocker recovery keys for all devices.'
-            Endpoints = @(
-                'informationProtection/bitlocker/recoveryKeys'
-            )
-        },
-        @{
-            Scope = 'openid'
-            Reason = 'Standard scope required for user sign-in with OpenID Connect.'
-            Endpoints = @()
-        },
-        @{
-            Scope = 'profile'
-            Reason = 'Standard scope to get basic user profile information during sign-in.'
-            Endpoints = @()
-        },
-        @{
-            scope = 'DeviceManagementConfiguration.ReadWrite.All'
-            reason = 'Required to create, update, and delete Intune device configuration policies.'
-            endpoints = @(
-                'deviceManagement/deviceConfigurations'
-            )
-        },
-        @{
-            scope = 'DeviceManagementApps.Read.All'
-            reason = 'Required to read application information in Intune.'
-            endpoints = @(
-                'deviceAppManagement/mobileApps'
-            )
-        },
-        @{
-            scope = 'DeviceManagementManagedDevices.ReadWrite.All'
-            reason = 'Required to create, update, and delete Intune managed device properties.'
-            endpoints = @(
-                'deviceManagement/managedDevices'
-            )
-        },
-        @{
-            scope = 'offline_access'
-            reason = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
-            endpoints = @()
-        }
-    )
-    version = '1.3.0.0'
-    description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
 }
