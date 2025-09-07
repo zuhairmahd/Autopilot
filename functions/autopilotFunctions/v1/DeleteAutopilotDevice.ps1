@@ -11,6 +11,7 @@ function DeleteAutopilotDevice()
         [int]$RetryDelaySeconds = 20
     )
     $functionName = $MyInvocation.MyCommand.Name
+    
     #region variables and logs.
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting DeleteAutopilotDevice: Identifier=$DeviceIdentifyer Type=$IdentifyerType MaxRetries=$MaxRetries RetryDelaySeconds=$RetryDelaySeconds" -LogLevel "Information"
     Write-Verbose "[$functionName] Received parameters:" 
@@ -29,7 +30,7 @@ function DeleteAutopilotDevice()
     Write-Verbose "[$functionName] Identifyer type: $IdentifyerType."
     $success = $false
     $autoPilotDeviceURI = "deviceManagement/windowsAutopilotDeviceIdentities"
-    #endregion
+    #endregion variables and logs.
 
     switch ($IdentifyerType)
     {
@@ -76,6 +77,7 @@ function DeleteAutopilotDevice()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using provided DeviceId $autoPilotDeviceId" -LogLevel "Verbose"
         }
     }
+    
     if ($autoPilotDeviceId)
     {
         Write-Verbose "[$functionName] Found device with id $autoPilotDeviceId in Autopilot."
@@ -92,7 +94,20 @@ function DeleteAutopilotDevice()
         {
             Write-Verbose "[$functionName] Delete request initiated successfully. Beginning monitoring of device deletion..."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Delete request accepted for $autoPilotDeviceId. Monitoring..." -LogLevel "Information"
-            
+            Write-Host "Delete request accepted..." -ForegroundColor Green        
+            $response = Read-Host "Would you like to monitor the deletion process? (Y/N)"
+            while ($response -notmatch '^(Y|N)$')
+            {
+                [console]::beep(1000, 300)
+                $response = Read-Host "Please enter Y or N. Monitor the deletion process? (Y/N)"
+            }
+            if ($response -eq 'N')
+            {
+                Write-Host "Skipping monitoring of deletion process." -ForegroundColor Yellow
+                Write-Host "It may take some time for the device to be fully deleted from Autopilot." -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "User opted out of monitoring deletion process for $autoPilotDeviceId" -LogLevel "Information"
+                return $true
+            }
             #region Monitor the deletion process
             $retryCount = 0
             $isDeleted = $false
