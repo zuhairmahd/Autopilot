@@ -140,11 +140,7 @@ function Write-Log()
             }
             
             # Write to console
-            <<<<<<< HEAD
             if ($WriteToConsole)
-            =======
-            if ($OutputToConsole)
-            >>>>>>> origin/dev
             {
                 Write-Host $separatorLine
             }
@@ -166,44 +162,28 @@ function Write-Log()
                 {
                     "Error"
                     {
-                        <<<<<<< HEAD
                         if ($WriteToConsole)
-                        =======
-                        if ($OutputToConsole)
-                        >>>>>>> origin/dev
                         {
                             Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
                         }
                     }
                     "Warning"
                     {
-                        <<<<<<< HEAD
                         if ($WriteToConsole)
-                        =======
-                        if ($OutputToConsole)
-                        >>>>>>> origin/dev
                         {
                             Write-Warning "[$Module] $Message" 
                         }
                     }
                     "Verbose"
                     {
-                        <<<<<<< HEAD
                         if ($WriteToConsole)
-                        =======
-                        if ($OutputToConsole)
-                        >>>>>>> origin/dev
                         {
                             Write-Verbose "[$Module] $Message" 
                         }
                     }
                     "Debug"
                     {
-                        <<<<<<< HEAD
                         if ($WriteToConsole)
-                        =======
-                        if ($OutputToConsole)
-                        >>>>>>> origin/dev
                         {
                             Write-Debug "[$Module] $Message" 
                         }
@@ -299,35 +279,35 @@ function Write-Log()
         {
             "Error"
             {
-                if ($OutputToConsole)
+                if ($WriteToConsole)
                 {
                     Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue 
                 }
             }
             "Warning"
             {
-                if ($OutputToConsole)
+                if ($WriteToConsole)
                 {
                     Write-Warning "[$Module] $Message" 
                 }
             }
             "Verbose"
             {
-                if ($OutputToConsole)
+                if ($WriteToConsole)
                 {
                     Write-Verbose "[$Module] $Message" 
                 }
             }
             "Debug"
             {
-                if ($OutputToConsole)
+                if ($WriteToConsole)
                 {
                     Write-Debug "[$Module] $Message" 
                 }
             }
             default
             {
-                if ($OutputToConsole)
+                if ($WriteToConsole)
                 {
                     Write-Verbose "Logged: $logEntry" 
                 }
