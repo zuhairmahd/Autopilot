@@ -54,7 +54,7 @@ jobs:
     # Only build on pushes to dev and skip CI loop commits
     if: >
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/dev' &&
+      github.ref == 'refs/heads/master' &&
       !contains((github.event.head_commit.message || ''), '[skip ci]')
     steps:
       - name: Checkout code
@@ -97,10 +97,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    # Only sign on pushes to dev and skip CI loop commits
+    # Only sign on pushes to master and skip CI loop commits
     if: >
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/dev' &&
+      github.ref == 'refs/heads/master' &&
       !contains((github.event.head_commit.message || ''), '[skip ci]')
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
