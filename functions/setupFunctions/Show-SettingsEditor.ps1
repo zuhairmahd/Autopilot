@@ -180,7 +180,7 @@ function Show-SettingsEditor()
             }
             
             # Use the actual domain configuration for current values
-            $currentValues = $domainConfig.settings
+            $currentValues = $domainConfig
             Write-Log -LogFile $logFile -Module $functionName -Message "Using current domain settings with $($currentValues.PSObject.Properties.Count) properties" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Using current domain settings with $($currentValues.PSObject.Properties.Count) properties"
             
@@ -611,6 +611,8 @@ function Get-SettingDescription()
         'cacheType'                       = 'Token cache storage method (Memory, File)'
         'secureString'                    = 'Use secure string for password storage'
         'delegated'                       = 'Use delegated permissions (user context) vs application permissions'
+        'groupTag'                        = 'Group tag for identifying devices in Autopilot deployment profiles'
+        'assignedUser'                    = 'Username of the user assigned to the device for Autopilot enrollment'
         # Nested object descriptions
         'repoPath'                        = 'Repository owner/organization name'
         'baseURL'                         = 'Base URL for repository hosting service'
