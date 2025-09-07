@@ -61,6 +61,8 @@ param(
     [string]$InputFile,
     [Parameter(Mandatory = $false)]
     [string]$Version,
+    [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
+    [string]$versionPartToIncrement = 'Revision',
     [Alias('outputFile')]
     [string]$OutputPath = '',
     [string]$SettingsFile = "$pwd\settings.psd1",
