@@ -451,7 +451,7 @@ function Get-CurrentSettings()
             try
             {
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
-                $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile -force -validate   
+                $null = $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile -force -validate   
                 Write-Verbose "[$functionName] Created default settings file"
             }
             catch
@@ -1466,7 +1466,7 @@ function Update-NestedSetting()
         }
         
         # Save the updated settings using Export-PowerShellDataFile
-        Export-PowerShellDataFile -InputObject $settings -Path $SettingsFile -Force
+        $null = Export-PowerShellDataFile -InputObject $settings -Path $SettingsFile -Force
         
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated nested setting: $SettingPath" -LogLevel "Information"
         return $true

@@ -169,7 +169,7 @@ function Start-FirstRunWizard()
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
                 $defaultSettings.auth.delegated = $authConfig.IsDelegated
                 $defaultSettings.auth.authType = $authConfig.AuthType
-                $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
+                $null = $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
                 Write-SafeLog "Created settings.psd1 with defaults" "Information"
             }
             catch {
@@ -231,7 +231,7 @@ function Start-FirstRunWizard()
         {
             try {
                 $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
-                $defaultStrings | Export-PowerShellDataFile -Path $StringsFile
+                $null = $defaultStrings | Export-PowerShellDataFile -Path $StringsFile
                 Write-SafeLog "Created strings.psd1 with defaults" "Information"
             }
             catch {
