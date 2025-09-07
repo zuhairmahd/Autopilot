@@ -18,13 +18,16 @@ function ImportAutopilotDevice()
     )
     $functionName = $MyInvocation.MyCommand.Name
     #region print verbose log of the parameters and define variables
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting ImportAutopilotDevice for serial=$($DeviceObject.serialNumber) CustomImport=$CustomImport GroupTag='$GroupTag' AssignedUser='$AssignedUser' maxWaitTime=$maxWaitTime timeInSeconds=$timeInSeconds" -LogLevel "Information"
     if ($accessToken)
     {
         Write-Verbose "[$functionName] AccessToken provided."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Access token provided" -LogLevel "Information"
     }
     else
     {
         Write-Verbose "[$functionName] AccessToken not provided."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Access token missing - aborting import" -LogLevel "Error"
         return $false
     }
     Write-Verbose "[$functionName] DeviceObject: $DeviceObject"
@@ -41,6 +44,7 @@ function ImportAutopilotDevice()
     $model = $DeviceObject.model
     Write-Verbose "[$functionName] Model: $model"
     $hash = $DeviceObject.hardwareHash
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Prepared import object for serial=$serialNumber make='$make' model='$model' groupTag='$GroupTag' assignedUser='$AssignedUser'" -LogLevel "Information"
     #endregion  
     #region prepare import object.
     if ($CustomImport -eq $true)
@@ -48,6 +52,7 @@ function ImportAutopilotDevice()
         do
         {
             Write-Verbose "[$functionName] CustomImport is set to true."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Prompting user for custom import parameters" -LogLevel "Information"
             Write-Host "Enter the desired Group Tag for the device:"
             Write-Host "Press enter to keep the default value of $GroupTag."
             Write-Host "Enter 'None' to enter a blank Group Tag"
@@ -114,16 +119,19 @@ function ImportAutopilotDevice()
             {
                 $ProceedWithImport = $true
                 Write-Host "Continuing with the import."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "User confirmed import with parameters GroupTag='$groupTag' AssignedUser='$AssignedUser'" -LogLevel "Information"
             }
             elseif ($ImportChoice -eq 'R')
             {
                 $ProceedWithImport = $false
                 Write-Host "Reentering the parameters."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "User chose to reenter parameters" -LogLevel "Information"
             }
             else
             {
                 $ProceedWithImport = $false
                 Write-Host "Exiting..."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "User aborted custom import (backout)" -LogLevel "Information"
                 return $returnValues.backoutText
             }
         } while ($ProceedWithImport -eq $false)
@@ -131,6 +139,7 @@ function ImportAutopilotDevice()
     else
     {
         Write-Verbose "[$functionName] CustomImport is set to false."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using default import parameters" -LogLevel "Information"
     }
     $json = @"
 {
@@ -152,21 +161,28 @@ function ImportAutopilotDevice()
 "@
   
     $imported = callGraphApi -AccessToken $AccessToken -ResourcePath $uri -Method POST -Body $json
+    Write-Log -LogFile $LogFile -Module $functionName -Message "POST import request submitted for serial=$serialNumber" -LogLevel "Information"
+    
     if ($null -eq $imported)
     {
         Write-Host "The device import failed."
         Write-Host "Please check the Intune portal or contact an Intune administrator."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Import POST returned null - failure" -LogLevel "Error"
         return $null
     }
     Write-Host "The device import was successfully started."
     Write-Host "The imported device ID is $($imported.id)."
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Import started id=$($imported.id)" -LogLevel "Information"
     #wait for the device to be imported
     Write-Host "Waiting for the import for device with device ID $($imported.id) to be completed."
+    Start-Sleep -Seconds 10
     $device = callGraphApi -AccessToken $AccessToken -ResourcePath "$uri/$($imported.id)" -Method GET
     $index = 0
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Beginning wait loop for import completion with maxWaitTime=$maxWaitTime timeInSeconds=$timeInSeconds" -LogLevel "Information"
     while ($index -lt $maxWaitTime)
     {
         Write-Verbose "[$functionName] The device import status is $($device.state.deviceImportStatus)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Poll $index/$maxWaitTime status=$($device.state.deviceImportStatus)" -LogLevel "Information"
         if (($device.state.deviceImportStatus -ne 'unknown') -or ($index -gt $maxWaitTime))
         {
             break
@@ -184,11 +200,13 @@ function ImportAutopilotDevice()
     {
         Write-Host "The import is taking too long (over $maxWaitTime minutes)." 
         Write-Host 'Please check the Intune portal or contact an Intune administrator.'
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Timeout waiting for import completion (status still unknown)" -LogLevel "Warning"
         return $null
     }
     else
     {
         Write-Verbose "[$functionName] The device import state is $($device.state.deviceImportStatus)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Import completed with status $($device.state.deviceImportStatus)" -LogLevel "Information"
         return $device
     }
 }
