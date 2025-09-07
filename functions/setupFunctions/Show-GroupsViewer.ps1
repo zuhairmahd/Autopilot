@@ -11,7 +11,7 @@ function Show-GroupsViewer()
         a specific domain in a formatted, easy-to-read manner.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file. Defaults to "settings.json".
+        Path to the settings.psd1 file. Defaults to "settings.psd1".
     
     .PARAMETER DomainName
         Optional domain name to view group settings for. If not provided, will attempt
@@ -37,7 +37,7 @@ function Show-GroupsViewer()
         Displays group settings for the specified domain only.
     
     .EXAMPLE
-        Show-GroupsViewer -SettingsFile "settings.json" -Silent
+        Show-GroupsViewer -SettingsFile "settings.psd1" -Silent
         
         Displays group settings with minimal output.
     
@@ -50,7 +50,7 @@ function Show-GroupsViewer()
     #>
     [CmdletBinding()]
     param(
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
         [switch]$Silent
     )

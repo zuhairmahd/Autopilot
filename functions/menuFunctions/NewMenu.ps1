@@ -41,7 +41,7 @@ function NewMenu()
         [Parameter(Mandatory = $false)]
         [string]$MenuName,
         [Parameter(Mandatory = $false)]
-        [string]$MenuConfigFile = "$pwd\menu.json",
+        [string]$MenuConfigFile = "$pwd\menu",
         [Parameter(Mandatory = $false)]
         [switch]$DisableEarlyFiltering
     )
@@ -58,7 +58,8 @@ function NewMenu()
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Loading menu from configuration: $MenuName" -LogLevel "Verbose"
         
-        try {
+        try
+        {
             $menuConfig = Get-CachedMenuConfiguration -MenuName $MenuName -MenuConfigFile $MenuConfigFile
             
             if ($menuConfig)
@@ -108,7 +109,7 @@ function NewMenu()
                         
                         # Create menu item with proper structure for AddMenuItem compatibility
                         $menuItem = @{
-                            Name = $item.name
+                            Name        = $item.name
                             Description = $item.description
                         }
                         
@@ -192,7 +193,8 @@ function NewMenu()
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Could not load menu configuration for '$MenuName', falling back to manual creation" -LogLevel "Warning"
             }
         }
-        catch {
+        catch
+        {
             Write-Log -LogFile $LogFile -Module $functionName -Message "Error loading menu configuration for '$MenuName': $_ - falling back to manual creation" -LogLevel "Error"
         }
     }

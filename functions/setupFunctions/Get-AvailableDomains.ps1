@@ -5,8 +5,8 @@ function Get-AvailableDomains()
         Gets a list of available domains from separate domain configuration files.
     
     .DESCRIPTION
-        Scans the configuration directory for domain configuration files and returns
-        a list of available domain names. Also checks the main settings.json for
+        Scans the configuration directory for domain configuration files (.psd1) and returns
+        a list of available domain names. Also checks the main settings.psd1 for
         backward compatibility with domains stored in the old format.
     
     .PARAMETER ConfigurationPath
@@ -14,7 +14,7 @@ function Get-AvailableDomains()
         Defaults to the current working directory.
     
     .PARAMETER SettingsFile
-        Path to the main settings.json file to check for legacy domain configurations.
+        Path to the main settings.psd1 file to check for legacy domain configurations.
     
     .OUTPUTS
         System.Array
@@ -27,6 +27,7 @@ function Get-AvailableDomains()
         This function supports both the new separate file format and legacy format
         for backward compatibility during transition.
         Phase 4A Optimization: Uses pre-allocated ArrayList for efficient collection building.
+        Uses PowerShell Data File (.psd1) format for optimal performance.
     #>
     [CmdletBinding()]
     [OutputType([System.Array])]
@@ -46,8 +47,8 @@ function Get-AvailableDomains()
     
     try
     {
-        # First, check for separate domain configuration files
-        $domainFiles = Get-ChildItem -Path $ConfigurationPath -Filter "*.json" -ErrorAction SilentlyContinue
+        # First, check for separate domain configuration files (.psd1 format)
+        $domainFiles = Get-ChildItem -Path $ConfigurationPath -Filter "*.psd1" -ErrorAction SilentlyContinue
         
         # Phase 4A Optimization: Pre-allocate capacity if we have an estimate
         if ($domainFiles.Count -gt 0)
@@ -58,23 +59,22 @@ function Get-AvailableDomains()
         foreach ($file in $domainFiles)
         {
             # Skip common configuration files
-            if ($file.Name -in @("settings.json", "strings.json", "menu.json", "config.json"))
+            if ($file.Name -in @("settings.psd1", "strings.psd1", "menu.psd1", "config.psd1", "init.psd1", "lastrun.psd1"))
             {
                 continue
             }
             
-            # Extract domain name from filename (remove .json extension)
+            # Extract domain name from filename (remove .psd1 extension)
             $domainName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
             
             # Validate that this is a domain configuration file
             try
             {
-                $content = Get-Content -Path $file.FullName -Raw | ConvertFrom-Json
-                # Check that it's an object (not an array) and has the required properties
-                if ($content -is [PSCustomObject] -and 
-                    $content.PSObject.Properties.Name -contains 'groupsToInclude' -and 
-                    $content.PSObject.Properties.Name -contains 'groupsToExclude' -and 
-                    $content.PSObject.Properties.Name -contains 'settings')
+                $content = Import-PowerShellDataFile -Path $file.FullName -ErrorAction Stop
+                # Check that it's a hashtable and has the required properties for domain configuration
+                if ($content -and 
+                    ($content.ContainsKey('groupsToInclude') -or $content.Keys -contains 'groupsToInclude') -and 
+                    ($content.ContainsKey('groupsToExclude') -or $content.Keys -contains 'groupsToExclude'))
                 {
                     [void]$availableDomains.Add($domainName)
                     Write-Verbose "[$functionName] Found domain configuration: $domainName"
@@ -86,19 +86,19 @@ function Get-AvailableDomains()
             }
             catch
             {
-                Write-Verbose "[$functionName] Skipping invalid JSON file: $($file.Name)"
+                Write-Verbose "[$functionName] Skipping invalid PSD1 file: $($file.Name) - $($_.Exception.Message)"
             }
         }
         
-        # Also check the main settings.json for legacy domains (backward compatibility)
+        # Also check the main settings.psd1 for legacy domains (backward compatibility)
         if ($SettingsFile -and (Test-Path $SettingsFile))
         {
             try
             {
-                $settingsContent = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
-                if ($settingsContent.domains)
+                $settingsContent = Import-PowerShellDataFile -Path $SettingsFile -ErrorAction Stop
+                if ($settingsContent -and $settingsContent.ContainsKey('domains'))
                 {
-                    $legacyDomains = $settingsContent.domains.PSObject.Properties.Name
+                    $legacyDomains = $settingsContent['domains'].Keys
                     foreach ($legacyDomain in $legacyDomains)
                     {
                         if ($legacyDomain -notin $availableDomains)

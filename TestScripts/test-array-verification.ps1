@@ -68,7 +68,7 @@ try
     }
     
     # Create a test settings file with auth section using the helper
-    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.json" -IncludeAuth
+    $testSettingsFile = New-MockSettingsFile -TestFolder $testContext.TestFolder -FileName "test-settings.psd1" -IncludeAuth
     Write-TestResult "Test settings file created at: $testSettingsFile" -Success $true
     
     # Test 1: Update with identical array
@@ -91,7 +91,7 @@ try
     
     # Test 4: Verify final state
     Write-TestSubSection "Test 4: Verify final state"
-    $finalContent = Get-Content -Path $testSettingsFile -Raw | ConvertFrom-Json
+    $finalContent = Import-PowerShellDataFile -Path $testSettingsFile
     $finalScope = $finalContent.auth.scope
     $isCorrectType = $finalScope -is [array]
     $hasCorrectValue = $finalScope.Count -eq 1 -and $finalScope[0] -eq "offline_access"

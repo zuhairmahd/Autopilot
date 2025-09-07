@@ -82,7 +82,7 @@ function Invoke-CacheManagement()
         
         [string]$MenuName,
         
-        [string]$MenuConfigFile = "$pwd\menu.json",
+        [string]$MenuConfigFile = "$pwd\menu",
         
         [switch]$ForceReload,
         
@@ -303,8 +303,8 @@ function Invoke-CacheManagement()
             Write-Verbose "[$functionName] Listing available caches"
             
             $cacheList = @(
-                @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.json)'; Variable = '$script:menuConfigCache' }
-                @{ Name = 'Strings'; Description = 'String resources cache (strings.json)'; Variable = '$script:stringsCache' }
+                @{ Name = 'Menu'; Description = 'Menu configuration cache (menu.psd1)'; Variable = '$script:menuConfigCache' }
+                @{ Name = 'Strings'; Description = 'String resources cache (strings.psd1)'; Variable = '$script:stringsCache' }
                 @{ Name = 'Groups'; Description = 'Entra ID groups cache'; Variable = '$global:GroupCache' }
                 @{ Name = 'Users'; Description = 'Entra ID users cache'; Variable = '$global:UserCache' }
                 @{ Name = 'Devices'; Description = 'Device ID lookup cache'; Variable = '$global:DeviceIdCache' }

@@ -1,8 +1,9 @@
 {
-  "hash": "64DA4782EE0CA2469315EE49865D43E8813FC29909B020DCE49FCAB8C2273EEE",
+  "date": "2025-09-06",
+  "version": "3.3.0.30028",
+  "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+  "hash": "22AA15F21D642BAF62C38CC9F87F2D48726C57A43EFD0356FEC07544610A7A0E",
   "stringsVersion": "1.3.0.0",
   "settingsVersion": "1.3.0.0",
-  "version": "3.3.0.30016",
-  "date": "2025-09-06",
-  "GUID": "c2c08149-3c1f-4558-9e4c-87487943bbf5"
+  "hashUpdated": true
 }

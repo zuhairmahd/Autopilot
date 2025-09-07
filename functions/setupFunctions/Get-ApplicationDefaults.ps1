@@ -128,50 +128,44 @@ function Get-ApplicationDefaults()
         
         # Domain template defaults - single source of truth for domain structure
         Domain         = @{
-            groupsToInclude  = @()
-            groupsToExclude  = @()
-            settings         = @{
-                domain                          = $DomainName
-                appInfo                         = @{
-                    name        = "Autopilot"
-                    companyName = ""
-                    description = "Autopilot for Windows devices"
-                    version     = $Version
-                }
-                validateScopes                  = $true
-                maxWaitTime                     = 30
-                showLicenseBanner               = $true
-                deviceContactThresholdInDays    = 30
-                appMode                         = "full"
-                timeInSeconds                   = 60
-                maxUserMatchDisplay             = 10
-                maxGroupMatchDisplay            = 10
-                release                         = "master"
-                repoInfo                        = @{
-                    repoName      = "Autopilot"
-                    baseSourceURL = "https://raw.githubusercontent.com"
-                    baseURL       = "https://www.github.com"
-                    repoPath      = "zuhairmahd"
-                }
-                autoUpdate                      = $true
-                deviceNamePrefix                = ""
-                operatingSystem                 = "Windows"
-                minUsernameLength               = 3
-                maxUserNameLength               = 50
-                maxSerialNumberLength           = 50
-                minSerialNumberLength           = 7
-                minimumDevicePhysicalMemoryInGB = 8
-                maxNumberOfDevicesAllowed       = 15
-                preferredBrowser                = "Chrome"
-                privateSession                  = $false
-                userPatternsToExclude           = @( 
-                    "-test",
-                    "onmicrosoft.com"
-                )
-                groupPatternsToExclude          = @()  
-                desiredAutopilotProfiles        = @()
+            groupsToInclude                 = @()
+            groupsToExclude                 = @()
+            domain                          = $DomainName
+            companyName                     = ""
+            version                         = $Version
+            validateScopes                  = $true
+            maxWaitTime                     = 30
+            showLicenseBanner               = $true
+            deviceContactThresholdInDays    = 30
+            appMode                         = "full"
+            timeInSeconds                   = 60
+            maxUserMatchDisplay             = 10
+            maxGroupMatchDisplay            = 10
+            release                         = "master"
+            repoInfo                        = @{
+                repoName      = "Autopilot"
+                baseSourceURL = "https://raw.githubusercontent.com"
+                baseURL       = "https://www.github.com"
+                repoPath      = "zuhairmahd"
             }
-            additionalScopes = @()
+            autoUpdate                      = $true
+            deviceNamePrefix                = ""
+            operatingSystem                 = "Windows"
+            minUsernameLength               = 3
+            maxUserNameLength               = 50
+            maxSerialNumberLength           = 50
+            minSerialNumberLength           = 7
+            minimumDevicePhysicalMemoryInGB = 8
+            maxNumberOfDevicesAllowed       = 15
+            preferredBrowser                = "Chrome"
+            privateSession                  = $false
+            userPatternsToExclude           = @( 
+                "-test",
+                "onmicrosoft.com"
+            )
+            groupPatternsToExclude          = @()  
+            desiredAutopilotProfiles        = @()
+            additionalScopes                = @()
         }
         
         # Required scopes for Microsoft Graph API
@@ -343,6 +337,509 @@ function Get-ApplicationDefaults()
                 unknownErrorMessage            = "An unknown error occurred."
             }
         }
+        
+        # Menu defaults - complete menu structure 
+        Menus          = @{
+            version         = $Version
+            name            = 'menu.psd1'
+            description     = 'This file contains the definitions for the menus used in the application.'
+            appModeHierarchy = @{
+                full                 = @('*')
+                advanced             = @('advanced', 'helpdesk', 'registration')
+                helpdesk             = @('helpdesk')
+                registration         = @('registration')
+                advancedRegistration = @('advancedRegistration', 'registration')
+                admin                = @('admin', 'advanced', 'helpdesk', 'registration')
+                custom               = @()
+            }
+            appModeDefaults = @{
+                full                = @{
+                    description  = 'Full administrative access with all features enabled'
+                    capabilities = @('all_menus', 'all_actions', 'settings_management', 'advanced_diagnostics', 'export_all', 'device_management')
+                }
+                advanced            = @{
+                    description  = 'Advanced user with helpdesk and configuration capabilities'
+                    capabilities = @('advanced_features', 'helpdesk_operations', 'device_registration', 'settings_view', 'advanced_exports')
+                }
+                helpdesk            = @{
+                    description  = 'Helpdesk operator with device troubleshooting and user assignment capabilities'
+                    capabilities = @('device_assignment', 'device_troubleshooting', 'basic_exports', 'device_actions', 'user_management')
+                }
+                registration        = @{
+                    description  = 'Device registration specialist with Autopilot enrollment capabilities'
+                    capabilities = @('autopilot_registration', 'device_import', 'basic_exports', 'device_status_check')
+                }
+                advancedRegistration = @{
+                    description  = 'Advanced registration specialist with administrative Autopilot capabilities'
+                    capabilities = @('advanced_autopilot', 'custom_import', 'device_preparation', 'advanced_device_actions')
+                }
+                admin               = @{
+                    description  = 'System administrator with full configuration and management capabilities'
+                    capabilities = @('system_administration', 'advanced_features', 'helpdesk_operations', 'device_registration', 'full_configuration')
+                }
+                custom              = @{
+                    description  = 'Customizable mode where users define their own access patterns'
+                    capabilities = @('user_defined')
+                }
+            }
+            mainMenu        = @{
+                Title               = 'Main Menu'
+                Description         = 'Please choose from one of the following options'
+                type                = 'static'
+                includeInDisplayModes = @()
+                items               = @(
+                    @{
+                        name                   = 'Give a device to a user'
+                        description            = 'Start the user and device readiness check'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Check device status'
+                        description            = 'Troubleshoot a device'
+                        blockType              = 'menu'
+                        menuName               = 'checkMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Autopilot menu'
+                        description            = 'Import a device into Autopilot and perform related actions'
+                        blockType              = 'menu'
+                        menuName               = 'autopilotMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Change application settings'
+                        description            = 'Modify the application settings'
+                        blockType              = 'menu'
+                        menuName               = 'settingsMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Check for script updates'
+                        description            = 'Check if there are any updates available for the scripts'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Restart the device'
+                        description            = 'Restart the device'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Show Group Assignments'
+                        description            = 'Show the group assignments for the device'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Export Menu'
+                        description            = 'Export device information'
+                        blockType              = 'menu'
+                        menuName               = 'exportMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration')
+                    },
+                    @{
+                        name                   = 'About'
+                        description            = 'Learn more about this application'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
+            checkMenu        = @{
+                Title               = 'Check Device Status'
+                Description         = 'How would you like to lookup the device?'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk')
+                items               = @(
+                    @{
+                        name                   = 'Lookup device by Serial Number'
+                        description            = 'Lookup a device by its serial number'
+                        blockType              = 'menu'
+                        menuName               = 'serialNumberMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Lookup device by User'
+                        description            = 'Lookup a device by the user id or email address'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    }
+                )
+            }
+            autopilotMenu    = @{
+                Title               = 'Autopilot Menu'
+                Description         = 'Import a device into Autopilot and perform related actions'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                items               = @(
+                    @{
+                        name                   = 'Import device into Autopilot'
+                        description            = 'Import a device into Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Custom import device into Autopilot (requires admin rights)'
+                        description            = 'Custom import a device into Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Import Corporate Device Identifier for Device Preparation (requires admin rights)'
+                        description            = 'Import a Corporate Device Identifier for Device Preparation'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)'
+                        description            = 'Export a Corporate Device Identifier for manual upload to Device Preparation'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Get device hash for manual upload to Autopilot (requires admin rights)'
+                        description            = 'Get the device hash for manual upload to Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Download and install latest Windows updates(requires admin rights)'
+                        description            = 'Download and install the latest Windows updates'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Check device Autopilot status'
+                        description            = 'Check if a device is registered in Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Delete device from Autopilot'
+                        description            = 'Delete a device from Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Quick Import device into Autopilot (requires admin rights)'
+                        description            = 'Quick import a device into Autopilot'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Delete Corporate Device Identifier from Device Preparation (requires admin rights)'
+                        description            = 'Delete a Corporate Device Identifier from Device Preparation'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advancedRegistration')
+                    }
+                )
+            }
+            settingsMenu     = @{
+                Title               = 'Settings menu'
+                Description         = 'Make changes to the application settings'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                items               = @(
+                    @{
+                        name                   = 'Change environment settings'
+                        description            = 'Change the environment settings'
+                        blockType              = 'menu'
+                        menuName               = 'environmentMenu'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change Entra Credentials'
+                        description            = 'Change the Entra credentials'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change Auto Update settings'
+                        description            = 'Change the Auto Update settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change App Mode settings'
+                        description            = 'Change the App Mode settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    }
+                )
+            }
+            exportMenu       = @{
+                Title               = 'Export Menu'
+                Description         = 'Choose what you would like to export'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Export Autopilot Devices'
+                        description            = 'Export Autopilot devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Export Imported Autopilot Devices'
+                        description            = 'Export imported Autopilot devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'registration', 'advancedRegistration')
+                    },
+                    @{
+                        name                   = 'Export Managed Windows Devices'
+                        description            = 'Export managed Windows devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Export Unmanaged Windows Devices'
+                        description            = 'Export unmanaged Windows devices to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Export device storage report'
+                        description            = 'Export a report of device storage to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Export Application Assignments'
+                        description            = 'Export application assignments to a CSV file'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    }
+                )
+            }
+            serialNumberMenu = @{
+                Title               = 'Lookup by Serial Number'
+                Description         = 'How would you like to enter the serial number?'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk')
+                items               = @(
+                    @{
+                        name                   = 'Enter a serial number'
+                        description            = 'Lookup a device by its serial number'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Use this device''s serial number'
+                        description            = 'Lookup the device the application is running on'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    }
+                )
+            }
+            environmentMenu  = @{
+                Title               = 'Change Environment Menu'
+                Description         = 'Manage your environment settings and configurations'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                items               = @(
+                    @{
+                        name                   = 'View global environment settings'
+                        description            = 'View the global environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'View domain specific environment settings'
+                        description            = 'View the domain specific environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'View group inclusion/exclusion settings for all domains'
+                        description            = 'View the group inclusion/exclusion settings for all domains'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Change global environment settings'
+                        description            = 'Change the global environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Change domain specific settings'
+                        description            = 'Change the domain specific environment settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Change authentication settings'
+                        description            = 'Change the authentication settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Change group inclusion/exclusion'
+                        description            = 'Change the group inclusion/exclusion settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    }
+                )
+            }
+            # Dynamic menus (these are created programmatically)
+            userMenu         = @{
+                type                  = 'dynamic'
+                Title                 = 'Select a user'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                Description           = 'Did you mean:'
+            }
+            deviceMenu       = @{
+                type                  = 'dynamic'
+                Title                 = 'Device Selection'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                Description           = 'Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))'
+            }
+            groupMenu        = @{
+                type                  = 'dynamic'
+                Title                 = 'Select a group'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                Description           = 'Did you mean:'
+            }
+            # Additional menus for various workflows
+            deviceActionsMenu = @{
+                Title               = 'Device Actions for $deviceName'
+                Description         = 'Select an action to perform on this device:'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Wipe Device'
+                        description            = 'Wipe the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Clean Device'
+                        description            = 'Clean the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced')
+                    },
+                    @{
+                        name                   = 'Sync Device'
+                        description            = 'Sync the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Get LAPS Password'
+                        description            = 'Retrieve the LAPS password for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Get BitLocker Recovery Key'
+                        description            = 'Retrieve the BitLocker recovery key for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Get Hardware Password Details'
+                        description            = 'Retrieve the BIOS password details for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk')
+                    },
+                    @{
+                        name                   = 'Restart Device'
+                        description            = 'Restart the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Show Device Health Status'
+                        description            = 'Show the health status of the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Check next user readiness state'
+                        description            = 'Check the next user readiness state for the selected device'
+                        type                   = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
+            # Additional dynamic and static menus that exist in the committed menu.psd1
+            appModeMenu = @{
+                type                  = 'dynamic'
+                Title                 = '$menuTitle'
+                includeInDisplayModes = @('full', 'admin')
+                Description           = '$menuDescription'
+            }
+            groupAssignmentsMenu = @{
+                type                  = 'dynamic'
+                Title                 = 'Group Assignments for $groupName'
+                includeInDisplayModes = @('full', 'admin', 'advanced')
+                Description           = 'What type of assignments would you like to see?'
+            }
+            deviceWaitMenu = @{
+                Title               = 'Device Wait Menu'
+                Description         = 'Choose what you would like to do with this device:'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Restart the device'
+                        Description            = 'Restart the device'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
+            groupsEditMenu = @{
+                Title               = 'Groups Edit Menu'
+                Description         = 'Select which group settings you want to modify:'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin')
+                items               = @(
+                    @{
+                        name                   = 'Edit Groups to Include'
+                        description            = 'Modify the groups that are included'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'Edit Groups to Exclude'
+                        description            = 'Modify the groups that are excluded'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    },
+                    @{
+                        name                   = 'View Current Group Settings'
+                        description            = 'View the current group settings'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin')
+                    }
+                )
+            }
+            reportExportMenu = @{
+                Title               = 'Report Export Menu'
+                Description         = 'Select the format to which you would like to export the report'
+                type                = 'static'
+                includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                items               = @(
+                    @{
+                        name                   = 'Export in HTML format'
+                        Description            = 'Export the report in HTML format'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    },
+                    @{
+                        name                   = 'Export in CSV format'
+                        Description            = 'Export the report in CSV format'
+                        blockType              = 'action'
+                        includeInDisplayModes  = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
+                    }
+                )
+            }
+        }
     }
     
     # Complete settings structure combining all components
@@ -352,8 +849,6 @@ function Get-ApplicationDefaults()
         auth           = $defaults.Auth
         requiredScopes = $defaults.RequiredScopes
         globalSettings = $defaults.Global
-        # Note: domains section is now handled by separate domain configuration files
-        # This structure is maintained for backward compatibility during migration
     }
     
     # Overwrite configurations - centralized force-overwrite settings
@@ -373,8 +868,7 @@ function Get-ApplicationDefaults()
         # Universal settings that apply to both global and local contexts
         # These will be applied to both global and domain settings processing
         UniversalSettings = @{
-            "baseSourceURL" = "https://raw.githubusercontent.com"
-            "baseURL"       = "https://www.github.com"
+            # Enter universal settings here
         }
     }
     
@@ -415,6 +909,13 @@ function Get-ApplicationDefaults()
         {
             Write-Verbose "[$functionName] Returning strings defaults"
             $result = $defaults.Strings
+            $script:defaultsCache[$cacheKey] = $result
+            return $result
+        }
+        'Menus'
+        {
+            Write-Verbose "[$functionName] Returning menu defaults"
+            $result = $defaults.Menus
             $script:defaultsCache[$cacheKey] = $result
             return $result
         }

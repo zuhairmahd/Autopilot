@@ -1,4 +1,4 @@
-# Test script to verify the updated configuration functions work with settings.json
+# Test script to verify the updated configuration functions work with settings.psd1
 # PowerShell 5.1 compatible
 
 param(
@@ -11,7 +11,7 @@ param(
 $psInfo = Test-PowerShellVersion
 Write-Host "PowerShell Version: $($psInfo.Version)" -ForegroundColor Cyan
 
-Write-TestSection "Configuration Functions Test with settings.json"
+Write-TestSection "Configuration Functions Test with settings.psd1"
 Write-Host "Test folder: $TestFolder" -ForegroundColor Yellow
 
 # Clean up any existing test folder
@@ -39,11 +39,11 @@ try {
     if ($success) {
         Write-TestResult "InitializeConfiguration completed successfully" -Success $true
         
-        # Check if init.json was created
-        $initFile = "$TestFolder\init.json"
+        # Check if init.psd1 was created
+        $initFile = "$TestFolder\init.psd1"
         if (Test-Path $initFile) {
-            Write-TestResult "init.json file created" -Success $true
-            $initContent = Get-Content $initFile -Raw | ConvertFrom-Json
+            Write-TestResult "init.psd1 file created" -Success $true
+            $initContent = Import-PowerShellDataFile -Path $initFile
             Write-Host "  Found $($initContent.Count) configuration items" -ForegroundColor Gray
         }
     } else {

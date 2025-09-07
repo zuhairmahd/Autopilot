@@ -2,11 +2,11 @@ function Show-SettingsEditor()
 {
     <#
     .SYNOPSIS
-        Interactive editor for application settings using default values from Test-SettingsJsonExists.
+        Interactive editor for application settings using default values from Get-ApplicationDefaults.
     
     .DESCRIPTION
         Provides an interactive interface for users to modify application settings.
-        Uses the default settings structure from Test-SettingsJsonExists as the source of truth
+        Uses the default settings structure from Get-ApplicationDefaults as the source of truth
         for available settings and their descriptions. Supports different data types including
         boolean, string, array, and enumerated values with proper validation.
     
@@ -14,7 +14,7 @@ function Show-SettingsEditor()
         Specifies whether to edit 'Global', 'Domain', or 'Auth' settings.
     
     .PARAMETER SettingsFile
-        Path to the settings.json file. Defaults to "settings.json".
+        Path to the settings.psd1 file. Defaults to "settings.psd1".
     
     .PARAMETER DomainName
         Required when SettingsType is 'Domain'. Specifies which domain's settings to edit.
@@ -38,7 +38,7 @@ function Show-SettingsEditor()
     .NOTES
         - Maintains PowerShell 5.1 compatibility
         - Uses unified Update-Setting function for all setting types
-        - Leverages Test-SettingsJsonExists for default settings structure
+        - Leverages Get-ApplicationDefaults for default settings structure
         - Supports auth settings editing with Test-AuthDefaults for validation
     #>
     [CmdletBinding()]
@@ -46,7 +46,7 @@ function Show-SettingsEditor()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Global', 'Domain', 'Auth')]
         [string]$SettingsType,
-        [string]$SettingsFile = "settings.json",
+        [string]$SettingsFile = "settings.psd1",
         [string]$DomainName,
         [switch]$Silent,
         [hashtable]$PresetValues
@@ -83,7 +83,7 @@ function Show-SettingsEditor()
             }
         }
         
-        # Get default settings structure from Test-SettingsJsonExists
+        # Get default settings structure from Get-ApplicationDefaults
         Write-Log -LogFile $logFile -Module $functionName -Message "Retrieving default settings structure" -LogLevel "Verbose"
         Write-Verbose "[$functionName] Retrieving default settings structure"
         $defaultSettings = Get-DefaultSettingsStructure
@@ -144,7 +144,7 @@ function Show-SettingsEditor()
             
             $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
             
-            if ($null -eq $domainConfig -or $null -eq $domainConfig.settings)
+            if ($null -eq $domainConfig)
             {
                 Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
                 Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for: $DomainName" -LogLevel "Warning"
@@ -153,7 +153,7 @@ function Show-SettingsEditor()
             
             Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
             Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
-            
+
             # Get domain settings template from centralized defaults (fixed approach)
             Write-Log -LogFile $logFile -Module $functionName -Message "Getting domain settings template from centralized defaults for domain: '$DomainName'" -LogLevel "Verbose"
             Write-Verbose "[$functionName] Getting domain settings template from centralized defaults for domain: '$DomainName'"
@@ -161,14 +161,14 @@ function Show-SettingsEditor()
             try
             {
                 $domainTemplate = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName
-                if ($null -eq $domainTemplate -or $null -eq $domainTemplate.settings)
+                if ($null -eq $domainTemplate)
                 {
                     Write-Warning "[$functionName] Failed to get domain template from centralized defaults"
                     Write-Log -LogFile $logFile -Module $functionName -Message "Failed to get domain template from centralized defaults" -LogLevel "Warning"
                     return $false
                 }
                 
-                $settingsTemplate = $domainTemplate.settings
+                $settingsTemplate = $domainTemplate
                 Write-Log -LogFile $logFile -Module $functionName -Message "Successfully retrieved domain settings template with $($settingsTemplate.Count) properties" -LogLevel "Information"
                 Write-Verbose "[$functionName] Successfully retrieved domain settings template with $($settingsTemplate.Count) properties"
             }
@@ -209,7 +209,9 @@ function Show-SettingsEditor()
         $hasChanges = $false
         
         # Process each setting in the template - with support for nested objects
-        $processedSettings = Get-FlattenedSettingsForEditing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues
+        # Exclude GroupsToInclude and GroupsToExclude as they have dedicated editors
+        $excludeSettings = @('groupsToInclude', 'groupsToExclude', 'GroupsToInclude', 'GroupsToExclude')
+        $processedSettings = Get-FlattenedSettingsForProcessing -SettingsTemplate $settingsTemplate -CurrentValues $currentValues -ExcludeSettings $excludeSettings
         
         foreach ($settingInfo in $processedSettings)
         {
@@ -232,7 +234,14 @@ function Show-SettingsEditor()
             if (-not $Silent)
             {
                 # Display setting with path for nested values
-                $displayName = if ($isNested) { $settingPath } else { $settingName }
+                $displayName = if ($isNested)
+                {
+                    $settingPath 
+                }
+                else
+                {
+                    $settingName 
+                }
                 Write-Host "Setting: $displayName" -ForegroundColor Yellow
                 Write-Host "Description: $(Get-SettingDescription -SettingName $settingName)" -ForegroundColor Gray
                 Write-Host "Current value: $(Format-SettingValueForDisplay -Value $currentValue)" -ForegroundColor Cyan
@@ -255,7 +264,14 @@ function Show-SettingsEditor()
             if ($newValue -ne $currentValue)
             {
                 # For nested settings, use the path as the key
-                $keyToUse = if ($isNested) { $settingPath } else { $settingName }
+                $keyToUse = if ($isNested)
+                {
+                    $settingPath 
+                }
+                else
+                {
+                    $settingName 
+                }
                 $updatedSettings[$keyToUse] = $newValue
                 $hasChanges = $true
                 Write-Log -LogFile $logFile -Module $functionName -Message "Setting '$settingPath' changed from '$currentValue' to '$newValue'" -LogLevel "Information"
@@ -431,17 +447,24 @@ function Get-CurrentSettings()
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
-            if (-not (Test-SettingsJsonExists -SettingsFile $SettingsFile -Silent))
+            # Create default settings file using Get-ConfigurationData which will handle defaults
+            try
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings file" -LogLevel "Error"
-                Write-Verbose "[$functionName] Failed to create default settings file"
+                $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+                $null = $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile -force -validate   
+                Write-Verbose "[$functionName] Created default settings file"
+            }
+            catch
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to create default settings file: $($_.Exception.Message)" -LogLevel "Error"
+                Write-Verbose "[$functionName] Failed to create default settings file: $($_.Exception.Message)"
                 return $null
             }
             Write-Log -LogFile $logFile -Module $functionName -Message "Default settings file created" -LogLevel "Information"
             Write-Verbose "[$functionName] Default settings file created"
         }
         
-        $content = Get-Content -Path $SettingsFile -Raw | ConvertFrom-Json
+        $content = Import-PowerShellDataFile -Path $SettingsFile
         Write-Log -LogFile $logFile -Module $functionName -Message "Settings file loaded successfully" -LogLevel "Information"
         Write-Verbose "[$functionName] Settings file loaded successfully"
         return $content
@@ -454,151 +477,7 @@ function Get-CurrentSettings()
     }
 }
 
-function Get-FlattenedSettingsForEditing()
-{
-    <#
-    .SYNOPSIS
-        Flattens settings structure for editing while preserving nested object information.
-    
-    .DESCRIPTION
-        Processes both template and current values to create a flat list of editable settings
-        with proper path information for nested values. Handles hashtables and PSCustomObjects.
-    #>
-    [CmdletBinding()]
-    param(
-        $SettingsTemplate,
-        $CurrentValues
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Flattening settings for editing"
-    
-    $flattenedSettings = @()
-    
-    if ($SettingsTemplate -is [hashtable])
-    {
-        # Handle hashtable (auth settings)
-        foreach ($key in $SettingsTemplate.Keys)
-        {
-            $defaultValue = $SettingsTemplate[$key]
-            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue) { $currentValue = $defaultValue }
-            
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
-            {
-                # Process nested object
-                $nestedSettings = Get-FlattenedSettingsForEditing -SettingsTemplate $defaultValue -CurrentValues $currentValue
-                foreach ($nestedSetting in $nestedSettings)
-                {
-                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
-                    $nestedSetting.IsNested = $true
-                }
-                $flattenedSettings += $nestedSettings
-            }
-            else
-            {
-                # Simple value
-                $flattenedSettings += @{
-                    Name         = $key
-                    Path         = $key
-                    DefaultValue = $defaultValue
-                    CurrentValue = $currentValue
-                    IsNested     = $false
-                }
-            }
-        }
-    }
-    else
-    {
-        # Handle PSCustomObject (global and domain settings)
-        foreach ($property in $SettingsTemplate.PSObject.Properties)
-        {
-            $key = $property.Name
-            $defaultValue = $property.Value
-            $currentValue = Get-NestedValue -Object $CurrentValues -Path $key
-            if ($null -eq $currentValue) { $currentValue = $defaultValue }
-            
-            if ($defaultValue -is [hashtable] -or $defaultValue -is [PSCustomObject])
-            {
-                # Process nested object
-                $nestedSettings = Get-FlattenedSettingsForEditing -SettingsTemplate $defaultValue -CurrentValues $currentValue
-                foreach ($nestedSetting in $nestedSettings)
-                {
-                    $nestedSetting.Path = "$key.$($nestedSetting.Path)"
-                    $nestedSetting.IsNested = $true
-                }
-                $flattenedSettings += $nestedSettings
-            }
-            else
-            {
-                # Simple value
-                $flattenedSettings += @{
-                    Name         = $key
-                    Path         = $key
-                    DefaultValue = $defaultValue
-                    CurrentValue = $currentValue
-                    IsNested     = $false
-                }
-            }
-        }
-    }
-    
-    Write-Verbose "[$functionName] Flattened $($flattenedSettings.Count) settings for editing"
-    return $flattenedSettings
-}
 
-function Get-NestedValue()
-{
-    <#
-    .SYNOPSIS
-        Gets a value from a nested object using dot notation path.
-    #>
-    [CmdletBinding()]
-    param(
-        $Object,
-        [string]$Path
-    )
-    
-    if (-not $Object -or [string]::IsNullOrWhiteSpace($Path))
-    {
-        return $null
-    }
-    
-    $pathParts = $Path.Split('.')
-    $current = $Object
-    
-    foreach ($part in $pathParts)
-    {
-        if ($current -is [hashtable])
-        {
-            if ($current.ContainsKey($part))
-            {
-                $current = $current[$part]
-            }
-            else
-            {
-                return $null
-            }
-        }
-        elseif ($current -is [PSCustomObject])
-        {
-            if ($current.PSObject.Properties.Name -contains $part)
-            {
-                $current = $current.$part
-            }
-            else
-            {
-                return $null
-            }
-        }
-        else
-        {
-            return $null
-        }
-    }
-    
-    return $current
-}
 
 function Format-SettingValueForDisplay()
 {
@@ -1493,6 +1372,7 @@ function Save-DomainSettings()
         return $false
     }
 }
+
 function Update-NestedSetting()
 {
     <#
@@ -1524,7 +1404,7 @@ function Update-NestedSetting()
             return $false
         }
         
-        $settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json
+        $settings = Import-PowerShellDataFile -Path $SettingsFile
         
         # Parse the setting path
         $pathParts = $SettingPath.Split('.')
@@ -1585,8 +1465,8 @@ function Update-NestedSetting()
             $currentLevel | Add-Member -MemberType NoteProperty -Name $finalProperty -Value $SettingValue
         }
         
-        # Save the updated settings
-        $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile -Encoding UTF8
+        # Save the updated settings using Export-PowerShellDataFile
+        $null = Export-PowerShellDataFile -InputObject $settings -Path $SettingsFile -Force
         
         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated nested setting: $SettingPath" -LogLevel "Information"
         return $true

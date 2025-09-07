@@ -80,13 +80,25 @@ try {
     
     Write-TestSection "Test 2: Setup Functions"
     
-    # Test Test-SettingsJsonExists function  
-    Write-Host "Testing Test-SettingsJsonExists function availability..." -ForegroundColor Cyan
-    $settingsTestAvailable = Get-Command "Test-SettingsJsonExists" -ErrorAction SilentlyContinue
-    if ($settingsTestAvailable) {
-        Write-TestResult "Test-SettingsJsonExists function is available" $true
+    # Test Get-ConfigurationData function (replacement for JSON functions) 
+    Write-Host "Testing Get-ConfigurationData function availability..." -ForegroundColor Cyan
+    $configDataAvailable = Get-Command "Get-ConfigurationData" -ErrorAction SilentlyContinue
+    if ($configDataAvailable) {
+        Write-TestResult "Get-ConfigurationData function is available" $true
+        # Test basic execution
+        try {
+            $testResult = Get-ConfigurationData -ConfigurationPath "nonexistent" -DefaultValues @{test = "value"} -ErrorAction SilentlyContinue
+            if ($testResult.test -eq "value") {
+                Write-TestResult "Get-ConfigurationData function executed successfully" $true
+            } else {
+                Write-TestResult "Get-ConfigurationData function did not return expected defaults" $false
+            }
+        }
+        catch {
+            Write-TestResult "Get-ConfigurationData function execution failed: $($_.Exception.Message)" $false
+        }
     } else {
-        Write-TestResult "Test-SettingsJsonExists function is not available" $false
+        Write-TestResult "Get-ConfigurationData function is not available" $false
     }
     
     Write-TestSection "Test 3: Menu Functions"
@@ -121,7 +133,7 @@ try {
     # Test critical functions from each category
     $criticalFunctions = @(
         "Write-Log",
-        "Test-SettingsJsonExists", 
+        "Get-ConfigurationData", 
         "Test-MenuItemIncluded",
         "InitializeConfiguration",
         "MergeSettings",

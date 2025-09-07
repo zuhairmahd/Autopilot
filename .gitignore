@@ -13,6 +13,7 @@ Desktop.ini
 release/
 test/
 build/
+test/
 TestReports/
 TestResults/
 .claude/
@@ -38,9 +39,7 @@ TestResults/
 *.snupkg
 
 # Misc. files.
-*.bat
 *.csv
-*.cmd
 *.backup.*
 config.json
 *.zuh

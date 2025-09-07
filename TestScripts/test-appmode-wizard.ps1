@@ -25,8 +25,8 @@ try {
     
     # Set up test files and directories
     $secretsDir = Join-Path $TestFolder ".secrets"
-    $settingsFile = Join-Path $TestFolder "settings.json"
-    $stringsFile = Join-Path $TestFolder "strings.json"
+    $settingsFile = Join-Path $TestFolder "settings.psd1"
+    $stringsFile = Join-Path $TestFolder "strings.psd1"
     
     if (-not (Test-Path $secretsDir)) {
         New-Item -Path $secretsDir -ItemType Directory -Force | Out-Null

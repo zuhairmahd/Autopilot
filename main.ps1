@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
-    [string]$InitFile = "$pwd\settings.json",
-    [string]$stringsFile = "$pwd\strings.json",
+    [string]$InitFile = "$pwd\settings.psd1",
+    [string]$stringsFile = "$pwd\strings.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -61,7 +61,83 @@ else
 }
 
 #region import functions.
-$functionsFolder = "$PWD\functions"
+function Find-FolderPath()
+{
+    <#
+    .SYNOPSIS
+        Searches upward from the given path for a folder with the specified name.
+    .PARAMETER Path
+        The starting path to begin searching from.
+    .PARAMETER FolderName
+        The name of the folder to search for.
+    .OUTPUTS
+        Returns the full path to the folder if found, otherwise $null.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$FolderName
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #write verbose log of received parameters
+    Write-Verbose "[$functionName] Find-FolderPath called with Path: $Path, FolderName: $FolderName"
+    try
+    {
+        $currentPath = (Resolve-Path -Path $Path).Path
+        Write-Verbose "[$functionName] Current path resolved to: $currentPath"
+
+        # 1. Search children (recursively) of the starting path
+        Write-Verbose "[$functionName] Searching children of $currentPath for folder named $FolderName"
+        $childMatch = Get-ChildItem -Path $currentPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+        Write-Verbose "[$functionName] Checking child match: $($childMatch.FullName)"
+        if ($childMatch)
+        {
+            Write-Verbose "[$functionName] Found folder in children: $($childMatch.FullName)"
+            return $childMatch.FullName
+        }
+        # Also check if the starting path itself matches
+        if ((Split-Path -Path $currentPath -Leaf) -ieq $FolderName)
+        {
+            Write-Verbose "[$functionName] Starting path itself matches: $currentPath"
+            return $currentPath
+        }
+
+        # 2. Search up the parent chain, at each level search its children for the folder
+        while ($currentPath)
+        {
+            $parent = Split-Path -Path $currentPath -Parent
+            if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
+            {
+                break 
+            } # Reached root
+            Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
+            $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+            if ($siblingMatch)
+            {
+                Write-Verbose "[$functionName] Found folder in parent: $($siblingMatch.FullName)"
+                return $siblingMatch.FullName
+            }
+            # Also check if the parent itself matches
+            if ((Split-Path -Path $parent -Leaf) -ieq $FolderName)
+            {
+                Write-Verbose "[$functionName] Parent itself matches: $parent"
+                return $parent
+            }
+            $currentPath = $parent
+        }
+        Write-Verbose "[$functionName] No folder found with name $FolderName in children or parent hierarchy."
+        return $null
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error occurred while searching for folder: $_"
+        return $null
+    }
+}
+
+$functionsFolder = find-folderPath -Path $scriptPath -FolderName 'functions'
 if (Test-Path $functionsFolder)
 {
     Write-Verbose "[$scriptName] Importing functions from $functionsFolder"
@@ -198,49 +274,40 @@ if (Test-Path $configFile)
     $name = $sessionResult.Name
     
     # Check if password change is required
-    if (Test-Path $InitFile)
+    # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
+    $initDefaults = @{}
+    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
+    
+    if ($initFileContent -and $initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
     {
-        try 
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+        
+        # Invoke password change process
+        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+        
+        if ($passwordChangeResult)
         {
-            $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
-            if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+            
+            # Reload the configuration with new password
+            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
+            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
+            if ($reloadResult.Success)
             {
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-                
-                # Invoke password change process
-                $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-                
-                if ($passwordChangeResult)
-                {
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-                    
-                    # Reload the configuration with new password
-                    Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-                    $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-                    
-                    if ($reloadResult.Success)
-                    {
-                        # Update configContent for this session
-                        $configContent = $reloadResult.ConfigContent
-                    }
-                    else
-                    {
-                        Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                        exit 1
-                    }
-                }
-                else
-                {
-                    Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
-                }
+                # Update configContent for this session
+                $configContent = $reloadResult.ConfigContent
+            }
+            else
+            {
+                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
+                exit 1
             }
         }
-        catch
+        else
         {
-            Write-Warning "Failed to check password change requirement: $($_.Exception.Message)"
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement: $($_.Exception.Message)" -LogLevel "Warning"
+            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
         }
     }
     
@@ -276,7 +343,7 @@ else
     Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
     
     # Launch the first run wizard
-    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.json"
+    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1"
     
     if ($wizardResult)
     {
@@ -310,7 +377,8 @@ else
             {
                 try 
                 {
-                    $initFileContent = Get-Content -Path $InitFile -Raw -Force | ConvertFrom-Json
+                    $initDefaults = @{}
+                    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
                     if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
                     {
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required after wizard (changePWOnNextStart=true)" -LogLevel "Information"
@@ -475,7 +543,7 @@ else
     $defaultBranch
 }
 $global:maxJSONDepth = 20
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.psd1"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $groupsToInclude = $settings.groupsToInclude
@@ -503,7 +571,8 @@ foreach ($key in $getTokenParams.Keys)
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
-$loadedStrings = Get-StringsFromJson -StringsFile $stringsFile
+$stringsDefaults = Get-ApplicationDefaults -DefaultType "Strings"
+$loadedStrings = Get-ConfigurationData -ConfigurationPath $stringsFile -DefaultValues $stringsDefaults
 $global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
@@ -784,9 +853,10 @@ $script:menus = @()
 $menuConfig = Get-CachedMenuConfiguration
 if ($menuConfig)
 {
-    # Convert the flat menu.json structure to array format for Test-MenuItemIncluded
-    foreach ($menuName in $menuConfig.PSObject.Properties.Name)
+    # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
+    foreach ($menuName in $menuConfig.keys)
     {
+        Write-Verbose "[$scriptName] Loading menu: $menuName"
         $menu = $menuConfig.$menuName
         if ($menu.items)
         {
@@ -1511,7 +1581,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials"
         Write-Host "Please check the logs for more information." -ForegroundColor Red
     }
 }
-# Auto Update settings action - matches menu.json item "Change Auto Update settings"
+# Auto Update settings action - matches menu.psd1 item "Change Auto Update settings"
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settings" -Action {
     Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
@@ -1558,7 +1628,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
 }
-# App Mode settings action - matches menu.json item "Change App Mode settings"  
+# App Mode settings action - matches menu.psd1 item "Change App Mode settings"  
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings" -Action {
     Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"

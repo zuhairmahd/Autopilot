@@ -108,10 +108,13 @@ function Get-AppModeConfigurationFromUser()
             
             # Create the app mode selection menu from configuration
             $appModeMenu = NewMenu -MenuName "appModeMenu"
-            if (-not $appModeMenu) {
+            if (-not $appModeMenu)
+            {
                 # Fallback to manual creation if config not found
                 $appModeMenu = NewMenu -Title $menuTitle -Description $menuDescription
-            } else {
+            }
+            else
+            {
                 # Update title and description with actual values
                 $appModeMenu.Title = $appModeMenu.Title -replace '\$menuTitle', $menuTitle
                 $appModeMenu.Description = $appModeMenu.Description -replace '\$menuDescription', $menuDescription

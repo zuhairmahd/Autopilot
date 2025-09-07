@@ -32,7 +32,7 @@ function FilterMenuItemsByAppMode()
         [Parameter(Mandatory = $false)]
         [string]$CurrentAppMode = $settings.appMode,
         [Parameter(Mandatory = $false)]
-        [string]$MenuConfigFile = "$pwd\menu.json"
+        [string]$MenuConfigFile = "$pwd\menu.psd1"
     )
     
     $functionName = $MyInvocation.MyCommand.Name
