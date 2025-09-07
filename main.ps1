@@ -468,7 +468,7 @@ $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 
 # Set auth as a script variable so it can be accessed by functions
-$global:Auth = $auth
+$script:Auth = $auth
 
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
