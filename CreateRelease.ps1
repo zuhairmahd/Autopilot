@@ -232,6 +232,214 @@ function update-LastRunObject()
     }
 }
 
+function Update-LastRunVersion()
+{
+    param (
+        [string]$Version = $null,
+        [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
+        [string]$PartToIncrement = 'Revision',
+        [Parameter(Mandatory = $true)]
+        [hashtable]$LastRun
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    # 1. Normalize & validate supplied version (may be empty)
+    if (-not [string]::IsNullOrWhiteSpace($Version))
+    {
+        if ($Version -notmatch '^[\d\.]+$')
+        {
+            Write-Warning 'Invalid version format (only digits and periods allowed). Using Null as the supplied version.'
+            $updatedVersion = $null
+        }
+        $versionParts = $Version.Split('.')
+        while ($versionParts.Count -lt 4)
+        {
+            $versionParts += '0' 
+        }
+        $updatedVersion = ($versionParts[0..3]) -join '.'
+    }
+
+    # 2. Normalize last run version if present
+    $lastRunVersion = $null
+    if (-not [string]::IsNullOrWhiteSpace($LastRun.version) -and $LastRun.version -match '^[\d\.]+$')
+    {
+        $lrParts = $LastRun.version.Split('.')
+        while ($lrParts.Count -lt 4)
+        {
+            $lrParts += '0' 
+        }
+        $lastRunVersion = ($lrParts[0..3]) -join '.'
+    }
+
+    # 3. Determine base version via interactive logic (preserve existing behavior)
+    if ([string]::IsNullOrWhiteSpace($updatedVersion) -and [string]::IsNullOrWhiteSpace($lastRunVersion))
+    {
+        Write-Host 'What version number would you like to use for this build?'
+        Write-Host 'Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)'
+        $updatedVersion = Read-Host 'Enter version number'
+        while ($updatedVersion -notmatch '^\d+\.\d+\.\d+\.\d+$')
+        {
+            Write-Host 'Invalid version format. Please use n.n.n.n'
+            [console]::Beep(1000, 500)
+            $updatedVersion = Read-Host 'Enter a valid version number'
+        }
+        $maintainCurrentVersion = $true
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($updatedVersion) -and -not [string]::IsNullOrWhiteSpace($lastRunVersion))
+    {
+        # Both supplied & last run available – ask user which to use (keep behavior), show comparison
+        $supObj = [Version]$updatedVersion
+        $lastObj = [Version]$lastRunVersion
+        $cmp = $supObj.CompareTo($lastObj)
+        $relation = if ($cmp -gt 0)
+        {
+            'greater than' 
+        }
+        elseif ($cmp -lt 0)
+        {
+            'less than' 
+        }
+        else
+        {
+            'equal to' 
+        }
+        Write-Host "Supplied version: $updatedVersion"
+        Write-Host "Last run version: $lastRunVersion"
+        Write-Host "Supplied version is $relation last run version."
+        Write-Host 'Which version would you like to use? (S for supplied, L for last run)'
+        $response = Read-Host 'Enter S for supplied version, L for last run version, or E to exit'
+        while ($response -notin 'S', 'L', 'E')
+        {
+            Write-Host 'Invalid response. Please enter S, L, or E.'
+            [console]::Beep(1000, 500)
+            $response = Read-Host 'Enter S for supplied version, L for last run version, or E to exit'
+        }
+        switch ($response)
+        {
+            'S'
+            {
+                Write-Host "Using supplied version: $updatedVersion"; $maintainCurrentVersion = $true 
+            }
+            'L'
+            {
+                Write-Host "Using last run version: $lastRunVersion"; $updatedVersion = $lastRunVersion 
+            }
+            'E'
+            {
+                Write-Host 'Exiting script.'; exit 0 
+            }
+        }
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($lastRunVersion) -and [string]::IsNullOrWhiteSpace($updatedVersion))
+    {
+        Write-Host "No version supplied. Using last run version: $lastRunVersion"
+        $updatedVersion = $lastRunVersion
+    }
+    else
+    {
+        # Only supplied version exists
+        Write-Host "Using supplied version: $updatedVersion"
+        $maintainCurrentVersion = $true
+    }
+
+    # 4. Show context
+    Write-Host "Last run date: $($lastRun.date)"
+    Write-Host "GUID: $($lastRun.guid)"
+    Write-Host "Part to increment: $PartToIncrement"
+    Write-Host "Current base version: $updatedVersion"
+    Write-Host "Maintain current version: $maintainCurrentVersion"
+    Write-Verbose "[$functionName] No version update switch state: $NoVersionUpdate"
+
+    # 5. Increment if allowed
+    $finalVersion = $updatedVersion
+    if (-not $maintainCurrentVersion -and -not $NoVersionUpdate)
+    {
+        $parts = $finalVersion.Split('.')
+        # Ensure exactly 4 parts (defensive)
+        while ($parts.Count -lt 4)
+        {
+            $parts += '0' 
+        }
+        switch ($PartToIncrement)
+        {
+            'Major'
+            {
+                $parts[0] = ([int]$parts[0] + 1); $parts[1] = 0; $parts[2] = 0; $parts[3] = 0 
+            }
+            'Minor'
+            {
+                $parts[1] = ([int]$parts[1] + 1); $parts[2] = 0; $parts[3] = 0 
+            }
+            'Build'
+            {
+                $parts[2] = ([int]$parts[2] + 1); $parts[3] = 0 
+            }
+            'Revision'
+            {
+                $parts[3] = ([int]$parts[3] + 1) 
+            }
+        }
+        $finalVersion = ($parts[0..3]) -join '.'
+        Write-Host "Incremented $($PartToIncrement): $updatedVersion -> $finalVersion"
+    }
+    elseif ($maintainCurrentVersion -or $NoVersionUpdate)
+    {
+        Write-Host "Maintaining version without increment: $finalVersion"
+    }
+
+    return $finalVersion
+}
+
+function UpdateHash()
+{
+    [CmdletBinding()]
+    param (
+        [string]$executableFilePath,
+        [string]$lastRunPath = "$pwd\lastrun.json"
+    )
+
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
+    Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
+    if (-not (Test-Path $executableFilePath))
+    {
+        Write-Error "File not found: $executableFilePath"
+        Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    if (-not (Test-Path $lastRunPath))
+    {
+        Write-Error "Last run file not found: $lastRunPath"
+        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+
+    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
+    if (-not $lastRunContent)
+    {
+        Write-Error "Failed to read JSON from $lastRunPath"
+        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
+        return $false
+    }
+    
+    # Get the hash of the executable file
+    $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
+    
+    if ($fileHash)
+    {
+        $lastRunContent.hash = $fileHash.Hash
+        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
+        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
+        Write-Host "Hash updated successfully in $lastRunPath"
+        return $true
+    }
+    else
+    {
+        Write-Error "Failed to write updated hash to $lastRunPath"
+        return $false
+    }
+}
+
 function SignScripts()
 {
     [CmdletBinding()]
@@ -361,217 +569,6 @@ function CopyFiles()
     }
     $success = $true
     return $success
-}
-
-function Update-LastRunVersion()
-{
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]$Version,
-        [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
-        [string]$PartToIncrement = 'Revision',
-        [Parameter(Mandatory = $true)]
-        [hashtable]$LastRun
-    )
-
-    $functionName = $MyInvocation.MyCommand.Name
-    # 1. Normalize & validate supplied version (may be empty)
-    $originalSupplied = $Version
-    if (-not [string]::IsNullOrWhiteSpace($Version))
-    {
-        if ($Version -notmatch '^[\d\.]+$')
-        {
-            Write-Error 'Invalid version format (only digits and periods allowed).'
-            return $null
-        }
-        $versionParts = $Version.Split('.')
-        while ($versionParts.Count -lt 4)
-        {
-            $versionParts += '0' 
-        }
-        $Version = ($versionParts[0..3]) -join '.'
-    }
-
-    # 2. Normalize last run version if present
-    $lastRunVersion = $null
-    if (-not [string]::IsNullOrWhiteSpace($LastRun.version) -and $LastRun.version -match '^[\d\.]+$')
-    {
-        $lrParts = $LastRun.version.Split('.')
-        while ($lrParts.Count -lt 4)
-        {
-            $lrParts += '0' 
-        }
-        $lastRunVersion = ($lrParts[0..3]) -join '.'
-    }
-
-    # 3. Determine base version via interactive logic (preserve existing behavior)
-    $updatedVersion = $Version
-    if ([string]::IsNullOrWhiteSpace($updatedVersion) -and [string]::IsNullOrWhiteSpace($lastRunVersion))
-    {
-        Write-Host 'What version number would you like to use for this build?'
-        Write-Host 'Enter version number using the format major.minor.build.revision (e.g., 1.0.0.0)'
-        $updatedVersion = Read-Host 'Enter version number'
-        while ($updatedVersion -notmatch '^\d+\.\d+\.\d+\.\d+$')
-        {
-            Write-Host 'Invalid version format. Please use n.n.n.n'
-            [console]::Beep(1000, 500)
-            $updatedVersion = Read-Host 'Enter a valid version number'
-        }
-        $maintainCurrentVersion = $true
-    }
-    elseif (-not [string]::IsNullOrWhiteSpace($updatedVersion) -and -not [string]::IsNullOrWhiteSpace($lastRunVersion))
-    {
-        # Both supplied & last run available – ask user which to use (keep behavior), show comparison
-        $supObj = [Version]$updatedVersion
-        $lastObj = [Version]$lastRunVersion
-        $cmp = $supObj.CompareTo($lastObj)
-        $relation = if ($cmp -gt 0)
-        {
-            'greater than' 
-        }
-        elseif ($cmp -lt 0)
-        {
-            'less than' 
-        }
-        else
-        {
-            'equal to' 
-        }
-        Write-Host "Supplied version: $updatedVersion"
-        Write-Host "Last run version: $lastRunVersion"
-        Write-Host "Supplied version is $relation last run version."
-        Write-Host 'Which version would you like to use? (S for supplied, L for last run)'
-        $response = Read-Host 'Enter S for supplied version, L for last run version, or E to exit'
-        while ($response -notin 'S', 'L', 'E')
-        {
-            Write-Host 'Invalid response. Please enter S, L, or E.'
-            [console]::Beep(1000, 500)
-            $response = Read-Host 'Enter S for supplied version, L for last run version, or E to exit'
-        }
-        switch ($response)
-        {
-            'S'
-            {
-                Write-Host "Using supplied version: $updatedVersion"; $maintainCurrentVersion = $true 
-            }
-            'L'
-            {
-                Write-Host "Using last run version: $lastRunVersion"; $updatedVersion = $lastRunVersion 
-            }
-            'E'
-            {
-                Write-Host 'Exiting script.'; exit 0 
-            }
-        }
-    }
-    elseif (-not [string]::IsNullOrWhiteSpace($lastRunVersion) -and [string]::IsNullOrWhiteSpace($updatedVersion))
-    {
-        Write-Host "No version supplied. Using last run version: $lastRunVersion"
-        $updatedVersion = $lastRunVersion
-    }
-    else
-    {
-        # Only supplied version exists
-        Write-Host "Using supplied version: $updatedVersion"
-        $maintainCurrentVersion = $true
-    }
-
-    # 4. Show context
-    Write-Host "Last run date: $($lastRun.date)"
-    Write-Host "GUID: $($lastRun.guid)"
-    Write-Host "Part to increment: $PartToIncrement"
-    Write-Host "Current base version: $updatedVersion"
-    Write-Host "Maintain current version: $maintainCurrentVersion"
-    Write-Verbose "[$functionName] No version update switch state: $NoVersionUpdate"
-
-    # 5. Increment if allowed
-    $finalVersion = $updatedVersion
-    if (-not $maintainCurrentVersion -and -not $NoVersionUpdate)
-    {
-        $parts = $finalVersion.Split('.')
-        # Ensure exactly 4 parts (defensive)
-        while ($parts.Count -lt 4)
-        {
-            $parts += '0' 
-        }
-        switch ($PartToIncrement)
-        {
-            'Major'
-            {
-                $parts[0] = ([int]$parts[0] + 1); $parts[1] = 0; $parts[2] = 0; $parts[3] = 0 
-            }
-            'Minor'
-            {
-                $parts[1] = ([int]$parts[1] + 1); $parts[2] = 0; $parts[3] = 0 
-            }
-            'Build'
-            {
-                $parts[2] = ([int]$parts[2] + 1); $parts[3] = 0 
-            }
-            'Revision'
-            {
-                $parts[3] = ([int]$parts[3] + 1) 
-            }
-        }
-        $finalVersion = ($parts[0..3]) -join '.'
-        Write-Host "Incremented $PartToIncrement: $updatedVersion -> $finalVersion"
-    }
-    elseif ($maintainCurrentVersion -or $NoVersionUpdate)
-    {
-        Write-Host "Maintaining version without increment: $finalVersion"
-    }
-
-    return $finalVersion
-}
-
-function UpdateHash()
-{
-    [CmdletBinding()]
-    param (
-        [string]$executableFilePath,
-        [string]$lastRunPath = "$pwd\lastrun.json"
-    )
-
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Updating hash in lastrun file: $lastRunPath"
-    Write-Log -logFile $logFile -Message "Updating hash in lastrun file: $lastRunPath" -module $functionName
-    if (-not (Test-Path $executableFilePath))
-    {
-        Write-Error "File not found: $executableFilePath"
-        Write-Log -logFile $logFile -Message "File not found: $executableFilePath" -module $functionName -logLevel "Error"
-        return $false
-    }
-    if (-not (Test-Path $lastRunPath))
-    {
-        Write-Error "Last run file not found: $lastRunPath"
-        Write-Log -logFile $logFile -Message "Last run file not found: $lastRunPath" -module $functionName -logLevel "Error"
-        return $false
-    }
-
-    $lastRunContent = Get-Content -Path $lastRunPath -Raw -Force | ConvertFrom-Json
-    if (-not $lastRunContent)
-    {
-        Write-Error "Failed to read JSON from $lastRunPath"
-        Write-Log -logFile $logFile -Message "Failed to read JSON from $lastRunPath" -module $functionName -logLevel "Error"
-        return $false
-    }
-    
-    # Get the hash of the executable file
-    $fileHash = Get-FileHash -Path $executableFilePath -Algorithm SHA256
-    
-    if ($fileHash)
-    {
-        $lastRunContent.hash = $fileHash.Hash
-        $updatedContent = $lastRunContent | ConvertTo-Json -Depth 100
-        Set-Content -Path $lastRunPath -Value $updatedContent -Encoding UTF8
-        Write-Host "Hash updated successfully in $lastRunPath"
-        return $true
-    }
-    else
-    {
-        Write-Error "Failed to write updated hash to $lastRunPath"
-        return $false
-    }
 }
 
 function MergeFunctions()
@@ -969,7 +966,7 @@ function UpdateSettingsFile()
             # Update the changePWOnNextStart setting
             Write-Verbose "[$functionName] Checking for changePWOnNextStart setting."
             Write-Log -LogFile $LogFile -Module $functionName -Message "Checking for changePWOnNextStart setting." -LogLevel "Information"
-            if ($settings.auth -and $settings.auth.changePWOnNextStart -ne $null)
+            if ($settings.auth -and $null -ne $settings.auth.changePWOnNextStart)
             {
                 Write-Verbose "[$functionName] changePWOnNextStart setting found. Setting it to true."
                 Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting found. Setting it to true." -LogLevel "Information"
@@ -1019,7 +1016,6 @@ function UpdateSettingsFile()
 #endregion helper functions
 
 #region Define variables
-$initFile = "init.psd1"
 $lastRunFile = "$pwd\lastrun.json"
 $lastRun = get-lastrun -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
