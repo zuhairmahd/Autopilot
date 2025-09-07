@@ -181,8 +181,8 @@ function Show-SettingsViewer()
             
             # Use the actual domain configuration for current values
             $currentValues = $domainConfig
-            Write-Log -LogFile $logFile -Module $functionName -Message "Using current domain settings with $($currentValues.PSObject.Properties.Count) properties" -LogLevel "Verbose"
-            Write-Verbose "[$functionName] Using current domain settings with $($currentValues.PSObject.Properties.Count) properties"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using current domain settings with $($currentValues.Count) properties" -LogLevel "Verbose"
+            Write-Verbose "[$functionName] Using current domain settings with $($currentValues.Count) properties"
             
             Write-Log -LogFile $logFile -Module $functionName -Message "Displaying domain settings for domain: '$DomainName' from separate configuration file" -LogLevel "Information"
             Write-Verbose "[$functionName] Displaying domain settings for domain: '$DomainName' from separate configuration file"
