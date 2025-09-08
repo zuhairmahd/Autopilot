@@ -11,6 +11,65 @@ function ProcessSerialNumber()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing device lookup for serial number: $SerialNumber" -LogLevel "Verbose"
+
+    # Load menu configuration for filtering
+    $menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
+    
+    # Helper function for menu item filtering based on app mode
+    function Test-ShouldIncludeMenuItem {
+        param(
+            [string]$MenuItemName,
+            [string]$MenuName = "deviceActionsMenu",
+            [string]$CurrentAppMode = $Settings.appMode
+        )
+        
+        # If no app mode set or is full, include all items
+        if (-not $CurrentAppMode -or $CurrentAppMode -eq "full") {
+            return $true
+        }
+        
+        # If no menu config available, include all items (fallback)
+        if (-not $menuConfigForFiltering) {
+            return $true
+        }
+        
+        # Get the specific menu configuration
+        $menuConfig = $null
+        if ($menuConfigForFiltering.$MenuName) {
+            $menuConfig = $menuConfigForFiltering.$MenuName
+        }
+        
+        if (-not $menuConfig -or -not $menuConfig.items) {
+            return $true
+        }
+        
+        # Find the menu item in configuration
+        $configItem = $menuConfig.items | Where-Object { $_.name -eq $MenuItemName }
+        if (-not $configItem) {
+            # Item not found in config, include by default (fallback)
+            return $true
+        }
+        
+        # If no includeInDisplayModes specified, include by default
+        if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0) {
+            return $true
+        }
+        
+        # Get app mode hierarchy and check if current mode is allowed
+        try {
+            $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
+            foreach ($allowedMode in $configItem.includeInDisplayModes) {
+                if ($hierarchyAllowed -contains $allowedMode) {
+                    return $true
+                }
+            }
+            return $false
+        }
+        catch {
+            # If hierarchy check fails, include by default (safety fallback)
+            return $true
+        }
+    }
 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Verbose"
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
@@ -209,27 +268,33 @@ Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device
             #region Assign actions to remaining menu items
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Assigning actions to available menu items" -LogLevel "Information"
             
-            # Always available actions
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
-                Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
+            # Always available actions - now filtered by app mode
+            if (Test-ShouldIncludeMenuItem -MenuItemName "Wipe Device") {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Wipe Device" -Action {
+                    Write-Host "`nInitiating device wipe for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                    SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'wipe' | Out-Null
+                }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Wipe Device'" -LogLevel "Debug"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Wipe Device'" -LogLevel "Debug"
             
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
-                Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
+            if (Test-ShouldIncludeMenuItem -MenuItemName "Clean Device") {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Clean Device" -Action {
+                    Write-Host "`nInitiating device clean for: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                    SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'clean' -MonitorAction
+                }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Clean Device'" -LogLevel "Debug"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Clean Device'" -LogLevel "Debug"
             
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
-                Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
+            if (Test-ShouldIncludeMenuItem -MenuItemName "Sync Device") {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Sync Device" -Action {
+                    Write-Host "`nSyncing device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                    SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'sync'
+                }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Sync Device'" -LogLevel "Debug"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Sync Device'" -LogLevel "Debug"
             
-            # Conditionally available actions - only assign if menu item still exists
-            if ($enrollmentState.managedDevice.laps.credentials.count -gt 0)
+            # Conditionally available actions - only assign if menu item still exists AND app mode allows
+            if ($enrollmentState.managedDevice.laps.credentials.count -gt 0 -and (Test-ShouldIncludeMenuItem -MenuItemName "Get LAPS Password"))
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get LAPS Password" -Action {
                     GetDeviceLAPSCredentials -enrollmentState $enrollmentState
@@ -247,7 +312,7 @@ Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "LAPS Password action assigned - credentials available" -LogLevel "Debug"
             }
             
-            if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
+            if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey -and (Test-ShouldIncludeMenuItem -MenuItemName "Get BitLocker Recovery Key"))
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
                     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
@@ -269,7 +334,7 @@ Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "BitLocker Recovery Key action assigned - keys available" -LogLevel "Debug"
             }
             
-            if ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0)
+            if ($null -ne $enrollmentState.managedDevice.hardwarePassword -and $enrollmentState.managedDevice.hardwarePassword.count -gt 0 -and (Test-ShouldIncludeMenuItem -MenuItemName "Get Hardware Password Details"))
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get Hardware Password Details" -Action {
                     Write-Host "`nHardware password details retrieved successfully." -ForegroundColor Green
@@ -295,51 +360,57 @@ Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Hardware Password Details action assigned - details available" -LogLevel "Debug"
             }
             
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
-                Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
-                SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
+            if (Test-ShouldIncludeMenuItem -MenuItemName "Restart Device") {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Restart Device" -Action {
+                    Write-Host "`nRestarting device: $deviceName ($SerialNumber)" -ForegroundColor Yellow
+                    SendDeviceCommand -AccessToken $AccessToken -ManagedDeviceId $managedDeviceId -Command 'restart' | Out-Null
+                }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Restart Device'" -LogLevel "Debug"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Restart Device'" -LogLevel "Debug"
             
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
-                $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report: $deviceReport" -LogLevel "Information"
-                # Handle navigation responses from ShowReport
-                if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
-                {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
+            if (Test-ShouldIncludeMenuItem -MenuItemName "Show Device Health Status") {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Show Device Health Status" -Action {
+                    $deviceReport = ShowDeviceReport -enrollmentState $enrollmentState -SerialNumber $serialNumber
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device report: $deviceReport" -LogLevel "Information"
+                    # Handle navigation responses from ShowReport
+                    if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
+                    {
+                        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
+                        return $returnValues.backoutText
+                    }
+                    elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
+                    {
+                        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
+                        return "EXIT_APPLICATION"
+                    }
+                    elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
+                    {
+                        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User requested application exit from device selection." -LogLevel "Information"
+                        return "EXIT_APPLICATION"
+                    }        
+                    elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
+                    {
+                        if ($deviceReport -eq $true -or $deviceReport -in ("Export to HTML", "Export to CSV"))
+                        {
+                            Write-Host "`nDevice health status displayed successfully." -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
+                        }
+                        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
+                    }
                     return $returnValues.backoutText
                 }
-                elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
-                {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
-                    return "EXIT_APPLICATION"
-                }
-                elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
-                {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User requested application exit from device selection." -LogLevel "Information"
-                    return "EXIT_APPLICATION"
-                }        
-                elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
-                {
-                    if ($deviceReport -eq $true -or $deviceReport -in ("Export to HTML", "Export to CSV"))
-                    {
-                        Write-Host "`nDevice health status displayed successfully." -ForegroundColor Green
-                    }
-                    else
-                    {
-                        Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
-                    }
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
-                }
-                return $returnValues.backoutText
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Show Device Health Status'" -LogLevel "Debug"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Show Device Health Status'" -LogLevel "Debug"
             
-            $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
-                return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
+            if (Test-ShouldIncludeMenuItem -MenuItemName "Check next user readiness state") {
+                $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Check next user readiness state" -Action {
+                    return (GetNextUserReadinessReport -enrollmentState $enrollmentState).ReadinessState
+                }
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Check next user readiness state'" -LogLevel "Debug"
             }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Action assigned for 'Check next user readiness state'" -LogLevel "Debug"
             #endregion
             
             # Show the device actions menu with navigation context

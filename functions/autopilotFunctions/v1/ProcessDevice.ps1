@@ -15,6 +15,65 @@ function ProcessDevice()
     #region check and initialize variables
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking access token..."
+
+    # Load menu configuration for filtering
+    $menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
+    
+    # Helper function for menu item filtering based on app mode
+    function Test-ShouldIncludeMenuItem {
+        param(
+            [string]$MenuItemName,
+            [string]$MenuName = "deviceWaitMenu",
+            [string]$CurrentAppMode = $settings.appMode
+        )
+        
+        # If no app mode set or is full, include all items
+        if (-not $CurrentAppMode -or $CurrentAppMode -eq "full") {
+            return $true
+        }
+        
+        # If no menu config available, include all items (fallback)
+        if (-not $menuConfigForFiltering) {
+            return $true
+        }
+        
+        # Get the specific menu configuration
+        $menuConfig = $null
+        if ($menuConfigForFiltering.$MenuName) {
+            $menuConfig = $menuConfigForFiltering.$MenuName
+        }
+        
+        if (-not $menuConfig -or -not $menuConfig.items) {
+            return $true
+        }
+        
+        # Find the menu item in configuration
+        $configItem = $menuConfig.items | Where-Object { $_.name -eq $MenuItemName }
+        if (-not $configItem) {
+            # Item not found in config, include by default (fallback)
+            return $true
+        }
+        
+        # If no includeInDisplayModes specified, include by default
+        if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0) {
+            return $true
+        }
+        
+        # Get app mode hierarchy and check if current mode is allowed
+        try {
+            $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
+            foreach ($allowedMode in $configItem.includeInDisplayModes) {
+                if ($hierarchyAllowed -contains $allowedMode) {
+                    return $true
+                }
+            }
+            return $false
+        }
+        catch {
+            # If hierarchy check fails, include by default (safety fallback)
+            return $true
+        }
+    }
         
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking access token..." -LogLevel "Verbose"
     if ($accessToken)
@@ -160,7 +219,8 @@ function ProcessDevice()
                         # Update title with actual serial number
                         $deviceWaitMenu.Title = $deviceWaitMenu.Title -replace '\$serialNumber', $serialNumber
                     }
-                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
+                    if (Test-ShouldIncludeMenuItem -MenuItemName "Restart the device") {
+                        $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Restart the device" -Action {
                         Write-Host "Restarting the device..."
                         Write-Verbose "[$functionName] User chose to restart the device."
 
@@ -172,12 +232,16 @@ function ProcessDevice()
                             return $returnValues.noRestartMessage 
                         }
                     }
-                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
-                        Write-Host "Continuing to wait for profile assignment..."
-                        $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $settings.timeInSeconds -maxWaitTime $settings.maxWaitTime
-                        return $deviceAssignment
                     }
-                    $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {
+                    if (Test-ShouldIncludeMenuItem -MenuItemName "Continue to wait for profile assignment") {
+                        $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Continue to wait for profile assignment" -Action {
+                            Write-Host "Continuing to wait for profile assignment..."
+                            $deviceAssignment = CheckDeviceAssignment -serialNumber $serialNumber -AccessToken $accessToken -waitforAssignment -waitTimeInSeconds $settings.timeInSeconds -maxWaitTime $settings.maxWaitTime
+                            return $deviceAssignment
+                        }
+                    }
+                    if (Test-ShouldIncludeMenuItem -MenuItemName "Delete the device from Autopilot") {
+                        $deviceWaitMenu = AddMenuItem -Menu $deviceWaitMenu -Name "Delete the device from Autopilot" -Action {
                         Write-Host "Deleting the device from Autopilot..."
                         if (DeleteAutopilotDevice -DeviceIdentifyer $deviceAssignment.id -IdentifyerType 'DeviceId')
                         {
@@ -189,6 +253,7 @@ function ProcessDevice()
                             Write-Host 'Failed to delete the device from Autopilot.' -ForegroundColor Red
                             return $returnValues.deviceDeleteFailedMessage
                         }
+                    }
                     }
                     $result = ShowMenu -Menu $deviceWaitMenu -CalledBy 'Action'
                     Write-Verbose "[$functionName] Result from device wait menu: $result"

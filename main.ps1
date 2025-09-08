@@ -1102,6 +1102,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
 #endregion serial number menu
 
 #region Autopilot menu   
+if (Test-ShouldIncludeMenuItem -MenuItemName "Quick Import device into Autopilot (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1117,6 +1118,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Custom import device into Autopilot (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1137,6 +1140,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         return $returnValues.backoutText
     }
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Import device into Autopilot" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot" -Action {
     Write-Verbose "[$scriptName] Import device into Autopilot (standard)."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1152,6 +1157,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Auto
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of standard import: $result"
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1184,6 +1191,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
         Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
     }
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Deleting Corporate Device Identifier from Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1232,6 +1241,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device
         Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
     }
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -action {
     Write-Verbose "[$scriptName] Exporting Corporate Device Identifier for manual upload to Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1270,6 +1281,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device
         Write-Host 'Failed to export Corporate Device Identifier.' -ForegroundColor Red
     }
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Get device hash for manual upload to Autopilot (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
@@ -1300,6 +1313,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for man
         }
     }
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Download and install latest Windows updates(requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
     Write-Verbose "[$scriptName] Download and install latest Windows updates."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1317,7 +1332,11 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
     $updateResult = ApplyWindowsUpdates
     Write-Host $returnValues.$updateResult
 }
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Check device Autopilot status" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
+}
+if (Test-ShouldIncludeMenuItem -MenuItemName "Delete device from Autopilot" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
     Write-Host 'Deleting the device from Autopilot...'
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
@@ -1340,6 +1359,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
+}
 }
 
 #endregion Autopilot menu
@@ -1827,11 +1847,11 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 #region Helper function for menu item filtering based on app mode
 # Load menu configuration to get includeInDisplayModes for items
 $menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
-$mainMenuConfig = if ($menuConfigForFiltering -and $menuConfigForFiltering.mainMenu) { $menuConfigForFiltering.mainMenu } else { $null }
 
 function Test-ShouldIncludeMenuItem {
     param(
         [string]$MenuItemName,
+        [string]$MenuName = "mainMenu",
         [string]$CurrentAppMode = $settings.appMode
     )
     
@@ -1841,12 +1861,30 @@ function Test-ShouldIncludeMenuItem {
     }
     
     # If no menu config available, include all items (fallback)
-    if (-not $mainMenuConfig -or -not $mainMenuConfig.items) {
+    if (-not $menuConfigForFiltering) {
+        return $true
+    }
+    
+    # Get the specific menu configuration
+    $menuConfig = $null
+    if ($menuConfigForFiltering.$MenuName) {
+        $menuConfig = $menuConfigForFiltering.$MenuName
+    } else {
+        # Fallback: try to find menu by name in all configurations
+        foreach ($configKey in $menuConfigForFiltering.Keys) {
+            if ($menuConfigForFiltering[$configKey].Title -match $MenuName -or $configKey -eq $MenuName) {
+                $menuConfig = $menuConfigForFiltering[$configKey]
+                break
+            }
+        }
+    }
+    
+    if (-not $menuConfig -or -not $menuConfig.items) {
         return $true
     }
     
     # Find the menu item in configuration
-    $configItem = $mainMenuConfig.items | Where-Object { $_.name -eq $MenuItemName }
+    $configItem = $menuConfig.items | Where-Object { $_.name -eq $MenuItemName }
     if (-not $configItem) {
         # Item not found in config, include by default (fallback)
         return $true
