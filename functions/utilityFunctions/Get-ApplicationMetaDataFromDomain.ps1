@@ -17,11 +17,34 @@ function Get-ApplicationMetaDataFromDomain()
         $domainsSettingsFiles = Get-ChildItem -Path $pwd -File -Filter *.psd1 -ErrorAction SilentlyContinue | Where-Object { $_.Name -match $domainPattern }
         Write-Verbose "[$functionName] Found $($domainsSettingsFiles.count) domain settings files."
         Write-Log -logFile $logFile -module $functionName -Message "Found $($domainsSettingsFiles.count) domain settings files."
-        if ($domainsSettingsFiles -and $domainsSettingsFiles.count -gt 0)
+        if ($domainsSettingsFiles -and $domainsSettingsFiles.count -eq 1)
         {
             Write-Verbose "[$functionName] Found $($domainsSettingsFiles.count) domain settings files."
             Write-Log -logFile $logFile -module $functionName -Message "Found $($domainsSettingsFiles.count) domain settings files"
             $domainSettingsFile = $domainsSettingsFiles | Select-Object -First 1
+        }
+        elseif ($domainsSettingsFiles -and $domainsSettingsFiles.count -gt 1)
+        {
+            Write-Verbose "[$functionName] Found multiple domain settings files."
+            Write-Log -logFile $logFile -module $functionName -Message "Found multiple domain settings files."
+            Write-Host "Multiple domain settings files found."
+            for ($i = 0; $i -lt $domainsSettingsFiles.Count; $i++)
+            {
+                $list += @( ($domainsSettingsFiles[$i].Name) -replace '.psd1', '' )
+                Write-Verbose "[$functionName] $($domainsSettingsFiles[$i].Name)"
+            }
+            $result = DisplayNumericMenu -choices $list -banner "Please choose a domain" -Prompt "Choose the correct number and press enter" -RequireEnter
+            Write-Verbose "[$functionName] User selected domain settings file: $($domainSettingsFile.Name)"
+            if ($result -eq 0)
+            {
+                Write-Verbose "[$functionName] User cancelled the selection."
+                Write-Log -logFile $logFile -module $functionName -Message "User cancelled the selection."
+                return $null
+            }
+            else
+            {
+                $domainSettingsFile = "$result.psd1"
+            }
         }
         else 
         {
