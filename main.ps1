@@ -1816,12 +1816,8 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
 }
 
-#region Helper function for menu item filtering based on app mode
 # Load menu configuration to get includeInDisplayModes for items
 $menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
-
-#endregion Helper function for menu item filtering
-
 # Add menu items - filtering is handled by ShowMenu function
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
