@@ -1,4 +1,4 @@
-function GetRequiredMenusForAppMode()
+function Get-RequiredMenusForAppMode()
 {
     <#
     .SYNOPSIS
@@ -121,7 +121,7 @@ function GetRequiredMenusForAppMode()
                     # Recursively check for nested menu dependencies
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Analyzing nested dependencies for submenu: $($item.menuName)" -LogLevel "Debug"
                     Write-Verbose "[$functionName] Analyzing nested dependencies for submenu: $($item.menuName)"
-                    $nestedMenus = GetRequiredMenusRecursive -MenuName $item.menuName -MenuConfig $menuConfig -CurrentAppMode $CurrentAppMode
+                    $nestedMenus = Get-RequiredMenusRecursive -MenuName $item.menuName -MenuConfig $menuConfig -CurrentAppMode $CurrentAppMode
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($nestedMenus.Count) nested menus for submenu: $($item.menuName)" -LogLevel "Debug"
                     Write-Verbose "[$functionName] Found $($nestedMenus.Count) nested menus for submenu: $($item.menuName)"
                     foreach ($nestedMenu in $nestedMenus)
@@ -176,7 +176,7 @@ function GetRequiredMenusForAppMode()
     }
 }
 
-function GetRequiredMenusRecursive()
+function Get-RequiredMenusRecursive()
 {
     <#
     .SYNOPSIS
@@ -257,7 +257,7 @@ function GetRequiredMenusRecursive()
                     # Recursively check this nested menu
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Recursively analyzing nested menu: $($item.menuName)" -LogLevel "Debug"
                     Write-Verbose "[$functionName] Recursively analyzing nested menu: $($item.menuName)"
-                    $deeperMenus = GetRequiredMenusRecursive -MenuName $item.menuName -MenuConfig $MenuConfig -CurrentAppMode $CurrentAppMode
+                    $deeperMenus = Get-RequiredMenusRecursive -MenuName $item.menuName -MenuConfig $MenuConfig -CurrentAppMode $CurrentAppMode
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Found $($deeperMenus.Count) deeper nested menus from: $($item.menuName)" -LogLevel "Debug"
                     Write-Verbose "[$functionName] Found $($deeperMenus.Count) deeper nested menus for submenu: $($item.menuName)"
                     $addedDeeperMenus = 0
