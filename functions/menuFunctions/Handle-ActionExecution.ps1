@@ -9,7 +9,7 @@ function Handle-ActionExecution()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Executing action: $($SelectedItem.Name)"
+    Write-Verbose "[$functionName] Executing action: $($SelectedItem.Name): $($SelectedItem.Action)"
     
     # Execute the action
     $result = & $SelectedItem.Action

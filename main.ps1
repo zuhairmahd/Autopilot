@@ -3,6 +3,7 @@ param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.psd1",
     [string]$stringsFile = "$pwd\strings.psd1",
+    [string]$menuFile = "$pwd\menu.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -28,7 +29,7 @@ param(
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
     [ValidateSet('github', 'gitlab')]
-    [string]$Repo,  
+    [string]$Repo,
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
@@ -110,7 +111,7 @@ function Find-FolderPath()
             $parent = Split-Path -Path $currentPath -Parent
             if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
             {
-                break 
+                break
             } # Reached root
             Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
             $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
@@ -179,15 +180,15 @@ if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "Ex
         Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
         $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
     }
-    else 
+    else
     {
         Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
     }
 }
-else 
+else
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
-    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"        
+    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
 $appMetaData = Get-ApplicationMetaDataFromDomain
@@ -201,7 +202,7 @@ if (-not $version.version)
         $version = $appMetaData.version
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
     }
-    else 
+    else
     {
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
         $version = @{
@@ -227,7 +228,7 @@ if ($ShowVersion)
     Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
     Write-Log -LogFile $LogFile -finishLogging
-    exit 0  
+    exit 0
 }
 $oldExecutableFileName = 'main.exe.old'
 if (Test-Path $oldExecutableFileName)
@@ -239,7 +240,7 @@ if (Test-Path $oldExecutableFileName)
 }
 #endregion Initialize script
 
-#region Load parameters from the configuration file if it exists
+#region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
 # Check if the .secrets directory exists, create it if it doesn't
 $secretsDir = Split-Path $configFile -Parent
@@ -438,22 +439,20 @@ else
         exit 1
     }
 }
-# Initialize application configuration using centralized helper functions
-Write-Verbose "[$scriptName] Initializing application configuration"
+#endregion Process login
 
+#region Initialize application configuration
+Write-Verbose "[$scriptName] Initializing application configuration"
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
-    $domain 
+    $domain
 }
 else
 {
-    "contoso.com" 
+    "contoso.com"
 }
-
-# Initialize configuration with helper function
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
-
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -463,7 +462,7 @@ if (-not $configResult.Success)
 
 # Extract configuration results
 $auth = $configResult.Auth
-$globalSettings = $configResult.GlobalSettings  
+$globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 
@@ -474,16 +473,15 @@ $script:Auth = $auth
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
-Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
 Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-#endregion Load parameters from the configuration file if it exists
+#endregion  Initialize application configuration
 
 #region Define variables
 #define repo parameters
@@ -578,8 +576,8 @@ $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
 Write-Verbose "[$scriptName] Loaded $($returnValues.Count) return values, $($deviceStates.Count) device states, and $($deviceActions.Count) device actions"
 # Initialize navigation context variables
-$Global:History = [System.Collections.ArrayList]::new() 
-$Global:MenuHistory = [System.Collections.ArrayList]::new() 
+$Global:History = [System.Collections.ArrayList]::new()
+$Global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:previousMenu = New-Object System.Collections.Hashtable
 # Device enrollment state cache content
 $script:DeviceEnrollmentCache = @{}
@@ -622,7 +620,7 @@ Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($ver
 Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
 if ($settings.showLicenseBanner)
 {
-    Write-Host "==========================================================`n" -ForegroundColor White     
+    Write-Host "==========================================================`n" -ForegroundColor White
     Write-Host "This script is licensed under the MIT License." -ForegroundColor White
     Write-Host "For more information and to read the license terms, visit: https://opensource.org/licenses/MIT" -ForegroundColor White
     Write-Host "" -ForegroundColor White
@@ -707,7 +705,7 @@ if ($ResetAuth)
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"  
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
 Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
 $accessToken = GetGraphAccessToken @getTokenParams
@@ -804,16 +802,16 @@ if ($accessToken)
     }
     if ($auth.ForceNewToken -or $auth.ForceNewRefreshToken -or $auth.NoSaveRefreshToken)
     {
-        Write-Host "Forced new token retrieval due to parameters." -ForegroundColor Cyan 
+        Write-Host "Forced new token retrieval due to parameters." -ForegroundColor Cyan
         Write-Host "The script will now exit."
-        Write-Host "You can run the script again without these parameters to use the new token." 
-        exit 0    
+        Write-Host "You can run the script again without these parameters to use the new token."
+        exit 0
     }
 }
 else
 {
     Write-Host "Failed to retrieve access token." -ForegroundColor Red
-    Write-Host "Please check your authentication parameters and try again." 
+    Write-Host "Please check your authentication parameters and try again."
     Write-Host "Would you like to re-enter your authentication information?"
     Write-Host "note that this will reset your password and require you to re-enter your application authentication information."
     $retry = Read-Host "Enter 'yes' to re-enter authentication, or 'no' to exit"
@@ -822,7 +820,7 @@ else
         Write-Host "Invalid choice. Please enter 'yes' or 'no'."
         [console]::beep()
         $retry = Read-Host "Enter 'yes' to re-enter authentication, or 'no' to exit"
-    }   
+    }
     if ($retry -eq 'yes')
     {
         # Reset the authentication information
@@ -847,10 +845,8 @@ else
 }
 #endregion initialization block with access token
 
-#region Menu Definitions
-# Load menu configuration for filtering
-$script:menus = @()
-$menuConfig = Get-CachedMenuConfiguration
+#region Create menus
+$menuConfig = Import-PowerShellDataFile -Path $menuFile -ErrorAction SilentlyContinue
 if ($menuConfig)
 {
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
@@ -865,70 +861,14 @@ if ($menuConfig)
     }
     Write-Verbose "Loaded $($script:menus.Count) menu items for filtering"
 }
-
-# Load menus from configuration where possible, fallback to manual creation
-# Use selective loading to only load menus needed for current app mode
-$requiredMenus = GetRequiredMenusForAppMode -CurrentAppMode $settings.appMode
-Write-Verbose "Loading required menus for app mode '$($settings.appMode)': [$($requiredMenus -join ', ')]"
-
-# Always load main menu
 $mainMenu = NewMenu -MenuName "mainMenu"
-
-# Conditionally load other menus based on app mode requirements
-# Create empty menus for those not needed to prevent script errors
-$CheckMenu = if ($requiredMenus -contains "checkMenu")
-{ 
-    NewMenu -MenuName "checkMenu" 
-}
-else
-{ 
-    NewMenu -Title "Check Menu" -Description "Device troubleshooting options"
-}
-
-$serialNumberMenu = if ($requiredMenus -contains "serialNumberMenu")
-{ 
-    NewMenu -MenuName "serialNumberMenu" 
-}
-else
-{ 
-    NewMenu -Title "Serial Number Menu" -Description "Serial number operations"
-}
-
-$exportMenu = if ($requiredMenus -contains "exportMenu")
-{ 
-    NewMenu -MenuName "exportMenu" 
-}
-else
-{ 
-    NewMenu -Title "Export Menu" -Description "Export options"
-}
-
-$settingsMenu = if ($requiredMenus -contains "settingsMenu")
-{ 
-    NewMenu -MenuName "settingsMenu" 
-}
-else
-{ 
-    NewMenu -Title "Settings Menu" -Description "Application settings"
-}
-
-$autopilotMenu = if ($requiredMenus -contains "autopilotMenu")
-{ 
-    NewMenu -MenuName "autopilotMenu" 
-}
-else
-{ 
-    NewMenu -Title "Autopilot Menu" -Description "Autopilot operations"
-}
-
-$environmentMenu = if ($requiredMenus -contains "environmentMenu")
-{ 
-    NewMenu -MenuName "environmentMenu" 
-}
-else
-{ 
-    NewMenu -Title "Environment Menu" -Description "Environment settings"
-}
+$CheckMenu = NewMenu -MenuName "checkMenu"
+$serialNumberMenu = NewMenu -MenuName "serialNumberMenu"
+$exportMenu = NewMenu -MenuName "exportMenu"
+$settingsMenu = NewMenu -MenuName "settingsMenu"
+$autopilotMenu = NewMenu -MenuName "autopilotMenu"
+$environmentMenu = NewMenu -MenuName "environmentMenu"
+#endregion Create menus
 
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
@@ -1050,6 +990,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
         return $returnValues.backoutText
     }
+}
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number" -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
@@ -1073,7 +1014,7 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
             {
                 Write-Verbose "[$scriptName] Action called via $context"
                 Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
-                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check' 
+                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check'
                 Write-Verbose "[$scriptName] Result returned: $result"
             }
         }
@@ -1097,9 +1038,10 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
         Read-Host "Press Enter to continue"
     }
+}
 #endregion serial number menu
 
-#region Autopilot menu   
+#region Autopilot menu
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1316,7 +1258,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
     Write-Host $returnValues.$updateResult
 }
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
-}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
     Write-Host 'Deleting the device from Autopilot...'
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
@@ -1340,91 +1281,12 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
-}
-
 #endregion Autopilot menu
 
-#region Settings menu
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environment settings" -Action {
-    Write-Host "Displaying global settings..." -ForegroundColor Cyan
-    $success = Show-SettingsViewer -SettingsType "Global" -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nGlobal settings displayed successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to display global environment settings. Please check the logs for details." -ForegroundColor Red
-    }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
-    Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
-
-    # Get the current domain from settings (same logic as domain settings editor)
-    $currentDomain = $domain
-    # If no current domain, try to get it from domains section or prompt user
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        try
-        {
-            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
-            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
-            {
-                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
-                if ($availableDomains.Count -eq 1)
-                {
-                    $currentDomain = $availableDomains[0]
-                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
-                }
-                else
-                {
-                    Write-Host "Available domains:" -ForegroundColor White
-                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
-                    {
-                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
-                    }
-                    
-                    do
-                    {
-                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
-                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
-                        {
-                            $currentDomain = $availableDomains[[int]$choice - 1]
-                            break
-                        }
-                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
-                    } while ($true)
-                }
-            }
-            else
-            {
-                $currentDomain = Read-Host "Enter domain name to view"
-            }
-        }
-        catch
-        {
-            $currentDomain = Read-Host "Enter domain name to view"
-        }
-    }
-    
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
-        return $returnValues.backoutText
-    }
-    
-    $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
-    }
+#region Environment menu
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
-    
     $success = Show-GroupsViewer -SettingsFile $InitFile
     if ($success)
     {
@@ -1434,6 +1296,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusio
     {
         Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
     }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
     Write-Host "Launching global settings editor..." -ForegroundColor Cyan
     $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
@@ -1445,62 +1308,16 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global envir
     {
         Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
     }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
     Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
-    
     # Get the current domain from settings
     $currentDomain = $domain
-    # If no current domain, try to get it from domains section or prompt user
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        try
-        {
-            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
-            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
-            {
-                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
-                if ($availableDomains.Count -eq 1)
-                {
-                    $currentDomain = $availableDomains[0]
-                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
-                }
-                else
-                {
-                    Write-Host "Available domains:" -ForegroundColor White
-                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
-                    {
-                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
-                    }
-                    
-                    do
-                    {
-                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
-                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
-                        {
-                            $currentDomain = $availableDomains[[int]$choice - 1]
-                            break
-                        }
-                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
-                    } while ($true)
-                }
-            }
-            else
-            {
-                $currentDomain = Read-Host "Enter domain name to configure"
-            }
-        }
-        catch
-        {
-            $currentDomain = Read-Host "Enter domain name to configure"
-        }
-    }
-    
     if ([string]::IsNullOrWhiteSpace($currentDomain))
     {
         Write-Host "No domain specified. Cannot edit domain-specific settings." -ForegroundColor Red
         return $returnValues.backoutText
     }
-    
     $success = Show-SettingsEditor -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
     if ($success)
     {
@@ -1510,10 +1327,10 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain speci
     {
         Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
     }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
     Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
     Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
-    
     $success = Show-SettingsEditor -SettingsType "Auth" -SettingsFile $InitFile
     if ($success)
     {
@@ -1523,12 +1340,11 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     {
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
+}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
-
     $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain -accessToken $accessToken
-    #region Handle navigation responses from GetDeviceByUser
     if ($result -eq "Back" -or $result -eq "back")
     {
         Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
@@ -1543,11 +1359,15 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     {
         Write-Verbose "[$scriptName] User requested application exit from device selection."
         return "EXIT_APPLICATION"
-    }        
-    else 
+    }
+    else
     {
         return $result
     }
+}
+#endregion Environment menu
+
+#region Settings menu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
@@ -1555,7 +1375,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials"
     while ($choice -notin @('yes', 'no'))
     {
         Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-        #beep
         [console]::beep(1000, 500)
         $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
     }
@@ -1568,13 +1387,12 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials"
     {
         Write-Host "The authentication information has been changed." -ForegroundColor Green
     }
-    else 
+    else
     {
         Write-Host "Failed to change the authentication information." -ForegroundColor Red
         Write-Host "Please check the logs for more information." -ForegroundColor Red
     }
 }
-# Auto Update settings action - matches menu.psd1 item "Change Auto Update settings"
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settings" -Action {
     Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
@@ -1592,7 +1410,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
     while ($choice -notin @('yes', 'no', 'y', 'n'))
     {
         Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        #beep
         [console]::beep(1000, 500)
         $choice = Read-Host "$messageString (yes/no)"
     }
@@ -1602,7 +1419,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         return $returnValues.backoutText
     }
     $settings.autoUpdate = -not $settings.autoUpdate
-    # Save the updated settings back to the configuration file
     if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
     {
         Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
@@ -1621,38 +1437,27 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settin
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
     }
 }
-# App Mode settings action - matches menu.psd1 item "Change App Mode settings"  
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings" -Action {
     Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
-    
-    # Use the refactored function for consistent app mode selection
     $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -Context "settings"
-    
-    # Handle cancellation
     if ($result.cancelled)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
         Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
         return $returnValues.backoutText
     }
-    
-    # Handle unchanged selection
     if ($result.currentModeUnchanged)
     {
         Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
         return $returnValues.backoutText
     }
-    
     $newAppMode = $result.appMode
-    
-    # Confirm the change
     Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
     Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
     Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
     Write-Host ""
-    
     $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
     while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
     {
@@ -1660,41 +1465,36 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         [console]::beep(1000, 500)
         $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
     }
-    
     if ($confirmChoice -in @('no', 'n'))
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
         Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
         return $returnValues.backoutText
     }
-    
-    # Save the updated app mode setting
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
-    
     if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
     {
         Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
-        
-        # Clean up temporary files
         $filesCleaned = cleanupTempFiles
         if ($filesCleaned.AllRemoved)
         {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
         }
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-        
         Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
         Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
         Write-Host ""
         Write-Log -logFile $logFile -finishLogging
-        exit  0
+        exit 0
     }
     else
     {
         Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
+}
+
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
@@ -1791,8 +1591,8 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         Write-Verbose "[$scriptName] Result: $result"
         Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        $serialNumber = $result        
-    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))    
+        $serialNumber = $result
+    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
 
     #region Handle navigation responses from GetDeviceByUser
     if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
@@ -1809,16 +1609,13 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     {
         Write-Verbose "[$scriptName] User requested application exit from device selection."
         return "EXIT_APPLICATION"
-    }        
-    else 
+    }
+    else
     {
         return $result
     }
 }
 
-# Load menu configuration to get includeInDisplayModes for items
-$menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
-# Add menu items - filtering is handled by ShowMenu function
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1826,12 +1623,11 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     {
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
         return $returnValues.backoutText # Return to the previous menu
-    } 
+    }
     else # Continue only if a username was entered
     {
         $hasCorrectGroups = $false
         $hasCorrectNumberOfDevices = $false
-        
         #region Check if the user exists first.
         $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
@@ -1904,6 +1700,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             return $returnValues.noUserFoundInDirectoryMessage
         }
         #endregion Check if the user exists first.
+        
         Write-Host "Checking group membership for user $userName."
         $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
         if ($groups.success -eq $true)
@@ -1912,9 +1709,9 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
             $hasCorrectGroups = $true
         }
-        elseif ($selectedItem.Submenu)
+        else
         {
-            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group membershipss and $($groups.ForbiddenGroups.Count) forbidden group membershipss."
+            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group memberships and $($groups.ForbiddenGroups.Count) forbidden group memberships."
             Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
             Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
             if ($groups.missingGroups.Count -gt 0)
@@ -1936,7 +1733,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
         }
         Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
-        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken 
+        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken
         if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
         {
             Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
@@ -1946,7 +1743,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         {
             Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
             Write-Host "No additional devices can be assigned to this user."
-        }        
+        }
         if ($hasCorrectGroups -and $hasCorrectNumberOfDevices)
         {
             Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
@@ -1977,17 +1774,9 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
     }
 }
-}
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
-}
-
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-}
-
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-}
-
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
@@ -2016,8 +1805,6 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         }
     }
 }
-}
-
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
@@ -2026,8 +1813,6 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
-}
-
 $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
@@ -2037,7 +1822,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     }
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
-    #region Check if the group exists 
+    #region Check if the group exists
     $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
     Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
     if ($groupInfo.GetType().Name -eq 'String')
@@ -2114,9 +1899,10 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $returnValues.noGroupFoundMessage
     }
     #endregion Check if the group exists
+    
     # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup 
+    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
     #region Handle navigation responses from GetDeviceByUser
     if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
     {
@@ -2132,55 +1918,18 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     {
         Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
         return "EXIT_APPLICATION"
-    }        
-    else 
+    }
+    else
     {
         return $result
     }
 }
-}
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-}
-
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    $uri = "applications(appId='$appId')"
-    $extraParameters = "select=displayName"
-    $registeredAppName = (CallGraphApi -ResourcePath $uri -accessToken $accessToken -extraParameters $extraParameters).displayName
-    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
-    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
-    if ($updateAvailable.success -eq $true)
-    {
-        Write-Host "Last updated on $($updateAvailable.ReleaseDate)" 
-        Write-Host "File checksum: $($updateAvailable.Hash)"
-        if ($version.hash -eq $updateAvailable.hash)
-        {
-            Write-Host "Checksums match: You are running a genuine copy of the script." -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host "Checksums do not match: The script may have been tampered with. We recommend you stop using the script immediately." -ForegroundColor Yellow
-        }
-        if ($updateAvailable.version -gt $version.version)
-        {
-            Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
-            Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
-            Write-Host "Go to 'Check For Script Updates' to download the latest version." -ForegroundColor Yellow
-        }
-    }
-    Write-Host "==========================================================`n"    
-    Write-Host "Domain: $domain"
-    Write-Host "Application name from config: $name"
-    Write-Host "Registered application name: $registeredAppName"
-    Write-Host "Application id: $appId"
-    Write-Host "Tenant id: $tenantId"
-    Write-Host "Delegated authentication: $($auth.delegated)."
-    Write-Host "Authentication type: $($auth.AuthType)"
-    Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
+    Show-AboutApplication -accessToken $accessToken
 }
-#endregion Menu definitions
 
-#region Show Menu
+#region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try
 {
@@ -2199,20 +1948,15 @@ catch
 # Only show menu if not in test mode
 if ($settings.testMode -eq $false)
 {
-    Write-Verbose "Test mode: $($settings.testMode)" 
+    Write-Verbose "Test mode: $($settings.testMode)"
     if ($null -ne $mainMenu)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
         $result = ShowMenu -Menu $mainMenu
-    }
-    else
-    {
-        Write-Host "Main menu is not defined. Please check the script configuration." -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Main menu is not defined. Please check the script configuration." -LogLevel "Error"
-    }
-    if ($null -eq $result)
-    {
-        Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+        if ($null -eq $result)
+        {
+            Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
+        }
     }
 }
 else
@@ -2220,28 +1964,13 @@ else
     Write-Host "Test mode: $($settings.testMode). No menu will be shown." -ForegroundColor Yellow
     Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
-#endregion Show Menu
+#endregion show menus
 
 #region Cleanup
 # Clear sensitive data from memory before exiting
 Clear-SecureMemory -ClearScriptVariables
 
-# Cleanup temporary files 
-$filesCleaned = cleanupTempFiles
-if ($filesCleaned.AllRemoved)
-{
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
-}
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-
-# Finish logging
-Write-Log -LogFile $LogFile -FinishLogging
-#endregion Cleanup
-# Clear sensitive data from memory before exiting
-Clear-SecureMemory -ClearScriptVariables
-
-# Cleanup temporary files 
+# Cleanup temporary files
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
