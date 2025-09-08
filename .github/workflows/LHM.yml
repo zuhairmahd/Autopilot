@@ -72,10 +72,10 @@ jobs:
           Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
           Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Ensure bin directory exists
+      - name: Ensure lhm directory exists
         shell: pwsh
         run: |
-          if (-not (Test-Path -Path .\lhm)) { New-Item -Path .\bin -ItemType Directory }
+          if (-not (Test-Path -Path .\lhm)) { New-Item -Path .\lhm -ItemType Directory }
 
       - name: Build executable
         shell: pwsh
