@@ -162,17 +162,8 @@ function ShowMenu()
     {
         # If this menu was prefiltered at build time, skip additional include checks
         $includeItem = $false
-        if ($Menu.ContainsKey('PreFiltered') -and $Menu.PreFiltered)
-        {
-            $includeItem = $true
-            Write-Verbose "[$functionName] Menu marked PreFiltered; including item '$($item.Name)' without additional checks"
-        }
-        else
-        {
-            # Pass the menus configuration if available, otherwise null (which will allow all items)
-            $menusToPass = if ($script:menus) { $script:menus } else { $null }
-            $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
-        }
+        # Pass the menus configuration if available, otherwise null (which will allow all items)
+        $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
         if ($includeItem)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"
@@ -208,7 +199,7 @@ function ShowMenu()
     if ($null -ne $settings.appMode -and $settings.appMode -ne "full" -and $settings.appMode -ne '')
     {
         Write-Verbose "[$functionName] App mode is not 'full', adding app mode to banner"
-        write-log -LogFile $LogFile -Module $functionName -Message "App mode is not 'full', adding app mode to banner" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "App mode is not 'full', adding app mode to banner" -LogLevel "Information"
         $banner = "(App Mode: $($settings.appMode))`n$banner"
     }
     #endregion

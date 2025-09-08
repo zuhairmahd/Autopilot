@@ -75,14 +75,14 @@ function Get-ApplicationDefaults()
         Write-Verbose "[$functionName] Returning cached defaults for: $cacheKey"
         return $script:defaultsCache[$cacheKey]
     }
-    
+    Write-Verbose "[$functionName] Cache miss for defaults: $cacheKey"
     Write-Verbose "[$functionName] Getting default values for type: $DefaultType (cache miss: $cacheKey)"
     
     # Define all default structures
-    $defaults = @{
+    $defaults = [ordered]@{
         
         # Authentication defaults - single source of truth
-        Auth           = @{
+        Auth           = [ordered]@{
             changePwOnNextStart = $false
             authType            = "PublicAuthFlow"
             noSaveRefreshToken  = $false
@@ -104,7 +104,7 @@ function Get-ApplicationDefaults()
         }
         
         # Global settings defaults - single source of truth
-        Global         = @{
+        Global         = [ordered]@{
             configFile                   = ".\.secrets\config.json"
             maxWaitTime                  = 30
             showLicenseBanner            = $true
@@ -127,7 +127,7 @@ function Get-ApplicationDefaults()
         }
         
         # Domain template defaults - single source of truth for domain structure
-        Domain         = @{
+        Domain         = [ordered]@{
             groupsToInclude                 = @()
             groupsToExclude                 = @()
             domain                          = $DomainName
@@ -290,7 +290,7 @@ function Get-ApplicationDefaults()
         )
         
         # Strings defaults - UI text and localization
-        Strings        = @{
+        Strings        = [ordered]@{
             Description   = "This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script."
             deviceActions = @{
                 none            = "No action"
@@ -343,7 +343,7 @@ function Get-ApplicationDefaults()
         }
         
         # Menu defaults - complete menu structure 
-        Menus          = @{
+        Menus          = [ordered]@{
             version              = $Version
             name                 = 'menu.psd1'
             description          = 'This file contains the definitions for the menus used in the application.'
@@ -847,7 +847,7 @@ function Get-ApplicationDefaults()
     }
     
     # Complete settings structure combining all components
-    $defaults.Settings = @{
+    $defaults.Settings = [ordered]@{
         description    = "This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly."
         version        = $Version
         auth           = $defaults.Auth
@@ -856,7 +856,7 @@ function Get-ApplicationDefaults()
     }
     
     # Overwrite configurations - centralized force-overwrite settings
-    $defaults.Overwrite = @{
+    $defaults.Overwrite = [ordered]@{
         # Global settings that should be forcibly overwritten
         # These settings will only be applied during global settings processing
         GlobalSettings    = @{

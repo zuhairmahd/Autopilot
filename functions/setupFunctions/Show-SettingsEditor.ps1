@@ -201,8 +201,18 @@ function Show-SettingsEditor()
             return $false
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Settings template loaded successfully. Found $($settingsTemplate.PSObject.Properties.Count) settings to process"
+        # Get count of settings in template - handle both hashtables and PSCustomObjects
+        $settingsCount = if ($settingsTemplate -is [hashtable])
+        {
+            $settingsTemplate.Keys.Count
+        }
+        else
+        {
+            $settingsTemplate.PSObject.Properties.Count
+        }
+        
+        Write-Log -LogFile $logFile -Module $functionName -Message "Settings template loaded successfully. Found $settingsCount settings to process" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Settings template loaded successfully. Found $settingsCount settings to process"
         
         Write-Host ""
         $updatedSettings = @{}

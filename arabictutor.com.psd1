@@ -1,41 +1,45 @@
 ﻿@{
+    desiredAutopilotProfiles = @()
     privateSession = $false
     groupsToExclude = @{}
-    desiredAutopilotProfiles = @()
+    companyName = 'ZM Consulting'
     maxUserMatchDisplay = 20
     appMode = 'full'
-    userPatternsToExclude = @(
-        '-test',
-        'onmicrosoft.com'
-    )
     minimumDevicePhysicalMemoryInGB = 8
+    maxNumberOfDevicesAllowed = 15
     maxGroupMatchDisplay = 20
+    maxWaitTime = '30'
     autoUpdate = $true
     preferredBrowser = 'Chrome'
+    maxSerialNumberLength = 50
     minUsernameLength = 3
     version = '1.0.0'
     operatingSystem = 'Windows'
     minSerialNumberLength = 7
     maxUserNameLength = 50
     validateScopes = $false
-    showLicenseBanner = $false
-    timeInSeconds = '60'
     groupsToInclude = @(
         @{
             id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
             name = 'Cloud Managed PC User 3.26.2023_18:43:44'
+        },
+        @{
+            id = '57d1aba1-180a-4856-b497-bc6d5014f06f'
+            name = 'AutoPilot'
         }
     )
     groupTag = 'ENTRA'
     repo = 'Github'
     groupPatternsToExclude = @()
-    companyName = 'ZM Consulting'
     release = 'master'
     deviceContactThresholdInDays = 30
     additionalScopes = @{}
-    maxNumberOfDevicesAllowed = 15
-    maxSerialNumberLength = 50
-    maxWaitTime = '30'
+    userPatternsToExclude = @(
+        '-test',
+        'onmicrosoft.com'
+    )
+    timeInSeconds = '60'
+    showLicenseBanner = $false
     domain = 'arabictutor.com'
     deviceNamePrefix = 'vmware'
 }

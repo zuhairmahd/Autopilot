@@ -107,10 +107,14 @@ function Get-FlattenedSettingsForProcessing()
     
     $flattenedSettings = @()
     
-    if ($SettingsTemplate -is [hashtable])
+    if ($SettingsTemplate -is [hashtable] -or $SettingsTemplate -is [System.Collections.Specialized.OrderedDictionary])
     {
-        # Handle hashtable (auth settings and PSD1 native format)
-        foreach ($key in $SettingsTemplate.Keys)
+        # Handle hashtable and OrderedDictionary (auth settings and PSD1 native format)
+        # Filter out system properties that aren't actual settings
+        $systemProperties = @('Count', 'Keys', 'Values', 'IsReadOnly', 'IsFixedSize', 'SyncRoot', 'IsSynchronized')
+        $settingsKeys = $SettingsTemplate.Keys | Where-Object { $_ -notin $systemProperties }
+        
+        foreach ($key in $settingsKeys)
         {
             # Skip excluded settings
             if ($ExcludeSettings -contains $key)
