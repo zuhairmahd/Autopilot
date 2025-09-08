@@ -1050,7 +1050,6 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
         return $returnValues.backoutText
     }
-}
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number" -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
@@ -1098,7 +1097,6 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
         Read-Host "Press Enter to continue"
     }
-}
 #endregion serial number menu
 
 #region Autopilot menu   
@@ -1318,6 +1316,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
     Write-Host $returnValues.$updateResult
 }
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
+}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
     Write-Host 'Deleting the device from Autopilot...'
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
@@ -1341,6 +1340,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Auto
         Write-Verbose "[$scriptName] Device deletion result: $result"
     }
 }
+}
 
 #endregion Autopilot menu
 
@@ -1356,7 +1356,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environ
     {
         Write-Host "`nFailed to display global environment settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
     Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
 
@@ -1422,7 +1421,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specifi
     {
         Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -1436,7 +1434,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusio
     {
         Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
     Write-Host "Launching global settings editor..." -ForegroundColor Cyan
     $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
@@ -1448,7 +1445,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global envir
     {
         Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
     Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
     
@@ -1514,7 +1510,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain speci
     {
         Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
     Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
     Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
@@ -1528,7 +1523,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     {
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -1554,7 +1548,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     {
         return $result
     }
-}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
@@ -1702,7 +1695,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
-}
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
@@ -1823,6 +1815,10 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
+
+# Load menu configuration to get includeInDisplayModes for items
+$menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
+# Add menu items - filtering is handled by ShowMenu function
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1981,9 +1977,17 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
     }
 }
+}
+
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
+}
+
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+}
+
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+}
+
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
@@ -2012,6 +2016,8 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         }
     }
 }
+}
+
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
@@ -2020,6 +2026,8 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
+}
+
 $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
@@ -2130,7 +2138,11 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $result
     }
 }
+}
+
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+}
+
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $uri = "applications(appId='$appId')"
     $extraParameters = "select=displayName"

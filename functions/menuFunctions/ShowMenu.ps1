@@ -171,7 +171,7 @@ function ShowMenu()
         {
             # Pass the menus configuration if available, otherwise null (which will allow all items)
             $menusToPass = if ($script:menus) { $script:menus } else { $null }
-            $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass
+            $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
         }
         if ($includeItem)
         {

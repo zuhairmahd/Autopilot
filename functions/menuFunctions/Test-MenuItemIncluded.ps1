@@ -5,7 +5,9 @@ function Test-MenuItemIncluded()
         [Parameter(Mandatory = $true)]
         [string]$MenuItemName,
         [Parameter(Mandatory = $false)]
-        [PSCustomObject[]]$Menus
+        [PSCustomObject[]]$Menus,
+        [Parameter(Mandatory = $false)]
+        [hashtable]$CurrentMenu
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -13,10 +15,57 @@ function Test-MenuItemIncluded()
     Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
 Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with app mode: $($settings.appMode)" -LogLevel "Verbose"
 
-    # If $Menus parameter is null, always assume the menu needs to be displayed
+    # If $Menus parameter is null, check if we can load menu configuration from file
     if ($null -eq $Menus)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Menus parameter is null, allowing menu item '$MenuItemName'" -LogLevel "Debug"
+        Write-Verbose "[$functionName] Menus parameter is null, attempting to load from menu.psd1"
+        try {
+            $menuConfig = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
+            if ($menuConfig) {
+                Write-Verbose "[$functionName] Successfully loaded menu configuration from file"
+                
+                # Try to determine which menu we're working with
+                $menuType = $null
+                if ($CurrentMenu -and $CurrentMenu.Title) {
+                    $menuTitle = $CurrentMenu.Title
+                    Write-Verbose "[$functionName] Current menu title: '$menuTitle'"
+                    
+                    # Map menu titles to menu configuration keys
+                    foreach ($configKey in $menuConfig.Keys) {
+                        $config = $menuConfig[$configKey]
+                        if ($config.Title -and $config.Title -like "*$menuTitle*") {
+                            $menuType = $configKey
+                            Write-Verbose "[$functionName] Matched menu type: '$menuType'"
+                            break
+                        }
+                    }
+                    
+                    # Additional pattern matching for common menu types
+                    if (-not $menuType) {
+                        if ($menuTitle -like "*Autopilot*") {
+                            $menuType = "autopilotMenu"
+                        } elseif ($menuTitle -like "*Device Actions*" -or $menuTitle -like "*Select an action*") {
+                            $menuType = "deviceActionsMenu"
+                        } elseif ($menuTitle -like "*Options for Device*" -or $menuTitle -like "*Choose what you would like to do*") {
+                            $menuType = "deviceWaitMenu"
+                        } else {
+                            $menuType = "mainMenu"
+                        }
+                        Write-Verbose "[$functionName] Using pattern-matched menu type: '$menuType'"
+                    }
+                }
+                
+                if ($menuType -and $menuConfig[$menuType]) {
+                    Write-Verbose "[$functionName] Using menu configuration for type: '$menuType'"
+                    return Test-MenuItemIncluded -MenuItemName $MenuItemName -Menus @($menuConfig[$menuType]) -CurrentMenu $CurrentMenu
+                }
+            }
+        }
+        catch {
+            Write-Verbose "[$functionName] Failed to load menu configuration: $_"
+        }
+        
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Could not load menu configuration, allowing menu item '$MenuItemName'" -LogLevel "Debug"
         return $true
     }
     
