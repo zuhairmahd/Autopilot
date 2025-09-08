@@ -844,7 +844,6 @@ else
         Write-Host "Exiting script due to authentication failure." -ForegroundColor Red
         exit 1
     }
-}
 #endregion initialization block with access token
 
 #region Menu Definitions
@@ -941,7 +940,6 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Ac
     {
         Write-Host "Failed to export Autopilot devices." -ForegroundColor Red
     }
-}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
     if ($exported)
@@ -952,7 +950,6 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Dev
     {
         Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
     }
-}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
     if ($exported)
@@ -963,7 +960,6 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Device
     {
         Write-Host "Failed to export Managed devices." -ForegroundColor Red
     }
-}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
     if ($exported)
@@ -974,7 +970,6 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devi
     {
         Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
     }
-}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
@@ -986,7 +981,6 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report"
     {
         Write-Host "Failed to export device storage report." -ForegroundColor Red
     }
-}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignments" -Action {
     $exported, $appsProcessed = GetAppAssignmentTypes -AccessToken $accessToken -Export -outputPath $ScriptPath -fileMode 'Overwrite'
     if ($exported)
@@ -1006,7 +1000,6 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to export app assignment types." -LogLevel "Error"
         }
     }
-}
 #endregion export menu
 
 #region serial number menu
@@ -1050,7 +1043,6 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
         return $returnValues.backoutText
     }
-}
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number" -Action {
     Write-Verbose "[$scriptName] Getting the serial number for this device..."
     $deviceObject = GetDeviceInfo -NoHash
@@ -1098,11 +1090,9 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's
         Write-Host "Could not obtain the serial number." -ForegroundColor Red
         Read-Host "Press Enter to continue"
     }
-}
 #endregion serial number menu
 
 #region Autopilot menu   
-if (Test-ShouldIncludeMenuItem -MenuItemName "Quick Import device into Autopilot (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Quick import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1118,8 +1108,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device int
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of quick import: $result"
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Custom import device into Autopilot (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Custom import device into Autopilot."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1140,8 +1128,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         return $returnValues.backoutText
     }
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Import device into Autopilot" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot" -Action {
     Write-Verbose "[$scriptName] Import device into Autopilot (standard)."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1157,8 +1143,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Auto
     $result = PrepareImportDevice -accessToken $accessToken
     Write-Verbose "[$scriptName] Result of standard import: $result"
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1191,8 +1175,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
         Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
     }
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Deleting Corporate Device Identifier from Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1241,8 +1223,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device
         Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
     }
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -action {
     Write-Verbose "[$scriptName] Exporting Corporate Device Identifier for manual upload to Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1281,8 +1261,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device
         Write-Host 'Failed to export Corporate Device Identifier.' -ForegroundColor Red
     }
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Get device hash for manual upload to Autopilot (requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
     {
@@ -1313,8 +1291,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for man
         }
     }
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Download and install latest Windows updates(requires admin rights)" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
     Write-Verbose "[$scriptName] Download and install latest Windows updates."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1332,11 +1308,8 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install la
     $updateResult = ApplyWindowsUpdates
     Write-Host $returnValues.$updateResult
 }
-}
-if (Test-ShouldIncludeMenuItem -MenuItemName "Check device Autopilot status" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
 }
-if (Test-ShouldIncludeMenuItem -MenuItemName "Delete device from Autopilot" -MenuName "autopilotMenu") {
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
     Write-Host 'Deleting the device from Autopilot...'
     $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
@@ -1376,7 +1349,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environ
     {
         Write-Host "`nFailed to display global environment settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
     Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
 
@@ -1442,7 +1414,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specifi
     {
         Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
     Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -1456,7 +1427,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusio
     {
         Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
     Write-Host "Launching global settings editor..." -ForegroundColor Cyan
     $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
@@ -1468,7 +1438,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global envir
     {
         Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
     Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
     
@@ -1534,7 +1503,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain speci
     {
         Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
     Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
     Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
@@ -1548,7 +1516,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
     {
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
-}
 $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -1574,7 +1541,6 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     {
         return $result
     }
-}
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
@@ -1722,7 +1688,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
-}
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
@@ -1848,72 +1813,9 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 # Load menu configuration to get includeInDisplayModes for items
 $menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
 
-function Test-ShouldIncludeMenuItem {
-    param(
-        [string]$MenuItemName,
-        [string]$MenuName = "mainMenu",
-        [string]$CurrentAppMode = $settings.appMode
-    )
-    
-    # If no app mode set or is full, include all items
-    if (-not $CurrentAppMode -or $CurrentAppMode -eq "full") {
-        return $true
-    }
-    
-    # If no menu config available, include all items (fallback)
-    if (-not $menuConfigForFiltering) {
-        return $true
-    }
-    
-    # Get the specific menu configuration
-    $menuConfig = $null
-    if ($menuConfigForFiltering.$MenuName) {
-        $menuConfig = $menuConfigForFiltering.$MenuName
-    } else {
-        # Fallback: try to find menu by name in all configurations
-        foreach ($configKey in $menuConfigForFiltering.Keys) {
-            if ($menuConfigForFiltering[$configKey].Title -match $MenuName -or $configKey -eq $MenuName) {
-                $menuConfig = $menuConfigForFiltering[$configKey]
-                break
-            }
-        }
-    }
-    
-    if (-not $menuConfig -or -not $menuConfig.items) {
-        return $true
-    }
-    
-    # Find the menu item in configuration
-    $configItem = $menuConfig.items | Where-Object { $_.name -eq $MenuItemName }
-    if (-not $configItem) {
-        # Item not found in config, include by default (fallback)
-        return $true
-    }
-    
-    # If no includeInDisplayModes specified, include by default
-    if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0) {
-        return $true
-    }
-    
-    # Get app mode hierarchy and check if current mode is allowed
-    try {
-        $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
-        foreach ($allowedMode in $configItem.includeInDisplayModes) {
-            if ($hierarchyAllowed -contains $allowedMode) {
-                return $true
-            }
-        }
-        return $false
-    }
-    catch {
-        # If hierarchy check fails, include by default (fallback)
-        return $true
-    }
-}
 #endregion Helper function for menu item filtering
 
-# Add menu items conditionally based on app mode
-if (Test-ShouldIncludeMenuItem -MenuItemName "Give a device to a user") {
+# Add menu items - filtering is handled by ShowMenu function
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -2074,19 +1976,15 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
 }
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Check device status") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Autopilot menu") {
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Change application settings") {
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Check for script updates") {
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
@@ -2117,7 +2015,6 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
 }
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Restart the device") {
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
@@ -2128,7 +2025,6 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
 }
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Show Group Assignments") {
 $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
@@ -2241,11 +2137,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
 }
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "Export Menu") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 }
 
-if (Test-ShouldIncludeMenuItem -MenuItemName "About") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $uri = "applications(appId='$appId')"
     $extraParameters = "select=displayName"
@@ -2280,7 +2174,6 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     Write-Host "Delegated authentication: $($auth.delegated)."
     Write-Host "Authentication type: $($auth.AuthType)"
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
-}
 }
 #endregion Menu definitions
 
