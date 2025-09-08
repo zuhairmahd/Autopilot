@@ -13,27 +13,32 @@ function Test-MenuItemIncluded()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be included"
     Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with app mode: $($settings.appMode)" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with app mode: $($settings.appMode)" -LogLevel "Verbose"
 
     # If $Menus parameter is null, check if we can load menu configuration from file
     if ($null -eq $Menus)
     {
         Write-Verbose "[$functionName] Menus parameter is null, attempting to load from menu.psd1"
-        try {
+        try
+        {
             $menuConfig = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
-            if ($menuConfig) {
+            if ($menuConfig)
+            {
                 Write-Verbose "[$functionName] Successfully loaded menu configuration from file"
                 
                 # Try to determine which menu we're working with
                 $menuType = $null
-                if ($CurrentMenu -and $CurrentMenu.Title) {
+                if ($CurrentMenu -and $CurrentMenu.Title)
+                {
                     $menuTitle = $CurrentMenu.Title
                     Write-Verbose "[$functionName] Current menu title: '$menuTitle'"
                     
                     # Map menu titles to menu configuration keys
-                    foreach ($configKey in $menuConfig.Keys) {
+                    foreach ($configKey in $menuConfig.Keys)
+                    {
                         $config = $menuConfig[$configKey]
-                        if ($config.Title -and $config.Title -like "*$menuTitle*") {
+                        if ($config.Title -and $config.Title -like "*$menuTitle*")
+                        {
                             $menuType = $configKey
                             Write-Verbose "[$functionName] Matched menu type: '$menuType'"
                             break
@@ -41,27 +46,37 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item i
                     }
                     
                     # Additional pattern matching for common menu types
-                    if (-not $menuType) {
-                        if ($menuTitle -like "*Autopilot*") {
+                    if (-not $menuType)
+                    {
+                        if ($menuTitle -like "*Autopilot*")
+                        {
                             $menuType = "autopilotMenu"
-                        } elseif ($menuTitle -like "*Device Actions*" -or $menuTitle -like "*Select an action*") {
+                        }
+                        elseif ($menuTitle -like "*Device Actions*" -or $menuTitle -like "*Select an action*")
+                        {
                             $menuType = "deviceActionsMenu"
-                        } elseif ($menuTitle -like "*Options for Device*" -or $menuTitle -like "*Choose what you would like to do*") {
+                        }
+                        elseif ($menuTitle -like "*Options for Device*" -or $menuTitle -like "*Choose what you would like to do*")
+                        {
                             $menuType = "deviceWaitMenu"
-                        } else {
+                        }
+                        else
+                        {
                             $menuType = "mainMenu"
                         }
                         Write-Verbose "[$functionName] Using pattern-matched menu type: '$menuType'"
                     }
                 }
                 
-                if ($menuType -and $menuConfig[$menuType]) {
+                if ($menuType -and $menuConfig[$menuType])
+                {
                     Write-Verbose "[$functionName] Using menu configuration for type: '$menuType'"
                     return Test-MenuItemIncluded -MenuItemName $MenuItemName -Menus @($menuConfig[$menuType]) -CurrentMenu $CurrentMenu
                 }
             }
         }
-        catch {
+        catch
+        {
             Write-Verbose "[$functionName] Failed to load menu configuration: $_"
         }
         
@@ -90,30 +105,30 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item i
             [PSCustomObject[]]$MenuItems
         )
         $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $LogFile -Module $functionName -Message "Searching for menu item '$SearchName' in provided menus" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Searching for menu item '$SearchName' in provided menus" -LogLevel "Verbose"
         foreach ($menuItem in $MenuItems)
         {
             # Check if this menu item matches the search name
-Write-Log -LogFile $LogFile -Module $functionName -Message "Checking menu item: $($menuItem.name)" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Checking menu item: $($menuItem.name)" -LogLevel "Verbose"
             if ($menuItem.name -eq $SearchName)
             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$SearchName'" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$SearchName'" -LogLevel "Verbose"
                 return $menuItem
             }
             
             # If this menu item has sub-items, search recursively
             if ($menuItem.items -and $menuItem.items.Count -gt 0)
             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$($menuItem.name)' has sub-items, searching recursively" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$($menuItem.name)' has sub-items, searching recursively" -LogLevel "Verbose"
                 $found = Find-MenuItemRecursive -SearchName $SearchName -MenuItems $menuItem.items
                 if ($found)
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$SearchName' in sub-items of '$($menuItem.name)'" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$SearchName' in sub-items of '$($menuItem.name)'" -LogLevel "Verbose"
                     return $found
                 }
             }
         }
-Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$SearchName' not found in provided menus" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$SearchName' not found in provided menus" -LogLevel "Verbose"
         # If we reach here, the item was not found
         return $null
     }
@@ -124,11 +139,11 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$SearchNa
     # If the menu item is not found, return true (include it by default)
     if ($null -eq $foundMenuItem)
     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' not found in menus configuration, allowing by default" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' not found in menus configuration, allowing by default" -LogLevel "Verbose"
         return $true
     }
 
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$MenuItemName' in menus configuration" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$MenuItemName' in menus configuration" -LogLevel "Verbose"
 
     # Check if the menu item has includeInDisplayModes array
     if ($foundMenuItem.includeInDisplayModes -and $foundMenuItem.includeInDisplayModes.Count -gt 0)
@@ -144,12 +159,12 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found menu item '$Me
             }
         }
         
-Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' hierarchical includeInDisplayModes check: $appModeMatches (checking [$($foundMenuItem.includeInDisplayModes -join ', ')] against hierarchy [$($hierarchyAllowed -join ', ')])" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu item '$MenuItemName' hierarchical includeInDisplayModes check: $appModeMatches (checking [$($foundMenuItem.includeInDisplayModes -join ', ')] against hierarchy [$($hierarchyAllowed -join ', ')])" -LogLevel "Verbose"
         return $appModeMatches
     }
 
     # If no includeInDisplayModes array is found, include by default
-Write-Log -LogFile $LogFile -Module $functionName -Message "No includeInDisplayModes found for menu item '$MenuItemName', allowing by default" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "No includeInDisplayModes found for menu item '$MenuItemName', allowing by default" -LogLevel "Verbose"
     return $true
 }
 
