@@ -844,6 +844,7 @@ else
         Write-Host "Exiting script due to authentication failure." -ForegroundColor Red
         exit 1
     }
+}
 #endregion initialization block with access token
 
 #region Menu Definitions
@@ -940,6 +941,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Ac
     {
         Write-Host "Failed to export Autopilot devices." -ForegroundColor Red
     }
+}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'imported'
     if ($exported)
@@ -950,6 +952,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Imported Autopilot Dev
     {
         Write-Host "Failed to export Imported Autopilot devices." -ForegroundColor Red
     }
+}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'managed'
     if ($exported)
@@ -960,6 +963,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Managed Windows Device
     {
         Write-Host "Failed to export Managed devices." -ForegroundColor Red
     }
+}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'unmanaged'
     if ($exported)
@@ -970,6 +974,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Unmanaged Windows Devi
     {
         Write-Host "Failed to export Unmanaged devices." -ForegroundColor Red
     }
+}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report" -Action {
     $dateTime = Get-Date -Format "yyyyMMdd_HHmm"
     $storageOutputFileName = "DeviceStorageReport-$dateTime.csv"
@@ -981,6 +986,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export device storage report"
     {
         Write-Host "Failed to export device storage report." -ForegroundColor Red
     }
+}
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignments" -Action {
     $exported, $appsProcessed = GetAppAssignmentTypes -AccessToken $accessToken -Export -outputPath $ScriptPath -fileMode 'Overwrite'
     if ($exported)
@@ -1000,6 +1006,7 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to export app assignment types." -LogLevel "Error"
         }
     }
+}
 #endregion export menu
 
 #region serial number menu
