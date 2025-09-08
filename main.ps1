@@ -1823,6 +1823,59 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         return $result
     }
 }
+
+#region Helper function for menu item filtering based on app mode
+# Load menu configuration to get includeInDisplayModes for items
+$menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
+$mainMenuConfig = if ($menuConfigForFiltering -and $menuConfigForFiltering.mainMenu) { $menuConfigForFiltering.mainMenu } else { $null }
+
+function Test-ShouldIncludeMenuItem {
+    param(
+        [string]$MenuItemName,
+        [string]$CurrentAppMode = $settings.appMode
+    )
+    
+    # If no app mode set or is full, include all items
+    if (-not $CurrentAppMode -or $CurrentAppMode -eq "full") {
+        return $true
+    }
+    
+    # If no menu config available, include all items (fallback)
+    if (-not $mainMenuConfig -or -not $mainMenuConfig.items) {
+        return $true
+    }
+    
+    # Find the menu item in configuration
+    $configItem = $mainMenuConfig.items | Where-Object { $_.name -eq $MenuItemName }
+    if (-not $configItem) {
+        # Item not found in config, include by default (fallback)
+        return $true
+    }
+    
+    # If no includeInDisplayModes specified, include by default
+    if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0) {
+        return $true
+    }
+    
+    # Get app mode hierarchy and check if current mode is allowed
+    try {
+        $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
+        foreach ($allowedMode in $configItem.includeInDisplayModes) {
+            if ($hierarchyAllowed -contains $allowedMode) {
+                return $true
+            }
+        }
+        return $false
+    }
+    catch {
+        # If hierarchy check fails, include by default (fallback)
+        return $true
+    }
+}
+#endregion Helper function for menu item filtering
+
+# Add menu items conditionally based on app mode
+if (Test-ShouldIncludeMenuItem -MenuItemName "Give a device to a user") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -1981,9 +2034,21 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
     }
 }
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Check device status") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Autopilot menu") {
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Change application settings") {
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Check for script updates") {
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
@@ -2012,6 +2077,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         }
     }
 }
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Restart the device") {
 $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
@@ -2020,6 +2088,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Show Group Assignments") {
 $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
@@ -2130,7 +2201,13 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $result
     }
 }
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "Export Menu") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+}
+
+if (Test-ShouldIncludeMenuItem -MenuItemName "About") {
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     $uri = "applications(appId='$appId')"
     $extraParameters = "select=displayName"
@@ -2165,6 +2242,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
     Write-Host "Delegated authentication: $($auth.delegated)."
     Write-Host "Authentication type: $($auth.AuthType)"
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
+}
 }
 #endregion Menu definitions
 
