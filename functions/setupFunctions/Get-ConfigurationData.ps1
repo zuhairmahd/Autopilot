@@ -120,23 +120,6 @@ function Get-ConfigurationData()
                             $createdFromDefaults = $true
                         }
                     }
-                    'init' 
-                    {
-                        # For init files, create from the structure used in InitializeConfiguration
-                        $initVars = @(
-                            @{name = 'configFile'; value = ".\\.secrets\\config.json"; description = "The path to the authentication configuration file."; devdefault = ".\\.secrets\\config.json"; reldefault = ".\\.secrets\\config.json"; default = ".\\.secrets\\config.json"; type = 'string'},
-                            @{name = 'configuration'; value = "settings.psd1"; description = "The path to the configuration file."; devdefault = 'settings.psd1'; reldefault = 'settings.psd1'; default = 'settings.psd1'; type = 'string'},
-                            @{name = 'ShowAdvancedOptions'; value = @('True', 'False'); description = "Show advanced options in the GUI."; devdefault = 'True'; reldefault = 'True'; default = 'False'; type = 'array'},
-                            @{name = 'GroupTag'; value = "MSB01"; description = "The Autopilot group tag."; devdefault = "MSB01"; reldefault = "MSB01"; default = ''; type = 'string'},
-                            @{name = 'maxWaitTime'; value = '60'; description = 'How long to wait before giving up on importing a device.'; devdefault = '60'; reldefault = '60'; default = '30'; type = 'string'},
-                            @{name = 'timeInSeconds'; value = '60'; description = 'How long to wait before initiating another check.'; devdefault = '60'; reldefault = '60'; default = '30'; type = 'string'},
-                            @{name = 'Repo'; value = @('Github', 'Gitlab'); description = 'The repository provider to use.'; devdefault = 'Github'; reldefault = 'Github'; default = 'Github'; type = 'array'}, 
-                            @{name = 'Release'; value = "2.2"; description = 'The release branch to use.'; devdefault = 'main'; reldefault = '2.2'; default = 'main'; type = 'string'}
-                        )
-                        $null = Export-PowerShellDataFile -InputObject $initVars -Path $psd1Path -Force
-                        Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
-                        $createdFromDefaults = $true
-                    }
                     default 
                     {
                         Write-Verbose "[$functionName] No default template available for: $configType"
@@ -199,62 +182,6 @@ function Get-ConfigurationData()
         # Load PSD1 file
         Write-Verbose "[$functionName] Loading PSD1 file: $psd1Path"
         $rawConfig = Import-PowerShellDataFile -Path $psd1Path -ErrorAction Stop
-        
-        # Process configuration based on type
-        if ($ConfigurationType -ne 'default' -and $rawConfig -is [System.Array])
-        {
-            # Handle init.psd1 style array configuration
-            Write-Verbose "[$functionName] Processing array configuration with type: $ConfigurationType"
-            $processedConfig = @{}
-            
-            foreach ($item in $rawConfig)
-            {
-                if ($item -is [hashtable] -and $item.ContainsKey('name'))
-                {
-                    $key = $item['name']
-                    Write-Verbose "[$functionName] Processing key: $key"
-                    # Select value based on configuration type
-                    $value = switch ($ConfigurationType)
-                    {
-                        'dev'
-                        {
-                            if ($item.ContainsKey('devdefault'))
-                            {
-                                $item['devdefault'] 
-                            }
-                            else
-                            {
-                                $item['default'] 
-                            } 
-                        }
-                        'release'
-                        {
-                            if ($item.ContainsKey('reldefault'))
-                            {
-                                $item['reldefault'] 
-                            }
-                            else
-                            {
-                                $item['default'] 
-                            } 
-                        }
-                        default
-                        {
-                            $item['default'] 
-                        }
-                    }
-                    
-                    $processedConfig[$key] = $value
-                }
-            }
-            
-            $configData = $processedConfig
-        }
-        else
-        {
-            # Handle standard hashtable configuration
-            $configData = $rawConfig
-        }
         
         # Merge with defaults
         $mergedConfig = $DefaultValues.Clone()

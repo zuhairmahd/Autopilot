@@ -3,6 +3,7 @@ param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.psd1",
     [string]$stringsFile = "$pwd\strings.psd1",
+    [string]$menuFile = "$pwd\menu.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -239,7 +240,7 @@ if (Test-Path $oldExecutableFileName)
 }
 #endregion Initialize script
 
-#region Load parameters from the configuration file if it exists
+#region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
 # Check if the .secrets directory exists, create it if it doesn't
 $secretsDir = Split-Path $configFile -Parent
@@ -438,9 +439,10 @@ else
         exit 1
     }
 }
-# Initialize application configuration using centralized helper functions
-Write-Verbose "[$scriptName] Initializing application configuration"
+#endregion Process login
 
+#region Initialize application configuration
+Write-Verbose "[$scriptName] Initializing application configuration"
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
@@ -450,10 +452,7 @@ else
 {
     "contoso.com" 
 }
-
-# Initialize configuration with helper function
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
-
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters -verbose 
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -474,7 +473,6 @@ $script:Auth = $auth
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
 Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
@@ -483,8 +481,8 @@ Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-#endregion Load parameters from the configuration file if it exists
-
+#endregion  Initialize application configuration
+exit 0
 #region Define variables
 #define repo parameters
 $defaultBranch = 'master'
@@ -850,7 +848,7 @@ else
 #region Menu Definitions
 # Load menu configuration for filtering
 $script:menus = @()
-$menuConfig = Get-CachedMenuConfiguration
+$menuConfig = Import-PowerShellDataFile -Path $menuFile -ErrorAction SilentlyContinue
 if ($menuConfig)
 {
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
@@ -1050,296 +1048,296 @@ $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial nu
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
         return $returnValues.backoutText
     }
-$serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number" -Action {
-    Write-Verbose "[$scriptName] Getting the serial number for this device..."
-    $deviceObject = GetDeviceInfo -NoHash
-    Write-Verbose "[$scriptName] Device object: $($deviceObject)"
-    if ($deviceObject)
-    {
-        $serialNumber = $deviceObject.serialNumber
-        $make = $deviceObject.manufacturer
-        $model = $deviceObject.model
-        Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
-        $context = Get-CallingContext -IncludeNavigationPath
-        switch ($context)
+    $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Use this device's serial number" -Action {
+        Write-Verbose "[$scriptName] Getting the serial number for this device..."
+        $deviceObject = GetDeviceInfo -NoHash
+        Write-Verbose "[$scriptName] Device object: $($deviceObject)"
+        if ($deviceObject)
         {
-            Action-ViaCheckMenu
+            $serialNumber = $deviceObject.serialNumber
+            $make = $deviceObject.manufacturer
+            $model = $deviceObject.model
+            Write-Host "Looking up local device: $make $model (Serial: $serialNumber)"
+            $context = Get-CallingContext -IncludeNavigationPath
+            switch ($context)
             {
-                Write-Verbose "[$scriptName] Action called via $context"
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-                Write-Verbose "[$scriptName] Result returned: $result"
+                Action-ViaCheckMenu
+                {
+                    Write-Verbose "[$scriptName] Action called via $context"
+                    $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                    Write-Verbose "[$scriptName] Result returned: $result"
+                }
+                Action-ViaAutopilotMenu
+                {
+                    Write-Verbose "[$scriptName] Action called via $context"
+                    Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
+                    $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check' 
+                    Write-Verbose "[$scriptName] Result returned: $result"
+                }
             }
-            Action-ViaAutopilotMenu
+            # Check if ProcessSerialNumber returned an exit signal
+            if ($null -eq $result)
             {
-                Write-Verbose "[$scriptName] Action called via $context"
-                Write-Verbose "[$scriptName] Got serial number: $SerialNumber"
-                $result = ProcessDevice -accessToken $accessToken -deviceObject $deviceObject -action 'check' 
-                Write-Verbose "[$scriptName] Result returned: $result"
+                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                return "EXIT_APPLICATION"
             }
-        }
-        # Check if ProcessSerialNumber returned an exit signal
-        if ($null -eq $result)
-        {
-            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-            return "EXIT_APPLICATION"
-        }
-        elseif ($result -eq $true -or $result -in $returnValues.Values)
-        {
-            Write-Host $result
+            elseif ($result -eq $true -or $result -in $returnValues.Values)
+            {
+                Write-Host $result
+            }
+            else
+            {
+                Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
+            }
         }
         else
         {
-            Write-Host "Failed to fetch information for device with serial number: $serialNumber" -ForegroundColor Red
+            Write-Host "Could not obtain the serial number." -ForegroundColor Red
+            Read-Host "Press Enter to continue"
         }
-    }
-    else
-    {
-        Write-Host "Could not obtain the serial number." -ForegroundColor Red
-        Read-Host "Press Enter to continue"
-    }
-#endregion serial number menu
+        #endregion serial number menu
 
-#region Autopilot menu   
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
-    Write-Verbose "[$scriptName] Quick import device into Autopilot."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $result = PrepareImportDevice -accessToken $accessToken
-    Write-Verbose "[$scriptName] Result of quick import: $result"
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
-    Write-Verbose "[$scriptName] Custom import device into Autopilot."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Checking for Windows updates."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $result = PrepareImportDevice -accessToken $accessToken -CustomImport
-    if ($result -eq $returnValues.backoutText)
-    {
-        Write-Verbose "[$scriptName] Custom import aborted. Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText
-    }
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot" -Action {
-    Write-Verbose "[$scriptName] Import device into Autopilot (standard)."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $result = PrepareImportDevice -accessToken $accessToken
-    Write-Verbose "[$scriptName] Result of standard import: $result"
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
-    Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Checking for Windows updates."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $deviceIdentifier = GetCorpDeviceIdentifier
-    if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
-    {
-        # For manufacturerModelSerial type, format as comma-separated string
-        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
-        if ($result)
-        {
-            Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green
+        #region Autopilot menu   
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Quick Import device into Autopilot (requires admin rights)" -Action {
+            Write-Verbose "[$scriptName] Quick import device into Autopilot."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            $result = PrepareImportDevice -accessToken $accessToken
+            Write-Verbose "[$scriptName] Result of quick import: $result"
         }
-        else
-        {
-            Write-Host "Failed to add device to corporate identifiers." -ForegroundColor Red
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device into Autopilot (requires admin rights)" -Action {
+            Write-Verbose "[$scriptName] Custom import device into Autopilot."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+                Write-Verbose "[$scriptName] Checking for Windows updates."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            $result = PrepareImportDevice -accessToken $accessToken -CustomImport
+            if ($result -eq $returnValues.backoutText)
+            {
+                Write-Verbose "[$scriptName] Custom import aborted. Returning $($returnValues.backoutText)."
+                return $returnValues.backoutText
+            }
         }
-    }
-    else
-    {
-        Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
-    }
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -Action {
-    Write-Verbose "[$scriptName] Deleting Corporate Device Identifier from Device Preparation."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Preparing to delete Corporate Device Identifier from Device Preparation."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $deviceIdentifier = GetCorpDeviceIdentifier
-    if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
-    {
-        # For manufacturerModelSerial type, format as comma-separated string
-        Write-Host "This will delete the corporate device identifier for:"
-        Write-Host " Manufacturer: $($deviceIdentifier.Manufacturer)"
-        Write-Host " Model: $($deviceIdentifier.Model)"
-        Write-Host " Serial Number: $($deviceIdentifier.SerialNumber)"
-        $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
-        while ($choice -notin @('yes', 'no'))
-        {
-            Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-            [console]::beep(1000, 500)
-            $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot" -Action {
+            Write-Verbose "[$scriptName] Import device into Autopilot (standard)."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            $result = PrepareImportDevice -accessToken $accessToken
+            Write-Verbose "[$scriptName] Result of standard import: $result"
         }
-        if ($choice -eq 'no')
-        {
-            Write-Host "Operation cancelled." -ForegroundColor Yellow
-            return $null
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
+            Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+                Write-Verbose "[$scriptName] Checking for Windows updates."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            $deviceIdentifier = GetCorpDeviceIdentifier
+            if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
+            {
+                # For manufacturerModelSerial type, format as comma-separated string
+                $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
+                if ($result)
+                {
+                    Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host "Failed to add device to corporate identifiers." -ForegroundColor Red
+                }
+            }
+            else
+            {
+                Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
+            }
         }
-        $result = DeleteCorporateDeviceIdentifier -AccessToken $accessToken -deviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial"
-        if ($result -in $returnValues.deviceDeleteSuccessMessage)
-        {
-            Write-Host "Device successfully removed from corporate identifiers." -ForegroundColor Green
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Delete Corporate Device Identifier from Device Preparation (requires admin rights)" -Action {
+            Write-Verbose "[$scriptName] Deleting Corporate Device Identifier from Device Preparation."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+                Write-Verbose "[$scriptName] Preparing to delete Corporate Device Identifier from Device Preparation."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            $deviceIdentifier = GetCorpDeviceIdentifier
+            if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
+            {
+                # For manufacturerModelSerial type, format as comma-separated string
+                Write-Host "This will delete the corporate device identifier for:"
+                Write-Host " Manufacturer: $($deviceIdentifier.Manufacturer)"
+                Write-Host " Model: $($deviceIdentifier.Model)"
+                Write-Host " Serial Number: $($deviceIdentifier.SerialNumber)"
+                $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
+                while ($choice -notin @('yes', 'no'))
+                {
+                    Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+                    [console]::beep(1000, 500)
+                    $choice = Read-Host "Are you sure you want to delete this corporate device identifier? (yes/no)"
+                }
+                if ($choice -eq 'no')
+                {
+                    Write-Host "Operation cancelled." -ForegroundColor Yellow
+                    return $null
+                }
+                $result = DeleteCorporateDeviceIdentifier -AccessToken $accessToken -deviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial"
+                if ($result -in $returnValues.deviceDeleteSuccessMessage)
+                {
+                    Write-Host "Device successfully removed from corporate identifiers." -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host $result
+                }
+            }
+            else
+            {
+                Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
+            }
         }
-        else
-        {
-            Write-Host $result
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -action {
+            Write-Verbose "[$scriptName] Exporting Corporate Device Identifier for manual upload to Device Preparation."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+                Write-Verbose "[$scriptName] Preparing to export Corporate Device Identifier for manual upload to Device Preparation."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            $deviceIdentifier = GetCorpDeviceIdentifier
+            if ($null -ne $deviceIdentifier)
+            {
+                $outputFile = "$pwd\CorporateDeviceIdentifier_$($deviceIdentifier.SerialNumber).csv"
+                #if we are running under PowerShell 7 or later, we can use Export-Csv with -NoTypeInformation and -NoHeader
+                if ($PSVersionTable.PSVersion.Major -ge 7)
+                {
+                    $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -NoHeader -Force
+                    Write-Host "Device information exported to $outputFile"
+                }
+                else
+                {
+                    $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -Force
+                    Write-Host "Device information exported to $outputFile"
+                    Write-Host "Since you are running under Powershell 5 or earlier, the CSV file will contain a header row."
+                    Write-Host "Be sure to remove the header row if you want to use this file for upload to Autopilot device preparation."
+                    Write-Host "You can use a text editor or a CSV editing tool to remove the header row."
+                    Write-Host "If you do not remove the header row, the upload to Autopilot device preparation will fail."
+                }
+            }
+            else
+            {
+                Write-Host 'Failed to export Corporate Device Identifier.' -ForegroundColor Red
+            }
         }
-    }
-    else
-    {
-        Write-Host "Failed to retrieve Corporate Device Identifier." -ForegroundColor Red
-    }
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Export Corporate Device Identifier for manual upload to Device Preparation (requires admin rights)" -action {
-    Write-Verbose "[$scriptName] Exporting Corporate Device Identifier for manual upload to Device Preparation."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Preparing to export Corporate Device Identifier for manual upload to Device Preparation."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $deviceIdentifier = GetCorpDeviceIdentifier
-    if ($null -ne $deviceIdentifier)
-    {
-        $outputFile = "$pwd\CorporateDeviceIdentifier_$($deviceIdentifier.SerialNumber).csv"
-        #if we are running under PowerShell 7 or later, we can use Export-Csv with -NoTypeInformation and -NoHeader
-        if ($PSVersionTable.PSVersion.Major -ge 7)
-        {
-            $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -NoHeader -Force
-            Write-Host "Device information exported to $outputFile"
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+                Write-Verbose "[$scriptName] Getting device object."
+                $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            if ($deviceObject)
+            {
+                Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
+                $outputFile = "\device_$($deviceObject.serialNumber).csv"
+                if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
+                {
+                    Write-Host 'Device hash created successfully.' -ForegroundColor Green
+                    Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
+                    Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
+                    Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
+                }
+                else
+                {
+                    Write-Host 'Failed to create device hash.' -ForegroundColor Red
+                }
+            }
         }
-        else
-        {
-            $deviceIdentifier | Export-Csv -Path $outputFile -NoTypeInformation -Force
-            Write-Host "Device information exported to $outputFile"
-            Write-Host "Since you are running under Powershell 5 or earlier, the CSV file will contain a header row."
-            Write-Host "Be sure to remove the header row if you want to use this file for upload to Autopilot device preparation."
-            Write-Host "You can use a text editor or a CSV editing tool to remove the header row."
-            Write-Host "If you do not remove the header row, the upload to Autopilot device preparation will fail."
+        $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
+            Write-Verbose "[$scriptName] Download and install latest Windows updates."
+            if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
+            {
+                Write-Verbose "[$scriptName] The script is running with sufficient permissions."
+                Write-Verbose "[$scriptName] Checking for Windows updates."
+            }
+            else
+            {
+                Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
+                Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
+                return $null
+            }
+            Write-Host 'Downloading and installing the latest Windows updates...'
+            $updateResult = ApplyWindowsUpdates
+            Write-Host $returnValues.$updateResult
         }
+        $autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
     }
-    else
-    {
-        Write-Host 'Failed to export Corporate Device Identifier.' -ForegroundColor Red
-    }
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Get device hash for manual upload to Autopilot (requires admin rights)" -action {
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Getting device object."
-        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    if ($deviceObject)
-    {
-        Write-Host "Getting device hash for device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model)."
-        $outputFile = "\device_$($deviceObject.serialNumber).csv"
-        if (GetDeviceHash -Device $deviceObject -OutputFile $outputFile)
+    $autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
+        Write-Host 'Deleting the device from Autopilot...'
+        $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
+        if ($deviceObject)
         {
-            Write-Host 'Device hash created successfully.' -ForegroundColor Green
-            Write-Host "The device hash is saved to $outputFile." -ForegroundColor Green
-            Write-Host 'You can now upload the device hash to Autopilot.' -ForegroundColor Green
-            Write-Host 'Please check the Intune portal for more information.' -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host 'Failed to create device hash.' -ForegroundColor Red
-        }
-    }
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Download and install latest Windows updates(requires admin rights)" -action {
-    Write-Verbose "[$scriptName] Download and install latest Windows updates."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-        Write-Verbose "[$scriptName] Checking for Windows updates."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    Write-Host 'Downloading and installing the latest Windows updates...'
-    $updateResult = ApplyWindowsUpdates
-    Write-Host $returnValues.$updateResult
-}
-$autopilotMenu = AddMenuItem -Menu $autopilotMenu -Name "Check device Autopilot status" -Submenu $SerialNumberMenu
-}
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -name "Delete device from Autopilot" -action {
-    Write-Host 'Deleting the device from Autopilot...'
-    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser -nohash
-    if ($deviceObject)
-    {
-        Write-Host "This will delete the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
-        $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
-        while ($choice -notin @('yes', 'no'))
-        {
-            Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-            #beep
-            [console]::beep(1000, 500)
+            Write-Host "This will delete the device with serial number $($deviceObject.serialNumber): $($deviceObject.manufacturer) $($deviceObject.make) $($deviceObject.model) from Autopilot."
             $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
+            while ($choice -notin @('yes', 'no'))
+            {
+                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                #beep
+                [console]::beep(1000, 500)
+                $choice = Read-Host "Are you sure you want to delete this device? (yes/no)"
+            }
+            if ($choice -eq 'no')
+            {
+                Write-Host "Exiting..."
+                return $returnValues.backoutText
+            }
+            $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
+            Write-Verbose "[$scriptName] Device deletion result: $result"
         }
-        if ($choice -eq 'no')
-        {
-            Write-Host "Exiting..."
-            return $returnValues.backoutText
-        }
-        $result = ProcessDevice -accessToken $accessToken -DeviceObject $deviceObject -action 'delete'
-        Write-Verbose "[$scriptName] Device deletion result: $result"
     }
-}
 }
 
 #endregion Autopilot menu
@@ -1356,791 +1354,791 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View global environ
     {
         Write-Host "`nFailed to display global environment settings. Please check the logs for details." -ForegroundColor Red
     }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
-    Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
+    $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View domain specific environment settings" -Action {
+        Write-Host "Displaying domain-specific environment settings..." -ForegroundColor Cyan
 
-    # Get the current domain from settings (same logic as domain settings editor)
-    $currentDomain = $domain
-    # If no current domain, try to get it from domains section or prompt user
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        try
+        # Get the current domain from settings (same logic as domain settings editor)
+        $currentDomain = $domain
+        # If no current domain, try to get it from domains section or prompt user
+        if ([string]::IsNullOrWhiteSpace($currentDomain))
         {
-            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
-            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
+            try
             {
-                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
-                if ($availableDomains.Count -eq 1)
+                $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
+                if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
                 {
-                    $currentDomain = $availableDomains[0]
-                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                    $availableDomains = $settingsContent.domains.PSObject.Properties.Name
+                    if ($availableDomains.Count -eq 1)
+                    {
+                        $currentDomain = $availableDomains[0]
+                        Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                    }
+                    else
+                    {
+                        Write-Host "Available domains:" -ForegroundColor White
+                        for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                        {
+                            Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
+                        }
+                    
+                        do
+                        {
+                            $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
+                            if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                            {
+                                $currentDomain = $availableDomains[[int]$choice - 1]
+                                break
+                            }
+                            Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
+                        } while ($true)
+                    }
                 }
                 else
                 {
-                    Write-Host "Available domains:" -ForegroundColor White
-                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
-                    {
-                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
-                    }
-                    
-                    do
-                    {
-                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
-                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
-                        {
-                            $currentDomain = $availableDomains[[int]$choice - 1]
-                            break
-                        }
-                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
-                    } while ($true)
+                    $currentDomain = Read-Host "Enter domain name to view"
                 }
             }
-            else
+            catch
             {
                 $currentDomain = Read-Host "Enter domain name to view"
             }
         }
-        catch
+    
+        if ([string]::IsNullOrWhiteSpace($currentDomain))
         {
-            $currentDomain = Read-Host "Enter domain name to view"
+            Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
+            return $returnValues.backoutText
         }
-    }
     
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        Write-Host "No domain specified. Cannot view domain-specific settings." -ForegroundColor Red
-        return $returnValues.backoutText
-    }
-    
-    $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
-    }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
-    Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
-    Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
-    
-    $success = Show-GroupsViewer -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nGroup settings displayed successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
-    }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
-    Write-Host "Launching global settings editor..." -ForegroundColor Cyan
-    $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nGlobal settings updated successfully. Changes will take effect on next restart." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
-    }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
-    Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
-    
-    # Get the current domain from settings
-    $currentDomain = $domain
-    # If no current domain, try to get it from domains section or prompt user
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        try
+        $success = Show-SettingsViewer -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+        if ($success)
         {
-            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
-            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
+            Write-Host "`nDomain settings for '$currentDomain' displayed successfully." -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host "`nFailed to display domain settings. Please check the logs for details." -ForegroundColor Red
+        }
+        $environmentMenu = AddMenuItem -menu $environmentMenu -Name "View group inclusion/exclusion settings for all domains" -Action {
+            Write-Host "Displaying group inclusion/exclusion settings..." -ForegroundColor Cyan
+            Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
+    
+            $success = Show-GroupsViewer -SettingsFile $InitFile
+            if ($success)
             {
-                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
-                if ($availableDomains.Count -eq 1)
+                Write-Host "`nGroup settings displayed successfully." -ForegroundColor Green
+            }
+            else
+            {
+                Write-Host "`nFailed to display group settings. Please check the logs for details." -ForegroundColor Red
+            }
+            $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change global environment settings" -Action {
+                Write-Host "Launching global settings editor..." -ForegroundColor Cyan
+                $success = Show-SettingsEditor -SettingsType "Global" -SettingsFile $InitFile
+                if ($success)
                 {
-                    $currentDomain = $availableDomains[0]
-                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                    Write-Host "`nGlobal settings updated successfully. Changes will take effect on next restart." -ForegroundColor Green
                 }
                 else
                 {
-                    Write-Host "Available domains:" -ForegroundColor White
-                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                    Write-Host "`nFailed to update global settings. Please check the logs for details." -ForegroundColor Red
+                }
+                $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change domain specific settings" -action {
+                    Write-Host "Launching domain-specific settings editor..." -ForegroundColor Cyan
+    
+                    # Get the current domain from settings
+                    $currentDomain = $domain
+                    # If no current domain, try to get it from domains section or prompt user
+                    if ([string]::IsNullOrWhiteSpace($currentDomain))
                     {
-                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
-                    }
-                    
-                    do
-                    {
-                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
-                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                        try
                         {
-                            $currentDomain = $availableDomains[[int]$choice - 1]
-                            break
+                            $settingsContent = Get-Content -Path $InitFile -Raw | ConvertFrom-Json
+                            if ($settingsContent.domains -and $settingsContent.domains.PSObject.Properties.Count -gt 0)
+                            {
+                                $availableDomains = $settingsContent.domains.PSObject.Properties.Name
+                                if ($availableDomains.Count -eq 1)
+                                {
+                                    $currentDomain = $availableDomains[0]
+                                    Write-Host "Using domain: $currentDomain" -ForegroundColor Yellow
+                                }
+                                else
+                                {
+                                    Write-Host "Available domains:" -ForegroundColor White
+                                    for ($i = 0; $i -lt $availableDomains.Count; $i++)
+                                    {
+                                        Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
+                                    }
+                    
+                                    do
+                                    {
+                                        $choice = Read-Host "Select domain number (1-$($availableDomains.Count))"
+                                        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
+                                        {
+                                            $currentDomain = $availableDomains[[int]$choice - 1]
+                                            break
+                                        }
+                                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
+                                    } while ($true)
+                                }
+                            }
+                            else
+                            {
+                                $currentDomain = Read-Host "Enter domain name to configure"
+                            }
                         }
-                        Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
-                    } while ($true)
+                        catch
+                        {
+                            $currentDomain = Read-Host "Enter domain name to configure"
+                        }
+                    }
+    
+                    if ([string]::IsNullOrWhiteSpace($currentDomain))
+                    {
+                        Write-Host "No domain specified. Cannot edit domain-specific settings." -ForegroundColor Red
+                        return $returnValues.backoutText
+                    }
+    
+                    $success = Show-SettingsEditor -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
+                    if ($success)
+                    {
+                        Write-Host "`nDomain settings for '$currentDomain' updated successfully." -ForegroundColor Green
+                    }
+                    else
+                    {
+                        Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
+                    }
+                    $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
+                        Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
+                        Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
+    
+                        $success = Show-SettingsEditor -SettingsType "Auth" -SettingsFile $InitFile
+                        if ($success)
+                        {
+                            Write-Host "`nAuthentication settings updated successfully. Changes may require application restart." -ForegroundColor Green
+                        }
+                        else
+                        {
+                            Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
+                        }
+                        $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
+                            Write-Host "Launching groups editor..." -ForegroundColor Cyan
+                            Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
+
+                            $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain -accessToken $accessToken
+                            #region Handle navigation responses from GetDeviceByUser
+                            if ($result -eq "Back" -or $result -eq "back")
+                            {
+                                Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+                                return $returnValues.backoutText
+                            }
+                            elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+                            {
+                                Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+                                return "EXIT_APPLICATION"
+                            }
+                            elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
+                            {
+                                Write-Verbose "[$scriptName] User requested application exit from device selection."
+                                return "EXIT_APPLICATION"
+                            }        
+                            else 
+                            {
+                                return $result
+                            }
+                            $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
+                            $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
+                                Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
+                                $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
+                                while ($choice -notin @('yes', 'no'))
+                                {
+                                    Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                                    #beep
+                                    [console]::beep(1000, 500)
+                                    $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
+                                }
+                                if ($choice -eq 'no')
+                                {
+                                    Write-Host "Exiting..."
+                                    return $returnValues.backoutText
+                                }
+                                if (Start-FirstRunWizard -authOnly)
+                                {
+                                    Write-Host "The authentication information has been changed." -ForegroundColor Green
+                                }
+                                else 
+                                {
+                                    Write-Host "Failed to change the authentication information." -ForegroundColor Red
+                                    Write-Host "Please check the logs for more information." -ForegroundColor Red
+                                }
+                            }
+                            # Auto Update settings action - matches menu.psd1 item "Change Auto Update settings"
+                            $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settings" -Action {
+                                Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
+                                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
+                                if ($settings.autoUpdate)
+                                {
+                                    Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently enabled." -LogLevel "Information"
+                                    $messageString = "Auto Update is currently enabled. Would you like to disable it?"
+                                }
+                                else
+                                {
+                                    Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently disabled." -LogLevel "Information"
+                                    $messageString = "Auto Update is currently disabled. Would you like to enable it?"
+                                }
+                                $choice = Read-Host "$messageString (yes/no)"
+                                while ($choice -notin @('yes', 'no', 'y', 'n'))
+                                {
+                                    Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+                                    #beep
+                                    [console]::beep(1000, 500)
+                                    $choice = Read-Host "$messageString (yes/no)"
+                                }
+                                if ($choice -in @('no', 'n'))
+                                {
+                                    Write-Log -logFile $LogFile -Module "$scriptName" -Message "User chose not to change Auto Update setting." -LogLevel "Information"
+                                    return $returnValues.backoutText
+                                }
+                                $settings.autoUpdate = -not $settings.autoUpdate
+                                # Save the updated settings back to the configuration file
+                                if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
+                                {
+                                    Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
+                                    $filesCleaned = cleanupTempFiles
+                                    if ($filesCleaned.AllRemoved)
+                                    {
+                                        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+                                    }
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+                                }
+                                else
+                                {
+                                    Write-Host "Failed to update autoUpdate setting" -ForegroundColor Red
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
+                                }
+                            }
+                            # App Mode settings action - matches menu.psd1 item "Change App Mode settings"  
+                            $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings" -Action {
+                                Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
+                                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
+    
+                                # Use the refactored function for consistent app mode selection
+                                $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -Context "settings"
+    
+                                # Handle cancellation
+                                if ($result.cancelled)
+                                {
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
+                                    Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+                                    return $returnValues.backoutText
+                                }
+    
+                                # Handle unchanged selection
+                                if ($result.currentModeUnchanged)
+                                {
+                                    Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
+                                    return $returnValues.backoutText
+                                }
+    
+                                $newAppMode = $result.appMode
+    
+                                # Confirm the change
+                                Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
+                                Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
+                                Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
+                                Write-Host ""
+    
+                                $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+                                while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
+                                {
+                                    Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
+                                    [console]::beep(1000, 500)
+                                    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
+                                }
+    
+                                if ($confirmChoice -in @('no', 'n'))
+                                {
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
+                                    Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
+                                    return $returnValues.backoutText
+                                }
+    
+                                # Save the updated app mode setting
+                                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
+    
+                                if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
+                                {
+                                    Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
+        
+                                    # Clean up temporary files
+                                    $filesCleaned = cleanupTempFiles
+                                    if ($filesCleaned.AllRemoved)
+                                    {
+                                        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+                                    }
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+        
+                                    Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
+                                    Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
+                                    Write-Host ""
+                                    Write-Log -logFile $logFile -finishLogging
+                                    exit  0
+                                }
+                                else
+                                {
+                                    Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
+                                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
+                                }
+                                #endregion Settings menu
+
+                                $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
+                                $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
+                                    $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+                                    if ($null -eq $userName)
+                                    {
+                                        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+                                        return $returnValues.backoutText
+                                    }
+                                    Write-Verbose "[$scriptName] Got user name: $userName"
+    
+                                    #region Check if the user exists first.
+                                    $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
+                                    Write-Verbose "[$scriptName] Substring search: $($userInfo)"
+                                    Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
+                                    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
+                                    if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+                                    {
+                                        Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
+                                        $userName = $userInfo[0].value.userPrincipalName
+                                        Write-Verbose "[$scriptName] User name set to: $userName"
+                                    }
+                                    elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+                                    {
+                                        Write-Host "Could not find an exact match for user $($userName)."
+                                        if ($userInfo[0].value.count -eq 1)
+                                        {
+                                            Write-Host "Found a user with a similar name."
+                                        }
+                                        else
+                                        {
+                                            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+                                        }
+                                        if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+                                        {
+                                            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+                                        }
+                                        elseif ($($userInfo[0].value.count) -eq 1)
+                                        {
+                                            Write-Host "Is this the correct user?"
+                                        }
+                                        else
+                                        {
+                                            Write-Host "Displaying all $($userInfo[0].value.count) matches:"
+                                        }
+                                        $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
+                                        Write-Verbose "[$scriptName] User name selected: $possibleUserName"
+                                        # Handle navigation options returned from DisplayUserList
+                                        if ($possibleUserName -in $returnValues.Values)
+                                        {
+                                            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
+                                            return $possibleUserName
+                                        }
+                                        elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
+                                        {
+                                            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+                                            return $returnValues.backoutText
+                                        }
+                                        elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
+                                        {
+                                            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+                                            return "Main Menu"
+                                        }
+                                        elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
+                                        {
+                                            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                                            return "EXIT_APPLICATION"
+                                        }
+                                        else
+                                        {
+                                            Write-Verbose "[$scriptName] User selected: $possibleUserName"
+                                            $userName = $possibleUserName
+                                        }
+                                    }
+                                    elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
+                                    {
+                                        return $userInfo
+                                    }
+                                    else
+                                    {
+                                        return $returnValues.noUserFoundInDirectoryMessage
+                                    }
+                                    #endregion Check if the user exists first.
+    
+                                    # Call GetDeviceByUser to find devices for the specified user
+                                    Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
+                                    $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
+                                    Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
+                                    Write-Host "Found device for user $userName with serial number: $serialNumber"
+    
+                                    do
+                                    {
+                                        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+                                        Write-Verbose "[$scriptName] Result: $result"
+                                        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
+                                        $serialNumber = $result        
+                                    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))    
+
+                                    #region Handle navigation responses from GetDeviceByUser
+                                    if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
+                                    {
+                                        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+                                        return $returnValues.backoutText
+                                    }
+                                    elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
+                                    {
+                                        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+                                        return "EXIT_APPLICATION"
+                                    }
+                                    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
+                                    {
+                                        Write-Verbose "[$scriptName] User requested application exit from device selection."
+                                        return "EXIT_APPLICATION"
+                                    }        
+                                    else 
+                                    {
+                                        return $result
+                                    }
+                                }
+
+                                # Load menu configuration to get includeInDisplayModes for items
+                                $menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
+                                # Add menu items - filtering is handled by ShowMenu function
+                                $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
+                                    $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+                                    # Check if user entered 'back'
+                                    if ($null -eq $username)
+                                    {
+                                        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+                                        return $returnValues.backoutText # Return to the previous menu
+                                    } 
+                                    else # Continue only if a username was entered
+                                    {
+                                        $hasCorrectGroups = $false
+                                        $hasCorrectNumberOfDevices = $false
+        
+                                        #region Check if the user exists first.
+                                        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
+                                        Write-Verbose "[$scriptName] Substring search: $($userInfo)"
+                                        Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
+                                        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
+                                        if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+                                        {
+                                            Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
+                                            $userName = $userInfo[0].value.userPrincipalName
+                                            Write-Verbose "[$scriptName] User name set to: $userName"
+                                        }
+                                        elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+                                        {
+                                            Write-Host "Could not find an exact match for user $($userName)."
+                                            if ($userInfo[0].value.count -eq 1)
+                                            {
+                                                Write-Host "Found a user with a similar name."
+                                            }
+                                            else
+                                            {
+                                                Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+                                            }
+                                            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+                                            {
+                                                Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+                                            }
+                                            elseif ($($userInfo[0].value.count) -eq 1)
+                                            {
+                                                Write-Host "Is this the correct user?"
+                                            }
+                                            else
+                                            {
+                                                Write-Host "Displaying all $($userInfo[0].value.count) matches:"
+                                            }
+                                            $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
+                                            Write-Verbose "[$scriptName] User name selected: $possibleUserName"
+                                            # Handle navigation options returned from DisplayUserList
+                                            if ($possibleUserName -in $returnValues.Values)
+                                            {
+                                                Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
+                                                return $possibleUserName
+                                            }
+                                            elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
+                                            {
+                                                Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+                                                return $returnValues.backoutText
+                                            }
+                                            elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
+                                            {
+                                                Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+                                                return "Main Menu"
+                                            }
+                                            elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
+                                            {
+                                                Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                                                return "EXIT_APPLICATION"
+                                            }
+                                            else
+                                            {
+                                                Write-Verbose "[$scriptName] User selected: $possibleUserName"
+                                                $userName = $possibleUserName
+                                            }
+                                        }
+                                        elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
+                                        {
+                                            return $userInfo
+                                        }
+                                        else
+                                        {
+                                            return $returnValues.noUserFoundInDirectoryMessage
+                                        }
+                                        #endregion Check if the user exists first.
+                                        Write-Host "Checking group membership for user $userName."
+                                        $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
+                                        if ($groups.success -eq $true)
+                                        {
+                                            Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
+                                            Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
+                                            $hasCorrectGroups = $true
+                                        }
+                                        elseif ($selectedItem.Submenu)
+                                        {
+                                            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group membershipss and $($groups.ForbiddenGroups.Count) forbidden group membershipss."
+                                            Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
+                                            Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
+                                            if ($groups.missingGroups.Count -gt 0)
+                                            {
+                                                Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
+                                                foreach ($group in $groups.missingGroups)
+                                                {
+                                                    Write-Host $group -ForegroundColor Red
+                                                }
+                                            }
+                                            if ($groups.ForbiddenGroups.Count -gt 0)
+                                            {
+                                                Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
+                                                foreach ($group in $groups.invalidExcludeGroups)
+                                                {
+                                                    Write-Host $group -ForegroundColor Red
+                                                }
+                                            }
+                                            Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
+                                        }
+                                        Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
+                                        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken 
+                                        if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
+                                        {
+                                            Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
+                                            $hasCorrectNumberOfDevices = $true
+                                        }
+                                        else
+                                        {
+                                            Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
+                                            Write-Host "No additional devices can be assigned to this user."
+                                        }        
+                                        if ($hasCorrectGroups -and $hasCorrectNumberOfDevices)
+                                        {
+                                            Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
+                                            Write-Host "We will now check the device state." -ForegroundColor Green
+                                            Write-Host "Enter the device's serial number."
+                                            Write-Host "This would be the device you plan to give to the user."
+                                            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+                                            # Check if user entered 'back'
+                                            if ($null -eq $serialNumber)
+                                            {
+                                                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+                                                return $returnValues.backoutText # Return to the previous menu
+                                            }
+                                            else # Process only if a serial number was entered
+                                            {
+                                                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+                                                # Check if ProcessSerialNumber returned an exit signal
+                                                if ($null -eq $result)
+                                                {
+                                                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                                                    return "EXIT_APPLICATION"
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            Write-Host "The user $userName is not ready to receive a Windows 11 device." -ForegroundColor Red
+                                        }
+                                    }
+                                }
+                            }
+
+                            $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
+                        }
+
+                        $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+                    }
+
+                    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+                }
+
+                $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+                    Write-Host "Checking for script updates..."
+                    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
+                    Write-Verbose "[$scriptName] Update result: $updateResult"
+                    switch ($updateResult)
+                    {
+                        $returnValues.UpdateSuccessMessage
+                        {
+                            Write-Host 'The script has been updated.' -ForegroundColor Green
+                            Write-Host 'Please restart the script.' -ForegroundColor Green
+                            exit 0
+                        }
+                        $returnValues.UpdateFailedMessage
+                        {
+                            Write-Host 'The script update failed.' -ForegroundColor Red
+                        }
+                        $returnValues.UpdateNotNeededMessage
+                        {
+                            Write-Host 'The script is up to date.' -ForegroundColor Green
+                        }
+                        default
+                        {
+                            Write-Host "An error has occurred:"
+                            Write-Host "Error message: $($updateResult.Content)"
+                            Write-Host "Status Code: $($updateResult.StatusCode)"
+                        }
+                    }
                 }
             }
-            else
-            {
-                $currentDomain = Read-Host "Enter domain name to configure"
-            }
-        }
-        catch
-        {
-            $currentDomain = Read-Host "Enter domain name to configure"
-        }
-    }
-    
-    if ([string]::IsNullOrWhiteSpace($currentDomain))
-    {
-        Write-Host "No domain specified. Cannot edit domain-specific settings." -ForegroundColor Red
-        return $returnValues.backoutText
-    }
-    
-    $success = Show-SettingsEditor -SettingsType "Domain" -DomainName $currentDomain -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nDomain settings for '$currentDomain' updated successfully." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to update domain settings. Please check the logs for details." -ForegroundColor Red
-    }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authentication settings" -Action {
-    Write-Host "Launching authentication settings editor..." -ForegroundColor Cyan
-    Write-Host "These settings control how the application authenticates with Microsoft Graph API." -ForegroundColor Gray
-    
-    $success = Show-SettingsEditor -SettingsType "Auth" -SettingsFile $InitFile
-    if ($success)
-    {
-        Write-Host "`nAuthentication settings updated successfully. Changes may require application restart." -ForegroundColor Green
-    }
-    else
-    {
-        Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
-    }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
-    Write-Host "Launching groups editor..." -ForegroundColor Cyan
-    Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
 
-    $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain -accessToken $accessToken
-    #region Handle navigation responses from GetDeviceByUser
-    if ($result -eq "Back" -or $result -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
-    {
-        Write-Verbose "[$scriptName] User requested application exit from device selection."
-        return "EXIT_APPLICATION"
-    }        
-    else 
-    {
-        return $result
-    }
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
-    Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
-    $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
-    while ($choice -notin @('yes', 'no'))
-    {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'."
-        #beep
-        [console]::beep(1000, 500)
-        $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
-    }
-    if ($choice -eq 'no')
-    {
-        Write-Host "Exiting..."
-        return $returnValues.backoutText
-    }
-    if (Start-FirstRunWizard -authOnly)
-    {
-        Write-Host "The authentication information has been changed." -ForegroundColor Green
-    }
-    else 
-    {
-        Write-Host "Failed to change the authentication information." -ForegroundColor Red
-        Write-Host "Please check the logs for more information." -ForegroundColor Red
-    }
-}
-# Auto Update settings action - matches menu.psd1 item "Change Auto Update settings"
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Auto Update settings" -Action {
-    Write-Verbose "[$scriptName] Auto Update: $($settings.autoUpdate)"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update setting: $($settings.autoUpdate)" -LogLevel "Information"
-    if ($settings.autoUpdate)
-    {
-        Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently enabled." -LogLevel "Information"
-        $messageString = "Auto Update is currently enabled. Would you like to disable it?"
-    }
-    else
-    {
-        Write-Log -logFile $LogFile -Module "$scriptName" -Message "Auto Update is currently disabled." -LogLevel "Information"
-        $messageString = "Auto Update is currently disabled. Would you like to enable it?"
-    }
-    $choice = Read-Host "$messageString (yes/no)"
-    while ($choice -notin @('yes', 'no', 'y', 'n'))
-    {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        #beep
-        [console]::beep(1000, 500)
-        $choice = Read-Host "$messageString (yes/no)"
-    }
-    if ($choice -in @('no', 'n'))
-    {
-        Write-Log -logFile $LogFile -Module "$scriptName" -Message "User chose not to change Auto Update setting." -LogLevel "Information"
-        return $returnValues.backoutText
-    }
-    $settings.autoUpdate = -not $settings.autoUpdate
-    # Save the updated settings back to the configuration file
-    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "autoUpdate" -SettingValue $settings.autoUpdate)
-    {
-        Write-Host "Auto Update settings saved successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auto Update settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
-        if ($filesCleaned.AllRemoved)
-        {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+            $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
+                Write-Host 'Restarting the device...'
+                if (-not (RestartDevice))
+                {
+                    Write-Verbose "[$scriptName] RestartDevice function failed."
+                    return $returnValues.backoutText
+                }
+            }
         }
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-    }
-    else
-    {
-        Write-Host "Failed to update autoUpdate setting" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update autoUpdate setting" -LogLevel "Error"
-    }
-}
-# App Mode settings action - matches menu.psd1 item "Change App Mode settings"  
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings" -Action {
-    Write-Verbose "[$scriptName] Current App Mode: $($settings.appMode)"
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Current App Mode setting: $($settings.appMode)" -LogLevel "Information"
-    
-    # Use the refactored function for consistent app mode selection
-    $result = Get-AppModeConfigurationFromUser -CurrentMode $settings.appMode -Context "settings"
-    
-    # Handle cancellation
-    if ($result.cancelled)
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose to cancel app mode change." -LogLevel "Information"
-        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
-        return $returnValues.backoutText
-    }
-    
-    # Handle unchanged selection
-    if ($result.currentModeUnchanged)
-    {
-        Write-Host "`nThe selected mode is already the current mode." -ForegroundColor Yellow
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
-        return $returnValues.backoutText
-    }
-    
-    $newAppMode = $result.appMode
-    
-    # Confirm the change
-    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
-    Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
-    Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
-    Write-Host ""
-    
-    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
-    {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        [console]::beep(1000, 500)
-        $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    }
-    
-    if ($confirmChoice -in @('no', 'n'))
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
-        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
-        return $returnValues.backoutText
-    }
-    
-    # Save the updated app mode setting
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
-    
-    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
-    {
-        Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
-        
-        # Clean up temporary files
-        $filesCleaned = cleanupTempFiles
-        if ($filesCleaned.AllRemoved)
-        {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
-        }
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-        
-        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
-        Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Log -logFile $logFile -finishLogging
-        exit  0
-    }
-    else
-    {
-        Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
-    }
-#endregion Settings menu
 
-$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
-$CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action {
-    $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    if ($null -eq $userName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got user name: $userName"
-    
-    #region Check if the user exists first.
-    $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
-    Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-    Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-    if ($null -ne $userInfo -and $userInfo[1] -eq $false)
-    {
-        Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-        $userName = $userInfo[0].value.userPrincipalName
-        Write-Verbose "[$scriptName] User name set to: $userName"
-    }
-    elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
-    {
-        Write-Host "Could not find an exact match for user $($userName)."
-        if ($userInfo[0].value.count -eq 1)
-        {
-            Write-Host "Found a user with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
-        }
-        if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($($userInfo[0].value.count) -eq 1)
-        {
-            Write-Host "Is this the correct user?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($userInfo[0].value.count) matches:"
-        }
-        $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-        Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-        # Handle navigation options returned from DisplayUserList
-        if ($possibleUserName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-            return $possibleUserName
-        }
-        elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleUserName"
-            $userName = $possibleUserName
-        }
-    }
-    elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-    {
-        return $userInfo
-    }
-    else
-    {
-        return $returnValues.noUserFoundInDirectoryMessage
-    }
-    #endregion Check if the user exists first.
-    
-    # Call GetDeviceByUser to find devices for the specified user
-    Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
-    $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
-    Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
-    Write-Host "Found device for user $userName with serial number: $serialNumber"
-    
-    do
-    {
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Verbose "[$scriptName] Result: $result"
-        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        $serialNumber = $result        
-    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))    
-
-    #region Handle navigation responses from GetDeviceByUser
-    if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($serialNumber -eq "Main Menu" -or $serialNumber -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
-    {
-        Write-Verbose "[$scriptName] User requested application exit from device selection."
-        return "EXIT_APPLICATION"
-    }        
-    else 
-    {
-        return $result
-    }
-}
-
-# Load menu configuration to get includeInDisplayModes for items
-$menuConfigForFiltering = Get-CachedMenuConfiguration -MenuConfigFile "$pwd\menu.psd1"
-# Add menu items - filtering is handled by ShowMenu function
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
-    $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    # Check if user entered 'back'
-    if ($null -eq $username)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText # Return to the previous menu
-    } 
-    else # Continue only if a username was entered
-    {
-        $hasCorrectGroups = $false
-        $hasCorrectNumberOfDevices = $false
-        
-        #region Check if the user exists first.
-        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
-        Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-        Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-        if ($null -ne $userInfo -and $userInfo[1] -eq $false)
-        {
-            Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-            $userName = $userInfo[0].value.userPrincipalName
-            Write-Verbose "[$scriptName] User name set to: $userName"
-        }
-        elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
-        {
-            Write-Host "Could not find an exact match for user $($userName)."
-            if ($userInfo[0].value.count -eq 1)
+        $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+            $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+            if ($null -eq $groupName)
             {
-                Write-Host "Found a user with a similar name."
-            }
-            else
-            {
-                Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
-            }
-            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
-            {
-                Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-            }
-            elseif ($($userInfo[0].value.count) -eq 1)
-            {
-                Write-Host "Is this the correct user?"
-            }
-            else
-            {
-                Write-Host "Displaying all $($userInfo[0].value.count) matches:"
-            }
-            $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-            Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-            # Handle navigation options returned from DisplayUserList
-            if ($possibleUserName -in $returnValues.Values)
-            {
-                Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-                return $possibleUserName
-            }
-            elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
-            {
-                Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
                 return $returnValues.backoutText
             }
-            elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
+            Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+            #region Check if the group exists 
+            $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
+            Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
+            if ($groupInfo.GetType().Name -eq 'String')
             {
-                Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-                return "Main Menu"
+                # Handle error messages from GetEntraUser
+                Write-Verbose "[$scriptName] Error finding group: $groupInfo"
+                return $groupInfo
             }
-            elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
+            $selectedGroup = $null
+            $substringSearch = $groupInfo[1]
+            $searchResults = $groupInfo[0].value
+            if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
             {
-                Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-                return "EXIT_APPLICATION"
+                # Exact match found
+                Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
+                $selectedGroup = $searchResults.value
+                Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+            }
+            elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
+            {
+                # Similar matches found
+                Write-Host "Could not find an exact match for group '$groupName'."
+                if ($searchResults.value.count -eq 1)
+                {
+                    Write-Host "Found a group with a similar name."
+                }
+                else
+                {
+                    Write-Host "Found $($searchResults.value.count) groups with similar names:"
+                }
+                if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
+                {
+                    Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+                }
+                elseif ($searchResults.value.count -eq 1)
+                {
+                    Write-Host "Is this the correct group?"
+                }
+                else
+                {
+                    Write-Host "Displaying all $($searchResults.value.count) matches:"
+                }
+                # Display group selection menu similar to user selection
+                $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
+                # Handle navigation options returned from DisplayGroupList
+                if ($possibleGroupName -in $returnValues.Values)
+                {
+                    Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
+                    return $possibleGroupName
+                }
+                elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
+                {
+                    Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+                    return $returnValues.backoutText
+                }
+                elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
+                {
+                    Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+                    return "Main Menu"
+                }
+                elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
+                {
+                    Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                    return "EXIT_APPLICATION"
+                }
+                else
+                {
+                    Write-Verbose "[$scriptName] User selected: $possibleGroupName"
+                    $selectedGroup = $possibleGroupName
+                }
             }
             else
             {
-                Write-Verbose "[$scriptName] User selected: $possibleUserName"
-                $userName = $possibleUserName
+                return $returnValues.noGroupFoundMessage
             }
-        }
-        elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-        {
-            return $userInfo
-        }
-        else
-        {
-            return $returnValues.noUserFoundInDirectoryMessage
-        }
-        #endregion Check if the user exists first.
-        Write-Host "Checking group membership for user $userName."
-        $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
-        if ($groups.success -eq $true)
-        {
-            Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
-            Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
-            $hasCorrectGroups = $true
-        }
-        elseif ($selectedItem.Submenu)
-        {
-            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group membershipss and $($groups.ForbiddenGroups.Count) forbidden group membershipss."
-            Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
-            Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
-            if ($groups.missingGroups.Count -gt 0)
+            #endregion Check if the group exists
+            # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
+            Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
+            $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup 
+            #region Handle navigation responses from GetDeviceByUser
+            if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
             {
-                Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.missingGroups)
-                {
-                    Write-Host $group -ForegroundColor Red
-                }
+                Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
+                return $returnValues.backoutText
             }
-            if ($groups.ForbiddenGroups.Count -gt 0)
+            elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
             {
-                Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.invalidExcludeGroups)
-                {
-                    Write-Host $group -ForegroundColor Red
-                }
+                Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+                return "EXIT_APPLICATION"
             }
-            Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
-        }
-        Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
-        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken 
-        if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
-        {
-            Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
-            $hasCorrectNumberOfDevices = $true
-        }
-        else
-        {
-            Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
-            Write-Host "No additional devices can be assigned to this user."
-        }        
-        if ($hasCorrectGroups -and $hasCorrectNumberOfDevices)
-        {
-            Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
-            Write-Host "We will now check the device state." -ForegroundColor Green
-            Write-Host "Enter the device's serial number."
-            Write-Host "This would be the device you plan to give to the user."
-            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-            # Check if user entered 'back'
-            if ($null -eq $serialNumber)
+            elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
             {
-                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-                return $returnValues.backoutText # Return to the previous menu
-            }
-            else # Process only if a serial number was entered
+                Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
+                return "EXIT_APPLICATION"
+            }        
+            else 
             {
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
-                # Check if ProcessSerialNumber returned an exit signal
-                if ($null -eq $result)
-                {
-                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                    return "EXIT_APPLICATION"
-                }
+                return $result
             }
         }
-        else
-        {
-            Write-Host "The user $userName is not ready to receive a Windows 11 device." -ForegroundColor Red
-        }
     }
-}
-}
 
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
-}
-
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-}
-
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-}
-
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
-    Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
-    Write-Verbose "[$scriptName] Update result: $updateResult"
-    switch ($updateResult)
-    {
-        $returnValues.UpdateSuccessMessage
-        {
-            Write-Host 'The script has been updated.' -ForegroundColor Green
-            Write-Host 'Please restart the script.' -ForegroundColor Green
-            exit 0
-        }
-        $returnValues.UpdateFailedMessage
-        {
-            Write-Host 'The script update failed.' -ForegroundColor Red
-        }
-        $returnValues.UpdateNotNeededMessage
-        {
-            Write-Host 'The script is up to date.' -ForegroundColor Green
-        }
-        default
-        {
-            Write-Host "An error has occurred:"
-            Write-Host "Error message: $($updateResult.Content)"
-            Write-Host "Status Code: $($updateResult.StatusCode)"
-        }
-    }
-}
-}
-
-$mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
-    Write-Host 'Restarting the device...'
-    if (-not (RestartDevice))
-    {
-        Write-Verbose "[$scriptName] RestartDevice function failed."
-        return $returnValues.backoutText
-    }
-}
-}
-
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
-    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    if ($null -eq $groupName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
-    
-    #region Check if the group exists 
-    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
-    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
-    if ($groupInfo.GetType().Name -eq 'String')
-    {
-        # Handle error messages from GetEntraUser
-        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
-        return $groupInfo
-    }
-    $selectedGroup = $null
-    $substringSearch = $groupInfo[1]
-    $searchResults = $groupInfo[0].value
-    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
-    {
-        # Exact match found
-        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value
-        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
-    }
-    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
-    {
-        # Similar matches found
-        Write-Host "Could not find an exact match for group '$groupName'."
-        if ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Found a group with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($searchResults.value.count) groups with similar names:"
-        }
-        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Is this the correct group?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($searchResults.value.count) matches:"
-        }
-        # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
-        # Handle navigation options returned from DisplayGroupList
-        if ($possibleGroupName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
-            return $possibleGroupName
-        }
-        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
-            $selectedGroup = $possibleGroupName
-        }
-    }
-    else
-    {
-        return $returnValues.noGroupFoundMessage
-    }
-    #endregion Check if the group exists
-    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup 
-    #region Handle navigation responses from GetDeviceByUser
-    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
-        return "EXIT_APPLICATION"
-    }        
-    else 
-    {
-        return $result
-    }
-}
-}
-
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 }
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
