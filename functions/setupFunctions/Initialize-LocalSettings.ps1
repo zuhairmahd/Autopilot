@@ -44,7 +44,7 @@ function Initialize-LocalSettings()
             else
             {
                 $localSettings.add($key, $domainConfig.$key)
-                Write-Verbose "[$functionName] Set local $key to: $($localConfigData.$key)"
+                Write-Verbose "[$functionName] Set local $key to: $($domainConfig.$key)"
             }
         }
         elseif ($PSBoundParameters.ContainsKey($key))
