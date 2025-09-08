@@ -79,7 +79,7 @@ function Get-DomainConfigurationFromFiles()
         Write-Warning "[$functionName] Error loading domain configuration for $DomainName : $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Message "Error loading domain configuration for $DomainName : $($_.Exception.Message)" -Module $functionName -LogLevel "Error"
         # Return a minimal default configuration
-        $fallbackConfig = [ordered]]@{
+    $fallbackConfig = [ordered]@{
             groupsToInclude  = @()
             groupsToExclude  = @()
             domain           = $DomainName
