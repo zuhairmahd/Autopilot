@@ -43,6 +43,7 @@ function Handle-MenuItemSelection()
     if ($selectedItem.Action)
     {
         Write-Verbose "[$functionName] Selected item has an Action"
+        Write-Verbose "[$functionName] Action text: $($selectedItem.Action)"
         return Handle-ActionExecution -SelectedItem $selectedItem -CurrentMenu $CurrentMenu
     }
     elseif ($selectedItem.Submenu)

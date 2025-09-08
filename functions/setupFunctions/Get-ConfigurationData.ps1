@@ -93,7 +93,8 @@ function Get-ConfigurationData()
                     'settings' 
                     {
                         $defaultData = Get-ApplicationDefaults -DefaultType "Settings"
-                        if ($defaultData) {
+                        if ($defaultData)
+                        {
                             $null = Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
                             Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                             $createdFromDefaults = $true
@@ -102,7 +103,8 @@ function Get-ConfigurationData()
                     'strings' 
                     {
                         $defaultData = Get-ApplicationDefaults -DefaultType "Strings"
-                        if ($defaultData) {
+                        if ($defaultData)
+                        {
                             $null = Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
                             Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                             $createdFromDefaults = $true
@@ -111,7 +113,8 @@ function Get-ConfigurationData()
                     'menu' 
                     {
                         $defaultData = Get-ApplicationDefaults -DefaultType "Menus"
-                        if ($defaultData) {
+                        if ($defaultData)
+                        {
                             $null = Export-PowerShellDataFile -InputObject $defaultData -Path $psd1Path -Force
                             Write-Host "Created missing $psd1Path from application defaults" -ForegroundColor Green
                             $createdFromDefaults = $true
@@ -169,6 +172,7 @@ function Get-ConfigurationData()
         # Initialize caching if enabled
         if ($EnableCaching)
         {
+            Write-Verbose "[$functionName] Caching enabled"
             if (-not $script:configurationCache)
             {
                 $script:configurationCache = @{}
@@ -177,12 +181,13 @@ function Get-ConfigurationData()
             }
             
             # Check cache
+            Write-Verbose "[$functionName] Checking cache for: $psd1Path"
             $cacheKey = $psd1Path
             if ($script:configurationCache.ContainsKey($cacheKey))
             {
                 $currentFileTime = (Get-Item $psd1Path).LastWriteTime
                 $cachedFileTime = $script:configurationTimestamps[$cacheKey]
-                
+                Write-Verbose "[$functionName] Current file time: $currentFileTime, Cached file time: $cachedFileTime"
                 if ($cachedFileTime -and $currentFileTime -eq $cachedFileTime)
                 {
                     Write-Verbose "[$functionName] Using cached configuration for: $psd1Path"
@@ -207,7 +212,7 @@ function Get-ConfigurationData()
                 if ($item -is [hashtable] -and $item.ContainsKey('name'))
                 {
                     $key = $item['name']
-                    
+                    Write-Verbose "[$functionName] Processing key: $key"
                     # Select value based on configuration type
                     $value = switch ($ConfigurationType)
                     {
