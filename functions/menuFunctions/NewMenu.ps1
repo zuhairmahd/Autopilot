@@ -5,8 +5,9 @@ function NewMenu()
         Creates a new menu from configuration or manually.
     
     .DESCRIPTION
-        Creates a new menu either from configuration or manually, with proper
-        menu item structure and filtering support.
+        Creates a simple menu structure from configuration or manually. 
+        No filtering or actions are applied - this is handled by AddMenuItem and ShowMenu.
+        This is a simplified approach that separates menu creation from action assignment.
     
     .PARAMETER Title
         Title for manually created menus
@@ -20,16 +21,14 @@ function NewMenu()
     .PARAMETER MenuConfigFile
         Path to menu configuration file
         
-    .PARAMETER DisableEarlyFiltering
-        Disable early filtering optimization for testing/compatibility
-        
     .OUTPUTS
-        OrderedDictionary - Menu object with items and metadata
+        Hashtable - Menu object with basic structure
         
     .NOTES
-        - Simplified implementation focused on core menu creation
+        - Simplified implementation focused on structure only
+        - No filtering applied - handled by ShowMenu
+        - No placeholder actions - handled by AddMenuItem  
         - Maintains PowerShell 5.1 compatibility
-        - Supports both configuration-based and manual menu creation
     #>
     [CmdletBinding()]
     param (
@@ -40,13 +39,11 @@ function NewMenu()
         [Parameter(Mandatory = $false)]
         [string]$MenuName,
         [Parameter(Mandatory = $false)]
-        [string]$MenuConfigFile = "$pwd\menu",
-        [Parameter(Mandatory = $false)]
-        [switch]$DisableEarlyFiltering
+        [string]$MenuConfigFile = "$pwd\menu"
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Starting menu creation - MenuName: '$MenuName', Title: '$Title'"
+    Write-Verbose "[$functionName] Creating menu - MenuName: '$MenuName', Title: '$Title'"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Creating menu - MenuName: '$MenuName', Title: '$Title'" -LogLevel "Debug"
     
     # Try to load from configuration if MenuName is provided
@@ -63,11 +60,10 @@ function NewMenu()
                 Write-Verbose "[$functionName] Successfully loaded menu configuration for: $MenuName"
                 
                 # Create base menu object
-                $menu = [ordered]@{
+                $menu = @{
                     Title       = $menuConfig.Title
                     Description = $menuConfig.Description
                     Items       = @()
-                    PreFiltered = $false
                 }
                 
                 # Process static menu items if they exist
@@ -75,23 +71,15 @@ function NewMenu()
                 {
                     Write-Verbose "[$functionName] Processing $($menuConfig.items.Count) static menu items"
                     
-                    # Apply filtering if enabled
-                    $itemsToProcess = if ($DisableEarlyFiltering) { 
-                        $menuConfig.items 
-                    } else { 
-                        FilterMenuItemsByAppMode -MenuItems $menuConfig.items
-                        $menu.PreFiltered = $true
-                    }
-                    
-                    # Process each menu item
-                    foreach ($item in $itemsToProcess)
+                    # Process each menu item - no filtering, just structure
+                    foreach ($item in $menuConfig.items)
                     {
                         $menuItem = @{
                             Name        = $item.name
                             Description = $item.description
                         }
                         
-                        # Set display modes (default to "full" if not specified)
+                        # Preserve display modes for ShowMenu to use
                         $menuItem.includeInDisplayModes = if ($item.includeInDisplayModes -and $item.includeInDisplayModes.Count -gt 0) {
                             $item.includeInDisplayModes
                         } else {
@@ -101,15 +89,8 @@ function NewMenu()
                         # Handle different item types
                         if ($item.blockType -eq "action" -or $item.type -eq "action")
                         {
-                            # Create placeholder action that AddMenuItem can override
-                            $itemName = $item.name
-                            $currentLogFile = $LogFile
-                            $currentFunctionName = $functionName
-                            $menuItem.Action = {
-                                Write-Log -LogFile $currentLogFile -Module $currentFunctionName -Message "Placeholder action called for menu item: $itemName - action may not have been properly initialized" -LogLevel "Warning"
-                                Write-Verbose "[$currentFunctionName] Placeholder action executed for menu item: $itemName"
-                                Write-Host "This feature is not yet configured. Please contact your administrator." -ForegroundColor Yellow
-                            }.GetNewClosure()
+                            # No action assigned - AddMenuItem will handle this
+                            $menuItem.Action = $null
                         }
                         elseif ($item.blockType -eq "menu" -or $item.type -eq "submenu")
                         {
@@ -117,7 +98,7 @@ function NewMenu()
                             if ($item.menuName)
                             {
                                 Write-Verbose "[$functionName] Creating submenu: $($item.menuName)"
-                                $submenu = NewMenu -MenuName $item.menuName -MenuConfigFile $MenuConfigFile -DisableEarlyFiltering:$DisableEarlyFiltering
+                                $submenu = NewMenu -MenuName $item.menuName -MenuConfigFile $MenuConfigFile
                                 if ($submenu)
                                 {
                                     $menuItem.Submenu = $submenu
@@ -166,7 +147,7 @@ function NewMenu()
     Write-Verbose "[$functionName] Creating manual menu with title: '$Title'"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Creating manual menu: '$Title'" -LogLevel "Information"
     
-    $menu = [ordered]@{
+    $menu = @{
         Title       = $Title
         Description = $Description
         Items       = @()

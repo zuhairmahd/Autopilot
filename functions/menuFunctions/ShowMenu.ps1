@@ -157,22 +157,13 @@ function ShowMenu()
     $menuItems = @()
     Write-Verbose "[$functionName] Initializing choices and menu items."
     
-    # Loop through menu items and add to choices (excluding items in exclusion list)
+    # Loop through menu items and add to choices (filtering happens here)
     foreach ($item in $Menu.Items)
     {
-        # If this menu was prefiltered at build time, skip additional include checks
-        $includeItem = $false
-        if ($Menu.ContainsKey('PreFiltered') -and $Menu.PreFiltered)
-        {
-            $includeItem = $true
-            Write-Verbose "[$functionName] Menu marked PreFiltered; including item '$($item.Name)' without additional checks"
-        }
-        else
-        {
-            # Pass the menus configuration if available, otherwise null (which will allow all items)
-            $menusToPass = if ($script:menus) { $script:menus } else { $null }
-            $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
-        }
+        # Check if item should be included based on current app mode and menu configuration
+        $menusToPass = if ($script:menus) { $script:menus } else { $null }
+        $includeItem = Test-MenuItemIncluded -MenuItemName $item.Name -Menus $menusToPass -CurrentMenu $Menu
+        
         if ($includeItem)
         {
             Write-Verbose "[$functionName] Adding item: $($item.Name)"

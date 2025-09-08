@@ -18,11 +18,15 @@ function AddMenuItem()
     
     if ($Action -and $Submenu)
     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Error: Menu item '$Name' cannot have both Action and Submenu" -LogLevel "Warning"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error: Menu item '$Name' cannot have both Action and Submenu" -LogLevel "Warning"
         throw "A menu item cannot have both an Action and a Submenu."
     }
     
-    if (-not $Action -and -not $Submenu)
+    # Check if we're updating an existing item (allow null action for updates)
+    $existingItem = $Menu.Items | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
+    $isUpdate = $null -ne $existingItem
+    
+    if (-not $Action -and -not $Submenu -and -not $isUpdate)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error: Menu item '$Name' must have either Action or Submenu" -LogLevel "Error"
         throw "A menu item must have either an Action or a Submenu."
