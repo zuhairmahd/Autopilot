@@ -16,7 +16,9 @@ try
     . "$PSScriptRoot\..\functions\setupFunctions\Save-DomainConfiguration.ps1"
     . "$PSScriptRoot\..\functions\setupFunctions\Get-ApplicationDefaults.ps1"
     . "$PSScriptRoot\..\functions\setupFunctions\Get-ConfigurationData.ps1"
-    . "$PSScriptRoot\..\functions\utilityFunctions\Export-PowerShellDataFile.ps1"
+    . "$PSScriptRoot\..\functions\utilityFunctions\Export-PowerShellDataFile\Export-PowerShellDataFile.ps1"
+    . "$PSScriptRoot\..\functions\utilityFunctions\Export-PowerShellDataFile\ConvertTo-HashtableFromPSCustomObject.ps1"
+    . "$PSScriptRoot\..\functions\utilityFunctions\Export-PowerShellDataFile\ConvertTo-Psd1String.ps1"
     . "$PSScriptRoot\..\functions\utilityFunctions\Write-Log.ps1"
     
     # Initialize unified test environment
