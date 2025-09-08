@@ -136,7 +136,11 @@ function NewMenu()
                             # Capture the item name in the closure
                             $itemName = $item.name
                             $menuItem.Action = {
-                                Write-Host "Action not implemented for menu item: $itemName" -ForegroundColor Yellow
+                                # Log the issue for debugging without showing user-facing error
+                                Write-Log -LogFile $LogFile -Module "MenuPlaceholder" -Message "Placeholder action called for menu item: $itemName - action may not have been properly initialized" -LogLevel "Warning"
+                                Write-Verbose "Placeholder action executed for menu item: $itemName"
+                                # Return to previous menu instead of showing error to user
+                                return "Back"
                             }.GetNewClosure()
                         }
                         elseif ($item.blockType -eq "menu" -or $item.type -eq "submenu")
