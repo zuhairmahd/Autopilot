@@ -1711,7 +1711,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
         else
         {
-            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group membershipss and $($groups.ForbiddenGroups.Count) forbidden group membershipss."
+            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group memberships and $($groups.ForbiddenGroups.Count) forbidden group memberships."
             Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
             Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
             if ($groups.missingGroups.Count -gt 0)
