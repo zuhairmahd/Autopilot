@@ -98,7 +98,8 @@ Write-Host "Test main script"
     Write-Host "Test 2: Validating CreateRelease.ps1 parameter sets..." -ForegroundColor Yellow
     
     # Test help output for new parameters
-    $helpOutput = pwsh -Command "Get-Help '/home/runner/work/Autopilot/Autopilot/CreateRelease.ps1' -Parameter TargetsFile -ErrorAction SilentlyContinue"
+    $createReleaseScript = Join-Path $PSScriptRoot '..' 'CreateRelease.ps1'
+    $helpOutput = pwsh -Command "Get-Help '$createReleaseScript' -Parameter TargetsFile -ErrorAction SilentlyContinue"
     if ($helpOutput)
     {
         Write-Host "✓ TargetsFile parameter is recognized" -ForegroundColor Green
