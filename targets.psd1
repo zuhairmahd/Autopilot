@@ -9,7 +9,6 @@
         development = @{
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
-                Version         = '1.3.0.0-dev'
                 OutputPath      = 'bin'
                 SkipSigning     = $false
                 NoVersionUpdate = $false
