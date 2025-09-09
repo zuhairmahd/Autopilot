@@ -81,11 +81,10 @@ param(
     [Parameter(Mandatory = $false, ParameterSetName = 'TargetSecretsOnly')]
     [switch]$SecretsOnly,
     [switch]$AddDebug,
-    [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
-    [Parameter(Mandatory = $false, ParameterSetName = 'TargetSecretsOnly')]
-    [Parameter(Mandatory = $true, ParameterSetName = 'TargetBuild')]
-    [Parameter(Mandatory = $true, ParameterSetName = 'TargetSecretsOnly')]
-    [string]$TargetsFile,
+    [Parameter(ParameterSetName = 'SecretsOnly')]
+    [Parameter(ParameterSetName = 'TargetBuild')]
+    [Parameter(ParameterSetName = 'TargetSecretsOnly')]
+    [string]$TargetsFile = (Join-Path -Path $PWD -ChildPath "targets.psd1"),
     [Parameter(Mandatory = $true, ParameterSetName = 'TargetBuild')]
     [Parameter(Mandatory = $true, ParameterSetName = 'TargetSecretsOnly')]
     [string]$TargetName

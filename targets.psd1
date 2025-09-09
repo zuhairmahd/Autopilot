@@ -1,154 +1,161 @@
 @{
     description = 'Build targets configuration for CreateRelease.ps1 - defines different build configurations with parameters and settings'
-    version = '1.0.0'
+    version     = '1.0.0'
     
     # Build targets - each target defines build parameters and settings to apply
-    targets = @{
+    targets     = @{
         
         # Development build target
         development = @{
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
-                Version = '1.3.0.0-dev'
-                OutputPath = 'bin'
-                SkipSigning = $true
-                NoVersionUpdate = $true
-                Overwrite = $true
-                noCleanup = $false
+                Version         = '1.3.0.0-dev'
+                OutputPath      = 'bin'
+                SkipSigning     = $false
+                NoVersionUpdate = $false
+                Overwrite       = $true
+                noCleanup       = $false
             }
             
             # Settings to apply to global settings.psd1
-            globalSettings = @{
-                testMode = $true
-                autoUpdate = $false
+            globalSettings  = @{
+                testMode          = $true
+                autoUpdate        = $false
                 showLicenseBanner = $true
-                validateScopes = $false
+                validateScopes    = $false
             }
             
             # Settings to apply to auth section
-            authSettings = @{
+            authSettings    = @{
                 changePwOnNextStart = $false
-                forceNewToken = $false
-                validateScopes = $false
+                forceNewToken       = $false
+                validateScopes      = $false
             }
             
             # Domain to use for domain-specific settings (optional)
-            domain = $null
+            domain          = $null
             
             # Settings to apply to domain configuration (when domain is specified)
-            domainSettings = @{
+            domainSettings  = @{
                 # These would be applied to the domain-specific configuration file
             }
             
-            description = 'Development build with test mode enabled and signing disabled'
+            description     = 'Development build with test mode enabled and signing disabled'
         }
         
         # Production build target
-        production = @{
+        production  = @{
             buildParameters = @{
-                Version = '1.3.1.0'
-                OutputPath = 'bin'
-                SkipSigning = $false
+                Version         = '1.3.1.0'
+                OutputPath      = 'bin'
+                SkipSigning     = $false
                 NoVersionUpdate = $false
-                Overwrite = $true
-                noCleanup = $true
+                Overwrite       = $true
+                noCleanup       = $true
             }
             
-            globalSettings = @{
-                testMode = $false
-                autoUpdate = $true
+            globalSettings  = @{
+                testMode          = $false
+                autoUpdate        = $true
                 showLicenseBanner = $false
-                validateScopes = $true
+                validateScopes    = $true
             }
             
-            authSettings = @{
+            authSettings    = @{
                 changePwOnNextStart = $true
-                forceNewToken = $false
-                validateScopes = $true
+                forceNewToken       = $false
+                validateScopes      = $true
             }
             
-            domain = $null
-            domainSettings = @{}
+            domain          = $null
+            domainSettings  = @{}
             
-            description = 'Production build with signing enabled and test mode disabled'
+            description     = 'Production build with signing enabled and test mode disabled'
         }
         
         # Customer-specific build (example for arabictutor.com)
         arabictutor = @{
             buildParameters = @{
-                Version = '1.3.0.0-arabictutor'
-                OutputPath = './build/arabictutor'
-                SkipSigning = $false
+                Version         = '1.3.0.0-arabictutor'
+                OutputPath      = './build/arabictutor'
+                SkipSigning     = $false
                 NoVersionUpdate = $false
-                Overwrite = $true
+                Overwrite       = $true
             }
             
-            globalSettings = @{
-                testMode = $false
-                autoUpdate = $true
+            globalSettings  = @{
+                testMode             = $false
+                autoUpdate           = $true
                 maxGroupMatchDisplay = 20
-                maxUserMatchDisplay = 20
+                maxUserMatchDisplay  = 20
             }
             
-            authSettings = @{
+            authSettings    = @{
                 changePwOnNextStart = $false
-                validateScopes = $false
+                validateScopes      = $false
             }
             
             # Use arabictutor.com domain configuration
-            domain = 'arabictutor.com'
+            domain          = 'arabictutor.com'
             
             # Settings specific to arabictutor.com domain
-            domainSettings = @{
-                companyName = 'ZM Consulting'
-                appMode = 'full'
+            domainSettings  = @{
+                companyName          = 'ZM Consulting'
+                appMode              = 'full'
                 maxGroupMatchDisplay = 20
-                maxUserMatchDisplay = 20
-                groupTag = 'ENTRA'
-                deviceNamePrefix = 'vmware'
-                showLicenseBanner = $false
-                validateScopes = $false
+                maxUserMatchDisplay  = 20
+                groupTag             = 'ENTRA'
+                deviceNamePrefix     = 'vmware'
+                showLicenseBanner    = $false
+                validateScopes       = $false
             }
             
-            description = 'Customer build for arabictutor.com with specific branding and settings'
+            description     = 'Customer build for arabictutor.com with specific branding and settings'
         }
         
         # Government build (example for gao.gov)
-        government = @{
+        government  = @{
             buildParameters = @{
-                Version = '1.3.0.0-gov'
-                OutputPath = 'lhm'
-                SkipSigning = $false
+                Version         = '1.3.0.0-gov'
+                OutputPath      = 'lhm'
+                SkipSigning     = $false
                 NoVersionUpdate = $false
-                Overwrite = $true
+                Overwrite       = $true
             }
             
-            globalSettings = @{
-                testMode = $false
-                autoUpdate = $true
+            globalSettings  = @{
+                testMode       = $false
+                autoUpdate     = $true
                 validateScopes = $false
             }
             
-            authSettings = @{
-                changePwOnNextStart = $false
-                validateScopes = $false
+            authSettings    = @{
+                changePwOnNextStart = $true
+                validateScopes      = $false
             }
             
-            domain = 'gao.gov'
+            domain          = 'gao.gov'
             
-            domainSettings = @{
-                companyName = 'Government Accountability Office'
-                maxGroupMatchDisplay = 20
-                maxUserMatchDisplay = 20
+            domainSettings  = @{
+                groupsToInclude                 = @(
+                    'sg_Office_365_License_G5_wth_windows_pilot',
+                    'sg_passwrd_hash_stage',
+                    'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB',
+                    'ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED'
+                )
+                groupsToExclude                 = @{}
+                companyName                     = 'Government Accountability Office'
+                maxGroupMatchDisplay            = 20
+                maxUserMatchDisplay             = 20
                 minimumDevicePhysicalMemoryInGB = 16
-                maxSerialNumberLength = 11
-                maxNumberOfDevicesAllowed = 20
-                deviceNamePrefix = 'w11-'
-                privateSession = $true
-                groupTag = 'MSB01'
-                showLicenseBanner = $false
-                validateScopes = $false
-                userPatternsToExclude = @(
+                maxSerialNumberLength           = 11
+                maxNumberOfDevicesAllowed       = 20
+                deviceNamePrefix                = 'w11-'
+                privateSession                  = $true
+                groupTag                        = 'MSB01'
+                showLicenseBanner               = $false
+                validateScopes                  = $false
+                userPatternsToExclude           = @(
                     '-test'
                     'onmicrosoft.com'
                     '-rsa'
@@ -156,38 +163,38 @@
                     '-a'
                     '-sup'
                 )
-                desiredAutopilotProfiles = @('msb')
+                desiredAutopilotProfiles        = @('msb')
             }
             
-            description = 'Government build for gao.gov with enhanced security and compliance settings'
+            description     = 'Government build for gao.gov with enhanced security and compliance settings'
         }
         
         # Testing target for CI/CD validation
-        ci_test = @{
+        ci_test     = @{
             buildParameters = @{
-                Version = 'test.0.0.1'
-                OutputPath = './build/ci_test'
-                SkipSigning = $true
+                Version         = 'test.0.0.1'
+                OutputPath      = './build/ci_test'
+                SkipSigning     = $true
                 NoVersionUpdate = $true
-                Overwrite = $true
-                noCleanup = $false
+                Overwrite       = $true
+                noCleanup       = $false
             }
             
-            globalSettings = @{
-                testMode = $true
-                autoUpdate = $false
+            globalSettings  = @{
+                testMode       = $true
+                autoUpdate     = $false
                 validateScopes = $false
             }
             
-            authSettings = @{
+            authSettings    = @{
                 changePwOnNextStart = $false
-                validateScopes = $false
+                validateScopes      = $false
             }
             
-            domain = $null
-            domainSettings = @{}
+            domain          = $null
+            domainSettings  = @{}
             
-            description = 'CI/CD testing target with minimal settings for pipeline validation'
+            description     = 'CI/CD testing target with minimal settings for pipeline validation'
         }
     }
 }
