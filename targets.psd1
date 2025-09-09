@@ -10,7 +10,7 @@
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
                 Version = '1.3.0.0-dev'
-                OutputPath = './build/dev'
+                OutputPath = 'bin'
                 SkipSigning = $true
                 NoVersionUpdate = $true
                 Overwrite = $true
@@ -47,7 +47,7 @@
         production = @{
             buildParameters = @{
                 Version = '1.3.1.0'
-                OutputPath = './build/production'
+                OutputPath = 'bin'
                 SkipSigning = $false
                 NoVersionUpdate = $false
                 Overwrite = $true
@@ -117,7 +117,7 @@
         government = @{
             buildParameters = @{
                 Version = '1.3.0.0-gov'
-                OutputPath = './build/government'
+                OutputPath = 'lhm'
                 SkipSigning = $false
                 NoVersionUpdate = $false
                 Overwrite = $true
