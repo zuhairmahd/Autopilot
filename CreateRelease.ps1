@@ -57,9 +57,11 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, ParameterSetName = 'StandardBuild')]
+    [Parameter(Mandatory = $false, ParameterSetName = 'TargetBuild')]
     [string]$InputFile,
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, ParameterSetName = 'StandardBuild')]
+    [Parameter(Mandatory = $false, ParameterSetName = 'TargetBuild')]
     [string]$Version,
     [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
     [string]$versionPartToIncrement = 'Revision',
@@ -76,14 +78,63 @@ param(
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
+    [Parameter(Mandatory = $false, ParameterSetName = 'TargetSecretsOnly')]
     [switch]$SecretsOnly,
     [switch]$AddDebug,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
-    [switch]$NoPasswordChange
+    [Parameter(Mandatory = $false, ParameterSetName = 'TargetSecretsOnly')]
+    [switch]$NoPasswordChange,
+    [Parameter(Mandatory = $true, ParameterSetName = 'TargetBuild')]
+    [Parameter(Mandatory = $true, ParameterSetName = 'TargetSecretsOnly')]
+    [string]$TargetsFile,
+    [Parameter(Mandatory = $true, ParameterSetName = 'TargetBuild')]
+    [Parameter(Mandatory = $true, ParameterSetName = 'TargetSecretsOnly')]
+    [string]$TargetName
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
 $logFile = $Log
+
+# Process target configuration if TargetBuild parameter set is used
+$targetConfig = $null
+if ($PSCmdlet.ParameterSetName -eq 'TargetBuild' -or $PSCmdlet.ParameterSetName -eq 'TargetSecretsOnly')
+{
+    Write-Host "Loading target configuration: $TargetName from $TargetsFile" -ForegroundColor Cyan
+    
+    # Simple target loading before function imports
+    try
+    {
+        if (-not (Test-Path $TargetsFile))
+        {
+            Write-Host "Targets file not found: $TargetsFile" -ForegroundColor Red
+            exit 1
+        }
+        
+        $targetsData = Import-PowerShellDataFile -Path $TargetsFile
+        if (-not $targetsData.targets -or -not $targetsData.targets.ContainsKey($TargetName))
+        {
+            Write-Host "Target '$TargetName' not found in targets file" -ForegroundColor Red
+            $availableTargets = $targetsData.targets.Keys -join ', '
+            Write-Host "Available targets: $availableTargets" -ForegroundColor Yellow
+            exit 1
+        }
+        
+        $targetConfig = $targetsData.targets[$TargetName]
+        Write-Host "Target loaded: $($targetConfig.description)" -ForegroundColor Green
+    }
+    catch
+    {
+        Write-Host "Error loading target configuration: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+    
+    # Set InputFile as default if not specified (for backward compatibility)
+    if (-not $InputFile)
+    {
+        $InputFile = "main.ps1"
+        Write-Verbose "[$scriptName] InputFile not specified, using default: $InputFile"
+    }
+}
 
 #region import functions.
 function Find-FolderPath()
@@ -1035,6 +1086,254 @@ function UpdateSettingsFile()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
     }
 }
+
+function Load-TargetConfiguration()
+{
+    <#
+    .SYNOPSIS
+        Loads and validates target configuration from targets.psd1 file.
+    
+    .DESCRIPTION
+        Reads the targets.psd1 file and extracts the specified target configuration,
+        including build parameters and settings to apply.
+    
+    .PARAMETER TargetsFile
+        Path to the targets.psd1 file.
+    
+    .PARAMETER TargetName
+        Name of the target to load from the targets file.
+    
+    .OUTPUTS
+        System.Collections.Hashtable
+        Returns hashtable containing target configuration or $null if target not found.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TargetsFile,
+        [Parameter(Mandatory = $true)]
+        [string]$TargetName
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Loading target configuration from: $TargetsFile"
+    Write-Log -LogFile $logFile -Message "Loading target configuration from: $TargetsFile" -Module $functionName -LogLevel "Information"
+    
+    try
+    {
+        if (-not (Test-Path $TargetsFile))
+        {
+            Write-Error "[$functionName] Targets file not found: $TargetsFile"
+            Write-Log -LogFile $logFile -Message "Targets file not found: $TargetsFile" -Module $functionName -LogLevel "Error"
+            return $null
+        }
+        
+        # Load targets configuration
+        $targetsConfig = Import-PowerShellDataFile -Path $TargetsFile
+        Write-Verbose "[$functionName] Targets file loaded successfully"
+        Write-Log -LogFile $logFile -Message "Targets file loaded successfully" -Module $functionName -LogLevel "Verbose"
+        
+        # Validate targets structure
+        if (-not $targetsConfig.targets)
+        {
+            Write-Error "[$functionName] Invalid targets file structure - missing 'targets' section"
+            Write-Log -LogFile $logFile -Message "Invalid targets file structure - missing 'targets' section" -Module $functionName -LogLevel "Error"
+            return $null
+        }
+        
+        # Check if target exists
+        if (-not $targetsConfig.targets.ContainsKey($TargetName))
+        {
+            Write-Error "[$functionName] Target '$TargetName' not found in targets file"
+            Write-Log -LogFile $logFile -Message "Target '$TargetName' not found in targets file" -Module $functionName -LogLevel "Error"
+            
+            # List available targets
+            $availableTargets = $targetsConfig.targets.Keys -join ', '
+            Write-Host "Available targets: $availableTargets" -ForegroundColor Yellow
+            Write-Log -LogFile $logFile -Message "Available targets: $availableTargets" -Module $functionName -LogLevel "Information"
+            return $null
+        }
+        
+        $targetConfig = $targetsConfig.targets[$TargetName]
+        Write-Verbose "[$functionName] Target '$TargetName' loaded successfully"
+        Write-Log -LogFile $logFile -Message "Target '$TargetName' loaded successfully: $($targetConfig.description)" -Module $functionName -LogLevel "Information"
+        
+        return $targetConfig
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error loading target configuration: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Message "Error loading target configuration: $($_.Exception.Message)" -Module $functionName -LogLevel "Error"
+        return $null
+    }
+}
+
+function Apply-TargetSettings()
+{
+    <#
+    .SYNOPSIS
+        Applies target settings to global and domain configuration files.
+    
+    .DESCRIPTION
+        Merges target settings into the appropriate configuration files using existing
+        settings management functions. Creates default configurations if files don't exist.
+    
+    .PARAMETER TargetConfig
+        Target configuration hashtable containing settings to apply.
+    
+    .PARAMETER SettingsFilePath
+        Path to the main settings.psd1 file.
+    
+    .PARAMETER ConfigurationPath
+        Directory path where configuration files are located.
+    
+    .OUTPUTS
+        System.Boolean
+        Returns $true if settings were applied successfully, $false otherwise.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$TargetConfig,
+        [Parameter(Mandatory = $true)]
+        [string]$SettingsFilePath,
+        [Parameter(Mandatory = $false)]
+        [string]$ConfigurationPath = $pwd
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Applying target settings to configuration files"
+    Write-Log -LogFile $logFile -Message "Applying target settings to configuration files" -Module $functionName -LogLevel "Information"
+    
+    try
+    {
+        # Load or create main settings file
+        if (Test-Path $SettingsFilePath)
+        {
+            Write-Verbose "[$functionName] Loading existing settings file: $SettingsFilePath"
+            $currentSettings = Import-PowerShellDataFile -Path $SettingsFilePath
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Creating new settings file from defaults"
+            $currentSettings = Get-ApplicationDefaults -DefaultType "Settings"
+        }
+        
+        # Apply global settings if specified
+        if ($TargetConfig.globalSettings -and $TargetConfig.globalSettings.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] Applying $($TargetConfig.globalSettings.Count) global settings"
+            Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.globalSettings.Count) global settings" -Module $functionName -LogLevel "Verbose"
+            
+            foreach ($key in $TargetConfig.globalSettings.Keys)
+            {
+                $currentSettings.globalSettings[$key] = $TargetConfig.globalSettings[$key]
+                Write-Verbose "[$functionName] Applied global setting: $key = $($TargetConfig.globalSettings[$key])"
+            }
+        }
+        
+        # Apply auth settings if specified
+        if ($TargetConfig.authSettings -and $TargetConfig.authSettings.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] Applying $($TargetConfig.authSettings.Count) auth settings"
+            Write-Log -LogFile $logFile -Message "Applying $($TargetConfig.authSettings.Count) auth settings" -Module $functionName -LogLevel "Verbose"
+            
+            foreach ($key in $TargetConfig.authSettings.Keys)
+            {
+                $currentSettings.auth[$key] = $TargetConfig.authSettings[$key]
+                Write-Verbose "[$functionName] Applied auth setting: $key = $($TargetConfig.authSettings[$key])"
+            }
+        }
+        
+        # Save updated main settings file
+        Write-Verbose "[$functionName] Saving updated settings file"
+        $currentSettings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate -Force
+        Write-Log -LogFile $logFile -Message "Updated settings file saved: $SettingsFilePath" -Module $functionName -LogLevel "Information"
+        
+        # Handle domain-specific settings if specified
+        if ($TargetConfig.domain -and $TargetConfig.domainSettings -and $TargetConfig.domainSettings.Count -gt 0)
+        {
+            Write-Verbose "[$functionName] Processing domain settings for: $($TargetConfig.domain)"
+            Write-Log -LogFile $logFile -Message "Processing domain settings for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Information"
+            
+            # Load or create domain configuration
+            $domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
+            
+            # Apply domain settings
+            foreach ($key in $TargetConfig.domainSettings.Keys)
+            {
+                $domainConfig[$key] = $TargetConfig.domainSettings[$key]
+                Write-Verbose "[$functionName] Applied domain setting: $key = $($TargetConfig.domainSettings[$key])"
+            }
+            
+            # Save domain configuration
+            $saveResult = Save-DomainConfiguration -DomainName $TargetConfig.domain -DomainConfiguration $domainConfig -ConfigurationPath $ConfigurationPath
+            if ($saveResult)
+            {
+                Write-Log -LogFile $logFile -Message "Domain configuration saved for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Information"
+            }
+            else
+            {
+                Write-Warning "[$functionName] Failed to save domain configuration for: $($TargetConfig.domain)"
+                Write-Log -LogFile $logFile -Message "Failed to save domain configuration for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Warning"
+            }
+        }
+        
+        Write-Verbose "[$functionName] Target settings applied successfully"
+        Write-Log -LogFile $logFile -Message "Target settings applied successfully" -Module $functionName -LogLevel "Information"
+        return $true
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error applying target settings: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Message "Error applying target settings: $($_.Exception.Message)" -Module $functionName -LogLevel "Error"
+        return $false
+    }
+}
+
+function Set-ParametersFromTarget()
+{
+    <#
+    .SYNOPSIS
+        Sets script parameters based on target configuration.
+    
+    .DESCRIPTION
+        Extracts build parameters from target configuration and applies them to
+        script variables, ensuring target parameters override command-line parameters.
+    
+    .PARAMETER TargetConfig
+        Target configuration hashtable containing build parameters.
+    
+    .OUTPUTS
+        System.Collections.Hashtable
+        Returns hashtable of parameters to use for the build.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$TargetConfig
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Setting parameters from target configuration"
+    Write-Log -LogFile $logFile -Message "Setting parameters from target configuration" -Module $functionName -LogLevel "Information"
+    
+    $params = @{}
+    
+    # Copy build parameters from target if they exist
+    if ($TargetConfig.buildParameters)
+    {
+        foreach ($key in $TargetConfig.buildParameters.Keys)
+        {
+            $params[$key] = $TargetConfig.buildParameters[$key]
+            Write-Verbose "[$functionName] Set parameter from target: $key = $($TargetConfig.buildParameters[$key])"
+        }
+        Write-Log -LogFile $logFile -Message "Applied $($TargetConfig.buildParameters.Count) build parameters from target" -Module $functionName -LogLevel "Verbose"
+    }
+    
+    return $params
+}
+
 #endregion helper functions
 
 #region Define variables
@@ -1101,6 +1400,22 @@ if ($CreateModule)
 if ($SecretsOnly)
 {
     Write-Host "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets"
+    
+    # Apply target settings if using target-based mode
+    if ($targetConfig)
+    {
+        Write-Host "Applying target settings in SecretsOnly mode..." -ForegroundColor Cyan
+        $settingsApplied = Apply-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+        if (-not $settingsApplied)
+        {
+            Write-Host "Failed to apply target settings in SecretsOnly mode" -ForegroundColor Yellow
+        }
+        else
+        {
+            Write-Host "Target settings applied successfully in SecretsOnly mode" -ForegroundColor Green
+        }
+    }
+    
     if ($NoPasswordChange)
     {
         Write-Verbose "[$scriptName] Skipping settings file update to avoid password change."
@@ -1110,14 +1425,8 @@ if ($SecretsOnly)
     else
     {
         Write-Verbose "[$scriptName] Updating settings file to force password change."
-        Write-Log -logFile $logFile -Message "Updating settings file to force password  change." -module $scriptName
+        Write-Log -logFile $logFile -Message "Updating settings file to force password change." -module $scriptName
         $settingsUpdate = $true
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Skipping settings file update."
-        Write-Log -logFile $logFile -Message "Skipping settings file update." -module $scriptName
-        $settingsUpdate = $false
     }
     Write-Log -logFile $logFile -Message "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets" -module $scriptName
     if ($Overwrite)
@@ -1282,6 +1591,46 @@ else
     New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
 }
 #endregion
+
+# Apply target configuration settings if using target-based build
+if ($targetConfig)
+{
+    Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
+    
+    # Apply target settings to configuration files
+    $settingsApplied = Apply-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+    if (-not $settingsApplied)
+    {
+        Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
+    
+    # Override script parameters with target build parameters
+    $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
+    foreach ($key in $targetParams.Keys)
+    {
+        $value = $targetParams[$key]
+        Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
+        
+        # Map target parameters to script variables
+        switch ($key)
+        {
+            'Version' { $Version = $value }
+            'OutputPath' { $OutputPath = $value }
+            'SkipSigning' { $SkipSigning = $value }
+            'NoVersionUpdate' { $NoVersionUpdate = $value }
+            'Overwrite' { $Overwrite = $value }
+            'noCleanup' { $noCleanup = $value }
+            'AddDebug' { $AddDebug = $value }
+            'CompanyName' { $CompanyName = $value }
+            'Author' { $Author = $value }
+            default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
+        }
+    }
+    
+    Write-Host "Target configuration applied successfully" -ForegroundColor Green
+}
 
 #region Merge functions
 if (-not $CreateModule)
