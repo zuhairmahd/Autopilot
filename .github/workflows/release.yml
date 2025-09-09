@@ -59,8 +59,8 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning 
-          write-host "Build complete. Executable and lastrun.json are in the bin directory."
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -SkipSigning
+          write-host "Build complete (release using target: production). Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -120,7 +120,7 @@ jobs:
           Write-Host "Copied .\bin\main.exe to .\main.exe."
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
           write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -updateHash
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -updateHash
       
       - name: Upload signed artifacts
         uses: actions/upload-artifact@v4

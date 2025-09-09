@@ -2,7 +2,8 @@ function DisplayNumericMenu()
 {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true)][string[]]$choices,
+        [Parameter(Mandatory = $true)]
+        [string[]]$choices,
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
@@ -102,7 +103,7 @@ function DisplayNumericMenu()
             }
             catch
             {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Verbose"
                 $selection = $null
             }
         } until ($allValidKeys -contains $selection)
@@ -170,7 +171,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $
         # Convert to integer explicitly to avoid any type conversion issues
         $index = [int]$selection - 1
         Write-Verbose "[$functionName] Returning choice at index $($index): '$($choices[$index])'"
-Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choices[$index])'" -LogLevel "Debug"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "User selected option $($index + 1): '$($choices[$index])'" -LogLevel "Debug"
         # Return the selected choice
         return $choices[$index]
     }
