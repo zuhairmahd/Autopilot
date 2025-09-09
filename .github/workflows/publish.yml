@@ -83,7 +83,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -inputFile main.ps1 -Overwrite -SkipSigning
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -inputFile main.ps1 -Overwrite
           Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
@@ -205,7 +205,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName government -Overwrite -SkipSigning
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName government -Overwrite
           Write-Host "Build complete (lhm using target: government). Executable and lastrun.json are in the lhm directory."
 
       - name: Upload build artifact

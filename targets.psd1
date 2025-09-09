@@ -10,7 +10,7 @@
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
                 OutputPath      = 'bin'
-                SkipSigning     = $false
+                SkipSigning     = $true
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $false
@@ -47,7 +47,7 @@
             buildParameters = @{
                 Version         = '1.3.1.0'
                 OutputPath      = 'bin'
-                SkipSigning     = $false
+                SkipSigning     = $true
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $true
@@ -77,7 +77,7 @@
             buildParameters = @{
                 Version         = '1.3.0.0-arabictutor'
                 OutputPath      = './build/arabictutor'
-                SkipSigning     = $false
+                SkipSigning     = $true
                 NoVersionUpdate = $false
                 Overwrite       = $true
             }
@@ -117,7 +117,7 @@
             buildParameters = @{
                 Version         = '1.3.0.0-gov'
                 OutputPath      = 'lhm'
-                SkipSigning     = $false
+                SkipSigning     = $true
                 NoVersionUpdate = $false
                 Overwrite       = $true
             }
