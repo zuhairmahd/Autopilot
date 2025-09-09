@@ -59,7 +59,7 @@
 param(
     [Parameter(Mandatory = $true, ParameterSetName = 'StandardBuild')]
     [Parameter(Mandatory = $false, ParameterSetName = 'TargetBuild')]
-    [string]$InputFile,
+    [string]$InputFile = 'main.ps1',
     [Parameter(Mandatory = $false, ParameterSetName = 'StandardBuild')]
     [Parameter(Mandatory = $false, ParameterSetName = 'TargetBuild')]
     [string]$Version,
@@ -83,7 +83,6 @@ param(
     [switch]$AddDebug,
     [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
     [Parameter(Mandatory = $false, ParameterSetName = 'TargetSecretsOnly')]
-    [switch]$NoPasswordChange,
     [Parameter(Mandatory = $true, ParameterSetName = 'TargetBuild')]
     [Parameter(Mandatory = $true, ParameterSetName = 'TargetSecretsOnly')]
     [string]$TargetsFile,
@@ -1001,174 +1000,7 @@ function CopySecrets()
     return $true
 }
 
-function UpdateSettingsFile()
-{
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$SettingsFilePath,
-        [switch]$confirm
-    )
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Updating settings file at: $SettingsFilePath"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Updating settings file at: $SettingsFilePath" -LogLevel "Information"
-    if ($confirm)
-    {
-        $response = Read-Host "Are you sure you want to change the default password? (Y/N)"
-        while ($response -notin 'Y', 'N', 'yes', 'no')
-        {
-            $response = Read-Host 'Invalid input. Please enter Y or N: '
-            Write-Verbose "[$functionName] User response: $response"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "User response: $response" -LogLevel "Information"
-            [console]::beep(500, 300)
-        }
-        if ($response -eq 'N' -or $response -eq 'no')
-        {
-            Write-Host 'Exiting without updating settings file.'
-            Write-Log -LogFile $LogFile -Module $functionName -Message "User chose not to update settings file. Exiting." -LogLevel "Information"
-            return $false
-        }   
-    }
-    if (Test-Path $SettingsFilePath)
-    {
-        try
-        {
-            Write-Verbose "[$functionName] Reading settings file content."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Reading settings file content." -LogLevel "Information"
-            $settings = Import-PowerShellDataFile -Path $SettingsFilePath
-            # Update the changePWOnNextStart setting
-            Write-Verbose "[$functionName] Checking for changePWOnNextStart setting."
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Checking for changePWOnNextStart setting." -LogLevel "Information"
-            if ($settings.auth -and $null -ne $settings.auth.changePWOnNextStart)
-            {
-                Write-Verbose "[$functionName] changePWOnNextStart setting found. Setting it to true."
-                Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting found. Setting it to true." -LogLevel "Information"
-                if ($settings.auth.changePWOnNextStart -eq $true)
-                {
-                    Write-Host "changePWOnNextStart is already set to true. No changes made."
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart is already set to true. No changes made." -LogLevel "Information"
-                    return $true
-                }
-                $settings.auth.changePWOnNextStart = $true
-                # Write updated settings back to file
-                Write-Verbose "[$functionName] Writing updated settings back to file."
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Writing updated settings back to file." -LogLevel "Information"
-                try
-                {
-                    $settings | Export-PowerShellDataFile -Path $SettingsFilePath -Validate -force
-                    Write-Host "Settings updated successfully" -ForegroundColor Green
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Settings.psd1 updated successfully - changePWOnNextStart set to true" -LogLevel "Information"
-                }
-                catch
-                {
-                    Write-Error "Failed to write updated settings to $SettingsFilePath"
-                    Write-Error $_.Exception.Message
-                    Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to write updated settings to $SettingsFilePath" -LogLevel 'Error'
-                    return $false
-                }
-            }                
-            else
-            {
-                Write-Warning "changePWOnNextStart setting not found in auth section"
-                Write-Log -LogFile $LogFile -Module $functionName -Message "changePWOnNextStart setting not found in auth section" -LogLevel "Warning"
-            }
-        }
-        catch
-        {
-            Write-Host "Failed to update settings file: $($_.Exception.Message)" -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Failed to update settings file: $($_.Exception.Message)" -LogLevel "Error"
-            return $false
-        }
-    }
-    else
-    {
-        Write-Warning "Settings file not found: $SettingsFile"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Settings file not found: $SettingsFile" -LogLevel "Warning"
-    }
-}
-
-function Load-TargetConfiguration()
-{
-    <#
-    .SYNOPSIS
-        Loads and validates target configuration from targets.psd1 file.
-    
-    .DESCRIPTION
-        Reads the targets.psd1 file and extracts the specified target configuration,
-        including build parameters and settings to apply.
-    
-    .PARAMETER TargetsFile
-        Path to the targets.psd1 file.
-    
-    .PARAMETER TargetName
-        Name of the target to load from the targets file.
-    
-    .OUTPUTS
-        System.Collections.Hashtable
-        Returns hashtable containing target configuration or $null if target not found.
-    #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$TargetsFile,
-        [Parameter(Mandatory = $true)]
-        [string]$TargetName
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Loading target configuration from: $TargetsFile"
-    Write-Log -LogFile $logFile -Message "Loading target configuration from: $TargetsFile" -Module $functionName -LogLevel "Information"
-    
-    try
-    {
-        if (-not (Test-Path $TargetsFile))
-        {
-            Write-Error "[$functionName] Targets file not found: $TargetsFile"
-            Write-Log -LogFile $logFile -Message "Targets file not found: $TargetsFile" -Module $functionName -LogLevel "Error"
-            return $null
-        }
-        
-        # Load targets configuration
-        $targetsConfig = Import-PowerShellDataFile -Path $TargetsFile
-        Write-Verbose "[$functionName] Targets file loaded successfully"
-        Write-Log -LogFile $logFile -Message "Targets file loaded successfully" -Module $functionName -LogLevel "Verbose"
-        
-        # Validate targets structure
-        if (-not $targetsConfig.targets)
-        {
-            Write-Error "[$functionName] Invalid targets file structure - missing 'targets' section"
-            Write-Log -LogFile $logFile -Message "Invalid targets file structure - missing 'targets' section" -Module $functionName -LogLevel "Error"
-            return $null
-        }
-        
-        # Check if target exists
-        if (-not $targetsConfig.targets.ContainsKey($TargetName))
-        {
-            Write-Error "[$functionName] Target '$TargetName' not found in targets file"
-            Write-Log -LogFile $logFile -Message "Target '$TargetName' not found in targets file" -Module $functionName -LogLevel "Error"
-            
-            # List available targets
-            $availableTargets = $targetsConfig.targets.Keys -join ', '
-            Write-Host "Available targets: $availableTargets" -ForegroundColor Yellow
-            Write-Log -LogFile $logFile -Message "Available targets: $availableTargets" -Module $functionName -LogLevel "Information"
-            return $null
-        }
-        
-        $targetConfig = $targetsConfig.targets[$TargetName]
-        Write-Verbose "[$functionName] Target '$TargetName' loaded successfully"
-        Write-Log -LogFile $logFile -Message "Target '$TargetName' loaded successfully: $($targetConfig.description)" -Module $functionName -LogLevel "Information"
-        
-        return $targetConfig
-    }
-    catch
-    {
-        Write-Error "[$functionName] Error loading target configuration: $($_.Exception.Message)"
-        Write-Log -LogFile $logFile -Message "Error loading target configuration: $($_.Exception.Message)" -Module $functionName -LogLevel "Error"
-        return $null
-    }
-}
-
-function Apply-TargetSettings()
+function Update-TargetSettings()
 {
     <#
     .SYNOPSIS
@@ -1342,7 +1174,7 @@ $lastRun = Get-LastRunObject -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
 $SettingsFile = Join-Path -Path $PWD -ChildPath "settings.psd1"
 $functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1', 'lastrun.json') 
+$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1') 
 $settingsVersion = (Import-PowerShellDataFile -Path (Join-Path -Path $PWD -ChildPath "settings.psd1")).version
 $stringsVersion = (Import-PowerShellDataFile -Path (Join-Path -Path $PWD -ChildPath "strings.psd1")).version
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
@@ -1405,7 +1237,7 @@ if ($SecretsOnly)
     if ($targetConfig)
     {
         Write-Host "Applying target settings in SecretsOnly mode..." -ForegroundColor Cyan
-        $settingsApplied = Apply-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+        $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
         if (-not $settingsApplied)
         {
             Write-Host "Failed to apply target settings in SecretsOnly mode" -ForegroundColor Yellow
@@ -1598,7 +1430,7 @@ if ($targetConfig)
     Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
     
     # Apply target settings to configuration files
-    $settingsApplied = Apply-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+    $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
     if (-not $settingsApplied)
     {
         Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
@@ -1890,18 +1722,6 @@ if ($secretsCopied)
 else
 {
     Write-Host "No secrets were copied."
-}
-
-Write-Host "Updating settings file to force password change."
-if ($Overwrite)
-{
-    Write-Host "Overwriting settings file without confirmation."
-    $null = UpdateSettingsFile -SettingsFilePath $destSettingsFile
-}
-else
-{
-    Write-Host "Prompting for confirmation before updating settings file."
-    $null = UpdateSettingsFile -SettingsFilePath $destSettingsFile -confirm
 }
 
 if (-not $noCleanup)
