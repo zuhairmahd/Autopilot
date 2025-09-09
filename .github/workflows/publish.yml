@@ -83,7 +83,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -Overwrite -SkipSigning
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -inputFile main.ps1 -Overwrite -SkipSigning
           Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
@@ -147,7 +147,7 @@ jobs:
           Write-Host "Copied .\bin\main.exe to .\main.exe."
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
           Write-Host "Copied .\bin\lastrun.json to .\lastrun.json."
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -Overwrite -updateHash
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -inputFile main.ps1 -Overwrite -updateHash
 
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
