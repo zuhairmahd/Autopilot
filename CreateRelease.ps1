@@ -67,8 +67,8 @@ param(
     [string]$versionPartToIncrement = 'Revision',
     [Alias('outputFile')]
     [string]$OutputPath = '',
-    [string]$SettingsFile = "$pwd\settings.psd1",
-    [string]$Log = "$pwd\logs\createRelease.log",
+    [string]$SettingsFile = (Join-Path -Path $PWD -ChildPath "settings.psd1"),
+    [string]$Log = (Join-Path -Path $PWD -ChildPath "logs" | Join-Path -ChildPath "createRelease.log"),
     [string]$CompanyName = 'Zuhair Mahmoud',
     [string]$Author = 'Zuhair Mahmoud',
     [switch]$CreateModule,
@@ -723,8 +723,8 @@ function MergeFunctions()
     }
     else
     {
-        Write-Verbose "[$functionName] Destination file does not contain a path, using current directory: $pwd"
-        $destinationDir = $pwd
+        Write-Verbose "[$functionName] Destination file does not contain a path, using current directory: $PWD"
+        $destinationDir = $PWD
     }
     
     # Ensure the destination directory exists
@@ -1198,7 +1198,7 @@ function Apply-TargetSettings()
         [Parameter(Mandatory = $true)]
         [string]$SettingsFilePath,
         [Parameter(Mandatory = $false)]
-        [string]$ConfigurationPath = $pwd
+        [string]$ConfigurationPath = $PWD
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -1337,14 +1337,14 @@ function Set-ParametersFromTarget()
 #endregion helper functions
 
 #region Define variables
-$lastRunFile = "$pwd\lastrun.json"
+$lastRunFile = Join-Path -Path $PWD -ChildPath "lastrun.json"
 $lastRun = Get-LastRunObject -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
-$SettingsFile = "$pwd\settings.psd1"
+$SettingsFile = Join-Path -Path $PWD -ChildPath "settings.psd1"
 $functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1', 'lastrun.json') 
-$settingsVersion = (Import-PowerShellDataFile -Path "$pwd\settings.psd1").version
-$stringsVersion = (Import-PowerShellDataFile -Path "$pwd\strings.psd1").version
+$settingsVersion = (Import-PowerShellDataFile -Path (Join-Path -Path $PWD -ChildPath "settings.psd1")).version
+$stringsVersion = (Import-PowerShellDataFile -Path (Join-Path -Path $PWD -ChildPath "strings.psd1")).version
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
@@ -1357,7 +1357,7 @@ if ([string]::IsNullOrWhiteSpace($OutputPath))
 {
     # No output path provided; use default build folder
     Write-Verbose "[$scriptName] No OutputPath specified. Using default build directory."
-    $OutputFile = Join-Path -Path "$pwd\build" -ChildPath $exeName
+    $OutputFile = Join-Path -Path $PWD -ChildPath "build" | Join-Path -ChildPath $exeName
 }
 else
 {
@@ -1635,7 +1635,7 @@ if ($targetConfig)
 #region Merge functions
 if (-not $CreateModule)
 {
-    $mergeOutputFile = Join-Path -Path "$pwd\build" -ChildPath 'merged.ps1'
+    $mergeOutputFile = Join-Path -Path $PWD -ChildPath "build" | Join-Path -ChildPath 'merged.ps1'
     $mergeParentFolder = Split-Path -Parent $mergeOutputFile
     # Ensure destination directory exists
     if (-not (Test-Path -Path $mergeParentFolder))
@@ -1961,8 +1961,8 @@ if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSi
     Write-Verbose "[$scriptName] User chose to copy the executable to the current directory."
     try
     {
-        Copy-Item -Path $OutputFile -Destination $pwd -Force
-        Write-Host "Executable copied to current directory at $pwd."
+        Copy-Item -Path $OutputFile -Destination $PWD -Force
+        Write-Host "Executable copied to current directory at $PWD."
     }
     catch
     {

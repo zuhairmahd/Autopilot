@@ -15,9 +15,9 @@ $scriptName = $MyInvocation.MyCommand.Name
 $testStartTime = Get-Date
 
 # Test configuration
-$testDir = "/tmp/target-build-test"
-$targetsFile = "$testDir/test-targets.psd1"
-$testMainScript = "$testDir/main.ps1"
+$testDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "target-build-test"
+$targetsFile = Join-Path -Path $testDir -ChildPath "test-targets.psd1"
+$testMainScript = Join-Path -Path $testDir -ChildPath "main.ps1"
 
 Write-Host "=== Testing CreateRelease.ps1 Target-Based Build Functionality ===" -ForegroundColor Cyan
 Write-Host "Test directory: $testDir"
@@ -98,7 +98,7 @@ Write-Host "Test main script"
     Write-Host "Test 2: Validating CreateRelease.ps1 parameter sets..." -ForegroundColor Yellow
     
     # Test help output for new parameters
-    $createReleaseScript = Join-Path $PSScriptRoot '..' 'CreateRelease.ps1'
+    $createReleaseScript = Join-Path -Path $PSScriptRoot -ChildPath '..' | Join-Path -ChildPath 'CreateRelease.ps1'
     $helpOutput = pwsh -Command "Get-Help '$createReleaseScript' -Parameter TargetsFile -ErrorAction SilentlyContinue"
     if ($helpOutput)
     {
@@ -114,10 +114,14 @@ Write-Host "Test main script"
     
     Set-Location -Path $testDir
     
+    # Get the repository root directory
+    $repoRoot = Join-Path -Path $PSScriptRoot -ChildPath '..'
+    $createReleaseScript = Join-Path -Path $repoRoot -ChildPath 'CreateRelease.ps1'
+    
     # Run CreateRelease with SecretsOnly to test target loading without full build
     $testOutput = pwsh -Command "
         try {
-            & '/home/runner/work/Autopilot/Autopilot/CreateRelease.ps1' -TargetsFile '$targetsFile' -TargetName 'test' -SecretsOnly -NoPasswordChange -ErrorAction Stop 2>&1
+            & '$createReleaseScript' -TargetsFile '$targetsFile' -TargetName 'test' -SecretsOnly -NoPasswordChange -ErrorAction Stop 2>&1
         } catch {
             Write-Output 'ERROR: ' + `$_.Exception.Message
         }
@@ -138,7 +142,7 @@ Write-Host "Test main script"
     
     $errorOutput = pwsh -Command "
         try {
-            & '/home/runner/work/Autopilot/Autopilot/CreateRelease.ps1' -TargetsFile '$targetsFile' -TargetName 'nonexistent' -SecretsOnly -NoPasswordChange 2>&1
+            & '$createReleaseScript' -TargetsFile '$targetsFile' -TargetName 'nonexistent' -SecretsOnly -NoPasswordChange 2>&1
         } catch {
             Write-Output 'Expected error: ' + `$_.Exception.Message
         }
@@ -159,7 +163,7 @@ Write-Host "Test main script"
     
     $missingFileOutput = pwsh -Command "
         try {
-            & '/home/runner/work/Autopilot/Autopilot/CreateRelease.ps1' -TargetsFile 'nonexistent.psd1' -TargetName 'test' -SecretsOnly -NoPasswordChange 2>&1
+            & '$createReleaseScript' -TargetsFile 'nonexistent.psd1' -TargetName 'test' -SecretsOnly -NoPasswordChange 2>&1
         } catch {
             Write-Output 'Expected error: ' + `$_.Exception.Message
         }
@@ -180,7 +184,7 @@ Write-Host "Test main script"
     
     $backwardCompatOutput = pwsh -Command "
         try {
-            & '/home/runner/work/Autopilot/Autopilot/CreateRelease.ps1' -InputFile '$testMainScript' -SecretsOnly -NoPasswordChange 2>&1 | Select-Object -First 10
+            & '$createReleaseScript' -InputFile '$testMainScript' -SecretsOnly -NoPasswordChange 2>&1 | Select-Object -First 10
         } catch {
             Write-Output 'ERROR: ' + `$_.Exception.Message
         }
@@ -203,7 +207,7 @@ Write-Host "Test main script"
     Write-Host "Test duration: $($testDuration.TotalSeconds.ToString('F2')) seconds" -ForegroundColor Gray
     
     # Test with the actual targets.psd1 file if it exists
-    $actualTargetsFile = "/home/runner/work/Autopilot/Autopilot/targets.psd1"
+    $actualTargetsFile = Join-Path -Path $repoRoot -ChildPath "targets.psd1"
     if (Test-Path $actualTargetsFile)
     {
         Write-Host "=== Testing with actual targets.psd1 ===" -ForegroundColor Cyan
@@ -218,7 +222,7 @@ Write-Host "Test main script"
         
         $actualTestOutput = pwsh -Command "
             try {
-                & '/home/runner/work/Autopilot/Autopilot/CreateRelease.ps1' -TargetsFile '$actualTargetsFile' -TargetName '$firstTarget' -SecretsOnly -NoPasswordChange 2>&1 | Select-Object -First 5
+                & '$createReleaseScript' -TargetsFile '$actualTargetsFile' -TargetName '$firstTarget' -SecretsOnly -NoPasswordChange 2>&1 | Select-Object -First 5
             } catch {
                 Write-Output 'ERROR: ' + `$_.Exception.Message
             }
@@ -245,7 +249,7 @@ catch
 finally
 {
     # Cleanup
-    Set-Location -Path "/home/runner/work/Autopilot/Autopilot"
+    Set-Location -Path $repoRoot
     if (Test-Path $testDir)
     {
         Remove-Item -Path $testDir -Recurse -Force
