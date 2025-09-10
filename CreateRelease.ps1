@@ -1146,9 +1146,9 @@ function Set-ParametersFromTarget()
     
     return $params
 }
-
 #endregion helper functions
 
+#region Apply script parameters and target settings
 Write-Host "Applying scritt parameters..."
 write-log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
 # Apply target configuration settings if using target-based build
@@ -1201,6 +1201,7 @@ if ($targetConfig)
         write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
     }
 }
+#endregion
 
 #region Define variables
 $lastRunFile = Join-Path -Path $PWD -ChildPath "lastrun.json"
@@ -1246,7 +1247,6 @@ $destSettingsFile = "$parentFolder\settings.psd1"
 #endregion
 
 #region initial checks
-
 if ($CreateModule)
 {
     Write-Host "Creating module $helperModuleName."
@@ -1265,7 +1265,6 @@ if ($CreateModule)
 if ($SecretsOnly)
 {
     Write-Host "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets"
-    
     # Apply target settings if using target-based mode
     if ($targetConfig)
     {
@@ -1280,7 +1279,6 @@ if ($SecretsOnly)
             Write-Host "Target settings applied successfully in SecretsOnly mode" -ForegroundColor Green
         }
     }
-    
     if ($NoPasswordChange)
     {
         Write-Verbose "[$scriptName] Skipping settings file update to avoid password change."
@@ -1593,23 +1591,8 @@ else
 #region Main code
 if (Test-Path $OutputFile)
 {
-    Write-Host "The output file $OutputFile already exists. Do you want to replace it? (Y/N)"
-    $response = Read-Host
-    while ($response -ne 'Y' -and $response -ne 'N')
-    {
-        Write-Host "Invalid response. Please enter Y or N."
-        [console]::beep(1000, 500)
-        $response = Read-Host
-    }
-    if ($response -ne 'Y')
-    {
-        Write-Host "Exiting script."
-        exit 0
-    }
-    else
-    {
-        Write-Host "Replacing $OutputFile"
-    }
+    Write-Host "The output file $OutputFile already exists. Removing..."
+    Remove-Item -Path $OutputFile -Force
 }
 
 $params = @{
