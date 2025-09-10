@@ -1149,6 +1149,59 @@ function Set-ParametersFromTarget()
 
 #endregion helper functions
 
+Write-Host "Applying scritt parameters..."
+write-log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
+# Apply target configuration settings if using target-based build
+if ($targetConfig)
+{
+    # Override script parameters with target build parameters
+    $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
+    write-log -logFile $logFile -Message "Build parameters to apply: $($targetParams | Out-String)" -module $scriptName
+    foreach ($key in $targetParams.Keys)
+    {
+        $value = $targetParams[$key]
+        Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
+        write-log -logFile $logFile -Message "Applying target parameter: $key = $value" -module $scriptName
+        # Map target parameters to script variables
+        switch ($key)
+        {
+            'Version' { $Version = $value }
+            'OutputPath' { $OutputPath = $value }
+            'SkipSigning' { $SkipSigning = $value }
+            'NoVersionUpdate' { $NoVersionUpdate = $value }
+            'Overwrite' { $Overwrite = $value }
+            'noCleanup' { $noCleanup = $value }
+            'AddDebug' { $AddDebug = $value }
+            'CompanyName' { $CompanyName = $value }
+            'Author' { $Author = $value }
+            default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
+        }
+        Write-Verbose "[$scriptName] Set $key to $value of type $($value.GetType().Name)"
+        write-log -logFile $logFile -Message "Set $key to $value of type $($value.GetType().Name)" -module $scriptName
+    }
+    Write-Host "Build configuration applied successfully" -ForegroundColor Green
+    write-log -logFile $logFile -Message "Build configuration applied successfully" -module $scriptName
+    if ($updateHash -eq $false)
+    {
+        Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
+        write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
+        # Apply target settings to configuration files
+        $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+        write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
+        if (-not $settingsApplied)
+        {
+            Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
+            Write-Log -logFile $logFile -finishLogging
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Host "Target settings applied successfully." -ForegroundColor Green
+        write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
+    }
+}
+
 #region Define variables
 $lastRunFile = Join-Path -Path $PWD -ChildPath "lastrun.json"
 $lastRun = Get-LastRunObject -LastRunFile $lastRunFile
@@ -1193,50 +1246,6 @@ $destSettingsFile = "$parentFolder\settings.psd1"
 #endregion
 
 #region initial checks
-Write-Host "Applying scritt parameters..."
-# Apply target configuration settings if using target-based build
-if ($targetConfig)
-{
-    # Override script parameters with target build parameters
-    $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
-    foreach ($key in $targetParams.Keys)
-    {
-        $value = $targetParams[$key]
-        Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
-        # Map target parameters to script variables
-        switch ($key)
-        {
-            'Version' { $Version = $value }
-            'OutputPath' { $OutputPath = $value }
-            'SkipSigning' { $SkipSigning = $value }
-            'NoVersionUpdate' { $NoVersionUpdate = $value }
-            'Overwrite' { $Overwrite = $value }
-            'noCleanup' { $noCleanup = $value }
-            'AddDebug' { $AddDebug = $value }
-            'CompanyName' { $CompanyName = $value }
-            'Author' { $Author = $value }
-            default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
-        }
-        Write-Verbose "[$scriptName] Set $key to $value of type $($value.GetType().Name)"
-    }
-    Write-Host "Target configuration applied successfully" -ForegroundColor Green
-    if ($updateHash -eq $false)    
-    {
-        Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
-        # Apply target settings to configuration files
-        $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
-        if (-not $settingsApplied)
-        {
-            Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
-            Write-Log -logFile $logFile -finishLogging
-            exit 1
-        }
-    }
-    else
-    {
-        Write-Host "Target settings applied successfully." -ForegroundColor Green
-    }
-}
 
 if ($CreateModule)
 {
@@ -1350,6 +1359,7 @@ if ($SecretsOnly)
 if ($updateHash)
 {
     Write-Host "Updating hash in lastrun file: $lastRunFile"
+    Write-Host "Updating hash for executable: $OutputFile"
     $updatedHash = UpdateHash -executableFilePath $OutputFile -lastRunContent $lastRun
     if ($updatedHash.hashUpdated)
     {

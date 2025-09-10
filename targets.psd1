@@ -175,7 +175,6 @@
             
             authSettings    = @{
                 changePwOnNextStart = $false
-                validateScopes      = $false
             }
             
             domain          = $null

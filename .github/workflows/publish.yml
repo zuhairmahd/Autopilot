@@ -86,6 +86,8 @@ jobs:
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -SkipSigning
           #copy lastrun.json to bin directory
           Copy-Item -Path .\lastrun.json -Destination .\bin\lastrun.json -Force
+          #copy the logs into the destination bin folder if it exists
+          if (Test-Path -Path .\logs\CreateRelease.log) { Copy-Item -Path .\logs\* -Destination .\bin\logs -Recurse -Force }
           Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
