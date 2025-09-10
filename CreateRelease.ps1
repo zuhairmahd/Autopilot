@@ -1150,7 +1150,7 @@ function Set-ParametersFromTarget()
 #region Apply script parameters and target settings
 Write-Host "Applying scritt parameters..."
 write-log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
-# Apply target configuration settings if using target-based build
+# Apply target build scrit configuration
 if ($targetConfig)
 {
     # Override script parameters with target build parameters
@@ -1180,25 +1180,6 @@ if ($targetConfig)
     }
     Write-Host "Build configuration applied successfully" -ForegroundColor Green
     write-log -logFile $logFile -Message "Build configuration applied successfully" -module $scriptName
-    if ($updateHash -eq $false)
-    {
-        Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
-        write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
-        # Apply target settings to configuration files
-        $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
-        write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
-        if (-not $settingsApplied)
-        {
-            Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
-            Write-Log -logFile $logFile -finishLogging
-            exit 1
-        }
-    }
-    else
-    {
-        Write-Host "Target settings applied successfully." -ForegroundColor Green
-        write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
-    }
 }
 #endregion
 
@@ -1206,11 +1187,9 @@ if ($targetConfig)
 $lastRunFile = Join-Path -Path $PWD -ChildPath "lastrun.json"
 $lastRun = Get-LastRunObject -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
-$SettingsFile = Join-Path -Path $PWD -ChildPath "settings.psd1"
 $functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1') 
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
-$helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
 # Resolve output file path from -OutputPath (directory or filename)
 $leafName = Split-Path -Leaf $InputFile
@@ -1242,7 +1221,7 @@ Write-Host "Output file resolved to: $OutputFile"
 # Initialize success message after resolving OutputFile
 $successMessage = "$OutputFile written"
 $parentFolder = Split-Path -Parent $OutputFile
-$destSettingsFile = "$parentFolder\settings.psd1"
+$SettingsFile = "$parentFolder\settings.psd1"
 #endregion
 
 #region initial checks
@@ -1279,6 +1258,20 @@ if ($updateHash)
         exit 1
     }
 }
+
+Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
+write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
+# Apply target settings to configuration files
+$settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
+if (-not $settingsApplied)
+{
+    Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
+    Write-Log -logFile $logFile -finishLogging
+    exit 1
+}
+Write-Host "Target settings applied successfully." -ForegroundColor Green
+write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
 
 Write-Verbose "[$scriptName] Updating last run version..."
 $updatedVersion = Update-LastRunVersion -version $version -PartToIncrement 'Revision' -LastRun $LastRun
@@ -1520,6 +1513,7 @@ else
     Write-Host "Failed to create executable: $OutputFile"
     exit 1
 }
+
 if (-not $SkipSigning)
 {
     Write-Host "Signing executable at $OutputFile"

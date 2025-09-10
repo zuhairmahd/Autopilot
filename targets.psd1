@@ -29,7 +29,7 @@
             }
             
             # Domain to use for domain-specific settings (optional)
-            domain          = $null
+            domain          = 'arabictutor.com'
             
             # Settings to apply to domain configuration (when domain is specified)
             domainSettings  = @{
@@ -117,8 +117,26 @@
             }
             
             authSettings    = @{
+                
                 changePwOnNextStart = $true
-
+                validateScopes      = $false
+                authType            = 'PublicAuthFlow'
+                noSaveRefreshToken  = $false
+                forceNewToken       = $false
+                scope               = @(
+                    'offline_access',
+                    'openid',
+                    'Device.ReadWrite.All',
+                    'DeviceManagementApps.Read.All',
+                    'DeviceManagementConfiguration.ReadWrite.All',
+                    'DeviceManagementManagedDevices.PrivilegedOperations.All',
+                    'DeviceManagementManagedDevices.ReadWrite.All',
+                    'DeviceManagementServiceConfig.ReadWrite.All'
+                )
+                delegated           = $false
+                cacheType           = 'Memory'
+                secureString        = $false
+                renewalLeadTime     = 5
             }
             
             domain          = 'gao.gov'
