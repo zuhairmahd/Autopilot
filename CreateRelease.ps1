@@ -1277,29 +1277,6 @@ if ($updateHash)
         exit 1
     }
 }
-
-Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
-write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
-# Apply target settings to configuration files (only if target config is provided)
-if ($targetConfig)
-{
-    $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile -ConfigurationPath $parentFolder
-    write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
-    if (-not $settingsApplied)
-    {
-        Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
-        Write-Log -logFile $logFile -finishLogging
-        exit 1
-    }
-    Write-Host "Target settings applied successfully." -ForegroundColor Green
-    write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
-}
-else
-{
-    Write-Host "No target configuration provided - skipping target settings application." -ForegroundColor Yellow
-    write-log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
-}
-
 Write-Verbose "[$scriptName] Updating last run version..."
 $updatedVersion = Update-LastRunVersion -version $version -PartToIncrement 'Revision' -LastRun $LastRun
 Write-Verbose "[$scriptName] Last run version after update: $($updatedVersion.version)"
@@ -1366,8 +1343,29 @@ else
     }
     New-Item -Path $parentFolder -ItemType Directory -Force | Out-Null
 }
-#endregion
 
+Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
+write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
+# Apply target settings to configuration files (only if target config is provided)
+if ($targetConfig)
+{
+    $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile -ConfigurationPath $parentFolder
+    write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
+    if (-not $settingsApplied)
+    {
+        Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
+    Write-Host "Target settings applied successfully." -ForegroundColor Green
+    write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
+}
+else
+{
+    Write-Host "No target configuration provided - skipping target settings application." -ForegroundColor Yellow
+    write-log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
+}
+#endregion
 
 #region Merge functions
 if (-not $CreateModule)
@@ -1587,16 +1585,6 @@ else
     exit 1
 }
 
-if (CopyFiles -Source $filesToCopy -Destination $parentFolder)
-{
-    Write-Host "Files copied successfully to $parentFolder"
-}
-else
-{
-    Write-Host "Failed to copy files to $parentFolder"
-    exit 1
-}
-
 if ($Overwrite)
 {
     $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder -Overwrite
@@ -1644,6 +1632,21 @@ if (-not $noCleanup)
     else
     {
         Write-Host "No merge output file to clean up."
+    }
+    #look for backup files with a .backup.* extension.
+    $backupFiles = Get-ChildItem -Path $parentFolder -Recurse -Filter "*.backup.*"
+    if ($backupFiles.Count -gt 0)
+    {
+        Write-Host "Found $($backupFiles.Count) backup files to remove."
+        foreach ($file in $backupFiles)
+        {
+            Write-Host "Removing backup file: $($file.FullName)"
+            Remove-Item -Path $file.FullName -Force | Out-Null
+        }
+    }
+    else
+    {
+        Write-Host "No backup files found to remove."
     }
 }
 else 
