@@ -17,8 +17,8 @@
         timeInSeconds = 60
         maxUserMatchDisplay = 10
         maxWaitTime = 30
-        showLicenseBanner = $true
-        autoUpdate = $true
+        showLicenseBanner = $false
+        autoUpdate = $false
         appMode = 'full'
         validateScopes = $false
         maxGroupMatchDisplay = 10
@@ -131,7 +131,7 @@
     version = '1.3.0.0'
     auth = @{
         cacheType = 'Memory'
-        changePwOnNextStart = $true
+        changePwOnNextStart = $false
         validateScopes = $false
         noSaveRefreshToken = $false
         forceNewToken = $false
