@@ -4,14 +4,12 @@
     
     # Build targets - each target defines build parameters and settings to apply
     targets     = @{
-        
         # Development build target
         development = @{
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
-                Version         = '1.3.0.0-dev'
+                inputFile       = 'main.ps1'
                 OutputPath      = 'bin'
-                SkipSigning     = $false
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $false
@@ -19,9 +17,8 @@
             
             # Settings to apply to global settings.psd1
             globalSettings  = @{
-                testMode          = $true
                 autoUpdate        = $false
-                showLicenseBanner = $true
+                showLicenseBanner = $false
                 validateScopes    = $false
             }
             
@@ -29,7 +26,6 @@
             authSettings    = @{
                 changePwOnNextStart = $false
                 forceNewToken       = $false
-                validateScopes      = $false
             }
             
             # Domain to use for domain-specific settings (optional)
@@ -46,12 +42,10 @@
         # Production build target
         production  = @{
             buildParameters = @{
-                Version         = '1.3.1.0'
                 OutputPath      = 'bin'
-                SkipSigning     = $false
                 NoVersionUpdate = $false
                 Overwrite       = $true
-                noCleanup       = $true
+                noCleanup       = $false
             }
             
             globalSettings  = @{
@@ -64,7 +58,6 @@
             authSettings    = @{
                 changePwOnNextStart = $true
                 forceNewToken       = $false
-                validateScopes      = $true
             }
             
             domain          = $null
@@ -76,9 +69,7 @@
         # Customer-specific build (example for arabictutor.com)
         arabictutor = @{
             buildParameters = @{
-                Version         = '1.3.0.0-arabictutor'
                 OutputPath      = './build/arabictutor'
-                SkipSigning     = $false
                 NoVersionUpdate = $false
                 Overwrite       = $true
             }
@@ -91,8 +82,7 @@
             }
             
             authSettings    = @{
-                changePwOnNextStart = $false
-                validateScopes      = $false
+                changePwOnNextStart = $true
             }
             
             # Use arabictutor.com domain configuration
@@ -116,9 +106,7 @@
         # Government build (example for gao.gov)
         government  = @{
             buildParameters = @{
-                Version         = '1.3.0.0-gov'
                 OutputPath      = 'lhm'
-                SkipSigning     = $false
                 NoVersionUpdate = $false
                 Overwrite       = $true
             }
@@ -131,7 +119,7 @@
             
             authSettings    = @{
                 changePwOnNextStart = $true
-                validateScopes      = $false
+
             }
             
             domain          = 'gao.gov'
@@ -140,8 +128,7 @@
                 groupsToInclude                 = @(
                     'sg_Office_365_License_G5_wth_windows_pilot',
                     'sg_passwrd_hash_stage',
-                    'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB',
-                    'ITN-USR-CON-WIN-ENROLLMENT-PROD-AUTOENROLLMENTENABLED'
+                    'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
                 )
                 groupsToExclude                 = @{}
                 companyName                     = 'Government Accountability Office'
@@ -188,7 +175,6 @@
             
             authSettings    = @{
                 changePwOnNextStart = $false
-                validateScopes      = $false
             }
             
             domain          = $null
