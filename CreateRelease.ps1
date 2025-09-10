@@ -57,11 +57,7 @@
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true, ParameterSetName = 'StandardBuild')]
-    [Parameter(Mandatory = $false, ParameterSetName = 'TargetBuild')]
     [string]$InputFile = 'main.ps1',
-    [Parameter(Mandatory = $false, ParameterSetName = 'StandardBuild')]
-    [Parameter(Mandatory = $false, ParameterSetName = 'TargetBuild')]
     [string]$Version,
     [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
     [string]$versionPartToIncrement = 'Revision',
@@ -77,25 +73,19 @@ param(
     [switch]$updateHash,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
-    [Parameter(Mandatory = $false, ParameterSetName = 'SecretsOnly')]
-    [Parameter(Mandatory = $false, ParameterSetName = 'TargetSecretsOnly')]
     [switch]$SecretsOnly,
     [switch]$AddDebug,
-    [Parameter(ParameterSetName = 'SecretsOnly')]
     [Parameter(ParameterSetName = 'TargetBuild')]
-    [Parameter(ParameterSetName = 'TargetSecretsOnly')]
     [string]$TargetsFile = (Join-Path -Path $PWD -ChildPath "targets.psd1"),
-    [Parameter(Mandatory = $true, ParameterSetName = 'TargetBuild')]
-    [Parameter(Mandatory = $true, ParameterSetName = 'TargetSecretsOnly')]
+    [Parameter(ParameterSetName = 'TargetBuild')]
     [string]$TargetName
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
 $logFile = $Log
 
-# Process target configuration if TargetBuild parameter set is used
 $targetConfig = $null
-if ($PSCmdlet.ParameterSetName -eq 'TargetBuild' -or $PSCmdlet.ParameterSetName -eq 'TargetSecretsOnly')
+if ($PSCmdlet.ParameterSetName -eq 'TargetBuild')
 {
     Write-Host "Loading target configuration: $TargetName from $TargetsFile" -ForegroundColor Cyan
     
@@ -118,19 +108,11 @@ if ($PSCmdlet.ParameterSetName -eq 'TargetBuild' -or $PSCmdlet.ParameterSetName 
         }
         
         $targetConfig = $targetsData.targets[$TargetName]
-        Write-Host "Target loaded: $($targetConfig.description)" -ForegroundColor Green
     }
     catch
     {
         Write-Host "Error loading target configuration: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
-    }
-    
-    # Set InputFile as default if not specified (for backward compatibility)
-    if (-not $InputFile)
-    {
-        $InputFile = "main.ps1"
-        Write-Verbose "[$scriptName] InputFile not specified, using default: $InputFile"
     }
 }
 
@@ -1174,8 +1156,6 @@ $maintainCurrentVersion = $false
 $SettingsFile = Join-Path -Path $PWD -ChildPath "settings.psd1"
 $functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
 $filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1') 
-$settingsVersion = (Import-PowerShellDataFile -Path (Join-Path -Path $PWD -ChildPath "settings.psd1")).version
-$stringsVersion = (Import-PowerShellDataFile -Path (Join-Path -Path $PWD -ChildPath "strings.psd1")).version
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 $helperModuleName = "HelperModule.psm1"
 Write-Host "Starting build script on $todaysDate"
@@ -1213,6 +1193,51 @@ $destSettingsFile = "$parentFolder\settings.psd1"
 #endregion
 
 #region initial checks
+Write-Host "Applying scritt parameters..."
+# Apply target configuration settings if using target-based build
+if ($targetConfig)
+{
+    # Override script parameters with target build parameters
+    $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
+    foreach ($key in $targetParams.Keys)
+    {
+        $value = $targetParams[$key]
+        Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
+        # Map target parameters to script variables
+        switch ($key)
+        {
+            'Version' { $Version = $value }
+            'OutputPath' { $OutputPath = $value }
+            'SkipSigning' { $SkipSigning = $value }
+            'NoVersionUpdate' { $NoVersionUpdate = $value }
+            'Overwrite' { $Overwrite = $value }
+            'noCleanup' { $noCleanup = $value }
+            'AddDebug' { $AddDebug = $value }
+            'CompanyName' { $CompanyName = $value }
+            'Author' { $Author = $value }
+            default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
+        }
+        Write-Verbose "[$scriptName] Set $key to $value of type $($value.GetType().Name)"
+    }
+    Write-Host "Target configuration applied successfully" -ForegroundColor Green
+    if ($updateHash -eq $false)    
+    {
+        Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
+        # Apply target settings to configuration files
+        $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
+        if (-not $settingsApplied)
+        {
+            Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
+            Write-Log -logFile $logFile -finishLogging
+            exit 1
+        }
+    }
+    else
+    {
+        Write-Host "Target settings applied successfully." -ForegroundColor Green
+    }
+}
+
 if ($CreateModule)
 {
     Write-Host "Creating module $helperModuleName."
@@ -1423,45 +1448,6 @@ else
 }
 #endregion
 
-# Apply target configuration settings if using target-based build
-if ($targetConfig)
-{
-    Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
-    
-    # Apply target settings to configuration files
-    $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
-    if (-not $settingsApplied)
-    {
-        Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
-        Write-Log -logFile $logFile -finishLogging
-        exit 1
-    }
-    
-    # Override script parameters with target build parameters
-    $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
-    foreach ($key in $targetParams.Keys)
-    {
-        $value = $targetParams[$key]
-        Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
-        
-        # Map target parameters to script variables
-        switch ($key)
-        {
-            'Version' { $Version = $value }
-            'OutputPath' { $OutputPath = $value }
-            'SkipSigning' { $SkipSigning = $value }
-            'NoVersionUpdate' { $NoVersionUpdate = $value }
-            'Overwrite' { $Overwrite = $value }
-            'noCleanup' { $noCleanup = $value }
-            'AddDebug' { $AddDebug = $value }
-            'CompanyName' { $CompanyName = $value }
-            'Author' { $Author = $value }
-            default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
-        }
-    }
-    
-    Write-Host "Target configuration applied successfully" -ForegroundColor Green
-}
 
 #region Merge functions
 if (-not $CreateModule)
@@ -1793,6 +1779,8 @@ if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSi
 else
 {
     Write-Host "Executable not copied."
+    $message = if ($SkipSigning) { "Skipping copy as signing was skipped." }  else { "User chose not to copy the executable." }
+    Write-Verbose "[$scriptName] $message"
 }
 Write-Host "Script completed successfully."
 Write-Log -logFile $logFile -finishLogging

@@ -73,15 +73,8 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          $targetName = '${{ github.event.inputs.target }}'
-          $skipSigning = [System.Convert]::ToBoolean('${{ github.event.inputs.skip_signing }}')
-          
-          if ($skipSigning) {
-            .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -Overwrite -SkipSigning
-          } else {
-            .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -Overwrite
-          }
-          
+          $targetName = '${{ github.event.inputs.target }}' -SkipSigning
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -SkipSigning
           Write-Host "Build complete using target: $targetName"
 
       - name: Get target output path
