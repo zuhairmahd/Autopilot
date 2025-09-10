@@ -16,6 +16,8 @@ function GetUpdates()
     $tempUpdateFile = "$env:TEMP\$fileName"
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Verbose "[$functionName] updateURL: $updateURL"
+    Write-Verbose "[$functionName] metaDataURL: $metaDataURL"
+    Write-Verbose "[$functionName] Temp Update File: $tempUpdateFile"
     #endregion
 
     #helper function to download the remote file.

@@ -83,8 +83,12 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -SkipSigning
-          Write-Host "Build complete (dev). Executable and lastrun.json are in the bin directory."
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -SkipSigning
+          #copy lastrun.json to bin directory
+          Copy-Item -Path .\lastrun.json -Destination .\bin\lastrun.json -Force
+          #copy the logs into the destination bin folder if it exists
+          if (Test-Path -Path .\logs\CreateRelease.log) { Copy-Item -Path .\logs\* -Destination .\bin\logs -Recurse -Force }
+          Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -143,6 +147,9 @@ jobs:
       - name: update hash
         shell: pwsh
         run: |
+          #copy lastrun to the root folder from the current directory if it exists.
+          if (Test-Path -Path .\bin\lastrun.json) { Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force }
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -Overwrite -updateHash
           Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force
           Write-Host "Copied .\bin\main.exe to .\main.exe."
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
@@ -207,8 +214,10 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath lhm -CompanyName 'Government Accountability Office' -Overwrite -SkipSigning
-          Write-Host "Build complete (lhm). Executable and lastrun.json are in the lhm directory."
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName government -SkipSigning
+          #copy lastrun.json to lhm directory
+          Copy-Item -Path .\lastrun.json -Destination .\lhm\lastrun.json -Force
+          Write-Host "Build complete (lhm using target: government). Executable and lastrun.json are in the lhm directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -267,6 +276,9 @@ jobs:
       - name: update hash
         shell: pwsh
         run: |
+          #copy lastrun to the root folder from the current directory if it exists.
+          if (Test-Path -Path .\lhm\lastrun.json) { Copy-Item -Path .\lhm\lastrun.json -Destination .\lastrun.json -Force } 
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName government -updateHash
           Copy-Item -Path .\lhm\main.exe -Destination .\main.exe -Force
           Write-Host "Copied .\lhm\main.exe to .\main.exe."
           Copy-Item -Path .\lhm\lastrun.json -Destination .\lastrun.json -Force

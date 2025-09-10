@@ -1,10 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$Label,
-    [string]$scriptsFolder = "scripts\helpdesk",
+    [string]$scriptsFolder = "scripts",
     [string]$log = "$env:windir\Logs\DriveLetterFindScript.log",
-    [switch]$EmitFinalPath,
-    [switch]$ignoreLabelIfOnlyOne
+    [switch]$EmitFinalPath
 )
 
 function Write-Log()
@@ -358,14 +357,60 @@ function Write-Log()
     }
 }
 
+function Test-WindowsSetupDrive()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DriveLetter
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    $score = 0
+    
+    # Check for common Windows setup files and folders
+    $windowsSetupIndicators = @(
+        @{ Path = "setup.exe"; Weight = 3; Description = "Windows Setup executable" }
+        @{ Path = "sources"; Weight = 3; Description = "Sources folder" }
+        @{ Path = "boot"; Weight = 2; Description = "Boot folder" }
+        @{ Path = "efi"; Weight = 2; Description = "EFI folder" }
+        @{ Path = "bootmgr"; Weight = 2; Description = "Boot manager" }
+        @{ Path = "sources\install.wim"; Weight = 4; Description = "Windows install image" }
+        @{ Path = "sources\install.esd"; Weight = 4; Description = "Windows install image (ESD)" }
+        @{ Path = "sources\boot.wim"; Weight = 3; Description = "Windows boot image" }
+        @{ Path = "autorun.inf"; Weight = 1; Description = "Autorun file" }
+    )
+    
+    Write-Verbose "[$functionName] Checking drive $DriveLetter for Windows setup indicators"
+    
+    foreach ($indicator in $windowsSetupIndicators)
+    {
+        $fullPath = Join-Path "${DriveLetter}:" $indicator.Path
+        if (Test-Path $fullPath)
+        {
+            $score += $indicator.Weight
+            Write-Verbose "[$functionName] Found $($indicator.Description) at $fullPath (weight: $($indicator.Weight))"
+        }
+    }
+    
+    # Score >= 5 indicates likely Windows setup drive
+    # Score >= 8 indicates very likely Windows setup drive
+    $isWindowsSetup = $score -ge 5
+    Write-Verbose "[$functionName] Drive $DriveLetter Windows setup score: $score (threshold: 5, result: $isWindowsSetup)"
+    
+    return @{
+        IsWindowsSetup = $isWindowsSetup
+        Score          = $score
+        Confidence     = if ($score -ge 8) { "High" } elseif ($score -ge 5) { "Medium" } else { "Low" }
+    }
+}
+
 function Get-WindowsUSBDriveLetter()
 {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
-        [string]$Label,
-        [Parameter(Mandatory = $false)]
-        [switch]$IgnoreLabelIfOnlyOne
+        [string]$Label
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -383,13 +428,6 @@ function Get-WindowsUSBDriveLetter()
         @() 
     }
     Write-Verbose "[$functionName] Found $($usbDrives.Count) USB drives."
-
-    # If only one physical USB drive exists and caller wants to ignore label requirement, disable label filtering
-    if ($Label -and $IgnoreLabelIfOnlyOne -and $usbDrives.Count -eq 1)
-    {
-        Write-Verbose "[$functionName] -Label specified ('$Label') but only one USB drive detected and -IgnoreLabelIfOnlyOne provided. Ignoring label filter."
-        $Label = $null
-    }
     foreach ($usbDrive in $usbDrives)
     {
         Write-Verbose "[$functionName] Processing USB drive: $($usbDrive.DeviceID) - Model: $($usbDrive.Model)"
@@ -484,14 +522,7 @@ Write-Log -logFile $logFile -StartLogging
 Write-Log -LogFile $logFile -Message "Script started." -Module $scriptName -LogLevel "Information"
 if ($label)
 {
-    if ($ignoreLabelIfOnlyOne)
-    {
-        $usbDriveLetter = @(Get-WindowsUSBDriveLetter -Label $Label -IgnoreLabelIfOnlyOne)
-    }
-    else
-    {
-        $usbDriveLetter = @(Get-WindowsUSBDriveLetter -Label $Label)
-    }
+    $usbDriveLetter = @(Get-WindowsUSBDriveLetter -Label $Label)
     if ($usbDriveLetter.Count -eq 1)
     {
         Write-Host "Using USB drive with label $($usbDriveLetter[0].VolumeName) in Drive $($usbDriveLetter[0].DriveLetter):"
@@ -507,15 +538,84 @@ if ($label)
 }
 else
 {
-    $global:usbDriveLetter = @(Get-WindowsUSBDriveLetter)
-    Write-Host "No label specified. Found $($usbDriveLetter.Count) USB drives."
-    Write-Host "Using the first one: $($usbDriveLetter[0].DriveLetter)"
-    Write-Log -LogFile $logFile -Message "No label specified. Found $($usbDriveLetter.Count) USB drives. Using the first one: $($usbDriveLetter[0].DriveLetter)" -Module $scriptName -LogLevel "Information"
-    $usbDriveLetter = $usbDriveLetter[0]
+    $usbDriveLetters = @(Get-WindowsUSBDriveLetter)
+    Write-Host "No label specified. Found $($usbDriveLetters.Count) USB drives."
+    Write-Log -LogFile $logFile -Message "No label specified. Found $($usbDriveLetters.Count) USB drives." -Module $scriptName -LogLevel "Information"
+    
+    if ($usbDriveLetters.Count -eq 0)
+    {
+        Write-Warning "No USB drives found."
+        Write-Log -LogFile $logFile -Message "No USB drives found." -Module $scriptName -LogLevel "Warning"
+        $usbDriveLetter = $null
+    }
+    elseif ($usbDriveLetters.Count -eq 1)
+    {
+        Write-Host "Using the only USB drive found: $($usbDriveLetters[0].DriveLetter)"
+        Write-Log -LogFile $logFile -Message "Using the only USB drive found: $($usbDriveLetters[0].DriveLetter)" -Module $scriptName -LogLevel "Information"
+        $usbDriveLetter = $usbDriveLetters[0]
+    }
+    else
+    {
+        # Multiple USB drives found - try to detect Windows setup drives
+        Write-Host "Multiple USB drives found. Attempting to detect Windows setup drive..."
+        Write-Log -LogFile $logFile -Message "Multiple USB drives found. Attempting to detect Windows setup drive..." -Module $scriptName -LogLevel "Information"
+        
+        $windowsSetupDrives = @()
+        foreach ($drive in $usbDriveLetters)
+        {
+            $setupTest = Test-WindowsSetupDrive -DriveLetter $drive.DriveLetter
+            if ($setupTest.IsWindowsSetup)
+            {
+                $windowsSetupDrives += @{
+                    Drive      = $drive
+                    Score      = $setupTest.Score
+                    Confidence = $setupTest.Confidence
+                }
+                Write-Host "Found potential Windows setup drive: $($drive.DriveLetter) (confidence: $($setupTest.Confidence), score: $($setupTest.Score))"
+                Write-Log -LogFile $logFile -Message "Found potential Windows setup drive: $($drive.DriveLetter) (confidence: $($setupTest.Confidence), score: $($setupTest.Score))" -Module $scriptName -LogLevel "Information"
+            }
+        }
+        
+        if ($windowsSetupDrives.Count -eq 1)
+        {
+            $bestDrive = $windowsSetupDrives[0].Drive
+            Write-Host "Using detected Windows setup drive: $($bestDrive.DriveLetter)"
+            Write-Log -LogFile $logFile -Message "Using detected Windows setup drive: $($bestDrive.DriveLetter)" -Module $scriptName -LogLevel "Information"
+            $usbDriveLetter = $bestDrive
+        }
+        elseif ($windowsSetupDrives.Count -gt 1)
+        {
+            # Multiple Windows setup drives - use the one with highest score
+            $bestDrive = ($windowsSetupDrives | Sort-Object Score -Descending)[0].Drive
+            Write-Host "Multiple Windows setup drives detected. Using highest scored drive: $($bestDrive.DriveLetter)"
+            Write-Log -LogFile $logFile -Message "Multiple Windows setup drives detected. Using highest scored drive: $($bestDrive.DriveLetter)" -Module $scriptName -LogLevel "Information"
+            $usbDriveLetter = $bestDrive
+        }
+        else
+        {
+            # No Windows setup drives detected - fall back to first drive
+            Write-Warning "No Windows setup drives detected. Using first USB drive: $($usbDriveLetters[0].DriveLetter)"
+            Write-Log -LogFile $logFile -Message "No Windows setup drives detected. Using first USB drive: $($usbDriveLetters[0].DriveLetter)" -Module $scriptName -LogLevel "Warning"
+            $usbDriveLetter = $usbDriveLetters[0]
+        }
+    }
 }
 
 if ($usbDriveLetter -and $usbDriveLetter.DriveLetter)
 {
+    # Validate that this appears to be a Windows setup drive
+    $setupValidation = Test-WindowsSetupDrive -DriveLetter $usbDriveLetter.DriveLetter
+    if ($setupValidation.IsWindowsSetup)
+    {
+        Write-Host "Confirmed: Drive $($usbDriveLetter.DriveLetter) appears to be a Windows setup drive (confidence: $($setupValidation.Confidence))"
+        Write-Log -LogFile $logFile -Message "Confirmed: Drive $($usbDriveLetter.DriveLetter) appears to be a Windows setup drive (confidence: $($setupValidation.Confidence))" -Module $scriptName -LogLevel "Information"
+    }
+    else
+    {
+        Write-Warning "Drive $($usbDriveLetter.DriveLetter) does not appear to contain Windows setup files (score: $($setupValidation.Score)). Proceeding anyway..."
+        Write-Log -LogFile $logFile -Message "Drive $($usbDriveLetter.DriveLetter) does not appear to contain Windows setup files (score: $($setupValidation.Score)). Proceeding anyway..." -Module $scriptName -LogLevel "Warning"
+    }
+    
     $scriptsFolder = "$($usbDriveLetter.DriveLetter):\$scriptsFolder"
     Write-Host "Checking whether scripts folder exists at $scriptsFolder"
     if (Test-Path $scriptsFolder)
@@ -545,6 +645,18 @@ if ($usbDriveLetter -and $usbDriveLetter.DriveLetter)
     {
         Write-Warning "Scripts folder not found at $scriptsFolder"
         Write-Log -LogFile $logFile -Message "Scripts folder not found at $scriptsFolder" -Module $scriptName -LogLevel "Warning"
+        
+        # Provide helpful information about what was found on the drive
+        $driveRoot = "$($usbDriveLetter.DriveLetter):\"
+        if (Test-Path $driveRoot)
+        {
+            $rootContents = Get-ChildItem $driveRoot -ErrorAction SilentlyContinue | Select-Object -First 10 -ExpandProperty Name
+            if ($rootContents)
+            {
+                Write-Host "Contents found in drive root: $($rootContents -join ', ')"
+                Write-Log -LogFile $logFile -Message "Contents found in drive root: $($rootContents -join ', ')" -Module $scriptName -LogLevel "Information"
+            }
+        }
     }
 }
 else

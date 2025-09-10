@@ -1,0 +1,186 @@
+name: Target-based Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target name from targets.psd1 to build'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+          - arabictutor
+          - government
+          - ci_test
+      skip_signing:
+        description: 'Skip code signing'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Test (pwsh on Windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify PowerShell 7
+        shell: pwsh
+        run: |
+          Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
+
+      - name: Run tests - syntax
+        shell: pwsh
+        run: .\TestScripts\Test-Runner.ps1 -TestCategory syntax
+
+      - name: Run tests - core
+        shell: pwsh
+        run: .\TestScripts\Test-Runner.ps1 -TestCategory core
+
+  build:
+    name: Build (${{ github.event.inputs.target }} target)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache PowerShell modules
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules
+          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pwsh-modules-
+
+      - name: Install build dependencies
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          $targetName = '${{ github.event.inputs.target }}' -SkipSigning
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -SkipSigning
+          Write-Host "Build complete using target: $targetName"
+
+      - name: Get target output path
+        id: target_info
+        shell: pwsh
+        run: |
+          $targetsConfig = Import-PowerShellDataFile -Path '.\targets.psd1'
+          $targetConfig = $targetsConfig.targets['${{ github.event.inputs.target }}']
+          $outputPath = $targetConfig.buildParameters.OutputPath
+          
+          Write-Host "Target output path: $outputPath"
+          echo "output_path=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          
+          # Create artifact name based on target
+          $artifactName = "autopilot-build-${{ github.event.inputs.target }}"
+          echo "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.target_info.outputs.artifact_name }}
+          path: ${{ steps.target_info.outputs.output_path }}
+
+  sign:
+    name: Code Signing (${{ github.event.inputs.target }})
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: build
+    if: github.event.inputs.skip_signing == 'false'
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Get target output path
+        id: target_info
+        shell: pwsh
+        run: |
+          $targetsConfig = Import-PowerShellDataFile -Path '.\targets.psd1'
+          $targetConfig = $targetsConfig.targets['${{ github.event.inputs.target }}']
+          $outputPath = $targetConfig.buildParameters.OutputPath
+          
+          Write-Host "Target output path: $outputPath"
+          echo "output_path=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          
+          # Create artifact name based on target
+          $artifactName = "autopilot-build-${{ github.event.inputs.target }}"
+          echo "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.target_info.outputs.artifact_name }}
+          path: ${{ steps.target_info.outputs.output_path }}
+
+      - name: Skip signing (missing secrets)
+        if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
+        shell: pwsh
+        run: |
+          Write-Host "Signing skipped: required Azure Trusted Signing secrets not configured."
+
+      - name: Sign files with Trusted Signing
+        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://eus.codesigning.azure.net/
+          trusted-signing-account-name: zuhairmahd
+          certificate-profile-name: Cert1
+          files-folder: ${{ github.workspace }}/${{ steps.target_info.outputs.output_path }}
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: update hash
+        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        shell: pwsh
+        run: |
+          $outputPath = '${{ steps.target_info.outputs.output_path }}'
+          $targetName = '${{ github.event.inputs.target }}'
+          
+          if (Test-Path -Path "$outputPath\main.exe") {
+            Copy-Item -Path "$outputPath\main.exe" -Destination .\main.exe -Force
+            Write-Host "Copied $outputPath\main.exe to .\main.exe."
+          }
+          if (Test-Path -Path "$outputPath\lastrun.json") {
+            Copy-Item -Path "$outputPath\lastrun.json" -Destination .\lastrun.json -Force
+            Write-Host "Copied $outputPath\lastrun.json to .\lastrun.json."
+          }
+          
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -Overwrite -updateHash
+
+      - name: Upload signed artifacts
+        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.target_info.outputs.artifact_name }}-signed
+          path: |
+            ${{ steps.target_info.outputs.output_path }}/main.exe
+            ${{ steps.target_info.outputs.output_path }}/lastrun.json
