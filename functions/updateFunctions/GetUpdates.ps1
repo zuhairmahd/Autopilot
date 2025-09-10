@@ -12,8 +12,7 @@ function GetUpdates()
     #region define variables and write logs 
     $functionName = $MyInvocation.MyCommand.Name
     $fileName = Split-Path -Path $executableFileName -Leaf
-    $updateURL = "$updateURL/bin/$fileName"
-    $oldUpdateURL = "$updateURL/$fileName"
+    $updateURL = "$updateURL/$fileName"
     $tempUpdateFile = "$env:TEMP\$fileName"
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Verbose "[$functionName] updateURL: $updateURL"
@@ -74,21 +73,9 @@ function GetUpdates()
     $response = DownloadRemoteFile -url $updateURL -outputFile $tempUpdateFile
     if (-not $response.Success)
     {
-        #try the old URL format
-        Write-Verbose "[$functionName] Trying the old URL format: $oldUpdateURL to download the update file."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Trying the old URL format: $oldUpdateURL to download the update file." -LogLevel "Information"
-        $response = DownloadRemoteFile -url $oldUpdateURL -outputFile $tempUpdateFile
-        if ($response.Success)
-        {
-            Write-Verbose "[$functionName] Successfully downloaded the update file from the old URL format: $oldUpdateURL"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
-        }
-        else
-        {
-            Write-Error "[$functionName] Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again." -LogLevel "Error"
-            return $response
-        }
+        Write-Error "[$functionName] Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again." -LogLevel "Error"
+        return $response
     }
     else
     {
