@@ -148,6 +148,8 @@ jobs:
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
           Write-Host "Copied .\bin\lastrun.json to .\lastrun.json."
           .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -updateHash
+          copy-item -path .\main.exe -destination .\bin\main.exe -Force
+          Write-Host "Updated hash in lastrun.json."
 
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
@@ -270,6 +272,7 @@ jobs:
           Copy-Item -Path .\lhm\lastrun.json -Destination .\lastrun.json -Force
           Write-Host "Copied .\lhm\lastrun.json to .\lastrun.json."
           .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath lhm -Overwrite -updateHash
+          copy-item -path .\main.exe -destination .\lhm\main.exe -Force
 
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
