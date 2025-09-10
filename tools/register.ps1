@@ -1,10 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$Label,
-    [string]$scriptsFolder = "scripts\helpdesk",
+    [string]$scriptsFolder = "scripts",
     [string]$log = "$env:windir\Logs\DriveLetterFindScript.log",
-    [switch]$EmitFinalPath,
-    [switch]$ignoreLabelIfOnlyOne
+    [switch]$EmitFinalPath
 )
 
 function Write-Log()
@@ -384,9 +383,11 @@ function Test-WindowsSetupDrive()
     
     Write-Verbose "[$functionName] Checking drive $DriveLetter for Windows setup indicators"
     
-    foreach ($indicator in $windowsSetupIndicators) {
+    foreach ($indicator in $windowsSetupIndicators)
+    {
         $fullPath = Join-Path "${DriveLetter}:" $indicator.Path
-        if (Test-Path $fullPath) {
+        if (Test-Path $fullPath)
+        {
             $score += $indicator.Weight
             Write-Verbose "[$functionName] Found $($indicator.Description) at $fullPath (weight: $($indicator.Weight))"
         }
@@ -399,8 +400,8 @@ function Test-WindowsSetupDrive()
     
     return @{
         IsWindowsSetup = $isWindowsSetup
-        Score = $score
-        Confidence = if ($score -ge 8) { "High" } elseif ($score -ge 5) { "Medium" } else { "Low" }
+        Score          = $score
+        Confidence     = if ($score -ge 8) { "High" } elseif ($score -ge 5) { "Medium" } else { "Low" }
     }
 }
 
@@ -409,9 +410,7 @@ function Get-WindowsUSBDriveLetter()
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
-        [string]$Label,
-        [Parameter(Mandatory = $false)]
-        [switch]$IgnoreLabelIfOnlyOne
+        [string]$Label
     )
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -429,13 +428,6 @@ function Get-WindowsUSBDriveLetter()
         @() 
     }
     Write-Verbose "[$functionName] Found $($usbDrives.Count) USB drives."
-
-    # If only one physical USB drive exists and caller wants to ignore label requirement, disable label filtering
-    if ($Label -and $IgnoreLabelIfOnlyOne -and $usbDrives.Count -eq 1)
-    {
-        Write-Verbose "[$functionName] -Label specified ('$Label') but only one USB drive detected and -IgnoreLabelIfOnlyOne provided. Ignoring label filter."
-        $Label = $null
-    }
     foreach ($usbDrive in $usbDrives)
     {
         Write-Verbose "[$functionName] Processing USB drive: $($usbDrive.DeviceID) - Model: $($usbDrive.Model)"
@@ -530,14 +522,7 @@ Write-Log -logFile $logFile -StartLogging
 Write-Log -LogFile $logFile -Message "Script started." -Module $scriptName -LogLevel "Information"
 if ($label)
 {
-    if ($ignoreLabelIfOnlyOne)
-    {
-        $usbDriveLetter = @(Get-WindowsUSBDriveLetter -Label $Label -IgnoreLabelIfOnlyOne)
-    }
-    else
-    {
-        $usbDriveLetter = @(Get-WindowsUSBDriveLetter -Label $Label)
-    }
+    $usbDriveLetter = @(Get-WindowsUSBDriveLetter -Label $Label)
     if ($usbDriveLetter.Count -eq 1)
     {
         Write-Host "Using USB drive with label $($usbDriveLetter[0].VolumeName) in Drive $($usbDriveLetter[0].DriveLetter):"
@@ -582,8 +567,8 @@ else
             if ($setupTest.IsWindowsSetup)
             {
                 $windowsSetupDrives += @{
-                    Drive = $drive
-                    Score = $setupTest.Score
+                    Drive      = $drive
+                    Score      = $setupTest.Score
                     Confidence = $setupTest.Confidence
                 }
                 Write-Host "Found potential Windows setup drive: $($drive.DriveLetter) (confidence: $($setupTest.Confidence), score: $($setupTest.Score))"
