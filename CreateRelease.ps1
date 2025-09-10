@@ -1069,12 +1069,31 @@ function Update-TargetSettings()
             Write-Log -LogFile $logFile -Message "Processing domain settings for: $($TargetConfig.domain)" -Module $functionName -LogLevel "Information"
             
             # Load or create domain configuration
-            $domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
-            
+            $global:domainConfig = Get-DomainConfigurationFromFiles -DomainName $TargetConfig.domain -ConfigurationPath $ConfigurationPath
+            #remove the first element of the domainConfig if it is not a hashtable
+            if ($domainConfig -and $domainConfig.Count -gt 0 -and -not ($domainConfig[0] -is [hashtable]))
+            {
+                for ($i = 0; $i -lt $domainConfig.Count; $i++)
+                {
+                    if ($domainConfig[$i] -is [hashtable] -or $i -eq $domainConfig.Count - 1)
+                    {
+                        $global:domainConfig = $domainConfig[$i]
+                        break
+                    }
+                }
+            }
             # Apply domain settings
             foreach ($key in $TargetConfig.domainSettings.Keys)
             {
-                $domainConfig[$key] = $TargetConfig.domainSettings[$key]
+                Write-Verbose "[$functionName] Applying domain setting: $key = $($TargetConfig.domainSettings[$key]) with value type $($TargetConfig.domainSettings[$key].GetType().Name)"
+                if ($domainConfig.Keys -contains $key)
+                {
+                    $domainConfig[$key] = $TargetConfig.domainSettings[$key]
+                }
+                else
+                {
+                    $domainConfig.Add($key, $TargetConfig.domainSettings[$key])
+                }
                 Write-Verbose "[$functionName] Applied domain setting: $key = $($TargetConfig.domainSettings[$key])"
             }
             
@@ -1261,17 +1280,25 @@ if ($updateHash)
 
 Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
 write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
-# Apply target settings to configuration files
-$settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
-write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
-if (-not $settingsApplied)
+# Apply target settings to configuration files (only if target config is provided)
+if ($targetConfig)
 {
-    Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
-    Write-Log -logFile $logFile -finishLogging
-    exit 1
+    $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile -ConfigurationPath $parentFolder
+    write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
+    if (-not $settingsApplied)
+    {
+        Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
+        Write-Log -logFile $logFile -finishLogging
+        exit 1
+    }
+    Write-Host "Target settings applied successfully." -ForegroundColor Green
+    write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
 }
-Write-Host "Target settings applied successfully." -ForegroundColor Green
-write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
+else
+{
+    Write-Host "No target configuration provided - skipping target settings application." -ForegroundColor Yellow
+    write-log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
+}
 
 Write-Verbose "[$scriptName] Updating last run version..."
 $updatedVersion = Update-LastRunVersion -version $version -PartToIncrement 'Revision' -LastRun $LastRun

@@ -117,7 +117,6 @@
             }
             
             authSettings    = @{
-                
                 changePwOnNextStart = $true
                 validateScopes      = $false
                 authType            = 'PublicAuthFlow'
@@ -142,32 +141,65 @@
             domain          = 'gao.gov'
             
             domainSettings  = @{
-                groupsToInclude                 = @(
-                    'sg_Office_365_License_G5_wth_windows_pilot',
-                    'sg_passwrd_hash_stage',
-                    'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
-                )
-                groupsToExclude                 = @{}
-                companyName                     = 'Government Accountability Office'
-                maxGroupMatchDisplay            = 20
-                maxUserMatchDisplay             = 20
-                minimumDevicePhysicalMemoryInGB = 16
-                maxSerialNumberLength           = 11
-                maxNumberOfDevicesAllowed       = 20
-                deviceNamePrefix                = 'w11-'
                 privateSession                  = $true
-                groupTag                        = 'MSB01'
-                showLicenseBanner               = $false
-                validateScopes                  = $false
+                groupsToExclude                 = @()
+                desiredAutopilotProfiles        = @(
+                    'msb'
+                )
+                maxUserMatchDisplay             = 10
+                appMode                         = 'registration'
                 userPatternsToExclude           = @(
-                    '-test'
-                    'onmicrosoft.com'
-                    '-rsa'
-                    '-cma'
-                    '-a'
+                    '-test',
+                    'onmicrosoft.com',
+                    '-cma',
+                    '-a',
+                    '-rsa',
                     '-sup'
                 )
-                desiredAutopilotProfiles        = @('msb')
+                assignedUser                    = ''
+                minimumDevicePhysicalMemoryInGB = 16
+                maxGroupMatchDisplay            = 10
+                maxWaitTime                     = 30
+                autoUpdate                      = $true
+                preferredBrowser                = 'Chrome'
+                maxSerialNumberLength           = 11
+                minUsernameLength               = 3
+                version                         = '1.3.0.0'
+                operatingSystem                 = 'Windows'
+                minSerialNumberLength           = 7
+                maxUserNameLength               = 50
+                validateScopes                  = $false
+                groupsToInclude                 = @(
+                    @{
+                        id   = '74d8cfe5-7934-4bd7-bcf3-593dcc6639ed'
+                        name = 'sg_Office_365_License_G5_wth_windows_pilot'
+                    },
+                    @{
+                        id   = 'be87a9ef-3e44-4e6b-8a9e-d1696e2f7db5'
+                        name = 'sg_passwrd_hash_stage'
+                    },
+                    @{
+                        id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
+                        name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    }
+                )
+                groupTag                        = 'MSB01'
+                groupPatternsToExclude          = @()
+                repoInfo                        = @{
+                    repoPath      = 'zuhairmahd'
+                    baseURL       = 'https://www.github.com'
+                    baseSourceURL = 'https://raw.githubusercontent.com'
+                    repoName      = 'Autopilot'
+                }
+                companyName                     = 'Government Accountability Office'
+                release                         = 'lhm'
+                deviceContactThresholdInDays    = 30
+                additionalScopes                = @()
+                maxNumberOfDevicesAllowed       = 20
+                timeInSeconds                   = 60
+                showLicenseBanner               = $false
+                domain                          = 'gao.gov'
+                deviceNamePrefix                = 'w11-'
             }
             
             description     = 'Government build for gao.gov with enhanced security and compliance settings'
