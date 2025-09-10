@@ -73,12 +73,11 @@ param(
     [switch]$updateHash,
     [switch]$Overwrite,
     [switch]$NoVersionUpdate,
-    [switch]$SecretsOnly,
     [switch]$AddDebug,
     [Parameter(ParameterSetName = 'TargetBuild')]
     [string]$TargetsFile = (Join-Path -Path $PWD -ChildPath "targets.psd1"),
     [Parameter(ParameterSetName = 'TargetBuild')]
-    [string]$TargetName
+    [string]$TargetName = 'development'
 )
 
 $scriptName = $MyInvocation.MyCommand.Name
@@ -1247,113 +1246,6 @@ $destSettingsFile = "$parentFolder\settings.psd1"
 #endregion
 
 #region initial checks
-if ($CreateModule)
-{
-    Write-Host "Creating module $helperModuleName."
-    $mergeResult = MergeFunctions -FilesToMerge $functionsToMerge -DestinationFile $helperModuleName
-    if ($mergeResult -eq $true)
-    {
-        Write-Host "Module $helperModuleName created successfully."
-    }
-    else
-    {
-        Write-Host "Failed to create module: $helperModuleName."
-        exit 1
-    }
-}
-
-if ($SecretsOnly)
-{
-    Write-Host "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets"
-    # Apply target settings if using target-based mode
-    if ($targetConfig)
-    {
-        Write-Host "Applying target settings in SecretsOnly mode..." -ForegroundColor Cyan
-        $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile
-        if (-not $settingsApplied)
-        {
-            Write-Host "Failed to apply target settings in SecretsOnly mode" -ForegroundColor Yellow
-        }
-        else
-        {
-            Write-Host "Target settings applied successfully in SecretsOnly mode" -ForegroundColor Green
-        }
-    }
-    if ($NoPasswordChange)
-    {
-        Write-Verbose "[$scriptName] Skipping settings file update to avoid password change."
-        Write-Log -logFile $logFile -Message "Skipping settings file update to avoid password change." -module $scriptName
-        $settingsUpdate = $false
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Updating settings file to force password change."
-        Write-Log -logFile $logFile -Message "Updating settings file to force password change." -module $scriptName
-        $settingsUpdate = $true
-    }
-    Write-Log -logFile $logFile -Message "Running in SecretsOnly mode. Copying secrets to $parentFolder\.secrets" -module $scriptName
-    if ($Overwrite)
-    {
-        $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder -Overwrite
-    }
-    else
-    {
-        $secretsCopied = CopySecrets -SourceFolder $PSScriptRoot -DestinationFolder $parentFolder
-    }
-    if ($secretsCopied)
-    {
-        Write-Host "Secrets copied successfully to $parentFolder\.secrets"
-        Write-Log -logFile $logFile -Message "Secrets copied successfully to $parentFolder\.secrets" -module $scriptName
-    }
-    else
-    {
-        Write-Host "No secrets were copied."
-    }
-    Write-Host "Checking whether to update settings file to force password change."
-    if (-not $NoPasswordChange)
-    {
-        Write-Log -logFile $logFile -Message "Updating settings file to force password change." -module $scriptName
-        Write-Verbose "[$scriptName] Updating settings file to force password change."
-        if (-not (Test-Path -Path $destSettingsFile))
-        {
-            Write-Host "Settings file not found at $destSettingsFile. Copying from $SettingsFile."
-            Write-Log -logFile $logFile -Message "Settings file not found at $destSettingsFile. Copying from $SettingsFile." -module $scriptName
-            Copy-Item -Path $SettingsFile -Destination $destSettingsFile -Force
-        }
-        else
-        {
-            Write-Host "Found settings file at $destSettingsFile."
-            Write-Log -logFile $logFile -Message "Found settings file at $destSettingsFile." -module $scriptName
-        }
-        if ($Overwrite)
-        {
-            Write-Log -logFile $logFile -Message "Overwrite is set to true. Updating settings file without confirmation." -module $scriptName
-            $settingsUpdated = UpdateSettingsFile -SettingsFilePath $destSettingsFile
-        }
-        else
-        {
-            Write-Log -logFile $logFile -Message "Prompting user for confirmation before updating settings file." -module $scriptName
-            $settingsUpdated = UpdateSettingsFile -SettingsFilePath $destSettingsFile -confirm
-        }
-        if ($settingsUpdated)
-        {
-            Write-Host "Settings file $destSettingsFile updated successfully."
-            Write-Log -logFile $logFile -Message "Settings file $destSettingsFile updated successfully." -module $scriptName
-        }
-        else
-        {
-            Write-Host "Failed to update settings file $destSettingsFile."
-            Write-Log -logFile $logFile -Message "Failed to update settings file $destSettingsFile." -module $scriptName -LogLevel 'Error'
-        }
-    }
-    else
-    {
-        Write-Host "Skipping settings file update."
-        Write-Log -logFile $logFile -Message "Skipping settings file update." -module $scriptName
-    }
-    exit 0
-}
-
 if ($updateHash)
 {
     Write-Host "Updating hash in lastrun file: $lastRunFile"

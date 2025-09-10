@@ -49,7 +49,6 @@
             }
             
             globalSettings  = @{
-                testMode          = $false
                 autoUpdate        = $true
                 showLicenseBanner = $false
                 validateScopes    = $true
