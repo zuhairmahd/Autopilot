@@ -73,7 +73,7 @@ jobs:
       - name: Build executable
         shell: pwsh
         run: |
-          $targetName = '${{ github.event.inputs.target }}' -SkipSigning
+          $targetName = '${{ github.event.inputs.target }}'
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -SkipSigning
           Write-Host "Build complete using target: $targetName"
 
@@ -84,7 +84,6 @@ jobs:
           $targetsConfig = Import-PowerShellDataFile -Path '.\targets.psd1'
           $targetConfig = $targetsConfig.targets['${{ github.event.inputs.target }}']
           $outputPath = $targetConfig.buildParameters.OutputPath
-          
           Write-Host "Target output path: $outputPath"
           echo "output_path=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           
@@ -122,10 +121,8 @@ jobs:
           $targetsConfig = Import-PowerShellDataFile -Path '.\targets.psd1'
           $targetConfig = $targetsConfig.targets['${{ github.event.inputs.target }}']
           $outputPath = $targetConfig.buildParameters.OutputPath
-          
           Write-Host "Target output path: $outputPath"
           echo "output_path=$outputPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          
           # Create artifact name based on target
           $artifactName = "autopilot-build-${{ github.event.inputs.target }}"
           echo "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -164,7 +161,8 @@ jobs:
         run: |
           $outputPath = '${{ steps.target_info.outputs.output_path }}'
           $targetName = '${{ github.event.inputs.target }}'
-          
+          write-host "Output path: $outputPath"
+          write-host "Target name: $targetName"
           if (Test-Path -Path "$outputPath\main.exe") {
             Copy-Item -Path "$outputPath\main.exe" -Destination .\main.exe -Force
             Write-Host "Copied $outputPath\main.exe to .\main.exe."
@@ -173,9 +171,31 @@ jobs:
             Copy-Item -Path "$outputPath\lastrun.json" -Destination .\lastrun.json -Force
             Write-Host "Copied $outputPath\lastrun.json to .\lastrun.json."
           }
-          
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $targetName -Overwrite -updateHash
 
+      - name: Commit signed artifacts to repository
+        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        shell: pwsh
+        run: |
+          if (test-path -path $outputPath\main.exe) {
+            Copy-Item -Path "$outputPath\main.exe" -Destination .\main.exe -Force
+            Write-Host "Copied $outputPath\main.exe to .\main.exe."
+          }
+          git config --global user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -a $outputPath
+          git add -a main.exe 
+          git add -a lastrun.json
+          git status
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            $branch = '${{ github.ref_name }}'
+            git commit -m "chore(build): update signed artifacts (lhm) [skip ci]"
+            git push origin HEAD:$branch
+            Write-Host "Signed artifacts committed and pushed to $branch"
+          }
+          else { Write-Host "No changes to commit." }
+          
       - name: Upload signed artifacts
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
         uses: actions/upload-artifact@v4
