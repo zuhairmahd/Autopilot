@@ -1365,6 +1365,31 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
         return $result
     }
 }
+
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change Autopilot profile settings" -Action {
+    Write-Host "Launching Autopilot profiles editor..." -ForegroundColor Cyan
+    Write-Host "These settings control which Autopilot profiles are considered valid for device assignment." -ForegroundColor Gray
+    $result = Show-AutopilotProfilesEditor -SettingsFile $InitFile -DomainName $domain -AccessToken $accessToken
+    if ($result -eq "Back" -or $result -eq "back")
+    {
+        Write-Verbose "[$scriptName] User selected Back from Autopilot profiles editor, returning to previous menu"
+        return $returnValues.backoutText
+    }
+    elseif ($result -eq "Main Menu" -or $result -eq "main menu")
+    {
+        Write-Verbose "[$scriptName] User selected Main Menu from Autopilot profiles editor"
+        return "EXIT_APPLICATION"
+    }
+    elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
+    {
+        Write-Verbose "[$scriptName] User requested application exit from Autopilot profiles editor."
+        return "EXIT_APPLICATION"
+    }
+    else
+    {
+        return $result
+    }
+}
 #endregion Environment menu
 
 #region Settings menu

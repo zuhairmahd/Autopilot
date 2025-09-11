@@ -603,6 +603,15 @@
                     'full',
                     'admin'
                 )
+            },
+            @{
+                description           = 'Change the Autopilot profile settings'
+                name                  = 'Change Autopilot profile settings'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
             }
         )
         type                  = 'static'

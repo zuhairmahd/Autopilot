@@ -130,6 +130,7 @@ function Get-ApplicationDefaults()
         Domain         = [ordered]@{
             groupsToInclude                 = @()
             groupsToExclude                 = @()
+            autopilotProfilesToInclude      = @()
             domain                          = $DomainName
             companyName                     = ""
             version                         = $Version
