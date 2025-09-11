@@ -596,18 +596,10 @@
                 )
             },
             @{
-                description           = 'Change the group inclusion/exclusion settings'
-                name                  = 'Change group inclusion/exclusion'
-                blockType             = 'action'
-                includeInDisplayModes = @(
-                    'full',
-                    'admin'
-                )
-            },
-            @{
-                description           = 'Change the Autopilot profile settings'
-                name                  = 'Change Autopilot profile settings'
-                blockType             = 'action'
+                menuName              = 'inclusionExclusionMenu'
+                description           = 'Change the inclusion/exclusion settings for groups and Autopilot profiles'
+                name                  = 'Change inclusion/exclusion'
+                blockType             = 'menu'
                 includeInDisplayModes = @(
                     'full',
                     'admin'
@@ -816,6 +808,35 @@
             'registration'
         )
     }
+    inclusionExclusionMenu = @{
+        Title                 = 'Inclusion/Exclusion Settings'
+        Description           = 'Manage group and Autopilot profile inclusion/exclusion settings:'
+        items                 = @(
+            @{
+                description           = 'Modify the groups that are included or excluded from operations'
+                name                  = 'Change group inclusion/exclusion'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'Modify the Autopilot profiles that are considered valid for assignment'
+                name                  = 'Change Autopilot profile settings'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            }
+        )
+        type                  = 'static'
+        includeInDisplayModes = @(
+            'full',
+            'admin'
+        )
+    }
     groupsEditMenu       = @{
         Title                 = 'Groups Edit Menu'
         Description           = 'Select which group settings you want to modify:'
@@ -890,6 +911,35 @@
             'advanced',
             'helpdesk',
             'registration'
+        )
+    }
+    autopilotProfilesEditMenu = @{
+        Title                 = 'Autopilot Profiles Edit Menu'
+        Description           = 'Select which Autopilot profile settings you want to modify:'
+        items                 = @(
+            @{
+                description           = 'Modify the Autopilot profiles that are included'
+                name                  = 'Modify Autopilot profiles to include'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            },
+            @{
+                description           = 'View the current Autopilot profile settings'
+                name                  = 'View current Autopilot profile settings'
+                blockType             = 'action'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            }
+        )
+        type                  = 'static'
+        includeInDisplayModes = @(
+            'full',
+            'admin'
         )
     }
 }

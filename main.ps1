@@ -1341,23 +1341,27 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
 }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclusion/exclusion" -Action {
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change inclusion/exclusion" -subMenu (NewMenu -MenuName "inclusionExclusionMenu")
+
+# Configure inclusion/exclusion submenu actions
+$inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
+$inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
     $result = Show-GroupsEditor -SettingsFile $InitFile -DomainName $domain -accessToken $accessToken
     if ($result -eq "Back" -or $result -eq "back")
     {
-        Write-Verbose "[$scriptName] User selected Back from device selection, returning to previous menu"
+        Write-Verbose "[$scriptName] User selected Back from groups editor, returning to previous menu"
         return $returnValues.backoutText
     }
     elseif ($result -eq "Main Menu" -or $result -eq "main menu")
     {
-        Write-Verbose "[$scriptName] User selected Main Menu from device selection"
+        Write-Verbose "[$scriptName] User selected Main Menu from groups editor"
         return "EXIT_APPLICATION"
     }
     elseif ([string]::IsNullOrWhiteSpace($result) -or $null -eq $result)
     {
-        Write-Verbose "[$scriptName] User requested application exit from device selection."
+        Write-Verbose "[$scriptName] User requested application exit from groups editor."
         return "EXIT_APPLICATION"
     }
     else
@@ -1366,7 +1370,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change group inclus
     }
 }
 
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change Autopilot profile settings" -Action {
+$inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change Autopilot profile settings" -Action {
     Write-Host "Launching Autopilot profiles editor..." -ForegroundColor Cyan
     Write-Host "These settings control which Autopilot profiles are considered valid for device assignment." -ForegroundColor Gray
     $result = Show-AutopilotProfilesEditor -SettingsFile $InitFile -DomainName $domain -AccessToken $accessToken

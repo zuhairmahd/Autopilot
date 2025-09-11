@@ -181,174 +181,175 @@ function Show-AutopilotProfilesEditor()
             Write-Host "These settings control which Autopilot profiles are considered valid for device assignment.`n" -ForegroundColor Gray
         }
         
-        # Create Autopilot profiles editing menu
+        # Create Autopilot profiles editing menu using the menu system
         if (-not $Silent)
         {
-            # Simple menu structure for Autopilot profiles (only include, no exclude needed)
+            # Create menu from configuration, will update title with dynamic variable
+            $autopilotProfilesEditMenu = NewMenu -MenuName "autopilotProfilesEditMenu"
+            # Update the title to include the actual domain name
+            $autopilotProfilesEditMenu.Title = $autopilotProfilesEditMenu.Title -replace '\$DomainName', $DomainName
+            
+            # Set actions for the menu items
+            $autopilotProfilesEditMenu = AddMenuItem -Menu $autopilotProfilesEditMenu -Name "Modify Autopilot profiles to include" -Action {
+                Write-Host "Selected: Modify Autopilot profiles to include" -ForegroundColor Green
+                return 'modify'
+            } -ReturnsValue
+            $autopilotProfilesEditMenu = AddMenuItem -Menu $autopilotProfilesEditMenu -Name "View current Autopilot profile settings" -Action {
+                Write-Host "Selected: View current Autopilot profile settings" -ForegroundColor Cyan
+                return 'view'
+            } -ReturnsValue
+            
+            # Loop: after editing profiles, return to the profile management menu
             while ($true)
             {
-                Write-Host "`n══ Autopilot Profiles to Include ══" -ForegroundColor Green
-                Write-Host "Profiles in this list will be considered valid for device assignment." -ForegroundColor Gray
-                Write-Host "Current Autopilot profiles:" -ForegroundColor Cyan
-                Write-Log -LogFile $logFile -Module $functionName -Message "Found $($currentAutopilotProfiles.Count) Autopilot profiles" -LogLevel "Information"
-                Write-Verbose "[$functionName] Current Autopilot profiles count: $($currentAutopilotProfiles.Count)"
-                
-                if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
+                # Use proper stack operation to maintain menu navigation integrity
+                $profileChoice = ShowMenu -Menu $autopilotProfilesEditMenu -CalledBy 'Custom_AutopilotProfilesEditorSubmenu' -StackOperation 'Push'
+                # Validate that we got a proper choice, not a navigation option
+                if ($null -eq $profileChoice -or $profileChoice -eq "Back" -or $profileChoice -eq "Main Menu" -or $profileChoice -eq 0 -or $profileChoice -eq "0")
                 {
-                    # Detect format and display accordingly
-                    $firstElement = $currentAutopilotProfiles | Select-Object -First 1
-                    Write-Verbose "[$functionName] Current Autopilot profiles format: $($firstElement.GetType().Name)"
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Current Autopilot profiles format: $($firstElement.GetType().Name)" -LogLevel "Information"
+                    Write-Verbose "[$functionName] ShowMenu returned navigation option: '$profileChoice', treating as navigation"
+                    break
+                }
+                
+                # Process the user's choice
+                if ($profileChoice -eq 'modify')
+                {
+                    Write-Host "`n══ Autopilot Profiles to Include ══" -ForegroundColor Green
+                    Write-Host "Profiles in this list will be considered valid for device assignment." -ForegroundColor Gray
+                    Write-Host "Current Autopilot profiles:" -ForegroundColor Cyan
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Found $($currentAutopilotProfiles.Count) Autopilot profiles" -LogLevel "Information"
+                    Write-Verbose "[$functionName] Current Autopilot profiles count: $($currentAutopilotProfiles.Count)"
                     
-                    if ($firstElement -is [string])
+                    if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
                     {
-                        # Old string format
-                        foreach ($profile in $currentAutopilotProfiles)
+                        # Detect format and display accordingly
+                        $firstElement = $currentAutopilotProfiles | Select-Object -First 1
+                        Write-Verbose "[$functionName] Current Autopilot profiles format: $($firstElement.GetType().Name)"
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Current Autopilot profiles format: $($firstElement.GetType().Name)" -LogLevel "Information"
+                        
+                        if ($firstElement -is [string])
                         {
-                            Write-Host "  - $profile" -ForegroundColor White
-                        }
-                        Write-Host "  (Note: Profiles are in old format - will be upgraded)" -ForegroundColor Yellow
-                    }
-                    elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                        (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                        ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
-                    {
-                        # New hashtable format
-                        foreach ($profile in $currentAutopilotProfiles)
-                        {
-                            Write-Host "  - Name: $($profile.name)" -ForegroundColor White
-                            if ($profile.id)
+                            # Old string format
+                            foreach ($profile in $currentAutopilotProfiles)
                             {
-                                Write-Host "    ID:   $($profile.id)" -ForegroundColor Gray
+                                Write-Host "  - $profile" -ForegroundColor White
                             }
-                            else
+                            Write-Host "  (Note: Profiles are in old format - will be upgraded)" -ForegroundColor Yellow
+                        }
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                        {
+                            # New hashtable format
+                            foreach ($profile in $currentAutopilotProfiles)
                             {
-                                Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                Write-Host "  - Name: $($profile.name)" -ForegroundColor White
+                                if ($profile.id)
+                                {
+                                    Write-Host "    ID:   $($profile.id)" -ForegroundColor Gray
+                                }
+                                else
+                                {
+                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                }
+                            }
+                        }
+                        else
+                        {
+                            # Fallback for unknown format
+                            foreach ($profile in $currentAutopilotProfiles)
+                            {
+                                Write-Host "  - $profile" -ForegroundColor White
                             }
                         }
                     }
                     else
                     {
-                        # Fallback for unknown format
-                        foreach ($profile in $currentAutopilotProfiles)
-                        {
-                            Write-Host "  - $profile" -ForegroundColor White
-                        }
+                        Write-Host "  (no Autopilot profiles specified)" -ForegroundColor Gray
                     }
-                }
-                else
-                {
-                    Write-Host "  (no Autopilot profiles specified)" -ForegroundColor Gray
-                }
-                
-                Write-Host "`nOptions:" -ForegroundColor Cyan
-                Write-Host "  1. Modify Autopilot profiles to include" -ForegroundColor White
-                Write-Host "  2. View current Autopilot profile settings" -ForegroundColor White
-                Write-Host "  3. Return to previous menu" -ForegroundColor White
-                
-                $choice = Read-Host "Select option (1-3)"
-                
-                switch ($choice)
-                {
-                    '1'
+                    
+                    # Get updated profiles
+                    $updatedProfiles = Get-AutopilotProfileArrayInput -CurrentProfiles $currentAutopilotProfiles -AccessToken $AccessToken
+                    if ($null -ne $updatedProfiles -and (Compare-AutopilotProfileArrayContents -Array1 $currentAutopilotProfiles -Array2 $updatedProfiles))
                     {
-                        $updatedProfiles = Get-AutopilotProfileArrayInput -CurrentProfiles $currentAutopilotProfiles -AccessToken $AccessToken
-                        if ($null -ne $updatedProfiles -and (Compare-AutopilotProfileArrayContents -Array1 $currentAutopilotProfiles -Array2 $updatedProfiles))
-                        {
-                            Write-Log -LogFile $logFile -Module $functionName -Message "Autopilot profiles changed" -LogLevel "Information"
-                            Write-Verbose "[$functionName] Autopilot profiles changed"
-                            
-                            # Save changes immediately
-                            Write-Host "`nSaving changes..." -ForegroundColor Yellow
-                            $success = Update-DomainAutopilotProfileSetting -SettingsFile $SettingsFile -DomainName $DomainName -Profiles $updatedProfiles
-                            if ($success)
-                            {
-                                Write-Host "Autopilot profile settings updated successfully!" -ForegroundColor Green
-                                Write-Host "`nAutopilot profile settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
-                                Write-Host "Press any key to continue..." -ForegroundColor Yellow
-                                [void][System.Console]::ReadKey($true)
-                                # Update current values for future operations
-                                $currentAutopilotProfiles = $updatedProfiles
-                            }
-                            else
-                            {
-                                Write-Host "Failed to update Autopilot profile settings!" -ForegroundColor Red
-                                Write-Host "Press any key to continue..." -ForegroundColor Yellow
-                                [void][System.Console]::ReadKey($true)
-                            }
-                        }
-                    }
-                    '2'
-                    {
-                        Write-Host "`n══ Current Autopilot Profile Settings ══" -ForegroundColor Cyan
-                        Write-Host "Domain: $DomainName`n" -ForegroundColor Yellow
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Autopilot profiles changed" -LogLevel "Information"
+                        Write-Verbose "[$functionName] Autopilot profiles changed"
                         
-                        Write-Host "Autopilot Profiles to Include:" -ForegroundColor Green
-                        if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
+                        # Save changes immediately
+                        Write-Host "`nSaving changes..." -ForegroundColor Yellow
+                        $success = Update-DomainAutopilotProfileSetting -SettingsFile $SettingsFile -DomainName $DomainName -Profiles $updatedProfiles
+                        if ($success)
                         {
-                            # Detect format and display accordingly
-                            $firstElement = $currentAutopilotProfiles[0]
-                            if ($firstElement -is [string])
-                            {
-                                # Old string format
-                                foreach ($profile in $currentAutopilotProfiles)
-                                {
-                                    Write-Host "  - $profile" -ForegroundColor White
-                                }
-                                Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s) [Legacy Format]" -ForegroundColor Yellow
-                            }
-                            elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                                (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                                ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
-                            {
-                                # New hashtable format
-                                foreach ($profile in $currentAutopilotProfiles)
-                                {
-                                    Write-Host "  - Name: $($profile.name)" -ForegroundColor White
-                                    if ($profile.id)
-                                    {
-                                        Write-Host "    ID:   $($profile.id)" -ForegroundColor Gray
-                                    }
-                                    else
-                                    {
-                                        Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
-                                    }
-                                }
-                                Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s) [Enhanced Format]" -ForegroundColor Green
-                            }
-                            else
-                            {
-                                # Fallback for unknown format
-                                foreach ($profile in $currentAutopilotProfiles)
-                                {
-                                    Write-Host "  - $profile" -ForegroundColor White
-                                }
-                                Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s)" -ForegroundColor Gray
-                            }
+                            Write-Host "Autopilot profile settings updated successfully!" -ForegroundColor Green
+                            Write-Host "`nAutopilot profile settings updated successfully. Changes will take effect immediately." -ForegroundColor Green
+                            Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                            [void][System.Console]::ReadKey($true)
+                            # Update current values for future operations
+                            $currentAutopilotProfiles = $updatedProfiles
                         }
                         else
                         {
-                            Write-Host "  (no Autopilot profiles specified)" -ForegroundColor Gray
+                            Write-Host "Failed to update Autopilot profile settings!" -ForegroundColor Red
+                            Write-Host "Press any key to continue..." -ForegroundColor Yellow
+                            [void][System.Console]::ReadKey($true)
                         }
-                        
-                        Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
-                        [void][System.Console]::ReadKey($true)
-                    }
-                    '3'
-                    {
-                        Write-Log -LogFile $logFile -Module $functionName -Message "User chose to return to previous menu" -LogLevel "Information"
-                        break
-                    }
-                    default
-                    {
-                        Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
-                        continue
                     }
                 }
-                
-                if ($choice -eq '3')
+                elseif ($profileChoice -eq 'view')
                 {
-                    break
+                    Write-Host "`n══ Current Autopilot Profile Settings ══" -ForegroundColor Cyan
+                    Write-Host "Domain: $DomainName`n" -ForegroundColor Yellow
+                    
+                    Write-Host "Autopilot Profiles to Include:" -ForegroundColor Green
+                    if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
+                    {
+                        # Detect format and display accordingly
+                        $firstElement = $currentAutopilotProfiles[0]
+                        if ($firstElement -is [string])
+                        {
+                            # Old string format
+                            foreach ($profile in $currentAutopilotProfiles)
+                            {
+                                Write-Host "  - $profile" -ForegroundColor White
+                            }
+                            Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s) [Legacy Format]" -ForegroundColor Yellow
+                        }
+                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
+                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
+                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
+                        {
+                            # New hashtable format
+                            foreach ($profile in $currentAutopilotProfiles)
+                            {
+                                Write-Host "  - Name: $($profile.name)" -ForegroundColor White
+                                if ($profile.id)
+                                {
+                                    Write-Host "    ID:   $($profile.id)" -ForegroundColor Gray
+                                }
+                                else
+                                {
+                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
+                                }
+                            }
+                            Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s) [Enhanced Format]" -ForegroundColor Green
+                        }
+                        else
+                        {
+                            # Fallback for unknown format
+                            foreach ($profile in $currentAutopilotProfiles)
+                            {
+                                Write-Host "  - $profile" -ForegroundColor White
+                            }
+                            Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s)" -ForegroundColor Gray
+                        }
+                    }
+                    else
+                    {
+                        Write-Host "  (no Autopilot profiles specified)" -ForegroundColor Gray
+                    }
+                    
+                    Write-Host "`nPress any key to continue..." -ForegroundColor Yellow
+                    [void][System.Console]::ReadKey($true)
                 }
             }
         }
