@@ -221,27 +221,6 @@
         'name' = 'userPatternsToExclude'
     },
     @{
-        'description' = 'The desired Autopilot profiles to assign to devices.'
-        'reldefault' = @(
-            'AutopilotProfile1',
-            'AutopilotProfile2'
-        )
-        'value' = @(
-            'AutopilotProfile1',
-            'AutopilotProfile2'
-        )
-        'name' = 'DesiredAutopilotProfiles'
-        'default' = @(
-            'AutopilotProfile1',
-            'AutopilotProfile2'
-        )
-        'type' = 'array'
-        'devdefault' = @(
-            'AutopilotProfile1',
-            'AutopilotProfile2'
-        )
-    },
-    @{
         'description' = 'The groups to include in the Autopilot device assignment.'
         'reldefault' = @(
         )
