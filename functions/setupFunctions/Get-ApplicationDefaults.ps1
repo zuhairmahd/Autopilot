@@ -345,10 +345,10 @@ function Get-ApplicationDefaults()
         
         # Menu defaults - complete menu structure 
         Menus          = [ordered]@{
-            version              = $Version
-            name                 = 'menu.psd1'
-            description          = 'This file contains the definitions for the menus used in the application.'
-            appModeHierarchy     = @{
+            version                = $Version
+            name                   = 'menu.psd1'
+            description            = 'This file contains the definitions for the menus used in the application.'
+            appModeHierarchy       = @{
                 full                 = @('*')
                 advanced             = @('advanced', 'helpdesk', 'registration')
                 helpdesk             = @('helpdesk')
@@ -357,7 +357,7 @@ function Get-ApplicationDefaults()
                 admin                = @('admin', 'advanced', 'helpdesk', 'registration')
                 custom               = @()
             }
-            appModeDefaults      = @{
+            appModeDefaults        = @{
                 full                 = @{
                     description  = 'Full administrative access with all features enabled'
                     capabilities = @('all_menus', 'all_actions', 'settings_management', 'advanced_diagnostics', 'export_all', 'device_management')
@@ -387,7 +387,7 @@ function Get-ApplicationDefaults()
                     capabilities = @('user_defined')
                 }
             }
-            mainMenu             = @{
+            mainMenu               = @{
                 Title                 = 'Main Menu'
                 Description           = 'Please choose from one of the following options'
                 type                  = 'static'
@@ -453,7 +453,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            checkMenu            = @{
+            checkMenu              = @{
                 Title                 = 'Check Device Status'
                 Description           = 'How would you like to lookup the device?'
                 type                  = 'static'
@@ -474,7 +474,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            autopilotMenu        = @{
+            autopilotMenu          = @{
                 Title                 = 'Autopilot Menu'
                 Description           = 'Import a device into Autopilot and perform related actions'
                 type                  = 'static'
@@ -542,7 +542,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            settingsMenu         = @{
+            settingsMenu           = @{
                 Title                 = 'Settings menu'
                 Description           = 'Make changes to the application settings'
                 type                  = 'static'
@@ -575,7 +575,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            exportMenu           = @{
+            exportMenu             = @{
                 Title                 = 'Export Menu'
                 Description           = 'Choose what you would like to export'
                 type                  = 'static'
@@ -619,7 +619,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            serialNumberMenu     = @{
+            serialNumberMenu       = @{
                 Title                 = 'Lookup by Serial Number'
                 Description           = 'How would you like to enter the serial number?'
                 type                  = 'static'
@@ -639,7 +639,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            environmentMenu      = @{
+            environmentMenu        = @{
                 Title                 = 'Change Environment Menu'
                 Description           = 'Manage your environment settings and configurations'
                 type                  = 'static'
@@ -690,26 +690,26 @@ function Get-ApplicationDefaults()
                 )
             }
             # Dynamic menus (these are created programmatically)
-            userMenu             = @{
+            userMenu               = @{
                 type                  = 'dynamic'
                 Title                 = 'Select a user'
                 includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
                 Description           = 'Did you mean:'
             }
-            deviceMenu           = @{
+            deviceMenu             = @{
                 type                  = 'dynamic'
                 Title                 = 'Device Selection'
                 includeInDisplayModes = @('full', 'admin', 'advanced', 'helpdesk', 'registration')
                 Description           = 'Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))'
             }
-            groupMenu            = @{
+            groupMenu              = @{
                 type                  = 'dynamic'
                 Title                 = 'Select a group'
                 includeInDisplayModes = @('full', 'admin', 'advanced')
                 Description           = 'Did you mean:'
             }
             # Additional menus for various workflows
-            deviceActionsMenu    = @{
+            deviceActionsMenu      = @{
                 Title                 = 'Device Actions for $deviceName'
                 Description           = 'Select an action to perform on this device:'
                 type                  = 'static'
@@ -772,19 +772,19 @@ function Get-ApplicationDefaults()
                 )
             }
             # Additional dynamic and static menus that exist in the committed menu.psd1
-            appModeMenu          = @{
+            appModeMenu            = @{
                 type                  = 'dynamic'
                 Title                 = '$menuTitle'
                 includeInDisplayModes = @('full', 'admin')
                 Description           = '$menuDescription'
             }
-            groupAssignmentsMenu = @{
+            groupAssignmentsMenu   = @{
                 type                  = 'dynamic'
                 Title                 = 'Group Assignments for $groupName'
                 includeInDisplayModes = @('full', 'admin', 'advanced')
                 Description           = 'What type of assignments would you like to see?'
             }
-            deviceWaitMenu       = @{
+            deviceWaitMenu         = @{
                 Title                 = 'Device Wait Menu'
                 Description           = 'Choose what you would like to do with this device:'
                 type                  = 'static'
@@ -798,7 +798,36 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            groupsEditMenu       = @{
+            inclusionExclusionMenu = @{
+                Title                 = 'Inclusion/Exclusion Settings'
+                Description           = 'Manage group and Autopilot profile inclusion/exclusion settings:'
+                items                 = @(
+                    @{
+                        description           = 'Modify the groups that are included or excluded from operations'
+                        name                  = 'Change group inclusion/exclusion'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin'
+                        )
+                    },
+                    @{
+                        description           = 'Modify the Autopilot profiles that are considered valid for assignment'
+                        name                  = 'Change Autopilot profile settings'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin'
+                )
+            }
+            groupsEditMenu         = @{
                 Title                 = 'Groups Edit Menu'
                 Description           = 'Select which group settings you want to modify:'
                 type                  = 'static'
@@ -824,7 +853,7 @@ function Get-ApplicationDefaults()
                     }
                 )
             }
-            reportExportMenu     = @{
+            reportExportMenu       = @{
                 Title                 = 'Report Export Menu'
                 Description           = 'Select the format to which you would like to export the report'
                 type                  = 'static'
