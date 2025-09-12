@@ -68,7 +68,8 @@
         # Customer-specific build (example for arabictutor.com)
         arabictutor = @{
             buildParameters = @{
-                OutputPath      = './build/arabictutor'
+                inputFile       = 'main.ps1'
+                OutputPath      = "build\arabictutor"
                 NoVersionUpdate = $false
                 Overwrite       = $true
             }
