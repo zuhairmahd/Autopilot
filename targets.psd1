@@ -5,7 +5,7 @@
     # Build targets - each target defines build parameters and settings to apply
     targets     = @{
         # Development build target
-        development = @{
+        dev = @{
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
                 inputFile       = 'main.ps1'
@@ -63,44 +63,6 @@
             domainSettings  = @{}
             
             description     = 'Production build with signing enabled and test mode disabled'
-        }
-        
-        # Customer-specific build (example for arabictutor.com)
-        arabictutor = @{
-            buildParameters = @{
-                inputFile       = 'main.ps1'
-                OutputPath      = "build\arabictutor"
-                NoVersionUpdate = $false
-                Overwrite       = $true
-            }
-            
-            globalSettings  = @{
-                testMode             = $false
-                autoUpdate           = $true
-                maxGroupMatchDisplay = 20
-                maxUserMatchDisplay  = 20
-            }
-            
-            authSettings    = @{
-                changePwOnNextStart = $true
-            }
-            
-            # Use arabictutor.com domain configuration
-            domain          = 'arabictutor.com'
-            
-            # Settings specific to arabictutor.com domain
-            domainSettings  = @{
-                companyName          = 'ZM Consulting'
-                appMode              = 'full'
-                maxGroupMatchDisplay = 20
-                maxUserMatchDisplay  = 20
-                groupTag             = 'ENTRA'
-                deviceNamePrefix     = 'vmware'
-                showLicenseBanner    = $false
-                validateScopes       = $false
-            }
-            
-            description     = 'Customer build for arabictutor.com with specific branding and settings'
         }
         
         # Government build (example for gao.gov)

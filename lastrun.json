@@ -1,9 +1,9 @@
 {
-    "date":  "2025-09-06",
-    "version":  "4.0.0.30050",
-    "guid":  "c2c08149-3c1f-4558-9e4c-87487943bbf5",
-    "hash":  "259006DEEDA91C7D75F99B409456CA87677506E162A7BA466FB21B840B80F883",
-    "stringsVersion":  "1.3.0.0",
-    "settingsVersion":  "1.3.0.0",
-    "hashUpdated":  true
+  "date": "2025-09-06",
+  "version": "4.0.0.30051",
+  "guid": "c2c08149-3c1f-4558-9e4c-87487943bbf5",
+  "hash": "32B250F24E6940E1C349232CBE83D6E0059B33BCDE7D550C58E22CFDE7181B6F",
+  "stringsVersion": "1.3.0.0",
+  "settingsVersion": "1.3.0.0",
+  "hashUpdated": true
 }
