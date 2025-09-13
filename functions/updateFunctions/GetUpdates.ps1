@@ -1,6 +1,6 @@
 function GetUpdates()
 {
-    [cmdletBinding  ()]
+    [CmdletBinding()]
     param (
         [Parameter(Mandatory = $false)]
         [string]$executableFileName = "$pwd\main.exe",
