@@ -361,7 +361,6 @@ function Show-SettingsViewer()
     }
 }
 
-
 function Display-SettingInfoForViewer()
 {
     <#
@@ -451,91 +450,4 @@ function Display-SettingInfo()
     }
     
     Write-Host ""  # Empty line for spacing
-}
-
-function Format-SettingValueForDisplay()
-{
-    <#
-    .SYNOPSIS
-        Formats a setting value for display in the UI with enhanced array and nested object handling.
-    #>
-    [CmdletBinding()]
-    param($Value)
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    
-    # Add detailed logging for debugging array display issues  
-    if ($null -ne $Value)
-    {
-        Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Formatting null value for display"
-    }
-    
-    try
-    {
-        if ($Value -is [array])
-        {
-            Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
-            if ($Value.Count -eq 0)
-            {
-                return "(empty array)"
-            }
-            else
-            {
-                # Handle nested arrays properly - flatten if needed
-                $flattenedElements = @()
-                foreach ($element in $Value)
-                {
-                    if ($element -is [array])
-                    {
-                        # Handle nested array by flattening it
-                        Write-Verbose "[$functionName] Found nested array element, flattening"
-                        $flattenedElements += $element
-                    }
-                    else
-                    {
-                        $flattenedElements += $element
-                    }
-                }
-                
-                # Join the flattened elements
-                $joinedValue = $flattenedElements -join ', '
-                Write-Verbose "[$functionName] Array elements flattened and joined as: '$joinedValue'"
-                return "[$joinedValue]"
-            }
-        }
-        elseif ($Value -is [bool])
-        {
-            Write-Verbose "[$functionName] Processing boolean value: $Value"
-            return $Value.ToString().ToLower()
-        }
-        elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
-        {
-            Write-Verbose "[$functionName] Processing hashtable or PSCustomObject"
-            return "(nested object)"
-        }
-        elseif ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value))
-        {
-            Write-Verbose "[$functionName] Processing null or whitespace value"
-            return "(not set)"
-        }
-        else
-        {
-            Write-Verbose "[$functionName] Processing other type as string: '$Value'"
-            return [string]$Value
-        }
-    }
-    catch
-    {
-        Write-Verbose "[$functionName] Error formatting value: $($_.Exception.Message)"
-        # Fallback to safe string conversion
-        if ($Value -is [array] -and $Value.Count -gt 0)
-        {
-            return "[$($Value -join ', ')]"
-        }
-        return $Value.ToString()
-    }
 }
