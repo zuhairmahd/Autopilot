@@ -14,8 +14,8 @@ function GetUpdates()
     #region define variables and write logs 
     $functionName = $MyInvocation.MyCommand.Name
     $fileName = Split-Path -Path $executableFileName -Leaf
-    $updateURL = "$updateURL/$fileName"
     $tempUpdateFile = "$env:TEMP\$fileName"
+    $executableUpdateURL = "$updateURL/$fileName"
     Write-Verbose "[$functionName] Executable File Name: $executableFileName"
     Write-Verbose "[$functionName] updateURL: $updateURL"
     Write-Verbose "[$functionName] metaDataURL: $metaDataURL"
@@ -112,6 +112,7 @@ function GetUpdates()
                     Write-Error "[$functionName] No backup found for $fileName. The file may be missing or corrupted."
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "No backup found for $fileName. The file may be missing or corrupted." -LogLevel "Error"
                 }
+                $returnObject.Success = $false
                 return $returnObject
             }
         }
@@ -134,8 +135,8 @@ function GetUpdates()
         Write-Verbose "[$functionName] Temp update file $tempUpdateFile exists. Removing it."
         Remove-Item -Path $tempUpdateFile -Force
     }
-    Write-Verbose "[$functionName] Getting remote file from $updateURL"
-    $response = DownloadRemoteFile -url $updateURL -outputFile $tempUpdateFile
+    Write-Verbose "[$functionName] Getting remote file from $executableUpdateURL"
+    $response = DownloadRemoteFile -url $executableUpdateURL -outputFile $tempUpdateFile
     if (-not $response.Success)
     {
         Write-Error "[$functionName] Failed to download the update file from $updateURL. Please check the URLs and try again."
