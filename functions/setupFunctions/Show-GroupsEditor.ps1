@@ -63,81 +63,17 @@ function Show-GroupsEditor()
             return $false
         }
         
-        # Get domain name if not specified (following domain settings editor pattern)
+        # Get domain name if not specified - use consolidated logic
         if ([string]::IsNullOrWhiteSpace($DomainName))
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "No domain specified, attempting to determine current domain" -LogLevel "Verbose"
             Write-Verbose "[$functionName] No domain specified, attempting to determine current domain"
             
-            # Try to get the current domain from calling scope (same logic as domain settings editor)
-            $currentDomain = $null
-            try
-            {
-                # Check if $domain variable exists in calling scope
-                $currentDomain = Get-Variable -Name "domain" -Scope 1 -ValueOnly -ErrorAction SilentlyContinue
-                if (-not [string]::IsNullOrWhiteSpace($currentDomain))
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Found loaded domain from scope: '$currentDomain'" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] Found loaded domain from scope: '$currentDomain'"
-                    $DomainName = $currentDomain
-                }
-            }
-            catch
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Unable to access domain variable from calling scope: $($_.Exception.Message)" -LogLevel "Warning"
-                Write-Verbose "[$functionName] Unable to access domain variable from calling scope: $($_.Exception.Message)"
-            }
-            
-            # If no current domain found, fall back to domain selection
+            $DomainName = Get-DomainForEditor -DomainName $DomainName -SettingsFile $SettingsFile -Silent:$Silent -FunctionName $functionName
             if ([string]::IsNullOrWhiteSpace($DomainName))
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "No loaded domain found, falling back to domain selection" -LogLevel "Warning"
-                Write-Verbose "[$functionName] No loaded domain found, falling back to domain selection"
-                
-                $configPath = Split-Path $SettingsFile -Parent
-                $availableDomains = Get-AvailableDomains -ConfigurationPath $configPath -SettingsFile $SettingsFile
-                if ($availableDomains.Count -eq 0)
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "No domains available" -LogLevel "Error"
-                    Write-Warning "[$functionName] No domains available"
-                    return $false
-                }
-                
-                if ($availableDomains.Count -eq 1)
-                {
-                    $DomainName = $availableDomains[0]
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Auto-selected single domain: '$DomainName'" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Auto-selected single domain: '$DomainName'"
-                }
-                else
-                {
-                    if (-not $Silent)
-                    {
-                        Write-Host "`nAvailable domains:" -ForegroundColor Cyan
-                        for ($i = 0; $i -lt $availableDomains.Count; $i++)
-                        {
-                            Write-Host "$($i + 1). $($availableDomains[$i])" -ForegroundColor White
-                        }
-                        
-                        do
-                        {
-                            $choice = Read-Host "Select domain (1-$($availableDomains.Count))"
-                            if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $availableDomains.Count)
-                            {
-                                $DomainName = $availableDomains[[int]$choice - 1]
-                                break
-                            }
-                            Write-Host "Invalid choice. Please enter a number between 1 and $($availableDomains.Count)." -ForegroundColor Red
-                        } while ($true)
-                    }
-                    else
-                    {
-                        $DomainName = $availableDomains[0]  # Use first domain in silent mode
-                    }
-                    
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User selected domain: '$DomainName'" -LogLevel "Information"
-                    Write-Verbose "[$functionName] User selected domain: '$DomainName'"
-                }
+                Write-Warning "[$functionName] No domain could be determined"
+                return $false
             }
         }
         
@@ -229,70 +165,26 @@ function Show-GroupsEditor()
                     Write-Verbose "[$functionName] Current groups to include count: $($currentIncludeGroups.Count)"
                     if ($currentIncludeGroups -and $currentIncludeGroups.Count -gt 0)
                     {
-                        # Detect format and display accordingly
-                        $firstElement = $currentIncludeGroups | Select-Object -First 1
-                        Write-Verbose "[$functionName] Current groups to include format: $($firstElement.GetType().Name)"
-                        write-log -logFile $logFile -module $functionName -Message "Current groups to include format: $($firstElement.GetType().Name)"
-                        if ($firstElement -is [string])
-                        {
-                            # Old string format
-                            foreach ($group in $currentIncludeGroups)
-                            {
-                                Write-Host "  - $group" -ForegroundColor White
-                            }
-                            Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
-                        }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
-                        {
-                            # New hashtable format
-                            foreach ($group in $currentIncludeGroups)
-                            {
-                                Write-Host "  - Name: $($group.name)" -ForegroundColor White
-                                if ($group.id)
-                                {
-                                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
-                                }
-                                else
-                                {
-                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
-                                }
-                            }
-                        }
-                        else
-                        {
-                            # Fallback for unknown format
-                            foreach ($group in $currentIncludeGroups)
-                            {
-                                Write-Host "  - $group" -ForegroundColor White
-                            }
-                        }
+                        Show-EditorArrayContents -Array $currentIncludeGroups -ArrayName "groups" -FunctionName $functionName
                     }
                     else
                     {
                         Write-Host "  (no groups specified)" -ForegroundColor Gray
                     }
                     
-                    $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
-                    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
-                    {
-                        Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
-                        [console]::beep(1000, 500)
-                        $choice = Read-Host "`nDo you want to modify groups to include? (y/n)"
-                    }
+                    $shouldModify = Show-EditorInteractiveChoice -PromptText "`nDo you want to modify groups to include? (y/n)" -FunctionName $functionName
 
-                    if ($choice -eq 'y' -or $choice -eq 'Y')
+                    if ($shouldModify)
                     {
                         $updatedIncludeGroups = Get-GroupArrayInput -CurrentGroups $currentIncludeGroups -GroupType "include" -AccessToken $AccessToken
-                        if ($null -ne $updatedIncludeGroups -and (Compare-ArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups))
+                        if ($null -ne $updatedIncludeGroups -and (Compare-EditorArrayContents -Array1 $currentIncludeGroups -Array2 $updatedIncludeGroups -FunctionName $functionName))
                         {
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to include changed" -LogLevel "Information"
                             Write-Verbose "[$functionName] Groups to include changed"
                             
                             # Save changes immediately
                             Write-Host "`nSaving changes..." -ForegroundColor Yellow
-                            $includeSuccess = Update-DomainGroupSetting -SettingsFile $SettingsFile -DomainName $DomainName -GroupType "groupsToInclude" -Groups $updatedIncludeGroups
+                            $includeSuccess = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "groupsToInclude" -SettingValue $updatedIncludeGroups -FunctionName $functionName
                             if ($includeSuccess)
                             {
                                 Write-Host "Group settings updated successfully!" -ForegroundColor Green
@@ -320,69 +212,26 @@ function Show-GroupsEditor()
                     write-log -logFile $logFile -module $functionName -Message "$($currentExcludeGroups.count) groups to exclude: $($currentExcludeGroups -join ', ')"
                     if ($currentExcludeGroups -and $currentExcludeGroups.Count -gt 0)
                     {
-                        # Detect format and display accordingly
-                        $firstElement = $currentExcludeGroups | Select-Object -First 1
-                        Write-Verbose "[$functionName] Current groups to exclude format: $($firstElement.GetType().Name)"
-                        write-log -logFile $logFile -module $functionName -Message "Current groups to exclude format: $($firstElement.GetType().Name)"
-                        if ($firstElement -is [string])
-                        {
-                            # Old string format
-                            foreach ($group in $currentExcludeGroups)
-                            {
-                                Write-Host "  - $group" -ForegroundColor White
-                            }
-                            Write-Host "  (Note: Groups are in old format - will be upgraded)" -ForegroundColor Yellow
-                        }
-                        elseif (($firstElement -is [hashtable] -or $firstElement -is [PSCustomObject]) -and 
-                            (($firstElement -is [hashtable] -and $firstElement.ContainsKey('name')) -or 
-                            ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
-                        {
-                            # New hashtable format
-                            foreach ($group in $currentExcludeGroups)
-                            {
-                                Write-Host "  - Name: $($group.name)" -ForegroundColor White
-                                if ($group.id)
-                                {
-                                    Write-Host "    ID:   $($group.id)" -ForegroundColor Gray
-                                }
-                                else
-                                {
-                                    Write-Host "    ID:   (not resolved)" -ForegroundColor Yellow
-                                }
-                            }
-                        }
-                        else
-                        {
-                            # Fallback for unknown format
-                            foreach ($group in $currentExcludeGroups)
-                            {
-                                Write-Host "  - $group" -ForegroundColor White
-                            }
-                        }
+                        Show-EditorArrayContents -Array $currentExcludeGroups -ArrayName "groups" -FunctionName $functionName
                     }
                     else
                     {
                         Write-Host "  (no groups specified)" -ForegroundColor Gray
                     }
                     
-                    $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
-                    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
-                    {
-                        Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
-                        [console]::beep(1000, 500)
-                        $choice = Read-Host "`nDo you want to modify groups to exclude? (y/n)"
-                    }
-                    if ($choice -eq 'y' -or $choice -eq 'Y')
+                    $shouldModify = Show-EditorInteractiveChoice -PromptText "`nDo you want to modify groups to exclude? (y/n)" -FunctionName $functionName
+
+                    if ($shouldModify)
                     {
                         $updatedExcludeGroups = Get-GroupArrayInput -CurrentGroups $currentExcludeGroups -GroupType "exclude" -AccessToken $AccessToken
-                        if ($null -ne $updatedExcludeGroups -and (Compare-ArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups))
+                        if ($null -ne $updatedExcludeGroups -and (Compare-EditorArrayContents -Array1 $currentExcludeGroups -Array2 $updatedExcludeGroups -FunctionName $functionName))
                         {
                             Write-Log -LogFile $logFile -Module $functionName -Message "Groups to exclude changed" -LogLevel "Information"
                             Write-Verbose "[$functionName] Groups to exclude changed"
                             
                             # Save changes immediately
                             Write-Host "`nSaving changes..." -ForegroundColor Yellow
-                            $excludeSuccess = Update-DomainGroupSetting -SettingsFile $SettingsFile -DomainName $DomainName -GroupType "groupsToExclude" -Groups $updatedExcludeGroups
+                            $excludeSuccess = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "groupsToExclude" -SettingValue $updatedExcludeGroups -FunctionName $functionName
                             if ($excludeSuccess)
                             {
                                 Write-Host "Group settings updated successfully!" -ForegroundColor Green
@@ -730,280 +579,6 @@ function Get-GroupArrayInput()
     Write-Log -LogFile $logFile -Module $functionName -Message "Returning $GroupType group array with $($result.Count) groups in hashtable format" -LogLevel "Information"
     Write-Verbose "[$functionName] Returning $GroupType group array with $($result.Count) groups in hashtable format"
     return $result
-}
-
-function Compare-ArrayContents()
-{
-    <#
-    .SYNOPSIS
-        Compares two arrays to determine if they have different contents.
-        Supports both string arrays and hashtable arrays with name/id properties.
-    #>
-    [CmdletBinding()]
-    param(
-        [array]$Array1,
-        [array]$Array2
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Verbose "[$functionName] Comparing array contents"
-    
-    # Handle null or empty arrays
-    if (($null -eq $Array1 -or $Array1.Count -eq 0) -and ($null -eq $Array2 -or $Array2.Count -eq 0))
-    {
-        Write-Verbose "[$functionName] Both arrays are null or empty - no change"
-        return $false  # No change
-    }
-    
-    if (($null -eq $Array1 -or $Array1.Count -eq 0) -and ($Array2.Count -gt 0))
-    {
-        Write-Verbose "[$functionName] Array1 is empty but Array2 has content - change detected"
-        return $true  # Change detected
-    }
-    
-    if (($Array1.Count -gt 0) -and ($null -eq $Array2 -or $Array2.Count -eq 0))
-    {
-        Write-Verbose "[$functionName] Array1 has content but Array2 is empty - change detected"
-        return $true  # Change detected
-    }
-    
-    # Detect array formats
-    $format1 = if ($Array1[0] -is [string])
-    {
-        "String" 
-    }
-    elseif ($Array1[0].name -and $Array1[0].id)
-    {
-        "HashTable" 
-    }
-    else
-    {
-        "Unknown" 
-    }
-    $format2 = if ($Array2[0] -is [string])
-    {
-        "String" 
-    }
-    elseif ($Array2[0].name -and $Array2[0].id)
-    {
-        "HashTable" 
-    }
-    else
-    {
-        "Unknown" 
-    }
-    
-    Write-Verbose "[$functionName] Array1 format: $format1, Array2 format: $format2"
-    
-    # If formats are different, there's definitely a change
-    if ($format1 -ne $format2)
-    {
-        Write-Verbose "[$functionName] Different array formats detected - change detected"
-        return $true
-    }
-    
-    # Compare based on format
-    if ($format1 -eq "HashTable" -and $format2 -eq "HashTable")
-    {
-        # Compare hashtable arrays by name and id
-        if ($Array1.Count -ne $Array2.Count)
-        {
-            Write-Verbose "[$functionName] Different array lengths - change detected"
-            return $true
-        }
-        
-        for ($i = 0; $i -lt $Array1.Count; $i++)
-        {
-            $item1 = $Array1[$i]
-            $item2 = $Array2[$i]
-            
-            if ($item1.name -ne $item2.name -or $item1.id -ne $item2.id)
-            {
-                Write-Verbose "[$functionName] Hashtable content difference detected at index $i"
-                return $true
-            }
-        }
-        
-        Write-Verbose "[$functionName] Hashtable arrays are identical - no change"
-        return $false
-    }
-    else
-    {
-        # Use standard Compare-Object for string arrays
-        $comparison = Compare-Object -ReferenceObject $Array1 -DifferenceObject $Array2
-        $hasChanges = $null -ne $comparison
-        
-        Write-Verbose "[$functionName] Array comparison result: hasChanges = $hasChanges"
-        return $hasChanges
-    }
-}
-
-function Update-DomainGroupSetting()
-{
-    <#
-    .SYNOPSIS
-        Updates domain-level group settings using separate domain configuration files.
-    #>
-    [CmdletBinding()]
-    param(
-        [string]$SettingsFile,
-        [string]$DomainName,
-        [ValidateSet('groupsToInclude', 'groupsToExclude')]
-        [string]$GroupType,
-        [array]$Groups
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Updating $GroupType for domain '$DomainName'" -LogLevel "Information"
-    Write-Verbose "[$functionName] Updating $GroupType for domain '$DomainName'"
-    
-    try
-    {
-        # Determine configuration path from settings file
-        $configPath = Split-Path $SettingsFile -Parent
-        Write-Log -LogFile $logFile -Module $functionName -Message "Configuration path: $configPath" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Configuration path: $configPath"
-        
-        # Load current domain configuration
-        $domainConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
-        if ($null -eq $domainConfig)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to load domain configuration for '$DomainName'" -LogLevel "Error"
-            Write-Warning "[$functionName] Failed to load domain configuration for '$DomainName'"
-            return $false
-        }
-        
-        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully loaded domain configuration for '$DomainName'" -LogLevel "Information"
-        Write-Verbose "[$functionName] Successfully loaded domain configuration for '$DomainName'"
-        
-        # Update the specific group setting
-        Write-Log -LogFile $logFile -Module $functionName -Message "Setting $GroupType to array with $($Groups.Count) groups" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Setting $GroupType to array with $($Groups.Count) groups"
-        
-        # Ensure Groups is always an array, even for single items
-        $groupsArray = @($Groups)
-        
-        # Update the domain configuration
-        if ($GroupType -eq 'groupsToInclude')
-        {
-            $domainConfig.groupsToInclude = $groupsArray
-        }
-        elseif ($GroupType -eq 'groupsToExclude')
-        {
-            $domainConfig.groupsToExclude = $groupsArray
-        }
-        
-        Write-Log -LogFile $logFile -Module $functionName -Message "Updated $GroupType in domain configuration object" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Updated $GroupType in domain configuration object"
-        
-        # Save the updated domain configuration
-        Write-Log -LogFile $logFile -Module $functionName -Message "Saving updated domain configuration" -LogLevel "Verbose"
-        Write-Verbose "[$functionName] Saving updated domain configuration"
-        
-        $success = Save-DomainConfiguration -DomainName $DomainName -DomainConfiguration $domainConfig -ConfigurationPath $configPath
-        if ($success)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved updated domain configuration" -LogLevel "Information"
-            Write-Verbose "[$functionName] Successfully saved updated domain configuration"
-            
-            # Verification approach updated: Previously, verification involved direct file inspection and manual parsing of the configuration file,
-            
-            $verifyConfig = Get-DomainConfigurationFromFiles -DomainName $DomainName -ConfigurationPath $configPath
-            if ($verifyConfig)
-            {
-                # Convert to hashtable if needed for consistent access
-                $verifyConfigHash = Test-IsHashtableOrConvert -InputObject $verifyConfig
-                
-                # Get the actual saved groups
-                $actualGroups = if ($GroupType -eq 'groupsToInclude')
-                {
-                    $verifyConfigHash['groupsToInclude']
-                }
-                else
-                {
-                    $verifyConfigHash['groupsToExclude']
-                }
-                
-                # Ensure actualGroups is always an array
-                $actualGroups = @($actualGroups)
-                
-                Write-Log -LogFile $logFile -Module $functionName -Message "Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups" -LogLevel "Verbose"
-                Write-Verbose "[$functionName] Verification: Saved $($groupsArray.Count) groups, Loaded $($actualGroups.Count) groups"
-                
-                # Use simplified comparison approach similar to Update-Setting.ps1
-                $verificationResult = $false
-                
-                if ($groupsArray.Count -eq 0 -and $actualGroups.Count -eq 0)
-                {
-                    # Both are empty - verification successful
-                    $verificationResult = $true
-                }
-                elseif ($groupsArray.Count -eq $actualGroups.Count)
-                {
-                    # Same count, compare content
-                    if ($groupsArray.Count -gt 0 -and $groupsArray[0] -is [hashtable])
-                    {
-                        # Hashtable comparison - compare by ID and name
-                        $verificationResult = $true
-                        for ($i = 0; $i -lt $groupsArray.Count; $i++)
-                        {
-                            $saved = $groupsArray[$i]
-                            $loaded = $actualGroups[$i]
-                            
-                            # Convert loaded item to hashtable if needed
-                            $loadedHash = Test-IsHashtableOrConvert -InputObject $loaded
-                            
-                            if (($saved.name -ne $loadedHash.name) -or ($saved.id -ne $loadedHash.id))
-                            {
-                                Write-Log -LogFile $logFile -Module $functionName -Message "Content mismatch at index $i`: saved($($saved.name),$($saved.id)) vs loaded($($loadedHash.name),$($loadedHash.id))" -LogLevel "Verbose"
-                                $verificationResult = $false
-                                break
-                            }
-                        }
-                    }
-                    else
-                    {
-                        # Simple array comparison
-                        $comparisonResult = Compare-Object -ReferenceObject $groupsArray -DifferenceObject $actualGroups
-                        $verificationResult = ($null -eq $comparisonResult)
-                    }
-                }
-                
-                if ($verificationResult)
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Successfully updated and verified $GroupType" -LogLevel "Information"
-                    Write-Verbose "[$functionName] Successfully updated and verified $GroupType"
-                    return $true
-                }
-                else
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "Verification failed for $GroupType" -LogLevel "Warning"
-                    Write-Verbose "[$functionName] Verification failed for $GroupType. Saved: $($groupsArray.Count) items, Loaded: $($actualGroups.Count) items"
-                    Write-Warning "[$functionName] Verification failed for $GroupType"
-                    return $false
-                }
-            }
-            else
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to reload domain configuration for verification" -LogLevel "Warning"
-                Write-Warning "[$functionName] Failed to reload domain configuration for verification"
-                return $false
-            }
-        }
-        else
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save updated domain configuration" -LogLevel "Error"
-            Write-Warning "[$functionName] Failed to save updated domain configuration"
-            return $false
-        }
-    }
-    catch
-    {
-        Write-Log -LogFile $logFile -Module $functionName -Message "Error updating $($GroupType): $($_.Exception.Message)" -LogLevel "Error"
-        Write-Log -LogFile $logFile -Module $functionName -Message "Full error details: $($_.Exception | Format-List * | Out-String)" -LogLevel "Debug"
-        Write-Warning "[$functionName] Error updating $($GroupType): $($_.Exception.Message)"
-        return $false
-    }
 }
 
 function Resolve-SingleGroupInteractive()
