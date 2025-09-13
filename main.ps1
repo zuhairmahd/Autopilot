@@ -541,7 +541,7 @@ else
 {
     $defaultBranch
 }
-$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.psd1"
+$remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $groupsToInclude = $settings.groupsToInclude
