@@ -868,6 +868,7 @@ $exportMenu = NewMenu -MenuName "exportMenu"
 $settingsMenu = NewMenu -MenuName "settingsMenu"
 $autopilotMenu = NewMenu -MenuName "autopilotMenu"
 $environmentMenu = NewMenu -MenuName "environmentMenu"
+$inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
 #endregion Create menus
 
 #region export menu
@@ -1341,10 +1342,7 @@ $environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change authenticati
         Write-Host "`nFailed to update authentication settings. Please check the logs for details." -ForegroundColor Red
     }
 }
-$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change inclusion/exclusion" -subMenu (NewMenu -MenuName "inclusionExclusionMenu")
-
-# Configure inclusion/exclusion submenu actions
-$inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
+$environmentMenu = AddMenuItem -menu $environmentMenu -Name "Change inclusion/exclusion" -subMenu $inclusionExclusionMenu 
 $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change group inclusion/exclusion" -Action {
     Write-Host "Launching groups editor..." -ForegroundColor Cyan
     Write-Host "These settings control which groups are included or excluded from operations." -ForegroundColor Gray
@@ -1369,7 +1367,6 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
         return $result
     }
 }
-
 $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Change Autopilot profile settings" -Action {
     Write-Host "Launching Autopilot profiles editor..." -ForegroundColor Cyan
     Write-Host "These settings control which Autopilot profiles are considered valid for device assignment." -ForegroundColor Gray

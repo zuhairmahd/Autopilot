@@ -165,10 +165,8 @@ function Get-ApplicationDefaults()
                 "onmicrosoft.com"
             )
             groupPatternsToExclude          = @()  
-            desiredAutopilotProfiles        = @()
             groupTag                        = ''
             assignedUser                    = ''
-
             additionalScopes                = @()
         }
         
