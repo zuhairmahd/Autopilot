@@ -6,12 +6,11 @@ on:
       target:
         description: 'Target name from targets.psd1 to build'
         required: true
-        default: 'development'
+        default: 'dev'
         type: choice
         options:
-          - development
+          - dev
           - production
-          - arabictutor
           - government
           - ci_test
       skip_signing:
