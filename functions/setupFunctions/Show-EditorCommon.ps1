@@ -128,10 +128,9 @@ function Compare-EditorArrayContents()
     [CmdletBinding()]
     param(
         [array]$Array1,
-        [array]$Array2,
-        [string]$FunctionName
+        [array]$Array2
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$FunctionName] Comparing array contents"
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Comparing array contents" -LogLevel "Verbose"
     
@@ -246,10 +245,9 @@ function Get-EditorArrayFormat()
     #>
     [CmdletBinding()]
     param(
-        [array]$Array,
-        [string]$FunctionName
+        [array]$Array
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name    
     if (-not $Array -or $Array.Count -eq 0)
     {
         Write-Verbose "[$FunctionName] Array is empty or null"
@@ -289,10 +287,9 @@ function Show-EditorArrayContents()
     [CmdletBinding()]
     param(
         [array]$Array,
-        [string]$ArrayName,
-        [string]$FunctionName
+        [string]$ArrayName
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name
     if (-not $Array -or $Array.Count -eq 0)
     {
         Write-Host "  (no $ArrayName specified)" -ForegroundColor Gray
@@ -344,10 +341,9 @@ function Get-EditorReplaceOrAddChoice()
     [CmdletBinding()]
     param(
         [array]$CurrentArray,
-        [string]$ItemType,
-        [string]$FunctionName
+        [string]$ItemType
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name    
     if (-not $CurrentArray -or $CurrentArray.Count -eq 0)
     {
         Write-Verbose "[$FunctionName] No existing items, will create new array"
@@ -416,10 +412,9 @@ function Convert-StringArrayToHashTableArray()
     #>
     [CmdletBinding()]
     param(
-        [array]$StringArray,
-        [string]$FunctionName
+        [array]$StringArray
     )
-    
+    $FunctionName = $MyInvocation.MyCommand.Name    
     $convertedArray = @()
     Write-Host "`nConverting existing items to new format..." -ForegroundColor Yellow
     Write-Verbose "[$FunctionName] Converting $($StringArray.Count) items from string to hashtable format"
@@ -451,10 +446,9 @@ function Update-DomainArraySetting()
         [string]$SettingsFile,
         [string]$DomainName,
         [string]$SettingName,
-        [array]$SettingValue,
-        [string]$FunctionName
+        [array]$SettingValue
     )
-    
+    $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Updating $SettingName for domain '$DomainName'" -LogLevel "Information"
     Write-Verbose "[$FunctionName] Updating $SettingName for domain '$DomainName'"
     
@@ -618,10 +612,9 @@ function Show-EditorInteractiveChoice()
     #>
     [CmdletBinding()]
     param(
-        [string]$PromptText,
-        [string]$FunctionName
+        [string]$PromptText
     )
-    
+    $FunctionName = $MyInvocation.MyCommand.Name    
     $choice = Read-Host $PromptText
     while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
     {
