@@ -14,6 +14,7 @@
         }
     )
     groupsToExclude = @()
+    autopilotProfilesToInclude = @()
     domain = 'gao.gov'
     companyName = 'Government Accountability Office'
     version = '1.3.0.0'
@@ -27,10 +28,10 @@
     maxGroupMatchDisplay = 10
     release = 'lhm'
     repoInfo = @{
-        baseURL = 'https://www.github.com'
-        repoName = 'Autopilot'
         repoPath = 'zuhairmahd'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
+        baseURL = 'https://www.github.com'
     }
     autoUpdate = $true
     deviceNamePrefix = 'w11-'
@@ -52,10 +53,10 @@
         '-sup'
     )
     groupPatternsToExclude = @()
-    desiredAutopilotProfiles = @(
-        'msb'
-    )
     groupTag = 'MSB01'
     assignedUser = ''
     additionalScopes = @()
+    desiredAutopilotProfiles = @(
+        'msb'
+    )
 }
