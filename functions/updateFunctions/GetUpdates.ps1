@@ -1,11 +1,13 @@
 function GetUpdates()
 {
+    [cmdletBinding  ()]
     param (
         [Parameter(Mandatory = $false)]
         [string]$executableFileName = "$pwd\main.exe",
         [Parameter(Mandatory = $true)]
         [string]$updateURL,
         [string]$metaDataURL = "$updateURL/lastrun.json",
+        [string[]]$SupportingFiles,
         [switch]$noConfirmation
     )
 
@@ -20,7 +22,7 @@ function GetUpdates()
     Write-Verbose "[$functionName] Temp Update File: $tempUpdateFile"
     #endregion
 
-    #helper function to download the remote file.
+    #region helper functions
     function DownloadRemoteFile()
     {
         [cmdletBinding()]
@@ -56,6 +58,67 @@ function GetUpdates()
         return $returnObject
     }
     
+    function DownloadSupportingFiles()
+    {
+        [CmdletBinding()]
+        param(
+            [string[]]$SupportingFiles
+        )
+
+        $functionName = $MyInvocation.MyCommand.Name    
+        $backupFolder = $env:TEMP
+        $returnObject = [PSCustomObject]@{
+            Success    = $false
+            StatusCode = $null
+            Content    = $null
+        }
+        Write-Verbose "[$functionName] Downloading $($SupportingFiles.Count) supporting files..."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading $($SupportingFiles.Count) supporting files..." -LogLevel "Information"
+        foreach ($file in $SupportingFiles)
+        {
+            $fileName = Split-Path -Path $file -Leaf
+            $fileURL = "$updateURL/$fileName"
+            $localFilePath = Join-Path -Path (Split-Path -Path $executableFileName -Parent) -ChildPath $fileName
+            $backupFilePath = Join-Path -Path $backupFolder -ChildPath "$fileName.bak"
+            Write-Verbose "[$functionName] Backing up current $fileName to $backupFilePath"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Backing up current $fileName to $backupFilePath" -LogLevel "Information"
+            Copy-Item -Path $localFilePath -Destination $backupFilePath -Force -ErrorAction SilentlyContinue
+            Write-Verbose "[$functionName] Downloading supporting file from $fileURL to $localFilePath"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading supporting file from $fileURL to $localFilePath" -LogLevel "Information"
+            $response = DownloadRemoteFile -url $fileURL -outputFile $localFilePath
+            $returnObject.StatusCode = $response.StatusCode
+            $returnObject.Content = $response.Content
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($url): $($response.StatusCode)" -LogLevel "Information"
+            if ($response.Success)
+            {
+                Write-Verbose "[$functionName] Successfully downloaded supporting file from $fileURL to $localFilePath"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded supporting file from $fileURL to $localFilePath" -LogLevel "Information"
+                $returnObject.Success = $true
+            }    
+            else
+            {
+                Write-Error "[$functionName] Failed to download supporting file from $fileURL. Please check the URL and try again."
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download supporting file from $fileURL. Please check the URL and try again." -LogLevel "Error"
+                if (Test-Path $backupFilePath)
+                {
+                    Write-Verbose "[$functionName] Restoring backup of $fileName from $backupFilePath to $localFilePath"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Restoring backup of $fileName from $backupFilePath to $localFilePath" -LogLevel "Information"
+                    Copy-Item -Path $backupFilePath -Destination $localFilePath -Force
+                    Write-Verbose "[$functionName] Successfully restored backup of $fileName"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully restored backup of $fileName" -LogLevel "Information"
+                }
+                else
+                {
+                    Write-Error "[$functionName] No backup found for $fileName. The file may be missing or corrupted."
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No backup found for $fileName. The file may be missing or corrupted." -LogLevel "Error"
+                }
+                return $returnObject
+            }
+        }
+        return $returnObject
+    }
+    #endregion
+
     if ($executableFileName -notmatch 'exe')
     {
         Write-Verbose "[$functionName] The provided executable file name '$executableFileName' does not match 'exe'."
@@ -75,16 +138,15 @@ function GetUpdates()
     $response = DownloadRemoteFile -url $updateURL -outputFile $tempUpdateFile
     if (-not $response.Success)
     {
-        Write-Error "[$functionName] Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from both $updateURL and $oldUpdateURL. Please check the URLs and try again." -LogLevel "Error"
+        Write-Error "[$functionName] Failed to download the update file from $updateURL. Please check the URLs and try again."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from $updateURL. Please check the URLs and try again." -LogLevel "Error"
         return $response
     }
     else
     {
-        Write-Verbose "[$functionName] Successfully downloaded the update file from the old URL format: $oldUpdateURL"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from the old URL format: $oldUpdateURL" -LogLevel "Information"
+        Write-Verbose "[$functionName] Successfully downloaded the update file from $updateURL"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from $updateURL" -LogLevel "Information"
     }
-    
     $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
     Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
@@ -101,7 +163,7 @@ function GetUpdates()
     {
         Write-Error "[$functionName] Failed to retrieve metadata from $metaDataURL. Please check the URL and try again."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to retrieve metadata from $metaDataURL. Please check the URL and try again." -LogLevel "Error"
-        return $false
+        $returnValues.UpdateFailedMessage
     }
     Write-Verbose "[$functionName] remoteVersion = $remoteVersion"
     #endregion
@@ -141,43 +203,41 @@ function GetUpdates()
         Write-Verbose "[$functionName] Proceeding with the update."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Proceeding with the update..."
         Write-Host "Checking file signature..."
-        if (Invoke-FileCertVerification -FilePath $tempUpdateFile)
-        {
-            Write-Host "File signature is valid"
-            Write-Verbose "[$functionName] File signature is valid."
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File signature is valid." -LogLevel "Information"
-            Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
-            $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256
-            Write-Verbose "[$functionName] File hash for $($tempUpdateFile) is $($fileHash.Hash)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
-            Write-Host "Checking file hash..."
-            if ($fileMetaData.Hash -eq $fileHash.Hash)
-            {
-                Write-Host "File hash matches." -NoNewline
-                Write-Host " - Proceeding with update..." -ForegroundColor Green
-                Write-Verbose "[$functionName] File hash matches the expected hash."
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash matches the expected hash." -LogLevel "Information"
-            }
-            else
-            {
-                Write-Host "File hash does not match the expected hash." -ForegroundColor Red
-                Write-Host "Expected hash: $($fileMetaData.Hash)" -ForegroundColor Yellow
-                Write-Host "Actual hash: $($fileHash.Hash)" -ForegroundColor Yellow
-                Write-Verbose "[$functionName] File hash does not match the expected hash."
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash." -LogLevel "Error"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Expected hash: $($fileMetaData.Hash)" -LogLevel "Error"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Actual hash: $($fileHash.Hash)" -LogLevel "Error"
-                Write-Host "Aborting update." -ForegroundColor Red
-                return $returnValues.InvalidFileHash
-            }
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
-        }
-        else
+        if (-not (Invoke-FileCertVerification -FilePath $tempUpdateFile))
         {
             Write-Host "File signature is invalid. Aborting update." -ForegroundColor Red
             return $returnValues.InvalidSignatureMessage
         }   
+        Write-Host "File signature is valid"
+        Write-Verbose "[$functionName] File signature is valid."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "File signature is valid." -LogLevel "Information"
+        
+        Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
+        $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256        
+        Write-Verbose "[$functionName] File hash for $($tempUpdateFile) is $($fileHash.Hash)"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash for $tempUpdateFile is $($fileHash.Hash)" -LogLevel "Information"
+        Write-Host "Comparing file hash..."
+        if ($fileMetaData.Hash -eq $fileHash.Hash)
+        {
+            Write-Host "File hash matches." -NoNewline
+            Write-Host " - Proceeding with update..." -ForegroundColor Green
+            Write-Verbose "[$functionName] File hash matches the expected hash."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash matches the expected hash." -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "File hash does not match the expected hash." -ForegroundColor Red
+            Write-Host "Expected hash: $($fileMetaData.Hash)" -ForegroundColor Yellow
+            Write-Host "Actual hash: $($fileHash.Hash)" -ForegroundColor Yellow
+            Write-Verbose "[$functionName] File hash does not match the expected hash."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "File hash does not match the expected hash." -LogLevel "Error"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Expected hash: $($fileMetaData.Hash)" -LogLevel "Error"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Actual hash: $($fileHash.Hash)" -LogLevel "Error"
+            Write-Host "Aborting update." -ForegroundColor Red
+            return $returnValues.InvalidFileHash
+        }
+        
         $backupFile = Join-Path -Path $env:TEMP -ChildPath "$fileName.bak"
         Write-Verbose "[$functionName] Backing up current $executableFileName to $backupFile."
         try
@@ -200,6 +260,16 @@ function GetUpdates()
             Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
             Write-Verbose "[$functionName] Update completed successfully. New version: $remoteVersion"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update completed successfully. New version: $remoteVersion" -LogLevel "Information"
+            
+            if ($SupportingFiles)
+            {
+                $response = DownloadSupportingFiles -SupportingFiles $SupportingFiles
+                if (-not $response.Success)
+                {
+                    Write-Error "[$functionName] Failed to download one or more supporting files. Aborting update process."
+                    return $response
+                }
+            }
         }
         catch
         {

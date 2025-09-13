@@ -1805,7 +1805,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopil
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
-    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL
+    $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -SupportingFiles $menuFile
     Write-Verbose "[$scriptName] Update result: $updateResult"
     switch ($updateResult)
     {
