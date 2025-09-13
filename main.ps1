@@ -157,6 +157,7 @@ else
 #endregion import functions.
 
 #region Initialize script
+$global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
