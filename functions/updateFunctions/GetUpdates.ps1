@@ -88,7 +88,7 @@ function GetUpdates()
             $response = DownloadRemoteFile -url $fileURL -outputFile $localFilePath
             $returnObject.StatusCode = $response.StatusCode
             $returnObject.Content = $response.Content
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($url): $($response.StatusCode)" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($fileURL): $($response.StatusCode)" -LogLevel "Information"
             if ($response.Success)
             {
                 Write-Verbose "[$functionName] Successfully downloaded supporting file from $fileURL to $localFilePath"
