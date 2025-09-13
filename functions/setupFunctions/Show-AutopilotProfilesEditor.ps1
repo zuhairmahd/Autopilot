@@ -72,7 +72,7 @@ function Show-AutopilotProfilesEditor()
             Write-Log -LogFile $logFile -Module $functionName -Message "No domain specified, attempting to determine current domain" -LogLevel "Verbose"
             Write-Verbose "[$functionName] No domain specified, attempting to determine current domain"
             
-            $DomainName = Get-DomainForEditor -DomainName $DomainName -SettingsFile $SettingsFile -Silent:$Silent -FunctionName $functionName
+            $DomainName = Get-DomainForEditor -DomainName $DomainName -SettingsFile $SettingsFile -Silent:$Silent
             if ([string]::IsNullOrWhiteSpace($DomainName))
             {
                 Write-Warning "[$functionName] No domain could be determined"
@@ -158,7 +158,7 @@ function Show-AutopilotProfilesEditor()
                     
                     if ($currentAutopilotProfiles -and $currentAutopilotProfiles.Count -gt 0)
                     {
-                        Show-EditorArrayContents -Array $currentAutopilotProfiles -ArrayName "Autopilot profiles" -FunctionName $functionName
+                        Show-EditorArrayContents -Array $currentAutopilotProfiles -ArrayName "Autopilot profiles" 
                     }
                     else
                     {
@@ -167,14 +167,14 @@ function Show-AutopilotProfilesEditor()
                     
                     # Get updated profiles
                     $updatedProfiles = Get-AutopilotProfileArrayInput -CurrentProfiles $currentAutopilotProfiles -AccessToken $AccessToken
-                    if ($null -ne $updatedProfiles -and (Compare-EditorArrayContents -Array1 $currentAutopilotProfiles -Array2 $updatedProfiles -FunctionName $functionName))
+                    if ($null -ne $updatedProfiles -and (Compare-EditorArrayContents -Array1 $currentAutopilotProfiles -Array2 $updatedProfiles))
                     {
                         Write-Log -LogFile $logFile -Module $functionName -Message "Autopilot profiles changed" -LogLevel "Information"
                         Write-Verbose "[$functionName] Autopilot profiles changed"
                         
                         # Save changes immediately
                         Write-Host "`nSaving changes..." -ForegroundColor Yellow
-                        $success = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "autopilotProfiles" -SettingValue $updatedProfiles -FunctionName $functionName
+                        $success = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "autopilotProfiles" -SettingValue $updatedProfiles
                         if ($success)
                         {
                             Write-Host "Autopilot profile settings updated successfully!" -ForegroundColor Green
@@ -400,7 +400,7 @@ function Get-AutopilotProfileArrayInput()
             }
             
             # Process the first profile name
-            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $input.Trim() -AccessToken $AccessToken -FunctionName $functionName
+            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $input.Trim() -AccessToken $AccessToken
             if ($resolvedProfile)
             {
                 $newProfilesHashTable += $resolvedProfile
@@ -417,7 +417,7 @@ function Get-AutopilotProfileArrayInput()
             }
             
             # Process each additional profile name
-            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $input.Trim() -AccessToken $AccessToken -FunctionName $functionName
+            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $input.Trim() -AccessToken $AccessToken
             if ($resolvedProfile)
             {
                 $newProfilesHashTable += $resolvedProfile
@@ -576,7 +576,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                         if (-not [string]::IsNullOrWhiteSpace($newProfileName))
                         {
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different Autopilot profile name: '$($newProfileName.Trim())'" -LogLevel "Verbose"
-                            return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken -FunctionName $FunctionName
+                            return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken
                         }
                         else
                         {
@@ -617,7 +617,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                             if (-not [string]::IsNullOrWhiteSpace($newProfileName))
                             {
                                 Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different Autopilot profile name: '$($newProfileName.Trim())'" -LogLevel "Verbose"
-                                return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken -FunctionName $FunctionName
+                                return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken
                             }
                             else
                             {

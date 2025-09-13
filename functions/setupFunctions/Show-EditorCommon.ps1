@@ -296,7 +296,7 @@ function Show-EditorArrayContents()
         return
     }
     
-    $arrayFormat = Get-EditorArrayFormat -Array $Array -FunctionName $FunctionName
+    $arrayFormat = Get-EditorArrayFormat -Array $Array
     Write-Verbose "[$FunctionName] Displaying array in format: $arrayFormat"
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Displaying $ArrayName array in format: $arrayFormat" -LogLevel "Verbose"
     
