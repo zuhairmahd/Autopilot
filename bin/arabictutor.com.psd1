@@ -1,4 +1,4 @@
-@{
+﻿@{
     groupsToInclude = @(
         @{
             id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
@@ -36,8 +36,8 @@
     repoInfo = @{
         repoPath = 'zuhairmahd'
         baseURL = 'https://www.github.com'
-        repoName = 'Autopilot'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
     }
     autoUpdate = $false
     deviceNamePrefix = 'vmware'
