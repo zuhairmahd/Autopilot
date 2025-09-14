@@ -591,10 +591,9 @@ function Resolve-SingleGroupInteractive()
     [CmdletBinding()]
     param(
         [string]$GroupName,
-        [string]$AccessToken,
-        [string]$FunctionName
+        [string]$AccessToken
     )
-    
+    $FunctionName = $MyInvocation.MyCommand.Name    
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
     
     if (-not $AccessToken)

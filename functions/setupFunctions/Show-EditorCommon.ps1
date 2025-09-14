@@ -28,10 +28,9 @@ function Get-DomainForEditor()
     param(
         [string]$DomainName,
         [string]$SettingsFile,
-        [switch]$Silent,
-        [string]$FunctionName
+        [switch]$Silent
     )
-    
+    $FunctionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Getting domain for editor. Provided domain: '$DomainName'" -LogLevel "Verbose"
     Write-Verbose "[$FunctionName] Getting domain for editor. Provided domain: '$DomainName'"
     

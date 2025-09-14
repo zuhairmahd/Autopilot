@@ -174,7 +174,7 @@ function Show-AutopilotProfilesEditor()
                         
                         # Save changes immediately
                         Write-Host "`nSaving changes..." -ForegroundColor Yellow
-                        $success = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "autopilotProfiles" -SettingValue $updatedProfiles
+                        $success = Update-DomainArraySetting -SettingsFile $SettingsFile -DomainName $DomainName -SettingName "autopilotProfilesToInclude" -SettingValue $updatedProfiles
                         if ($success)
                         {
                             Write-Host "Autopilot profile settings updated successfully!" -ForegroundColor Green
@@ -205,9 +205,9 @@ function Show-AutopilotProfilesEditor()
                         if ($firstElement -is [string])
                         {
                             # Old string format
-                            foreach ($profile in $currentAutopilotProfiles)
+                            foreach ($autopilotProfile in $currentAutopilotProfiles)
                             {
-                                Write-Host "  - $profile" -ForegroundColor White
+                                Write-Host "  - $autopilotProfile" -ForegroundColor White
                             }
                             Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s) [Legacy Format]" -ForegroundColor Yellow
                         }
@@ -216,12 +216,12 @@ function Show-AutopilotProfilesEditor()
                             ($firstElement -is [PSCustomObject] -and ($firstElement.PSObject.Properties.Name -contains 'name'))))
                         {
                             # New hashtable format
-                            foreach ($profile in $currentAutopilotProfiles)
+                            foreach ($autopilotProfile in $currentAutopilotProfiles)
                             {
-                                Write-Host "  - Name: $($profile.name)" -ForegroundColor White
-                                if ($profile.id)
+                                Write-Host "  - Name: $($autopilotProfile.name)" -ForegroundColor White
+                                if ($autopilotProfile.id)
                                 {
-                                    Write-Host "    ID:   $($profile.id)" -ForegroundColor Gray
+                                    Write-Host "    ID:   $($autopilotProfile.id)" -ForegroundColor Gray
                                 }
                                 else
                                 {
@@ -233,9 +233,9 @@ function Show-AutopilotProfilesEditor()
                         else
                         {
                             # Fallback for unknown format
-                            foreach ($profile in $currentAutopilotProfiles)
-                            {
-                                Write-Host "  - $profile" -ForegroundColor White
+                            foreach ($autopilotProfile in $currentAutopilotProfiles)
+                            {   
+                                Write-Host "  - $autopilotProfile" -ForegroundColor White
                             }
                             Write-Host "  Total: $($currentAutopilotProfiles.Count) profile(s)" -ForegroundColor Gray
                         }
@@ -312,15 +312,15 @@ function Get-AutopilotProfileArrayInput()
         Write-Host "`nCurrent Autopilot profiles:" -ForegroundColor Cyan
         if ($currentFormat -eq "HashTableArray")
         {
-            foreach ($profile in $CurrentProfiles)
+            foreach ($autopilotProfile in $CurrentProfiles)
             {
-                Write-Host "  - Name: $($profile.name)" -ForegroundColor White
-                Write-Host "    ID:   $($profile.id)" -ForegroundColor Gray
+                Write-Host "  - Name: $($autopilotProfile.name)" -ForegroundColor White
+                Write-Host "    ID:   $($autopilotProfile.id)" -ForegroundColor Gray
             }
         }
         else
         {
-            foreach ($profile in $CurrentProfiles)
+            foreach ($autopilotProfile in $CurrentProfiles)
             {
                 Write-Host "  - $profile" -ForegroundColor White
             }
@@ -388,11 +388,11 @@ function Get-AutopilotProfileArrayInput()
     {
         if ($firstInput)
         {
-            $input = Read-Host "Autopilot profile name"
+            $choice = Read-Host "Autopilot profile name"
             $firstInput = $false
             
             # If first input is empty, return current profiles
-            if ([string]::IsNullOrWhiteSpace($input))
+            if ([string]::IsNullOrWhiteSpace($choice))
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User cancelled input, keeping current Autopilot profiles" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] User cancelled input, keeping current Autopilot profiles"
@@ -400,7 +400,7 @@ function Get-AutopilotProfileArrayInput()
             }
             
             # Process the first profile name
-            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $input.Trim() -AccessToken $AccessToken
+            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken
             if ($resolvedProfile)
             {
                 $newProfilesHashTable += $resolvedProfile
@@ -410,14 +410,14 @@ function Get-AutopilotProfileArrayInput()
         }
         else
         {
-            $input = Read-Host "Autopilot profile name"
-            if ([string]::IsNullOrWhiteSpace($input))
+            $choice = Read-Host "Autopilot profile name"
+            if ([string]::IsNullOrWhiteSpace($choice))
             {
                 break
             }
             
             # Process each additional profile name
-            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $input.Trim() -AccessToken $AccessToken
+            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken
             if ($resolvedProfile)
             {
                 $newProfilesHashTable += $resolvedProfile
@@ -476,10 +476,10 @@ function Resolve-SingleAutopilotProfileInteractive()
     [CmdletBinding()]
     param(
         [string]$ProfileName,
-        [string]$AccessToken,
-        [string]$FunctionName
+        [string]$AccessToken
     )
     
+    $FunctionName = $MyInvocation.MyCommand.Name    
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving Autopilot profile: '$ProfileName'" -LogLevel "Verbose"
     
     if (-not $AccessToken)
@@ -502,11 +502,11 @@ function Resolve-SingleAutopilotProfileInteractive()
             if ($result.value.Count -eq 1)
             {
                 # Single exact match found
-                $profile = $result.value[0]
-                Write-Host "  Found profile: '$($profile.displayName)' (ID: $($profile.id))" -ForegroundColor Green
+                $autopilotProfile = $result.value[0]    
+                Write-Host "  Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
                 return @{
-                    name = $profile.displayName
-                    id   = $profile.id
+                    name = $autopilotProfile.displayName
+                    id   = $autopilotProfile.id
                 }
             }
             else
@@ -515,8 +515,8 @@ function Resolve-SingleAutopilotProfileInteractive()
                 Write-Host "  Multiple Autopilot profiles found matching '$ProfileName':" -ForegroundColor Yellow
                 for ($i = 0; $i -lt $result.value.Count; $i++)
                 {
-                    $profile = $result.value[$i]
-                    Write-Host "    $($i + 1). $($profile.displayName) (ID: $($profile.id))" -ForegroundColor White
+                    $autopilotProfile = $result.value[$i]
+                    Write-Host "    $($i + 1). $($autopilotProfile.displayName) (ID: $($autopilotProfile.id))" -ForegroundColor White
                 }
                 Write-Host "    0. Skip this profile" -ForegroundColor Gray
                 
@@ -554,8 +554,8 @@ function Resolve-SingleAutopilotProfileInteractive()
                 Write-Host "  Similar Autopilot profiles found:" -ForegroundColor Yellow
                 for ($i = 0; $i -lt $similarResult.value.Count; $i++)
                 {
-                    $profile = $similarResult.value[$i]
-                    Write-Host "    $($i + 1). $($profile.displayName) (ID: $($profile.id))" -ForegroundColor White
+                    $autopilotProfile = $similarResult.value[$i]
+                    Write-Host "    $($i + 1). $($autopilotProfile.displayName) (ID: $($autopilotProfile.id))" -ForegroundColor White
                 }
                 Write-Host "    0. Enter different profile name" -ForegroundColor Gray
                 Write-Host "    00. Skip this profile" -ForegroundColor Gray
