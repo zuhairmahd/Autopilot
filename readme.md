@@ -794,25 +794,25 @@ The Autopilot Profiles Editor is now integrated into the hierarchical menu syste
 This provides a more organized and intuitive menu structure that groups related functionality together while maintaining the enhanced menu system for consistent user experience.
 
 **Settings Storage Structure**:
-```json
-{
-  "domains": {
-    "example.com": {
-      "autopilotProfilesToInclude": [
-        {
-          "name": "Corporate-Enrollment-Profile",
-          "id": "12345678-1234-1234-1234-123456789abc"
-        },
-        {
-          "name": "BYOD-Enrollment-Profile", 
-          "id": "87654321-4321-4321-4321-abcdef123456"
+```powershell
+@{
+    domains = @{
+        "example.com" = @{
+            autopilotProfilesToInclude = @(
+                @{
+                    name = "Corporate-Enrollment-Profile"
+                    id   = "12345678-1234-1234-1234-123456789abc"
+                },
+                @{
+                    name = "BYOD-Enrollment-Profile"
+                    id   = "87654321-4321-4321-4321-abcdef123456"
+                }
+            )
+            settings = @{
+                # Other domain-specific settings
+            }
         }
-      ],
-      "settings": {
-        // Other domain-specific settings
-      }
     }
-  }
 }
 ```
 
