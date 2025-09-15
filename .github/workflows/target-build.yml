@@ -182,9 +182,9 @@ jobs:
           }
           git config --global user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -a $outputPath
-          git add -a main.exe 
-          git add -a lastrun.json
+          git add -A $outputPath
+          git add -A main.exe 
+          git add -A lastrun.json
           git status
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {

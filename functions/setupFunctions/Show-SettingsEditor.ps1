@@ -271,6 +271,9 @@ function Show-SettingsEditor()
                 Get-SettingInput -SettingName $settingName -CurrentValue $currentValue -DefaultValue $defaultValue
             }
             
+            # Debug the newValue before comparison
+            Write-Verbose "[$functionName] newValue received from Get-SettingInput: Type='$($newValue.GetType().Name)', Value='$newValue'"
+            
             if ($newValue -ne $currentValue)
             {
                 # For nested settings, use the path as the key
@@ -288,6 +291,7 @@ function Show-SettingsEditor()
                 Write-Verbose "[$functionName] Setting '$settingPath' changed from '$currentValue' to '$newValue'"
                 if (-not $Silent)
                 {
+                    Write-Verbose "[$functionName] About to format newValue for display: Type='$($newValue.GetType().Name)', Value='$newValue'"
                     Write-Host "Updated to: $(Format-SettingValueForDisplay -Value $newValue)" -ForegroundColor Green
                 }
             }
@@ -487,8 +491,6 @@ function Get-CurrentSettings()
     }
 }
 
-
-
 function Format-SettingValueForDisplay()
 {
     <#
@@ -500,19 +502,36 @@ function Format-SettingValueForDisplay()
     
     $functionName = $MyInvocation.MyCommand.Name
     
-    # Add detailed logging for debugging array display issues
-    if ($null -ne $Value)
-    {
-        Write-Verbose "[$functionName] Formatting value for display. Type: $($Value.GetType().Name), IsArray: $($Value -is [array])"
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Formatting null value for display"
-    }
-    
     try
     {
-        if ($Value -is [array])
+        # Handle null/empty cases first to avoid type issues
+        if ($null -eq $Value)
+        {
+            Write-Verbose "[$functionName] Processing null value"
+            return "(not set)"
+        }
+        elseif ($Value -is [string] -and [string]::IsNullOrWhiteSpace($Value))
+        {
+            Write-Verbose "[$functionName] Processing empty string value"
+            return "(not set)"
+        }
+        # Handle primitive types explicitly before complex types
+        elseif ($Value -is [bool])
+        {
+            Write-Verbose "[$functionName] Processing boolean value: $Value"
+            return $Value.ToString().ToLower()
+        }
+        elseif ($Value -is [string])
+        {
+            Write-Verbose "[$functionName] Processing string value: '$Value'"
+            return [string]$Value
+        }
+        elseif ($Value -is [int] -or $Value -is [long] -or $Value -is [double] -or $Value -is [decimal])
+        {
+            Write-Verbose "[$functionName] Processing numeric value: '$Value'"
+            return [string]$Value
+        }
+        elseif ($Value -is [array])
         {
             Write-Verbose "[$functionName] Processing array with $($Value.Count) elements"
             if ($Value.Count -eq 0)
@@ -543,24 +562,34 @@ function Format-SettingValueForDisplay()
                 return "[$joinedValue]"
             }
         }
-        elseif ($Value -is [bool])
-        {
-            Write-Verbose "[$functionName] Processing boolean value: $Value"
-            return $Value.ToString().ToLower()
-        }
         elseif ($Value -is [hashtable] -or $Value -is [PSCustomObject])
         {
             Write-Verbose "[$functionName] Processing hashtable or PSCustomObject"
-            return "(nested object)"
-        }
-        elseif ($null -eq $Value -or [string]::IsNullOrWhiteSpace([string]$Value))
-        {
-            Write-Verbose "[$functionName] Processing null or whitespace value"
-            return "(not set)"
+            if ($Value -is [PSCustomObject])
+            {
+                Write-Verbose "[$functionName] Detected PSCustomObject with $($Value.PSObject.Properties.Count) properties"
+                # Sort properties alphabetically for deterministic display (important for tests and diff stability)
+                $orderedProps = $Value.PSObject.Properties | Sort-Object Name
+                return "{ $(($orderedProps | ForEach-Object { "$($_.Name): $($_.Value)" }) -join ', ') }"
+            }
+            elseif ($Value -is [hashtable])
+            {
+                Write-Verbose "[$functionName] Detected hashtable with $($Value.Keys.Count) keys"
+                # Sort keys alphabetically for deterministic display
+                $orderedKeys = $Value.Keys | Sort-Object
+                $pairs = foreach ($k in $orderedKeys) { "${k}: $($Value[$k])" }
+                return "{ $($pairs -join ', ') }"
+            }
+            else 
+            {
+                Write-Verbose "[$functionName] Unknown object type, converting to string"
+                return $Value.ToString()
+            }
         }
         else
         {
-            Write-Verbose "[$functionName] Processing other type as string: '$Value'"
+            # Final fallback for any other type - convert to string
+            Write-Verbose "[$functionName] Processing unknown type ($($Value.GetType().Name)) as string: '$Value'"
             return [string]$Value
         }
     }

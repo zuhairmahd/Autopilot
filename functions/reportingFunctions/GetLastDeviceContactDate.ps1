@@ -37,7 +37,17 @@ function GetLastDeviceContactDate()
         $contactDates.add('deviceCreatedDateTime', $enrollmentState.device.createdDateTime)
         $contactDates.add('deviceRegistrationDateTime', $enrollmentState.device.registrationDateTime)
     }
+    $global:cd = $contactDates
     #Figure out the latest contact date
+    if ($null -ne $contactDates.Values)
+    {
+        Write-Verbose "[$functionName] No contact dates found."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No contact dates found." -LogLevel "Warning"
+        $contactDates.add('latestContactDate', $null)
+        $contactDates.add('numberOfDaysSinceLastContact', $null)
+        $contactDates.add('withinThreshold', $withinThreshold)
+        return $contactDates
+    }
     $latestContactDate = $contactDates.Values | Sort-Object -Descending | Select-Object -First 1
     Write-Verbose "[$functionName] Latest contact date: $latestContactDate"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Latest contact date: $latestContactDate" -LogLevel "Information"

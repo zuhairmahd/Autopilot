@@ -34,7 +34,8 @@ Set-Location $repoRoot
 
 $testResults = @()
 
-function Test-FormatFunction {
+function Test-FormatFunction
+{
     param(
         [string]$FunctionSource,
         [scriptblock]$FormatFunction,
@@ -43,41 +44,48 @@ function Test-FormatFunction {
     
     $results = @()
     
-    foreach ($testCase in $TestCases.GetEnumerator()) {
+    foreach ($testCase in $TestCases.GetEnumerator())
+    {
         $testName = $testCase.Key
         $testData = $testCase.Value
         $inputValue = $testData.Input
         $expectedOutput = $testData.Expected
         
-        try {
+        try
+        {
             $actualOutput = & $FormatFunction $inputValue
             
-            if ($actualOutput -eq $expectedOutput) {
+            if ($actualOutput -eq $expectedOutput)
+            {
                 $results += @{
-                    Source = $FunctionSource
-                    Test = $testName
-                    Status = 'PASS'
+                    Source   = $FunctionSource
+                    Test     = $testName
+                    Status   = 'PASS'
                     Expected = $expectedOutput
-                    Actual = $actualOutput
+                    Actual   = $actualOutput
                 }
                 Write-Host "  ✓ $testName" -ForegroundColor Green
-            } else {
+            }
+            else
+            {
                 $results += @{
-                    Source = $FunctionSource
-                    Test = $testName
-                    Status = 'FAIL'
+                    Source   = $FunctionSource
+                    Test     = $testName
+                    Status   = 'FAIL'
                     Expected = $expectedOutput
-                    Actual = $actualOutput
+                    Actual   = $actualOutput
                 }
                 Write-Host "  ✗ $testName - Expected: '$expectedOutput', Got: '$actualOutput'" -ForegroundColor Red
             }
-        } catch {
+        }
+        catch
+        {
             $results += @{
-                Source = $FunctionSource
-                Test = $testName
-                Status = 'ERROR'
+                Source   = $FunctionSource
+                Test     = $testName
+                Status   = 'ERROR'
                 Expected = $expectedOutput
-                Actual = $_.Exception.Message
+                Actual   = $_.Exception.Message
             }
             Write-Host "  ✗ $testName - Error: $($_.Exception.Message)" -ForegroundColor Red
         }
@@ -88,7 +96,8 @@ function Test-FormatFunction {
 
 Write-Host "=== Testing Settings Display Formatting Functions ===" -ForegroundColor Cyan
 
-try {
+try
+{
     # Load the functions we need to test
     Write-Host "`nLoading functions..." -ForegroundColor Yellow
     . "$repoRoot/functions/setupFunctions/Show-SettingsEditor.ps1"
@@ -99,53 +108,53 @@ try {
     
     # Define comprehensive test cases
     $testCases = @{
-        'EmptyArray' = @{
-            Input = @()
+        'EmptyArray'                  = @{
+            Input    = @()
             Expected = '(empty array)'
         }
-        'SingleElementArray' = @{
-            Input = @("cloudconfig")
+        'SingleElementArray'          = @{
+            Input    = @("cloudconfig")
             Expected = '[cloudconfig]'
         }
-        'MultiElementArray' = @{
-            Input = @("msb", "autopilot")
+        'MultiElementArray'           = @{
+            Input    = @("msb", "autopilot")
             Expected = '[msb, autopilot]'
         }
         'SingleElementArrayWithComma' = @{
-            Input = ,@("cloudconfig")  # Comma operator creates nested array
+            Input    = , @("cloudconfig")  # Comma operator creates nested array
             Expected = '[cloudconfig]'
         }
-        'BooleanTrue' = @{
-            Input = $true
+        'BooleanTrue'                 = @{
+            Input    = $true
             Expected = 'true'
         }
-        'BooleanFalse' = @{
-            Input = $false
+        'BooleanFalse'                = @{
+            Input    = $false
             Expected = 'false'
         }
-        'NullValue' = @{
-            Input = $null
+        'NullValue'                   = @{
+            Input    = $null
             Expected = '(not set)'
         }
-        'EmptyString' = @{
-            Input = ''
+        'EmptyString'                 = @{
+            Input    = ''
             Expected = '(not set)'
         }
-        'NumericValue' = @{
-            Input = 42
+        'NumericValue'                = @{
+            Input    = 42
             Expected = '42'
         }
-        'StringValue' = @{
-            Input = 'test string'
+        'StringValue'                 = @{
+            Input    = 'test string'
             Expected = 'test string'
         }
-        'PSCustomObject' = @{
-            Input = [PSCustomObject]@{ Name = 'Test'; Value = 'Data' }
-            Expected = '(nested object)'
+        'PSCustomObject'              = @{
+            Input    = [PSCustomObject]@{ Name = 'Test'; Value = 'Data' }
+            Expected = '{ Name: Test, Value: Data }'
         }
-        'Hashtable' = @{
-            Input = @{ Name = 'Test'; Value = 'Data' }
-            Expected = '(nested object)'
+        'Hashtable'                   = @{
+            Input    = @{ Name = 'Test'; Value = 'Data' }
+            Expected = '{ Name: Test, Value: Data }'
         }
     }
     
@@ -159,18 +168,23 @@ try {
     Write-Host "`n3. Testing specific bug scenarios..." -ForegroundColor Yellow
     
     # Load actual settings to test real-world scenarios
-    if (Test-Path "$repoRoot/settings.json") {
+    if (Test-Path "$repoRoot/settings.json")
+    {
         $settings = Get-Content "$repoRoot/settings.json" -Raw | ConvertFrom-Json
         
         # Test appInfo.companyName scenario
-        if ($settings.globalSettings.appInfo.companyName) {
+        if ($settings.globalSettings.appInfo.companyName)
+        {
             $companyName = $settings.globalSettings.appInfo.companyName
             $formattedCompanyName = Format-SettingValueForDisplay -Value $companyName
             
-            if ($formattedCompanyName -ne "(nested object)") {
+            if ($formattedCompanyName -ne "(nested object)")
+            {
                 Write-Host "  ✓ appInfo.companyName displays as string value: '$formattedCompanyName'" -ForegroundColor Green
                 $testResults += @{ Test = 'RealWorldCompanyName'; Status = 'PASS' }
-            } else {
+            }
+            else
+            {
                 Write-Host "  ✗ appInfo.companyName still shows as '(nested object)'" -ForegroundColor Red
                 $testResults += @{ Test = 'RealWorldCompanyName'; Status = 'FAIL' }
             }
@@ -180,10 +194,13 @@ try {
         $nestedValue = Get-NestedValue -Object $settings.globalSettings -Path "appInfo.companyName"
         $formattedNested = Format-SettingValueForDisplay -Value $nestedValue
         
-        if ($formattedNested -ne "(nested object)" -and $formattedNested -ne "(not set)") {
+        if ($formattedNested -ne "(nested object)" -and $formattedNested -ne "(not set)")
+        {
             Write-Host "  ✓ Nested value retrieval works: '$formattedNested'" -ForegroundColor Green
             $testResults += @{ Test = 'NestedValueRetrieval'; Status = 'PASS' }
-        } else {
+        }
+        else
+        {
             Write-Host "  ✗ Nested value retrieval failed: '$formattedNested'" -ForegroundColor Red
             $testResults += @{ Test = 'NestedValueRetrieval'; Status = 'FAIL' }
         }
@@ -207,15 +224,20 @@ try {
     $successRate = if ($totalTests -gt 0) { [math]::Round(($passedTests / $totalTests) * 100, 1) } else { 0 }
     Write-Host "Success Rate: $successRate%" -ForegroundColor $(if ($successRate -ge 95) { 'Green' } elseif ($successRate -ge 80) { 'Yellow' } else { 'Red' })
     
-    if ($failedTests -eq 0 -and $errorTests -eq 0) {
+    if ($failedTests -eq 0 -and $errorTests -eq 0)
+    {
         Write-Host "`n✓ All tests passed! Settings display formatting is working correctly." -ForegroundColor Green
         exit 0
-    } else {
+    }
+    else
+    {
         Write-Host "`n✗ Some tests failed. Settings display formatting needs attention." -ForegroundColor Red
         exit 1
     }
     
-} catch {
+}
+catch
+{
     Write-Host "Error during testing: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack Trace: $($_.ScriptStackTrace)" -ForegroundColor Red
     exit 1
