@@ -1,0 +1,53 @@
+================================================================================
+2025-09-15 22:29:07.919 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying script parameters...
+2025-09-15 22:29:07.932 [Information] [Set-ParametersFromTarget] [Thread:15] [Context:runnervmbe3js\runneradmin] Setting parameters from target configuration
+2025-09-15 22:29:07.961 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Build parameters to apply: 
+Name                           Value
+----                           -----
+inputFile                      main.ps1
+Overwrite                      True
+noCleanup                      False
+OutputPath                     bin
+NoVersionUpdate                False
+
+
+2025-09-15 22:29:07.964 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target parameter: inputFile = main.ps1
+2025-09-15 22:29:07.969 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Set inputFile to main.ps1 of type String
+2025-09-15 22:29:07.972 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target parameter: Overwrite = True
+2025-09-15 22:29:07.976 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Set Overwrite to True of type Boolean
+2025-09-15 22:29:07.979 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target parameter: noCleanup = False
+2025-09-15 22:29:08.018 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Set noCleanup to False of type Boolean
+2025-09-15 22:29:08.021 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target parameter: OutputPath = bin
+2025-09-15 22:29:08.024 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Set OutputPath to bin of type String
+2025-09-15 22:29:08.026 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target parameter: NoVersionUpdate = False
+2025-09-15 22:29:08.029 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Set NoVersionUpdate to False of type Boolean
+2025-09-15 22:29:08.032 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Build configuration applied successfully
+2025-09-15 22:29:08.095 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Incremented last run version to 
+2025-09-15 22:29:08.105 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target configuration settings...
+2025-09-15 22:29:08.114 [Information] [Update-TargetSettings] [Thread:15] [Context:runnervmbe3js\runneradmin] Applying target settings to configuration files
+2025-09-15 22:29:08.206 [Information] [Update-TargetSettings] [Thread:15] [Context:runnervmbe3js\runneradmin] Updated settings file saved: bin\settings.psd1
+2025-09-15 22:29:08.225 [Information] [Update-TargetSettings] [Thread:15] [Context:runnervmbe3js\runneradmin] Processing domain settings for: arabictutor.com
+2025-09-15 22:29:08.231 [Information] [Get-DomainConfigurationFromFiles] [Thread:15] [Context:runnervmbe3js\runneradmin] Loading domain configuration for: arabictutor.com
+2025-09-15 22:29:08.248 [Information] [Get-DomainConfigurationFromFiles] [Thread:15] [Context:runnervmbe3js\runneradmin] Created new domain configuration file: bin\arabictutor.com.psd1
+2025-09-15 22:29:08.274 [Information] [Save-DomainConfiguration] [Thread:15] [Context:runnervmbe3js\runneradmin] Saving domain configuration for: arabictutor.com
+2025-09-15 22:29:08.299 [Information] [Save-DomainConfiguration] [Thread:15] [Context:runnervmbe3js\runneradmin] Successfully saved domain configuration to: bin\arabictutor.com.psd1
+2025-09-15 22:29:08.304 [Information] [Update-TargetSettings] [Thread:15] [Context:runnervmbe3js\runneradmin] Domain configuration saved for: arabictutor.com
+2025-09-15 22:29:08.307 [Information] [Update-TargetSettings] [Thread:15] [Context:runnervmbe3js\runneradmin] Target settings applied successfully
+2025-09-15 22:29:08.310 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Target settings application result: bin\settings.psd1 True
+2025-09-15 22:29:08.316 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Target settings applied successfully.
+2025-09-15 22:29:08.539 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Creating informational header block for output script
+2025-09-15 22:29:08.545 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Using existing GUID from last run: c2c08149-3c1f-4558-9e4c-87487943bbf5
+2025-09-15 22:29:08.560 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Added header block to script content
+2025-09-15 22:29:11.146 [Information] [UpdateHash] [Thread:15] [Context:runnervmbe3js\runneradmin] Updating hash in lastrun file: 
+2025-09-15 22:29:11.162 [Information] [UpdateHash] [Thread:15] [Context:runnervmbe3js\runneradmin] File hash (SHA256) of bin\main.exe: 8FBBBD20F5B2CEF1F046976A6FFA114A1548DD08AD070131E84674F1BA5BE301
+2025-09-15 22:29:11.169 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] Got the hash for bin\main.exe: 8FBBBD20F5B2CEF1F046976A6FFA114A1548DD08AD070131E84674F1BA5BE301
+2025-09-15 22:29:11.215 [Information] [CreateRelease.ps1] [Thread:15] [Context:runnervmbe3js\runneradmin] lastrun file saved successfully.
+2025-09-15 22:29:11.230 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] Starting to copy secrets from D:\a\Autopilot\Autopilot to bin
+2025-09-15 22:29:11.232 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] Received the following parameters:
+2025-09-15 22:29:11.235 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] SourceFolder: D:\a\Autopilot\Autopilot
+2025-09-15 22:29:11.237 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] DestinationFolder: bin
+2025-09-15 22:29:11.240 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] Overwrite: True
+2025-09-15 22:29:11.243 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] Creating .secrets folder in: bin
+2025-09-15 22:29:11.247 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] Looking for secrets in D:\a\Autopilot\Autopilot\.secrets
+2025-09-15 22:29:11.267 [Information] [CopySecrets] [Thread:15] [Context:runnervmbe3js\runneradmin] No secrets found in D:\a\Autopilot\Autopilot\.secrets
+================================================================================
