@@ -1,8 +1,8 @@
 ﻿@{
-    version              = '1.3.0.0'
-    name                 = 'menu.psd1'
-    description          = 'This file contains the definitions for the menus used in the application.'
-    appModeHierarchy     = @{
+    version                   = '1.3.0.0'
+    name                      = 'menu.psd1'
+    description               = 'This file contains the definitions for the menus used in the application.'
+    appModeHierarchy          = @{
         advanced             = @(
             'advanced',
             'helpdesk',
@@ -30,7 +30,7 @@
             '*'
         )
     }
-    appModeDefaults      = @{
+    appModeDefaults           = @{
         advanced             = @{
             capabilities = @(
                 'advanced_features',
@@ -97,7 +97,7 @@
             description  = 'Full administrative access with all features enabled'
         }
     }
-    mainMenu             = @{
+    mainMenu                  = @{
         Title                 = 'Main Menu'
         Description           = 'Please choose from one of the following options'
         items                 = @(
@@ -153,6 +153,8 @@
                 blockType             = 'action'
                 includeInDisplayModes = @(
                     'full',
+                    'helpdesk',
+                    'registration',
                     'admin',
                     'advanced'
                 )
@@ -206,7 +208,7 @@
         type                  = 'static'
         includeInDisplayModes = @()
     }
-    checkMenu            = @{
+    checkMenu                 = @{
         Title                 = 'Check Device Status'
         Description           = 'How would you like to lookup the device?'
         items                 = @(
@@ -242,7 +244,7 @@
             'helpdesk'
         )
     }
-    autopilotMenu        = @{
+    autopilotMenu             = @{
         Title                 = 'Autopilot Menu'
         Description           = 'Import a device into Autopilot and perform related actions'
         items                 = @(
@@ -365,7 +367,7 @@
             'advancedRegistration'
         )
     }
-    settingsMenu         = @{
+    settingsMenu              = @{
         Title                 = 'Settings menu'
         Description           = 'Make changes to the application settings'
         items                 = @(
@@ -417,7 +419,7 @@
             'advanced'
         )
     }
-    exportMenu           = @{
+    exportMenu                = @{
         Title                 = 'Export Menu'
         Description           = 'Choose what you would like to export'
         items                 = @(
@@ -499,7 +501,7 @@
             'registration'
         )
     }
-    serialNumberMenu     = @{
+    serialNumberMenu          = @{
         Title                 = 'Lookup by Serial Number'
         Description           = 'How would you like to enter the serial number?'
         items                 = @(
@@ -534,7 +536,7 @@
             'helpdesk'
         )
     }
-    environmentMenu      = @{
+    environmentMenu           = @{
         Title                 = 'Change Environment Menu'
         Description           = 'Manage your environment settings and configurations'
         items                 = @(
@@ -613,7 +615,7 @@
             'advanced'
         )
     }
-    userMenu             = @{
+    userMenu                  = @{
         Title                 = 'Select a user'
         Description           = 'Did you mean:'
         type                  = 'dynamic'
@@ -625,7 +627,7 @@
             'registration'
         )
     }
-    deviceMenu           = @{
+    deviceMenu                = @{
         Title                 = 'Device Selection'
         Description           = 'Select a device for user $UserName ($($deviceInfo.value[0].userDisplayName))'
         type                  = 'dynamic'
@@ -637,7 +639,7 @@
             'registration'
         )
     }
-    groupMenu            = @{
+    groupMenu                 = @{
         Title                 = 'Select a group'
         Description           = 'Did you mean:'
         type                  = 'dynamic'
@@ -647,7 +649,7 @@
             'advanced'
         )
     }
-    deviceActionsMenu    = @{
+    deviceActionsMenu         = @{
         Title                 = 'Device Actions for $deviceName'
         Description           = 'Select an action to perform on this device:'
         items                 = @(
@@ -763,7 +765,7 @@
             'registration'
         )
     }
-    appModeMenu          = @{
+    appModeMenu               = @{
         Title                 = '$menuTitle'
         Description           = '$menuDescription'
         type                  = 'dynamic'
@@ -772,7 +774,7 @@
             'admin'
         )
     }
-    groupAssignmentsMenu = @{
+    groupAssignmentsMenu      = @{
         Title                 = 'Group Assignments for $groupName'
         Description           = 'What type of assignments would you like to see?'
         type                  = 'dynamic'
@@ -782,7 +784,7 @@
             'advanced'
         )
     }
-    deviceWaitMenu       = @{
+    deviceWaitMenu            = @{
         Title                 = 'Device Wait Menu'
         Description           = 'Choose what you would like to do with this device:'
         items                 = @(
@@ -808,7 +810,7 @@
             'registration'
         )
     }
-    inclusionExclusionMenu = @{
+    inclusionExclusionMenu    = @{
         Title                 = 'Inclusion/Exclusion Settings'
         Description           = 'Manage group and Autopilot profile inclusion/exclusion settings:'
         items                 = @(
@@ -837,7 +839,7 @@
             'admin'
         )
     }
-    groupsEditMenu       = @{
+    groupsEditMenu            = @{
         Title                 = 'Groups Edit Menu'
         Description           = 'Select which group settings you want to modify:'
         items                 = @(
@@ -875,7 +877,7 @@
             'admin'
         )
     }
-    reportExportMenu     = @{
+    reportExportMenu          = @{
         Title                 = 'Report Export Menu'
         Description           = 'Select the format to which you would like to export the report'
         items                 = @(
