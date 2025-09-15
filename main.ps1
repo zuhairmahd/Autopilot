@@ -271,15 +271,12 @@ if (Test-Path $configFile)
     
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
-    $appId = $sessionResult.AppId
-    $tenantId = $sessionResult.TenantId
-    $name = $sessionResult.Name
     
     # Check if password change is required
     # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
     $initDefaults = @{}
     $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
-    
+    Write-Host "Change password on next start: $($initFileContent.auth.changePWOnNextStart)" -ForegroundColor Yellow
     if ($initFileContent -and $initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
     {
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
