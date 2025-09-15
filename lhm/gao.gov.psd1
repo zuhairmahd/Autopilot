@@ -28,10 +28,10 @@
     maxGroupMatchDisplay = 10
     release = 'lhm'
     repoInfo = @{
-        baseURL = 'https://www.github.com'
-        baseSourceURL = 'https://raw.githubusercontent.com'
         repoName = 'Autopilot'
         repoPath = 'zuhairmahd'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        baseURL = 'https://www.github.com'
     }
     autoUpdate = $true
     deviceNamePrefix = 'w11-'
