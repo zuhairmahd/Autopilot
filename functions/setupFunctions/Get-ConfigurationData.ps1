@@ -181,7 +181,7 @@ function Get-ConfigurationData()
         
         # Load PSD1 file
         Write-Verbose "[$functionName] Loading PSD1 file: $psd1Path"
-        $rawConfig = Import-PowerShellDataFile -Path $psd1Path -ErrorAction Stop
+        $configData = Import-PowerShellDataFile -Path $psd1Path -ErrorAction Stop
         
         # Merge with defaults
         $mergedConfig = $DefaultValues.Clone()
