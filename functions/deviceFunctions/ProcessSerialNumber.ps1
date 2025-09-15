@@ -11,7 +11,7 @@ function ProcessSerialNumber()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing device lookup for serial number: $SerialNumber" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial number: $SerialNumber" -LogLevel "Verbose"
     if ([string]::IsNullOrWhiteSpace($SerialNumber))
     {
         Write-Host "Serial number cannot be empty or null." -ForegroundColor Red
@@ -42,44 +42,53 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial 
         $today = (Get-Date).Date
         $yesterday = $today.AddDays(-1)
         $dayBeforeYesterday = $today.AddDays(-2)
-        $lastContactDate = [DateTime]::Parse($deviceLastContactDate.latestContactDate).Date
-        
-        if ($lastContactDate -eq $today)
+        if ($null -ne $deviceLastContactDate.latestContactDate)
         {
-            $contactMessage = "The device contacted Intune today."
-        }
-        elseif ($lastContactDate -eq $yesterday)
-        {
-            $contactMessage = "The device contacted Intune yesterday."
-        }
-        elseif ($lastContactDate -eq $dayBeforeYesterday)
-        {
-            $contactMessage = "The device contacted Intune the day before yesterday."
+            $lastContactDate = [DateTime]::Parse($deviceLastContactDate.latestContactDate).Date
         }
         else
         {
-            $contactMessage = "The device contacted Intune $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
+            $lastContactDate = $null
         }
-        if (-not ($deviceLastContactDate.withinThreshold))
+        if ($null -ne $lastContactDate)
         {
-            Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
-            Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
-            Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)" -LogLevel "Information"
-            Write-Host "Press any key to continue"
-            $null = Read-Host
-        }
-        elseif ($deviceLastContactDate.withinThreshold)
-        {
-            Write-Host $contactMessage -ForegroundColor Green
-            Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-        }
-        else
-        {
-            Write-Host "The last contact date could not be determined."
-        }
+            if ($lastContactDate -eq $today)
+            {
+                $contactMessage = "The device contacted Intune today."
+            }
+            elseif ($lastContactDate -eq $yesterday)
+            {
+                $contactMessage = "The device contacted Intune yesterday."
+            }
+            elseif ($lastContactDate -eq $dayBeforeYesterday)
+            {
+                $contactMessage = "The device contacted Intune the day before yesterday."
+            }
+            else
+            {
+                $contactMessage = "The device contacted Intune $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
+            }
+            if (-not ($deviceLastContactDate.withinThreshold))
+            {
+                Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
+                Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
+                Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)" -LogLevel "Information"
+                Write-Host "Press any key to continue"
+                $null = Read-Host
+            }
+            elseif ($deviceLastContactDate.withinThreshold)
+            {
+                Write-Host $contactMessage -ForegroundColor Green
+                Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+            }
+            else
+            {
+                Write-Host "The last contact date could not be determined."
+            }
+        }       
         if ($enrollmentState.inAutopilot)
         {
             Write-Host "This device is enrolled in Autopilot."
@@ -168,13 +177,13 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Validating serial 
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "No pending actions for this device." -LogLevel "Information"
             }
             # Create and show device actions menu using main.ps1 menu structure
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting device actions menu loop" -LogLevel "Debug"
             $deviceActionsMenu = NewMenu -MenuName "deviceActionsMenu"
             # Update the title to include the actual device name
             $deviceActionsMenu.Title = $deviceActionsMenu.Title -replace '\$deviceName', $deviceName
             
             #region Check device capabilities and remove unavailable menu items
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking device capabilities to determine available actions" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking device capabilities to determine available actions" -LogLevel "Verbose"
             
             # Check LAPS credentials availability
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking if device has LAPS credentials." -LogLevel "Verbose"
@@ -197,7 +206,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking device ca
             }
             
             # Check Hardware Password Details availability
-Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Verbose"
+            Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device has hardware password details." -LogLevel "Verbose"
             if ($null -eq $enrollmentState.managedDevice.hardwarePassword -or $enrollmentState.managedDevice.hardwarePassword.count -eq 0)
             {
                 Write-Verbose "[$functionName] No hardware password details available - removing menu item"
@@ -369,7 +378,7 @@ Write-Log -logFile $LogFile -Module "$functionName" -Message "Checking if device
     else
     {
         # Explicitly return $null if no enrollmentState
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device lookup failed or no enrollment state found" -LogLevel "Verbose"
         return $null
     }
     

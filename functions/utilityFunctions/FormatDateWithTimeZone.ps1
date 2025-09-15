@@ -2,7 +2,7 @@ function FormatDateWithTimeZone()
 {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory = $true, ValueFromPipeline = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
+        [Parameter(ValueFromPipeline = $true, Position = 0, ValueFromPipelineByPropertyName = $true)]
         $DateTime
     )
     $functionName = $MyInvocation.MyCommand.Name    
