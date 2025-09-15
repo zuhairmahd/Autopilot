@@ -136,9 +136,9 @@
         release = 'auto'
         repoInfo = @{
             baseURL = 'https://www.github.com'
-            baseSourceURL = 'https://raw.githubusercontent.com'
-            repoName = 'Autopilot'
             repoPath = 'zuhairmahd'
+            repoName = 'Autopilot'
+            baseSourceURL = 'https://raw.githubusercontent.com'
         }
         testMode = $false
         operatingSystem = 'Windows'

@@ -29,9 +29,9 @@
     release = 'lhm'
     repoInfo = @{
         repoPath = 'zuhairmahd'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        repoName = 'Autopilot'
         baseURL = 'https://www.github.com'
+        repoName = 'Autopilot'
+        baseSourceURL = 'https://raw.githubusercontent.com'
     }
     autoUpdate = $true
     deviceNamePrefix = 'w11-'
