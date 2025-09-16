@@ -1,6 +1,7 @@
 ﻿@{
     globalSettings = @{
         operatingSystem = 'Windows'
+        release = 'master'
         repoInfo = @{
             repoPath = 'zuhairmahd'
             baseURL = 'https://www.github.com'
@@ -14,16 +15,15 @@
             companyName = 'Zuhair Mahmoud'
         }
         timeInSeconds = 60
-        testMode = $false
         maxUserMatchDisplay = 10
         maxWaitTime = 30
+        showLicenseBanner = $false
         autoUpdate = $true
         appMode = 'full'
         validateScopes = $false
         maxGroupMatchDisplay = 10
-        release = 'master'
+        testMode = $false
         configFile = '.\.secrets\config.json'
-        showLicenseBanner = $false
         deviceContactThresholdInDays = 30
     }
     requiredScopes = @(
@@ -130,11 +130,12 @@
     description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
     version = '1.3.0.0'
     auth = @{
-        changePwOnNextStart = $true
+        cacheType = 'Memory'
+        changePwOnNextStart = $false
         validateScopes = $false
-        authType = 'PublicAuthFlow'
         noSaveRefreshToken = $false
         forceNewToken = $false
+        renewalLeadTime = 5
         scope = @(
             'offline_access',
             'openid',
@@ -145,9 +146,8 @@
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        delegated = $true
-        cacheType = 'Memory'
+        authType = 'PublicAuthFlow'
         secureString = $false
-        renewalLeadTime = 5
+        delegated = $true
     }
 }
