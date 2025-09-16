@@ -25,7 +25,19 @@ function ExportDeviceList()
     $unmanagedDeviceFilter = "operatingSystem eq 'Windows'"
     $unmanagedDeviceExtraParameters = "select=id,displayName,manufacturer,model,operatingSystemVersion,profileType,createdDateTime,registrationDateTime,accountEnabled,approximateLastSignInDateTime,enrollmentProfileName,enrollmentType,isCompliant"
     $managedDeviceUri = "deviceManagement/managedDevices"
-    $managedDeviceFilter = "operatingSystem eq Windows"
+    if ($settings.deviceNamePrefix -isnot [string] -or [string]::IsNullOrWhiteSpace($settings.deviceNamePrefix))
+    {
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device name prefix is not set in settings." -LogLevel "Warning"
+        Write-Verbose "[    $functionName] Device name prefix is not set in settings."
+        $managedDeviceFilter = "operatingSystem eq 'Windows'" 
+    }
+    else 
+    {
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using device name prefix '$($settings.deviceNamePrefix)' from settings." -LogLevel "Information"
+        Write-Verbose "[    $functionName] Using device name prefix '$($settings.deviceName
+        $deviceNamePrefixForOData = $settings.deviceNamePrefix -replace "'", "''"
+        $managedDeviceFilter = "operatingSystem eq 'Windows' and startswith(deviceName,'$deviceNamePrefixForOData')"
+    }
     $managedDeviceExtraParameters = "select=serialNumber,deviceName,manufacturer,model,osVersion,autopilotEnrolled,enrolledDateTime,lastSyncDateTime,complianceState,userPrincipalName,userDisplayName,usersLoggedOn"
     $CSVObject = [System.Collections.ArrayList]@()
     $success = $false
@@ -66,7 +78,7 @@ function ExportDeviceList()
         $device = $devices.value[$i]
         if (-not $device)
         {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping null or invalid $deviceType device at index $i." -LogLevel "Debug"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping null or invalid $deviceType device at index $i." -LogLevel "Debug"
             continue
         }
         switch ($deviceType)
@@ -187,7 +199,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Skipping null or i
             }
             else
             {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existing file $outputFile." -LogLevel "Verbose"
                 $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
             }
         }
@@ -199,7 +211,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Overwriting existi
     }
     else
     {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
     }
     #check if the csv file exists.
     if (Test-Path $outputFile)
