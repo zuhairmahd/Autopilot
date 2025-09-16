@@ -1,16 +1,16 @@
 @{
     groupsToInclude = @(
         @{
-            name = 'sg_Office_365_License_G5_wth_windows_pilot'
             id = '74d8cfe5-7934-4bd7-bcf3-593dcc6639ed'
+            name = 'sg_Office_365_License_G5_wth_windows_pilot'
         },
         @{
-            name = 'sg_passwrd_hash_stage'
             id = 'be87a9ef-3e44-4e6b-8a9e-d1696e2f7db5'
+            name = 'sg_passwrd_hash_stage'
         },
         @{
-            name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
             id = '27d943bc-77cc-44eb-9f81-13c76841129b'
+            name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
         }
     )
     groupsToExclude = @()
@@ -28,10 +28,10 @@
     maxGroupMatchDisplay = 10
     release = 'lhm'
     repoInfo = @{
-        repoName = 'Autopilot'
         baseURL = 'https://www.github.com'
-        repoPath = 'zuhairmahd'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
+        repoPath = 'zuhairmahd'
     }
     autoUpdate = $true
     deviceNamePrefix = 'w11-'
