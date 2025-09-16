@@ -34,7 +34,7 @@ function ExportDeviceList()
     else 
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Using device name prefix '$($settings.deviceNamePrefix)' from settings." -LogLevel "Information"
-        Write-Verbose "[    $functionName] Using device name prefix '$($settings.deviceName
+        Write-Verbose "[    $functionName] Using device name prefix '$($settings.deviceNamePrefix)' from settings."
         $deviceNamePrefixForOData = $settings.deviceNamePrefix -replace "'", "''"
         $managedDeviceFilter = "operatingSystem eq 'Windows' and startswith(deviceName,'$deviceNamePrefixForOData')"
     }
