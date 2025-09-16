@@ -34,10 +34,10 @@
     maxGroupMatchDisplay = 10
     release = 'master'
     repoInfo = @{
-        repoPath = 'zuhairmahd'
-        baseSourceURL = 'https://raw.githubusercontent.com'
         baseURL = 'https://www.github.com'
+        repoPath = 'zuhairmahd'
         repoName = 'Autopilot'
+        baseSourceURL = 'https://raw.githubusercontent.com'
     }
     autoUpdate = $false
     deviceNamePrefix = 'vmware'
