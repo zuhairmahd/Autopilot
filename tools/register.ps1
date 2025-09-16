@@ -505,7 +505,6 @@ function Get-WindowsUSBDriveLetter()
 
 $scriptName = $MyInvocation.MyCommand.Name
 $script:logFile = $log
-$scriptsFolder = "scripts\helpdesk"
 # If the logfile is a string without a path, set the path to the script directory
 if ($logFile -and -not ($logFile -match '[\\/]+'))
 {
