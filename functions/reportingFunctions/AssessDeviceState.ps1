@@ -238,7 +238,7 @@ function AssessDeviceState()
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning readiness state: $readinessState" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning primary action: $action" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning device: $device" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($allIssues.Count) issues: $($allIssues -join '; ')" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found $($allIssues.Count) issues: $($allIssues -join '; ')" -LogLevel "Verbose"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "All actions needed: $($allActions -join '; ')" -LogLevel "Information"
     return $returnValue
 }
