@@ -12,7 +12,8 @@ $ErrorActionPreference = 'Stop'
 $VerbosePreference = 'Continue'
 
 # Test helper functions
-function Test-Function {
+function Test-Function
+{
     param(
         [string]$TestName,
         [scriptblock]$TestCode,
@@ -20,14 +21,17 @@ function Test-Function {
     )
     
     Write-Host "Testing: $TestName" -ForegroundColor Cyan
-    try {
+    try
+    {
         & $TestCode
         Write-Host "✓ $TestName passed" -ForegroundColor Green
         return $true
     }
-    catch {
+    catch
+    {
         Write-Host "✗ $TestName failed: $_" -ForegroundColor Red
-        if (-not $ContinueOnError) {
+        if (-not $ContinueOnError)
+        {
             throw
         }
         return $false
@@ -41,9 +45,11 @@ Set-Location $rootPath
 
 # Import required functions
 $functionsFolder = "$rootPath\functions"
-if (Test-Path $functionsFolder) {
+if (Test-Path $functionsFolder)
+{
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
-    foreach ($function in $functions) {
+    foreach ($function in $functions)
+    {
         . $function.FullName
     }
 }
@@ -63,45 +69,54 @@ Test-Function "Test-ShouldIncludeMenuItem helper function works correctly" {
     $mainMenuConfig = if ($menuConfigForFiltering -and $menuConfigForFiltering.mainMenu) { $menuConfigForFiltering.mainMenu } else { $null }
 
     # Define the helper function (same as in main.ps1)
-    function Test-ShouldIncludeMenuItem {
+    function Test-ShouldIncludeMenuItem
+    {
         param(
             [string]$MenuItemName,
             [string]$CurrentAppMode = $settings.appMode
         )
         
         # If no app mode set or is full, include all items
-        if (-not $CurrentAppMode -or $CurrentAppMode -eq "full") {
+        if (-not $CurrentAppMode -or $CurrentAppMode -eq "full")
+        {
             return $true
         }
         
         # If no menu config available, include all items (fallback)
-        if (-not $mainMenuConfig -or -not $mainMenuConfig.items) {
+        if (-not $mainMenuConfig -or -not $mainMenuConfig.items)
+        {
             return $true
         }
         
         # Find the menu item in configuration
         $configItem = $mainMenuConfig.items | Where-Object { $_.name -eq $MenuItemName }
-        if (-not $configItem) {
+        if (-not $configItem)
+        {
             # Item not found in config, include by default (fallback)
             return $true
         }
         
         # If no includeInDisplayModes specified, include by default
-        if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0) {
+        if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0)
+        {
             return $true
         }
         
         # Get app mode hierarchy and check if current mode is allowed
-        try {
+        try
+        {
             $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
-            foreach ($allowedMode in $configItem.includeInDisplayModes) {
-                if ($hierarchyAllowed -contains $allowedMode) {
+            foreach ($allowedMode in $configItem.includeInDisplayModes)
+            {
+                if ($hierarchyAllowed -contains $allowedMode)
+                {
                     return $true
                 }
             }
             return $false
         }
-        catch {
+        catch
+        {
             # If hierarchy check fails, include by default (fallback)
             return $true
         }
@@ -109,19 +124,23 @@ Test-Function "Test-ShouldIncludeMenuItem helper function works correctly" {
     
     # Test items that should be visible in registration mode
     $shouldBeVisible = @("Give a device to a user", "Autopilot menu", "Export Menu", "About")
-    foreach ($item in $shouldBeVisible) {
+    foreach ($item in $shouldBeVisible)
+    {
         $result = Test-ShouldIncludeMenuItem -MenuItemName $item
-        if (-not $result) {
+        if (-not $result)
+        {
             throw "Item '$item' should be visible in registration mode but helper function returned false"
         }
         Write-Verbose "✓ '$item' correctly included in registration mode"
     }
     
     # Test items that should be hidden in registration mode
-    $shouldBeHidden = @("Change application settings", "Check for script updates")
-    foreach ($item in $shouldBeHidden) {
+    $shouldBeHidden = @("Change application settings", "Show Group Assignments")
+    foreach ($item in $shouldBeHidden)
+    {
         $result = Test-ShouldIncludeMenuItem -MenuItemName $item
-        if ($result) {
+        if ($result)
+        {
             throw "Item '$item' should be hidden in registration mode but helper function returned true"
         }
         Write-Verbose "✓ '$item' correctly excluded from registration mode"
@@ -131,7 +150,8 @@ Test-Function "Test-ShouldIncludeMenuItem helper function works correctly" {
 # Test different app modes
 $testModes = @("registration", "helpdesk", "advanced", "admin")
 
-foreach ($testMode in $testModes) {
+foreach ($testMode in $testModes)
+{
     Test-Function "App mode '$testMode' helper function filtering works correctly" {
         # Set up the test environment for this app mode
         $global:settings = @{ appMode = $testMode }
@@ -141,45 +161,54 @@ foreach ($testMode in $testModes) {
         $mainMenuConfig = if ($menuConfigForFiltering -and $menuConfigForFiltering.mainMenu) { $menuConfigForFiltering.mainMenu } else { $null }
 
         # Define the helper function (same as in main.ps1)
-        function Test-ShouldIncludeMenuItem {
+        function Test-ShouldIncludeMenuItem
+        {
             param(
                 [string]$MenuItemName,
                 [string]$CurrentAppMode = $settings.appMode
             )
             
             # If no app mode set or is full, include all items
-            if (-not $CurrentAppMode -or $CurrentAppMode -eq "full") {
+            if (-not $CurrentAppMode -or $CurrentAppMode -eq "full")
+            {
                 return $true
             }
             
             # If no menu config available, include all items (fallback)
-            if (-not $mainMenuConfig -or -not $mainMenuConfig.items) {
+            if (-not $mainMenuConfig -or -not $mainMenuConfig.items)
+            {
                 return $true
             }
             
             # Find the menu item in configuration
             $configItem = $mainMenuConfig.items | Where-Object { $_.name -eq $MenuItemName }
-            if (-not $configItem) {
+            if (-not $configItem)
+            {
                 # Item not found in config, include by default (fallback)
                 return $true
             }
             
             # If no includeInDisplayModes specified, include by default
-            if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0) {
+            if (-not $configItem.includeInDisplayModes -or $configItem.includeInDisplayModes.Count -eq 0)
+            {
                 return $true
             }
             
             # Get app mode hierarchy and check if current mode is allowed
-            try {
+            try
+            {
                 $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
-                foreach ($allowedMode in $configItem.includeInDisplayModes) {
-                    if ($hierarchyAllowed -contains $allowedMode) {
+                foreach ($allowedMode in $configItem.includeInDisplayModes)
+                {
+                    if ($hierarchyAllowed -contains $allowedMode)
+                    {
                         return $true
                     }
                 }
                 return $false
             }
-            catch {
+            catch
+            {
                 # If hierarchy check fails, include by default (fallback)
                 return $true
             }
@@ -201,12 +230,16 @@ foreach ($testMode in $testModes) {
         $includedCount = 0
         $excludedCount = 0
         
-        foreach ($item in $allMenuItems) {
+        foreach ($item in $allMenuItems)
+        {
             $shouldInclude = Test-ShouldIncludeMenuItem -MenuItemName $item
-            if ($shouldInclude) {
+            if ($shouldInclude)
+            {
                 $includedCount++
                 Write-Verbose "✓ '$item' included in $testMode mode"
-            } else {
+            }
+            else
+            {
                 $excludedCount++
                 Write-Verbose "✗ '$item' excluded from $testMode mode"
             }
@@ -215,7 +248,8 @@ foreach ($testMode in $testModes) {
         Write-Verbose "App mode '$testMode': $includedCount included, $excludedCount excluded"
         
         # Validate that some filtering occurred (unless it's a very permissive mode)
-        if ($testMode -eq "registration" -and $excludedCount -eq 0) {
+        if ($testMode -eq "registration" -and $excludedCount -eq 0)
+        {
             throw "Expected some items to be excluded in registration mode, but all items were included"
         }
     }

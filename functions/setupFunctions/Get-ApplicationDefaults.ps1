@@ -498,6 +498,9 @@ function Get-ApplicationDefaults()
                         includeInDisplayModes = @(
                             'full',
                             'admin',
+                            'helpdesk',
+                            'registration',
+                            'advancedRegistration',
                             'advanced'
                         )
                     },
