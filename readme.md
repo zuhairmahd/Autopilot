@@ -117,62 +117,118 @@ The application includes an interactive First Run Wizard that automatically laun
 
 **Required Information**: Have ready your Azure AD App ID, Tenant ID, domain name, and authentication credentials.
 
+
 ### Manual Setup (Advanced Users)
 
 For advanced scenarios where custom configuration is needed:
 
 1. **Clone or download** the script files from the [repository](https://github.com/zuhairmahd/autopilot) to a local directory
 2. **Create the secrets folder**: `New-Item -Path ".secrets" -ItemType Directory -Force` ([see .secrets/](./.secrets))
-3. **Configure authentication**: Place your `config.json` file in the [`.secrets` folder](./.secrets)
-4. **Configure application settings**: Ensure [`settings.json`](./settings.json) is configured for your environment
+3. **Configure authentication**: Place your `config-sample.psd1` file in the [`.secrets` folder](./.secrets)) and update as needed
+4. **Configure application settings**: Ensure [`settings.psd1`](./settings.psd1) is configured for your environment
 5. **Set up encryption**: On first run, the script will prompt you to encrypt your configuration file
 
-**Note**: The application automatically creates and manages essential configuration files (`settings.json`, `strings.json`, `menu.json`) with comprehensive defaults if they are missing. This ensures a smooth setup experience and automatic recovery from configuration issues.
+**Note**: The application automatically creates and manages essential configuration files (`settings.psd1`, `strings.psd1`, `menu.psd1`) with comprehensive defaults if they are missing. This ensures a smooth setup experience and automatic recovery from configuration issues.
 
 ### Environment-Specific Configurations
 
-The tool supports domain-specific configurations stored in separate files for better organization and management.
 
-#### Domain Configuration Files
+The tool supports domain-specific configurations stored in separate sections within the main PSD1 configuration file for better organization and management.
 
-Starting with this version, domain-specific settings are stored in separate JSON files named after the domain (e.g., `contoso.com.json`, `fabrikam.com.json`). This provides several benefits:
+#### Domain Configuration Structure
 
-- **Better Organization**: Each domain has its own configuration file
-- **Easier Management**: Modify domain settings without affecting the main settings.json
-- **Simplified Backup**: Back up individual domain configurations separately
+Starting with this version, domain-specific settings are stored in the `domains` hashtable within the main `settings.psd1` file. Each domain is represented as a key in the hashtable (e.g., `contoso.com`, `fabrikam.com`). This provides several benefits:
+
+- **Better Organization**: Each domain has its own configuration section
+- **Easier Management**: Modify domain settings without affecting other domains
+- **Simplified Backup**: Back up the main configuration file or export individual domain sections
 - **Reduced Conflicts**: Multiple administrators can work on different domain configurations simultaneously
 
 #### Configuration Structure
 
-Each domain configuration file contains:
-```json
-{
-  "groupsToInclude": ["Domain-Users", "Device-Recipients"],
-  "groupsToExclude": ["Contractors", "Temporary-Users"],
-  "settings": {
-    "deviceNamePrefix": "CONTOSO-",
-    "domain": "contoso.com",
-    "maxNumberOfDevicesAllowed": 10,
-    "MinimumDevicePhysicalMemoryInGB": 8
-  },
-  "additionalScopes": []
+Each domain configuration is stored as a hashtable in `settings.psd1` and should follow this structure:
+```powershell
+@{
+  domains = @{
+    "arabictutor.com" = @{
+      groupsToInclude = @(
+        @{
+          id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
+          name = 'Cloud Managed PC User 3.26.2023_18:43:44'
+        }
+      )
+      groupsToExclude = @(
+        @{
+          id = 'a0138743-e4fe-45db-a231-737b10a2615d'
+          name = 'autoPilot-device-preparation-user'
+        }
+      )
+      autopilotProfilesToInclude = @(
+        @{
+          id = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
+          name = 'windowsCloudConfig Autopilot profile'
+        },
+        @{
+          id = '78a4c8b8-c7fb-4fbb-9db6-7c91eb1db7d1'
+          name = 'Hybrid join profile'
+        }
+      )
+      domain = 'arabictutor.com'
+      companyName = 'ZM Consulting'
+      version = '4.0.0.30055'
+      validateScopes = $false
+      maxWaitTime = 30
+      showLicenseBanner = $false
+      deviceContactThresholdInDays = 30
+      appMode = 'full'
+      timeInSeconds = 60
+      maxUserMatchDisplay = 10
+      maxGroupMatchDisplay = 10
+      release = 'master'
+      repoInfo = @{
+        repoPath = 'zuhairmahd'
+        repoName = 'Autopilot'
+        baseURL = 'https://www.github.com'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+      }
+      autoUpdate = $false
+      deviceNamePrefix = 'vmware'
+      operatingSystem = 'Windows'
+      minUsernameLength = 3
+      maxUserNameLength = 50
+      maxSerialNumberLength = 50
+      minSerialNumberLength = 7
+      minimumDevicePhysicalMemoryInGB = 8
+      maxNumberOfDevicesAllowed = 15
+      preferredBrowser = 'Chrome'
+      privateSession = $false
+      userPatternsToExclude = @(
+        '-test',
+        'onmicrosoft.com'
+      )
+      groupPatternsToExclude = @()
+      groupTag = 'ENTRA'
+      assignedUser = ''
+      additionalScopes = @()
+    }
+  }
 }
 ```
 
 #### Automatic Migration
 
-The application automatically migrates existing domain configurations from the main `settings.json` file to separate domain files on first load. The migration:
+The application automatically migrates any legacy JSON or older configuration formats to the new PSD1 structure on first load. The migration:
 
-- Creates separate `.json` files for each domain
+- Converts existing domain configurations to the PSD1 hashtable format
 - Preserves all existing settings and group configurations
-- Removes the domains section from the main settings.json after successful migration
+- Removes legacy configuration files after successful migration
 - Creates backups before making any changes
 
 #### Backward Compatibility
 
 The tool maintains backward compatibility with existing configurations:
-- Can still read domains from `settings.json` if separate files don't exist
-- Automatically creates domain files with default settings if needed
+- Can still read legacy formats if PSD1 files don't exist
+- Automatically creates domain sections with default settings if needed
 - Supports loading from both formats during transition period
 
 For more technical details, refer to [Advanced Settings](./docs/Consolidated-Configuration-System.md) in the technical documentation.

@@ -119,7 +119,7 @@ function Update-Setting()
     {
         'Global'
         {
-            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -functionName $functionName -settingType 'Global'))
+            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -settingType 'Global'))
             {
                 Write-Log -LogFile $logFile -Message "Invalid parameters for Global setting type" -Module $functionName -LogLevel "Error"
                 return $false
@@ -129,7 +129,7 @@ function Update-Setting()
         }
         'Auth'
         {
-            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -functionName $functionName -settingType 'Auth'))
+            if (-not (Test-SettingNameAndValue -SettingName $SettingName -SettingValue $SettingValue -settingType 'Auth'))
             {
                 Write-Log -LogFile $logFile -Message "Invalid parameters for Auth setting type" -Module $functionName -LogLevel "Error"
                 return $false
