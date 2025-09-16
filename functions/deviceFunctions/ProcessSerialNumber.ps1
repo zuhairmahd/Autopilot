@@ -19,7 +19,7 @@ function ProcessSerialNumber()
     }
     $SerialNumber = $SerialNumber.Trim()
     Write-Host "`nLooking up device information for serial number: $SerialNumber" -ForegroundColor Cyan
-    $enrollmentState = GetDeviceEnrollmentState -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
+    $enrollmentState = GetDeviceEnrollmentStatus -SerialNumber $SerialNumber -AccessToken $AccessToken -Settings $Settings
     if ($enrollmentState)
     {
         $success = $true
