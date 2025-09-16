@@ -37,9 +37,8 @@ function GetLastDeviceContactDate()
         $contactDates.add('deviceCreatedDateTime', $enrollmentState.device.createdDateTime)
         $contactDates.add('deviceRegistrationDateTime', $enrollmentState.device.registrationDateTime)
     }
-    $global:cd = $contactDates
     #Figure out the latest contact date
-    if ($null -ne $contactDates.Values)
+    if ($null -eq $contactDates.Values)
     {
         Write-Verbose "[$functionName] No contact dates found."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "No contact dates found." -LogLevel "Warning"

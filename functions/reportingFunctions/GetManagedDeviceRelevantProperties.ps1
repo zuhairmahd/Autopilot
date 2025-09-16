@@ -23,7 +23,7 @@ function GetManagedDeviceRelevantProperties()
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device: $($enrollmentState.managed)" -LogLevel "Information"
     if ($enrollmentState.managed)
     {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a managed device." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a managed device." -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Checking whether this is an orphan device..." -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Autopilot managed device id: $($enrollmentState.autopilot.device.managedDeviceId)" -LogLevel "Information"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Managed device id: $($enrollmentState.managedDevice.device.id)" -LogLevel "Information"
@@ -48,7 +48,7 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a managed de
             Write-Host "Checking for a user association on the manage device..."
             if ($enrollmentState.managedDevice.device.userId -ne '' -and $null -ne $enrollmentState.managedDevice.device.userId)
             {
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a user..." -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found a user..." -LogLevel "Verbose"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User display name: $($enrollmentState.managedDevice.users.userDisplayName)" -LogLevel "Information"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User id: $($enrollmentState.managedDevice.device.userId)" -LogLevel "Information"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "User principal name: $($enrollmentState.managedDevice.users.userPrincipalName)" -LogLevel "Information"
