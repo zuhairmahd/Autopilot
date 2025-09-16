@@ -1,2 +1,2 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0register.ps1"
+powershell -ExecutionPolicy Bypass -File "%~dp0register.ps1" -ScriptsFolder scripts 
