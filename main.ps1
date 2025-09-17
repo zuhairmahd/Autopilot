@@ -1653,6 +1653,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     else # Continue only if a username was entered
     {
         $hasCorrectGroups = $false
+        $hasStrongMapping = $false
         $hasCorrectNumberOfDevices = $false
         #region Check if the user exists first.
         $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
@@ -1758,6 +1759,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
         }
+        
         Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
         $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken
         if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
@@ -1770,7 +1772,34 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
             Write-Host "No additional devices can be assigned to this user."
         }
-        if ($hasCorrectGroups -and $hasCorrectNumberOfDevices)
+
+        if ($settings.checkStrongMapping)
+        {
+            Write-Host "`nChecking if the user $userName has strong certificate mapping enabled." -ForegroundColor Cyan
+            $strongMappingInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
+            Write-Verbose "[$scriptName] Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)"
+            write-log -logFile $logFile -Module "$scriptName" -Message "Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Verbose"
+            if ($strongMappingInfo.StrongMapping)
+            {
+                Write-Host "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -ForegroundColor Green
+                write-log -logFile $logFile -Module "$scriptName" -Message "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -LogLevel "Information"
+                foreach ($cert in $strongMappingInfo.Certificates)
+                {
+                    Write-Host "Certificate info: $cert" -ForegroundColor Green
+                    write-log -logFile $logFile -Module "$scriptName" -Message "Certificate info: $cert" -LogLevel "Information"
+                }
+                Write-Host "----------------------------------------" -ForegroundColor Green
+                $hasStrongMapping = $true
+            }
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Strong mapping check is disabled in settings."
+            write-log -logFile $logFile -Module "$scriptName" -Message "Strong mapping check is disabled in settings." -LogLevel "Information"
+            $hasStrongMapping = $true
+        }
+
+        if (    $hasCorrectGroups -and $hasCorrectNumberOfDevices -and $hasStrongMapping)
         {
             Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
             Write-Host "We will now check the device state." -ForegroundColor Green

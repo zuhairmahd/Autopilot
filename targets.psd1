@@ -183,6 +183,7 @@
                 maxGroupMatchDisplay            = 10
                 maxWaitTime                     = 30
                 autoUpdate                      = $true
+                checkStrongMapping              = $true
                 preferredBrowser                = 'Chrome'
                 maxSerialNumberLength           = 11
                 minUsernameLength               = 3
