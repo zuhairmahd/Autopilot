@@ -577,7 +577,10 @@ function Format-SettingValueForDisplay()
                 Write-Verbose "[$functionName] Detected hashtable with $($Value.Keys.Count) keys"
                 # Sort keys alphabetically for deterministic display
                 $orderedKeys = $Value.Keys | Sort-Object
-                $pairs = foreach ($k in $orderedKeys) { "${k}: $($Value[$k])" }
+                $pairs = foreach ($k in $orderedKeys)
+                {
+                    "${k}: $($Value[$k])" 
+                }
                 return "{ $($pairs -join ', ') }"
             }
             else 
@@ -623,6 +626,7 @@ function Get-SettingDescription()
         'showLicenseBanner'               = 'Whether to display the license banner on startup'
         'deviceContactThresholdInDays'    = 'Number of days before a device is considered stale'
         'checkStrongMapping'              = 'Check whether certificate strong mapping is enabled for the user'
+        'strongMappingOptional'           = 'Whether strong mapping is optional for the user. If set to false, the user is not considered ready to receive a device'
         'appMode'                         = 'Application mode controlling which features are available'
         'timeInSeconds'                   = 'Default timeout to wait between retries in seconds'
         'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'

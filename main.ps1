@@ -1772,33 +1772,48 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
             Write-Host "No additional devices can be assigned to this user."
         }
-
+        
         if ($settings.checkStrongMapping)
         {
             Write-Host "`nChecking if the user $userName has strong certificate mapping enabled." -ForegroundColor Cyan
             $strongMappingInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
             Write-Verbose "[$scriptName] Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-            write-log -logFile $logFile -Module "$scriptName" -Message "Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Verbose"
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Verbose"
             if ($strongMappingInfo.StrongMapping)
             {
                 Write-Host "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -ForegroundColor Green
-                write-log -logFile $logFile -Module "$scriptName" -Message "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -LogLevel "Information"
+                Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -LogLevel "Information"
                 foreach ($cert in $strongMappingInfo.Certificates)
                 {
                     Write-Host "Certificate info: $cert" -ForegroundColor Green
-                    write-log -logFile $logFile -Module "$scriptName" -Message "Certificate info: $cert" -LogLevel "Information"
+                    Write-Log -logFile $logFile -Module "$scriptName" -Message "Certificate info: $cert" -LogLevel "Information"
                 }
                 Write-Host "----------------------------------------" -ForegroundColor Green
                 $hasStrongMapping = $true
+            }
+            else
+            {
+                if ($settings.strongMappingOptional)
+                {
+                    Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Yellow
+                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled, but this is allowed as strong mapping is optional." -LogLevel "Warning"
+                    $hasStrongMapping = $true
+                }
+                else
+                {
+                    Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Red
+                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled." -LogLevel "Error"
+                    Write-Host "Please enable strong certificate mapping for this user or contact an Intune administrator." -ForegroundColor Red
+                }
             }
         }
         else
         {
             Write-Verbose "[$scriptName] Strong mapping check is disabled in settings."
-            write-log -logFile $logFile -Module "$scriptName" -Message "Strong mapping check is disabled in settings." -LogLevel "Information"
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping check is disabled in settings." -LogLevel "Information"
             $hasStrongMapping = $true
         }
-
+        
         if (    $hasCorrectGroups -and $hasCorrectNumberOfDevices -and $hasStrongMapping)
         {
             Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
