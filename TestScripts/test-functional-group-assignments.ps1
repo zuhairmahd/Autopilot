@@ -9,11 +9,13 @@ $scriptPath = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 $rootPath = Split-Path $scriptPath -Parent
 
 # Import required functions
-try {
+try
+{
     . "$rootPath/functions/utilityFunctions/Write-Log.ps1"
     
     # Mock functions to avoid actual API calls
-    function CallGraphAPI {
+    function CallGraphAPI
+    {
         param(
             [string]$accessToken,
             [string]$ResourcePath,
@@ -24,20 +26,21 @@ try {
         )
         
         # Return mock data based on the resource path
-        if ($ResourcePath -like "*batch*") {
+        if ($ResourcePath -like "*batch*")
+        {
             return @{
                 responses = @(
                     @{
-                        id = "test-id-1"
+                        id     = "test-id-1"
                         status = 200
-                        body = @{
+                        body   = @{
                             value = @(
                                 @{
-                                    id = "assignment-1"
-                                    intent = "Required"
-                                    target = @{
+                                    id       = "assignment-1"
+                                    intent   = "Required"
+                                    target   = @{
                                         '@odata.type' = '#microsoft.graph.groupAssignmentTarget'
-                                        groupId = "test-group-id"
+                                        groupId       = "test-group-id"
                                     }
                                     settings = @{}
                                 }
@@ -47,26 +50,28 @@ try {
                 )
             }
         }
-        else {
+        else
+        {
             # Mock resource lists
             return @{
                 value = @(
                     @{
-                        id = "test-id-1"
+                        id          = "test-id-1"
                         displayName = "Test Resource 1"
-                        name = "Test Resource 1"  # For configuration policies
+                        name        = "Test Resource 1"  # For configuration policies
                     },
                     @{
-                        id = "test-id-2"
+                        id          = "test-id-2"
                         displayName = "Test Resource 2"
-                        name = "Test Resource 2"  # For configuration policies
+                        name        = "Test Resource 2"  # For configuration policies
                     }
                 )
             }
         }
     }
     
-    function GetGroupIdsByNames {
+    function GetGroupIdsByNames
+    {
         param(
             [string]$AccessToken,
             [array]$GroupNames
@@ -78,26 +83,30 @@ try {
     $global:LogFile = "/tmp/functional-test.log"
     $global:maxJSONDepth = 10
     
-    . "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1"
+    . "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
     
     Write-Host "✓ Functions imported successfully"
-} catch {
+}
+catch
+{
     Write-Host "✗ Failed to import functions: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
 Write-Host "`nTesting GetGroupDirectAssignments function..." -ForegroundColor Yellow
 
-try {
+try
+{
     # Test the function with mock data
     $mockGroup = [PSCustomObject]@{
-        id = "12345678-1234-1234-1234-123456789012"
+        id          = "12345678-1234-1234-1234-123456789012"
         displayName = "TestGroup"
     }
     $result = GetGroupDirectAssignments -Group $mockGroup -AccessToken "mock-token" -IncludeBeta -ShowSummary -BatchSize 5
     
     # Validate the result structure
-    if ($result -and $result.GroupName -eq "TestGroup") {
+    if ($result -and $result.GroupName -eq "TestGroup")
+    {
         Write-Host "✓ Function returned expected result structure"
         
         # Check all expected properties exist
@@ -109,39 +118,49 @@ try {
         )
         
         $allPropertiesPresent = $true
-        foreach ($prop in $expectedProperties) {
-            if (-not $result.PSObject.Properties[$prop]) {
+        foreach ($prop in $expectedProperties)
+        {
+            if (-not $result.PSObject.Properties[$prop])
+            {
                 Write-Host "✗ Missing property: $prop" -ForegroundColor Red
                 $allPropertiesPresent = $false
             }
         }
         
-        if ($allPropertiesPresent) {
+        if ($allPropertiesPresent)
+        {
             Write-Host "✓ All expected properties present in result"
         }
         
         # Check that assignments arrays are properly initialized
         $arrayPropsInitialized = $true
-        foreach ($prop in $expectedProperties) {
-            if ($prop -like "*Assignments" -and $result.$prop -eq $null) {
+        foreach ($prop in $expectedProperties)
+        {
+            if ($prop -like "*Assignments" -and $result.$prop -eq $null)
+            {
                 Write-Host "✗ Property $prop is null instead of empty array" -ForegroundColor Red
                 $arrayPropsInitialized = $false
             }
         }
         
-        if ($arrayPropsInitialized) {
+        if ($arrayPropsInitialized)
+        {
             Write-Host "✓ All assignment arrays properly initialized"
         }
         
         Write-Host "✓ Functional test completed successfully" -ForegroundColor Green
         
-    } else {
+    }
+    else
+    {
         Write-Host "✗ Function did not return expected result structure" -ForegroundColor Red
         Write-Host "Result: $($result | ConvertTo-Json -Depth 2)" -ForegroundColor Red
         exit 1
     }
     
-} catch {
+}
+catch
+{
     Write-Host "✗ Functional test failed: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack trace: $($_.ScriptStackTrace)" -ForegroundColor Red
     exit 1

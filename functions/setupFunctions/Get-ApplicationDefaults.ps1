@@ -113,6 +113,8 @@ function Get-ApplicationDefaults()
             appMode                      = "full"
             timeInSeconds                = 60
             maxUserMatchDisplay          = 10
+            checkStrongMapping           = $false
+            strongMappingOptional        = $true
             maxGroupMatchDisplay         = 10
             release                      = "auto"
             repoInfo                     = @{
@@ -138,6 +140,8 @@ function Get-ApplicationDefaults()
             maxWaitTime                     = 30
             showLicenseBanner               = $true
             deviceContactThresholdInDays    = 30
+            checkStrongMapping              = $false
+            strongMappingOptional           = $true
             appMode                         = "full"
             timeInSeconds                   = 60
             maxUserMatchDisplay             = 10

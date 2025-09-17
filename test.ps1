@@ -370,9 +370,9 @@ else
         exit 1
     }
 }
-# Initialize application configuration using centralized helper functions
-Write-Verbose "[$scriptName] Initializing application configuration"
 
+
+# Initialize application configuration using centralized helper functions
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
@@ -443,7 +443,7 @@ $scope = $auth.scope
 # $autopilotCsv = [System.Collections.ArrayList]@()
 # $importedCsv = [System.Collections.ArrayList]@()
 # $accessToken = GetGraphAccessToken -configFile $configFile -deligated -scope $scope -AuthType 'MGGraph' -verbose 
-# $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
+$accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $scope -AuthType 'PublicAuthFlow'
 # $accessToken = GetGraphAccessToken -configFile $configFile
 # $autopilotDevices = CallGraphApi -ResourcePath $autoPilotDeviceURI -accessToken $accessToken -extraParameters $autopilotExtraParameters -consistencyLevel -verbose
 # $importedDevices = CallGraphApi -ResourcePath $importedAutopilotDeviceURI -accessToken $accessToken -consistencyLevel -extraParameters $importedAutopilotDeviceExtraParameters -verbose
@@ -457,76 +457,6 @@ $scope = $auth.scope
 #endregion Define variables
 
 
+$username = "mahmoudz@gao.gov"
+$global:userInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
 
-
-exit 0
-
-$uris = @()
-# Regex pattern to find variables ending with 'uri' (case-insensitive) whose assignment doesn't start with $ or http
-$queryPattern = '\$\w*uri\s*=\s*(?!\$|(?i:http))'
-$filesToSearch = Get-ChildItem "$pwd\*.ps1" -Recurse 
-Write-Host "Found $($filesToSearch.count) files."
-#Search each file for variables ending with 'uri' and extract their assigned values
-foreach ($file in $filesToSearch)
-{
-    Write-Host "Searching in $($file.Name)"
-    $lines = Select-String -Path $file.FullName -Pattern $queryPattern -AllMatches
-    if ($lines)
-    {
-        Write-Host "Found $($lines.count) lines in $($file.Name)" 
-        foreach ($line in $lines)
-        {
-            # Extract the value after the = sign, handling quoted and unquoted strings
-            $match = $line.Line -match '\$\w*uri\s*=\s*([\x27\x22]?)([^\x27\x22#\r\n]+)\1'
-            if ($match)
-            {
-                $extractedUri = $matches[2].Trim()
-                if ($extractedUri -and $extractedUri -notmatch '^(\$|(?i:http))')
-                {
-                    $uris += $extractedUri
-                    Write-Verbose "Found URI: $extractedUri in $($file.Name) at line $($line.LineNumber)"
-                }
-            }
-        }
-    }
-    else
-    {
-        Write-Host "No matches found in $($file.Name)"
-    }
-}
-#sort uris and remove dupicates
-Write-Host "Found $($uris.count) URIs."
-if ($uris.count -eq 0)
-{
-    Write-Host "No URIs found. Exiting script." -ForegroundColor Red
-    exit 1
-}
-else
-{
-    Write-Host "Found $($uris.count) unique URIs."
-}
-# Remove duplicates and sort the URIs
-Write-Host "Sorting and removing duplicates from URIs..."
-$uris = $uris | Sort-Object -Unique
-Write-Host "Found $($uris.count) unique URIs after sorting."
-Set-Content -Path 'uris.txt' -Value $uris -Force
-
-
-
-# A sample object to export
-$myObject = [PSCustomObject]@{
-    ComputerName    = 'Server01'
-    OperatingSystem = 'Windows Server 2025'
-    LastReboot      = (Get-Date).ToString()
-    InstalledApps   = @('AppA', 'AppB', 'AppC')
-}
-# Convert the object to a hashtable for writing to the file
-$exportData = @{
-    ComputerName    = $myObject.ComputerName
-    OperatingSystem = $myObject.OperatingSystem
-    LastReboot      = $myObject.LastReboot
-    InstalledApps   = $myObject.InstalledApps
-}
-
-# Write the hashtable to a .psd1 file
-Export-PowerShellDataFile -InputObject $exportData -Path 'mydata.psd1'
