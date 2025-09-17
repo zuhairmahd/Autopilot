@@ -184,6 +184,7 @@
                 maxWaitTime                     = 30
                 autoUpdate                      = $true
                 checkStrongMapping              = $true
+                strongMappingOptional           = $false
                 preferredBrowser                = 'Chrome'
                 maxSerialNumberLength           = 11
                 minUsernameLength               = 3
