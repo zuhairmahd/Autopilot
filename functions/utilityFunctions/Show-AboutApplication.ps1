@@ -2,7 +2,11 @@ function Show-AboutApplication()
 {
     [CmdletBinding()]
     param(
-        [string]$accessToken
+        [string]$accessToken,
+        [string]$Release,
+        [string]$appId,
+        [string]$tenantId,
+        [string]$name
     )
     
     $FunctionName = $MyInvocation.MyCommand.Name
@@ -49,4 +53,5 @@ function Show-AboutApplication()
         Write-Host "Authentication type: $($auth.AuthType)"
     }
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
+    Write-Host "Update branch: $Release" -ForegroundColor Cyan
 }

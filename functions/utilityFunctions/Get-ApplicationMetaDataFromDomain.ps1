@@ -94,6 +94,14 @@ function Get-ApplicationMetaDataFromDomain()
         {
             $null 
         }
+        release     = if ($domainSettings.release)
+        {
+            $domainSettings.release 
+        }
+        else
+        {
+            $null 
+        }
     }
     Write-Verbose "[$functionName] Application metadata for domain '$($domainSettings.domain)' retrieved successfully."
     Write-Log -logFile $logFile -module $functionName -Message "Application metadata for domain '$($domainSettings.domain)' retrieved successfully."
