@@ -148,7 +148,8 @@ function Show-GroupsEditor()
             while ($true)
             {
                 # Use proper stack operation to maintain menu navigation integrity
-                $groupChoice = ShowMenu -Menu $groupsEditMenu -CalledBy 'Custom_GroupsEditorSubmenu' -StackOperation 'Push'
+                # $groupChoice = ShowMenu -Menu $groupsEditMenu -CalledBy 'Custom_GroupsEditorSubmenu' -StackOperation 'Push'
+                $groupChoice = ShowMenu -Menu $groupsEditMenu -CalledBy 'Action'
                 # Validate that we got a proper choice, not a navigation option
                 if ($null -eq $groupChoice -or $groupChoice -eq "Back" -or $groupChoice -eq "Main Menu" -or $groupChoice -eq 0 -or $groupChoice -eq "0")
                 {

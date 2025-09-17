@@ -139,7 +139,7 @@ function Show-AutopilotProfilesEditor()
             while ($true)
             {
                 # Use proper stack operation to maintain menu navigation integrity
-                $profileChoice = ShowMenu -Menu $autopilotProfilesEditMenu -CalledBy 'Custom_AutopilotProfilesEditorSubmenu' -StackOperation 'Push'
+                $profileChoice = ShowMenu -Menu $autopilotProfilesEditMenu -CalledBy 'Action'
                 # Validate that we got a proper choice, not a navigation option
                 if ($null -eq $profileChoice -or $profileChoice -eq "Back" -or $profileChoice -eq "Main Menu" -or $profileChoice -eq 0 -or $profileChoice -eq "0")
                 {
@@ -249,8 +249,15 @@ function Show-AutopilotProfilesEditor()
                     [void][System.Console]::ReadKey($true)
                 }
             }
+            Write-Log -LogFile $logFile -Module $functionName -Message "User finished editing Autopilot profiles, returning $profileChoice" -LogLevel "Information"
+            if ($null -eq $profileChoice -or $profileChoice -eq 0 -or $profileChoice -eq "0" -or $profileChoice -eq "Back" -or $profileChoice -eq "Main Menu")
+            {
+                return $profileChoice
+            }
         }
         
+        # Since settings are now saved immediately after each edit operation,
+        # we no longer need to defer saving until the end
         Write-Log -LogFile $logFile -Module $functionName -Message "Autopilot profiles editor completed" -LogLevel "Information"
         Write-Verbose "[$functionName] Autopilot profiles editor completed"
         return $true
