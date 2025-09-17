@@ -227,6 +227,7 @@ if ($ShowVersion)
     Write-Verbose "[$scriptName] Version: $version"
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
     Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
     Write-Log -LogFile $LogFile -finishLogging
     exit 0
@@ -271,6 +272,9 @@ if (Test-Path $configFile)
     
     $configContent = $sessionResult.ConfigContent
     $domain = $sessionResult.Domain
+    $appId = $sessionResult.AppId
+    $tenantId = $sessionResult.TenantId
+    $name = $sessionResult.Name
     
     # Check if password change is required
     # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
@@ -1948,7 +1952,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    Show-AboutApplication -accessToken $accessToken
+    Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
 }
 
 #region show menus
