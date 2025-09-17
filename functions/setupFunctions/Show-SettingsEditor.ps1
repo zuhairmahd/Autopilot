@@ -622,6 +622,7 @@ function Get-SettingDescription()
         'maxWaitTime'                     = 'How long, in minutes, to wait before stopping retries.'
         'showLicenseBanner'               = 'Whether to display the license banner on startup'
         'deviceContactThresholdInDays'    = 'Number of days before a device is considered stale'
+        'checkStrongMapping'              = 'Check whether certificate strong mapping is enabled for the user'
         'appMode'                         = 'Application mode controlling which features are available'
         'timeInSeconds'                   = 'Default timeout to wait between retries in seconds'
         'maxUserMatchDisplay'             = 'Maximum number of user matches to display in search results'
