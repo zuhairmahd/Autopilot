@@ -9,14 +9,16 @@ $scriptPath = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 $rootPath = Split-Path $scriptPath -Parent
 
 # Import required functions
-try {
+try
+{
     . "$rootPath/functions/utilityFunctions/Write-Log.ps1"
-    . "$rootPath/functions/utilityFunctions/GetGroupIdsByNames.ps1"
-    . "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1"
-    
+    . "$rootPath/functions/UserAndGroupFunctions/GetGroupIdsByNames.ps1"
+    . "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
     $global:LogFile = "/tmp/group-test.log"
     Write-Host "✓ Functions imported successfully"
-} catch {
+}
+catch
+{
     Write-Host "✗ Failed to import functions: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
@@ -24,7 +26,8 @@ try {
 $testsPassed = 0
 $testsTotal = 0
 
-function Test-ArrayIndexing {
+function Test-ArrayIndexing
+{
     $script:testsTotal++
     Write-Host "`nTest: Array indexing safety" -ForegroundColor Yellow
     
@@ -36,32 +39,41 @@ function Test-ArrayIndexing {
     )
     
     $allPassed = $true
-    foreach ($case in $testCases) {
+    foreach ($case in $testCases)
+    {
         $groupIds = $case.Input
         $groupIdArray = @($groupIds)
         $result = $groupIdArray[0]
         
-        if ($result -eq $case.Expected) {
+        if ($result -eq $case.Expected)
+        {
             Write-Host "  ✓ Input type '$($case.Input.GetType().Name)' -> '$result'"
-        } else {
+        }
+        else
+        {
             Write-Host "  ✗ Input type '$($case.Input.GetType().Name)' -> '$result' (expected '$($case.Expected)')" -ForegroundColor Red
             $allPassed = $false
         }
     }
     
-    if ($allPassed) {
+    if ($allPassed)
+    {
         $script:testsPassed++
         Write-Host "✓ Array indexing test passed" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "✗ Array indexing test failed" -ForegroundColor Red
     }
 }
 
-function Test-HashtableConstruction {
+function Test-HashtableConstruction
+{
     $script:testsTotal++
     Write-Host "`nTest: PowerShell 5.1 compatible hashtable construction" -ForegroundColor Yellow
     
-    try {
+    try
+    {
         # Test the pattern used in GetGroupIdsByNames
         $result = @{}
         $result['ResolvedIds'] = @("id1", "id2")
@@ -73,54 +85,72 @@ function Test-HashtableConstruction {
         $expectedKeys = @('ResolvedIds', 'MissingNames', 'ResolvedNames', 'MissingIds')
         $allKeysPresent = $true
         
-        foreach ($key in $expectedKeys) {
-            if (-not $result.ContainsKey($key)) {
+        foreach ($key in $expectedKeys)
+        {
+            if (-not $result.ContainsKey($key))
+            {
                 Write-Host "  ✗ Missing key: $key" -ForegroundColor Red
                 $allKeysPresent = $false
             }
         }
         
-        if ($allKeysPresent) {
+        if ($allKeysPresent)
+        {
             $script:testsPassed++
             Write-Host "✓ Hashtable construction test passed" -ForegroundColor Green
-        } else {
+        }
+        else
+        {
             Write-Host "✗ Hashtable construction test failed" -ForegroundColor Red
         }
-    } catch {
+    }
+    catch
+    {
         Write-Host "✗ Hashtable construction test failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
-function Test-FunctionSignatures {
+function Test-FunctionSignatures
+{
     $script:testsTotal++
     Write-Host "`nTest: Function signatures and parameters" -ForegroundColor Yellow
     
-    try {
+    try
+    {
         $getGroupCommand = Get-Command GetGroupIdsByNames -ErrorAction Stop
         $getDirectCommand = Get-Command GetGroupDirectAssignments -ErrorAction Stop
         
         # Test required parameters exist
         $requiredParams = @{
-            'GetGroupIdsByNames' = @('GroupNames')
+            'GetGroupIdsByNames'        = @('GroupNames')
             'GetGroupDirectAssignments' = @('GroupName', 'BatchSize')
         }
         
         $allParamsPresent = $true
-        foreach ($funcName in $requiredParams.Keys) {
+        foreach ($funcName in $requiredParams.Keys)
+        {
             $command = Get-Command $funcName
-            foreach ($paramName in $requiredParams[$funcName]) {
-                if (-not $command.Parameters.ContainsKey($paramName)) {
+            foreach ($paramName in $requiredParams[$funcName])
+            {
+                if (-not $command.Parameters.ContainsKey($paramName))
+                {
                     Write-Host "  ✗ Missing parameter '$paramName' in function '$funcName'" -ForegroundColor Red
                     $allParamsPresent = $false
-                } else {
+                }
+                else
+                {
                     Write-Host "  ✓ Parameter '$paramName' found in '$funcName'"
                     
                     # Special validation for BatchSize parameter
-                    if ($paramName -eq 'BatchSize') {
+                    if ($paramName -eq 'BatchSize')
+                    {
                         $param = $command.Parameters[$paramName]
-                        if ($param.ParameterType -eq [int]) {
+                        if ($param.ParameterType -eq [int])
+                        {
                             Write-Host "  ✓ BatchSize parameter correctly typed as [int]"
-                        } else {
+                        }
+                        else
+                        {
                             Write-Host "  ✗ BatchSize parameter should be [int] type" -ForegroundColor Red
                             $allParamsPresent = $false
                         }
@@ -129,29 +159,36 @@ function Test-FunctionSignatures {
             }
         }
         
-        if ($allParamsPresent) {
+        if ($allParamsPresent)
+        {
             $script:testsPassed++
             Write-Host "✓ Function signatures test passed" -ForegroundColor Green
-        } else {
+        }
+        else
+        {
             Write-Host "✗ Function signatures test failed" -ForegroundColor Red
         }
-    } catch {
+    }
+    catch
+    {
         Write-Host "✗ Function signatures test failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
-function Test-CodePatterns {
+function Test-CodePatterns
+{
     $script:testsTotal++
     Write-Host "`nTest: Code patterns in source files" -ForegroundColor Yellow
     
-    try {
+    try
+    {
         # Check GetGroupDirectAssignments for safe array indexing
-        $directContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1" -Raw
+        $directContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1" -Raw
         $hasArrayWrapping = $directContent -match '\$groupIdArray = @\(\$groupIds\)'
         $hasSafeIndexing = $directContent -match '\$groupId = \$groupIdArray\[0\]'
         
         # Check GetGroupIdsByNames for simplified implementation (no complex hashtable construction needed)
-        $idsContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupIdsByNames.ps1" -Raw
+        $idsContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/GetGroupIdsByNames.ps1" -Raw
         $hasSimplifiedImplementation = $idsContent -match 'Initialize session cache' -and $idsContent -notmatch 'Resolve-FromIndex'
         
         # Check for batch API implementation patterns
@@ -160,31 +197,40 @@ function Test-CodePatterns {
         $hasBatchAPICall = $directContent -match 'ResourcePath.*\$batch'
         
         $patterns = @{
-            'Array wrapping in GetGroupDirectAssignments' = $hasArrayWrapping
-            'Safe indexing in GetGroupDirectAssignments' = $hasSafeIndexing
+            'Array wrapping in GetGroupDirectAssignments'     = $hasArrayWrapping
+            'Safe indexing in GetGroupDirectAssignments'      = $hasSafeIndexing
             'Simplified implementation in GetGroupIdsByNames' = $hasSimplifiedImplementation
-            'Batch processing helper function' = $hasBatchProcessing
-            'Batch request body construction' = $hasBatchRequestBody
-            'Batch API endpoint usage' = $hasBatchAPICall
+            'Batch processing helper function'                = $hasBatchProcessing
+            'Batch request body construction'                 = $hasBatchRequestBody
+            'Batch API endpoint usage'                        = $hasBatchAPICall
         }
         
         $allPatternsPresent = $true
-        foreach ($pattern in $patterns.Keys) {
-            if ($patterns[$pattern]) {
+        foreach ($pattern in $patterns.Keys)
+        {
+            if ($patterns[$pattern])
+            {
                 Write-Host "  ✓ $pattern"
-            } else {
+            }
+            else
+            {
                 Write-Host "  ✗ $pattern" -ForegroundColor Red
                 $allPatternsPresent = $false
             }
         }
         
-        if ($allPatternsPresent) {
+        if ($allPatternsPresent)
+        {
             $script:testsPassed++
             Write-Host "✓ Code patterns test passed" -ForegroundColor Green
-        } else {
+        }
+        else
+        {
             Write-Host "✗ Code patterns test failed" -ForegroundColor Red
         }
-    } catch {
+    }
+    catch
+    {
         Write-Host "✗ Code patterns test failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
@@ -199,10 +245,13 @@ Test-CodePatterns
 Write-Host "`n=== Test Results ===" -ForegroundColor Cyan
 Write-Host "Passed: $testsPassed/$testsTotal tests" -ForegroundColor $(if ($testsPassed -eq $testsTotal) { 'Green' } else { 'Yellow' })
 
-if ($testsPassed -eq $testsTotal) {
+if ($testsPassed -eq $testsTotal)
+{
     Write-Host "🎉 All group assignment function tests passed!" -ForegroundColor Green
     exit 0
-} else {
+}
+else
+{
     Write-Host "⚠️  Some tests failed. Please review the fixes." -ForegroundColor Yellow
     exit 1
 }
