@@ -9,15 +9,18 @@ $scriptPath = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
 $rootPath = Split-Path $scriptPath -Parent
 
 # Import required functions
-try {
+try
+{
     . "$rootPath/functions/utilityFunctions/Write-Log.ps1"
-    . "$rootPath/functions/utilityFunctions/GetGroupIdsByNames.ps1"
-    . "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1"
-    . "$rootPath/functions/utilityFunctions/ShowGroupAssignments.ps1"
+    . "$rootPath/functions/UserAndGroupFunctions/GetGroupIdsByNames.ps1"
+    . "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1"
+    . "$rootPath/functions/UserAndGroupFunctions/ShowGroupAssignments.ps1"
     
     $global:LogFile = "/tmp/expanded-group-test.log"
     Write-Host "✓ Functions imported successfully"
-} catch {
+}
+catch
+{
     Write-Host "✗ Failed to import functions: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
@@ -25,11 +28,13 @@ try {
 $testsPassed = 0
 $testsTotal = 0
 
-function Test-FunctionStructure {
+function Test-FunctionStructure
+{
     $script:testsTotal++
     Write-Host "`nTest: GetGroupDirectAssignments function structure" -ForegroundColor Yellow
     
-    try {
+    try
+    {
         $getDirectCommand = Get-Command GetGroupDirectAssignments -ErrorAction Stop
         
         # Check required parameters exist
@@ -37,18 +42,24 @@ function Test-FunctionStructure {
         $actualParams = $getDirectCommand.Parameters.Keys
         
         $missingParams = $requiredParams | Where-Object { $_ -notin $actualParams }
-        if ($missingParams.Count -eq 0) {
+        if ($missingParams.Count -eq 0)
+        {
             Write-Host "  ✓ All required parameters present"
             $script:testsPassed++
-        } else {
+        }
+        else
+        {
             Write-Host "  ✗ Missing parameters: $($missingParams -join ', ')" -ForegroundColor Red
         }
-    } catch {
+    }
+    catch
+    {
         Write-Host "  ✗ Function structure test failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
-function Test-AssignmentObjectStructure {
+function Test-AssignmentObjectStructure
+{
     $script:testsTotal++
     Write-Host "`nTest: Assignment object structure for new types" -ForegroundColor Yellow
     
@@ -81,19 +92,24 @@ function Test-AssignmentObjectStructure {
     $actualProperties = $mockAssignments.PSObject.Properties.Name
     $missingProperties = $expectedProperties | Where-Object { $_ -notin $actualProperties }
     
-    if ($missingProperties.Count -eq 0) {
+    if ($missingProperties.Count -eq 0)
+    {
         Write-Host "  ✓ All expected assignment properties present"
         $script:testsPassed++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Missing assignment properties: $($missingProperties -join ', ')" -ForegroundColor Red
     }
 }
 
-function Test-ShowGroupAssignmentsMenuItems {
+function Test-ShowGroupAssignmentsMenuItems
+{
     $script:testsTotal++
     Write-Host "`nTest: ShowGroupAssignments menu items structure" -ForegroundColor Yellow
     
-    try {
+    try
+    {
         $showGroupCommand = Get-Command ShowGroupAssignments -ErrorAction Stop
         
         # Check the function content includes the new menu items
@@ -115,24 +131,32 @@ function Test-ShowGroupAssignmentsMenuItems {
         )
         
         $missingItems = @()
-        foreach ($item in $expectedMenuItems) {
-            if ($functionContent -notmatch [regex]::Escape($item)) {
+        foreach ($item in $expectedMenuItems)
+        {
+            if ($functionContent -notmatch [regex]::Escape($item))
+            {
                 $missingItems += $item
             }
         }
         
-        if ($missingItems.Count -eq 0) {
+        if ($missingItems.Count -eq 0)
+        {
             Write-Host "  ✓ All expected menu items found in ShowGroupAssignments"
             $script:testsPassed++
-        } else {
+        }
+        else
+        {
             Write-Host "  ✗ Missing menu items: $($missingItems -join ', ')" -ForegroundColor Red
         }
-    } catch {
+    }
+    catch
+    {
         Write-Host "  ✗ Menu items test failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
 
-function Test-TypeMapping {
+function Test-TypeMapping
+{
     $script:testsTotal++
     Write-Host "`nTest: Assignment type mapping" -ForegroundColor Yellow
     
@@ -154,21 +178,27 @@ function Test-TypeMapping {
     )
     
     $missingMappings = @()
-    foreach ($mapping in $expectedMappings) {
-        if ($functionContent -notmatch "'$mapping'") {
+    foreach ($mapping in $expectedMappings)
+    {
+        if ($functionContent -notmatch "'$mapping'")
+        {
             $missingMappings += $mapping
         }
     }
     
-    if ($missingMappings.Count -eq 0) {
+    if ($missingMappings.Count -eq 0)
+    {
         Write-Host "  ✓ All expected type mappings found"
         $script:testsPassed++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Missing type mappings: $($missingMappings -join ', ')" -ForegroundColor Red
     }
 }
 
-function Test-BatchProcessingCalls {
+function Test-BatchProcessingCalls
+{
     $script:testsTotal++
     Write-Host "`nTest: Batch processing calls for new resource types" -ForegroundColor Yellow
     
@@ -185,24 +215,31 @@ function Test-BatchProcessingCalls {
     )
     
     $missingCalls = @()
-    foreach ($call in $expectedBatchCalls) {
-        if ($functionContent -notlike "*$call*") {
+    foreach ($call in $expectedBatchCalls)
+    {
+        if ($functionContent -notlike "*$call*")
+        {
             $missingCalls += $call
         }
     }
     
-    if ($missingCalls.Count -eq 0) {
+    if ($missingCalls.Count -eq 0)
+    {
         Write-Host "  ✓ All expected batch processing calls found"
         $script:testsPassed++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Missing batch processing calls: $($missingCalls.Count)"
-        foreach ($missing in $missingCalls) {
+        foreach ($missing in $missingCalls)
+        {
             Write-Host "    - $missing" -ForegroundColor Red
         }
     }
 }
 
-function Test-AssignmentCategorySwitch {
+function Test-AssignmentCategorySwitch
+{
     $script:testsTotal++
     Write-Host "`nTest: Assignment category switch statement" -ForegroundColor Yellow
     
@@ -219,21 +256,27 @@ function Test-AssignmentCategorySwitch {
     )
     
     $missingCategories = @()
-    foreach ($category in $expectedCategories) {
-        if ($functionContent -notmatch [regex]::Escape($category)) {
+    foreach ($category in $expectedCategories)
+    {
+        if ($functionContent -notmatch [regex]::Escape($category))
+        {
             $missingCategories += $category
         }
     }
     
-    if ($missingCategories.Count -eq 0) {
+    if ($missingCategories.Count -eq 0)
+    {
         Write-Host "  ✓ All expected assignment categories found in switch statement"
         $script:testsPassed++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Missing assignment categories: $($missingCategories -join ', ')" -ForegroundColor Red
     }
 }
 
-function Test-ApiEndpoints {
+function Test-ApiEndpoints
+{
     $script:testsTotal++
     Write-Host "`nTest: New API endpoint references" -ForegroundColor Yellow
     
@@ -250,16 +293,21 @@ function Test-ApiEndpoints {
     )
     
     $missingEndpoints = @()
-    foreach ($endpoint in $expectedEndpoints) {
-        if ($functionContent -notmatch [regex]::Escape($endpoint)) {
+    foreach ($endpoint in $expectedEndpoints)
+    {
+        if ($functionContent -notmatch [regex]::Escape($endpoint))
+        {
             $missingEndpoints += $endpoint
         }
     }
     
-    if ($missingEndpoints.Count -eq 0) {
+    if ($missingEndpoints.Count -eq 0)
+    {
         Write-Host "  ✓ All expected API endpoints found"
         $script:testsPassed++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Missing API endpoints: $($missingEndpoints -join ', ')" -ForegroundColor Red
     }
 }
@@ -277,10 +325,13 @@ Test-ApiEndpoints
 Write-Host "`n=== Test Summary ===" -ForegroundColor Green
 Write-Host "Tests Passed: $testsPassed/$testsTotal"
 
-if ($testsPassed -eq $testsTotal) {
+if ($testsPassed -eq $testsTotal)
+{
     Write-Host "✓ All tests passed!" -ForegroundColor Green
     exit 0
-} else {
+}
+else
+{
     Write-Host "✗ Some tests failed" -ForegroundColor Red
     exit 1
 }
