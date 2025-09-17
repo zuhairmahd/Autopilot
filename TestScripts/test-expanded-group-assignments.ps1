@@ -5,7 +5,14 @@
 
 Write-Host "=== Expanded Group Assignment Functionality Tests ===" -ForegroundColor Green
 
-$scriptPath = if ($PSScriptRoot) { $PSScriptRoot } else { Get-Location }
+$scriptPath = if ($PSScriptRoot)
+{
+    $PSScriptRoot 
+}
+else
+{
+    Get-Location 
+}
 $rootPath = Split-Path $scriptPath -Parent
 
 # Import required functions
@@ -113,7 +120,7 @@ function Test-ShowGroupAssignmentsMenuItems
         $showGroupCommand = Get-Command ShowGroupAssignments -ErrorAction Stop
         
         # Check the function content includes the new menu items
-        $functionContent = Get-Content "$rootPath/functions/utilityFunctions/ShowGroupAssignments.ps1" -Raw
+        $functionContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/ShowGroupAssignments.ps1" -Raw
         
         $expectedMenuItems = @(
             'Show Application Assignments',
@@ -161,7 +168,7 @@ function Test-TypeMapping
     Write-Host "`nTest: Assignment type mapping" -ForegroundColor Yellow
     
     # Check that the type mapping in ShowGroupAssignments includes all new types
-    $functionContent = Get-Content "$rootPath/functions/utilityFunctions/ShowGroupAssignments.ps1" -Raw
+    $functionContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/ShowGroupAssignments.ps1" -Raw
     
     $expectedMappings = @(
         'Application',
@@ -202,7 +209,7 @@ function Test-BatchProcessingCalls
     $script:testsTotal++
     Write-Host "`nTest: Batch processing calls for new resource types" -ForegroundColor Yellow
     
-    $functionContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1" -Raw
+    $functionContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1" -Raw
     
     $expectedBatchCalls = @(
         'Invoke-BatchAssignments -Resources $deviceScripts -ResourceType "Device Management Scripts"',
@@ -243,7 +250,7 @@ function Test-AssignmentCategorySwitch
     $script:testsTotal++
     Write-Host "`nTest: Assignment category switch statement" -ForegroundColor Yellow
     
-    $functionContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1" -Raw
+    $functionContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1" -Raw
     
     $expectedCategories = @(
         '"Script"',
@@ -279,9 +286,9 @@ function Test-ApiEndpoints
 {
     $script:testsTotal++
     Write-Host "`nTest: New API endpoint references" -ForegroundColor Yellow
-    
-    $functionContent = Get-Content "$rootPath/functions/utilityFunctions/GetGroupDirectAssignments.ps1" -Raw
-    
+
+    $functionContent = Get-Content "$rootPath/functions/UserAndGroupFunctions/GetGroupDirectAssignments.ps1" -Raw
+
     $expectedEndpoints = @(
         'deviceManagement/deviceManagementScripts',
         'deviceManagement/deviceHealthScripts',

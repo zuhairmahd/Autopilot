@@ -2,6 +2,7 @@ function Get-UserStrongMapping()
 {
     [CmdletBinding()]
     param (
+        [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
         [string]$UserName
