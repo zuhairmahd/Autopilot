@@ -1,4 +1,4 @@
-@{
+﻿@{
     groupsToInclude = @(
         @{
             name = 'Cloud Managed PC User 3.26.2023_18:43:44'
@@ -38,8 +38,9 @@
     repoInfo = @{
         baseSourceURL = 'https://raw.githubusercontent.com'
         repoPath = 'zuhairmahd'
-        repoName = 'Autopilot'
         baseURL = 'https://www.github.com'
+        baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
     }
     autoUpdate = $false
     deviceNamePrefix = 'vmware'
