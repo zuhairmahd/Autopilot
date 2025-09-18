@@ -1,4 +1,4 @@
-@{
+﻿@{
     description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
     version = '1.3.0.0'
     auth = @{
@@ -26,9 +26,9 @@
             Scope = 'User.Read.All'
             Endpoints = @(
                 '/ users',
-                'users /`r`n                {`r`n                    id`r`n                }',
-                'users /`r`n                {`r`n                    id`r`n                } / memberOf',
-                'users /`r`n                {`r`n                    id`r`n                } / registeredDevices'
+                'users /`n                {`n                    id`n                }',
+                'users /`n                {`n                    id`n                } / memberOf',
+                'users /`n                {`n                    id`n                } / registeredDevices'
             )
             Reason = 'Required to read user profiles, group memberships, and registered devices.'
         },
@@ -43,7 +43,7 @@
             Scope = 'DeviceManagementApps.ReadWrite.All'
             Endpoints = @(
                 'deviceAppManagement / mobileApps',
-                'deviceAppManagement / mobileApps /`r`n                {`r`n                    id`r`n                } / assignments'
+                'deviceAppManagement / mobileApps /`n                {`n                    id`n                } / assignments'
             )
             Reason = 'Required to read application information and manage app assignments.'
         },
@@ -58,7 +58,7 @@
             Scope = 'DeviceManagementManagedDevices.Read.All'
             Endpoints = @(
                 '/ deviceManagement / managedDevices',
-                'deviceManagement / managedDevices /`r`n                {`r`n                    id`r`n                }'
+                'deviceManagement / managedDevices /`n                {`n                    id`n                }'
             )
             Reason = 'Required to read Intune managed device properties.'
         },
@@ -131,13 +131,15 @@
         appMode = 'full'
         timeInSeconds = 60
         maxUserMatchDisplay = 10
+        checkStrongMapping = $false
+        strongMappingOptional = $true
         maxGroupMatchDisplay = 10
         release = 'auto'
         repoInfo = @{
             repoPath = 'zuhairmahd'
+            baseURL = 'https://www.github.com'
             baseSourceURL = 'https://raw.githubusercontent.com'
             repoName = 'Autopilot'
-            baseURL = 'https://www.github.com'
         }
         testMode = $false
         operatingSystem = 'Windows'
