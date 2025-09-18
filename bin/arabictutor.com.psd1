@@ -1,4 +1,4 @@
-@{
+﻿@{
     groupsToInclude = @(
         @{
             id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
@@ -28,6 +28,8 @@
     maxWaitTime = 30
     showLicenseBanner = $false
     deviceContactThresholdInDays = 30
+    checkStrongMapping = $false
+    strongMappingOptional = $true
     appMode = 'full'
     timeInSeconds = 60
     maxUserMatchDisplay = 10
@@ -35,9 +37,9 @@
     release = 'master'
     repoInfo = @{
         repoPath = 'zuhairmahd'
-        repoName = 'Autopilot'
         baseURL = 'https://www.github.com'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
     }
     autoUpdate = $false
     deviceNamePrefix = 'vmware'
