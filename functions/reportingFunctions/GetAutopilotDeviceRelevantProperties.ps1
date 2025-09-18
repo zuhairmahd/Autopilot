@@ -144,7 +144,7 @@ function GetAutopilotDeviceRelevantProperties()
         Write-Verbose "[$functionName] The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "The device enrollment state is valid: $($enrollmentState.autopilot.device.enrollmentState)." -LogLevel "Information"
         #Check the last enrollment status.
-        if ($enrollmentState.autopilot.events.count -gt 0)
+        if ($enrollmentState.autopilot.events.count -gt 0 -and $enrollmentState.autopilot.device.enrollmentState -ne 'notContacted')
         {
             $lastEnrollmentEvent = $enrollmentState.autopilot.events[-1]
             Write-Host "Checking the last autopilot event..."

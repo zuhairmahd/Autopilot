@@ -27,10 +27,10 @@ function ProcessSerialNumber()
         # Display basic device information
         Write-Host "`n=== Device Information ===" -ForegroundColor Green
         Write-Host "Serial Number: $SerialNumber"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device is managed: $($enrollmentState.managed)" -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Has device object: $($enrollmentState.hasDeviceObject)" -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device is managed: $($enrollmentState.managed)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Has device object: $($enrollmentState.hasDeviceObject)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "In Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device imported: $($enrollmentState.Imported)" -LogLevel "Information"
         if ($CheckUserReadiness)
         {
             return GetNextUserReadinessReport -enrollmentState $enrollmentState
@@ -100,8 +100,9 @@ function ProcessSerialNumber()
                 Write-Host "System Family: $($enrollmentState.autopilot.device.systemFamily)"
                 Write-Host "=============================`n" -ForegroundColor Green
                 $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
-                Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
-                Write-Host "Device Assessment State: $DeviceAssessmentState" -ForegroundColor Green
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assessment state: $DeviceAssessmentState" -LogLevel "Information"
+                Write-Verbose "[$functionName] Device Assessment State: $($DeviceAssessmentState | Out-String)"
+                write-log -logfile $LogFile -Module "$functionName" -Message "Device assessment state details: $($DeviceAssessmentState | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Debug"
             }
             Write-Host "Deployment profile assignment status: $($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus)"
             if ($enrollmentState.autopilot.device.deploymentProfileAssignmentStatus -in @('assignedInSync', 'assignedUnkownSyncState'))
@@ -121,8 +122,8 @@ function ProcessSerialNumber()
         }
         if ($enrollmentState.Imported)
         {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported in Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Imported count: $($enrollmentState.Imported)" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Imported in Autopilot: $($enrollmentState.inAutopilot)" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Imported count: $($enrollmentState.Imported)" -LogLevel "Information"
             if ($enrollmentState.Imported -gt 1)
             {
                 Write-Host "This device was imported into Autopilot $($enrollmentState.Imported) times." -ForegroundColor Green
@@ -147,7 +148,7 @@ function ProcessSerialNumber()
         else
         {
             Write-Verbose "This device was not recently imported into Autopilot."
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "This device was not recently imported into Autopilot." -LogLevel "Warning"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "This device was not recently imported into Autopilot." -LogLevel "Warning"
         }
         if ($enrollmentState.managed)
         {
@@ -259,7 +260,7 @@ function ProcessSerialNumber()
             if ($null -ne $enrollmentState.managedDevice.latestBitlockerKey)
             {
                 $deviceActionsMenu = AddMenuItem -Menu $deviceActionsMenu -Name "Get BitLocker Recovery Key" -Action {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Sending value of $($enrollmentState.managedDevice.latestBitlockerKey) to GetBitLockerRecoveryKey function." -LogLevel "Information"
                     $bitlockerKey = GetBitLockerRecoveryKey -key $enrollmentState.managedDevice.latestBitlockerKey -accessToken $AccessToken
                     if ($bitlockerKey -ne "`n")
                     {
@@ -316,17 +317,17 @@ function ProcessSerialNumber()
                 # Handle navigation responses from ShowReport
                 if ($deviceReport -eq "Back" -or $deviceReport -eq "back")
                 {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected Back from device selection, returning to previous menu" -LogLevel "Information"
                     return $returnValues.backoutText
                 }
                 elseif ($deviceReport -eq "Main Menu" -or $deviceReport -eq "main menu")
                 {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "User selected Main Menu from device selection" -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }
                 elseif ([string]::IsNullOrWhiteSpace($deviceReport) -or $null -eq $deviceReport)
                 {
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User requested application exit from device selection." -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "User requested application exit from device selection." -LogLevel "Information"
                     return "EXIT_APPLICATION"
                 }        
                 elseif ($deviceReport -ne '0' -and $null -ne $deviceReport -and $deviceReport -ne "Back" -and $deviceReport -ne "Main Menu")
@@ -339,7 +340,7 @@ function ProcessSerialNumber()
                     {
                         Write-Host "`nDevice health status could not be displayed." -ForegroundColor Red
                     }
-                    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "ShowDeviceReport returned: $deviceReport" -LogLevel "Information"
                 }
                 return $returnValues.backoutText
             }
@@ -359,16 +360,19 @@ function ProcessSerialNumber()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Returning from device actions menu with result: $result" -LogLevel "Information"
             return $result
         }
+
         else
         {
             Write-Host "This device is not managed in Intune." -ForegroundColor Yellow
+            Write-Host "This is normal for a device that has not had a user login yet." -ForegroundColor Gray
         }
         if ($enrollmentState.hasDeviceObject)
+
         {
             Write-Host "`nDevice object found in Intune." -ForegroundColor Green
-            Write-Host "Device ID: $($enrollmentState.managedDevice.device.id)"
-            Write-Host "Device Name: $($enrollmentState.managedDevice.device.deviceName)"
-            Write-Host "Model: $($enrollmentState.managedDevice.device.model)"
+            Write-Host "Device ID: $($enrollmentState.device.id)"
+            Write-Host "Device Name: $($enrollmentState.device.deviceName)"
+            Write-Host "Model: $($enrollmentState.device.model)"
         }
         else
         {
