@@ -66,7 +66,7 @@ function GetNextUserReadinessReport()
     # Call AssessDeviceState with error handling
     try
     {
-        $DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
+        $global:DeviceAssessmentState = AssessDeviceState -enrollmentState $enrollmentState -AssessmentType 'NextUserReadiness'
         if (-not $DeviceAssessmentState)
         {
             throw "AssessDeviceState returned null or empty result"
