@@ -485,7 +485,6 @@ Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded s
 #endregion  Initialize application configuration
 
 #region Define variables
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 $scope = $auth.scope
 # $DellDeviceHardwareDetailsURI = "deviceManagement/hardwarePasswordDetails. "
 # $logfile = "mylog.log"
@@ -523,7 +522,26 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+#region Usage examples for GetGraphObjectMetadata
+# Example 1: Get metadata for users collection
+$usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"
+$usersMetadata = GetGraphObjectMetadata -ApiResponse $usersResponse -AccessToken $accessToken
+Write-Host "Users Entity Metadata:"
+$usersMetadata | Format-List
 
-$username = "mahmoudz@gao.gov"
-$global:userInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
+# Example 2: Get metadata for groups with sample queries
+$groupsResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "groups"
+$groupsMetadata = GetGraphObjectMetadata -ApiResponse $groupsResponse -AccessToken $accessToken -IncludeSampleQueries $true
+Write-Host "Groups Entity Metadata with Sample Queries:"
+$groupsMetadata | Format-List
+
+# Example 3: Get metadata for a single user entity
+# Replace {userId} with a valid user ID
+$userId = 'zuhair@arabictutor.com'
+$singleUserResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users/$userId"
+$userMetadata = GetGraphObjectMetadata -ApiResponse $singleUserResponse -AccessToken $accessToken
+Write-Host "Single User Metadata:"
+$userMetadata | Format-List
+#endregion Usage examples for GetGraphObjectMetadata
+
 
