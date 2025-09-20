@@ -34,11 +34,11 @@
     timeInSeconds = 60
     maxUserMatchDisplay = 10
     maxGroupMatchDisplay = 10
-    release = 'master'
+    release = 'dev'
     repoInfo = @{
         baseURL = 'https://www.github.com'
-        baseSourceURL = 'https://raw.githubusercontent.com'
         repoPath = 'zuhairmahd'
+        baseSourceURL = 'https://raw.githubusercontent.com'
         repoName = 'Autopilot'
     }
     autoUpdate = $false

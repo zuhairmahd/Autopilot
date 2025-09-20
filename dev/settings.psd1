@@ -138,8 +138,8 @@
         repoInfo = @{
             repoName = 'Autopilot'
             baseURL = 'https://www.github.com'
-            repoPath = 'zuhairmahd'
             baseSourceURL = 'https://raw.githubusercontent.com'
+            repoPath = 'zuhairmahd'
         }
         testMode = $false
         operatingSystem = 'Windows'
