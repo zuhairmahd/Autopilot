@@ -83,6 +83,7 @@
                     repoName      = 'Autopilot'
                 }
                 release                         = 'dev'
+                updateLocalSettings             = $true
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 userPatternsToExclude           = @(
