@@ -75,26 +75,26 @@ jobs:
           Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
           Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Ensure bin directory exists
+      - name: Ensure dev directory exists
         shell: pwsh
         run: |
-          if (-not (Test-Path -Path .\bin)) { New-Item -Path .\bin -ItemType Directory }
+          if (-not (Test-Path -Path .\dev)) { New-Item -Path .\dev -ItemType Directory }
 
       - name: Build executable
         shell: pwsh
         run: |
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName dev -SkipSigning
-          #copy lastrun.json to bin directory
-          Copy-Item -Path .\lastrun.json -Destination .\bin\lastrun.json -Force
-          #copy the logs into the destination bin folder if it exists
-          if (Test-Path -Path .\logs\CreateRelease.log) { Copy-Item -Path .\logs\* -Destination .\bin\logs -Recurse -Force }
-          Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the bin directory."
+          #copy lastrun.json to dev directory
+          Copy-Item -Path .\lastrun.json -Destination .\dev\lastrun.json -Force
+          #copy the logs into the destination dev folder if it exists
+          if (Test-Path -Path .\logs\CreateRelease.log) { Copy-Item -Path .\logs\* -Destination .\dev\logs -Recurse -Force }
+          Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the dev directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: autopilot-build-dev
-          path: bin
+          path: dev
 
   sign-dev:
     name: Code Signing (dev)
@@ -120,7 +120,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: autopilot-build-dev
-          path: bin
+          path: dev
 
       - name: Skip signing (missing secrets)
         if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
@@ -148,24 +148,24 @@ jobs:
         shell: pwsh
         run: |
           #copy lastrun to the root folder from the current directory if it exists.
-          if (Test-Path -Path .\bin\lastrun.json) { Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force }
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName development -Overwrite -updateHash
-          Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force
-          Write-Host "Copied .\bin\main.exe to .\main.exe."
-          Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
-          Write-Host "Copied .\bin\lastrun.json to .\lastrun.json."
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath bin -Overwrite -updateHash
-          copy-item -path .\main.exe -destination .\bin\main.exe -Force
+          if (Test-Path -Path .\dev\lastrun.json) { Copy-Item -Path .\dev\lastrun.json -Destination .\lastrun.json -Force }
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName dev -Overwrite -updateHash
+          Copy-Item -Path .\dev\main.exe -Destination .\main.exe -Force
+          Write-Host "Copied .\dev\main.exe to .\main.exe."
+          Copy-Item -Path .\dev\lastrun.json -Destination .\lastrun.json -Force
+          Write-Host "Copied .\dev\lastrun.json to .\lastrun.json."
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath dev -Overwrite -updateHash
+          copy-item -path .\main.exe -destination .\dev\main.exe -Force
           Write-Host "Updated hash in lastrun.json."
 
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
         shell: pwsh
         run: |
-          if (Test-Path -Path .\bin\main.exe) { Write-Host "Signed main.exe exists. Copying to root."; Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force }
+          if (Test-Path -Path .\dev\main.exe) { Write-Host "Signed main.exe exists. Copying to root."; Copy-Item -Path .\dev\main.exe -Destination .\main.exe -Force }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A bin
+          git add -A dev
           git add -A main.exe
           git add -A lastrun.json
           git diff --cached --quiet

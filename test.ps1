@@ -3,6 +3,7 @@ param(
     [string]$configFile = "$pwd\.secrets\config.json",
     [string]$InitFile = "$pwd\settings.psd1",
     [string]$stringsFile = "$pwd\strings.psd1",
+    [string]$menuFile = "$pwd\menu.psd1",
     [int]$maxWaitTime,
     [int]$timeInSeconds,
     [String] $GroupTag,
@@ -28,7 +29,7 @@ param(
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
     [ValidateSet('github', 'gitlab')]
-    [string]$Repo,  
+    [string]$Repo,
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
     [string]$appMode,
@@ -110,7 +111,7 @@ function Find-FolderPath()
             $parent = Split-Path -Path $currentPath -Parent
             if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
             {
-                break 
+                break
             } # Reached root
             Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
             $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
@@ -156,6 +157,7 @@ else
 #endregion import functions.
 
 #region Initialize script
+$global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
@@ -169,9 +171,78 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
+#If the scriptname is a Powershell, change the extension to an exe.
+if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
+    $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
+    if (Test-Path "$pwd\$scriptNameExe")
+    {
+        Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
+        $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+    }
+    else
+    {
+        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+    }
+}
+else
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
+    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+}
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
+$appMetaData = Get-ApplicationMetaDataFromDomain
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
+    {
+        $version = $appMetaData.version
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+    }
+    else
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
+}
+if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
+{
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
+    $version.companyName = $appMetaData.companyName
+    Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
+}
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -finishLogging
+    exit 0
+}
+$oldExecutableFileName = 'main.exe.old'
+if (Test-Path $oldExecutableFileName)
+{
+    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
+    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
+    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
+}
 #endregion Initialize script
 
-#region Load parameters from the configuration file if it exists
+#region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
 # Check if the .secrets directory exists, create it if it doesn't
 $secretsDir = Split-Path $configFile -Parent
@@ -209,7 +280,6 @@ if (Test-Path $configFile)
     # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
     $initDefaults = @{}
     $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
-    
     if ($initFileContent -and $initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
     {
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
@@ -370,22 +440,20 @@ else
         exit 1
     }
 }
+#endregion Process login
 
-
-# Initialize application configuration using centralized helper functions
+#region Initialize application configuration
+Write-Verbose "[$scriptName] Initializing application configuration"
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
-    $domain 
+    $domain
 }
 else
 {
-    "contoso.com" 
+    "contoso.com"
 }
-
-# Initialize configuration with helper function
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
-
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -395,7 +463,7 @@ if (-not $configResult.Success)
 
 # Extract configuration results
 $auth = $configResult.Auth
-$globalSettings = $configResult.GlobalSettings  
+$globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
 
@@ -406,19 +474,17 @@ $script:Auth = $auth
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-
 Write-Verbose "[$scriptName] Configuration initialization completed successfully"
 Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
-Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"  
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
 Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
 Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-#endregion Load parameters from the configuration file if it exists
+#endregion  Initialize application configuration
 
 #region Define variables
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
 $scope = $auth.scope
 # $DellDeviceHardwareDetailsURI = "deviceManagement/hardwarePasswordDetails. "
 # $logfile = "mylog.log"
@@ -456,7 +522,26 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+#region Usage examples for GetGraphObjectMetadata
+# Example 1: Get metadata for users collection
+$usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"
+$usersMetadata = GetGraphObjectMetadata -ApiResponse $usersResponse -AccessToken $accessToken
+Write-Host "Users Entity Metadata:"
+$usersMetadata | Format-List
 
-$username = "mahmoudz@gao.gov"
-$global:userInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
+# Example 2: Get metadata for groups with sample queries
+$groupsResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "groups"
+$groupsMetadata = GetGraphObjectMetadata -ApiResponse $groupsResponse -AccessToken $accessToken -IncludeSampleQueries $true
+Write-Host "Groups Entity Metadata with Sample Queries:"
+$groupsMetadata | Format-List
+
+# Example 3: Get metadata for a single user entity
+# Replace {userId} with a valid user ID
+$userId = 'zuhair@arabictutor.com'
+$singleUserResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users/$userId"
+$userMetadata = GetGraphObjectMetadata -ApiResponse $singleUserResponse -AccessToken $accessToken
+Write-Host "Single User Metadata:"
+$userMetadata | Format-List
+#endregion Usage examples for GetGraphObjectMetadata
+
 

@@ -57,18 +57,39 @@ function GetGraphObjectMetadata()
     param
     (
         [Parameter(Mandatory = $true, Position = 0)]
+        [ValidateNotNull()]
         [object]$ApiResponse,
-        
         [Parameter(Mandatory = $false)]
+        [ValidateNotNullOrEmpty()]
         [string]$AccessToken,
-        
         [Parameter(Mandatory = $false)]
         [bool]$IncludeSampleQueries = $true,
-        
         [Parameter(Mandatory = $false)]
-        [int]$RecursionDepth = 3
-    )    #region variables and logs
-    Write-Verbose "Starting GetGraphObjectMetadata function with RecursionDepth=$RecursionDepth"
+        [int]$RecursionDepth = 3,
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('object', 'json')]
+        [string]$OutputFormat = 'object',
+        [Parameter(Mandatory = $false)]
+        [string]$CustomMetadataUrl
+    )
+    #region variables and logs
+    function Write-Log {
+        param(
+            [string]$Message,
+            [string]$Level = 'Information'
+        )
+        switch ($Level) {
+            'Error' { Write-Error $Message }
+            'Warning' { Write-Warning $Message }
+            'Verbose' { Write-Verbose $Message }
+            default { Write-Host $Message }
+        }
+    }
+    Write-Log "Starting GetGraphObjectMetadata function with RecursionDepth=$RecursionDepth" 'Verbose'
+    if (-not $ApiResponse) {
+        Write-Log "ApiResponse parameter is null or empty." 'Error'
+        return $null
+    }
     
     # Initialize output containers
     $metadata = @{
@@ -158,8 +179,13 @@ function GetGraphObjectMetadata()
 
     #region fetch metadata document
     # Construct the metadata URL
-    $metadataUrl = "https://graph.microsoft.com/$apiVersion/`$metadata"
-    Write-Verbose "Metadata URL: $metadataUrl"
+    if ($CustomMetadataUrl) {
+        $metadataUrl = $CustomMetadataUrl
+        Write-Log "Using custom metadata URL: $metadataUrl" 'Verbose'
+    } else {
+        $metadataUrl = "https://graph.microsoft.com/$apiVersion/`$metadata"
+        Write-Log "Metadata URL: $metadataUrl" 'Verbose'
+    }
     
     # Determine the access token to use
     if (-not $AccessToken)
@@ -182,26 +208,24 @@ function GetGraphObjectMetadata()
     try 
     {
         # Make a request to the metadata endpoint
-        Write-Verbose "Requesting metadata document from $metadataUrl"
+    Write-Log "Requesting metadata document from $metadataUrl" 'Verbose'
         $headers = @{
             "Authorization" = "Bearer $AccessToken"
             "Accept"        = "application/xml"
         }
         
-        $metadataResponse = Invoke-RestMethod -Uri $metadataUrl -Headers $headers -Method Get -ErrorAction Stop
-        Write-Verbose "Successfully retrieved metadata document"
+    $metadataResponse = Invoke-RestMethod -Uri $metadataUrl -Headers $headers -Method Get -ErrorAction Stop
+    Write-Log "Successfully retrieved metadata document" 'Verbose'
         
         # The metadata is an XML document that contains the full service definition
         # We need to parse it to find details about our entity
     }
     catch 
     {
-        Write-Verbose "Error retrieving metadata: $_"
-        Write-Host "Error retrieving metadata: $_" -ForegroundColor Red
-        Write-Host "Limited metadata will be available" -ForegroundColor Yellow
-        
-        # Return partial metadata even if we couldn't fetch the full document
-        return $metadata
+    Write-Log "Error retrieving metadata: $_" 'Error'
+    Write-Log "Limited metadata will be available" 'Warning'
+    # Return partial metadata even if we couldn't fetch the full document
+    return $metadata
     }
     #endregion
     
@@ -1030,7 +1054,11 @@ function GetGraphObjectMetadata()
         }
     }
     
-    Write-Verbose "Metadata extraction complete with enhanced navigation properties"
-    return $formattedResults
+    Write-Log "Metadata extraction complete with enhanced navigation properties" 'Verbose'
+    if ($OutputFormat -eq 'json') {
+        return $formattedResults | ConvertTo-Json -Depth 10
+    } else {
+        return $formattedResults
+    }
     #endregion
 }
