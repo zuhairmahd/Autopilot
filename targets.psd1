@@ -183,6 +183,7 @@
                 maxGroupMatchDisplay            = 20
                 maxWaitTime                     = 30
                 autoUpdate                      = $true
+                updateLocalSettings             = $true
                 checkStrongMapping              = $true
                 strongMappingOptional           = $true
                 preferredBrowser                = 'Chrome'
