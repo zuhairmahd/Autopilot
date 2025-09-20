@@ -36,13 +36,13 @@
     maxGroupMatchDisplay = 10
     release = 'dev'
     repoInfo = @{
-        repoPath = 'zuhairmahd'
-        repoName = 'Autopilot'
         baseURL = 'https://www.github.com'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
+        repoPath = 'zuhairmahd'
     }
     autoUpdate = $false
-    updateLocalSettings = $false
+    updateLocalSettings = $true
     deviceNamePrefix = 'vmware'
     operatingSystem = 'Windows'
     minUsernameLength = 3
