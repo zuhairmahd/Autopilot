@@ -1,7 +1,8 @@
-function Get-ApplicationMetaDataFromDomain()
+function Get-ApplicationMetaData()
 {
     [CmdletBinding()]
     param (
+        [string]$GlobalSettingsFile = "$pwd\settings.psd1",
         [string]$domain
     )
 
@@ -50,7 +51,6 @@ function Get-ApplicationMetaDataFromDomain()
         {
             Write-Verbose "[$functionName] No domain settings files found."
             Write-Log -logFile $logFile -module $functionName -Message "No domain settings files found."
-            return $null
         }
     }
     Write-Verbose "[$functionName] Domain settings file determined: $domainSettingsFile"
@@ -68,19 +68,49 @@ function Get-ApplicationMetaDataFromDomain()
         {
             Write-Verbose "[$functionName] Error reading domain settings file: $domainSettingsFile"
             Write-Log -logFile $logFile -module $functionName -Message "Error reading domain settings file: $domainSettingsFile" -logLevel 'Error'
-            return $null
         }
     }
     else
     {
         Write-Verbose "[$functionName] A domain settings file for domain '$domain' could not be determined."
         Write-Log -logFile $logFile -module $functionName -Message "A domain settings file for domain '$domain' could not be determined."
+    }
+    if ($GlobalSettingsFile)
+    {
+        Write-Verbose "[$functionName] Loading global settings from: $GlobalSettingsFile"
+        Write-Log -logFile $logFile -module $functionName -Message "Loading global settings from: $GlobalSettingsFile"
+        try
+        {
+            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile
+            Write-Verbose "[$functionName] Successfully loaded global settings."
+            Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded global settings."
+        }
+        catch
+        {
+            Write-Verbose "[$functionName] Error reading global settings file: $GlobalSettingsFile"
+            Write-Log -logFile $logFile -module $functionName -Message "Error reading global settings file: $GlobalSettingsFile" -logLevel 'Error'
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No global settings file specified."
+        Write-Log -logFile $logFile -module $functionName -Message "No global settings file specified."
+    }
+    if (-not $globalSettings -and -not $domainSettings)
+    {
+        Write-Verbose "[$functionName] No settings files could be loaded. Cannot retrieve application metadata."
+        Write-Log -logFile $logFile -module $functionName -Message "No settings files could be loaded. Cannot retrieve application metadata." -logLevel "Error"
         return $null
     }
+    
     $appMetaData = @{
         companyName = if ($domainSettings.companyName)
         {
             $domainSettings.companyName  
+        }
+        elseif ($globalSettings.companyName)
+        {
+            $globalSettings.companyName 
         }
         else
         {
@@ -90,6 +120,10 @@ function Get-ApplicationMetaDataFromDomain()
         {
             $domainSettings.version 
         }
+        elseif ($globalSettings.version)
+        {
+            $globalSettings.version 
+        }
         else
         {
             $null 
@@ -97,6 +131,10 @@ function Get-ApplicationMetaDataFromDomain()
         release     = if ($domainSettings.release)
         {
             $domainSettings.release 
+        }
+        elseif ($globalSettings.release)
+        {
+            $globalSettings.release 
         }
         else
         {
