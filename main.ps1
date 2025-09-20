@@ -192,7 +192,7 @@ else
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$appMetaData = Get-ApplicationMetaDataFromDomain
+$appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
 if (-not $version.version)
 {
@@ -649,13 +649,13 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
         if ($settings.updateLocalSettings)
         {
             Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-            write-log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
             $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $localDomainSettingsFile) 
         }
         else
         {
             Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-            write-log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
             $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
         }
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
@@ -1864,13 +1864,13 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
     if ($settings.updateLocalSettings)
     {
         Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-        write-log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+        Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
         $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $localDomainSettingsFile) 
     }
     else
     {
         Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-        write-log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+        Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
         $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
     }
     Write-Verbose "[$scriptName] Update result: $updateResult"
