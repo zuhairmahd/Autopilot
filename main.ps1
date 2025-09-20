@@ -543,7 +543,6 @@ else
 }
 $remoteVersionURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease/lastrun.json"
 $updateURL = "$baseSourceURL/$repoPath/$repoName/$latestRelease"
-$localDomainSettingsFile = "$($settings.release)\$($settings.domain).psd1"
 $updateAvailable = CheckForUpdates -remoteVersionURL $remoteVersionURL
 $groupsToInclude = $settings.groupsToInclude
 Write-Verbose "[$scriptName] Groups to include: $($groupsToInclude | Out-String)"
@@ -650,7 +649,7 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
         {
             Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
             Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $localDomainSettingsFile) -noConfirmation
+            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) -noConfirmation
         }
         else
         {
@@ -1865,7 +1864,7 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
     {
         Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
         Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $localDomainSettingsFile) 
+        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) 
     }
     else
     {
