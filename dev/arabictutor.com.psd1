@@ -37,9 +37,9 @@
     release = 'dev'
     repoInfo = @{
         baseURL = 'https://www.github.com'
-        baseSourceURL = 'https://raw.githubusercontent.com'
         repoName = 'Autopilot'
         repoPath = 'zuhairmahd'
+        baseSourceURL = 'https://raw.githubusercontent.com'
     }
     autoUpdate = $false
     updateLocalSettings = $true
