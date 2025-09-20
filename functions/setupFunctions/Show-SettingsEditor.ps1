@@ -634,6 +634,7 @@ function Get-SettingDescription()
         'testMode'                        = 'Enable test mode with additional debugging features'
         'operatingSystem'                 = 'Target operating system (Windows/macOS/Linux)'
         'autoUpdate'                      = 'Automatically check for and install updates'
+        'updateLocalSettings'             = 'Update local settings file when new defaults are available'
         'domain'                          = 'Domain name for this configuration'
         'deviceNamePrefix'                = 'Prefix to add to device names during enrollment'
         'minUsernameLength'               = 'Minimum allowed username length'
