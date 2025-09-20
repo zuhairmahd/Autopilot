@@ -1168,18 +1168,18 @@ function Set-ParametersFromTarget()
 
 #region Apply script parameters and target settings
 Write-Host "Applying scritt parameters..."
-write-log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
+Write-Log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
 # Apply target build scrit configuration
 if ($targetConfig)
 {
     # Override script parameters with target build parameters
     $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
-    write-log -logFile $logFile -Message "Build parameters to apply: $($targetParams | Out-String)" -module $scriptName
+    Write-Log -logFile $logFile -Message "Build parameters to apply: $($targetParams | Out-String)" -module $scriptName
     foreach ($key in $targetParams.Keys)
     {
         $value = $targetParams[$key]
         Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
-        write-log -logFile $logFile -Message "Applying target parameter: $key = $value" -module $scriptName
+        Write-Log -logFile $logFile -Message "Applying target parameter: $key = $value" -module $scriptName
         # Map target parameters to script variables
         switch ($key)
         {
@@ -1195,10 +1195,10 @@ if ($targetConfig)
             default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
         }
         Write-Verbose "[$scriptName] Set $key to $value of type $($value.GetType().Name)"
-        write-log -logFile $logFile -Message "Set $key to $value of type $($value.GetType().Name)" -module $scriptName
+        Write-Log -logFile $logFile -Message "Set $key to $value of type $($value.GetType().Name)" -module $scriptName
     }
     Write-Host "Build configuration applied successfully" -ForegroundColor Green
-    write-log -logFile $logFile -Message "Build configuration applied successfully" -module $scriptName
+    Write-Log -logFile $logFile -Message "Build configuration applied successfully" -module $scriptName
 }
 #endregion
 
@@ -1345,12 +1345,12 @@ else
 }
 
 Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
-write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
+Write-Log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
 # Apply target settings to configuration files (only if target config is provided)
 if ($targetConfig)
 {
     $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile -ConfigurationPath $parentFolder
-    write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
+    Write-Log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
     if (-not $settingsApplied)
     {
         Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
@@ -1358,19 +1358,19 @@ if ($targetConfig)
         exit 1
     }
     Write-Host "Target settings applied successfully." -ForegroundColor Green
-    write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
+    Write-Log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
 }
 else
 {
     Write-Host "No target configuration provided - skipping target settings application." -ForegroundColor Yellow
-    write-log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
+    Write-Log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
 }
 #endregion
 
 #region Merge functions
 if (-not $CreateModule)
 {
-    $mergeOutputFile = Join-Path -Path $PWD -ChildPath "build" | Join-Path -ChildPath 'merged.ps1'
+    $mergeOutputFile = Join-Path -Path $PWD -ChildPath $OutputPath | Join-Path -ChildPath 'merged.ps1'
     $mergeParentFolder = Split-Path -Parent $mergeOutputFile
     # Ensure destination directory exists
     if (-not (Test-Path -Path $mergeParentFolder))
