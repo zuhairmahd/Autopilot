@@ -46,16 +46,18 @@ jobs:
         shell: pwsh
         run: .\TestScripts\Test-Runner.ps1 -TestCategory integration
 
-  # ===================== DEV BRANCH BUILD & SIGN =====================
-  build-dev:
-    name: Build (dev branch)
+  # ===================== DYNAMIC BRANCH BUILD & SIGN =====================
+  build:
+    name: Build (${{ github.ref_name }} branch)
     runs-on: windows-latest
     timeout-minutes: 25
     needs: test
     if: >
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/dev' &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/lhm') &&
       !contains((github.event.head_commit.message || ''), '[skip ci]')
+    env:
+      BRANCH_NAME: ${{ github.ref_name }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -75,40 +77,59 @@ jobs:
           Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
           Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Ensure dev directory exists
+      - name: Set target configuration
         shell: pwsh
         run: |
-          if (-not (Test-Path -Path .\dev)) { New-Item -Path .\dev -ItemType Directory }
+          $branchName = "$env:BRANCH_NAME"
+          switch ($branchName) {
+            "dev" { $target = "dev"; $targetDescription = "development" }
+            "lhm" { $target = "government"; $targetDescription = "government" }
+            default { $target = $branchName; $targetDescription = $branchName }
+          }
+          Write-Host "Branch: $branchName, Target: $target, Description: $targetDescription"
+          echo "TARGET_NAME=$target" >> $env:GITHUB_ENV
+          echo "TARGET_DESCRIPTION=$targetDescription" >> $env:GITHUB_ENV
+
+      - name: Ensure branch directory exists
+        shell: pwsh
+        run: |
+          $branchDir = ".\$env:BRANCH_NAME"
+          if (-not (Test-Path -Path $branchDir)) { New-Item -Path $branchDir -ItemType Directory }
 
       - name: Build executable
         shell: pwsh
         run: |
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName dev -SkipSigning
-          #copy lastrun.json to dev directory
-          Copy-Item -Path .\lastrun.json -Destination .\dev\lastrun.json -Force
-          #copy the logs into the destination dev folder if it exists
-          if (Test-Path -Path .\logs\CreateRelease.log) { Copy-Item -Path .\logs\* -Destination .\dev\logs -Recurse -Force }
-          Write-Host "Build complete (dev using target: development). Executable and lastrun.json are in the dev directory."
+          $branchDir = ".\$env:BRANCH_NAME"
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $env:TARGET_NAME -SkipSigning
+          #copy lastrun.json to branch directory
+          Copy-Item -Path .\lastrun.json -Destination "$branchDir\lastrun.json" -Force
+          #copy the logs into the destination branch folder if it exists
+          if (Test-Path -Path .\logs\CreateRelease.log) { 
+            if (-not (Test-Path -Path "$branchDir\logs")) { New-Item -Path "$branchDir\logs" -ItemType Directory }
+            Copy-Item -Path .\logs\* -Destination "$branchDir\logs" -Recurse -Force 
+          }
+          Write-Host "Build complete ($env:BRANCH_NAME using target: $env:TARGET_DESCRIPTION). Executable and lastrun.json are in the $env:BRANCH_NAME directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: autopilot-build-dev
-          path: dev
+          name: autopilot-build-${{ github.ref_name }}
+          path: ${{ github.ref_name }}
 
-  sign-dev:
-    name: Code Signing (dev)
+  sign:
+    name: Code Signing (${{ github.ref_name }})
     runs-on: windows-latest
     timeout-minutes: 20
-    needs: build-dev
+    needs: build
     if: >
       github.event_name == 'push' &&
-      github.ref == 'refs/heads/dev' &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/lhm') &&
       !contains((github.event.head_commit.message || ''), '[skip ci]')
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      BRANCH_NAME: ${{ github.ref_name }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -116,11 +137,24 @@ jobs:
           persist-credentials: true
           fetch-depth: 0
 
+      - name: Set target configuration
+        shell: pwsh
+        run: |
+          $branchName = "$env:BRANCH_NAME"
+          switch ($branchName) {
+            "dev" { $target = "dev"; $targetDescription = "development" }
+            "lhm" { $target = "government"; $targetDescription = "government" }
+            default { $target = $branchName; $targetDescription = $branchName }
+          }
+          Write-Host "Branch: $branchName, Target: $target, Description: $targetDescription"
+          echo "TARGET_NAME=$target" >> $env:GITHUB_ENV
+          echo "TARGET_DESCRIPTION=$targetDescription" >> $env:GITHUB_ENV
+
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: autopilot-build-dev
-          path: dev
+          name: autopilot-build-${{ github.ref_name }}
+          path: ${{ github.ref_name }}
 
       - name: Skip signing (missing secrets)
         if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
@@ -138,7 +172,7 @@ jobs:
           endpoint: https://eus.codesigning.azure.net/
           trusted-signing-account-name: zuhairmahd
           certificate-profile-name: Cert1
-          files-folder: ${{ github.workspace }}/bin
+          files-folder: ${{ github.workspace }}/${{ github.ref_name }}
           files-folder-filter: exe,dll
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
@@ -147,159 +181,33 @@ jobs:
       - name: update hash
         shell: pwsh
         run: |
+          $branchDir = ".\$env:BRANCH_NAME"
           #copy lastrun to the root folder from the current directory if it exists.
-          if (Test-Path -Path .\dev\lastrun.json) { Copy-Item -Path .\dev\lastrun.json -Destination .\lastrun.json -Force }
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName dev -Overwrite -updateHash
-          Copy-Item -Path .\dev\main.exe -Destination .\main.exe -Force
-          Write-Host "Copied .\dev\main.exe to .\main.exe."
-          Copy-Item -Path .\dev\lastrun.json -Destination .\lastrun.json -Force
-          Write-Host "Copied .\dev\lastrun.json to .\lastrun.json."
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath dev -Overwrite -updateHash
-          copy-item -path .\main.exe -destination .\dev\main.exe -Force
+          if (Test-Path -Path "$branchDir\lastrun.json") { Copy-Item -Path "$branchDir\lastrun.json" -Destination .\lastrun.json -Force }
+          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName $env:TARGET_NAME -Overwrite -updateHash
+          Copy-Item -Path "$branchDir\main.exe" -Destination .\main.exe -Force
+          Write-Host "Copied $branchDir\main.exe to .\main.exe."
+          Copy-Item -Path "$branchDir\lastrun.json" -Destination .\lastrun.json -Force
+          Write-Host "Copied $branchDir\lastrun.json to .\lastrun.json."
+          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath $env:BRANCH_NAME -Overwrite -updateHash
+          copy-item -path .\main.exe -destination "$branchDir\main.exe" -Force
           Write-Host "Updated hash in lastrun.json."
 
       - name: Commit signed artifacts to repository
         if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
         shell: pwsh
         run: |
-          if (Test-Path -Path .\dev\main.exe) { Write-Host "Signed main.exe exists. Copying to root."; Copy-Item -Path .\dev\main.exe -Destination .\main.exe -Force }
+          $branchDir = ".\$env:BRANCH_NAME"
+          if (Test-Path -Path "$branchDir\main.exe") { Write-Host "Signed main.exe exists. Copying to root."; Copy-Item -Path "$branchDir\main.exe" -Destination .\main.exe -Force }
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A dev
+          git add -A $env:BRANCH_NAME
           git add -A main.exe
           git add -A lastrun.json
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
             $branch = '${{ github.ref_name }}'
-            git commit -m "chore(build): update signed artifacts (dev) [skip ci]"
-            git push origin HEAD:$branch
-            Write-Host "Signed artifacts committed and pushed to $branch"
-          }
-          else { Write-Host "No changes to commit." }
-
-  # ===================== LHM BRANCH BUILD & SIGN =====================
-  build-lhm:
-    name: Build (lhm branch)
-    runs-on: windows-latest
-    timeout-minutes: 25
-    needs: test
-    if: >
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/lhm' &&
-      !contains((github.event.head_commit.message || ''), '[skip ci]')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache PowerShell modules
-        uses: actions/cache@v4
-        with:
-          path: ~\Documents\PowerShell\Modules
-          key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
-          restore-keys: |
-            ${{ runner.os }}-pwsh-modules-
-
-      - name: Install build dependencies
-        shell: pwsh
-        run: |
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
-          Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
-
-      - name: Ensure lhm directory exists
-        shell: pwsh
-        run: |
-          if (-not (Test-Path -Path .\lhm)) { New-Item -Path .\lhm -ItemType Directory }
-
-      - name: Build executable
-        shell: pwsh
-        run: |
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName government -SkipSigning
-          #copy lastrun.json to lhm directory
-          Copy-Item -Path .\lastrun.json -Destination .\lhm\lastrun.json -Force
-          Write-Host "Build complete (lhm using target: government). Executable and lastrun.json are in the lhm directory."
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: autopilot-build-lhm
-          path: lhm
-
-  sign-lhm:
-    name: Code Signing (lhm)
-    runs-on: windows-latest
-    timeout-minutes: 20
-    needs: build-lhm
-    if: >
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/lhm' &&
-      !contains((github.event.head_commit.message || ''), '[skip ci]')
-    env:
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-          fetch-depth: 0
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: autopilot-build-lhm
-          path: lhm
-
-      - name: Skip signing (missing secrets)
-        if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
-        shell: pwsh
-        run: |
-          Write-Host "Signing skipped: required Azure Trusted Signing secrets not configured."
-
-      - name: Sign files with Trusted Signing
-        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
-        uses: azure/trusted-signing-action@v0
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: https://eus.codesigning.azure.net/
-          trusted-signing-account-name: zuhairmahd
-          certificate-profile-name: Cert1
-          files-folder: ${{ github.workspace }}/lhm
-          files-folder-filter: exe,dll
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-
-      - name: update hash
-        shell: pwsh
-        run: |
-          #copy lastrun to the root folder from the current directory if it exists.
-          if (Test-Path -Path .\lhm\lastrun.json) { Copy-Item -Path .\lhm\lastrun.json -Destination .\lastrun.json -Force } 
-          .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName government -updateHash
-          Copy-Item -Path .\lhm\main.exe -Destination .\main.exe -Force
-          Write-Host "Copied .\lhm\main.exe to .\main.exe."
-          Copy-Item -Path .\lhm\lastrun.json -Destination .\lastrun.json -Force
-          Write-Host "Copied .\lhm\lastrun.json to .\lastrun.json."
-          .\CreateRelease.ps1 -InputFile .\main.ps1 -outputPath lhm -Overwrite -updateHash
-          copy-item -path .\main.exe -destination .\lhm\main.exe -Force
-
-      - name: Commit signed artifacts to repository
-        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
-        shell: pwsh
-        run: |
-          if (Test-Path -Path .\lhm\main.exe) { Write-Host "Signed main.exe exists. Copying to root."; Copy-Item -Path .\lhm\main.exe -Destination .\main.exe -Force }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A lhm
-          git add -A main.exe
-          git add -A lastrun.json
-          git diff --cached --quiet
-          if ($LASTEXITCODE -ne 0) {
-            $branch = '${{ github.ref_name }}'
-            git commit -m "chore(build): update signed artifacts (lhm) [skip ci]"
+            git commit -m "chore(build): update signed artifacts ($env:BRANCH_NAME) [skip ci]"
             git push origin HEAD:$branch
             Write-Host "Signed artifacts committed and pushed to $branch"
           }
