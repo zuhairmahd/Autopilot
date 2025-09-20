@@ -20,6 +20,30 @@ function GetUpdates()
     Write-Verbose "[$functionName] updateURL: $updateURL"
     Write-Verbose "[$functionName] metaDataURL: $metaDataURL"
     Write-Verbose "[$functionName] Temp Update File: $tempUpdateFile"
+    Write-Verbose "[$functionName] Executable Update URL: $executableUpdateURL"
+    Write-Verbose "[$functionName] No confirmation: $noConfirmation"
+    Write-Verbose "[$functionName] Supporting Files count: $($SupportingFiles.Count)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Supporting Files count: $($SupportingFiles.Count)" -LogLevel "Information"
+    if ($SupportingFiles.count -gt 0)
+    {
+        foreach ($file in $SupportingFiles)
+        {
+            Write-Verbose "[$functionName] Supporting File: $file"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Supporting File: $file" -LogLevel "Information"
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No supporting files provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No supporting files provided." -LogLevel "Information"
+    }
+    #now write-log the above
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable File Name: $executableFileName" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "updateURL: $updateURL" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "metaDataURL: $metaDataURL" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Temp Update File: $tempUpdateFile" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable Update URL: $executableUpdateURL" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No confirmation: $noConfirmation" -LogLevel "Information"
     #endregion
 
     #region helper functions
