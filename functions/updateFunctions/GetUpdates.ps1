@@ -100,10 +100,27 @@ function GetUpdates()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading $($SupportingFiles.Count) supporting files..." -LogLevel "Information"
         foreach ($file in $SupportingFiles)
         {
-            $fileName = Split-Path -Path $file -Leaf
-            $fileURL = "$updateURL/$fileName"
+            Write-Verbose "[$functionName] Processing supporting file: $file"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing supporting file: $file" -LogLevel "Information"
+            if ($file -eq $settings.domain)
+            {
+                $fileURL = "$updateURL/$($settings.release)/$fileName"
+                Write-Verbose "[$functionName] File matches domain. Constructed URL: $fileURL"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File matches domain. Constructed URL: $fileURL" -LogLevel "Information"
+            }
+            else
+            {
+                $fileName = Split-Path -Path $file -Leaf
+                Write-Verbose "[$functionName] Extracted file name: $fileName"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted file name: $fileName" -LogLevel "Information"
+                $fileURL = "$updateURL/$fileName"
+                Write-Verbose "[$functionName] File does not match domain. Constructed URL: $fileURL"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File does not match domain. Constructed URL: $fileURL" -LogLevel "Information"
+            }            
             $localFilePath = Join-Path -Path (Split-Path -Path $executableFileName -Parent) -ChildPath $fileName
+            Write-Verbose "[$functionName] Local file path for $file is $localFilePath"
             $backupFilePath = Join-Path -Path $backupFolder -ChildPath "$fileName.bak"
+            Write-Verbose "[$functionName] Backup file path for $file is $backupFilePath"
             Write-Verbose "[$functionName] Backing up current $fileName to $backupFilePath"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Backing up current $fileName to $backupFilePath" -LogLevel "Information"
             Copy-Item -Path $localFilePath -Destination $backupFilePath -Force -ErrorAction SilentlyContinue
