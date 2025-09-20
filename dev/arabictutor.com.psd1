@@ -36,9 +36,9 @@
     maxGroupMatchDisplay = 10
     release = 'dev'
     repoInfo = @{
+        repoPath = 'zuhairmahd'
         repoName = 'Autopilot'
         baseURL = 'https://www.github.com'
-        repoPath = 'zuhairmahd'
         baseSourceURL = 'https://raw.githubusercontent.com'
     }
     autoUpdate = $false
