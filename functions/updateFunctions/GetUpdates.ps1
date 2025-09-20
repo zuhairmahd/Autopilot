@@ -370,4 +370,3 @@ function GetUpdates()
     #endregion
     return $returnValues.UpdateSuccessMessage
 }
-
