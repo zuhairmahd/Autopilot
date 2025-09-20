@@ -82,7 +82,7 @@
                     baseSourceURL = 'https://raw.githubusercontent.com'
                     repoName      = 'Autopilot'
                 }
-                release                         = 'master'
+                release                         = 'dev'
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 userPatternsToExclude           = @(
