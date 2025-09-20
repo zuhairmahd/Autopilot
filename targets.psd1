@@ -9,7 +9,7 @@
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
                 inputFile       = 'main.ps1'
-                OutputPath      = 'bin'
+                OutputPath      = 'dev'
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $false
