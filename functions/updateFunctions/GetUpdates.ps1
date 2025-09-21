@@ -104,6 +104,7 @@ function GetUpdates()
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing supporting file: $file" -LogLevel "Information"
             if ($file -eq $settings.domain)
             {
+                $fileName = "$file.psd1"
                 $fileURL = "$updateURL/$($settings.release)/$fileName"
                 Write-Verbose "[$functionName] File matches domain. Constructed URL: $fileURL"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "File matches domain. Constructed URL: $fileURL" -LogLevel "Information"
