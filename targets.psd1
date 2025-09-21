@@ -9,7 +9,7 @@
             # Build parameters that are passed to CreateRelease.ps1
             buildParameters = @{
                 inputFile       = 'main.ps1'
-                OutputPath      = 'bin'
+                OutputPath      = 'dev'
                 NoVersionUpdate = $false
                 Overwrite       = $true
                 noCleanup       = $false
@@ -82,7 +82,8 @@
                     baseSourceURL = 'https://raw.githubusercontent.com'
                     repoName      = 'Autopilot'
                 }
-                release                         = 'master'
+                release                         = 'dev'
+                updateLocalSettings             = $true
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 userPatternsToExclude           = @(
@@ -96,32 +97,6 @@
             }
             
             description     = 'Development build with test mode enabled and signing disabled'
-        }
-        
-        # Production build target
-        production = @{
-            buildParameters = @{
-                OutputPath      = 'bin'
-                NoVersionUpdate = $false
-                Overwrite       = $true
-                noCleanup       = $false
-            }
-            
-            globalSettings  = @{
-                autoUpdate        = $true
-                showLicenseBanner = $false
-                validateScopes    = $true
-            }
-            
-            authSettings    = @{
-                changePwOnNextStart = $true
-                forceNewToken       = $false
-            }
-            
-            domain          = $null
-            domainSettings  = @{}
-            
-            description     = 'Production build with signing enabled and test mode disabled'
         }
         
         # Government build (example for gao.gov)

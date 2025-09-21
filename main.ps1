@@ -1,3 +1,149 @@
+<#
+.SYNOPSIS
+    Main entry point for the Intune Helpdesk Menu application.
+
+.DESCRIPTION
+    This PowerShell script initializes configuration, authentication, and menu structures for managing Windows Autopilot devices and related Intune operations.
+    It supports exporting device lists, managing Autopilot profiles, updating application settings, and handling authentication with Microsoft Graph API.
+    The script loads supporting functions from the 'functions' folder and provides a menu-driven interface for helpdesk and administrative tasks.
+
+.PARAMETER configFile
+    Path to the configuration file containing authentication details. Default: "$pwd\.secrets\config.json"
+
+.PARAMETER InitFile
+    Path to the initialization file containing application settings. Default: "$pwd\settings.psd1"
+
+.PARAMETER stringsFile
+    Path to the strings file containing localized text. Default: "$pwd\strings.psd1"
+
+.PARAMETER menuFile
+    Path to the menu configuration file. Default: "$pwd\menu.psd1"
+
+.PARAMETER maxWaitTime
+    Maximum wait time in seconds for API operations.
+
+.PARAMETER timeInSeconds
+    Time limit in seconds for specific operations.
+
+.PARAMETER GroupTag
+    Autopilot group tag to assign to devices during import operations.
+
+.PARAMETER showLicenseBanner
+    Display the license banner on application startup.
+
+.PARAMETER showAuth
+    Display authentication configuration details during startup.
+
+.PARAMETER showVersion
+    Display the application version information and exit.
+
+.PARAMETER showSettings
+    Display all application settings during startup.
+
+.PARAMETER OverwriteLogs
+    Overwrite existing log files instead of appending to them.
+
+.PARAMETER SecureString
+    Use secure string encryption for sensitive data.
+
+.PARAMETER ResetAuth
+    Reset authentication credentials and launch the authentication wizard.
+
+.PARAMETER ForceNewToken
+    Force retrieval of a new access token, ignoring cached tokens.
+
+.PARAMETER delegated
+    Use delegated authentication flow (requires user interaction).
+
+.PARAMETER ForceNewRefreshToken
+    Force retrieval of a new refresh token (delegated auth only).
+
+.PARAMETER NoSaveRefreshToken
+    Do not save refresh tokens to disk (delegated auth only).
+
+.PARAMETER Scope
+    Microsoft Graph API scopes to request (delegated auth only).
+
+.PARAMETER AuthType
+    Authentication type for delegated flow. Valid values: 'PublicAuthFlow', 'Interactive', 'Private'
+
+.PARAMETER CacheType
+    Token cache storage type. Valid values: 'file', 'memory'
+
+.PARAMETER Repo
+    Repository source for updates. Valid values: 'github', 'gitlab'
+
+.PARAMETER Release
+    Specific release version to use for updates.
+
+.PARAMETER appMode
+    Application mode determining available features. Valid values: 'full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom'
+
+.PARAMETER LogFilePath
+    Path to the log file. Default: "$pwd\Logs\Autopilot.log"
+
+.PARAMETER LogLevel
+    Logging level for the application. Valid values: 'Error', 'Warning', 'Information', 'Verbose', 'Debug'
+
+.EXAMPLE
+    .\main.ps1
+    Run the application with default settings and display the main menu.
+
+.EXAMPLE
+    .\main.ps1 -showVersion
+    Display version information and exit without launching the menu.
+
+.EXAMPLE
+    .\main.ps1 -appMode helpDesk -LogLevel Verbose
+    Launch the application in help desk mode with verbose logging.
+
+.EXAMPLE
+    .\main.ps1 -delegated -AuthType Interactive -Scope "DeviceManagementManagedDevices.ReadWrite.All"
+    Use delegated authentication with interactive login and specific Graph API scopes.
+
+.EXAMPLE
+    .\main.ps1 -ResetAuth
+    Reset authentication credentials and launch the first-run wizard.
+
+.EXAMPLE
+    .\main.ps1 -GroupTag "IT-Devices" -OverwriteLogs -LogLevel Debug
+    Run with a specific group tag for Autopilot imports, overwrite existing logs, and enable debug logging.
+
+.EXAMPLE
+    .\main.ps1 -configFile "C:\Config\custom-config.json" -InitFile "C:\Config\custom-settings.psd1"
+    Use custom configuration and settings files instead of defaults.
+
+.EXAMPLE
+    .\main.ps1 -ForceNewToken -CacheType memory
+    Force a new access token and store it in memory only (not on disk).
+
+.LINK
+    Project Repository: https://github.com/zuhairmahd/autopilot
+
+.NOTES
+    Author: Zuhair Mahmoud
+    Copyright: (c) 2024 Zuhair Mahmoud
+    License: MIT License
+    
+    Project URL: https://github.com/zuhairmahd/autopilot
+    
+    Prerequisites:
+    - PowerShell 5.1 or later
+    - Microsoft Graph PowerShell modules
+    - Appropriate permissions in Microsoft Intune/Entra ID
+    
+    First Run:
+    If no configuration file exists, the script will launch a first-run wizard to set up authentication and basic settings.
+    
+    Authentication:
+    The script supports both application (client credentials) and delegated (user interactive) authentication flows.
+    Configuration is stored securely with encryption.
+    
+    Logging:
+    All operations are logged to the specified log file. Use -LogLevel to control verbosity.
+    Use -OverwriteLogs to start with a fresh log file on each run.
+#>
+
 [CmdletBinding()]
 param(
     [string]$configFile = "$pwd\.secrets\config.json",
@@ -192,7 +338,7 @@ else
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$appMetaData = Get-ApplicationMetaDataFromDomain
+$appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
 if (-not $version.version)
 {
@@ -648,14 +794,14 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
         if ($settings.updateLocalSettings)
         {
             Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-            write-log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) 
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) -noConfirmation
         }
         else
         {
             Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-            write-log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) -noConfirmation
         }
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Update result: $updateResult" -LogLevel "Information"
         switch ($updateResult)
@@ -1539,7 +1685,7 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     $userName = GetUserInput -Message "Enter the username (Email address) of the user whose device you want to look up." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     if ($null -eq $userName)
     {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
         return $returnValues.backoutText
     }
     Write-Verbose "[$scriptName] Got user name: $userName"
@@ -1686,7 +1832,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
             }
             else
             {
-                Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
+                Write-Host "Found $($userInfo[0].value.count) users with similar names:"
             }
             if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
             {
@@ -1863,13 +2009,13 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
     if ($settings.updateLocalSettings)
     {
         Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-        write-log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+        Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
         $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) 
     }
     else
     {
         Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-        write-log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+        Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
         $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
     }
     Write-Verbose "[$scriptName] Update result: $updateResult"

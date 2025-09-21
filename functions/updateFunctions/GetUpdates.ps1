@@ -20,6 +20,30 @@ function GetUpdates()
     Write-Verbose "[$functionName] updateURL: $updateURL"
     Write-Verbose "[$functionName] metaDataURL: $metaDataURL"
     Write-Verbose "[$functionName] Temp Update File: $tempUpdateFile"
+    Write-Verbose "[$functionName] Executable Update URL: $executableUpdateURL"
+    Write-Verbose "[$functionName] No confirmation: $noConfirmation"
+    Write-Verbose "[$functionName] Supporting Files count: $($SupportingFiles.Count)"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Supporting Files count: $($SupportingFiles.Count)" -LogLevel "Information"
+    if ($SupportingFiles.count -gt 0)
+    {
+        foreach ($file in $SupportingFiles)
+        {
+            Write-Verbose "[$functionName] Supporting File: $file"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Supporting File: $file" -LogLevel "Information"
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] No supporting files provided."
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No supporting files provided." -LogLevel "Information"
+    }
+    #now write-log the above
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable File Name: $executableFileName" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "updateURL: $updateURL" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "metaDataURL: $metaDataURL" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Temp Update File: $tempUpdateFile" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable Update URL: $executableUpdateURL" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No confirmation: $noConfirmation" -LogLevel "Information"
     #endregion
 
     #region helper functions
@@ -76,10 +100,28 @@ function GetUpdates()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading $($SupportingFiles.Count) supporting files..." -LogLevel "Information"
         foreach ($file in $SupportingFiles)
         {
-            $fileName = Split-Path -Path $file -Leaf
-            $fileURL = "$updateURL/$fileName"
+            Write-Verbose "[$functionName] Processing supporting file: $file"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing supporting file: $file" -LogLevel "Information"
+            if ($file -eq $settings.domain)
+            {
+                $fileName = "$file.psd1"
+                $fileURL = "$updateURL/$($settings.release)/$fileName"
+                Write-Verbose "[$functionName] File matches domain. Constructed URL: $fileURL"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File matches domain. Constructed URL: $fileURL" -LogLevel "Information"
+            }
+            else
+            {
+                $fileName = Split-Path -Path $file -Leaf
+                Write-Verbose "[$functionName] Extracted file name: $fileName"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted file name: $fileName" -LogLevel "Information"
+                $fileURL = "$updateURL/$fileName"
+                Write-Verbose "[$functionName] File does not match domain. Constructed URL: $fileURL"
+                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File does not match domain. Constructed URL: $fileURL" -LogLevel "Information"
+            }            
             $localFilePath = Join-Path -Path (Split-Path -Path $executableFileName -Parent) -ChildPath $fileName
+            Write-Verbose "[$functionName] Local file path for $file is $localFilePath"
             $backupFilePath = Join-Path -Path $backupFolder -ChildPath "$fileName.bak"
+            Write-Verbose "[$functionName] Backup file path for $file is $backupFilePath"
             Write-Verbose "[$functionName] Backing up current $fileName to $backupFilePath"
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Backing up current $fileName to $backupFilePath" -LogLevel "Information"
             Copy-Item -Path $localFilePath -Destination $backupFilePath -Force -ErrorAction SilentlyContinue
@@ -329,4 +371,3 @@ function GetUpdates()
     #endregion
     return $returnValues.UpdateSuccessMessage
 }
-

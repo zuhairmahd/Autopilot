@@ -253,6 +253,13 @@ function update-LastRunObject()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Updating last run file: $LastRunFile with version: $Version"
+    #update the date in lastrun.date
+    $LastRun.date = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    #print verbose each key in $lastrun.
+    foreach ($key in $LastRun.Keys)
+    {
+        Write-Verbose "[$functionName] LastRun.$key = $($LastRun[$key])"
+    }
     try
     {
         $lastRun | ConvertTo-Json -Depth 3 | Set-Content -Path $LastRunFile -Force
@@ -1168,37 +1175,67 @@ function Set-ParametersFromTarget()
 
 #region Apply script parameters and target settings
 Write-Host "Applying scritt parameters..."
-write-log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
+Write-Log -logFile $logFile -Message "Applying script parameters..." -module $scriptName
 # Apply target build scrit configuration
 if ($targetConfig)
 {
     # Override script parameters with target build parameters
     $targetParams = Set-ParametersFromTarget -TargetConfig $targetConfig
-    write-log -logFile $logFile -Message "Build parameters to apply: $($targetParams | Out-String)" -module $scriptName
+    Write-Log -logFile $logFile -Message "Build parameters to apply: $($targetParams | Out-String)" -module $scriptName
     foreach ($key in $targetParams.Keys)
     {
         $value = $targetParams[$key]
         Write-Verbose "[$scriptName] Applying target parameter: $key = $value"
-        write-log -logFile $logFile -Message "Applying target parameter: $key = $value" -module $scriptName
+        Write-Log -logFile $logFile -Message "Applying target parameter: $key = $value" -module $scriptName
         # Map target parameters to script variables
         switch ($key)
         {
-            'Version' { $Version = $value }
-            'OutputPath' { $OutputPath = $value }
-            'SkipSigning' { $SkipSigning = $value }
-            'NoVersionUpdate' { $NoVersionUpdate = $value }
-            'Overwrite' { $Overwrite = $value }
-            'noCleanup' { $noCleanup = $value }
-            'AddDebug' { $AddDebug = $value }
-            'CompanyName' { $CompanyName = $value }
-            'Author' { $Author = $value }
-            default { Write-Verbose "[$scriptName] Unknown target parameter: $key" }
+            'Version'
+            {
+                $Version = $value 
+            }
+            'OutputPath'
+            {
+                $OutputPath = $value 
+            }
+            'SkipSigning'
+            {
+                $SkipSigning = $value 
+            }
+            'NoVersionUpdate'
+            {
+                $NoVersionUpdate = $value 
+            }
+            'Overwrite'
+            {
+                $Overwrite = $value 
+            }
+            'noCleanup'
+            {
+                $noCleanup = $value 
+            }
+            'AddDebug'
+            {
+                $AddDebug = $value 
+            }
+            'CompanyName'
+            {
+                $CompanyName = $value 
+            }
+            'Author'
+            {
+                $Author = $value 
+            }
+            default
+            {
+                Write-Verbose "[$scriptName] Unknown target parameter: $key" 
+            }
         }
         Write-Verbose "[$scriptName] Set $key to $value of type $($value.GetType().Name)"
-        write-log -logFile $logFile -Message "Set $key to $value of type $($value.GetType().Name)" -module $scriptName
+        Write-Log -logFile $logFile -Message "Set $key to $value of type $($value.GetType().Name)" -module $scriptName
     }
     Write-Host "Build configuration applied successfully" -ForegroundColor Green
-    write-log -logFile $logFile -Message "Build configuration applied successfully" -module $scriptName
+    Write-Log -logFile $logFile -Message "Build configuration applied successfully" -module $scriptName
 }
 #endregion
 
@@ -1207,7 +1244,6 @@ $lastRunFile = Join-Path -Path $PWD -ChildPath "lastrun.json"
 $lastRun = Get-LastRunObject -LastRunFile $lastRunFile
 $maintainCurrentVersion = $false
 $functionsToMerge = @(Get-ChildItem -Path $functionsFolder -Recurse -Filter "*.ps1" | ForEach-Object { $_.FullName })
-$filesToCopy = @('settings.psd1', 'strings.psd1', 'init.psd1', 'menu.psd1') 
 $todaysDate = Get-Date -Format "yyyy-MM-dd"
 Write-Host "Starting build script on $todaysDate"
 # Resolve output file path from -OutputPath (directory or filename)
@@ -1345,12 +1381,12 @@ else
 }
 
 Write-Host "Applying target configuration settings..." -ForegroundColor Cyan
-write-log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
+Write-Log -logFile $logFile -Message "Applying target configuration settings..." -module $scriptName
 # Apply target settings to configuration files (only if target config is provided)
 if ($targetConfig)
 {
     $settingsApplied = Update-TargetSettings -TargetConfig $targetConfig -SettingsFilePath $SettingsFile -ConfigurationPath $parentFolder
-    write-log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
+    Write-Log -logFile $logFile -Message "Target settings application result: $settingsApplied" -module $scriptName
     if (-not $settingsApplied)
     {
         Write-Host "Failed to apply target settings. Exiting." -ForegroundColor Red
@@ -1358,19 +1394,19 @@ if ($targetConfig)
         exit 1
     }
     Write-Host "Target settings applied successfully." -ForegroundColor Green
-    write-log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
+    Write-Log -logFile $logFile -Message "Target settings applied successfully." -module $scriptName
 }
 else
 {
     Write-Host "No target configuration provided - skipping target settings application." -ForegroundColor Yellow
-    write-log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
+    Write-Log -logFile $logFile -Message "No target configuration provided - skipping target settings application." -module $scriptName
 }
 #endregion
 
 #region Merge functions
 if (-not $CreateModule)
 {
-    $mergeOutputFile = Join-Path -Path $PWD -ChildPath "build" | Join-Path -ChildPath 'merged.ps1'
+    $mergeOutputFile = Join-Path -Path $PWD -ChildPath $OutputPath | Join-Path -ChildPath 'merged.ps1'
     $mergeParentFolder = Split-Path -Parent $mergeOutputFile
     # Ensure destination directory exists
     if (-not (Test-Path -Path $mergeParentFolder))
@@ -1688,7 +1724,14 @@ if ((($response -eq 'Y' -or $response -eq 'y') -or $Overwrite) -and -not $SkipSi
 else
 {
     Write-Host "Executable not copied."
-    $message = if ($SkipSigning) { "Skipping copy as signing was skipped." }  else { "User chose not to copy the executable." }
+    $message = if ($SkipSigning)
+    {
+        "Skipping copy as signing was skipped." 
+    }
+    else
+    {
+        "User chose not to copy the executable." 
+    }
     Write-Verbose "[$scriptName] $message"
 }
 Write-Host "Script completed successfully."
