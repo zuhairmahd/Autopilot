@@ -136,10 +136,10 @@
         maxGroupMatchDisplay = 10
         release = 'auto'
         repoInfo = @{
-            repoPath = 'zuhairmahd'
             repoName = 'Autopilot'
-            baseURL = 'https://www.github.com'
+            repoPath = 'zuhairmahd'
             baseSourceURL = 'https://raw.githubusercontent.com'
+            baseURL = 'https://www.github.com'
         }
         testMode = $false
         operatingSystem = 'Windows'

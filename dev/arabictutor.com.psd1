@@ -36,10 +36,10 @@
     maxGroupMatchDisplay = 10
     release = 'dev'
     repoInfo = @{
-        repoName = 'Autopilot'
-        repoPath = 'zuhairmahd'
         baseURL = 'https://www.github.com'
+        repoPath = 'zuhairmahd'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
     }
     autoUpdate = $false
     updateLocalSettings = $true
