@@ -1953,6 +1953,12 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
                 if ($settings.strongMappingOptional)
                 {
                     Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Yellow
+                    Write-Host "While the user may be able to complete enrollment," -ForegroundColor Yellow
+                    Write-Host "This means that the user may have problems connecting to network resources." -ForegroundColor Yellow
+                    Write-Host "Please open a ticket to enable strong certificate mapping for this user." -ForegroundColor Yellow
+                    Write-Host "========================================" -ForegroundColor Yellow
+                    Write-Host "" -ForegroundColor Yellow
+                    Read-Host -Prompt 'Press any key to continue...'
                     Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled, but this is allowed as strong mapping is optional." -LogLevel "Warning"
                     $hasStrongMapping = $true
                 }
