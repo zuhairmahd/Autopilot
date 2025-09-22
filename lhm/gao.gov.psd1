@@ -18,7 +18,12 @@
         }
     )
     groupsToExclude = @()
-    autopilotProfilesToInclude = @()
+    autopilotProfilesToInclude = @(
+        @{
+            name = 'msb'
+            id = '20f6050d-263f-401b-847c-3a399e6aa8ac'
+        }
+    )
     domain = 'gao.gov'
     companyName = 'Government Accountability Office'
     version = '1.3.0.0'
@@ -34,10 +39,10 @@
     maxGroupMatchDisplay = 20
     release = 'lhm'
     repoInfo = @{
-        repoPath = 'zuhairmahd'
-        repoName = 'Autopilot'
         baseSourceURL = 'https://raw.githubusercontent.com'
         baseURL = 'https://www.github.com'
+        repoPath = 'zuhairmahd'
+        repoName = 'Autopilot'
     }
     autoUpdate = $true
     updateLocalSettings = $true
@@ -63,7 +68,4 @@
     groupTag = 'MSB01'
     assignedUser = ''
     additionalScopes = @()
-    desiredAutopilotProfiles = @(
-        'msb'
-    )
 }
