@@ -140,11 +140,14 @@
             domainSettings  = @{
                 privateSession                  = $true
                 groupsToExclude                 = @()
-                desiredAutopilotProfiles        = @(
-                    'msb'
-                )
                 maxUserMatchDisplay             = 10
                 appMode                         = 'registration'
+                autopilotProfilesToInclude      = @(
+                    @{
+                        id   = '20f6050d-263f-401b-847c-3a399e6aa8ac'
+                        name = 'msb'
+                    }
+                )
                 userPatternsToExclude           = @(
                     '-test',
                     'onmicrosoft.com',
