@@ -62,7 +62,7 @@ function AssessDeviceState()
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
                 Write-Verbose "within threshold: $($deviceLastContactDate.withinThreshold)"
-                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false) -and $deviceLastContactDate.withinThreshold)
+                if (($autopilotReadiness.AutopilotAssignmentGood -and $managedDeviceReadiness.ReadyForNextUser -and $deviceLastContactDate.withinThreshold) -or ($autopilotReadiness.AutopilotAssignmentGood -and $enrollmentState.autopilot.device.enrollmentState -eq 'notContacted' -and $enrollmentState.managed -eq $false))
                 {
                     Write-Host "The device is ready for the next user."
                     Write-Host $memoryMessage
@@ -168,7 +168,7 @@ function AssessDeviceState()
                         $allIssues += $issue
                         $actionsPriority[$deviceActions.WipeOrClean] = 2  # Higher priority action
                     }
-                    if ($deviceLastContactDate.withinThreshold -eq $false)
+                    if ($deviceLastContactDate.withinThreshold -eq $false -and -not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
                     {
                         $issue = "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days."
                         Write-Host $issue
