@@ -37,27 +37,27 @@ function AssessDeviceState()
             if ($enrollmentState.inAutopilot)
             {
                 $autopilotReadiness = GetAutopilotDeviceRelevantProperties -enrollmentState $enrollmentState
-                if (-not ($enrollmentState.autopilot.device.enrollmentState -eq 'notContacted'))
+                if ($enrollmentState.autopilot.device.enrollmentState -ne 'notContacted')
                 {   
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting managed device properties." -LogLevel "Information"
                     $managedDeviceReadiness = GetManagedDeviceRelevantProperties -enrollmentState $enrollmentState
+                    $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
+                    if ($deviceLastContactDate.withinThreshold)
+                    {
+                        Write-Host "The device last contacted Intune on $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone), $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
+                        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+                    }
+                    else
+                    {
+                        Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days. Last contact date: $($deviceLastContactDate.lastContactDate | FormatDateWithTimeZone)."
+                        Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
+                    }    
                     $memoryMessage = "`n"
                 }
                 else 
                 {
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device enrollment state is 'notContacted', skipping managed device readiness check." -LogLevel "Information"
                     $memoryMessage = "We could not determine whether the device has the required $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM. `n Please manually verify that the device has $($settings.MinimumDevicePhysicalMemoryInGB ) GB of RAM before proceeding."
-                }
-                $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
-                if ($deviceLastContactDate.withinThreshold)
-                {
-                    Write-Host "The device last contacted Intune on $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone), $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-                }
-                else
-                {
-                    Write-Host "The device has not contacted Intune in $($deviceLastContactDate.numberOfDaysSinceLastContact) days. Last contact date: $($deviceLastContactDate.lastContactDate | FormatDateWithTimeZone)."
-                    Write-Host "Please check the device's network connectivity and ensure it can reach Intune."
                 }
                 Write-Verbose "Autopilot assignment good: $($autopilotReadiness.AutopilotAssignmentGood)"
                 Write-Verbose "Managed device readiness good: $($managedDeviceReadiness.ReadyForNextUser)"
