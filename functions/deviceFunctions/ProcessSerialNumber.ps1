@@ -35,60 +35,8 @@ function ProcessSerialNumber()
         {
             return GetNextUserReadinessReport -enrollmentState $enrollmentState
         }
+
         
-        $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
-        
-        # Calculate actual calendar days difference based on midnight boundaries
-        $today = (Get-Date).Date
-        $yesterday = $today.AddDays(-1)
-        $dayBeforeYesterday = $today.AddDays(-2)
-        if ($null -ne $deviceLastContactDate.latestContactDate)
-        {
-            $lastContactDate = [DateTime]::Parse($deviceLastContactDate.latestContactDate).Date
-        }
-        else
-        {
-            $lastContactDate = $null
-        }
-        if ($null -ne $lastContactDate)
-        {
-            if ($lastContactDate -eq $today)
-            {
-                $contactMessage = "The device contacted Intune today."
-            }
-            elseif ($lastContactDate -eq $yesterday)
-            {
-                $contactMessage = "The device contacted Intune yesterday."
-            }
-            elseif ($lastContactDate -eq $dayBeforeYesterday)
-            {
-                $contactMessage = "The device contacted Intune the day before yesterday."
-            }
-            else
-            {
-                $contactMessage = "The device contacted Intune $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
-            }
-            if (-not ($deviceLastContactDate.withinThreshold))
-            {
-                Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
-                Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
-                Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)" -LogLevel "Information"
-                Write-Host "Press any key to continue"
-                $null = Read-Host
-            }
-            elseif ($deviceLastContactDate.withinThreshold)
-            {
-                Write-Host $contactMessage -ForegroundColor Green
-                Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
-            }
-            else
-            {
-                Write-Host "The last contact date could not be determined."
-            }
-        }       
         if ($enrollmentState.inAutopilot)
         {
             Write-Host "This device is enrolled in Autopilot."
@@ -161,6 +109,58 @@ function ProcessSerialNumber()
             Write-Host "Manufacturer: $manufacturer"
             Write-Host "Status: Managed by Intune" -ForegroundColor Green
             Write-Host "=============================`n" -ForegroundColor Green
+            $deviceLastContactDate = GetLastDeviceContactDate -accessToken $accessToken -enrollmentState $enrollmentState
+            # Calculate actual calendar days difference based on midnight boundaries
+            $today = (Get-Date).Date
+            $yesterday = $today.AddDays(-1)
+            $dayBeforeYesterday = $today.AddDays(-2)
+            if ($null -ne $deviceLastContactDate.latestContactDate)
+            {
+                $lastContactDate = [DateTime]::Parse($deviceLastContactDate.latestContactDate).Date
+            }
+            else
+            {
+                $lastContactDate = $null
+            }
+            if ($null -ne $lastContactDate)
+            {
+                if ($lastContactDate -eq $today)
+                {
+                    $contactMessage = "The device contacted Intune today."
+                }
+                elseif ($lastContactDate -eq $yesterday)
+                {
+                    $contactMessage = "The device contacted Intune yesterday."
+                }
+                elseif ($lastContactDate -eq $dayBeforeYesterday)
+                {
+                    $contactMessage = "The device contacted Intune the day before yesterday."
+                }
+                else
+                {
+                    $contactMessage = "The device contacted Intune $($deviceLastContactDate.numberOfDaysSinceLastContact) days ago."
+                }
+                if (-not ($deviceLastContactDate.withinThreshold))
+                {
+                    Write-Host "It has been more than $($deviceLastContactDate.numberOfDaysSinceLastContact) days  since the device has contacted Intune, which is more than $($Settings.deviceContactThresholdInDays) days." -ForegroundColor Red
+                    Write-Host "Please connect the device to the Internet overnight to ensure it can receive updates and policies." -ForegroundColor Red
+                    Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Number of days since last contact: $($deviceLastContactDate.numberOfDaysSinceLastContact)" -LogLevel "Information"
+                    Write-Host "Press any key to continue"
+                    $null = Read-Host
+                }
+                elseif ($deviceLastContactDate.withinThreshold)
+                {
+                    Write-Host $contactMessage -ForegroundColor Green
+                    Write-Host "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)"
+                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Last contact date: $($deviceLastContactDate.latestContactDate | FormatDateWithTimeZone)" -LogLevel "Information"
+                }
+                else
+                {
+                    Write-Host "The last contact date could not be determined."
+                }
+            }       
             $pendingActions = getDevicePendingActions -enrollmentState $enrollmentState
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Pending actions: $($pendingActions | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Information"
             if ($pendingActions.isPendingAction)
