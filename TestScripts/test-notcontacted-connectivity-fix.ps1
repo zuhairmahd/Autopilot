@@ -149,8 +149,8 @@ if ($testsFailed -eq 0) {
     Write-Output ""
     Write-Output "Summary of validated behavior:"
     Write-Output "- ✓ notContacted devices skip connectivity threshold checks"
-    Write-Output "- ✓ notContracted devices pass if other criteria are met"
-    Write-Output "- ✓ notContracted devices don't report connectivity as an issue"
+    Write-Output "- ✓ notContacted devices pass if other criteria are met"
+    Write-Output "- ✓ notContacted devices don't report connectivity as an issue"
     Write-Output "- ✓ Normal devices still respect connectivity requirements"
     Write-Output "- ✓ All edge cases work correctly"
     
