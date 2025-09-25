@@ -163,7 +163,7 @@
                 autoUpdate                      = $true
                 updateLocalSettings             = $true
                 checkStrongMapping              = $true
-                strongMappingOptional           = $true
+                strongMappingOptional           = $false
                 preferredBrowser                = 'Chrome'
                 maxSerialNumberLength           = 11
                 minUsernameLength               = 3
