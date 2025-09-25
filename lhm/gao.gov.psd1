@@ -32,16 +32,16 @@
     showLicenseBanner = $false
     deviceContactThresholdInDays = 30
     checkStrongMapping = $true
-    strongMappingOptional = $true
+    strongMappingOptional = $false
     appMode = 'registration'
     timeInSeconds = 60
     maxUserMatchDisplay = 10
     maxGroupMatchDisplay = 20
     release = 'lhm'
     repoInfo = @{
+        repoPath = 'zuhairmahd'
         baseSourceURL = 'https://raw.githubusercontent.com'
         baseURL = 'https://www.github.com'
-        repoPath = 'zuhairmahd'
         repoName = 'Autopilot'
     }
     autoUpdate = $true
