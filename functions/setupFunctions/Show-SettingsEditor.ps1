@@ -766,7 +766,7 @@ function Get-SettingInputType()
     Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
     
     # Check for specific known enumerated types
-    if ($SettingName -eq 'appMode')
+    if ($SettingName -eq 'appMode' -or $SettingName -eq 'appModes')
     { 
         Write-Verbose "[$functionName] Detected AppMode setting"
         return 'AppMode' 
@@ -877,20 +877,153 @@ function Get-AppModeInput()
 {
     <#
     .SYNOPSIS
-        Gets app mode input from user.
+        Gets app mode input from user, supporting both single and multiple mode selection.
+    
+    .DESCRIPTION
+        Enhanced app mode input function that detects current configuration and offers
+        appropriate single or multiple mode selection interface. Maintains backward 
+        compatibility while adding multiple mode support.
+    
+    .PARAMETER CurrentValue
+        Current app mode configuration (single mode string or array of modes)
+        
+    .OUTPUTS
+        Selected app mode configuration (single string or array)
+        
+    .NOTES
+        - Automatically detects single vs multiple mode configurations
+        - Offers upgrade path from single to multiple modes
+        - Maintains full backward compatibility
+        - Provides conflict resolution and hierarchy information
     #>
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
     
+    # Load the multiple mode input function
+    if (-not (Get-Command Get-MultipleAppModeInput -ErrorAction SilentlyContinue))
+    {
+        try
+        {
+            . "$PWD/functions/setupFunctions/Get-MultipleAppModeInput.ps1"
+        }
+        catch
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Could not load multiple app mode input function: $($_.Exception.Message)" -LogLevel "Warning"
+            # Fall back to legacy single mode selection
+            return Get-LegacyAppModeInput -CurrentValue $CurrentValue
+        }
+    }
+    
+    # Determine current configuration type
+    $isCurrentMultipleMode = $CurrentValue -is [array] -and $CurrentValue.Count -gt 1
+    $currentModeDisplay = if ($CurrentValue -is [array]) { "[$($CurrentValue -join ', ')]" } else { "'$CurrentValue'" }
+    
+    Write-Host "`n=== App Mode Configuration ===" -ForegroundColor Cyan
+    Write-Host "Current app mode(s): $currentModeDisplay" -ForegroundColor Green
+    
+    Write-Host "`nConfiguration Options:" -ForegroundColor Yellow
+    Write-Host "1. Configure multiple app modes (recommended - combine permissions)" -ForegroundColor White
+    Write-Host "2. Configure single app mode (legacy - one mode only)" -ForegroundColor White
+    Write-Host "3. Keep current configuration" -ForegroundColor White
+    
+    if (-not $isCurrentMultipleMode -and $CurrentValue -and $CurrentValue -ne '')
+    {
+        Write-Host "`nNote: You currently use single mode configuration." -ForegroundColor Cyan
+        Write-Host "Multiple mode configuration allows combining permissions from different modes." -ForegroundColor Cyan
+    }
+    
+    do
+    {
+        $choice = Read-Host "`nYour choice (1-3)"
+        
+        switch ($choice)
+        {
+            '1'
+            {
+                # Multiple mode configuration
+                Write-Host "`nSwitching to multiple app mode configuration..." -ForegroundColor Yellow
+                try
+                {
+                    $result = Get-MultipleAppModeInput -CurrentValue $CurrentValue
+                    Write-Log -LogFile $logFile -Module $functionName -Message "User selected multiple app mode configuration: $(if ($result -is [array]) { "[$($result -join ', ')]" } else { "'$result'" })" -LogLevel "Information"
+                    return $result
+                }
+                catch
+                {
+                    Write-Host "Error with multiple mode selection: $($_.Exception.Message)" -ForegroundColor Red
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Error in multiple mode selection: $($_.Exception.Message)" -LogLevel "Error"
+                    Write-Host "Falling back to single mode selection..." -ForegroundColor Yellow
+                    return Get-LegacyAppModeInput -CurrentValue $CurrentValue
+                }
+            }
+            
+            '2'
+            {
+                # Single mode configuration
+                Write-Host "`nUsing single app mode configuration..." -ForegroundColor Yellow
+                $result = Get-LegacyAppModeInput -CurrentValue $CurrentValue
+                Write-Log -LogFile $logFile -Module $functionName -Message "User selected single app mode configuration: '$result'" -LogLevel "Information"
+                return $result
+            }
+            
+            '3'
+            {
+                # Keep current
+                Write-Host "Keeping current configuration: $currentModeDisplay" -ForegroundColor Green
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode configuration: $currentModeDisplay" -LogLevel "Verbose"
+                return $CurrentValue
+            }
+            
+            default
+            {
+                Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+            }
+        }
+    } while ($true)
+}
+
+function Get-LegacyAppModeInput()
+{
+    <#
+    .SYNOPSIS
+        Legacy single app mode input function for backward compatibility.
+    
+    .DESCRIPTION
+        Provides the original single app mode selection interface. Used when user
+        specifically chooses single mode configuration or when multiple mode 
+        functionality is not available.
+    
+    .PARAMETER CurrentValue  
+        Current app mode value (single mode or first mode from array)
+        
+    .OUTPUTS
+        String - Selected single app mode
+    #>
+    param($CurrentValue)
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Extract single mode from array if needed
+    $singleCurrentValue = if ($CurrentValue -is [array] -and $CurrentValue.Count -gt 0) 
+    { 
+        $CurrentValue[0] 
+    } 
+    else 
+    { 
+        $CurrentValue 
+    }
+    
+    Write-Log -LogFile $logFile -Module $functionName -Message "Using legacy single app mode input. Current value: '$singleCurrentValue'" -LogLevel "Verbose"
+    
     $modes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
     
-    Write-Host "Available app modes:" -ForegroundColor White
+    Write-Host "`nAvailable app modes:" -ForegroundColor White
     for ($i = 0; $i -lt $modes.Count; $i++)
     {
         $mode = $modes[$i]
-        if ($mode -eq $CurrentValue)
+        if ($mode -eq $singleCurrentValue)
         {
             Write-Host "$($i + 1). $mode (Current)" -ForegroundColor Green
         }
@@ -907,8 +1040,8 @@ function Get-AppModeInput()
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode: '$CurrentValue'" -LogLevel "Verbose"
-            return $CurrentValue
+            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode: '$singleCurrentValue'" -LogLevel "Verbose"
+            return $singleCurrentValue
         }
         
         if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $modes.Count)
@@ -1261,6 +1394,47 @@ function Save-GlobalSettings()
         {
             $value = $Settings[$key]
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $value" -LogLevel "Verbose"
+            
+            # Special handling for app mode settings
+            if ($key -eq 'appMode' -or $key -eq 'appModes')
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Using specialized app mode settings handler for: $key" -LogLevel "Debug"
+                
+                # Load the Update-AppModeSettings function if not available
+                if (-not (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue))
+                {
+                    try
+                    {
+                        . "$PWD/functions/setupFunctions/Update-AppModeSettings.ps1"
+                    }
+                    catch
+                    {
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Could not load Update-AppModeSettings function: $($_.Exception.Message)" -LogLevel "Warning"
+                        # Fall back to regular Update-Setting
+                        $success = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName $key -SettingValue $value
+                        if (-not $success)
+                        {
+                            Write-Warning "[$functionName] Failed to update global setting: $key"
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update global setting: $key" -LogLevel "Error"
+                            return $false
+                        }
+                        continue
+                    }
+                }
+                
+                # Use specialized app mode settings update
+                $success = Update-AppModeSettings -AppModeConfiguration $value -SettingsFile $SettingsFile -MaintainLegacy
+                
+                if (-not $success)
+                {
+                    Write-Warning "[$functionName] Failed to update app mode setting: $key"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update app mode setting: $key" -LogLevel "Error"
+                    return $false
+                }
+                
+                # Skip the regular processing for this setting
+                continue
+            }
             
             # Handle nested settings (e.g., repoInfo.repoPath)
             if ($key.Contains('.'))

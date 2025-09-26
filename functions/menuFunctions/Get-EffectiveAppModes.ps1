@@ -10,7 +10,7 @@ function Get-EffectiveAppModes()
         hierarchy resolution and conflict detection.
     
     .PARAMETER Settings
-        Settings object containing app mode configuration
+        Settings object containing app mode configuration (hashtable or PSCustomObject)
         
     .OUTPUTS
         Array - Effective app modes with hierarchy resolution applied
@@ -23,11 +23,12 @@ function Get-EffectiveAppModes()
         - Supports new appModes array for multiple modes
         - Applies hierarchy resolution for conflicting modes
         - Returns array even for single mode configurations
+        - Supports both hashtable and PSCustomObject settings
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
-        [PSCustomObject]$Settings = $settings
+        $Settings = $settings
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -37,29 +38,61 @@ function Get-EffectiveAppModes()
     
     try
     {
+        # Handle both hashtable and PSCustomObject settings
+        $hasProperty = $false
+        $propertyValue = $null
+        
         # Check for new appModes array first (preferred)
-        if ($Settings.PSObject.Properties.Name -contains 'appModes' -and $Settings.appModes)
+        if ($Settings -is [hashtable])
         {
-            if ($Settings.appModes -is [array])
+            $hasProperty = $Settings.ContainsKey('appModes')
+            if ($hasProperty) { $propertyValue = $Settings['appModes'] }
+        }
+        elseif ($Settings -and $Settings.PSObject.Properties.Name -contains 'appModes')
+        {
+            $hasProperty = $true
+            $propertyValue = $Settings.appModes
+        }
+        
+        if ($hasProperty -and $propertyValue)
+        {
+            if ($propertyValue -is [array])
             {
-                $effectiveModes = $Settings.appModes | Where-Object { $_ -and $_.Trim() -ne '' }
+                $effectiveModes = $propertyValue | Where-Object { $_ -and $_.ToString().Trim() -ne '' }
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Using appModes array: [$($effectiveModes -join ', ')] ($($effectiveModes.Count) modes)" -LogLevel "Verbose"
             }
-            elseif ($Settings.appModes -is [string] -and $Settings.appModes.Trim() -ne '')
+            elseif ($propertyValue -is [string] -and $propertyValue.Trim() -ne '')
             {
                 # Handle single string value in appModes
-                $effectiveModes = @($Settings.appModes.Trim())
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Converting single appModes string to array: [$($Settings.appModes)]" -LogLevel "Verbose"
+                $effectiveModes = @($propertyValue.Trim())
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Converting single appModes string to array: [$($propertyValue)]" -LogLevel "Verbose"
             }
         }
         
         # Fall back to legacy appMode property for backward compatibility
-        if ($effectiveModes.Count -eq 0 -and $Settings.PSObject.Properties.Name -contains 'appMode' -and $Settings.appMode)
+        if ($effectiveModes.Count -eq 0)
         {
-            if ($Settings.appMode -is [string] -and $Settings.appMode.Trim() -ne '')
+            $hasLegacyProperty = $false
+            $legacyPropertyValue = $null
+            
+            if ($Settings -is [hashtable])
             {
-                $effectiveModes = @($Settings.appMode.Trim())
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Using legacy appMode property: [$($Settings.appMode)] (backward compatibility)" -LogLevel "Verbose"
+                $hasLegacyProperty = $Settings.ContainsKey('appMode')
+                if ($hasLegacyProperty) { $legacyPropertyValue = $Settings['appMode'] }
+            }
+            elseif ($Settings -and $Settings.PSObject.Properties.Name -contains 'appMode')
+            {
+                $hasLegacyProperty = $true
+                $legacyPropertyValue = $Settings.appMode
+            }
+            
+            if ($hasLegacyProperty -and $legacyPropertyValue)
+            {
+                if ($legacyPropertyValue -is [string] -and $legacyPropertyValue.Trim() -ne '')
+                {
+                    $effectiveModes = @($legacyPropertyValue.Trim())
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Using legacy appMode property: [$($legacyPropertyValue)] (backward compatibility)" -LogLevel "Verbose"
+                }
             }
         }
         
