@@ -12,9 +12,15 @@ function PrepareImportDevice()
     Write-Log -LogFile $LogFile -Module $functionName -Message "Preparing device import (CustomImport=$CustomImport)" -LogLevel "Information"
     Write-Verbose "[$functionName] Getting the serial number for this device..."
     Write-Verbose "[$functionName] Checking whether the script has sufficient permissions to run."
-    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser    
+    $deviceObject = getDeviceInfo -name 'localhost' -groupTag $GroupTag -assignedUser $AssignedUser
     if ($deviceObject)
     {
+        if ($deviceObject.deviceAllowed -eq $false)
+        {
+            Write-Host "The device manufacturer $($deviceObject.manufacturer) is not allowed." -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Device manufacturer $($deviceObject.manufacturer) is not allowed" -LogLevel "Error"
+            return $returnValues.manufacturerNotAllowed
+        }
         if ($customImport) 
         {
             Write-Verbose "[$functionName] Custom import is enabled."
