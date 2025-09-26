@@ -1260,7 +1260,7 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
     {
         # For manufacturerModelSerial type, format as comma-separated string
-        $global:result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities -verbose 
+        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities -verbose 
         if ($result)
         {
             Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green

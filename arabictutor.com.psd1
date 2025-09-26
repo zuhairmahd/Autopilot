@@ -6,6 +6,7 @@
     companyName                     = ''
     autopilotDeviceAllowedVendors   = @(
         'Dell Inc.',
+        'Microsoft',
         'VMWare'
     )
     version                         = '1.3.0.0'

@@ -26,6 +26,7 @@ function GetDeviceInfo()
     #Add the serial number to the hash table.
     $device.Add('SerialNumber', $serial)
     Write-Verbose "[$functionName] The serial number is $serial."
+    $cs = Get-CimInstance -CimSession $session -Class Win32_ComputerSystem
     if ($ManufacturerOverride)
     {
         Write-Verbose "[$functionName] Using provided ManufacturerOverride: $ManufacturerOverride"
@@ -33,7 +34,6 @@ function GetDeviceInfo()
     }
     else
     {
-        $cs = Get-CimInstance -CimSession $session -Class Win32_ComputerSystem
         $make = $cs.Manufacturer.Trim()
     }
     $device.Add('Manufacturer', $make)
@@ -83,13 +83,12 @@ function GetDeviceInfo()
             } ($s -replace '(?i)\b(corporation|corp\.?|inc\.?|co\.?|limited|ltd\.?|llc)\b', '').Trim().ToLower() }
         $normalizedMake = & $normalize $make
         $allowed = $false
-        for ($i = 0; $i -lt $settings.autopilotDeviceAllowedVendors.count; $i ++)
+        foreach ($candidate in $settings.autopilotDeviceAllowedVendors)
         {
-            $candidate = $settings.autopilotDeviceAllowedVendors[$i]
             $normalizedCandidate = & $normalize $candidate
             Write-Verbose "[$functionName] Comparing raw: '$make' vs '$candidate' | normalized: '$normalizedMake' vs '$normalizedCandidate'"
             write-log -logFile $logFile -module $functionName -message "Comparing manufacturer '$make' (normalized '$normalizedMake') with allowed vendor '$candidate' (normalized '$normalizedCandidate')."
-            if ($normalizedMake -eq $normalizedCandidate -or $normalizedMake -match [regex]::Escape($normalizedCandidate) -or $make -match [regex]::Escape($candidate))
+            if ($normalizedMake -eq $normalizedCandidate -or $normalizedMake.StartsWith($normalizedCandidate) -or $normalizedCandidate.StartsWith($normalizedMake))
             {
                 $allowed = $true
                 Write-Verbose "[$functionName] Match found: '$make' allowed by list entry '$candidate'."
