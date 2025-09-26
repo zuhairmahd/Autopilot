@@ -21,6 +21,9 @@
             name = 'Hybrid join profile'
         }
     )
+    autopilotDeviceAllowedVendors = @(
+        'vmware'
+    )
     domain = 'arabictutor.com'
     companyName = 'ZM Consulting'
     version = '4.0.0.30055'
@@ -28,7 +31,7 @@
     maxWaitTime = 30
     showLicenseBanner = $false
     deviceContactThresholdInDays = 30
-    checkStrongMapping = $false
+    checkStrongMapping = $true
     strongMappingOptional = $true
     appMode = 'full'
     timeInSeconds = 60
@@ -36,10 +39,10 @@
     maxGroupMatchDisplay = 10
     release = 'dev'
     repoInfo = @{
+        repoName = 'Autopilot'
+        baseSourceURL = 'https://raw.githubusercontent.com'
         baseURL = 'https://www.github.com'
         repoPath = 'zuhairmahd'
-        baseSourceURL = 'https://raw.githubusercontent.com'
-        repoName = 'Autopilot'
     }
     autoUpdate = $false
     updateLocalSettings = $true
