@@ -59,7 +59,7 @@ function AddCorporateDeviceIdentifier()
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
         [Parameter(Mandatory = $true)]
-        [PSCustomObject]$DeviceInfo, # Output from GetCorpDeviceIdentifier
+        $DeviceInfo, # Output from GetCorpDeviceIdentifier
         [Parameter(Mandatory = $false)]
         [ValidateSet('SerialNumber', 'IMEI', 'manufacturerModelSerial')]
         [string]$IdentifierType = 'manufacturerModelSerial',
@@ -68,7 +68,7 @@ function AddCorporateDeviceIdentifier()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Entered function. Parameters: AccessToken='$(if ($AccessToken) {'***'} else {'<null>'})', DeviceInfo='$DeviceInfo', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting AddCorporateDeviceIdentifier. DeviceInfo='$DeviceInfo', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting AddCorporateDeviceIdentifier. DeviceInfo='$DeviceInfo', IdentifierType='$IdentifierType', OverwriteImportedDeviceIdentities='$OverwriteImportedDeviceIdentities'" -LogLevel "Verbose"
     if ($AccessToken -eq '' -or $null -eq $AccessToken)
     {
         Write-Log -LogFile $LogFile -Module $functionName -Message "No AccessToken provided. Aborting." -LogLevel "Error"
