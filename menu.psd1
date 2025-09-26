@@ -249,14 +249,12 @@
         Description           = 'Import a device into Autopilot and perform related actions'
         items                 = @(
             @{
-                description           = 'Import a device into Autopilot'
-                name                  = 'Import device into Autopilot'
+                description           = 'Quick import a device into Autopilot'
+                name                  = 'Quick Import device into Autopilot (requires admin rights)'
                 type                  = 'action'
                 includeInDisplayModes = @(
                     'full',
                     'admin',
-                    'advanced',
-                    'registration',
                     'advancedRegistration'
                 )
             },
@@ -334,16 +332,6 @@
                     'full',
                     'admin',
                     'advanced',
-                    'advancedRegistration'
-                )
-            },
-            @{
-                description           = 'Quick import a device into Autopilot'
-                name                  = 'Quick Import device into Autopilot (requires admin rights)'
-                type                  = 'action'
-                includeInDisplayModes = @(
-                    'full',
-                    'admin',
                     'advancedRegistration'
                 )
             },

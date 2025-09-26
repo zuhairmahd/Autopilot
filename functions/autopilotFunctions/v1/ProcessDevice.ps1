@@ -97,7 +97,7 @@ function ProcessDevice()
             }
             if ($choice -eq 'no')
             {
-                Write-Host "Exiting..."
+                Write-Host "Import canceled..."
                 return $returnValues.backoutText
             }
             $importStart = Get-Date
