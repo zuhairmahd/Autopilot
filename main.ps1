@@ -1235,21 +1235,6 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Custom import device in
         return $returnValues.backoutText
     }
 }
-$autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import device into Autopilot" -Action {
-    Write-Verbose "[$scriptName] Import device into Autopilot (standard)."
-    if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
-    {
-        Write-Verbose "[$scriptName] The script is running with sufficient permissions."
-    }
-    else
-    {
-        Write-Host 'The script is not running with sufficient permissions.' -ForegroundColor Red
-        Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
-        return $null
-    }
-    $result = PrepareImportDevice -accessToken $accessToken
-    Write-Verbose "[$scriptName] Result of standard import: $result"
-}
 $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device Identifier for Device Preparation (requires admin rights)" -Action {
     Write-Verbose "[$scriptName] Importing Corporate Device Identifier for Device Preparation."
     if (([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator'))
@@ -1263,11 +1248,19 @@ $autopilotMenu = AddMenuItem -menu $autopilotMenu -Name "Import Corporate Device
         Write-Host 'Please exit the script and relaunch as an administrator.' -ForegroundColor Red
         return $null
     }
-    $deviceIdentifier = GetCorpDeviceIdentifier
+    $deviceIdentifier = GetDeviceInfo -nohash
+    Write-Verbose "[$scriptName] Device identifier: $($deviceIdentifier | Out-String)"
+    write-log -logFile $LogFile -Module $functionName -Message "Device identifier: $($deviceIdentifier | Out-String)" -LogLevel "Verbose"
+    if ($deviceIdentifier.deviceAllowed -eq $false)
+    {
+        Write-Host "The device manufacturer $($deviceIdentifier.manufacturer) is not allowed." -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Device manufacturer $($deviceIdentifier.manufacturer) is not allowed" -LogLevel "Error"
+        return $returnValues.manufacturerNotAllowed
+    }
     if ($deviceIdentifier -and $deviceIdentifier.SerialNumber)
     {
         # For manufacturerModelSerial type, format as comma-separated string
-        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities
+        $result = AddCorporateDeviceIdentifier -AccessToken $accessToken -DeviceInfo $deviceIdentifier -IdentifierType "manufacturerModelSerial" -OverwriteImportedDeviceIdentities -verbose 
         if ($result)
         {
             Write-Host "Device successfully added to corporate identifiers." -ForegroundColor Green

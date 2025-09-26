@@ -1,9 +1,10 @@
 @{
     deviceActions = @{
-        WipeOrClean     = 'Wipe or clean the device'
-        contactHelpdesk = 'Contact the helpdesk'
-        contactAdmin    = 'Contact an Intune administrator'
-        none            = 'No action'
+        WipeOrClean            = 'Wipe or clean the device'
+        contactHelpdesk        = 'Contact the helpdesk'
+        contactAdmin           = 'Contact an Intune administrator'
+        none                   = 'No action'
+        manufacturerNotAllowed = 'You are not allowed to import this device using this script.  Please contact your system administrator.'
     }
     version       = '1.3.0.0'
     returnValues  = @{
