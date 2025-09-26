@@ -19,7 +19,7 @@ This script leverages the Microsoft Graph API to communicate with Intune and pro
 
 ### Key Features
 
-- **🎯 Role-Based Interface**: Hierarchical app mode system with inheritance-based privilege escalation. Seven built-in modes (Full, Admin, Advanced, Helpdesk, Registration, Advanced Registration, Custom) with tailored menu options and capabilities for different organizational roles. See [App Mode Configuration Guide](docs/APP_MODE_CONFIGURATION.md) for detailed role definitions and defaults.
+- **🎯 Enhanced Role-Based Interface**: Advanced app mode system supporting both single and multiple mode configurations. Combine permissions from different modes (e.g., Help Desk + Registration) for flexible access control. Seven built-in modes with hierarchical permissions and intelligent conflict resolution. Interactive settings editor with real-time validation and conflict warnings.
 - **📋 Interactive Menu System**: Intuitive hierarchical navigation with keyboard shortcuts and stack-based history
 - **⚡ Device Assignment Workflow**: Streamlined device-to-user assignment with automated readiness validation
 - **🔍 Comprehensive Device Monitoring**: Real-time device enrollment status, BitLocker keys, LAPS credentials, and health monitoring
@@ -339,117 +339,330 @@ Example configuration:
 }
 ```
 
-### Custom App Mode
-
-### What is Custom App Mode?
-
-Custom App Mode allows administrators to define a tailored set of menu options for specific user roles or operational scenarios. When enabled, only the menu items explicitly listed in the `menuItemsToInclude` array in `settings.json` will be shown to the user. This provides granular control over the application's interface, ensuring users only see the features relevant to their responsibilities.
-
-### How to Enable Custom App Mode
-
-1. Open your `settings.json` file.
-2. Set the `appMode` property to a custom value (e.g., `"custom"`, `"helpDesk"`, or any string other than `"full"`).
-3. Add a `menuItemsToInclude` array listing the menu item names you want visible:
-
-```json
-{
-  "appMode": "custom",
-  "menuItemsToInclude": [
-    "Give a device to a user",
-    "Check device status",
-    "Export Menu",
-    "About"
-  ]
-}
-```
-
-### How It Works
-- When `appMode` is set to `"full"`, all menu items are displayed.
-- When set to any other value, only the items listed in `menuItemsToInclude` are shown.
-- This applies to all users, making it easy to restrict access to advanced or administrative features.
-- The menu system will automatically hide any items not included in the array, including submenus and actions.
-
-### Use Cases
-- Limit help desk users to basic device assignment and status checks
-- Provide a simplified interface for onboarding or registration scenarios
-- Restrict access to sensitive operations (e.g., device wipe, advanced settings)
-
-### Example
-If you want help desk users to only see device assignment, status checks, and the About page, configure your settings as follows:
-
-```json
-{
-  "appMode": "helpDesk",
-  "menuItemsToInclude": [
-    "Give a device to a user",
-    "Check device status",
-    "About"
-  ]
-}
-```
-
-The application will display only those menu options, hiding all others.
-
 ---
 
-## Application Modes
+## Multiple App Modes - Enhanced Role-Based Access Control
 
-The tool supports several operational modes that control which features and menu items are available to users. App modes can be configured during the first-run wizard or changed later through the settings menu.
+The Windows Autopilot Management Tool now supports both **single app mode** (legacy) and **multiple app modes** (new) to provide flexible role-based access control and menu customization. This enhanced system allows users to combine permissions from different modes for greater functionality while maintaining security boundaries.
 
-### Available App Modes
+### Multiple App Modes Overview
 
-- **Full Mode** (`appMode: "full"`): Complete feature set with all available functionality (recommended for administrators)
-- **Help Desk Mode** (`appMode: "helpDesk"`): Streamlined interface for help desk operations and device troubleshooting
-- **Advanced Mode** (`appMode: "advanced"`): Advanced features for experienced users and technical staff
-- **Advanced Registration Mode** (`appMode: "advancedRegistration"`): Advanced device registration capabilities with extended options
-- **Registration Mode** (`appMode: "registration"`): Device registration and enrollment focused interface
-- **Administrator Mode** (`appMode: "admin"`): Administrative functions and system configuration options
-- **Custom Mode** (`appMode: "custom"`): Custom configuration for specialized deployments
+The application now supports two configuration approaches:
 
-### Selecting App Mode
+1. **Single App Mode (Legacy)**: Traditional single mode configuration for backward compatibility
+2. **Multiple App Modes (New)**: Combine multiple modes to create custom permission sets
 
-App mode selection provides a consistent, user-friendly experience across different contexts with enhanced interface features:
+#### Benefits of Multiple App Modes
+- **Flexibility**: Combine permissions from different modes (e.g., Help Desk + Registration)
+- **Granular Control**: Fine-tune access based on specific organizational needs  
+- **Reduced Redundancy**: Automatically resolves conflicts between overlapping modes
+- **Backward Compatibility**: Existing single mode configurations continue to work unchanged
 
-#### During First-Run Setup
-When running the application for the first time, the First Run Wizard will prompt you to select an app mode:
+### App Mode Hierarchy System
+
+The application uses a hierarchical permission system where higher-level modes include permissions from lower-level modes:
+
+```
+Full Mode (*)
+├── Admin Mode
+│   ├── Advanced Mode
+│   │   ├── Help Desk Mode
+│   │   └── Registration Mode
+│   └── Advanced Registration Mode
+└── Custom Mode (user-defined)
+```
+
+#### Hierarchy Rules
+- **Full Mode**: Grants all permissions, supersedes all other modes
+- **Admin Mode**: Includes Advanced + Help Desk + Registration permissions
+- **Advanced Mode**: Includes Help Desk + Registration permissions  
+- **Advanced Registration**: Specialized registration with extended features
+- **Help Desk**: Device troubleshooting and user management
+- **Registration**: Device enrollment and basic operations
+- **Custom**: User-defined permissions based on configuration
+
+### Available Application Modes
+
+#### 🔑 Full Mode (`full`)
+**Complete administrative access with all features enabled**
+- All menu items and actions available
+- Bypasses all access restrictions
+- Recommended for system administrators
+- **Hierarchy**: `*` (all permissions)
+
+#### 👨‍💼 Admin Mode (`admin`)  
+**System administrator with full configuration and management capabilities**
+- Administrative functions and system configuration
+- Advanced user management and device operations
+- Full export and reporting capabilities
+- **Hierarchy**: `admin`, `advanced`, `helpdesk`, `registration`
+
+#### ⚙️ Advanced Mode (`advanced`)
+**Advanced user with helpdesk and configuration capabilities**
+- Advanced features for experienced users
+- Device configuration and policy management
+- Advanced troubleshooting tools
+- **Hierarchy**: `advanced`, `helpdesk`, `registration`
+
+#### 🎧 Help Desk Mode (`helpdesk`)
+**Streamlined interface for help desk operations and device troubleshooting**
+- Device assignment and troubleshooting
+- User management and device actions
+- Basic exports and reporting
+- **Hierarchy**: `helpdesk`
+
+#### 📝 Registration Mode (`registration`)
+**Device registration specialist with Autopilot enrollment capabilities**
+- Autopilot device registration and import
+- Device status checking and basic operations
+- Basic export functionality
+- **Hierarchy**: `helpdesk`, `registration`
+
+#### 🔧 Advanced Registration Mode (`advancedRegistration`)
+**Advanced registration specialist with administrative Autopilot capabilities**
+- Advanced Autopilot features and custom imports
+- Device preparation and advanced device actions
+- Extended registration capabilities
+- **Hierarchy**: `advancedRegistration`, `registration`
+
+#### 🎨 Custom Mode (`custom`)
+**Customizable mode where users define their own access patterns**
+- User-defined permissions and capabilities
+- Flexible configuration for specialized deployments
+- **Hierarchy**: Configurable (empty by default)
+
+### Configuration and Setup
+
+#### Setting App Mode
+
+App mode can be configured in multiple ways:
+
+**1. Command Line Parameter (Single Mode)**
+```powershell
+.\main.ps1 -appMode "helpdesk"
+```
+
+**2. Settings Configuration (Single Mode - Legacy)**
+```json
+{
+  "globalSettings": {
+    "appMode": "helpdesk"
+  }
+}
+```
+
+**3. Settings Configuration (Multiple Modes - New)**
+```json
+{
+  "globalSettings": {
+    "appMode": "helpdesk",
+    "appModes": ["helpdesk", "registration"]
+  }
+}
+```
+
+**4. Domain-Specific Configuration**
+```json
+{
+  "domains": {
+    "company.com": {
+      "settings": {
+        "appModes": ["advanced", "registration"]
+      }
+    }
+  }
+}
+```
+
+#### Multiple App Modes Configuration
+
+When using multiple app modes, the system combines permissions using **additive strategy** by default:
+
+**Help Desk + Registration Combination:**
+```json
+{
+  "globalSettings": {
+    "appModes": ["helpdesk", "registration"]
+  }
+}
+```
+*Result*: Access to help desk operations + device registration features
+
+**Admin + Custom Combination:**  
+```json
+{
+  "globalSettings": {
+    "appModes": ["admin", "custom"]
+  }
+}
+```
+*Result*: Full admin permissions + any custom-defined permissions
+
+### Conflict Resolution
+
+When multiple modes are selected, the system automatically resolves conflicts:
+
+#### Resolution Strategies
+
+1. **Additive Strategy (Default)**
+   - Combines permissions from all selected modes
+   - Provides union of all allowed features
+   - More permissive approach
+
+2. **Precedence Strategy**
+   - Uses permissions from highest precedence mode only
+   - Follows hierarchy order (Full > Admin > Advanced > etc.)
+   - More restrictive approach
+
+#### Conflict Examples
+
+**Redundant Modes:**
+```json
+{
+  "appModes": ["admin", "helpdesk"]
+}
+```
+→ *Warning*: `admin` already includes `helpdesk` permissions
+
+**Full Mode Combination:**
+```json
+{
+  "appModes": ["full", "helpdesk", "registration"]
+}
+```  
+→ *Result*: `full` mode grants all permissions, other modes are redundant
+
+### Interactive Settings Editor
+
+#### Selecting App Mode
+
+App mode selection provides enhanced interface features for both single and multiple mode configurations:
+
+**During First-Run Setup**
+When running the application for the first time, the First Run Wizard will prompt you to select app mode(s):
 
 1. Run the application: `.\main.ps1`
 2. Follow the wizard prompts for Azure AD configuration
-3. When prompted, select your preferred app mode from the menu with clear descriptions for each option
-4. Complete the remaining setup steps
+3. Choose between single mode or multiple mode configuration
+4. Select your preferred app mode(s) with interactive conflict detection
+5. Complete the remaining setup steps
 
-#### Changing App Mode Later
-You can change the app mode at any time through the settings menu:
+**Changing App Mode Later**
+You can change the app mode at any time through the enhanced settings menu:
 
 1. Navigate to **Change application settings** → **Change App Mode setting**
-2. Use the interactive menu to select from available app modes with detailed descriptions
-3. The system displays your current mode and provides navigation options (Back/Main)
-4. Confirm the change when prompted
-5. Restart the application when prompted to apply the new mode
+2. Choose between:
+   - **Configure multiple app modes** (recommended - combine permissions)
+   - **Configure single app mode** (legacy - one mode only)
+   - **Keep current configuration**
 
-**Note**: The app mode selection uses the application's standard menu system for consistent navigation and user experience across all contexts.
+#### Multiple App Mode Selection Features
+
+The enhanced settings editor provides:
+
+- **Interactive multi-selection interface**
+- **Conflict detection and resolution warnings**
+- **Hierarchy information and superseding notifications**
+- **Real-time effective permissions display**
+
+**Example Conflict Detection:**
+```
+⚠ CONFLICT INFORMATION:
+• Mode 'admin' already includes 'helpdesk' permissions
+• Resolution: Using additive strategy - all permissions combined
+```
+
+**Effective Permissions Display:**
+```
+Selected modes: [admin, registration]  
+Effective permissions: [admin, advanced, helpdesk, registration]
+```
 
 ### Custom App Mode Configuration
 
-Custom App Mode allows administrators to define a tailored set of menu options for specific user roles or operational scenarios. When using custom mode, you can further restrict menu items through the `menuItemsToInclude` array in `settings.json`.
+Organizations can create custom access patterns by:
 
-Example configuration:
+#### 1. Defining Custom Hierarchy
 ```json
-{
-  "appMode": "custom",
-  "menuItemsToInclude": [
-    "Give a device to a user",
-    "Check device status",
-    "Autopilot menu"
-  ]
+"appModeHierarchy": {
+  "custom": ["registration", "helpdesk"]
 }
 ```
 
-### How It Works
-- When `appMode` is set to `"full"`, all menu items are displayed
-- Other modes display predefined sets of menu items appropriate for that role
-- Custom mode can be further restricted using `menuItemsToInclude`
-- The menu system automatically shows/hides items based on the selected mode
+#### 2. Setting Custom Menu Visibility
+```json
+{
+  "name": "Special Function",
+  "includeInDisplayModes": ["custom"]
+}
+```
+
+#### 3. Custom Mode Combinations
+```json
+{
+  "globalSettings": {
+    "appModes": ["custom", "registration"]
+  }
+}
+```
+
+### Best Practices
+
+#### Recommended Mode Combinations
+
+**Support Operations:**
+```json
+{"appModes": ["helpdesk", "registration"]}
+```
+*Ideal for*: Support staff handling both troubleshooting and device enrollment
+
+**Senior Technical Staff:**
+```json  
+{"appModes": ["advanced", "registration"]}
+```
+*Ideal for*: Technical leads with device management and enrollment responsibilities
+
+**Device Specialists:**
+```json
+{"appModes": ["advancedRegistration"]}  
+```
+*Ideal for*: Dedicated device enrollment and preparation teams
+
+**System Administrators:**
+```json
+{"appModes": ["admin"]}
+```
+*Ideal for*: Full administrative access with all permissions
+
+#### Security Considerations
+
+- **Start with Minimum Access**: Begin with the least privileged mode combination
+- **Regular Reviews**: Periodically review mode assignments and effective permissions
+- **Conflict Resolution**: Understand how conflicts are resolved in your configuration
+- **Testing**: Test mode combinations in development before production deployment
+
+### Migration from Single to Multiple Modes
+
+**Existing Configuration:**
+```json
+{
+  "globalSettings": {
+    "appMode": "helpdesk"
+  }
+}
+```
+
+**Migrated Configuration:**
+```json  
+{
+  "globalSettings": {
+    "appMode": "helpdesk",
+    "appModes": ["helpdesk", "registration"]
+  }
+}
+```
+
+*Note*: The legacy `appMode` property is maintained for backward compatibility.
 
 ---
 
