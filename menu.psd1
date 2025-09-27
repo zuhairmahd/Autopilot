@@ -255,6 +255,7 @@
                 includeInDisplayModes = @(
                     'full',
                     'admin',
+                    'registration',
                     'advancedRegistration'
                 )
             },

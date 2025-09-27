@@ -607,6 +607,7 @@ function Get-ApplicationDefaults()
                         includeInDisplayModes = @(
                             'full',
                             'admin',
+                            'registration',
                             'advancedRegistration'
                         )
                     },
