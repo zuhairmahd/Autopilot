@@ -39,6 +39,28 @@ function Get-MultipleAppModeInput()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting multiple app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
     
+    # Load required dependencies
+    $dependencyFunctions = @(
+        "$PWD/functions/menuFunctions/Get-AppModeHierarchy.ps1",
+        "$PWD/functions/menuFunctions/Get-CombinedAppModeHierarchy.ps1"
+    )
+    
+    foreach ($depFunc in $dependencyFunctions)
+    {
+        if (Test-Path $depFunc)
+        {
+            try 
+            {
+                . $depFunc
+                Write-Log -LogFile $logFile -Module $functionName -Message "Loaded dependency: $($depFunc | Split-Path -Leaf)" -LogLevel "Verbose"
+            }
+            catch 
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Warning: Could not load dependency $($depFunc | Split-Path -Leaf): $($_.Exception.Message)" -LogLevel "Warning"
+            }
+        }
+    }
+    
     $availableModes = @(
         @{ Mode = 'full'; Name = 'Full Mode'; Description = 'Complete access to all features (supersedes all other modes)' }
         @{ Mode = 'admin'; Name = 'Administrator Mode'; Description = 'Administrative functions and system configuration' }
@@ -221,7 +243,15 @@ function Get-MultipleAppModeInput()
             if ($confirm -match '^[yY]')
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected multiple app modes: [$($selectedModes -join ', ')]" -LogLevel "Information"
-                return if ($selectedModes.Count -eq 1 -and $AllowSingleMode) { $selectedModes[0] } else { $selectedModes }
+                
+                if ($selectedModes.Count -eq 1 -and $AllowSingleMode) 
+                { 
+                    return $selectedModes[0] 
+                } 
+                else 
+                { 
+                    return $selectedModes 
+                }
             }
         }
         else
