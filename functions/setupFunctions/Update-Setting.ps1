@@ -336,17 +336,47 @@ function Update-Setting()
         {
             'Global'
             {
-                if ($verifySettingsHash['globalSettings'] -and $verifySettingsHash['globalSettings'].ContainsKey($SettingName) -and
-                    $verifySettingsHash['globalSettings'][$SettingName] -eq $SettingValue)
+                if ($verifySettingsHash['globalSettings'] -and $verifySettingsHash['globalSettings'].ContainsKey($SettingName))
                 {
-                    Write-Verbose "[$functionName] Successfully updated and verified global setting"
-                    Write-Log -LogFile $logFile -Message "Successfully updated and verified global setting '$SettingName'" -Module $functionName
-                    $true
+                    $actualValue = $verifySettingsHash['globalSettings'][$SettingName]
+                    
+                    # Handle array comparison specially (for appModes and other array settings)
+                    if ($SettingValue -is [array] -and $actualValue -is [array])
+                    {
+                        $comparisonResult = Compare-Object $SettingValue $actualValue
+                        if ($null -eq $comparisonResult)
+                        {
+                            Write-Verbose "[$functionName] Successfully updated and verified global setting (array)"
+                            Write-Log -LogFile $logFile -Message "Successfully updated and verified global setting '$SettingName' (array)" -Module $functionName
+                            $true
+                        }
+                        else
+                        {
+                            Write-Warning "[$functionName] Array values do not match after update"
+                            Write-Verbose "[$functionName] Expected: $($SettingValue -join ', ') | Actual: $($actualValue -join ', ')"
+                            Write-Log -LogFile $logFile -Message "Array values do not match for '$SettingName' | Expected: $($SettingValue -join ', ') | Actual: $($actualValue -join ', ')" -Module $functionName -LogLevel "Warning"
+                            $false
+                        }
+                    }
+                    # Handle scalar comparison
+                    elseif ($actualValue -eq $SettingValue)
+                    {
+                        Write-Verbose "[$functionName] Successfully updated and verified global setting (scalar)"
+                        Write-Log -LogFile $logFile -Message "Successfully updated and verified global setting '$SettingName' (scalar)" -Module $functionName
+                        $true
+                    }
+                    else
+                    {
+                        Write-Warning "[$functionName] Setting value does not match after update"
+                        Write-Verbose "[$functionName] Expected: '$SettingValue' | Actual: '$actualValue'"
+                        Write-Log -LogFile $logFile -Message "Setting value mismatch for '$SettingName' | Expected: '$SettingValue' | Actual: '$actualValue'" -Module $functionName -LogLevel "Warning"
+                        $false
+                    }
                 }
                 else
                 {
-                    Write-Warning "[$functionName] Failed to verify global setting update"
-                    Write-Log -LogFile $logFile -Message "Failed to verify global setting update for '$SettingName'" -Module $functionName -LogLevel "Warning"
+                    Write-Warning "[$functionName] Failed to verify global setting update - property not found"
+                    Write-Log -LogFile $logFile -Message "Failed to verify global setting update - property '$SettingName' not found" -Module $functionName -LogLevel "Warning"
                     $false
                 }
             }
