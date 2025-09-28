@@ -133,6 +133,7 @@ function Get-ApplicationDefaults()
             groupsToInclude                 = @()
             groupsToExclude                 = @()
             autopilotProfilesToInclude      = @()
+            autopilotDeviceAllowedVendors   = @()  	    
             domain                          = $DomainName
             companyName                     = ""
             version                         = $Version
@@ -310,6 +311,7 @@ function Get-ApplicationDefaults()
                 "1001"                         = "Some updates were installed"
                 deviceRestartSuccessMessage    = "The device was restarted successfully."
                 deviceNotAssignedMessage       = "The device is not assigned to a deployment profile."
+                manufacturerNotAllowed         = 'You are not allowed to import this device using this script.  Please contact your system administrator.'
                 deviceIsInIntuneMessage        = 'The device is in Intune. Delete the device and try again.'
                 userCanceledMessage            = "Operation canceled by user"
                 noUserDeviceFoundMessage       = "No user or device found."
@@ -599,13 +601,12 @@ function Get-ApplicationDefaults()
                 Description           = 'Import a device into Autopilot and perform related actions'
                 items                 = @(
                     @{
-                        description           = 'Import a device into Autopilot'
-                        name                  = 'Import device into Autopilot'
+                        description           = 'Quick import a device into Autopilot'
+                        name                  = 'Quick Import device into Autopilot (requires admin rights)'
                         type                  = 'action'
                         includeInDisplayModes = @(
                             'full',
                             'admin',
-                            'advanced',
                             'registration',
                             'advancedRegistration'
                         )
@@ -684,16 +685,6 @@ function Get-ApplicationDefaults()
                             'full',
                             'admin',
                             'advanced',
-                            'advancedRegistration'
-                        )
-                    },
-                    @{
-                        description           = 'Quick import a device into Autopilot'
-                        name                  = 'Quick Import device into Autopilot (requires admin rights)'
-                        type                  = 'action'
-                        includeInDisplayModes = @(
-                            'full',
-                            'admin',
                             'advancedRegistration'
                         )
                     },

@@ -48,6 +48,9 @@
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
                 maxGroupMatchDisplay            = 10
+                autopilotDeviceAllowedVendors   = @(
+                    'vmware'
+                ) 
                 autopilotProfilesToInclude      = @(
                     @{
                         id   = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
@@ -67,6 +70,8 @@
                 maxUserNameLength               = 50
                 validateScopes                  = $false
                 showLicenseBanner               = $false
+                checkStrongMapping              = $true
+                strongMappingOptional           = $true
                 timeInSeconds                   = 60
                 groupsToInclude                 = @(
                     @{
@@ -142,6 +147,9 @@
                 groupsToExclude                 = @()
                 maxUserMatchDisplay             = 10
                 appMode                         = 'registration'
+                autopilotDeviceAllowedVendors   = @(
+                    'Dell'
+                )
                 autopilotProfilesToInclude      = @(
                     @{
                         id   = '20f6050d-263f-401b-847c-3a399e6aa8ac'

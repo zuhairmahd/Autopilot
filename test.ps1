@@ -192,7 +192,7 @@ else
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$appMetaData = Get-ApplicationMetaDataFromDomain
+$appMetaData = Get-ApplicationMetaData
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
 if (-not $version.version)
 {
@@ -522,6 +522,10 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
+$global:corpDeviceInfo = GetCorpDeviceIdentifier
+$global:deviceInfo = GetDeviceInfo
+
+exit 0
 #region Usage examples for GetGraphObjectMetadata
 # Example 1: Get metadata for users collection
 $usersResponse = CallGraphAPI -accessToken $accessToken -ResourcePath "users"
