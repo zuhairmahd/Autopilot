@@ -1028,6 +1028,85 @@ $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
 #endregion Create menus
 
+#region Helper function for app mode filtering
+function Test-MenuItemVisibility {
+    <#
+    .SYNOPSIS
+        Tests if a menu item should be visible based on current app modes
+    #>
+    param(
+        [string]$MenuItemName,
+        [array]$CurrentAppModes
+    )
+    
+    # Get menu configuration
+    $menuConfig = Get-Content $menuFile -Raw | Invoke-Expression
+    if (-not $menuConfig -or -not $menuConfig.mainMenu -or -not $menuConfig.mainMenu.items) {
+        Write-Verbose "Menu configuration not available, allowing all items"
+        return $true
+    }
+    
+    # Find the menu item configuration
+    $menuItem = $menuConfig.mainMenu.items | Where-Object { $_.name -eq $MenuItemName }
+    if (-not $menuItem) {
+        Write-Verbose "Menu item '$MenuItemName' not found in configuration, allowing"
+        return $true
+    }
+    
+    if (-not $menuItem.includeInDisplayModes -or $menuItem.includeInDisplayModes.Count -eq 0) {
+        Write-Verbose "Menu item '$MenuItemName' has no display mode restrictions, allowing"
+        return $true
+    }
+    
+    # Get effective app modes using the new multiple mode support
+    if (-not (Get-Command Get-EffectiveAppModes -ErrorAction SilentlyContinue)) {
+        try {
+            . "$PWD/functions/menuFunctions/Get-EffectiveAppModes.ps1"
+        } catch {
+            Write-Verbose "Could not load Get-EffectiveAppModes, falling back to basic check"
+            # Fallback: check if any current mode is in the allowed list
+            foreach ($mode in $CurrentAppModes) {
+                if ($mode -in $menuItem.includeInDisplayModes) {
+                    return $true
+                }
+            }
+            return $false
+        }
+    }
+    
+    # Get combined hierarchy for all current modes
+    try {
+        if (-not (Get-Command Get-CombinedAppModeHierarchy -ErrorAction SilentlyContinue)) {
+            . "$PWD/functions/menuFunctions/Get-CombinedAppModeHierarchy.ps1"
+        }
+        
+        $combinedResult = Get-CombinedAppModeHierarchy -AppModes $CurrentAppModes -ResolutionStrategy 'Additive'
+        $effectivePermissions = $combinedResult.AllowedModes
+        
+        # Check if any effective permission is in the allowed display modes
+        foreach ($permission in $effectivePermissions) {
+            if ($permission -in $menuItem.includeInDisplayModes) {
+                Write-Verbose "Menu item '$MenuItemName' allowed due to permission '$permission'"
+                return $true
+            }
+        }
+        
+        Write-Verbose "Menu item '$MenuItemName' not allowed. Required: [$($menuItem.includeInDisplayModes -join ', ')], Available: [$($effectivePermissions -join ', ')]"
+        return $false
+        
+    } catch {
+        Write-Verbose "Error in app mode hierarchy check: $($_.Exception.Message). Falling back to basic check"
+        # Fallback: check if any current mode is in the allowed list
+        foreach ($mode in $CurrentAppModes) {
+            if ($mode -in $menuItem.includeInDisplayModes) {
+                return $true
+            }
+        }
+        return $false
+    }
+}
+#endregion Helper function for app mode filtering
+
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
@@ -1629,8 +1708,18 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
         return $returnValues.backoutText
     }
-    $newAppMode = $result.appMode
-    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
+    
+    # Handle both single and multiple app mode results
+    if ($result.isMultipleMode -and $result.appModes) {
+        $newAppModeConfig = $result.appModes
+        $newAppMode = $result.appMode  # Primary mode for display
+        Write-Host "`nYou selected multiple app modes: [$($result.appModes -join ', ')]" -ForegroundColor Green
+        Write-Host "Primary mode: $newAppMode" -ForegroundColor Cyan
+    } else {
+        $newAppModeConfig = $result.appMode
+        $newAppMode = $result.appMode
+        Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
+    }
     Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
     Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
     Write-Host ""
@@ -1647,8 +1736,28 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
         return $returnValues.backoutText
     }
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
-    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppModeConfig'" -LogLevel "Information"
+    
+    # Load Update-AppModeSettings function if available for enhanced multiple mode support
+    if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue) {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using enhanced app mode settings update (supports multiple modes)" -LogLevel "Information"
+        # Prioritize domain settings over global settings
+        $updateResult = Update-AppModeSettings -AppModeConfiguration $newAppModeConfig -SettingsFile $initFile -PreferDomain -MaintainLegacy
+    } else {
+        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using legacy app mode update method" -LogLevel "Warning"
+        # Try domain settings first, fall back to global
+        $updateResult = $false
+        if ($settings.domain) {
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Attempting to save app mode in domain settings for '$($settings.domain)'" -LogLevel "Information"
+            $updateResult = Update-Setting -SettingType "Domain" -Domain $settings.domain -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode
+        }
+        if (-not $updateResult) {
+            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain update failed or not available, using global settings" -LogLevel "Warning"
+            $updateResult = Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode
+        }
+    }
+    
+    if ($updateResult)
     {
         Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
@@ -1792,7 +1901,23 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
 }
 
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
+#region Get effective app modes for menu filtering
+Write-Verbose "[$scriptName] Getting effective app modes for menu filtering"
+try {
+    if (-not (Get-Command Get-EffectiveAppModes -ErrorAction SilentlyContinue)) {
+        . "$PWD/functions/menuFunctions/Get-EffectiveAppModes.ps1"
+    }
+    $effectiveAppModes = Get-EffectiveAppModes -Settings $settings
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Effective app modes for menu filtering: [$($effectiveAppModes -join ', ')]" -LogLevel "Information"
+} catch {
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Error getting effective app modes, falling back to legacy mode: $($_.Exception.Message)" -LogLevel "Warning"
+    $effectiveAppModes = if ($settings.appModes) { $settings.appModes } elseif ($settings.appMode) { @($settings.appMode) } else { @('full') }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using fallback app modes: [$($effectiveAppModes -join ', ')]" -LogLevel "Information"
+}
+#endregion Get effective app modes for menu filtering
+
+if (Test-MenuItemVisibility -MenuItemName "Give a device to a user" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
     if ($null -eq $username)
@@ -2000,10 +2125,18 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
     }
 }
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-$mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+}
+if (Test-MenuItemVisibility -MenuItemName "Check device status" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
+}
+if (Test-MenuItemVisibility -MenuItemName "Autopilot menu" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+}
+if (Test-MenuItemVisibility -MenuItemName "Change application settings" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+}
+if (Test-MenuItemVisibility -MenuItemName "Check for script updates" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     if ($settings.updateLocalSettings)
     {
@@ -2042,7 +2175,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action
         }
     }
 }
-$mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
+}
+if (Test-MenuItemVisibility -MenuItemName "Restart the device" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
     {
@@ -2050,7 +2185,9 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
         return $returnValues.backoutText
     }
 }
-$mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+}
+if (Test-MenuItemVisibility -MenuItemName "Show Group Assignments" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
     {
@@ -2161,9 +2298,14 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $result
     }
 }
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
+}
+if (Test-MenuItemVisibility -MenuItemName "Export Menu" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+}
+if (Test-MenuItemVisibility -MenuItemName "About" -CurrentAppModes $effectiveAppModes) {
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+        Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
+    }
 }
 
 #region show menus
