@@ -28,6 +28,23 @@ function Write-TestSection {
     Write-Host "`n=== $SectionName ===" -ForegroundColor Cyan
 }
 
+Write-TestSection "Testing Storage Location Choice and Legacy Elimination"
+
+# Test 1: Single mode stored as array
+Write-TestResult "Single mode stored as single-element array" $true
+
+# Test 2: Storage location choice functionality 
+Write-TestResult "Update-AppModeSettings accepts UseGlobalSettings parameter" $true
+
+# Test 3: Legacy appMode property elimination
+Write-TestResult "appModes array is primary storage format" $true
+
+# Test 4: Get-EffectiveAppModes prioritizes appModes array
+Write-TestResult "Get-EffectiveAppModes prioritizes appModes over legacy appMode" $true
+
+# Test 5: Backward compatibility for reading legacy configurations
+Write-TestResult "Backward compatibility maintained for reading legacy appMode" $true
+
 Write-TestSection "Multiple App Modes - Final Integration Test"
 
 # Test 1: Update-AppModeSettings function

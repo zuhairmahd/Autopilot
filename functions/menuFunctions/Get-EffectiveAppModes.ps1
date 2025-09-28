@@ -2,27 +2,27 @@ function Get-EffectiveAppModes()
 {
     <#
     .SYNOPSIS
-        Gets the effective app modes from settings, supporting both single and multiple mode configurations.
+        Gets the effective app modes from settings, prioritizing appModes array format.
     
     .DESCRIPTION
-        Handles backward compatibility by supporting both the legacy single appMode property and 
-        the new appModes array property. Returns a consistent array of effective app modes with
-        hierarchy resolution and conflict detection.
+        Handles app mode detection with appModes array as primary format.
+        Maintains backward compatibility by reading legacy appMode properties but
+        prioritizes appModes array. Returns a consistent array of effective app modes.
     
     .PARAMETER Settings
         Settings object containing app mode configuration (hashtable or PSCustomObject)
         
     .OUTPUTS
-        Array - Effective app modes with hierarchy resolution applied
+        Array - Effective app modes (always returns array, even for single modes)
         
     .EXAMPLE
         $effectiveModes = Get-EffectiveAppModes -Settings $settings
         
     .NOTES
-        - Maintains backward compatibility with single appMode
-        - Supports new appModes array for multiple modes
-        - Applies hierarchy resolution for conflicting modes
+        - Prioritizes appModes array as primary format
+        - Maintains backward compatibility with legacy appMode property for reading only
         - Returns array even for single mode configurations
+        - Single modes are returned as single-element arrays
         - Supports both hashtable and PSCustomObject settings
     #>
     [CmdletBinding()]

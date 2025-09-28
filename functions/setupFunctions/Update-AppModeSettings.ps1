@@ -2,79 +2,75 @@ function Update-AppModeSettings()
 {
     <#
     .SYNOPSIS
-        Updates app mode settings with support for both single and multiple modes.
+        Updates app mode settings with support for multiple modes and storage location choice.
     
     .DESCRIPTION
-        Handles the transition between single appMode and multiple appModes configurations
-        while maintaining backward compatibility. Manages both legacy single mode settings
-        and new multiple mode arrays in the global settings.
+        Handles app mode configuration updates using appModes array format only.
+        Single modes are stored as single-element arrays for consistency.
+        Allows user choice between Global and Domain settings storage.
     
-    .PARAMETER AppModeConfiguration
-        App mode configuration (single string or array) to save
+    .PARAMETER Configuration
+        App mode configuration (single string or array) to save as appModes array
         
     .PARAMETER SettingsFile
         Path to the settings file to update
         
-    .PARAMETER MaintainLegacy
-        If true, maintains both appMode and appModes properties for maximum compatibility
+    .PARAMETER UseGlobalSettings
+        If true, saves to Global settings; if false, saves to Domain settings
         
     .OUTPUTS
         Boolean - True if settings were updated successfully
         
     .EXAMPLE
-        $success = Update-AppModeSettings -AppModeConfiguration 'helpDesk' -SettingsFile 'settings.psd1'
+        $success = Update-AppModeSettings -Configuration 'helpDesk' -SettingsFile 'settings.psd1' -UseGlobalSettings:$true
         
     .EXAMPLE
-        $success = Update-AppModeSettings -AppModeConfiguration @('helpDesk', 'registration') -SettingsFile 'settings.psd1'
+        $success = Update-AppModeSettings -Configuration @('helpDesk', 'registration') -SettingsFile 'settings.psd1' -UseGlobalSettings:$false
         
     .NOTES
-        - Handles both single mode and multiple mode configurations
-        - Maintains backward compatibility with legacy appMode property
-        - Updates both appMode (primary mode) and appModes (all modes) for maximum compatibility
+        - Always stores configuration as appModes array (single modes become single-element arrays)
+        - Legacy appMode property is no longer created or maintained
         - Validates mode values before saving
+        - Supports user choice between Global and Domain settings
     #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        $AppModeConfiguration,
+        $Configuration,
         [Parameter(Mandatory = $false)]
         [string]$SettingsFile = "settings.psd1",
         [Parameter(Mandatory = $false)]
-        [switch]$MaintainLegacy = $true
+        [switch]$UseGlobalSettings = $true
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Updating app mode settings. Configuration: $(if ($AppModeConfiguration -is [array]) { "[$($AppModeConfiguration -join ', ')]" } else { "'$AppModeConfiguration'" })" -LogLevel "Information"
+    Write-Log -LogFile $logFile -Module $functionName -Message "Updating app mode settings. Configuration: $(if ($Configuration -is [array]) { "[$($Configuration -join ', ')]" } else { "'$Configuration'" })" -LogLevel "Information"
     
     try
     {
-        # Normalize and validate the configuration
-        $normalizedModes = @()
-        $primaryMode = $null
+        # Normalize configuration to array format only (eliminate legacy single mode)
+        $appModesArray = @()
         
-        if ($AppModeConfiguration -is [array])
+        if ($Configuration -is [array])
         {
-            $normalizedModes = $AppModeConfiguration | Where-Object { $_ -and $_.ToString().Trim() -ne '' }
-            $primaryMode = if ($normalizedModes.Count -gt 0) { $normalizedModes[0] } else { 'full' }
+            $appModesArray = $Configuration | Where-Object { $_ -and $_.ToString().Trim() -ne '' }
         }
-        elseif ($AppModeConfiguration -and $AppModeConfiguration.ToString().Trim() -ne '')
+        elseif ($Configuration -and $Configuration.ToString().Trim() -ne '')
         {
-            $primaryMode = $AppModeConfiguration.ToString().Trim()
-            $normalizedModes = @($primaryMode)
+            # Single mode becomes single-element array
+            $appModesArray = @($Configuration.ToString().Trim())
         }
         else
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Invalid app mode configuration provided, using default 'full'" -LogLevel "Warning"
-            $primaryMode = 'full'
-            $normalizedModes = @('full')
-        }
+            # Default fallback
+            $appModesArray = @('full')
         
         # Validate all modes
         $validModes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
         $validatedModes = @()
         $invalidModes = @()
         
-        foreach ($mode in $normalizedModes)
+        foreach ($mode in $appModesArray)
         {
             if ($mode -in $validModes)
             {
@@ -99,68 +95,40 @@ function Update-AppModeSettings()
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "No valid modes found, defaulting to 'full'" -LogLevel "Error"
             $validatedModes = @('full')
-            $primaryMode = 'full'
-        }
-        else
-        {
-            $primaryMode = $validatedModes[0]  # Ensure primary mode is valid
         }
         
-        Write-Log -LogFile $logFile -Module $functionName -Message "Validated modes: [$($validatedModes -join ', ')], Primary mode: '$primaryMode'" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Validated modes: [$($validatedModes -join ', ')]" -LogLevel "Verbose"
         
-        # Update the settings
+        # Update the settings using appModes array only (no legacy appMode support)
         $success = $true
+        $settingType = if ($UseGlobalSettings) { "Global" } else { "Domain" }
         
-        if ($MaintainLegacy)
-        {
-            # Update legacy appMode property (primary mode for backward compatibility)
-            Write-Log -LogFile $logFile -Module $functionName -Message "Updating legacy appMode property to '$primaryMode'" -LogLevel "Debug"
-            $legacySuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $primaryMode
-            
-            if (-not $legacySuccess)
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update legacy appMode property" -LogLevel "Warning"
-                $success = $false
-            }
-        }
+        Write-Log -LogFile $logFile -Module $functionName -Message "Updating appModes property in $settingType settings" -LogLevel "Debug"
+        $settingsSuccess = Update-Setting -SettingType $settingType -SettingsFile $SettingsFile -SettingName "appModes" -SettingValue $validatedModes
         
-        # Update new appModes array property
-        if ($validatedModes.Count -eq 1)
+        if (-not $settingsSuccess)
         {
-            # For single mode, store as single mode for simplicity (but still use array internally)
-            Write-Log -LogFile $logFile -Module $functionName -Message "Storing single mode '$($validatedModes[0])' as appModes array" -LogLevel "Debug"
-            $appModesSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appModes" -SettingValue $validatedModes
-        }
-        else
-        {
-            # For multiple modes, store as array
-            Write-Log -LogFile $logFile -Module $functionName -Message "Storing multiple modes [$($validatedModes -join ', ')] as appModes array" -LogLevel "Debug"
-            $appModesSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appModes" -SettingValue $validatedModes
-        }
-        
-        if (-not $appModesSuccess)
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update appModes array property" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update appModes property in $settingType settings" -LogLevel "Error"
             $success = $false
         }
         
         if ($success)
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "App mode settings updated successfully. Primary: '$primaryMode', All modes: [$($validatedModes -join ', ')]" -LogLevel "Information"
+            Write-Log -LogFile $logFile -Module $functionName -Message "App mode settings updated successfully in $settingType settings. Modes: [$($validatedModes -join ', ')]" -LogLevel "Information"
             
             # Log configuration summary
             if ($validatedModes.Count -eq 1)
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Configuration: Single mode '$($validatedModes[0])'" -LogLevel "Verbose"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Configuration: Single mode '$($validatedModes[0])' stored as array" -LogLevel "Verbose"
             }
             else
             {
-                Write-Log -LogFile $logFile -Module $functionName -Message "Configuration: Multiple modes with '$primaryMode' as primary, additional modes: [$($validatedModes[1..$($validatedModes.Length-1)] -join ', ')]" -LogLevel "Verbose"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Configuration: Multiple modes [$($validatedModes -join ', ')]" -LogLevel "Verbose"
             }
         }
         else
         {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update app mode settings" -LogLevel "Error"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update app mode settings in $settingType settings" -LogLevel "Error"
         }
         
         return $success

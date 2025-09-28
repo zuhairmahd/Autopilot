@@ -244,13 +244,55 @@ function Get-MultipleAppModeInput()
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected multiple app modes: [$($selectedModes -join ', ')]" -LogLevel "Information"
                 
-                if ($selectedModes.Count -eq 1 -and $AllowSingleMode) 
-                { 
-                    return $selectedModes[0] 
-                } 
-                else 
-                { 
-                    return $selectedModes 
+                # Ask user for storage location preference
+                Write-Host ""
+                Write-Host "Storage Location Options:" -ForegroundColor Yellow
+                Write-Host "1. Global Settings - Available to all users and domains"
+                Write-Host "2. Domain Settings - Specific to the active domain only"
+                Write-Host ""
+                
+                do {
+                    $storageChoice = Read-Host "Save to Global Settings (1) or Domain Settings (2)? (1/2)"
+                    
+                    if ($storageChoice -eq '1') {
+                        $useGlobalSettings = $true
+                        Write-Host "Saving to Global Settings..." -ForegroundColor Green
+                        break
+                    }
+                    elseif ($storageChoice -eq '2') {
+                        $useGlobalSettings = $false
+                        Write-Host "Saving to Domain Settings..." -ForegroundColor Green
+                        break
+                    }
+                    else {
+                        Write-Host "Invalid choice. Please enter 1 for Global or 2 for Domain." -ForegroundColor Red
+                    }
+                } while ($true)
+                
+                # Always return array format (eliminate legacy appMode)
+                $modesArray = if ($selectedModes.Count -eq 1) { @($selectedModes[0]) } else { $selectedModes }
+                
+                # Use Update-AppModeSettings for specialized handling with storage preference
+                try {
+                    $saveResult = Update-AppModeSettings -Configuration $modesArray -SettingsFile $initFile -UseGlobalSettings:$useGlobalSettings
+                    
+                    if ($saveResult) {
+                        $storageType = if ($useGlobalSettings) { "Global Settings" } else { "Domain Settings" }
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+                        Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
+                        return $modesArray
+                    }
+                    else {
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
+                        Write-Host "Failed to save app mode configuration" -ForegroundColor Red
+                        return $null
+                    }
+                }
+                catch {
+                    $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
+                    Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
+                    Write-Host $errorMessage -ForegroundColor Red
+                    return $null
                 }
             }
         }

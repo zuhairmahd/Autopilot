@@ -442,20 +442,19 @@ App mode can be configured in multiple ways:
 .\main.ps1 -appMode "helpdesk"
 ```
 
-**2. Settings Configuration (Single Mode - Legacy)**
+**2. Settings Configuration (Single Mode)**
 ```powershell
 @{
     globalSettings = @{
-        appMode = "helpdesk"
+        appModes = @("helpdesk")
     }
 }
 ```
 
-**3. Settings Configuration (Multiple Modes - New)**
+**3. Settings Configuration (Multiple Modes)**
 ```powershell
 @{
     globalSettings = @{
-        appMode = "helpdesk"
         appModes = @("helpdesk", "registration")
     }
 }
@@ -553,17 +552,36 @@ You can change the app mode at any time through the enhanced settings menu:
 1. Navigate to **Change application settings** → **Change App Mode setting**
 2. Choose between:
    - **Configure multiple app modes** (recommended - combine permissions)
-   - **Configure single app mode** (legacy - one mode only)
+   - **Configure single app mode** (stored as single-element array)
    - **Keep current configuration**
+3. **Choose storage location**:
+   - **Global Settings** - Available to all users and domains
+   - **Domain Settings** - Specific to the active domain only
 
 #### Multiple App Mode Selection Features
 
 The enhanced settings editor provides:
 
 - **Interactive multi-selection interface**
-- **Conflict detection and resolution warnings**
+- **Conflict detection and resolution warnings**  
 - **Hierarchy information and superseding notifications**
 - **Real-time effective permissions display**
+- **Storage location choice** (Global vs Domain settings)
+
+**Example Storage Location Choice:**
+```
+Selected modes: [helpDesk, registration]
+Effective permissions: [helpDesk, registration]
+Confirm this selection? (y/N): y
+
+Storage Location Options:
+1. Global Settings - Available to all users and domains
+2. Domain Settings - Specific to the active domain only
+
+Save to Global Settings (1) or Domain Settings (2)? (1/2): 2
+Saving to Domain Settings...
+App mode configuration saved successfully to Domain Settings
+```
 
 **Example Conflict Detection:**
 ```
@@ -643,7 +661,7 @@ Organizations can create custom access patterns by:
 
 ### Migration from Single to Multiple Modes
 
-**Existing Configuration:**
+**Existing Configuration (Legacy):**
 ```powershell
 @{
     globalSettings = @{
@@ -652,17 +670,25 @@ Organizations can create custom access patterns by:
 }
 ```
 
-**Migrated Configuration:**
+**New Configuration (appModes Array Only):**
 ```powershell  
 @{
     globalSettings = @{
-        appMode = "helpdesk"
+        appModes = @("helpdesk")
+    }
+}
+```
+
+**Multiple Modes Configuration:**
+```powershell
+@{
+    globalSettings = @{
         appModes = @("helpdesk", "registration")
     }
 }
 ```
 
-*Note*: The legacy `appMode` property is maintained for backward compatibility.
+*Note*: Legacy `appMode` properties are still read for backward compatibility, but new configurations use only `appModes` arrays. Single modes are stored as single-element arrays for consistency.
 
 ---
 
