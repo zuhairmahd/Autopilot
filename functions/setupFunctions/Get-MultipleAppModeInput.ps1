@@ -60,13 +60,15 @@ function Get-MultipleAppModeInput()
         $currentModes = @($CurrentValue)
     }
     
-    Write-Host "`n=== App Mode Selection ===" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "=== App Mode Selection ===" -ForegroundColor Cyan
     Write-Host "Configure application modes for this installation." -ForegroundColor White
     Write-Host "You can select multiple modes to combine their permissions." -ForegroundColor Yellow
     
     if ($currentModes.Count -gt 0)
     {
-        Write-Host "`nCurrent modes: [$($currentModes -join ', ')]" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "Current modes: [$($currentModes -join ', ')]" -ForegroundColor Green
         
         # Show current hierarchy
         try
@@ -80,28 +82,30 @@ function Get-MultipleAppModeInput()
         }
     }
     
-    Write-Host "`nAvailable app modes:" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Available app modes:" -ForegroundColor White
     for ($i = 0; $i -lt $availableModes.Count; $i++)
     {
         $mode = $availableModes[$i]
         $isSelected = $currentModes -contains $mode.Mode
-        $marker = if ($isSelected) { " ✓" } else { "  " }
+        $marker = if ($isSelected) { " [X]" } else { "   " }
         $color = if ($isSelected) { 'Green' } else { 'White' }
         
         Write-Host "$($i + 1).$marker $($mode.Name)" -ForegroundColor $color
         Write-Host "    $($mode.Description)" -ForegroundColor Gray
     }
     
-    Write-Host "`nSelection Options:" -ForegroundColor Yellow
-    Write-Host "• Enter mode numbers (e.g., '2,5' for Admin and Help Desk modes)" -ForegroundColor White
-    Write-Host "• Enter 'single' to select only one mode" -ForegroundColor White
-    Write-Host "• Enter 'clear' to start fresh selection" -ForegroundColor White
-    Write-Host "• Press Enter to keep current selection" -ForegroundColor White
-    Write-Host "• Enter 'help' for mode hierarchy information" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Selection Options:" -ForegroundColor Yellow
+    Write-Host "* Enter mode numbers (e.g., '2,5' for Admin and Help Desk modes)" -ForegroundColor White
+    Write-Host "* Enter 'single' to select only one mode" -ForegroundColor White
+    Write-Host "* Enter 'clear' to start fresh selection" -ForegroundColor White
+    Write-Host "* Press Enter to keep current selection" -ForegroundColor White
+    Write-Host "* Enter 'help' for mode hierarchy information" -ForegroundColor White
     
     do
     {
-        $choice = Read-Host "`nYour choice"
+        $choice = Read-Host "Your choice"
         
         # Handle special commands
         if ([string]::IsNullOrWhiteSpace($choice))
@@ -186,30 +190,34 @@ function Get-MultipleAppModeInput()
         
         if ($validationResult.IsValid)
         {
-            Write-Host "`nSelected modes: [$($selectedModes -join ', ')]" -ForegroundColor Green
+            Write-Host ""
+            Write-Host "Selected modes: [$($selectedModes -join ', ')]" -ForegroundColor Green
             Write-Host "Effective permissions: [$($validationResult.EffectivePermissions -join ', ')]" -ForegroundColor Cyan
             
             if ($validationResult.HasConflicts)
             {
-                Write-Host "`nCONFLICT INFORMATION:" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "CONFLICT INFORMATION:" -ForegroundColor Yellow
                 foreach ($conflict in $validationResult.Conflicts)
                 {
-                    Write-Host "• $($conflict.Description)" -ForegroundColor Yellow
+                    Write-Host "* $($conflict.Description)" -ForegroundColor Yellow
                 }
-                Write-Host "`nResolution: $($validationResult.Resolution)" -ForegroundColor Green
+                Write-Host ""
+                Write-Host "Resolution: $($validationResult.Resolution)" -ForegroundColor Green
             }
             
             if ($validationResult.HasRedundancy)
             {
-                Write-Host "`nNOTE: Some modes may be redundant due to hierarchy:" -ForegroundColor Cyan
+                Write-Host ""
+                Write-Host "NOTE: Some modes may be redundant due to hierarchy:" -ForegroundColor Cyan
                 foreach ($redundancy in $validationResult.Redundancies)
                 {
-                    Write-Host "• $redundancy" -ForegroundColor Cyan
+                    Write-Host "* $redundancy" -ForegroundColor Cyan
                 }
             }
             
             # Confirm selection
-            $confirm = Read-Host "`nConfirm this selection? (y/N)"
+            $confirm = Read-Host "Confirm this selection? (y/N)"
             if ($confirm -match '^[yY]')
             {
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected multiple app modes: [$($selectedModes -join ', ')]" -LogLevel "Information"
@@ -218,7 +226,8 @@ function Get-MultipleAppModeInput()
         }
         else
         {
-            Write-Host "`nINVALID SELECTION:" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "INVALID SELECTION:" -ForegroundColor Red
             Write-Host "$($validationResult.ErrorMessage)" -ForegroundColor Red
         }
         
@@ -232,10 +241,12 @@ function Show-AppModeHierarchyInfo()
         Displays app mode hierarchy and conflict resolution information.
     #>
     
-    Write-Host "`n=== App Mode Hierarchy Information ===" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "=== App Mode Hierarchy Information ===" -ForegroundColor Cyan
     Write-Host "Understanding mode combinations and conflicts:" -ForegroundColor White
     
-    Write-Host "`nMode Precedence (highest to lowest):" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Mode Precedence (highest to lowest):" -ForegroundColor Yellow
     Write-Host "1. Full Mode - Grants all permissions, supersedes all other modes" -ForegroundColor White
     Write-Host "2. Admin Mode - Administrative functions + Advanced + Help Desk + Registration" -ForegroundColor White  
     Write-Host "3. Advanced Mode - Advanced features + Help Desk + Registration" -ForegroundColor White
@@ -244,18 +255,21 @@ function Show-AppModeHierarchyInfo()
     Write-Host "6. Registration Mode - Device enrollment and basic operations" -ForegroundColor White
     Write-Host "7. Custom Mode - User-defined permissions" -ForegroundColor White
     
-    Write-Host "`nConflict Resolution:" -ForegroundColor Yellow
-    Write-Host "• ADDITIVE: Combines permissions from all selected modes (default)" -ForegroundColor White
-    Write-Host "• Higher precedence modes include lower precedence permissions" -ForegroundColor White
-    Write-Host "• Selecting both 'Admin' and 'Help Desk' is redundant (Admin includes Help Desk)" -ForegroundColor Cyan
-    Write-Host "• 'Full' mode with any other mode is redundant (Full includes everything)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Conflict Resolution:" -ForegroundColor Yellow
+    Write-Host "* ADDITIVE: Combines permissions from all selected modes (default)" -ForegroundColor White
+    Write-Host "* Higher precedence modes include lower precedence permissions" -ForegroundColor White
+    Write-Host "* Selecting both 'Admin' and 'Help Desk' is redundant (Admin includes Help Desk)" -ForegroundColor Cyan
+    Write-Host "* 'Full' mode with any other mode is redundant (Full includes everything)" -ForegroundColor Cyan
     
-    Write-Host "`nRecommended Combinations:" -ForegroundColor Yellow
-    Write-Host "• Help Desk + Registration: Comprehensive support operations" -ForegroundColor White
-    Write-Host "• Advanced Registration: Specialized device enrollment" -ForegroundColor White
-    Write-Host "• Custom: For unique organizational requirements" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Recommended Combinations:" -ForegroundColor Yellow
+    Write-Host "* Help Desk + Registration: Comprehensive support operations" -ForegroundColor White
+    Write-Host "* Advanced Registration: Specialized device enrollment" -ForegroundColor White
+    Write-Host "* Custom: For unique organizational requirements" -ForegroundColor White
     
-    Write-Host "`nPress Enter to continue..." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Press Enter to continue..." -ForegroundColor Gray
     Read-Host | Out-Null
 }
 
@@ -271,7 +285,8 @@ function Get-SingleAppModeSelection()
         [array]$CurrentModes
     )
     
-    Write-Host "`n=== Single App Mode Selection ===" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "=== Single App Mode Selection ===" -ForegroundColor Cyan
     Write-Host "Select one app mode for this installation:" -ForegroundColor White
     
     for ($i = 0; $i -lt $AvailableModes.Count; $i++)
@@ -287,7 +302,7 @@ function Get-SingleAppModeSelection()
     
     do
     {
-        $choice = Read-Host "`nSelect mode (1-$($AvailableModes.Count)) or Enter to cancel"
+        $choice = Read-Host "Select mode (1-$($AvailableModes.Count)) or Enter to cancel"
         
         if ([string]::IsNullOrWhiteSpace($choice))
         {

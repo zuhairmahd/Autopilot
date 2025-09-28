@@ -443,34 +443,34 @@ App mode can be configured in multiple ways:
 ```
 
 **2. Settings Configuration (Single Mode - Legacy)**
-```json
-{
-  "globalSettings": {
-    "appMode": "helpdesk"
-  }
+```powershell
+@{
+    globalSettings = @{
+        appMode = "helpdesk"
+    }
 }
 ```
 
 **3. Settings Configuration (Multiple Modes - New)**
-```json
-{
-  "globalSettings": {
-    "appMode": "helpdesk",
-    "appModes": ["helpdesk", "registration"]
-  }
+```powershell
+@{
+    globalSettings = @{
+        appMode = "helpdesk"
+        appModes = @("helpdesk", "registration")
+    }
 }
 ```
 
 **4. Domain-Specific Configuration**
-```json
-{
-  "domains": {
-    "company.com": {
-      "settings": {
-        "appModes": ["advanced", "registration"]
-      }
+```powershell
+@{
+    domains = @{
+        "company.com" = @{
+            settings = @{
+                appModes = @("advanced", "registration")
+            }
+        }
     }
-  }
 }
 ```
 
@@ -479,21 +479,21 @@ App mode can be configured in multiple ways:
 When using multiple app modes, the system combines permissions using **additive strategy** by default:
 
 **Help Desk + Registration Combination:**
-```json
-{
-  "globalSettings": {
-    "appModes": ["helpdesk", "registration"]
-  }
+```powershell
+@{
+    globalSettings = @{
+        appModes = @("helpdesk", "registration")
+    }
 }
 ```
 *Result*: Access to help desk operations + device registration features
 
 **Admin + Custom Combination:**  
-```json
-{
-  "globalSettings": {
-    "appModes": ["admin", "custom"]
-  }
+```powershell
+@{
+    globalSettings = @{
+        appModes = @("admin", "custom")
+    }
 }
 ```
 *Result*: Full admin permissions + any custom-defined permissions
@@ -517,17 +517,17 @@ When multiple modes are selected, the system automatically resolves conflicts:
 #### Conflict Examples
 
 **Redundant Modes:**
-```json
-{
-  "appModes": ["admin", "helpdesk"]
+```powershell
+@{
+    appModes = @("admin", "helpdesk")
 }
 ```
 → *Warning*: `admin` already includes `helpdesk` permissions
 
 **Full Mode Combination:**
-```json
-{
-  "appModes": ["full", "helpdesk", "registration"]
+```powershell
+@{
+    appModes = @("full", "helpdesk", "registration")
 }
 ```  
 → *Result*: `full` mode grants all permissions, other modes are redundant
@@ -598,11 +598,11 @@ Organizations can create custom access patterns by:
 ```
 
 #### 3. Custom Mode Combinations
-```json
-{
-  "globalSettings": {
-    "appModes": ["custom", "registration"]
-  }
+```powershell
+@{
+    globalSettings = @{
+        appModes = @("custom", "registration")
+    }
 }
 ```
 
@@ -611,26 +611,26 @@ Organizations can create custom access patterns by:
 #### Recommended Mode Combinations
 
 **Support Operations:**
-```json
-{"appModes": ["helpdesk", "registration"]}
+```powershell
+@{appModes = @("helpdesk", "registration")}
 ```
 *Ideal for*: Support staff handling both troubleshooting and device enrollment
 
 **Senior Technical Staff:**
-```json  
-{"appModes": ["advanced", "registration"]}
+```powershell  
+@{appModes = @("advanced", "registration")}
 ```
 *Ideal for*: Technical leads with device management and enrollment responsibilities
 
 **Device Specialists:**
-```json
-{"appModes": ["advancedRegistration"]}  
+```powershell
+@{appModes = @("advancedRegistration")}  
 ```
 *Ideal for*: Dedicated device enrollment and preparation teams
 
 **System Administrators:**
-```json
-{"appModes": ["admin"]}
+```powershell
+@{appModes = @("admin")}
 ```
 *Ideal for*: Full administrative access with all permissions
 
@@ -644,21 +644,21 @@ Organizations can create custom access patterns by:
 ### Migration from Single to Multiple Modes
 
 **Existing Configuration:**
-```json
-{
-  "globalSettings": {
-    "appMode": "helpdesk"
-  }
+```powershell
+@{
+    globalSettings = @{
+        appMode = "helpdesk"
+    }
 }
 ```
 
 **Migrated Configuration:**
-```json  
-{
-  "globalSettings": {
-    "appMode": "helpdesk",
-    "appModes": ["helpdesk", "registration"]
-  }
+```powershell  
+@{
+    globalSettings = @{
+        appMode = "helpdesk"
+        appModes = @("helpdesk", "registration")
+    }
 }
 ```
 
