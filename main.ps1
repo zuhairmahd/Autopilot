@@ -1742,7 +1742,7 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue) {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using enhanced app mode settings update (supports multiple modes)" -LogLevel "Information"
         # Prioritize domain settings over global settings
-        $updateResult = Update-AppModeSettings -AppModeConfiguration $newAppModeConfig -SettingsFile $initFile -PreferDomain -MaintainLegacy
+        $updateResult = Update-AppModeSettings -AppModeConfiguration $newAppModeConfig -SettingsFile $initFile -MaintainLegacy
     } else {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using legacy app mode update method" -LogLevel "Warning"
         # Try domain settings first, fall back to global
@@ -1902,21 +1902,9 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 }
 
 #region Get effective app modes for menu filtering
-Write-Verbose "[$scriptName] Getting effective app modes for menu filtering"
-try {
-    if (-not (Get-Command Get-EffectiveAppModes -ErrorAction SilentlyContinue)) {
-        . "$PWD/functions/menuFunctions/Get-EffectiveAppModes.ps1"
-    }
-    $effectiveAppModes = Get-EffectiveAppModes -Settings $settings
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Effective app modes for menu filtering: [$($effectiveAppModes -join ', ')]" -LogLevel "Information"
-} catch {
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Error getting effective app modes, falling back to legacy mode: $($_.Exception.Message)" -LogLevel "Warning"
-    $effectiveAppModes = if ($settings.appModes) { $settings.appModes } elseif ($settings.appMode) { @($settings.appMode) } else { @('full') }
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using fallback app modes: [$($effectiveAppModes -join ', ')]" -LogLevel "Information"
-}
-#endregion Get effective app modes for menu filtering
+# Menu filtering now handled by enhanced Test-MenuItemIncluded function
 
-if (Test-MenuItemVisibility -MenuItemName "Give a device to a user" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Give a device to a user" -Menus $script:menus) {
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
     $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
     # Check if user entered 'back'
@@ -2126,16 +2114,16 @@ if (Test-MenuItemVisibility -MenuItemName "Give a device to a user" -CurrentAppM
     }
 }
 }
-if (Test-MenuItemVisibility -MenuItemName "Check device status" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Check device status" -Menus $script:menus) {
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
 }
-if (Test-MenuItemVisibility -MenuItemName "Autopilot menu" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Autopilot menu" -Menus $script:menus) {
     $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
 }
-if (Test-MenuItemVisibility -MenuItemName "Change application settings" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Change application settings" -Menus $script:menus) {
     $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
 }
-if (Test-MenuItemVisibility -MenuItemName "Check for script updates" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Check for script updates" -Menus $script:menus) {
     $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
     Write-Host "Checking for script updates..."
     if ($settings.updateLocalSettings)
@@ -2176,7 +2164,7 @@ if (Test-MenuItemVisibility -MenuItemName "Check for script updates" -CurrentApp
     }
 }
 }
-if (Test-MenuItemVisibility -MenuItemName "Restart the device" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Restart the device" -Menus $script:menus) {
     $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
     Write-Host 'Restarting the device...'
     if (-not (RestartDevice))
@@ -2186,7 +2174,7 @@ if (Test-MenuItemVisibility -MenuItemName "Restart the device" -CurrentAppModes 
     }
 }
 }
-if (Test-MenuItemVisibility -MenuItemName "Show Group Assignments" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Show Group Assignments" -Menus $script:menus) {
     $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
     if ($null -eq $groupName)
@@ -2299,10 +2287,10 @@ if (Test-MenuItemVisibility -MenuItemName "Show Group Assignments" -CurrentAppMo
     }
 }
 }
-if (Test-MenuItemVisibility -MenuItemName "Export Menu" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus) {
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 }
-if (Test-MenuItemVisibility -MenuItemName "About" -CurrentAppModes $effectiveAppModes) {
+if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus) {
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
         Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
     }
