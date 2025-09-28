@@ -1028,8 +1028,6 @@ $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
 #endregion Create menus
 
-#region Helper function for app mode filtering removed - now using Test-MenuItemIncluded
-
 #region export menu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
@@ -1633,12 +1631,15 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     }
     
     # Handle both single and multiple app mode results
-    if ($result.isMultipleMode -and $result.appModes) {
+    if ($result.isMultipleMode -and $result.appModes)
+    {
         $newAppModeConfig = $result.appModes
         $newAppMode = $result.appMode  # Primary mode for display
         Write-Host "`nYou selected multiple app modes: [$($result.appModes -join ', ')]" -ForegroundColor Green
         Write-Host "Primary mode: $newAppMode" -ForegroundColor Cyan
-    } else {
+    }
+    else
+    {
         $newAppModeConfig = $result.appMode
         $newAppMode = $result.appMode
         Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
@@ -1662,19 +1663,25 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppModeConfig'" -LogLevel "Information"
     
     # Load Update-AppModeSettings function if available for enhanced multiple mode support
-    if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue) {
+    if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue)
+
+    {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using enhanced app mode settings update (supports multiple modes)" -LogLevel "Information"
         # Prioritize domain settings over global settings
-        $updateResult = Update-AppModeSettings -AppModeConfiguration $newAppModeConfig -SettingsFile $initFile -MaintainLegacy
-    } else {
+        $updateResult = Update-AppModeSettings -Configuration $newAppModeConfig -SettingsFile $initFile -MaintainLegacy
+    }
+    else
+    {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using legacy app mode update method" -LogLevel "Warning"
         # Try domain settings first, fall back to global
         $updateResult = $false
-        if ($settings.domain) {
+        if ($settings.domain)
+        {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Attempting to save app mode in domain settings for '$($settings.domain)'" -LogLevel "Information"
             $updateResult = Update-Setting -SettingType "Domain" -Domain $settings.domain -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode
         }
-        if (-not $updateResult) {
+        if (-not $updateResult)
+        {
             Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain update failed or not available, using global settings" -LogLevel "Warning"
             $updateResult = Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode
         }
@@ -1702,7 +1709,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
     }
 }
-
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
@@ -1827,393 +1833,402 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
 #region Get effective app modes for menu filtering
 # Menu filtering now handled by enhanced Test-MenuItemIncluded function
 
-if (Test-MenuItemIncluded -MenuItemName "Give a device to a user" -Menus $script:menus) {
+if (Test-MenuItemIncluded -MenuItemName "Give a device to a user" -Menus $script:menus)
+{
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
-    $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
-    # Check if user entered 'back'
-    if ($null -eq $username)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-        return $returnValues.backoutText # Return to the previous menu
-    }
-    else # Continue only if a username was entered
-    {
-        $hasCorrectGroups = $false
-        $hasStrongMapping = $false
-        $hasCorrectNumberOfDevices = $false
-        #region Check if the user exists first.
-        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
-        Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-        Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-        if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+        $username = GetUserInput -Message "Enter the username (Email address) of the user receiving the device." -Prompt 'Please enter the user name (email address)' -InputType 'userName' -settings $settings
+        # Check if user entered 'back'
+        if ($null -eq $username)
         {
-            Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-            $userName = $userInfo[0].value.userPrincipalName
-            Write-Verbose "[$scriptName] User name set to: $userName"
+            Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText # Return to the previous menu
         }
-        elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+        else # Continue only if a username was entered
         {
-            Write-Host "Could not find an exact match for user $($userName)."
-            if ($userInfo[0].value.count -eq 1)
+            $hasCorrectGroups = $false
+            $hasStrongMapping = $false
+            $hasCorrectNumberOfDevices = $false
+            #region Check if the user exists first.
+            $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
+            Write-Verbose "[$scriptName] Substring search: $($userInfo)"
+            Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
+            Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
+            if ($null -ne $userInfo -and $userInfo[1] -eq $false)
             {
-                Write-Host "Found a user with a similar name."
+                Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
+                $userName = $userInfo[0].value.userPrincipalName
+                Write-Verbose "[$scriptName] User name set to: $userName"
+            }
+            elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+            {
+                Write-Host "Could not find an exact match for user $($userName)."
+                if ($userInfo[0].value.count -eq 1)
+                {
+                    Write-Host "Found a user with a similar name."
+                }
+                else
+                {
+                    Write-Host "Found $($userInfo[0].value.count) users with similar names:"
+                }
+                if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+                {
+                    Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
+                }
+                elseif ($($userInfo[0].value.count) -eq 1)
+                {
+                    Write-Host "Is this the correct user?"
+                }
+                else
+                {
+                    Write-Host "Displaying all $($userInfo[0].value.count) matches:"
+                }
+                $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
+                Write-Verbose "[$scriptName] User name selected: $possibleUserName"
+                # Handle navigation options returned from DisplayUserList
+                if ($possibleUserName -in $returnValues.Values)
+                {
+                    Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
+                    return $possibleUserName
+                }
+                elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
+                {
+                    Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+                    return $returnValues.backoutText
+                }
+                elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
+                {
+                    Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
+                    return "Main Menu"
+                }
+                elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
+                {
+                    Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                    return "EXIT_APPLICATION"
+                }
+                else
+                {
+                    Write-Verbose "[$scriptName] User selected: $possibleUserName"
+                    $userName = $possibleUserName
+                }
+            }
+            elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
+            {
+                return $userInfo
             }
             else
             {
-                Write-Host "Found $($userInfo[0].value.count) users with similar names:"
+                return $returnValues.noUserFoundInDirectoryMessage
             }
-            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
+            #endregion Check if the user exists first.
+        
+            Write-Host "Checking group membership for user $userName."
+            $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
+            if ($groups.success -eq $true)
+            {
+                Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
+                Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
+                $hasCorrectGroups = $true
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group memberships and $($groups.ForbiddenGroups.Count) forbidden group memberships."
+                Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
+                Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
+                if ($groups.missingGroups.Count -gt 0)
+                {
+                    Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
+                    foreach ($group in $groups.missingGroups)
+                    {
+                        Write-Host $group -ForegroundColor Red
+                    }
+                }
+                if ($groups.ForbiddenGroups.Count -gt 0)
+                {
+                    Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
+                    foreach ($group in $groups.invalidExcludeGroups)
+                    {
+                        Write-Host $group -ForegroundColor Red
+                    }
+                }
+                Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
+            }
+        
+            Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
+            $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken
+            if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
+            {
+                Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
+                $hasCorrectNumberOfDevices = $true
+            }
+            else
+            {
+                Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
+                Write-Host "No additional devices can be assigned to this user."
+            }
+        
+            if ($settings.checkStrongMapping)
+            {
+                Write-Host "`nChecking if the user $userName has strong certificate mapping enabled." -ForegroundColor Cyan
+                $strongMappingInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
+                Write-Verbose "[$scriptName] Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)"
+                Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Verbose"
+                if ($strongMappingInfo.StrongMapping)
+                {
+                    Write-Host "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -ForegroundColor Green
+                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -LogLevel "Information"
+                    foreach ($cert in $strongMappingInfo.Certificates)
+                    {
+                        Write-Host "Certificate info: $cert" -ForegroundColor Green
+                        Write-Log -logFile $logFile -Module "$scriptName" -Message "Certificate info: $cert" -LogLevel "Information"
+                    }
+                    Write-Host "----------------------------------------" -ForegroundColor Green
+                    $hasStrongMapping = $true
+                }
+                else
+                {
+                    if ($settings.strongMappingOptional)
+                    {
+                        Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Yellow
+                        Write-Host "While the user may be able to complete enrollment," -ForegroundColor Yellow
+                        Write-Host "This means that the user may have problems connecting to network resources." -ForegroundColor Yellow
+                        Write-Host "Please open a ticket to enable strong certificate mapping for this user." -ForegroundColor Yellow
+                        Write-Host "========================================" -ForegroundColor Yellow
+                        Write-Host "" -ForegroundColor Yellow
+                        Read-Host -Prompt 'Press any key to continue...'
+                        Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled, but this is allowed as strong mapping is optional." -LogLevel "Warning"
+                        $hasStrongMapping = $true
+                    }
+                    else
+                    {
+                        Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Red
+                        Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled." -LogLevel "Error"
+                        Write-Host "Please enable strong certificate mapping for this user or contact an Intune administrator." -ForegroundColor Red
+                    }
+                }
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] Strong mapping check is disabled in settings."
+                Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping check is disabled in settings." -LogLevel "Information"
+                $hasStrongMapping = $true
+            }
+        
+            if (    $hasCorrectGroups -and $hasCorrectNumberOfDevices -and $hasStrongMapping)
+            {
+                Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
+                Write-Host "We will now check the device state." -ForegroundColor Green
+                Write-Host "Enter the device's serial number."
+                Write-Host "This would be the device you plan to give to the user."
+                $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+                # Check if user entered 'back'
+                if ($null -eq $serialNumber)
+                {
+                    Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+                    return $returnValues.backoutText # Return to the previous menu
+                }
+                else # Process only if a serial number was entered
+                {
+                    $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+                    # Check if ProcessSerialNumber returned an exit signal
+                    if ($null -eq $result)
+                    {
+                        Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+                        return "EXIT_APPLICATION"
+                    }
+                }
+            }
+            else
+            {
+                Write-Host "The user $userName is not ready to receive a Windows 11 device." -ForegroundColor Red
+            }
+        }
+    }
+}
+if (Test-MenuItemIncluded -MenuItemName "Check device status" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
+}
+if (Test-MenuItemIncluded -MenuItemName "Autopilot menu" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
+}
+if (Test-MenuItemIncluded -MenuItemName "Change application settings" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
+}
+if (Test-MenuItemIncluded -MenuItemName "Check for script updates" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
+        Write-Host "Checking for script updates..."
+        if ($settings.updateLocalSettings)
+        {
+            Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) 
+        }
+        else
+        {
+            Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
+            Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
+            $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
+        }
+        Write-Verbose "[$scriptName] Update result: $updateResult"
+        switch ($updateResult)
+        {
+            $returnValues.UpdateSuccessMessage
+            {
+                Write-Host 'The script has been updated.' -ForegroundColor Green
+                Write-Host 'Please restart the script.' -ForegroundColor Green
+                exit 0
+            }
+            $returnValues.UpdateFailedMessage
+            {
+                Write-Host 'The script update failed.' -ForegroundColor Red
+            }
+            $returnValues.UpdateNotNeededMessage
+            {
+                Write-Host 'The script is up to date.' -ForegroundColor Green
+            }
+            default
+            {
+                Write-Host "An error has occurred:"
+                Write-Host "Error message: $($updateResult.Content)"
+                Write-Host "Status Code: $($updateResult.StatusCode)"
+            }
+        }
+    }
+}
+if (Test-MenuItemIncluded -MenuItemName "Restart the device" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
+        Write-Host 'Restarting the device...'
+        if (-not (RestartDevice))
+        {
+            Write-Verbose "[$scriptName] RestartDevice function failed."
+            return $returnValues.backoutText
+        }
+    }
+}
+if (Test-MenuItemIncluded -MenuItemName "Show Group Assignments" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
+        $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
+        if ($null -eq $groupName)
+        {
+            Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
+            return $returnValues.backoutText
+        }
+        Write-Verbose "[$scriptName] Got group name: $groupName"
+    
+        #region Check if the group exists
+        $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
+        Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
+        if ($groupInfo.GetType().Name -eq 'String')
+        {
+            # Handle error messages from GetEntraUser
+            Write-Verbose "[$scriptName] Error finding group: $groupInfo"
+            return $groupInfo
+        }
+        $selectedGroup = $null
+        $substringSearch = $groupInfo[1]
+        $searchResults = $groupInfo[0].value
+        if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
+        {
+            # Exact match found
+            Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
+            $selectedGroup = $searchResults.value
+            Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        }
+        elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
+        {
+            # Similar matches found
+            Write-Host "Could not find an exact match for group '$groupName'."
+            if ($searchResults.value.count -eq 1)
+            {
+                Write-Host "Found a group with a similar name."
+            }
+            else
+            {
+                Write-Host "Found $($searchResults.value.count) groups with similar names:"
+            }
+            if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
             {
                 Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
             }
-            elseif ($($userInfo[0].value.count) -eq 1)
+            elseif ($searchResults.value.count -eq 1)
             {
-                Write-Host "Is this the correct user?"
+                Write-Host "Is this the correct group?"
             }
             else
             {
-                Write-Host "Displaying all $($userInfo[0].value.count) matches:"
+                Write-Host "Displaying all $($searchResults.value.count) matches:"
             }
-            $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-            Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-            # Handle navigation options returned from DisplayUserList
-            if ($possibleUserName -in $returnValues.Values)
+            # Display group selection menu similar to user selection
+            $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
+            # Handle navigation options returned from DisplayGroupList
+            if ($possibleGroupName -in $returnValues.Values)
             {
-                Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-                return $possibleUserName
+                Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
+                return $possibleGroupName
             }
-            elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
+            elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
             {
                 Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
                 return $returnValues.backoutText
             }
-            elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
+            elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
             {
                 Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
                 return "Main Menu"
             }
-            elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
+            elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
             {
                 Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
                 return "EXIT_APPLICATION"
             }
             else
             {
-                Write-Verbose "[$scriptName] User selected: $possibleUserName"
-                $userName = $possibleUserName
-            }
-        }
-        elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-        {
-            return $userInfo
-        }
-        else
-        {
-            return $returnValues.noUserFoundInDirectoryMessage
-        }
-        #endregion Check if the user exists first.
-        
-        Write-Host "Checking group membership for user $userName."
-        $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
-        if ($groups.success -eq $true)
-        {
-            Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
-            Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
-            $hasCorrectGroups = $true
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group memberships and $($groups.ForbiddenGroups.Count) forbidden group memberships."
-            Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
-            Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
-            if ($groups.missingGroups.Count -gt 0)
-            {
-                Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.missingGroups)
-                {
-                    Write-Host $group -ForegroundColor Red
-                }
-            }
-            if ($groups.ForbiddenGroups.Count -gt 0)
-            {
-                Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.invalidExcludeGroups)
-                {
-                    Write-Host $group -ForegroundColor Red
-                }
-            }
-            Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
-        }
-        
-        Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
-        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken
-        if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
-        {
-            Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
-            $hasCorrectNumberOfDevices = $true
-        }
-        else
-        {
-            Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
-            Write-Host "No additional devices can be assigned to this user."
-        }
-        
-        if ($settings.checkStrongMapping)
-        {
-            Write-Host "`nChecking if the user $userName has strong certificate mapping enabled." -ForegroundColor Cyan
-            $strongMappingInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
-            Write-Verbose "[$scriptName] Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-            Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Verbose"
-            if ($strongMappingInfo.StrongMapping)
-            {
-                Write-Host "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -ForegroundColor Green
-                Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -LogLevel "Information"
-                foreach ($cert in $strongMappingInfo.Certificates)
-                {
-                    Write-Host "Certificate info: $cert" -ForegroundColor Green
-                    Write-Log -logFile $logFile -Module "$scriptName" -Message "Certificate info: $cert" -LogLevel "Information"
-                }
-                Write-Host "----------------------------------------" -ForegroundColor Green
-                $hasStrongMapping = $true
-            }
-            else
-            {
-                if ($settings.strongMappingOptional)
-                {
-                    Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Yellow
-                    Write-Host "While the user may be able to complete enrollment," -ForegroundColor Yellow
-                    Write-Host "This means that the user may have problems connecting to network resources." -ForegroundColor Yellow
-                    Write-Host "Please open a ticket to enable strong certificate mapping for this user." -ForegroundColor Yellow
-                    Write-Host "========================================" -ForegroundColor Yellow
-                    Write-Host "" -ForegroundColor Yellow
-                    Read-Host -Prompt 'Press any key to continue...'
-                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled, but this is allowed as strong mapping is optional." -LogLevel "Warning"
-                    $hasStrongMapping = $true
-                }
-                else
-                {
-                    Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Red
-                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled." -LogLevel "Error"
-                    Write-Host "Please enable strong certificate mapping for this user or contact an Intune administrator." -ForegroundColor Red
-                }
+                Write-Verbose "[$scriptName] User selected: $possibleGroupName"
+                $selectedGroup = $possibleGroupName
             }
         }
         else
         {
-            Write-Verbose "[$scriptName] Strong mapping check is disabled in settings."
-            Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping check is disabled in settings." -LogLevel "Information"
-            $hasStrongMapping = $true
+            return $returnValues.noGroupFoundMessage
         }
-        
-        if (    $hasCorrectGroups -and $hasCorrectNumberOfDevices -and $hasStrongMapping)
-        {
-            Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
-            Write-Host "We will now check the device state." -ForegroundColor Green
-            Write-Host "Enter the device's serial number."
-            Write-Host "This would be the device you plan to give to the user."
-            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-            # Check if user entered 'back'
-            if ($null -eq $serialNumber)
-            {
-                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-                return $returnValues.backoutText # Return to the previous menu
-            }
-            else # Process only if a serial number was entered
-            {
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
-                # Check if ProcessSerialNumber returned an exit signal
-                if ($null -eq $result)
-                {
-                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                    return "EXIT_APPLICATION"
-                }
-            }
-        }
-        else
-        {
-            Write-Host "The user $userName is not ready to receive a Windows 11 device." -ForegroundColor Red
-        }
-    }
-}
-}
-if (Test-MenuItemIncluded -MenuItemName "Check device status" -Menus $script:menus) {
-    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
-}
-if (Test-MenuItemIncluded -MenuItemName "Autopilot menu" -Menus $script:menus) {
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Autopilot menu" -Submenu $autopilotMenu
-}
-if (Test-MenuItemIncluded -MenuItemName "Change application settings" -Menus $script:menus) {
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Change application settings" -Submenu $settingsMenu
-}
-if (Test-MenuItemIncluded -MenuItemName "Check for script updates" -Menus $script:menus) {
-    $mainMenu = AddMenuItem -menu $mainMenu -Name "Check for script updates" -Action {
-    Write-Host "Checking for script updates..."
-    if ($settings.updateLocalSettings)
-    {
-        Write-Verbose "[$scriptName] Including local settings file ($($settings.domain)) in update check."
-        Write-Log -logFile $logFile -Module "$scriptName" -Message "Including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile, $settings.domain) 
-    }
-    else
-    {
-        Write-Verbose "[$scriptName] Not including local settings file ($($settings.domain)) in update check."
-        Write-Log -logFile $logFile -Module "$scriptName" -Message "Not including local settings file ($($settings.domain)) in update check." -LogLevel "Information"
-        $updateResult = GetUpdates -executableFileName "$scriptPath\$scriptName" -updateURL $updateURL -metaDataURL $remoteVersionURL -SupportingFiles @($menuFile, $stringsFile) 
-    }
-    Write-Verbose "[$scriptName] Update result: $updateResult"
-    switch ($updateResult)
-    {
-        $returnValues.UpdateSuccessMessage
-        {
-            Write-Host 'The script has been updated.' -ForegroundColor Green
-            Write-Host 'Please restart the script.' -ForegroundColor Green
-            exit 0
-        }
-        $returnValues.UpdateFailedMessage
-        {
-            Write-Host 'The script update failed.' -ForegroundColor Red
-        }
-        $returnValues.UpdateNotNeededMessage
-        {
-            Write-Host 'The script is up to date.' -ForegroundColor Green
-        }
-        default
-        {
-            Write-Host "An error has occurred:"
-            Write-Host "Error message: $($updateResult.Content)"
-            Write-Host "Status Code: $($updateResult.StatusCode)"
-        }
-    }
-}
-}
-if (Test-MenuItemIncluded -MenuItemName "Restart the device" -Menus $script:menus) {
-    $mainMenu = AddMenuItem -menu $mainMenu -name "Restart the device" -action {
-    Write-Host 'Restarting the device...'
-    if (-not (RestartDevice))
-    {
-        Write-Verbose "[$scriptName] RestartDevice function failed."
-        return $returnValues.backoutText
-    }
-}
-}
-if (Test-MenuItemIncluded -MenuItemName "Show Group Assignments" -Menus $script:menus) {
-    $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
-    $groupName = GetUserInput -Message "Enter the name of the group whose assignments you want to view." -Prompt 'Please enter the group name' -InputType 'groupName' -settings $settings
-    if ($null -eq $groupName)
-    {
-        Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.BackoutText)."
-        return $returnValues.backoutText
-    }
-    Write-Verbose "[$scriptName] Got group name: $groupName"
+        #endregion Check if the group exists
     
-    #region Check if the group exists
-    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
-    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
-    if ($groupInfo.GetType().Name -eq 'String')
-    {
-        # Handle error messages from GetEntraUser
-        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
-        return $groupInfo
-    }
-    $selectedGroup = $null
-    $substringSearch = $groupInfo[1]
-    $searchResults = $groupInfo[0].value
-    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
-    {
-        # Exact match found
-        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value
-        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
-    }
-    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
-    {
-        # Similar matches found
-        Write-Host "Could not find an exact match for group '$groupName'."
-        if ($searchResults.value.count -eq 1)
+        # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
+        Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
+        $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
+        #region Handle navigation responses from GetDeviceByUser
+        if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
         {
-            Write-Host "Found a group with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($searchResults.value.count) groups with similar names:"
-        }
-        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Is this the correct group?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($searchResults.value.count) matches:"
-        }
-        # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
-        # Handle navigation options returned from DisplayGroupList
-        if ($possibleGroupName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
-            return $possibleGroupName
-        }
-        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
+            Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
             return $returnValues.backoutText
         }
-        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
+        elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
         {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
+            Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
+            return "EXIT_APPLICATION"
         }
-        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
+        elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
         {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+            Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
             return "EXIT_APPLICATION"
         }
         else
         {
-            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
-            $selectedGroup = $possibleGroupName
+            return $result
         }
     }
-    else
-    {
-        return $returnValues.noGroupFoundMessage
-    }
-    #endregion Check if the group exists
-    
-    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
-    Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
-    $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
-    #region Handle navigation responses from GetDeviceByUser
-    if ($ShowGroupAssignmentsResponse -eq "Back" -or $ShowGroupAssignmentsResponse -eq "back")
-    {
-        Write-Verbose "[$scriptName] User selected Back from group assignment selection, returning to previous menu"
-        return $returnValues.backoutText
-    }
-    elseif ($ShowGroupAssignmentsResponse -eq "Main Menu" -or $ShowGroupAssignmentsResponse -eq "main menu")
-    {
-        Write-Verbose "[$scriptName] User selected Main Menu from group assignment selection"
-        return "EXIT_APPLICATION"
-    }
-    elseif ([string]::IsNullOrWhiteSpace($ShowGroupAssignmentsResponse) -or $null -eq $ShowGroupAssignmentsResponse)
-    {
-        Write-Verbose "[$scriptName] User requested application exit from group assignment selection."
-        return "EXIT_APPLICATION"
-    }
-    else
-    {
-        return $result
-    }
 }
-}
-if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus) {
+if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus)
+{
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
 }
-if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus) {
+if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus)
+{
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
         Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
     }

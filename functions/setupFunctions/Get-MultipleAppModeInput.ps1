@@ -110,8 +110,22 @@ function Get-MultipleAppModeInput()
     {
         $mode = $availableModes[$i]
         $isSelected = $currentModes -contains $mode.Mode
-        $marker = if ($isSelected) { " [X]" } else { "   " }
-        $color = if ($isSelected) { 'Green' } else { 'White' }
+        $marker = if ($isSelected)
+        {
+            " [X]" 
+        }
+        else
+        {
+            "   " 
+        }
+        $color = if ($isSelected)
+        {
+            'Green' 
+        }
+        else
+        {
+            'White' 
+        }
         
         Write-Host "$($i + 1).$marker $($mode.Name)" -ForegroundColor $color
         Write-Host "    $($mode.Description)" -ForegroundColor Gray
@@ -168,7 +182,10 @@ function Get-MultipleAppModeInput()
         foreach ($part in $parts)
         {
             $part = $part.Trim()
-            if ([string]::IsNullOrWhiteSpace($part)) { continue }
+            if ([string]::IsNullOrWhiteSpace($part))
+            {
+                continue 
+            }
             
             if ($part -match '^\d+$')
             {
@@ -192,7 +209,10 @@ function Get-MultipleAppModeInput()
             }
         }
         
-        if (-not $validSelection) { continue }
+        if (-not $validSelection)
+        {
+            continue 
+        }
         
         if ($selectedIndices.Count -eq 0)
         {
@@ -251,44 +271,66 @@ function Get-MultipleAppModeInput()
                 Write-Host "2. Domain Settings - Specific to the active domain only"
                 Write-Host ""
                 
-                do {
+                do
+                {
                     $storageChoice = Read-Host "Save to Global Settings (1) or Domain Settings (2)? (1/2)"
                     
-                    if ($storageChoice -eq '1') {
+                    if ($storageChoice -eq '1')
+                    {
                         $useGlobalSettings = $true
                         Write-Host "Saving to Global Settings..." -ForegroundColor Green
                         break
                     }
-                    elseif ($storageChoice -eq '2') {
+                    elseif ($storageChoice -eq '2')
+                    {
                         $useGlobalSettings = $false
                         Write-Host "Saving to Domain Settings..." -ForegroundColor Green
                         break
                     }
-                    else {
+                    else
+                    {
                         Write-Host "Invalid choice. Please enter 1 for Global or 2 for Domain." -ForegroundColor Red
                     }
                 } while ($true)
                 
                 # Always return array format (eliminate legacy appMode)
-                $modesArray = if ($selectedModes.Count -eq 1) { @($selectedModes[0]) } else { $selectedModes }
+                $modesArray = if ($selectedModes.Count -eq 1)
+                {
+                    @($selectedModes[0]) 
+                }
+                else
+                {
+                    $selectedModes 
+                }
                 
                 # Use Update-AppModeSettings for specialized handling with storage preference
-                try {
+                try
+                {
                     $saveResult = Update-AppModeSettings -Configuration $modesArray -SettingsFile $initFile -UseGlobalSettings:$useGlobalSettings
                     
-                    if ($saveResult) {
-                        $storageType = if ($useGlobalSettings) { "Global Settings" } else { "Domain Settings" }
+                    if ($saveResult)
+                    {
+                        $storageType = if ($useGlobalSettings)
+                        {
+                            "Global Settings" 
+                        }
+                        else
+                        {
+                            "Domain Settings" 
+                        }
                         Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
                         Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
                         return $modesArray
                     }
-                    else {
+                    else
+                    {
                         Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
                         Write-Host "Failed to save app mode configuration" -ForegroundColor Red
                         return $null
                     }
                 }
-                catch {
+                catch
+                {
                     $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
                     Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
                     Write-Host $errorMessage -ForegroundColor Red
@@ -365,8 +407,22 @@ function Get-SingleAppModeSelection()
     {
         $mode = $AvailableModes[$i]
         $isCurrent = $CurrentModes.Count -eq 1 -and $CurrentModes[0] -eq $mode.Mode
-        $marker = if ($isCurrent) { " (Current)" } else { "" }
-        $color = if ($isCurrent) { 'Green' } else { 'White' }
+        $marker = if ($isCurrent)
+        {
+            " (Current)" 
+        }
+        else
+        {
+            "" 
+        }
+        $color = if ($isCurrent)
+        {
+            'Green' 
+        }
+        else
+        {
+            'White' 
+        }
         
         Write-Host "$($i + 1). $($mode.Name)$marker" -ForegroundColor $color
         Write-Host "   $($mode.Description)" -ForegroundColor Gray
@@ -404,14 +460,14 @@ function Test-AppModeSelection()
     )
     
     $result = @{
-        IsValid = $true
-        ErrorMessage = ""
-        HasConflicts = $false
-        HasRedundancy = $false
-        Conflicts = @()
-        Redundancies = @()
+        IsValid              = $true
+        ErrorMessage         = ""
+        HasConflicts         = $false
+        HasRedundancy        = $false
+        Conflicts            = @()
+        Redundancies         = @()
         EffectivePermissions = @()
-        Resolution = ""
+        Resolution           = ""
     }
     
     try
@@ -451,7 +507,6 @@ function Test-AppModeSelection()
             $result.HasRedundancy = $true
             $result.Redundancies += "Full mode grants all permissions - other modes are redundant"
         }
-        
     }
     catch
     {

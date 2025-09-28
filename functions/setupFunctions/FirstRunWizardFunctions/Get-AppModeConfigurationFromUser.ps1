@@ -75,7 +75,14 @@ function Get-AppModeConfigurationFromUser()
             {
                 'settings' 
                 { 
-                    $currentModeText = if ($CurrentMode) { " (Current: $CurrentMode)" } else { "" }
+                    $currentModeText = if ($CurrentMode)
+                    {
+                        " (Current: $CurrentMode)" 
+                    }
+                    else
+                    {
+                        "" 
+                    }
                     Write-Host "App Mode Selection$currentModeText" -ForegroundColor Cyan
                     Write-Host "Select your preferred app mode. The selection will return you to the previous menu." -ForegroundColor White
                 }
@@ -88,24 +95,6 @@ function Get-AppModeConfigurationFromUser()
                 { 
                     Write-Host "Select App Mode" -ForegroundColor Cyan
                     Write-Host "Select an app mode to configure the application interface." -ForegroundColor White
-                }
-            }
-
-            # Load the enhanced app mode input function
-            if (-not (Get-Command Get-AppModeInput -ErrorAction SilentlyContinue))
-            {
-                Write-Verbose "[$functionName] Loading Get-AppModeInput function"
-                try
-                {
-                    . "$PWD/functions/setupFunctions/Show-SettingsEditor.ps1"
-                }
-                catch
-                {
-                    Write-Verbose "[$functionName] Could not load enhanced app mode input function: $($_.Exception.Message)"
-                    # Use fallback to full mode
-                    $result.appMode = 'full'
-                    $result.appModes = @('full')
-                    return $result
                 }
             }
 
@@ -146,7 +135,6 @@ function Get-AppModeConfigurationFromUser()
             $result.appMode = 'full'
             $result.appModes = @('full')
         }
-
         Write-Verbose "[$functionName] App mode configuration completed successfully: Primary='$($result.appMode)', All=[$($result.appModes -join ', ')], Multiple=$($result.isMultipleMode)"
         return $result
     }

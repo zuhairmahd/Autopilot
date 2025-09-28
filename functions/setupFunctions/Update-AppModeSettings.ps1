@@ -40,7 +40,7 @@ function Update-AppModeSettings()
         [Parameter(Mandatory = $false)]
         [string]$SettingsFile = "settings.psd1",
         [Parameter(Mandatory = $false)]
-        [switch]$UseGlobalSettings = $true
+        [switch]$UseGlobalSettings
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -64,7 +64,7 @@ function Update-AppModeSettings()
         {
             # Default fallback
             $appModesArray = @('full')
-        
+        }        
         # Validate all modes
         $validModes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
         $validatedModes = @()
@@ -101,11 +101,25 @@ function Update-AppModeSettings()
         
         # Update the settings using appModes array only (no legacy appMode support)
         $success = $true
-        $settingType = if ($UseGlobalSettings) { "Global" } else { "Domain" }
-        
+        $updateParams = @{
+            SettingsFile = $SettingsFile
+            SettingName  = "appModes"
+            SettingValue = $validatedModes
+        }
+        if ($UseGlobalSettings)
+        {
+            $updateParams.Add('SettingType', "Global")
+        }
+        else
+        {
+            $updateParams.Add('SettingType', "Domain")
+            $updateParams.Add('DomainName', $settings.domain)
+            $updateParams.Add('settings', $settings)
+            $updateParams.Add('MergeSettings', $true)
+        }
         Write-Log -LogFile $logFile -Module $functionName -Message "Updating appModes property in $settingType settings" -LogLevel "Debug"
-        $settingsSuccess = Update-Setting -SettingType $settingType -SettingsFile $SettingsFile -SettingName "appModes" -SettingValue $validatedModes
-        
+        $settingsSuccess = Update-Setting @updateParams
+
         if (-not $settingsSuccess)
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update appModes property in $settingType settings" -LogLevel "Error"
@@ -175,11 +189,11 @@ function Get-AppModeSettingsFromFile()
     Write-Log -LogFile $logFile -Module $functionName -Message "Reading app mode settings from file: $SettingsFile" -LogLevel "Debug"
     
     $result = @{
-        LegacyAppMode = $null
-        AppModes = @()
-        EffectiveModes = @()
+        LegacyAppMode     = $null
+        AppModes          = @()
+        EffectiveModes    = @()
         ConfigurationType = "Unknown"
-        IsValid = $false
+        IsValid           = $false
     }
     
     try
@@ -229,7 +243,14 @@ function Get-AppModeSettingsFromFile()
         if ($result.AppModes.Count -gt 0)
         {
             $result.EffectiveModes = $result.AppModes
-            $result.ConfigurationType = if ($result.AppModes.Count -eq 1) { "SingleMode" } else { "MultipleMode" }
+            $result.ConfigurationType = if ($result.AppModes.Count -eq 1)
+            {
+                "SingleMode" 
+            }
+            else
+            {
+                "MultipleMode" 
+            }
             $result.IsValid = $true
         }
         elseif ($result.LegacyAppMode)

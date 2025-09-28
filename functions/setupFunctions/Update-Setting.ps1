@@ -95,10 +95,10 @@ function Update-Setting()
 
     function Test-SettingNameAndValue()
     {
+        [CmdletBinding()]
         param(
             [string]$SettingName,
             $SettingValue,
-            [string]$functionName,
             [string]$settingType
         )
         $functionName = $MyInvocation.MyCommand.Name

@@ -901,24 +901,16 @@ function Get-AppModeInput()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
     
-    # Load the multiple mode input function
-    if (-not (Get-Command Get-MultipleAppModeInput -ErrorAction SilentlyContinue))
-    {
-        try
-        {
-            . "$PWD/functions/setupFunctions/Get-MultipleAppModeInput.ps1"
-        }
-        catch
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "Could not load multiple app mode input function: $($_.Exception.Message)" -LogLevel "Warning"
-            # Fall back to legacy single mode selection
-            return Get-LegacyAppModeInput -CurrentValue $CurrentValue
-        }
-    }
-    
     # Determine current configuration type
     $isCurrentMultipleMode = $CurrentValue -is [array] -and $CurrentValue.Count -gt 1
-    $currentModeDisplay = if ($CurrentValue -is [array]) { "[$($CurrentValue -join ', ')]" } else { "'$CurrentValue'" }
+    $currentModeDisplay = if ($CurrentValue -is [array])
+    {
+        "[$($CurrentValue -join ', ')]" 
+    }
+    else
+    {
+        "'$CurrentValue'" 
+    }
     
     Write-Host "`n=== App Mode Configuration ===" -ForegroundColor Cyan
     Write-Host "Current app mode(s): $currentModeDisplay" -ForegroundColor Green
@@ -958,7 +950,6 @@ function Get-AppModeInput()
                     return Get-LegacyAppModeInput -CurrentValue $CurrentValue
                 }
             }
-            
             '2'
             {
                 # Single mode configuration
@@ -967,7 +958,6 @@ function Get-AppModeInput()
                 Write-Log -LogFile $logFile -Module $functionName -Message "User selected single app mode configuration: '$result'" -LogLevel "Information"
                 return $result
             }
-            
             '3'
             {
                 # Keep current
@@ -975,7 +965,6 @@ function Get-AppModeInput()
                 Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode configuration: $currentModeDisplay" -LogLevel "Verbose"
                 return $CurrentValue
             }
-            
             default
             {
                 Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red

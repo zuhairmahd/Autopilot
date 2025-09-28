@@ -1,49 +1,58 @@
-@{
-    groupsToInclude                 = @()
-    groupsToExclude                 = @()
-    autopilotProfilesToInclude      = @()
-    domain                          = 'arabictutor.com'
-    companyName                     = ''
-    autopilotDeviceAllowedVendors   = @(
+﻿@{
+    privateSession = $false
+    repoPath = 'zuhairmahd'
+    companyName = ''
+    maxUserMatchDisplay = 10
+    groupsToExclude = @()
+    userPatternsToExclude = @(
+        '-test',
+        'onmicrosoft.com'
+    )
+    assignedUser = ''
+    baseURL = 'https://www.github.com'
+    minimumDevicePhysicalMemoryInGB = 8
+    maxGroupMatchDisplay = 10
+    autopilotProfilesToInclude = @()
+    autopilotDeviceAllowedVendors = @(
         'Dell Inc.',
         'Microsoft',
         'VMWare'
     )
-    version                         = '1.3.0.0'
-    validateScopes                  = $true
-    maxWaitTime                     = 30
-    showLicenseBanner               = $true
-    deviceContactThresholdInDays    = 30
-    checkStrongMapping              = $false
-    strongMappingOptional           = $true
-    appMode                         = 'full'
-    timeInSeconds                   = 60
-    maxUserMatchDisplay             = 10
-    maxGroupMatchDisplay            = 10
-    release                         = 'master'
-    repoInfo                        = @{
-        repoName      = 'Autopilot'
-        repoPath      = 'zuhairmahd'
+    additionalScopes = @()
+    autoUpdate = $true
+    preferredBrowser = 'Chrome'
+    maxSerialNumberLength = 50
+    minUsernameLength = 3
+    version = '1.3.0.0'
+    operatingSystem = 'Windows'
+    minSerialNumberLength = 7
+    maxUserNameLength = 50
+    validateScopes = $true
+    showLicenseBanner = $true
+    configFile = '.\.secrets\config.json'
+    groupsToInclude = @()
+    groupTag = ''
+    repo = 'Github'
+    groupPatternsToExclude = @()
+    repoInfo = @{
+        repoPath = 'zuhairmahd'
+        baseURL = 'https://www.github.com'
         baseSourceURL = 'https://raw.githubusercontent.com'
-        baseURL       = 'https://www.github.com'
+        repoName = 'Autopilot'
     }
-    autoUpdate                      = $true
-    deviceNamePrefix                = ''
-    operatingSystem                 = 'Windows'
-    minUsernameLength               = 3
-    maxUserNameLength               = 50
-    maxSerialNumberLength           = 50
-    minSerialNumberLength           = 7
-    minimumDevicePhysicalMemoryInGB = 8
-    maxNumberOfDevicesAllowed       = 15
-    preferredBrowser                = 'Chrome'
-    privateSession                  = $false
-    userPatternsToExclude           = @(
-        '-test',
-        'onmicrosoft.com'
-    )
-    groupPatternsToExclude          = @()
-    groupTag                        = ''
-    assignedUser                    = ''
-    additionalScopes                = @()
+    description = 'Autopilot for Windows devices'
+    release = 'master'
+    repoName = 'Autopilot'
+    deviceContactThresholdInDays = 30
+    checkStrongMapping = $false
+    appMode = 'full'
+    testMode = $false
+    maxNumberOfDevicesAllowed = 15
+    timeInSeconds = 60
+    name = 'Autopilot'
+    maxWaitTime = 30
+    domain = 'arabictutor.com'
+    baseSourceURL = 'https://raw.githubusercontent.com'
+    strongMappingOptional = $true
+    deviceNamePrefix = ''
 }
