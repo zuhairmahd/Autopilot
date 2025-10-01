@@ -24,7 +24,10 @@ function VerifyGroupMembership()
         $functionName = $MyInvocation.MyCommand.Name
         Write-Verbose "[$functionName] Testing group format"
         write-log -logFile $logFile -module $functionName -Message "Testing group format"
-        if (-not $groups -or $groups.Count -eq 0) { return "Empty" }
+        if (-not $groups -or $groups.Count -eq 0)
+        {
+            return "Empty" 
+        }
         
         # Check first element to determine format
         $firstElement = $groups[0]
@@ -68,7 +71,10 @@ function VerifyGroupMembership()
         
         switch ($format)
         {
-            "Empty" { return @(), @() }  # Return empty arrays for names and IDs
+            "Empty"
+            {
+                return @(), @() 
+            }  # Return empty arrays for names and IDs
             "HashTableArray"
             {
                 # Extract names and IDs from hashtable format
@@ -78,10 +84,24 @@ function VerifyGroupMembership()
                 foreach ($group in $groups)
                 {
                     # Extract name (could be null/empty)
-                    $name = if ($group.name) { $group.name } else { $null }
+                    $name = if ($group.name)
+                    {
+                        $group.name 
+                    }
+                    else
+                    {
+                        $null 
+                    }
                     $groupNames += $name
                     # Extract ID (could be null/empty) 
-                    $id = if ($group.id) { $group.id } else { $null }
+                    $id = if ($group.id)
+                    {
+                        $group.id 
+                    }
+                    else
+                    {
+                        $null 
+                    }
                     $groupIds += $id
                 }
                 Write-Verbose "[$functionName] Extracted from hashtable format - Names: $($groupNames -join ', '), IDs: $($groupIds -join ', ')"
@@ -168,7 +188,14 @@ function VerifyGroupMembership()
         $hashTableGroups = @()
         for ($i = 0; $i -lt $groupNames.Count; $i++)
         {
-            $groupId = if ($i -lt $groupIds.Count) { $groupIds[$i] } else { $null }
+            $groupId = if ($i -lt $groupIds.Count)
+            {
+                $groupIds[$i] 
+            }
+            else
+            {
+                $null 
+            }
             $hashTableGroups += @{
                 name = $groupNames[$i]
                 id   = $groupId
@@ -265,7 +292,7 @@ function VerifyGroupMembership()
         # Check if user was found
         if ($user -is [string] -and $user -match '^\d+$')
         {
-Write-Log -logFile $logFile -module $functionName -Message "User $userName not found in Azure AD (Error code: $user)" -LogLevel "Verbose"
+            Write-Log -logFile $logFile -module $functionName -Message "User $userName not found in Azure AD (Error code: $user)" -LogLevel "Verbose"
             Write-Host "The user $userName was not found in Azure AD." -ForegroundColor Red
             Write-Host "Please check the user name and try again." -ForegroundColor Red
             $result.Error = "User not found in Azure AD (Error code: $user)"
@@ -289,7 +316,7 @@ Write-Log -logFile $logFile -module $functionName -Message "User $userName not f
     Write-Log -logFile $logFile -module $functionName -Message "Getting group membership for user $userName"
     try
     {
-        Write-Host "Getting group membership for user $userName ($($user.displayName))."
+        Write-Verbose "[$functionName] Getting all group memberships for user $userName"
         if ($includeGroupNames.count -gt 0)
         {
             Write-Verbose "[$functionName] Checking membership in $($includeGroupNames.Count) required groups for user $userName"
@@ -367,10 +394,24 @@ Write-Log -logFile $logFile -module $functionName -Message "User $userName not f
                 for ($i = 0; $i -lt $includeGroupNames.Count; $i++)
                 {
                     $name = $includeGroupNames[$i]
-                    $id = if ($i -lt $includeGroupIds.Count) { $includeGroupIds[$i] } else { $null }
+                    $id = if ($i -lt $includeGroupIds.Count)
+                    {
+                        $includeGroupIds[$i] 
+                    }
+                    else
+                    {
+                        $null 
+                    }
                     
                     # Use available identifier for comparison
-                    $identifier = if ($null -ne $name -and $name -ne "") { $name } else { $id }
+                    $identifier = if ($null -ne $name -and $name -ne "")
+                    {
+                        $name 
+                    }
+                    else
+                    {
+                        $id 
+                    }
                     if ($null -ne $identifier -and $identifier -ne "" -and $includedGroupMembership -notcontains $identifier)
                     {
                         $missingGroups += $identifier
@@ -500,7 +541,10 @@ Write-Log -logFile $logFile -module $functionName -Message "User $userName not f
                         break
                     }
                 }
-                catch { continue }
+                catch
+                {
+                    continue 
+                }
             }
             
             if (-not [string]::IsNullOrWhiteSpace($domainName))
