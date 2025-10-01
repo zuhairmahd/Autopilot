@@ -1802,9 +1802,6 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     }
     else # Continue only if a username was entered
     {
-        $hasCorrectGroups = $false
-        $hasStrongMapping = $false
-        $hasCorrectNumberOfDevices = $false
         #region Check if the user exists first.
         $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
         Write-Verbose "[$scriptName] Substring search: $($userInfo)"
@@ -1878,104 +1875,20 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
         #endregion Check if the user exists first.
         
-        Write-Host "Checking group membership for user $userName."
-        $groups = VerifyGroupMembership -AccessToken $accessToken -userName $userName -groupsToInclude $groupsToInclude -groupsToExclude $groupsToExclude
-        if ($groups.success -eq $true)
-        {
-            Write-Host "The user $userName has the correct group memberships" -ForegroundColor Green
-            Write-Host "The user is a member of all $($groupsToInclude.Count) required groups and is not a member of any of the $($groupsToExclude.Count) forbidden groups."
-            $hasCorrectGroups = $true
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] The function returned $($groups.MissingGroups.Count) missing group memberships and $($groups.ForbiddenGroups.Count) forbidden group memberships."
-            Write-Verbose "[$scriptName] Missing group memberships: $($groups.missingGroups | Out-String)"
-            Write-Verbose "[$scriptName] Forbidden groups: $($groups.ForbiddenGroups | Out-String)"
-            if ($groups.missingGroups.Count -gt 0)
-            {
-                Write-Host 'The user needs to be added to the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.missingGroups)
-                {
-                    Write-Host $group -ForegroundColor Red
-                }
-            }
-            if ($groups.ForbiddenGroups.Count -gt 0)
-            {
-                Write-Host 'The user needs to be removed from the following groups:' -ForegroundColor Red
-                foreach ($group in $groups.invalidExcludeGroups)
-                {
-                    Write-Host $group -ForegroundColor Red
-                }
-            }
-            Write-Host 'Please contact an Intune administrator.' -ForegroundColor Red
-        }
+        # Perform comprehensive readiness checks
+        Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
         
-        Write-Host "`nChecking if the user $userName has exceeded the number of allowed devices." -ForegroundColor Cyan
-        $totalDevices = GetTotalRegisteredDevicesByUser -Username $userName -AccessToken $accessToken
-        if ($totalDevices -lt $settings.maxNumberOfDevicesAllowed)
-        {
-            Write-Host "User $userName has $totalDevices devices, which is below the $($settings.maxNumberOfDevicesAllowed) allowed device limit." -ForegroundColor Green
-            $hasCorrectNumberOfDevices = $true
-        }
-        else
-        {
-            Write-Host "User $userName has $totalDevices devices, which is equal to or above the $($settings.maxNumberOfDevicesAllowed) allowed device limit."
-            Write-Host "No additional devices can be assigned to this user."
-        }
+        $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
         
-        if ($settings.checkStrongMapping)
-        {
-            Write-Host "`nChecking if the user $userName has strong certificate mapping enabled." -ForegroundColor Cyan
-            $strongMappingInfo = Get-UserStrongMapping -accessToken $accessToken -UserName $UserName
-            Write-Verbose "[$scriptName] Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-            Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping info: $($strongMappingInfo | ConvertTo-Json -Depth $maxJSONDepth)" -LogLevel "Verbose"
-            if ($strongMappingInfo.StrongMapping)
-            {
-                Write-Host "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -ForegroundColor Green
-                Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $($strongMappingInfo.userName) has strong certificate mapping enabled with $($strongMappingInfo.CertificateCount) certificates." -LogLevel "Information"
-                foreach ($cert in $strongMappingInfo.Certificates)
-                {
-                    Write-Host "Certificate info: $cert" -ForegroundColor Green
-                    Write-Log -logFile $logFile -Module "$scriptName" -Message "Certificate info: $cert" -LogLevel "Information"
-                }
-                Write-Host "----------------------------------------" -ForegroundColor Green
-                $hasStrongMapping = $true
-            }
-            else
-            {
-                if ($settings.strongMappingOptional)
-                {
-                    Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Yellow
-                    Write-Host "While the user may be able to complete enrollment," -ForegroundColor Yellow
-                    Write-Host "This means that the user may have problems connecting to network resources." -ForegroundColor Yellow
-                    Write-Host "Please open a ticket to enable strong certificate mapping for this user." -ForegroundColor Yellow
-                    Write-Host "========================================" -ForegroundColor Yellow
-                    Write-Host "" -ForegroundColor Yellow
-                    Read-Host -Prompt 'Press any key to continue...'
-                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled, but this is allowed as strong mapping is optional." -LogLevel "Warning"
-                    $hasStrongMapping = $true
-                }
-                else
-                {
-                    Write-Host "The user $userName does not have strong certificate mapping enabled." -ForegroundColor Red
-                    Write-Log -logFile $logFile -Module "$scriptName" -Message "The user $userName does not have strong certificate mapping enabled." -LogLevel "Error"
-                    Write-Host "Please enable strong certificate mapping for this user or contact an Intune administrator." -ForegroundColor Red
-                }
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] Strong mapping check is disabled in settings."
-            Write-Log -logFile $logFile -Module "$scriptName" -Message "Strong mapping check is disabled in settings." -LogLevel "Information"
-            $hasStrongMapping = $true
-        }
+        # Display the readiness report
+        Show-UserReadinessReport -ReadinessResult $readinessResult
         
-        if (    $hasCorrectGroups -and $hasCorrectNumberOfDevices -and $hasStrongMapping)
+        # Proceed to device check if user is ready
+        if ($readinessResult.IsReady)
         {
-            Write-Host "The user $userName is ready to receive a device." -ForegroundColor Green
-            Write-Host "We will now check the device state." -ForegroundColor Green
-            Write-Host "Enter the device's serial number."
-            Write-Host "This would be the device you plan to give to the user."
+            Write-Host "Enter the device's serial number." -ForegroundColor Cyan
+            Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
             $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
             # Check if user entered 'back'
             if ($null -eq $serialNumber)
@@ -1996,7 +1909,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         }
         else
         {
-            Write-Host "The user $userName is not ready to receive a Windows 11 device." -ForegroundColor Red
+            Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
         }
     }
 }
