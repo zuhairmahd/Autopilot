@@ -44,7 +44,8 @@ function DisplayUserList()
     }
     # Create user selection menu from configuration
     $userMenu = NewMenu -MenuName "userMenu"
-    if (-not $userMenu) {
+    if (-not $userMenu)
+    {
         # Fallback to manual creation if config not found
         $userMenu = NewMenu -Title "Select a user" -Description "Did you mean:"
     }
@@ -71,13 +72,23 @@ function DisplayUserList()
     Write-Verbose "[$functionName] Current navigation - Depth: $Depth, History count: $($History.Count)"
     Write-Verbose "[$functionName] Current menu title: $($userMenu.Title)"
     $selectedUser = ShowMenu -Menu $userMenu -CalledBy 'Action'
-    if ($null -ne $selectedUser -and $selectedUser -is [string])
+    
+    # Handle exit selection (ShowMenu returns null when user presses 0 to exit)
+    # Check if this is an exit vs a back/cancel by looking at whether it's truly null (exit) vs empty string (back)
+    if ($null -eq $selectedUser)
+    {
+        Write-Verbose "[$functionName] ShowMenu returned null - treating as exit command"
+        # Return 0 to signal exit, which ConvertFrom-UserSelection will handle
+        return 0
+    }
+    
+    if ($selectedUser -is [string])
     {
         Write-Verbose "[$functionName] Selected user: $selectedUser"
     }
     else
     {
-        Write-Verbose "[$functionName] Selected user is null or not a string"
+        Write-Verbose "[$functionName] Selected user is not a string: $($selectedUser.GetType().Name)"
     }
     return $selectedUser
 }

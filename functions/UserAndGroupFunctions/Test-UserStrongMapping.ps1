@@ -32,10 +32,8 @@ function Test-UserStrongMapping()
     param(
         [Parameter(Mandatory = $true)]
         [string]$UserName,
-        
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$Settings
     )

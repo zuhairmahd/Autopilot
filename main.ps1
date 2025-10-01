@@ -1800,118 +1800,53 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
         Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
         return $returnValues.backoutText # Return to the previous menu
     }
-    else # Continue only if a username was entered
+    
+    #region Resolve user with matching support
+    $userName = Resolve-UserWithMatching -UserName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues
+    
+    # Check if user resolution returned a navigation command
+    if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
     {
-        #region Check if the user exists first.
-        $userInfo = GetEntraUser -userName $userName -AccessToken $accessToken -findSimilar
-        Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-        Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-        Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-        if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+        Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
+        return $userName
+    }
+    #endregion Resolve user with matching support
+    
+    # Perform comprehensive readiness checks
+    Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
+    $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
+        
+    # Display the readiness report
+    Show-UserReadinessReport -ReadinessResult $readinessResult
+        
+    # Proceed to device check if user is ready
+    if ($readinessResult.IsReady)
+    {
+        Write-Host "Enter the device's serial number." -ForegroundColor Cyan
+        Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
+        $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
+        # Check if user entered 'back'
+        if ($null -eq $serialNumber)
         {
-            Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-            $userName = $userInfo[0].value.userPrincipalName
-            Write-Verbose "[$scriptName] User name set to: $userName"
+            Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
+            return $returnValues.backoutText # Return to the previous menu
         }
-        elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
+        else # Process only if a serial number was entered
         {
-            Write-Host "Could not find an exact match for user $($userName)."
-            if ($userInfo[0].value.count -eq 1)
+            $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
+            # Check if ProcessSerialNumber returned an exit signal
+            if ($null -eq $result)
             {
-                Write-Host "Found a user with a similar name."
-            }
-            else
-            {
-                Write-Host "Found $($userInfo[0].value.count) users with similar names:"
-            }
-            if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
-            {
-                Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-            }
-            elseif ($($userInfo[0].value.count) -eq 1)
-            {
-                Write-Host "Is this the correct user?"
-            }
-            else
-            {
-                Write-Host "Displaying all $($userInfo[0].value.count) matches:"
-            }
-            $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-            Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-            # Handle navigation options returned from DisplayUserList
-            if ($possibleUserName -in $returnValues.Values)
-            {
-                Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-                return $possibleUserName
-            }
-            elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
-            {
-                Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-                return $returnValues.backoutText
-            }
-            elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
-            {
-                Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-                return "Main Menu"
-            }
-            elseif ($null -eq $possibleUserName -or $possibleUserName -eq 0 -or $possibleUserName -eq "0")
-            {
-                Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
+                Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
                 return "EXIT_APPLICATION"
             }
-            else
-            {
-                Write-Verbose "[$scriptName] User selected: $possibleUserName"
-                $userName = $possibleUserName
-            }
         }
-        elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-        {
-            return $userInfo
-        }
-        else
-        {
-            return $returnValues.noUserFoundInDirectoryMessage
-        }
-        #endregion Check if the user exists first.
-        
-        # Perform comprehensive readiness checks
-        Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
-        
-        $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
-        
-        # Display the readiness report
-        Show-UserReadinessReport -ReadinessResult $readinessResult
-        
-        # Proceed to device check if user is ready
-        if ($readinessResult.IsReady)
-        {
-            Write-Host "Enter the device's serial number." -ForegroundColor Cyan
-            Write-Host "This would be the device you plan to give to the user." -ForegroundColor Cyan
-            $serialNumber = GetUserInput -Message "Enter the serial number of the device." -Prompt 'Please enter the serial number' -InputType 'serialNumber' -settings $settings
-            # Check if user entered 'back'
-            if ($null -eq $serialNumber)
-            {
-                Write-Verbose "[$scriptName] User pressed Enter. Returning $($returnValues.backoutText)."
-                return $returnValues.backoutText # Return to the previous menu
-            }
-            else # Process only if a serial number was entered
-            {
-                $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings -CheckUserReadiness
-                # Check if ProcessSerialNumber returned an exit signal
-                if ($null -eq $result)
-                {
-                    Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
-                    return "EXIT_APPLICATION"
-                }
-            }
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
-        }
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] User $userName is not ready. Readiness check failed with $($readinessResult.IssueCount) issues."
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "User $userName is not ready. Issues: $($readinessResult.IssueCount), Warnings: $($readinessResult.WarningCount)" -LogLevel Warning
     }
 }
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Check device status" -Submenu $CheckMenu
