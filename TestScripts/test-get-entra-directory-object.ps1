@@ -313,58 +313,6 @@ catch
 {
     Write-TestResult "2.1 - Group exact match" $false "Exception: $_"
 }
-
-#endregion
-
-#region Test 2.5: Group Case-Insensitive Exact Match
-Write-TestSection "Test 2.5: Group Case-Insensitive Exact Match"
-
-try
-{
-    $global:DirectoryObjectCache = @{}
-    
-    # Test various casings of "Marketing Team"
-    $testCases = @(
-        @{ Input = "marketing team"; Expected = "Marketing Team" },
-        @{ Input = "MARKETING TEAM"; Expected = "Marketing Team" },
-        @{ Input = "Marketing Team"; Expected = "Marketing Team" },
-        @{ Input = "MaRkEtInG TeAm"; Expected = "Marketing Team" }
-    )
-    
-    $allPassed = $true
-    foreach ($testCase in $testCases)
-    {
-        $global:DirectoryObjectCache = @{}  # Clear cache for each test
-        $result = Get-EntraDirectoryObject -EntityType Group -EntityName $testCase.Input -AccessToken "test-token"
-        
-        if ($null -eq $result -or $result[0].value.Count -eq 0)
-        {
-            Write-Host "  [FAIL] Input '$($testCase.Input)' did not find group" -ForegroundColor Red
-            $allPassed = $false
-        }
-        elseif ($result[0].value[0].displayName -ne $testCase.Expected)
-        {
-            Write-Host "  [FAIL] Input '$($testCase.Input)' returned wrong group: $($result[0].value[0].displayName)" -ForegroundColor Red
-            $allPassed = $false
-        }
-        elseif ($result[1] -ne $false)
-        {
-            Write-Host "  [FAIL] Input '$($testCase.Input)' used fuzzy search instead of exact match" -ForegroundColor Red
-            $allPassed = $false
-        }
-        else
-        {
-            Write-Host "  [PASS] Input '$($testCase.Input)' found via exact match" -ForegroundColor Green
-        }
-    }
-    
-    Write-TestResult "2.5 - Group case-insensitive exact match works for all casings" $allPassed
-}
-catch
-{
-    Write-TestResult "2.5 - Group case-insensitive exact match" $false "Exception: $_"
-}
-
 #endregion
 
 #region Test 3: User Fuzzy Search

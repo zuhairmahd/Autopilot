@@ -204,8 +204,6 @@ function Compare-EditorArrayContents()
         {
             $item1 = $Array1[$i]
             $item2 = $Array2[$i]
-            
-            # Handle both hashtable and PSCustomObject access patterns
             $name1 = $item1.name
             $id1 = $item1.id
             $name2 = $item2.name
@@ -625,3 +623,62 @@ function Show-EditorInteractiveChoice()
     Write-Log -LogFile $logFile -Module $FunctionName -Message "User interactive choice result: $result for prompt: $PromptText" -LogLevel "Verbose"
     return $result
 }
+
+# Helper function to check if item already exists
+function Test-ItemExists()
+{
+    [CmdletBinding()]
+    param(
+        $ItemName, 
+        $ItemId, 
+        $ExistingList
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$FunctionName] Checking if item exists: Name='$ItemName', Id='$ItemId'"
+    Write-Log -LogFile $logFile -Module $FunctionName -Message "Checking if item exists: Name='$ItemName', Id='$ItemId'"
+    
+    foreach ($existing in $ExistingList)
+    {
+        Write-Verbose "[$FunctionName] Comparing against existing item: $($existing | Out-String)"
+        Write-Log -LogFile $logFile -Module $FunctionName -Message "Comparing against existing item: $($existing | Out-String)"
+        if ($existing -is [hashtable] -or $existing -is [PSCustomObject])
+        {
+            $existingName = if ($existing -is [hashtable])
+            {
+                $existing['name'] 
+            }
+            else
+            {
+                $existing.name 
+            }
+            Write-Verbose "[$FunctionName] Existing item name: '$existingName'"
+            Write-Log -LogFile $logFile -Module $FunctionName -Message "Existing item name: '$existingName'"    
+            $existingId = if ($existing -is [hashtable])
+            {
+                $existing['id'] 
+            }
+            else
+            {
+                $existing.id 
+            }
+            Write-Verbose "[$FunctionName] Existing item id: '$existingId'"
+            Write-Log -LogFile $logFile -Module $FunctionName -Message "Existing item id: '$existingId'"            
+            if (($existingName -and $existingName -eq $ItemName) -or ($ItemId -and $existingId -and $existingId -eq $ItemId))
+            {
+                Write-Verbose "[$FunctionName] Item exists: Name='$ItemName', Id='$ItemId'"
+                Write-Log -LogFile $logFile -Module $FunctionName -Message "Item exists: Name='$ItemName', Id='$ItemId'"
+                return $true
+            }
+        }
+        elseif ($existing -is [string] -and $existing -eq $ItemName)
+        {
+            Write-Verbose "[$FunctionName] Item exists in string array: Name='$ItemName'"       
+            Write-Log -LogFile $logFile -Module $FunctionName -Message "Item exists in string array: Name='$ItemName'"      
+            return $true
+        }
+    }
+    Write-Verbose "[$FunctionName] Item does not exist: Name='$ItemName', Id='$ItemId'"
+    Write-Log -LogFile $logFile -Module $FunctionName -Message "Item does not exist: Name='$ItemName', Id='$ItemId'"
+    return $false
+}
+

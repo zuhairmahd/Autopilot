@@ -106,7 +106,6 @@ function Get-EntraDirectoryObject()
     }
     else
     {
-        # Group exact match by displayName (case-insensitive using tolower)
         $resourcePath = "groups"
         $filter = "displayName eq '$EntityName'"
         $extraParameters = "select=displayName,id"

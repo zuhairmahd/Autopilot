@@ -619,43 +619,6 @@ function Resolve-SingleGroupInteractive()
     $FunctionName = $MyInvocation.MyCommand.Name    
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
     
-    # Helper function to check if item already exists
-    function Test-ItemExists
-    {
-        param($ItemName, $ItemId, $ExistingList)
-        foreach ($existing in $ExistingList)
-        {
-            if ($existing -is [hashtable] -or $existing -is [PSCustomObject])
-            {
-                $existingName = if ($existing -is [hashtable])
-                {
-                    $existing['name'] 
-                }
-                else
-                {
-                    $existing.name 
-                }
-                $existingId = if ($existing -is [hashtable])
-                {
-                    $existing['id'] 
-                }
-                else
-                {
-                    $existing.id 
-                }
-                if (($existingName -and $existingName -eq $ItemName) -or ($ItemId -and $existingId -and $existingId -eq $ItemId))
-                {
-                    return $true
-                }
-            }
-            elseif ($existing -is [string] -and $existing -eq $ItemName)
-            {
-                return $true
-            }
-        }
-        return $false
-    }
-    
     if (-not $AccessToken)
     {
         Write-Host "  No access token available - saving group without ID resolution" -ForegroundColor Yellow
