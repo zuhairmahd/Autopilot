@@ -1802,7 +1802,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     }
     
     #region Resolve user with matching support
-    $userName = Resolve-UserWithMatching -UserName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues
+    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
     
     # Check if user resolution returned a navigation command
     if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))

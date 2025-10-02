@@ -103,8 +103,23 @@ $userFunctionsPath = Join-Path $functionsPath "UserAndGroupFunctions"
 
 try
 {
+    # Load dependencies for unified functions
+    . (Join-Path (Join-Path $functionsPath "graphFunctions") "CallGraphAPI.ps1")
+    . (Join-Path (Join-Path $functionsPath "menuFunctions") "ShowMenu.ps1")
+    . (Join-Path (Join-Path $functionsPath "menuFunctions") "NewMenu.ps1")
+    . (Join-Path (Join-Path $functionsPath "menuFunctions") "AddMenuItem.ps1")
+    
+    # Load the new unified functions that the wrappers call
+    . (Join-Path $userFunctionsPath "Resolve-DirectoryObject.ps1")
+    . (Join-Path $userFunctionsPath "ConvertFrom-DirectoryObjectSelection.ps1")
+    . (Join-Path $userFunctionsPath "Get-EntraDirectoryObject.ps1")
+    . (Join-Path $userFunctionsPath "Show-DirectoryObjectList.ps1")
+    
+    # Load the backward compatibility wrappers
     . (Join-Path $userFunctionsPath "Resolve-UserWithMatching.ps1")
     . (Join-Path $userFunctionsPath "ConvertFrom-UserSelection.ps1")
+    
+    # Load the old functions still needed for mocks
     . (Join-Path $userFunctionsPath "GetEntraUser.ps1")
     . (Join-Path $userFunctionsPath "DisplayUserList.ps1")
     
