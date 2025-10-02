@@ -1816,10 +1816,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
     $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
-        
     # Display the readiness report
     Show-UserReadinessReport -ReadinessResult $readinessResult
-        
     # Proceed to device check if user is ready
     if ($readinessResult.IsReady)
     {
@@ -1908,85 +1906,53 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     }
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
-    #region Check if the group exists
-    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
-    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
-    if ($groupInfo.GetType().Name -eq 'String')
+    #region Check if the group exists using unified Resolve-DirectoryObject
+    $resolvedGroupName = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group"
+    
+    # Handle navigation commands - check these FIRST before trying to use as group name
+    if ($resolvedGroupName -eq "EXIT_APPLICATION")
     {
-        # Handle error messages from GetEntraUser
-        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
-        return $groupInfo
+        Write-Verbose "[$scriptName] User requested application exit from group resolution"
+        return "EXIT_APPLICATION"
     }
-    $selectedGroup = $null
-    $substringSearch = $groupInfo[1]
-    $searchResults = $groupInfo[0].value
-    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
+    elseif ($resolvedGroupName -eq "Main Menu")
     {
-        # Exact match found
-        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value
-        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+        return "Main Menu"
     }
-    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
+    elseif ($resolvedGroupName -in $returnValues.Values)
     {
-        # Similar matches found
-        Write-Host "Could not find an exact match for group '$groupName'."
-        if ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Found a group with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($searchResults.value.count) groups with similar names:"
-        }
-        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Is this the correct group?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($searchResults.value.count) matches:"
-        }
-        # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
-        # Handle navigation options returned from DisplayGroupList
-        if ($possibleGroupName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
-            return $possibleGroupName
-        }
-        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
-            $selectedGroup = $possibleGroupName
-        }
+        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $resolvedGroupName"
+        return $resolvedGroupName
     }
-    else
+    
+    # At this point, $resolvedGroupName contains the resolved group displayName
+    Write-Verbose "[$scriptName] Resolved group name: $resolvedGroupName"
+    
+    # Get full group info for ShowGroupAssignments
+    # Use -FindSimilar to handle groups with special characters or exact match failures
+    $groupInfo = Get-EntraDirectoryObject -EntityName $resolvedGroupName -AccessToken $accessToken -EntityType "Group" -FindSimilar
+    if ($null -eq $groupInfo -or $groupInfo -eq $returnValues.noGroupFoundMessage -or $groupInfo[0].value.count -eq 0)
     {
+        Write-Verbose "[$scriptName] Could not retrieve group details for: $resolvedGroupName"
+        Write-Host "No group found for the specified group name." -ForegroundColor Red
         return $returnValues.noGroupFoundMessage
     }
-    #endregion Check if the group exists
     
-    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
+    # Find exact match from results (in case FindSimilar returned multiple)
+    $selectedGroup = $groupInfo[0].value | Where-Object { $_.displayName -eq $resolvedGroupName } | Select-Object -First 1
+    
+    # If no exact match in fuzzy results, take the first one
+    if ($null -eq $selectedGroup)
+    {
+        $selectedGroup = $groupInfo[0].value[0]
+        Write-Verbose "[$scriptName] No exact displayName match found, using first result: $($selectedGroup.displayName)"
+    }
+    
+    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    #endregion Check if the group exists using unified Resolve-DirectoryObject
+    
+    # Call ShowGroupAssignments to display the group's assignments
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
     $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
     #region Handle navigation responses from GetDeviceByUser
