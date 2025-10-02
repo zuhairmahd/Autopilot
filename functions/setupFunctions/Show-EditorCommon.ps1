@@ -206,38 +206,10 @@ function Compare-EditorArrayContents()
             $item2 = $Array2[$i]
             
             # Handle both hashtable and PSCustomObject access patterns
-            $name1 = if ($item1 -is [hashtable])
-            {
-                $item1.name 
-            }
-            else
-            {
-                $item1.name 
-            }
-            $id1 = if ($item1 -is [hashtable])
-            {
-                $item1.id 
-            }
-            else
-            {
-                $item1.id 
-            }
-            $name2 = if ($item2 -is [hashtable])
-            {
-                $item2.name 
-            }
-            else
-            {
-                $item2.name 
-            }
-            $id2 = if ($item2 -is [hashtable])
-            {
-                $item2.id 
-            }
-            else
-            {
-                $item2.id 
-            }
+            $name1 = $item1.name
+            $id1 = $item1.id
+            $name2 = $item2.name
+            $id2 = $item2.id
             
             if ($name1 -ne $name2 -or $id1 -ne $id2)
             {
