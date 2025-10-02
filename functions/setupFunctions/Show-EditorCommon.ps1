@@ -643,24 +643,10 @@ function Test-ItemExists()
         Write-Log -LogFile $logFile -Module $FunctionName -Message "Comparing against existing item: $($existing | Out-String)"
         if ($existing -is [hashtable] -or $existing -is [PSCustomObject])
         {
-            $existingName = if ($existing -is [hashtable])
-            {
-                $existing['name'] 
-            }
-            else
-            {
-                $existing.name 
-            }
+            $existingName = $existing.name 
             Write-Verbose "[$FunctionName] Existing item name: '$existingName'"
             Write-Log -LogFile $logFile -Module $FunctionName -Message "Existing item name: '$existingName'"    
-            $existingId = if ($existing -is [hashtable])
-            {
-                $existing['id'] 
-            }
-            else
-            {
-                $existing.id 
-            }
+            $existingId = $existing.id 
             Write-Verbose "[$FunctionName] Existing item id: '$existingId'"
             Write-Log -LogFile $logFile -Module $FunctionName -Message "Existing item id: '$existingId'"            
             if (($existingName -and $existingName -eq $ItemName) -or ($ItemId -and $existingId -and $existingId -eq $ItemId))
@@ -681,4 +667,3 @@ function Test-ItemExists()
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Item does not exist: Name='$ItemName', Id='$ItemId'"
     return $false
 }
-
