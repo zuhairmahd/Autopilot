@@ -18,6 +18,11 @@ TestReports/
 TestResults/
 .claude/
 
+# Test artifacts
+TestScripts/*.psd1
+TestScripts/*.json
+!TestScripts/test-*.json
+
 
 # PowerShell-specific files
 
