@@ -18,9 +18,12 @@ param()
 # Load test helper functions
 . "$PSScriptRoot\test-helper.ps1"
 
+# Determine paths
+$RootPath = Split-Path -Parent $PSScriptRoot
+
 # Load functions at script level (same pattern as main.ps1)
 Write-Host "=== Loading Functions at Script Level ===" -ForegroundColor Cyan
-$functionsFolder = "$PWD\functions"
+$functionsFolder = Join-Path $RootPath "functions"
 if (Test-Path $functionsFolder) {
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     $loadedCount = 0
@@ -35,7 +38,7 @@ if (Test-Path $functionsFolder) {
     }
     Write-Host "Loaded $loadedCount functions successfully" -ForegroundColor Green
 } else {
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    Write-Host "Cannot find the functions folder at: $functionsFolder. Exiting script." -ForegroundColor Red
     exit 1
 }
 

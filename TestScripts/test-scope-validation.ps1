@@ -13,8 +13,11 @@ try {
     # Load test helper functions
     . "$PSScriptRoot\test-helper.ps1"
     
+    # Determine paths
+    $RootPath = Split-Path -Parent $PSScriptRoot
+    
     # Load all functions at script level (same as main.ps1)
-    $functionsFolder = "$PWD\functions"
+    $functionsFolder = Join-Path $RootPath "functions"
     if (Test-Path $functionsFolder) {
         $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
         foreach ($function in $functions) {
@@ -26,7 +29,7 @@ try {
         }
         Write-TestResult "Functions loaded successfully" $true
     } else {
-        Write-TestResult "Functions folder not found" $false
+        Write-TestResult "Functions folder not found at: $functionsFolder" $false
         exit 1
     }
     
