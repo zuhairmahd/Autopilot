@@ -357,6 +357,7 @@ function Get-EditorReplaceOrAddChoice()
     Write-Host "  3. Keep current $ItemType unchanged" -ForegroundColor White
     
     $choice = Read-Host "Enter your choice (1-3)"
+    Write-Verbose "[$FunctionName] User choice input: $choice"
     while ($choice -notin '1', '2', '3')
     {
         Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
@@ -368,6 +369,9 @@ function Get-EditorReplaceOrAddChoice()
     {
         '1'
         {
+            Write-Host "`n[*] You chose: REPLACE all existing $ItemType" -ForegroundColor Yellow
+            Write-Host "  -> All current $ItemType will be removed" -ForegroundColor Red
+            Write-Host "  -> Only new $ItemType you enter will be saved" -ForegroundColor Green
             Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to replace existing $ItemType" -LogLevel "Verbose"
             Write-Verbose "[$FunctionName] User chose to replace existing $ItemType"
             return @{
@@ -377,6 +381,9 @@ function Get-EditorReplaceOrAddChoice()
         }
         '2'
         {
+            Write-Host "`n[*] You chose: ADD new $ItemType to existing ones" -ForegroundColor Yellow
+            Write-Host "  -> All current $ItemType will be kept" -ForegroundColor Green
+            Write-Host "  -> New $ItemType you enter will be added to the list" -ForegroundColor Green
             Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to add to existing $ItemType" -LogLevel "Verbose"
             Write-Verbose "[$FunctionName] User chose to add to existing $ItemType"
             return @{
@@ -386,6 +393,9 @@ function Get-EditorReplaceOrAddChoice()
         }
         '3'
         {
+            Write-Host "`n[*] You chose: KEEP current $ItemType unchanged" -ForegroundColor Yellow
+            Write-Host "  -> No changes will be made" -ForegroundColor Cyan
+            Write-Host "  -> Returning to previous menu" -ForegroundColor Cyan
             Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to keep current $ItemType unchanged" -LogLevel "Verbose"
             Write-Verbose "[$FunctionName] User chose to keep current $ItemType unchanged"
             return @{
@@ -624,7 +634,6 @@ function Show-EditorInteractiveChoice()
     return $result
 }
 
-# Helper function to check if item already exists
 function Test-ItemExists()
 {
     [CmdletBinding()]
