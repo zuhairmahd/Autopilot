@@ -57,14 +57,19 @@ Write-Host "This test verifies that a single exact match is auto-selected withou
 try
 {
     # Create a mock Get-EntraDirectoryObject function for testing
-    function Mock-GetEntraDirectoryObject-ExactMatch
+    function global:Get-EntraDirectoryObject
     {
-        param($EntityType, $EntityName, $AccessToken, [switch]$findSimilar)
+        param(
+            [string]$EntityType,
+            [string]$EntityName,
+            [string]$AccessToken,
+            [switch]$findSimilar
+        )
         
         if (-not $findSimilar)
         {
-            # Return single exact match
-            return @{
+            # Return single exact match as a tuple (result, isFuzzy)
+            $result = @{
                 value = @(
                     @{
                         displayName = "TestGroup"
@@ -72,26 +77,20 @@ try
                     }
                 )
             }
+            return $result, $false
         }
+        return @{ value = @() }, $false
     }
     
-    # Temporarily replace Get-EntraDirectoryObject
-    $originalFunction = Get-Command Get-EntraDirectoryObject -ErrorAction SilentlyContinue
-    if ($originalFunction)
+    # Mock Read-Host to prevent prompts
+    function global:Read-Host
     {
-        Rename-Item -Path "function:\Get-EntraDirectoryObject" -NewName "Get-EntraDirectoryObject-Original" -Force
+        param([string]$Prompt)
+        throw "Read-Host called during automated test - test should not prompt for input"
     }
-    Set-Item -Path "function:\Get-EntraDirectoryObject" -Value ${function:Mock-GetEntraDirectoryObject-ExactMatch}
     
     # Call function - should return immediately without prompting
     $result = Resolve-SingleGroupInteractive -GroupName "TestGroup" -AccessToken "mock_token"
-    
-    # Restore original function
-    if ($originalFunction)
-    {
-        Remove-Item -Path "function:\Get-EntraDirectoryObject" -Force
-        Rename-Item -Path "function:\Get-EntraDirectoryObject-Original" -NewName "Get-EntraDirectoryObject" -Force
-    }
     
     if ($result -and $result.name -eq "TestGroup" -and $result.id)
     {
@@ -102,11 +101,21 @@ try
     else
     {
         Write-Host "✗ Single exact match behavior failed" -ForegroundColor Red
+        Write-Host "  Result: $($result | ConvertTo-Json -Depth 2)" -ForegroundColor Gray
     }
 }
 catch
 {
     Write-Host "✗ Error testing single exact match: $($_.Exception.Message)" -ForegroundColor Red
+}
+finally
+{
+    # Restore original functions by reloading
+    $functionFiles = Get-ChildItem -Path $functionsPath -Filter "*.ps1" -Recurse
+    foreach ($file in $functionFiles)
+    {
+        . $file.FullName
+    }
 }
 
 # Test 3: Mock single fuzzy match scenario
@@ -115,46 +124,44 @@ Write-Host "This test verifies the fix: single fuzzy match should be auto-select
 try
 {
     # Create a mock Get-EntraDirectoryObject function for testing fuzzy match
-    function Mock-GetEntraDirectoryObject-FuzzyMatch
+    function global:Get-EntraDirectoryObject
     {
-        param($EntityType, $EntityName, $AccessToken, [switch]$findSimilar)
+        param(
+            [string]$EntityType,
+            [string]$EntityName,
+            [string]$AccessToken,
+            [switch]$findSimilar
+        )
         
         if (-not $findSimilar)
         {
             # Return no exact match
-            return @{ value = @() }
+            return @{ value = @() }, $false
         }
         else
         {
-            # Return single fuzzy match
-            return @{
+            # Return single fuzzy match as a tuple
+            $result = @{
                 value = @(
                     @{
                         displayName = "AutoPilot"
                         id          = "57d1aba1-180a-4856-b497-bc6d5014f06f"
                     }
                 )
-            }, $false
+            }
+            return $result, $true
         }
     }
     
-    # Temporarily replace Get-EntraDirectoryObject
-    $originalFunction = Get-Command Get-EntraDirectoryObject -ErrorAction SilentlyContinue
-    if ($originalFunction)
+    # Mock Read-Host to prevent prompts
+    function global:Read-Host
     {
-        Rename-Item -Path "function:\Get-EntraDirectoryObject" -NewName "Get-EntraDirectoryObject-Original" -Force
+        param([string]$Prompt)
+        throw "Read-Host called during automated test - test should not prompt for input"
     }
-    Set-Item -Path "function:\Get-EntraDirectoryObject" -Value ${function:Mock-GetEntraDirectoryObject-FuzzyMatch}
     
     # Call function - should return immediately without prompting (THE FIX)
     $result = Resolve-SingleGroupInteractive -GroupName "autopilot" -AccessToken "mock_token"
-    
-    # Restore original function
-    if ($originalFunction)
-    {
-        Remove-Item -Path "function:\Get-EntraDirectoryObject" -Force
-        Rename-Item -Path "function:\Get-EntraDirectoryObject-Original" -NewName "Get-EntraDirectoryObject" -Force
-    }
     
     if ($result -and $result.name -eq "AutoPilot" -and $result.id)
     {
@@ -165,11 +172,21 @@ try
     else
     {
         Write-Host "✗ Single fuzzy match behavior failed - FIX NOT WORKING" -ForegroundColor Red
+        Write-Host "  Result: $($result | ConvertTo-Json -Depth 2)" -ForegroundColor Gray
     }
 }
 catch
 {
     Write-Host "✗ Error testing single fuzzy match: $($_.Exception.Message)" -ForegroundColor Red
+}
+finally
+{
+    # Restore original functions by reloading
+    $functionFiles = Get-ChildItem -Path $functionsPath -Filter "*.ps1" -Recurse
+    foreach ($file in $functionFiles)
+    {
+        . $file.FullName
+    }
 }
 
 # Test 4: Mock multiple fuzzy match scenario
@@ -177,46 +194,52 @@ Write-Host "`nTest 4: Case-Insensitive Exact Match" -ForegroundColor Yellow
 Write-Host "This test verifies that exact match is case-insensitive for groups" -ForegroundColor Gray
 try
 {
-    # Create a mock Get-EntraDirectoryObject function for testing case-insensitive exact match
-    function Mock-GetEntraDirectoryObject-CaseInsensitive
-    {
-        param($EntityType, $EntityName, $AccessToken, [switch]$findSimilar)
-        
-        if (-not $findSimilar)
-        {
-            # Return exact match regardless of case
-            if ($EntityName.ToLower() -eq "autopilot")
-            {
-                return @{
-                    value = @(
-                        @{
-                            displayName = "AutoPilot"
-                            id          = "57d1aba1-180a-4856-b497-bc6d5014f06f"
-                        }
-                    )
-                }
-            }
-            else
-            {
-                return @{ value = @() }
-            }
-        }
-    }
-    
-    # Temporarily replace Get-EntraDirectoryObject
-    $originalFunction = Get-Command Get-EntraDirectoryObject -ErrorAction SilentlyContinue
-    if ($originalFunction)
-    {
-        Rename-Item -Path "function:\Get-EntraDirectoryObject" -NewName "Get-EntraDirectoryObject-Original" -Force
-    }
-    Set-Item -Path "function:\Get-EntraDirectoryObject" -Value ${function:Mock-GetEntraDirectoryObject-CaseInsensitive}
-    
     # Test with different casings
     $testCases = @("autopilot", "AutoPilot", "AUTOPILOT", "AuToPiLoT")
     $allPassed = $true
     
     foreach ($testCase in $testCases)
     {
+        # Create a mock Get-EntraDirectoryObject function for testing case-insensitive exact match
+        function global:Get-EntraDirectoryObject
+        {
+            param(
+                [string]$EntityType,
+                [string]$EntityName,
+                [string]$AccessToken,
+                [switch]$findSimilar
+            )
+            
+            if (-not $findSimilar)
+            {
+                # Return exact match regardless of case
+                if ($EntityName.ToLower() -eq "autopilot")
+                {
+                    $result = @{
+                        value = @(
+                            @{
+                                displayName = "AutoPilot"
+                                id          = "57d1aba1-180a-4856-b497-bc6d5014f06f"
+                            }
+                        )
+                    }
+                    return $result, $false
+                }
+                else
+                {
+                    return @{ value = @() }, $false
+                }
+            }
+            return @{ value = @() }, $false
+        }
+        
+        # Mock Read-Host to prevent prompts
+        function global:Read-Host
+        {
+            param([string]$Prompt)
+            throw "Read-Host called during automated test - test should not prompt for input"
+        }
+        
         Write-Host "  Testing: '$testCase'" -ForegroundColor Gray
         $result = Resolve-SingleGroupInteractive -GroupName $testCase -AccessToken "mock_token"
         
@@ -227,15 +250,9 @@ try
         else
         {
             Write-Host "    ✗ Failed to find group" -ForegroundColor Red
+            Write-Host "    Result: $($result | ConvertTo-Json -Depth 2)" -ForegroundColor Gray
             $allPassed = $false
         }
-    }
-    
-    # Restore original function
-    if ($originalFunction)
-    {
-        Remove-Item -Path "function:\Get-EntraDirectoryObject" -Force
-        Rename-Item -Path "function:\Get-EntraDirectoryObject-Original" -NewName "Get-EntraDirectoryObject" -Force
     }
     
     if ($allPassed)
@@ -250,6 +267,15 @@ try
 catch
 {
     Write-Host "✗ Error testing case-insensitive exact match: $($_.Exception.Message)" -ForegroundColor Red
+}
+finally
+{
+    # Restore original functions by reloading
+    $functionFiles = Get-ChildItem -Path $functionsPath -Filter "*.ps1" -Recurse
+    foreach ($file in $functionFiles)
+    {
+        . $file.FullName
+    }
 }
 
 # Test 5: Mock multiple fuzzy match scenario
