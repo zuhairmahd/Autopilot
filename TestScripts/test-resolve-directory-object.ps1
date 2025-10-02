@@ -497,35 +497,42 @@ function Show-DirectoryObjectList
     }
     
     # For single item with NoPrompt, auto-return it
-    if ($NoPrompt -and $EntityList.value.Count -eq 1)
+    # Note: EntityList is passed as an array directly, not wrapped in .value property
+    if ($NoPrompt -and $EntityList.Count -eq 1)
     {
         if ($EntityType -eq "User")
         {
-            return $EntityList.value[0].userPrincipalName
+            return $EntityList[0].userPrincipalName
         }
         else
         {
-            return $EntityList.value[0].displayName
+            return $EntityList[0].displayName
         }
     }
     
     # For multiple items or non-NoPrompt scenarios, use the mocked response
     # This prevents ShowMenu from being called, which would prompt for input
-    if ($null -ne $script:MockShowDirectoryObjectListResponse)
+    # Check if MockShowDirectoryObjectListEnabled is set (not just if response is not null)
+    if ($script:MockShowDirectoryObjectListEnabled)
     {
+        # If response is explicitly null, convert to 0 (exit) like the real function does
+        if ($null -eq $script:MockShowDirectoryObjectListResponse)
+        {
+            return 0
+        }
         return $script:MockShowDirectoryObjectListResponse
     }
     
-    # Default: return first item to avoid prompting
-    if ($EntityList.value.Count -gt 0)
+    # Default: return first item to avoid prompting (when mocking is disabled)
+    if ($EntityList.Count -gt 0)
     {
         if ($EntityType -eq "User")
         {
-            return $EntityList.value[0].userPrincipalName
+            return $EntityList[0].userPrincipalName
         }
         else
         {
-            return $EntityList.value[0].displayName
+            return $EntityList[0].displayName
         }
     }
     

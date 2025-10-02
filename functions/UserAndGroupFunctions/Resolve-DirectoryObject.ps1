@@ -32,8 +32,13 @@ function Resolve-DirectoryObject
         When specified, single-item results are automatically accepted without user confirmation.
         Useful for automated testing scenarios.
     
+    .PARAMETER ReturnEntity
+        When specified, returns the full entity object instead of just the identifier.
+        Useful when caller needs additional entity properties beyond the name.
+    
     .OUTPUTS
         Returns the validated userPrincipalName/displayName if an entity is found and confirmed,
+        or the full entity object if -ReturnEntity is specified,
         or a return value code for navigation (back, exit, etc.).
     
     .EXAMPLE
@@ -67,26 +72,21 @@ function Resolve-DirectoryObject
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$EntityName,
-        
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$AccessToken,
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$Settings,
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$ReturnValues,
-        
         [Parameter(Mandatory = $false)]
         [ValidateSet("User", "Group")]
         [string]$EntityType = "User",
-        
         [Parameter(Mandatory = $false)]
-        [switch]$NoPrompt
-    )
-    
-    $functionName = $MyInvocation.MyCommand.Name
+        [switch]$NoPrompt,
+        [Parameter(Mandatory = $false)]
+        [switch]$ReturnEntity
+    )    $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Resolving $EntityType`: $EntityName"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting $EntityType resolution for: $EntityName" -LogLevel "Verbose"
     
@@ -136,6 +136,13 @@ function Resolve-DirectoryObject
         }
         Write-Verbose "[$functionName] Exact match found. Resolved $EntityType name: $resolvedName"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Exact match for $EntityType`: $resolvedName" -LogLevel "Information"
+        
+        # Return full entity object if requested, otherwise return name
+        if ($ReturnEntity)
+        {
+            Write-Verbose "[$functionName] Returning full entity object for $EntityType"
+            return $entity
+        }
         return $resolvedName
     }
     
@@ -187,6 +194,29 @@ function Resolve-DirectoryObject
         # Process the selection result using the unified conversion function
         $result = ConvertFrom-DirectoryObjectSelection -SelectedValue $possibleEntityName -ReturnValues $ReturnValues
         Write-Verbose "[$functionName] Processed $EntityType selection: $result"
+        
+        # If ReturnEntity is specified and result is not a navigation command, find and return the entity object
+        if ($ReturnEntity -and $result -notin $ReturnValues.Values -and $result -ne "EXIT_APPLICATION" -and $result -ne "Main Menu")
+        {
+            Write-Verbose "[$functionName] Finding entity object for: $result"
+            $selectedEntity = $entityInfo[0].value | Where-Object {
+                if ($EntityType -eq "User")
+                {
+                    $_.userPrincipalName -eq $result 
+                }
+                else
+                {
+                    $_.displayName -eq $result 
+                }
+            } | Select-Object -First 1
+            
+            if ($null -ne $selectedEntity)
+            {
+                Write-Verbose "[$functionName] Returning full entity object for $EntityType"
+                return $selectedEntity
+            }
+        }
+        
         return $result
     }
     

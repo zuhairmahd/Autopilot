@@ -1,4 +1,4 @@
-function Get-EntraDirectoryObject
+function Get-EntraDirectoryObject()
 {
     <#
     .SYNOPSIS
@@ -53,15 +53,12 @@ function Get-EntraDirectoryObject
         [Parameter(Mandatory = $true)]
         [ValidateSet("User", "Group")]
         [string]$EntityType,
-        
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$EntityName,
-        
         [Parameter(Mandatory = $true)]
         [AllowEmptyString()]
         [string]$AccessToken,
-        
         [Parameter(Mandatory = $false)]
         [switch]$FindSimilar
     )
