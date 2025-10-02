@@ -114,9 +114,6 @@ function Resolve-DirectoryObject
     # Use the unified Get-EntraDirectoryObject function
     $entityInfo = Get-EntraDirectoryObject -EntityName $EntityName -AccessToken $AccessToken -EntityType $EntityType -FindSimilar
     
-    Write-Verbose "[$functionName] $EntityType search returned: $($entityInfo[0].value.count) results (fuzzy search: $($entityInfo[1]))"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "$EntityType search completed. Results: $($entityInfo[0].value.count), Fuzzy: $($entityInfo[1])" -LogLevel "Verbose"
-    
     # Handle exact match found
     if ($null -ne $entityInfo -and $entityInfo[1] -eq $false)
     {
