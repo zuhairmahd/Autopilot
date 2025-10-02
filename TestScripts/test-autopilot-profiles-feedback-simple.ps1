@@ -112,11 +112,11 @@ try
     $checks = @(
         @{ Pattern = 'MODE: REPLACE - Old profiles will be removed'; Description = 'Replace mode banner' }
         @{ Pattern = 'MODE: ADD - New profiles will be added'; Description = 'Add mode banner' }
-        @{ Pattern = '\[!\] REPLACE MODE:'; Description = 'Replace mode indicator' }
-        @{ Pattern = '\[\+\] ADD MODE:'; Description = 'Add mode indicator' }
+        @{ Pattern = '[!] REPLACE MODE:'; Description = 'Replace mode indicator' }
+        @{ Pattern = '[+] ADD MODE:'; Description = 'Add mode indicator' }
         @{ Pattern = 'SUMMARY - REPLACE MODE'; Description = 'Replace summary' }
         @{ Pattern = 'SUMMARY - ADD MODE'; Description = 'Add summary' }
-        @{ Pattern = 'NO CHANGES - Keeping .* existing profiles'; Description = 'Keep unchanged banner' }
+        @{ Pattern = 'NO CHANGES - Keeping'; Description = 'Keep unchanged banner' }
     )
     
     foreach ($check in $checks)

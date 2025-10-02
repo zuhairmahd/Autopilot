@@ -6,6 +6,7 @@
 
 .DESCRIPTION
     Validates that Autopilot profiles editor uses the same enhanced feedback pattern as groups editor.
+    Uses static code analysis to avoid complex mocking requirements.
 #>
 
 $ErrorActionPreference = "Stop"
@@ -14,169 +15,118 @@ Write-Host "===============================================================" -Fo
 Write-Host "  TEST: Autopilot Profiles Editor Feedback Integration" -ForegroundColor Cyan
 Write-Host "===============================================================" -ForegroundColor Cyan
 
-# Import required modules
+# Import the function for analysis
 $projectRoot = Split-Path $PSScriptRoot -Parent
 
-# Mock functions BEFORE importing the actual modules
-function global:Read-Host
-{
-    param([string]$Prompt)
-    throw "Read-Host should not be called in automated tests"
-}
-
-function global:Resolve-SingleAutopilotProfileInteractive
-{
-    param($ProfileName, $AccessToken, $ExistingItems)
-    return @{
-        name = $ProfileName
-        id   = "test-id-$ProfileName"
-    }
-}
-
+# Mock only what's needed for import
 function global:Write-Log
 {
-    param($LogFile, $Module, $Message, $LogLevel)
-    # Suppress logging in tests
+    param($LogFile, $Module, $Message, $LogLevel) 
 }
+$global:logFile = "test.log"
 
-# Import modules after mocks are in place
-. "$projectRoot\functions\setupFunctions\Show-EditorCommon.ps1"
-. "$projectRoot\functions\setupFunctions\Show-AutopilotProfilesEditor.ps1"
+try
+{
+    . "$projectRoot\functions\setupFunctions\Show-EditorCommon.ps1"
+    . "$projectRoot\functions\setupFunctions\Show-AutopilotProfilesEditor.ps1"
+}
+catch
+{
+    Write-Host "[FAIL] Failed to import modules: $_" -ForegroundColor Red
+    exit 1
+}
 
 # Test 1: Verify Get-EditorReplaceOrAddChoice is called
 Write-Host "`n[TEST 1] Verify Get-EditorReplaceOrAddChoice integration" -ForegroundColor Yellow
 Write-Host "==========================================================" -ForegroundColor Gray
 
-$testPassed = $false
+$allTests = @()
 try
 {
-    # Mock Get-EditorReplaceOrAddChoice to verify it's called with correct parameters
-    $script:editorChoiceCalled = $false
-    $script:editorChoiceItemType = $null
+    $functionCode = (Get-Command Get-AutopilotProfileArrayInput).ScriptBlock.ToString()
     
-    # Override the imported function with our mock
-    function global:Get-EditorReplaceOrAddChoice
+    if ($functionCode -match "Get-EditorReplaceOrAddChoice")
     {
-        param($CurrentArray, $ItemType)
-        $script:editorChoiceCalled = $true
-        $script:editorChoiceItemType = $ItemType
+        Write-Host "[PASS] Function calls Get-EditorReplaceOrAddChoice" -ForegroundColor Green
+        $allTests += $true
         
-        # Return keep unchanged to exit quickly
-        return @{
-            ShouldReplaceExisting = $false
-            ShouldProceed         = $false
-        }
-    }
-    
-    # Also mock Write-Host to suppress output
-    function global:Write-Host
-    {
-        param($Object, $ForegroundColor, $NoNewline)
-        # Suppress output
-    }
-    
-    $currentProfiles = @(
-        @{ name = "Profile1"; id = "id1" }
-    )
-    
-    try
-    {
-        $result = Get-AutopilotProfileArrayInput -CurrentProfiles $currentProfiles -AccessToken "test-token" -ErrorAction Stop
-    }
-    catch
-    {
-        Write-Host "[INFO] Function call completed with: $_" -ForegroundColor Cyan
-    }
-    
-    if ($script:editorChoiceCalled)
-    {
-        Write-Host "[PASS] Get-EditorReplaceOrAddChoice was called" -ForegroundColor Green
-        
-        if ($script:editorChoiceItemType -eq 'profile')
+        if ($functionCode -match "Get-EditorReplaceOrAddChoice[^\n]*-ItemType\s+'profile'")
         {
             Write-Host "[PASS] ItemType parameter is 'profile'" -ForegroundColor Green
-            $testPassed = $true
+            $allTests += $true
         }
         else
         {
-            Write-Host "[FAIL] ItemType was '$($script:editorChoiceItemType)', expected 'profile'" -ForegroundColor Red
+            Write-Host "[FAIL] ItemType parameter not set to 'profile'" -ForegroundColor Red
+            $allTests += $false
         }
     }
     else
     {
-        Write-Host "[FAIL] Get-EditorReplaceOrAddChoice was not called" -ForegroundColor Red
+        Write-Host "[FAIL] Function does not call Get-EditorReplaceOrAddChoice" -ForegroundColor Red
+        $allTests += $false
     }
 }
 catch
 {
     Write-Host "[FAIL] Exception: $_" -ForegroundColor Red
+    $allTests += $false
 }
 
-if (-not $testPassed)
-{
-    Write-Host "`n[OVERALL] TEST FAILED" -ForegroundColor Red
-    exit 1
-}
-
-# Test 2: Verify decision.ShouldReplaceExisting is used (not $shouldReplaceExisting variable)
+# Test 2: Verify decision object usage (not $shouldReplaceExisting variable)
 Write-Host "`n[TEST 2] Verify decision object usage" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Gray
 
-$testPassed = $false
 try
 {
-    # Check that the function code doesn't reference $shouldReplaceExisting
     $functionCode = (Get-Command Get-AutopilotProfileArrayInput).ScriptBlock.ToString()
     
     # Should NOT contain old variable reference
     if ($functionCode -notmatch '\$shouldReplaceExisting')
     {
         Write-Host "[PASS] Function does not use deprecated `$shouldReplaceExisting variable" -ForegroundColor Green
-        $testPassed = $true
+        $allTests += $true
     }
     else
     {
         Write-Host "[FAIL] Function still references `$shouldReplaceExisting variable" -ForegroundColor Red
         Write-Host "       Should use `$decision.ShouldReplaceExisting instead" -ForegroundColor Yellow
+        $allTests += $false
     }
     
     # Should contain new decision object references
     if ($functionCode -match '\$decision\.ShouldReplaceExisting')
     {
         Write-Host "[PASS] Function uses `$decision.ShouldReplaceExisting" -ForegroundColor Green
+        $allTests += $true
     }
     else
     {
         Write-Host "[FAIL] Function does not use `$decision.ShouldReplaceExisting" -ForegroundColor Red
-        $testPassed = $false
+        $allTests += $false
     }
     
     if ($functionCode -match '\$decision\.ShouldProceed')
     {
         Write-Host "[PASS] Function uses `$decision.ShouldProceed" -ForegroundColor Green
+        $allTests += $true
     }
     else
     {
         Write-Host "[FAIL] Function does not use `$decision.ShouldProceed" -ForegroundColor Red
-        $testPassed = $false
+        $allTests += $false
     }
 }
 catch
 {
     Write-Host "[FAIL] Exception: $_" -ForegroundColor Red
-}
-
-if (-not $testPassed)
-{
-    Write-Host "`n[OVERALL] TEST FAILED" -ForegroundColor Red
-    exit 1
+    $allTests += $false
 }
 
 # Test 3: Verify mode banners are present
 Write-Host "`n[TEST 3] Verify mode banners and feedback" -ForegroundColor Yellow
 Write-Host "============================================" -ForegroundColor Gray
 
-$testPassed = $false
 try
 {
     $functionCode = (Get-Command Get-AutopilotProfileArrayInput).ScriptBlock.ToString()
@@ -184,93 +134,100 @@ try
     $checks = @(
         @{ Pattern = 'MODE: REPLACE - Old profiles will be removed'; Description = 'Replace mode banner' }
         @{ Pattern = 'MODE: ADD - New profiles will be added'; Description = 'Add mode banner' }
-        @{ Pattern = '\[!\] REPLACE MODE:'; Description = 'Replace mode indicator' }
-        @{ Pattern = '\[\+\] ADD MODE:'; Description = 'Add mode indicator' }
+        @{ Pattern = '[!] REPLACE MODE:'; Description = 'Replace mode indicator' }
+        @{ Pattern = '[+] ADD MODE:'; Description = 'Add mode indicator' }
         @{ Pattern = 'SUMMARY - REPLACE MODE'; Description = 'Replace summary' }
         @{ Pattern = 'SUMMARY - ADD MODE'; Description = 'Add summary' }
-        @{ Pattern = 'NO CHANGES - Keeping .* existing profiles'; Description = 'Keep unchanged banner' }
+        @{ Pattern = 'NO CHANGES - Keeping'; Description = 'Keep unchanged banner' }
     )
     
-    $allPassed = $true
     foreach ($check in $checks)
     {
         if ($functionCode -match [regex]::Escape($check.Pattern))
         {
             Write-Host "[PASS] Found: $($check.Description)" -ForegroundColor Green
+            $allTests += $true
         }
         else
         {
             Write-Host "[FAIL] Missing: $($check.Description)" -ForegroundColor Red
-            $allPassed = $false
+            $allTests += $false
         }
     }
-    
-    $testPassed = $allPassed
 }
 catch
 {
     Write-Host "[FAIL] Exception: $_" -ForegroundColor Red
-}
-
-if (-not $testPassed)
-{
-    Write-Host "`n[OVERALL] TEST FAILED" -ForegroundColor Red
-    exit 1
+    $allTests += $false
 }
 
 # Test 4: Verify ASCII characters (no Unicode)
 Write-Host "`n[TEST 4] Verify ASCII characters only" -ForegroundColor Yellow
 Write-Host "=======================================" -ForegroundColor Gray
 
-$testPassed = $false
 try
 {
     $functionCode = (Get-Command Get-AutopilotProfileArrayInput).ScriptBlock.ToString()
     
     # Check for Unicode characters that should have been replaced
     $unicodePatterns = @(
-        @{ Char = '\u2713'; Name = 'Checkmark' }
-        @{ Char = '\u2192'; Name = 'Arrow' }
-        @{ Char = '\u2550'; Name = 'Box drawing' }
-        @{ Char = '\u26a0'; Name = 'Warning sign' }
+        @{ Char = '✓'; Name = 'Checkmark (U+2713)' }
+        @{ Char = '→'; Name = 'Arrow (U+2192)' }
+        @{ Char = '═'; Name = 'Box drawing (U+2550)' }
+        @{ Char = '⚠'; Name = 'Warning sign (U+26A0)' }
     )
     
-    $allPassed = $true
+    $foundUnicode = $false
     foreach ($pattern in $unicodePatterns)
     {
-        if ($functionCode -match $pattern.Char)
+        if ($functionCode -match [regex]::Escape($pattern.Char))
         {
             Write-Host "[FAIL] Found Unicode character: $($pattern.Name)" -ForegroundColor Red
-            $allPassed = $false
+            $foundUnicode = $true
+            $allTests += $false
         }
     }
     
-    if ($allPassed)
+    if (-not $foundUnicode)
     {
         Write-Host "[PASS] No Unicode characters found - using ASCII only" -ForegroundColor Green
-        $testPassed = $true
+        $allTests += $true
     }
 }
 catch
 {
     Write-Host "[FAIL] Exception: $_" -ForegroundColor Red
+    $allTests += $false
 }
 
-if (-not $testPassed)
-{
-    Write-Host "`n[OVERALL] TEST FAILED" -ForegroundColor Red
-    exit 1
-}
+# Summary
+$passCount = ($allTests | Where-Object { $_ -eq $true }).Count
+$failCount = ($allTests | Where-Object { $_ -eq $false }).Count
+$totalCount = $allTests.Count
 
 Write-Host "`n===============================================================" -ForegroundColor Cyan
-Write-Host "  ALL TESTS PASSED" -ForegroundColor Green
+if ($failCount -eq 0)
+{
+    Write-Host "  ALL TESTS PASSED ($passCount/$totalCount)" -ForegroundColor Green
+}
+else
+{
+    Write-Host "  TESTS COMPLETED: $passCount passed, $failCount failed" -ForegroundColor Yellow
+}
 Write-Host "===============================================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Summary:" -ForegroundColor White
-Write-Host "  [+] Get-EditorReplaceOrAddChoice integrated correctly" -ForegroundColor Green
-Write-Host "  [+] Decision object pattern implemented" -ForegroundColor Green
-Write-Host "  [+] Mode banners and feedback messages present" -ForegroundColor Green
-Write-Host "  [+] ASCII characters only (PowerShell 5.1 compatible)" -ForegroundColor Green
-Write-Host ""
 
-exit 0
+if ($failCount -gt 0)
+{
+    exit 1
+}
+else
+{
+    Write-Host ""
+    Write-Host "Summary:" -ForegroundColor White
+    Write-Host "  [+] Get-EditorReplaceOrAddChoice integrated correctly" -ForegroundColor Green
+    Write-Host "  [+] Decision object pattern implemented" -ForegroundColor Green
+    Write-Host "  [+] Mode banners and feedback messages present" -ForegroundColor Green
+    Write-Host "  [+] ASCII characters only (PowerShell 5.1 compatible)" -ForegroundColor Green
+    Write-Host ""
+    exit 0
+}
