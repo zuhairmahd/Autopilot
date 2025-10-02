@@ -206,10 +206,38 @@ function Compare-EditorArrayContents()
             $item2 = $Array2[$i]
             
             # Handle both hashtable and PSCustomObject access patterns
-            $name1 = if ($item1 -is [hashtable]) { $item1.name } else { $item1.name }
-            $id1 = if ($item1 -is [hashtable]) { $item1.id } else { $item1.id }
-            $name2 = if ($item2 -is [hashtable]) { $item2.name } else { $item2.name }
-            $id2 = if ($item2 -is [hashtable]) { $item2.id } else { $item2.id }
+            $name1 = if ($item1 -is [hashtable])
+            {
+                $item1.name 
+            }
+            else
+            {
+                $item1.name 
+            }
+            $id1 = if ($item1 -is [hashtable])
+            {
+                $item1.id 
+            }
+            else
+            {
+                $item1.id 
+            }
+            $name2 = if ($item2 -is [hashtable])
+            {
+                $item2.name 
+            }
+            else
+            {
+                $item2.name 
+            }
+            $id2 = if ($item2 -is [hashtable])
+            {
+                $item2.id 
+            }
+            else
+            {
+                $item2.id 
+            }
             
             if ($name1 -ne $name2 -or $id1 -ne $id2)
             {
@@ -358,45 +386,44 @@ function Get-EditorReplaceOrAddChoice()
     Write-Host "  2. Add new $ItemType to the existing ones" -ForegroundColor White
     Write-Host "  3. Keep current $ItemType unchanged" -ForegroundColor White
     
-    do
+    $choice = Read-Host "Enter your choice (1-3)"
+    while ($choice -notin '1', '2', '3')
     {
+        Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+        #beep
+        [console]::beep(1000, 200)
         $choice = Read-Host "Enter your choice (1-3)"
-        switch ($choice)
+    }
+    switch ($choice)
+    {
+        '1'
         {
-            '1'
-            {
-                Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to replace existing $ItemType" -LogLevel "Verbose"
-                Write-Verbose "[$FunctionName] User chose to replace existing $ItemType"
-                return @{
-                    ShouldReplaceExisting = $true
-                    ShouldProceed         = $true
-                }
-            }
-            '2'
-            {
-                Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to add to existing $ItemType" -LogLevel "Verbose"
-                Write-Verbose "[$FunctionName] User chose to add to existing $ItemType"
-                return @{
-                    ShouldReplaceExisting = $false
-                    ShouldProceed         = $true
-                }
-            }
-            '3'
-            {
-                Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to keep current $ItemType unchanged" -LogLevel "Verbose"
-                Write-Verbose "[$FunctionName] User chose to keep current $ItemType unchanged"
-                return @{
-                    ShouldReplaceExisting = $false
-                    ShouldProceed         = $false
-                }
-            }
-            default
-            {
-                Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
-                continue
+            Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to replace existing $ItemType" -LogLevel "Verbose"
+            Write-Verbose "[$FunctionName] User chose to replace existing $ItemType"
+            return @{
+                ShouldReplaceExisting = $true
+                ShouldProceed         = $true
             }
         }
-    } while ($true)
+        '2'
+        {
+            Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to add to existing $ItemType" -LogLevel "Verbose"
+            Write-Verbose "[$FunctionName] User chose to add to existing $ItemType"
+            return @{
+                ShouldReplaceExisting = $false
+                ShouldProceed         = $true
+            }
+        }
+        '3'
+        {
+            Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to keep current $ItemType unchanged" -LogLevel "Verbose"
+            Write-Verbose "[$FunctionName] User chose to keep current $ItemType unchanged"
+            return @{
+                ShouldReplaceExisting = $false
+                ShouldProceed         = $false
+            }
+        }
+    }
 }
 
 function Convert-StringArrayToHashTableArray()
@@ -615,7 +642,7 @@ function Show-EditorInteractiveChoice()
     )
     $FunctionName = $MyInvocation.MyCommand.Name    
     $choice = Read-Host $PromptText
-    while ($choice -ne 'y' -and $choice -ne 'Y' -and $choice -ne 'n' -and $choice -ne 'N')
+    while ($choice -notin @('y', 'Y', 'yes', 'n', 'N', 'no'))
     {
         Write-Host "Invalid selection. Please enter 'y' or 'n'." -ForegroundColor Red
         [console]::beep(1000, 500)

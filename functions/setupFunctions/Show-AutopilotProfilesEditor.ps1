@@ -344,39 +344,36 @@ function Get-AutopilotProfileArrayInput()
         Write-Host "  2. Add new profiles to the existing ones" -ForegroundColor White
         Write-Host "  3. Keep current profiles unchanged" -ForegroundColor White
         
-        do
+        $choice = Read-Host "Enter your choice (1-3)"
+        while ($choice -notin '1', '2', '3')
         {
-            $choice = Read-Host "Enter your choice (1-3)"
-            switch ($choice)
+            #beep
+            [console]::beep(1000, 200)
+            $choice = Read-Host "Invalid choice. Please enter 1, 2, or 3"
+        }
+        switch ($choice)
+        {
+            '1'
             {
-                '1'
-                {
-                    $shouldReplaceExisting = $true
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing Autopilot profiles" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to replace existing Autopilot profiles"
-                    break
-                }
-                '2'
-                {
-                    $shouldReplaceExisting = $false
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing Autopilot profiles" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to add to existing Autopilot profiles"
-                    break
-                }
-                '3'
-                {
-                    Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current Autopilot profiles unchanged" -LogLevel "Verbose"
-                    Write-Verbose "[$functionName] User chose to keep current Autopilot profiles unchanged"
-                    return $CurrentProfiles
-                }
-                default
-                {
-                    Write-Host "Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
-                    continue
-                }
+                $shouldReplaceExisting = $true
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to replace existing Autopilot profiles" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] User chose to replace existing Autopilot profiles"
+                break
             }
-            break
-        } while ($true)
+            '2'
+            {
+                $shouldReplaceExisting = $false
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to add to existing Autopilot profiles" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] User chose to add to existing Autopilot profiles"
+                break
+            }
+            '3'
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current Autopilot profiles unchanged" -LogLevel "Verbose"
+                Write-Verbose "[$functionName] User chose to keep current Autopilot profiles unchanged"
+                return $CurrentProfiles
+            }
+        }
     }
     
     Write-Host "`nEnter Autopilot profile names (one per line)." -ForegroundColor Yellow
@@ -407,12 +404,25 @@ function Get-AutopilotProfileArrayInput()
             }
             
             # Process the first profile name
-            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken
+            # For replace mode, check against building list; for add mode, check against current + building list
+            $checkList = if ($shouldReplaceExisting)
+            {
+                $newProfilesHashTable 
+            }
+            else
+            {
+                $CurrentProfiles + $newProfilesHashTable 
+            }
+            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken -ExistingItems $checkList
             if ($resolvedProfile)
             {
                 $newProfilesHashTable += $resolvedProfile
                 Write-Log -LogFile $logFile -Module $functionName -Message "Added first Autopilot profile: '$($resolvedProfile.name)'" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Added first Autopilot profile: '$($resolvedProfile.name)'"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] First profile input was null (likely duplicate), continuing to allow re-entry"
             }
         }
         else
@@ -424,12 +434,25 @@ function Get-AutopilotProfileArrayInput()
             }
             
             # Process each additional profile name
-            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken
+            # For replace mode, check against building list; for add mode, check against current + building list
+            $checkList = if ($shouldReplaceExisting)
+            {
+                $newProfilesHashTable 
+            }
+            else
+            {
+                $CurrentProfiles + $newProfilesHashTable 
+            }
+            $resolvedProfile = Resolve-SingleAutopilotProfileInteractive -ProfileName $choice.Trim() -AccessToken $AccessToken -ExistingItems $checkList
             if ($resolvedProfile)
             {
                 $newProfilesHashTable += $resolvedProfile
                 Write-Log -LogFile $logFile -Module $functionName -Message "Added Autopilot profile: '$($resolvedProfile.name)'" -LogLevel "Verbose"
                 Write-Verbose "[$functionName] Added Autopilot profile: '$($resolvedProfile.name)'"
+            }
+            else
+            {
+                Write-Verbose "[$functionName] Profile input was null (likely duplicate), ignoring and continuing"
             }
         }
     } while ($true)
@@ -479,15 +502,54 @@ function Resolve-SingleAutopilotProfileInteractive()
     .SYNOPSIS
         Resolves a single Autopilot profile name to profile object using interactive search.
         Uses GetAutopilotProfile function for better search capabilities.
+        Checks for duplicates against existing items.
     #>
     [CmdletBinding()]
     param(
         [string]$ProfileName,
-        [string]$AccessToken
+        [string]$AccessToken,
+        [array]$ExistingItems = @()
     )
     
     $FunctionName = $MyInvocation.MyCommand.Name    
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving Autopilot profile: '$ProfileName'" -LogLevel "Verbose"
+    
+    # Helper function to check if item already exists
+    function Test-ItemExists
+    {
+        param($ItemName, $ItemId, $ExistingList)
+        foreach ($existing in $ExistingList)
+        {
+            if ($existing -is [hashtable] -or $existing -is [PSCustomObject])
+            {
+                $existingName = if ($existing -is [hashtable])
+                {
+                    $existing['name'] 
+                }
+                else
+                {
+                    $existing.name 
+                }
+                $existingId = if ($existing -is [hashtable])
+                {
+                    $existing['id'] 
+                }
+                else
+                {
+                    $existing.id 
+                }
+                if (($existingName -and $existingName -eq $ItemName) -or ($ItemId -and $existingId -and $existingId -eq $ItemId))
+                {
+                    return $true
+                }
+            }
+            elseif ($existing -is [string] -and $existing -eq $ItemName)
+            {
+                return $true
+            }
+        }
+        return $false
+    }
     
     if (-not $AccessToken)
     {
@@ -511,6 +573,15 @@ function Resolve-SingleAutopilotProfileInteractive()
                 # Single exact match found
                 $autopilotProfile = $result.value[0]    
                 Write-Host "  Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
+                
+                # Check for duplicate
+                if (Test-ItemExists -ItemName $autopilotProfile.displayName -ItemId $autopilotProfile.id -ExistingList $ExistingItems)
+                {
+                    Write-Host "  WARNING: Profile '$($autopilotProfile.displayName)' is already in the list. Please choose a different profile." -ForegroundColor Yellow
+                    Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($autopilotProfile.displayName)'" -LogLevel "Warning"
+                    return $null
+                }
+                
                 return @{
                     name = $autopilotProfile.displayName
                     id   = $autopilotProfile.id
@@ -541,6 +612,15 @@ function Resolve-SingleAutopilotProfileInteractive()
                         $selectedProfile = $result.value[[int]$choice - 1]
                         Write-Host "  Selected: '$($selectedProfile.displayName)'" -ForegroundColor Green
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected Autopilot profile: '$($selectedProfile.displayName)' (ID: $($selectedProfile.id))" -LogLevel "Verbose"
+                        
+                        # Check for duplicate
+                        if (Test-ItemExists -ItemName $selectedProfile.displayName -ItemId $selectedProfile.id -ExistingList $ExistingItems)
+                        {
+                            Write-Host "  WARNING: Profile '$($selectedProfile.displayName)' is already in the list. Please choose a different profile." -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($selectedProfile.displayName)'" -LogLevel "Warning"
+                            return $null
+                        }
+                        
                         return @{
                             name = $selectedProfile.displayName
                             id   = $selectedProfile.id
@@ -583,7 +663,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                         if (-not [string]::IsNullOrWhiteSpace($newProfileName))
                         {
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different Autopilot profile name: '$($newProfileName.Trim())'" -LogLevel "Verbose"
-                            return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken
+                            return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken -ExistingItems $ExistingItems
                         }
                         else
                         {
@@ -596,6 +676,15 @@ function Resolve-SingleAutopilotProfileInteractive()
                         $selectedProfile = $similarResult.value[[int]$choice - 1]
                         Write-Host "  Selected: '$($selectedProfile.displayName)'" -ForegroundColor Green
                         Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected similar Autopilot profile: '$($selectedProfile.displayName)' (ID: $($selectedProfile.id))" -LogLevel "Verbose"
+                        
+                        # Check for duplicate
+                        if (Test-ItemExists -ItemName $selectedProfile.displayName -ItemId $selectedProfile.id -ExistingList $ExistingItems)
+                        {
+                            Write-Host "  WARNING: Profile '$($selectedProfile.displayName)' is already in the list. Please choose a different profile." -ForegroundColor Yellow
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($selectedProfile.displayName)'" -LogLevel "Warning"
+                            return $null
+                        }
+                        
                         return @{
                             name = $selectedProfile.displayName
                             id   = $selectedProfile.id
@@ -624,7 +713,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                             if (-not [string]::IsNullOrWhiteSpace($newProfileName))
                             {
                                 Write-Log -LogFile $logFile -Module $FunctionName -Message "User trying different Autopilot profile name: '$($newProfileName.Trim())'" -LogLevel "Verbose"
-                                return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken
+                                return Resolve-SingleAutopilotProfileInteractive -ProfileName $newProfileName.Trim() -AccessToken $AccessToken -ExistingItems $ExistingItems
                             }
                             else
                             {
