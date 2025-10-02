@@ -11,10 +11,11 @@ $testResults = @()
 Write-TestSection "`n1. Testing Function Loading..."
 try
 {
-    $functionsFolder = "$PWD\functions"
+    $RootPath = Split-Path -Parent $PSScriptRoot
+    $functionsFolder = Join-Path $RootPath "functions"
     if (Test-Path $functionsFolder)
     {
-        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
         foreach ($function in $functions)
         {
             . $function.FullName
@@ -24,7 +25,7 @@ try
     }
     else
     {
-        Write-Host "[FAIL] Functions folder not found" -ForegroundColor Red
+        Write-Host "[FAIL] Functions folder not found at: $functionsFolder" -ForegroundColor Red
         $testResults += "Function Loading: FAIL"
     }
 }

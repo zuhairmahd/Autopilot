@@ -36,8 +36,11 @@ Write-Host "=== Test 1: Validate Initialize-ApplicationConfiguration Function ==
 
 try
 {
+    # Determine paths
+    $RootPath = Split-Path -Parent $PSScriptRoot
+    
     # Load the function
-    $helperPath = "$PWD\functions\setupFunctions\Initialize-ApplicationConfiguration.ps1"
+    $helperPath = Join-Path $RootPath "functions\setupFunctions\Initialize-ApplicationConfiguration.ps1"
     if (Test-Path $helperPath)
     {
         . $helperPath

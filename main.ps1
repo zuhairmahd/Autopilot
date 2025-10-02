@@ -1683,93 +1683,21 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     }
     Write-Verbose "[$scriptName] Got user name: $userName"
     
-    #region Check if the user exists first.
-    $userInfo = GetEntraUser -UserName $userName -AccessToken $accessToken -findSimilar
-    Write-Verbose "[$scriptName] Substring search: $($userInfo)"
-    Write-Verbose "[$scriptName] User info returned: $($userInfo[0].value.count) users."
-    Write-Verbose "[$scriptName] User info: $($userInfo | ConvertTo-Json -Depth $maxJSONDepth)"
-    if ($null -ne $userInfo -and $userInfo[1] -eq $false)
+    #region Resolve user with matching support
+    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
+    # Check if user resolution returned a navigation command
+    if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
     {
-        Write-Host "Found user: $($userInfo[0].value.displayName) ($($userInfo[0].value.userPrincipalName))"
-        $userName = $userInfo[0].value.userPrincipalName
-        Write-Verbose "[$scriptName] User name set to: $userName"
+        Write-Verbose "[$scriptName] User resolution returned navigation command: $userName"
+        return $userName
     }
-    elseif ($null -ne $userInfo -and $userInfo[1] -eq $true)
-    {
-        Write-Host "Could not find an exact match for user $($userName)."
-        if ($userInfo[0].value.count -eq 1)
-        {
-            Write-Host "Found a user with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($($userInfo[0].value.count)) users with similar names:"
-        }
-        if ($($userInfo[0].value.count) -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($($userInfo[0].value.count) -eq 1)
-        {
-            Write-Host "Is this the correct user?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($userInfo[0].value.count) matches:"
-        }
-        $possibleUserName = DisplayUserList -UserList $userInfo[0].value -maxDisplay $settings.maxUserMatchDisplay
-        Write-Verbose "[$scriptName] User name selected: $possibleUserName"
-        # Handle navigation options returned from DisplayUserList
-        if ($possibleUserName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayUserList returned a message: $possibleUserName"
-            return $possibleUserName
-        }
-        elseif ($possibleUserName -eq "Back" -or $possibleUserName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleUserName -eq "Main Menu" -or $possibleUserName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($possibleUserName -eq 0 -or $possibleUserName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleUserName"
-            $userName = $possibleUserName
-        }
-    }
-    elseif ($userInfo -eq $returnValues.noUserFoundInDirectoryMessage)
-    {
-        return $userInfo
-    }
-    else
-    {
-        return $returnValues.noUserFoundInDirectoryMessage
-    }
-    #endregion Check if the user exists first.
+    #endregion Resolve user with matching support
     
     # Call GetDeviceByUser to find devices for the specified user
     Write-Verbose "[$scriptName] Calling GetDeviceByUser for user: $userName"
     $serialNumber = GetDeviceByUser -UserName $userName -OperatingSystem 'Windows' -AccessToken $accessToken
     Write-Verbose "[$scriptName] GetDeviceByUser returned: $serialNumber"
-    Write-Host "Found device for user $userName with serial number: $serialNumber"
     
-    do
-    {
-        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
-        Write-Verbose "[$scriptName] Result: $result"
-        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        $serialNumber = $result
-    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
-
     #region Handle navigation responses from GetDeviceByUser
     if ($serialNumber -eq "Back" -or $serialNumber -eq "back")
     {
@@ -1790,6 +1718,17 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
     {
         return $result
     }
+    #endregion Handle navigation responses from GetDeviceByUser
+    
+    Write-Host "Found device for user $userName with serial number: $serialNumber"
+    do
+    {
+        $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
+        Write-Verbose "[$scriptName] Result: $result"
+        Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
+        $serialNumber = $result
+    } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
+
 }
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
@@ -1802,7 +1741,7 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     }
     
     #region Resolve user with matching support
-    $userName = Resolve-UserWithMatching -UserName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues
+    $userName = Resolve-DirectoryObject -EntityName $userName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "User"
     
     # Check if user resolution returned a navigation command
     if ($userName -in $returnValues.Values -or $userName -in @("Main Menu", "EXIT_APPLICATION"))
@@ -1816,10 +1755,8 @@ $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action 
     Write-Verbose "[$scriptName] Starting comprehensive user readiness checks for: $userName"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting comprehensive user readiness checks for: $userName" -LogLevel Information
     $readinessResult = Test-UserReadiness -UserName $userName -AccessToken $accessToken -GroupsToInclude $groupsToInclude -GroupsToExclude $groupsToExclude -Settings $settings
-        
     # Display the readiness report
     Show-UserReadinessReport -ReadinessResult $readinessResult
-        
     # Proceed to device check if user is ready
     if ($readinessResult.IsReady)
     {
@@ -1908,85 +1845,38 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
     }
     Write-Verbose "[$scriptName] Got group name: $groupName"
     
-    #region Check if the group exists
-    $groupInfo = GetEntraGroup -groupName $groupName -AccessToken $accessToken -FindSimilar
-    Write-Verbose "[$scriptName] Group search result: $($groupInfo)"
-    if ($groupInfo.GetType().Name -eq 'String')
+    #region Resolve group using unified Resolve-DirectoryObject with entity return
+    $selectedGroup = Resolve-DirectoryObject -EntityName $groupName -AccessToken $accessToken -Settings $settings -ReturnValues $returnValues -EntityType "Group" -ReturnEntity
+    
+    # Handle navigation commands - check these FIRST before trying to use as group object
+    if ($selectedGroup -eq "EXIT_APPLICATION")
     {
-        # Handle error messages from GetEntraUser
-        Write-Verbose "[$scriptName] Error finding group: $groupInfo"
-        return $groupInfo
+        Write-Verbose "[$scriptName] User requested application exit from group resolution"
+        return "EXIT_APPLICATION"
     }
-    $selectedGroup = $null
-    $substringSearch = $groupInfo[1]
-    $searchResults = $groupInfo[0].value
-    if ($null -ne $searchResults.value.displayname -and $substringSearch -eq $false)
+    elseif ($selectedGroup -eq "Main Menu")
     {
-        # Exact match found
-        Write-Host "Found group: $($searchResults.value[0].displayName) ($($searchResults.value[0].id))"
-        $selectedGroup = $searchResults.value
-        Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+        Write-Verbose "[$scriptName] User selected Main Menu from group resolution"
+        return "Main Menu"
     }
-    elseif ($searchResults.groups.count -ne 0 -and $substringSearch -eq $true)
+    elseif ($selectedGroup -in $returnValues.Values)
     {
-        # Similar matches found
-        Write-Host "Could not find an exact match for group '$groupName'."
-        if ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Found a group with a similar name."
-        }
-        else
-        {
-            Write-Host "Found $($searchResults.value.count) groups with similar names:"
-        }
-        if ($searchResults.value.count -gt [int]$settings.maxUserMatchDisplay)
-        {
-            Write-Host "Displaying the first $($settings.maxUserMatchDisplay) matches:"
-        }
-        elseif ($searchResults.value.count -eq 1)
-        {
-            Write-Host "Is this the correct group?"
-        }
-        else
-        {
-            Write-Host "Displaying all $($searchResults.value.count) matches:"
-        }
-        # Display group selection menu similar to user selection
-        $possibleGroupName = DisplayGroupList -GroupList $searchResults -maxDisplay $settings.maxGroupMatchDisplay
-        # Handle navigation options returned from DisplayGroupList
-        if ($possibleGroupName -in $returnValues.Values)
-        {
-            Write-Verbose "[$scriptName] DisplayGroupList returned a message: $possibleGroupName"
-            return $possibleGroupName
-        }
-        elseif ($possibleGroupName -eq "Back" -or $possibleGroupName -eq "back")
-        {
-            Write-Verbose "[$scriptName] User selected 'Back'. Returning $($returnValues.backoutText)."
-            return $returnValues.backoutText
-        }
-        elseif ($possibleGroupName -eq "Main Menu" -or $possibleGroupName -eq "main menu")
-        {
-            Write-Verbose "[$scriptName] User selected 'Main Menu'. Returning to main menu."
-            return "Main Menu"
-        }
-        elseif ($null -eq $possibleGroupName -or $possibleGroupName -eq 0 -or $possibleGroupName -eq "0")
-        {
-            Write-Verbose "[$scriptName] User selected exit (0). Exiting application."
-            return "EXIT_APPLICATION"
-        }
-        else
-        {
-            Write-Verbose "[$scriptName] User selected: $possibleGroupName"
-            $selectedGroup = $possibleGroupName
-        }
+        Write-Verbose "[$scriptName] Resolve-DirectoryObject returned navigation command: $selectedGroup"
+        return $selectedGroup
     }
-    else
+    
+    # Validate we got a valid group object
+    if ($null -eq $selectedGroup -or -not $selectedGroup.id -or -not $selectedGroup.displayName)
     {
+        Write-Verbose "[$scriptName] Invalid group object returned from Resolve-DirectoryObject"
+        Write-Host "No group found for the specified group name." -ForegroundColor Red
         return $returnValues.noGroupFoundMessage
     }
-    #endregion Check if the group exists
     
-    # Call ShowGroupAssignments to display the group's assignments using the group name for consistency with existing function
+    Write-Verbose "[$scriptName] Group selected: $($selectedGroup.displayName) (ID: $($selectedGroup.id))"
+    #endregion Resolve group using unified Resolve-DirectoryObject with entity return
+    
+    # Call ShowGroupAssignments to display the group's assignments
     Write-Verbose "[$scriptName] Calling ShowGroupAssignments for group: $($selectedGroup.displayName)"
     $ShowGroupAssignmentsResponse = ShowGroupAssignments -AccessToken $accessToken -Group $selectedGroup
     #region Handle navigation responses from GetDeviceByUser

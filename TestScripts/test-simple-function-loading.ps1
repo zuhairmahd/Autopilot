@@ -12,15 +12,18 @@ param()
 
 Write-Host "=== Simple Function Loading Test ===" -ForegroundColor Cyan
 
+# Determine paths
+$RootPath = Split-Path -Parent $PSScriptRoot
+
 # Minimal environment initialization for tests that rely on Write-Log
-$logsFolder = Join-Path $PWD "Logs"
+$logsFolder = Join-Path $RootPath "Logs"
 if (-not (Test-Path $logsFolder)) {
     New-Item -ItemType Directory -Path $logsFolder -Force | Out-Null
 }
 $global:logFile = Join-Path $logsFolder "simple-function-loading.log"
 
 # Load functions using the same pattern as main.ps1
-$functionsFolder = "$PWD\functions"
+$functionsFolder = Join-Path $RootPath "functions"
 if (Test-Path $functionsFolder) {
     Write-Host "Loading functions from $functionsFolder" -ForegroundColor Yellow
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
@@ -39,7 +42,7 @@ if (Test-Path $functionsFolder) {
     
     Write-Host "Loaded $loadedCount functions" -ForegroundColor Green
 } else {
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+    Write-Host "Cannot find the functions folder at: $functionsFolder. Exiting script." -ForegroundColor Red
     exit 1
 }
 
