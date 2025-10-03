@@ -15,13 +15,21 @@ $VerbosePreference = "Continue"
 
 
 # Test configuration - create all artifacts in temp folder
-$tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+$tempPath = if ($env:TEMP)
+{
+    $env:TEMP 
+}
+else
+{
+    "/tmp" 
+}
 $TestConfigFolder = Join-Path $tempPath "update-setting-simplified-$(Get-Date -Format 'yyyyMMddHHmmss')"
 
 Write-Host "=== Simplified Update-Setting Function Tests ===" -ForegroundColor Yellow
 Write-Host "Test folder: $TestConfigFolder" -ForegroundColor Gray
 
-try {
+try
+{
     # Create test directory
     New-Item -ItemType Directory -Path $TestConfigFolder -Force | Out-Null
     
@@ -34,11 +42,13 @@ try {
     $functionErrors = 0
     Write-Host "The script root folder is $psscriptroot"
     Get-ChildItem -Path "$PSScriptRoot/../functions" -Recurse -Filter "*.ps1" | ForEach-Object {
-        try {
+        try
+        {
             . $_.FullName
             $functionCount++
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load function: $($_.Name) - $($_.Exception.Message)"
             $functionErrors++
         }
@@ -55,9 +65,12 @@ try {
     Write-Host "`n1. Testing Function Existence..." -ForegroundColor Cyan
     
     $updateSettingFunction = Get-Command Update-Setting -ErrorAction SilentlyContinue
-    if ($updateSettingFunction) {
+    if ($updateSettingFunction)
+    {
         Write-Host "✓ Update-Setting function is available" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "✗ Update-Setting function not found" -ForegroundColor Red
         throw "Update-Setting function not found"
     }
@@ -65,20 +78,29 @@ try {
     # Test 2: Parameter Validation
     Write-Host "`n2. Testing Parameter Validation..." -ForegroundColor Cyan
     
+    # Use absolute path in test folder to avoid creating artifacts in project root
+    $nonexistentFile = Join-Path $TestConfigFolder "nonexistent.psd1"
+    
     # Test Global without required parameters
-    $result = Update-Setting -SettingType "Global" -SettingsFile "nonexistent.psd1"
-    if (-not $result) {
+    $result = Update-Setting -SettingType "Global" -SettingsFile $nonexistentFile
+    if (-not $result)
+    {
         Write-Host "✓ Global parameter validation works" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "✗ Global parameter validation failed" -ForegroundColor Red
         throw "Global parameter validation failed"
     }
     
     # Test Domain without required parameters
-    $result = Update-Setting -SettingType "Domain" -SettingsFile "nonexistent.psd1"
-    if (-not $result) {
+    $result = Update-Setting -SettingType "Domain" -SettingsFile $nonexistentFile
+    if (-not $result)
+    {
         Write-Host "✓ Domain parameter validation works" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "✗ Domain parameter validation failed" -ForegroundColor Red
         throw "Domain parameter validation failed"
     }
@@ -86,10 +108,13 @@ try {
     # Test 3: File Not Found Handling
     Write-Host "`n3. Testing File Not Found Handling..." -ForegroundColor Cyan
     
-    $result = Update-Setting -SettingType "Global" -SettingsFile "nonexistent.psd1" -SettingName "test" -SettingValue "test"
-    if (-not $result) {
+    $result = Update-Setting -SettingType "Global" -SettingsFile $nonexistentFile -SettingName "test" -SettingValue "test"
+    if (-not $result)
+    {
         Write-Host "✓ File not found handling works" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "✗ File not found handling failed" -ForegroundColor Red
         throw "File not found handling failed"
     }
@@ -98,17 +123,22 @@ try {
     Write-Host "The Update-Setting function has basic functionality intact." -ForegroundColor Green
     Write-Host "Note: Full PSD1 support requires updating the function to use Import-PowerShellDataFile instead of ConvertFrom-Json" -ForegroundColor Yellow
     
-} catch {
+}
+catch
+{
     Write-Host "`n=== Test Failed ===" -ForegroundColor Red
     Write-Host "Error: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack Trace: $($_.ScriptStackTrace)" -ForegroundColor Red
     exit 1
-} finally {
+}
+finally
+{
     # Return to original location
     Pop-Location
     
     # Cleanup
-    if (Test-Path $TestConfigFolder) {
+    if (Test-Path $TestConfigFolder)
+    {
         Write-Host "`nCleaning up test folder..." -ForegroundColor Gray
         Remove-Item -Path $TestConfigFolder -Recurse -Force
         Write-Host "Test folder cleaned up" -ForegroundColor Gray

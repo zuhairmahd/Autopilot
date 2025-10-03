@@ -104,10 +104,11 @@ try
     if ($configDataAvailable)
     {
         Write-TestResult "Get-ConfigurationData function is available" $true
-        # Test basic execution
+        # Test basic execution - use temp file to avoid artifacts in project root
         try
         {
-            $testResult = Get-ConfigurationData -ConfigurationPath "nonexistent" -DefaultValues @{test = "value"} -ErrorAction SilentlyContinue
+            $tempConfigPath = Join-Path $testContext.TestFolder "test-nonexistent"
+            $testResult = Get-ConfigurationData -ConfigurationPath $tempConfigPath -DefaultValues @{test = "value"} -ErrorAction SilentlyContinue
             if ($testResult.test -eq "value")
             {
                 Write-TestResult "Get-ConfigurationData function executed successfully" $true
@@ -115,6 +116,12 @@ try
             else
             {
                 Write-TestResult "Get-ConfigurationData function did not return expected defaults" $false
+            }
+            # Clean up any created file
+            $createdFile = "$tempConfigPath.psd1"
+            if (Test-Path $createdFile)
+            {
+                Remove-Item $createdFile -Force -ErrorAction SilentlyContinue
             }
         }
         catch

@@ -129,7 +129,7 @@ foreach ($key in $GlobalConfigData.PSObject.Properties.Name) {
     Write-Verbose "[$functionName] Processing global setting: $key"          # Log entry 1
     Write-Log -logFile $logFile -Message "Processing global setting: $key"   # Log entry 2
     
-    if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key) {
+    if ($BoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key) {
         Write-Verbose "[$functionName] Checking if $key is a boolean"        # Log entry 3
         Write-Log -logFile $logFile -Message "Checking if $key is a boolean" # Log entry 4
         
@@ -302,7 +302,7 @@ if ((Test-RequiresFlattening $localSettings) -or (Test-RequiresFlattening $globa
 ```powershell
 # Optimized settings processing
 $settingsToProcess = $GlobalConfigData.PSObject.Properties | Where-Object { 
-    -not $PSBoundParameters.ContainsKey($_.Name) -and $null -ne $_.Value 
+    -not $BoundParameters.ContainsKey($_.Name) -and $null -ne $_.Value 
 }
 
 Write-Verbose "[$functionName] Batch processing $($settingsToProcess.Count) global settings"
