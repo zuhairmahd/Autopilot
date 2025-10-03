@@ -195,7 +195,7 @@ function Initialize-ApplicationConfiguration()
                 
                 # Step 5: Process domain-specific settings
                 $configurationPath = Split-Path -Parent $InitFile
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath 
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -BoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath 
                 $result.LocalSettings = $localResult.LocalSettings
                 
                 # Step 6: Process and merge scopes
