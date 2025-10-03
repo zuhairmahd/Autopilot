@@ -19,7 +19,10 @@ param(
 
 # Set up test environment
 $ErrorActionPreference = "Stop"
-if ($Verbose) { $VerbosePreference = "Continue" }
+if ($Verbose)
+{
+    $VerbosePreference = "Continue" 
+}
 
 Write-Host "=== Testing Autopilot Profile Menu Integration ===" -ForegroundColor Cyan
 
@@ -65,24 +68,24 @@ catch
     exit 1
 }
 
-# Test 3: Verify init.psd1 no longer contains DesiredAutopilotProfiles
+# Test 3: Verify settings.psd1 no longer contains DesiredAutopilotProfiles
 Write-Host "`nTest 3: Verify DesiredAutopilotProfiles removed from local settings editor" -ForegroundColor Yellow
 try 
 {
-    $initContent = Get-Content "./init.psd1" -Raw
-    if ($initContent -notmatch "DesiredAutopilotProfiles") 
+    $settingsContent = Get-Content "./settings.psd1" -Raw
+    if ($settingsContent -notmatch "DesiredAutopilotProfiles") 
     {
-        Write-Host "✓ DesiredAutopilotProfiles successfully removed from init.psd1" -ForegroundColor Green
+        Write-Host "✓ DesiredAutopilotProfiles successfully removed from settings.psd1" -ForegroundColor Green
     }
     else 
     {
-        Write-Host "✗ DesiredAutopilotProfiles still present in init.psd1" -ForegroundColor Red
+        Write-Host "✗ DesiredAutopilotProfiles still present in settings.psd1" -ForegroundColor Red
         exit 1
     }
 }
 catch 
 {
-    Write-Host "✗ Error checking init.psd1: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "✗ Error checking settings.psd1: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
@@ -99,16 +102,16 @@ catch
     exit 1
 }
 
-# Test 5: Check that init.psd1 is still valid PowerShell after removal
-Write-Host "`nTest 5: Verify init.psd1 is valid PowerShell syntax after removal" -ForegroundColor Yellow
+# Test 5: Check that settings.psd1 is still valid PowerShell after removal
+Write-Host "`nTest 5: Verify settings.psd1 is valid PowerShell syntax after removal" -ForegroundColor Yellow
 try 
 {
-    $null = Import-PowerShellDataFile "./init.psd1" -ErrorAction Stop
-    Write-Host "✓ Init.psd1 has valid PowerShell syntax" -ForegroundColor Green
+    $null = Import-PowerShellDataFile "./settings.psd1" -ErrorAction Stop
+    Write-Host "✓ Settings.psd1 has valid PowerShell syntax" -ForegroundColor Green
 }
 catch 
 {
-    Write-Host "✗ Init.psd1 has invalid PowerShell syntax: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "✗ Settings.psd1 has invalid PowerShell syntax: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 }
 
@@ -139,7 +142,7 @@ catch
 Write-Host "`n=== All Menu Integration Tests Passed! ===" -ForegroundColor Green
 Write-Host "✓ Autopilot profile settings menu item added to menu.psd1" -ForegroundColor Green
 Write-Host "✓ Show-AutopilotProfilesEditor integration added to main.ps1" -ForegroundColor Green  
-Write-Host "✓ DesiredAutopilotProfiles removed from local settings editor (init.psd1)" -ForegroundColor Green
+Write-Host "✓ DesiredAutopilotProfiles removed from local settings editor (settings.psd1)" -ForegroundColor Green
 Write-Host "✓ All PowerShell configuration files have valid syntax" -ForegroundColor Green
 Write-Host "✓ Menu structure maintains both group and Autopilot profile editing options" -ForegroundColor Green
 
