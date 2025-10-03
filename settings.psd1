@@ -1,26 +1,29 @@
 ﻿@{
+    globalSettings = @{
+        operatingSystem = 'Windows'
+        release = 'auto'
+        repoInfo = @{
+            repoPath = 'zuhairmahd'
+            baseURL = 'https://www.github.com'
+            baseSourceURL = 'https://raw.githubusercontent.com'
+            repoName = 'Autopilot'
+        }
+        timeInSeconds = 60
+        maxUserMatchDisplay = 10
+        maxWaitTime = 30
+        showLicenseBanner = $true
+        autoUpdate = $true
+        strongMappingOptional = $true
+        appMode = 'full'
+        validateScopes = $true
+        maxGroupMatchDisplay = 10
+        testMode = $false
+        checkStrongMapping = $false
+        configFile = '.\.secrets\config.json'
+        deviceContactThresholdInDays = 30
+    }
     description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
     version = '1.3.0.0'
-    auth = @{
-        changePwOnNextStart = $false
-        authType = 'PublicAuthFlow'
-        noSaveRefreshToken = $false
-        forceNewToken = $false
-        renewalLeadTime = 5
-        scope = @(
-            'offline_access',
-            'openid',
-            'Device.ReadWrite.All',
-            'DeviceManagementApps.Read.All',
-            'DeviceManagementConfiguration.ReadWrite.All',
-            'DeviceManagementManagedDevices.PrivilegedOperations.All',
-            'DeviceManagementManagedDevices.ReadWrite.All',
-            'DeviceManagementServiceConfig.ReadWrite.All'
-        )
-        cacheType = 'Memory'
-        secureString = $false
-        delegated = $true
-    }
     requiredScopes = @(
         @{
             Scope = 'User.Read.All'
@@ -122,27 +125,24 @@
             reason = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
         }
     )
-    globalSettings = @{
-        configFile = '.\.secrets\config.json'
-        maxWaitTime = 30
-        showLicenseBanner = $true
-        validateScopes = $true
-        deviceContactThresholdInDays = 30
-        appMode = 'full'
-        timeInSeconds = 60
-        maxUserMatchDisplay = 10
-        checkStrongMapping = $false
-        strongMappingOptional = $true
-        maxGroupMatchDisplay = 10
-        release = 'auto'
-        repoInfo = @{
-            repoPath = 'zuhairmahd'
-            baseURL = 'https://www.github.com'
-            baseSourceURL = 'https://raw.githubusercontent.com'
-            repoName = 'Autopilot'
-        }
-        testMode = $false
-        operatingSystem = 'Windows'
-        autoUpdate = $true
+    auth = @{
+        noSaveRefreshToken = $false
+        changePwOnNextStart = $false
+        authType = 'PublicAuthFlow'
+        delegated = $true
+        forceNewToken = $false
+        scope = @(
+            'offline_access',
+            'openid',
+            'Device.ReadWrite.All',
+            'DeviceManagementApps.Read.All',
+            'DeviceManagementConfiguration.ReadWrite.All',
+            'DeviceManagementManagedDevices.PrivilegedOperations.All',
+            'DeviceManagementManagedDevices.ReadWrite.All',
+            'DeviceManagementServiceConfig.ReadWrite.All'
+        )
+        cacheType = 'Memory'
+        secureString = $false
+        renewalLeadTime = 5
     }
 }

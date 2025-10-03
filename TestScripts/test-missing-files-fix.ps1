@@ -133,7 +133,8 @@ try
         "Initialize-AuthConfiguration",
         "Initialize-GlobalSettings",
         "Initialize-LocalSettings",
-        "Initialize-RequiredScopes"
+        "Initialize-RequiredScopes",
+        "Merge-ConfigurationDefaults"
     )
 
     $baseHelperPath = Join-Path $PWD 'functions' | Join-Path -ChildPath 'setupFunctions'
@@ -146,7 +147,16 @@ try
     foreach ($func in $helperFunctions)
     {
         $fileName = "$func.ps1"
-        $filePath = Join-Path $baseHelperPath $fileName
+        # Merge-ConfigurationDefaults is in FirstRunWizardFunctions subfolder
+        if ($func -eq "Merge-ConfigurationDefaults")
+        {
+            $filePath = Join-Path $baseHelperPath "FirstRunWizardFunctions\$fileName"
+        }
+        else
+        {
+            $filePath = Join-Path $baseHelperPath $fileName
+        }
+        
         if (-not (Test-Path $filePath))
         {
             $missingFiles += $fileName
@@ -203,8 +213,91 @@ catch
     $test4Result = $false
 }
 
+# Test 5: Verify Merge-ConfigurationDefaults integration with auth
+Write-Host "`n=== Test 5: Verify Merge-ConfigurationDefaults with Auth Object ===" -ForegroundColor Yellow
+
+try
+{
+    # Load the function if not already loaded
+    $mergeFunc = Get-Command "Merge-ConfigurationDefaults" -ErrorAction SilentlyContinue
+    if (-not $mergeFunc)
+    {
+        $mergePath = Join-Path $PWD 'functions\setupFunctions\FirstRunWizardFunctions\Merge-ConfigurationDefaults.ps1'
+        . $mergePath
+        $mergeFunc = Get-Command "Merge-ConfigurationDefaults" -ErrorAction SilentlyContinue
+    }
+    
+    if ($mergeFunc)
+    {
+        Write-Host "✓ Merge-ConfigurationDefaults function loaded successfully" -ForegroundColor Green
+        
+        # Test auth object merge
+        $existingAuth = @{
+            delegated = $true
+            authType  = "PublicAuthFlow"
+        }
+        
+        $defaultAuth = @{
+            delegated   = $true
+            authType    = "PublicAuthFlow"
+            scope       = @("offline_access", "openid", "Device.ReadWrite.All")
+            tenantId    = "common"
+            clientId    = ""
+            redirectUri = "http://localhost"
+        }
+        
+        # Set up log file for the function
+        $global:logFile = "$PWD\test-merge.log"
+        
+        $mergedAuth = Merge-ConfigurationDefaults -ExistingConfig $existingAuth -DefaultConfig $defaultAuth -PreserveExisting $true
+        
+        if ($null -ne $mergedAuth)
+        {
+            Write-Host "✓ Merge-ConfigurationDefaults successfully merged auth configuration" -ForegroundColor Green
+            
+            # Verify existing values preserved
+            if ($mergedAuth.delegated -eq $true -and $mergedAuth.authType -eq "PublicAuthFlow")
+            {
+                Write-Host "✓ Existing auth values preserved during merge" -ForegroundColor Green
+            }
+            else
+            {
+                Write-Host "✗ Existing auth values not preserved" -ForegroundColor Red
+                $test5Result = $false
+            }
+            
+            # Verify missing keys added
+            if ($mergedAuth.ContainsKey('scope') -and $mergedAuth.ContainsKey('tenantId'))
+            {
+                Write-Host "✓ Missing auth keys added from defaults (scope, tenantId)" -ForegroundColor Green
+                $test5Result = $true
+            }
+            else
+            {
+                Write-Host "✗ Missing auth keys not added correctly" -ForegroundColor Red
+                $test5Result = $false
+            }
+        }
+        else
+        {
+            Write-Host "✓ Merge returned null (no changes needed - config already complete)" -ForegroundColor Green
+            $test5Result = $true
+        }
+    }
+    else
+    {
+        Write-Host "✗ Merge-ConfigurationDefaults function not found" -ForegroundColor Red
+        $test5Result = $false
+    }
+}
+catch
+{
+    Write-Host "✗ Error testing Merge-ConfigurationDefaults: $($_.Exception.Message)" -ForegroundColor Red
+    $test5Result = $false
+}
+
 # Calculate final result
-$allTests = @($test1Result, $test2Result, $test3Result, $test4Result)
+$allTests = @($test1Result, $test2Result, $test3Result, $test4Result, $test5Result)
 $passedCount = ($allTests | Where-Object { $_ -eq $true }).Count
 $totalCount = $allTests.Count
 

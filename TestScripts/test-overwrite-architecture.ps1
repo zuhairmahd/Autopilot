@@ -102,7 +102,7 @@ try
     }
     
     # Test Initialize-GlobalSettings without overwrite processing (normal operation)
-    $globalResult = Initialize-GlobalSettings -GlobalConfigData $testGlobalData -PSBoundParameters @{}
+    $globalResult = Initialize-GlobalSettings -GlobalConfigData $testGlobalData -BoundParameters @{}
     
     if ($globalResult -and $globalResult.GlobalSettings)
     {
@@ -120,7 +120,7 @@ try
     }
     
     # Test Initialize-GlobalSettings with overwrite processing
-    $globalResultWithOverwrite = Initialize-GlobalSettings -GlobalConfigData $testGlobalData -PSBoundParameters @{} -processConfigOverwrite
+    $globalResultWithOverwrite = Initialize-GlobalSettings -GlobalConfigData $testGlobalData -BoundParameters @{} -processConfigOverwrite
     
     if ($globalResultWithOverwrite -and $globalResultWithOverwrite.GlobalSettings)
     {

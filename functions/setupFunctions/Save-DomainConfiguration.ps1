@@ -38,13 +38,10 @@ function Save-DomainConfiguration
     param(
         [Parameter(Mandatory = $true)]
         [string]$DomainName,
-        
         [Parameter(Mandatory = $true)]
         [object]$DomainConfiguration,
-        
         [Parameter(Mandatory = $false)]
         [string]$ConfigurationPath = $pwd,
-        
         [Parameter(Mandatory = $false)]
         [bool]$CreateBackup = $true
     )
@@ -88,6 +85,7 @@ function Save-DomainConfiguration
             try
             {
                 $verifyContent = Import-PowerShellDataFile -Path $domainConfigFile -ErrorAction Stop
+                Write-Verbose "[$functionName] Verified saved PSD1 content: $($verifyContent.Count) items"
                 Write-Verbose "[$functionName] Verified saved PSD1 is valid"
                 Write-Log -LogFile $logFile -Message "Verified saved PSD1 is valid for domain: $DomainName" -Module $functionName -LogLevel "Verbose"
                 return $true
