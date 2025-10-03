@@ -8,7 +8,7 @@ function Initialize-LocalSettings()
     param(
         $InitFileContent,
         [string]$Domain,
-        [hashtable]$PSBoundParameters,
+        [hashtable]$BoundParameters,
         [hashtable]$GlobalSettings = @{},
         [string]$ConfigurationPath = $pwd,
         [switch]$processConfigOverwrite
@@ -33,7 +33,7 @@ function Initialize-LocalSettings()
 
     foreach ($key in $domainConfig.Keys)
     {
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $domainConfig[$key])
+        if ($BoundParameters.ContainsKey($key) -eq $false -and $null -ne $domainConfig[$key])
         {
             if ($domainConfig[$key] -in ('true', 'false'))
             {
@@ -47,9 +47,9 @@ function Initialize-LocalSettings()
                 Write-Verbose "[$functionName] Set local $key to: $($domainConfig.$key)"
             }
         }
-        elseif ($PSBoundParameters.ContainsKey($key))
+        elseif ($BoundParameters.ContainsKey($key))
         {
-            $localSettings.add($key, $PSBoundParameters[$key])
+            $localSettings.add($key, $BoundParameters[$key])
             Write-Verbose "[$functionName] Used command-line override for local $key"
         }
     }
@@ -105,5 +105,35 @@ function Initialize-LocalSettings()
             Write-Log -LogFile $logFile -Message "Error applying overwrite configuration: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
         }
     }
+    
+    # Check against defaults and merge missing keys
+    Write-Log -logFile $logFile -Message "Checking local settings against defaults and merging missing keys" -module $functionName -logLevel "Information"
+    if (Get-Command "Merge-SettingsWithDefaults" -ErrorAction SilentlyContinue)
+    {
+        $mergedLocalSettings = Merge-SettingsWithDefaults -ExistingSettings $localSettings -SettingType "Local" -Domain $Domain -BoundParameters $BoundParameters
+        if ($mergedLocalSettings)
+        {
+            Write-Log -logFile $logFile -Message "Merged missing keys into local settings for domain: $Domain" -module $functionName -logLevel "Information"
+            $localSettings = $mergedLocalSettings
+            
+            # Save the merged domain configuration back to file
+            Write-Log -logFile $logFile -Message "Saving merged domain configuration for: $Domain" -module $functionName -logLevel "Information"
+            $saveResult = Save-DomainConfiguration -DomainName $Domain -DomainConfiguration $localSettings -ConfigurationPath $ConfigurationPath -CreateBackup $true
+            if ($saveResult)
+            {
+                Write-Log -logFile $logFile -Message "Successfully saved merged domain configuration for: $Domain" -module $functionName -logLevel "Information"
+            }
+            else
+            {
+                Write-Warning "[$functionName] Failed to save merged domain configuration for: $Domain"
+                Write-Log -logFile $logFile -Message "Failed to save merged domain configuration for: $Domain" -module $functionName -logLevel "Warning"
+            }
+        }
+    }
+    else
+    {
+        Write-Log -logFile $logFile -Message "Merge-SettingsWithDefaults function not available - skipping settings merge" -module $functionName -logLevel "Warning"
+    }
+    
     return @{ LocalSettings = $localSettings }
 }

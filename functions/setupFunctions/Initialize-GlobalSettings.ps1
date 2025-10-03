@@ -1,30 +1,3 @@
-<#
-.SYNOPSIS
-    Initializes and processes global settings from the configuration file, supporting command-line overrides and optional overwrite logic.
-
-.DESCRIPTION
-    This function reads global configuration data, applies command-line parameter overrides, and optionally processes overwrite settings from application defaults.
-    It supports boolean value conversion, verbose logging, and batch summary reporting for performance optimization.
-    Overwrite logic applies both global-specific and universal settings when requested.
-
-.PARAMETER GlobalConfigData
-    The object containing global configuration settings to be processed.
-
-.PARAMETER PSBoundParameters
-    Hashtable of parameters passed to the function, used for command-line overrides.
-
-.PARAMETER processConfigOverwrite
-    Switch to enable processing of overwrite configuration from application defaults.
-
-.OUTPUTS
-    Hashtable containing the processed global settings under the 'GlobalSettings' key.
-
-.EXAMPLE
-    $settings = Initialize-GlobalSettings -GlobalConfigData $configData -PSBoundParameters $params -processConfigOverwrite
-
-.NOTES
-    Uses Write-Log for logging and supports verbose output for diagnostics.
-#>
 function Initialize-GlobalSettings()
 {
     <#
@@ -34,7 +7,7 @@ function Initialize-GlobalSettings()
     [CmdletBinding()]
     param(
         [object]$GlobalConfigData,
-        [hashtable]$PSBoundParameters,
+        [hashtable]$BoundParameters,
         [switch]$processConfigOverwrite
     )
     
@@ -63,7 +36,7 @@ function Initialize-GlobalSettings()
         }
         Write-Log -logFile $logFile -Message "Processing global setting: $key" -module $functionName -logLevel "Verbose"
         
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key)
+        if ($BoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key)
         {
             if ($VerbosePreference -eq 'Continue')
             {
@@ -94,9 +67,9 @@ function Initialize-GlobalSettings()
             }
             $processedCount++
         }
-        elseif ($PSBoundParameters.ContainsKey($key))
+        elseif ($BoundParameters.ContainsKey($key))
         {
-            $globalSettings.add($key, $PSBoundParameters[$key])
+            $globalSettings.add($key, $BoundParameters[$key])
             if ($VerbosePreference -eq 'Continue')
             {
             }
@@ -107,6 +80,22 @@ function Initialize-GlobalSettings()
     
     # Batch summary logging for performance optimization
     Write-Log -logFile $logFile -Message "Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)" -module $functionName -LogLevel "Verbose"
+    
+    # Check against defaults and merge missing keys
+    Write-Log -logFile $logFile -Message "Checking global settings against defaults and merging missing keys" -module $functionName -logLevel "Information"
+    if (Get-Command "Merge-SettingsWithDefaults" -ErrorAction SilentlyContinue)
+    {
+        $mergedGlobalSettings = Merge-SettingsWithDefaults -ExistingSettings $globalSettings -SettingType "Global" -BoundParameters $BoundParameters
+        if ($mergedGlobalSettings)
+        {
+            Write-Log -logFile $logFile -Message "Merged missing keys into global settings" -module $functionName -logLevel "Information"
+            $globalSettings = $mergedGlobalSettings
+        }
+    }
+    else
+    {
+        Write-Log -logFile $logFile -Message "Merge-SettingsWithDefaults function not available - skipping settings merge" -module $functionName -logLevel "Warning"
+    }
     
     # Apply overwrite settings to global configuration
     if ($processConfigOverwrite)

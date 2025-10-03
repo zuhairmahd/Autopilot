@@ -18,7 +18,7 @@ function Initialize-ApplicationConfiguration()
     .PARAMETER Domain
         The domain name for configuration defaults.
     
-    .PARAMETER PSBoundParameters
+    .PARAMETER BoundParameters
         Parameters passed from the calling script to preserve command-line overrides.
     
     .PARAMETER LogFile
@@ -46,7 +46,7 @@ function Initialize-ApplicationConfiguration()
         [Parameter(Mandatory = $true)]
         [string]$menuFile,
         [string]$Domain = "contoso.com",
-        [hashtable]$PSBoundParameters = @{}
+        [hashtable]$BoundParameters = @{}
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -55,6 +55,19 @@ function Initialize-ApplicationConfiguration()
     Write-Verbose "[$functionName] StringsFile: $StringsFile"
     Write-Verbose "[$functionName] Domain: $Domain"
     Write-Verbose "[$functionName] MenuFile: $menuFile"
+
+    # Ensure required merging functions are available
+    if (-not (Get-Command "Merge-ConfigurationDefaults" -ErrorAction SilentlyContinue))
+    {
+        Write-Warning "[$functionName] Merge-ConfigurationDefaults function not available - settings merging will be skipped"
+        Write-Log -logFile $logFile -module $functionName -Message "Merge-ConfigurationDefaults function not available - settings merging will be skipped" -logLevel "Warning"
+    }
+    
+    if (-not (Get-Command "Merge-SettingsWithDefaults" -ErrorAction SilentlyContinue))
+    {
+        Write-Warning "[$functionName] Merge-SettingsWithDefaults function not available - settings merging will be skipped"
+        Write-Log -logFile $logFile -module $functionName -Message "Merge-SettingsWithDefaults function not available - settings merging will be skipped" -logLevel "Warning"
+    }
 
     # Helper function for batched file validation (Performance Optimization Phase 2)
     function Test-ConfigurationFilesExist() 
@@ -136,16 +149,53 @@ function Initialize-ApplicationConfiguration()
                 $initFileContent = Import-PowerShellDataFile -Path $InitFile
                 
                 # Step 3: Process auth configuration
-                $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -PSBoundParameters $PSBoundParameters
+                $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -PSBoundParameters $BoundParameters
                 $result.Auth = $authResult.Auth
                 
                 # Step 4: Process global settings
-                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -PSBoundParameters $PSBoundParameters -processConfigOverwrite
+                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -PSBoundParameters $BoundParameters -processConfigOverwrite
                 $result.GlobalSettings = $globalResult.GlobalSettings
+                
+                # Save merged global settings back to main settings file if changes were made
+                if ($globalResult.GlobalSettings -and $globalResult.GlobalSettings.Count -gt 0)
+                {
+                    Write-Verbose "[$functionName] Saving merged global settings back to main settings file"
+                    Write-Log -logFile $logFile -module $functionName -Message "Saving merged global settings back to main settings file" -logLevel "Information"
+                    
+                    try
+                    {
+                        # Update the global settings section in the main configuration
+                        $initFileContent.globalSettings = $globalResult.GlobalSettings
+                        
+                        # Create backup before saving
+                        $backupFile = "$InitFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+                        Copy-Item -Path $InitFile -Destination $backupFile -Force
+                        Write-Verbose "[$functionName] Created backup: $backupFile"
+                        Write-Log -logFile $logFile -module $functionName -Message "Created backup: $backupFile" -logLevel "Verbose"
+                        
+                        # Save the updated configuration using Export-PowerShellDataFile
+                        $exportResult = Export-PowerShellDataFile -InputObject $initFileContent -Path $InitFile -Force -Validate
+                        if ($exportResult)
+                        {
+                            Write-Verbose "[$functionName] Successfully saved merged global settings to: $InitFile"
+                            Write-Log -logFile $logFile -module $functionName -Message "Successfully saved merged global settings to: $InitFile" -logLevel "Information"
+                        }
+                        else
+                        {
+                            Write-Warning "[$functionName] Failed to save merged global settings"
+                            Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged global settings" -logLevel "Warning"
+                        }
+                    }
+                    catch
+                    {
+                        Write-Warning "[$functionName] Error saving merged global settings: $($_.Exception.Message)"
+                        Write-Log -logFile $logFile -module $functionName -Message "Error saving merged global settings: $($_.Exception.Message)" -logLevel "Warning"
+                    }
+                }
                 
                 # Step 5: Process domain-specific settings
                 $configurationPath = Split-Path -Parent $InitFile
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $PSBoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath 
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -PSBoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath 
                 $result.LocalSettings = $localResult.LocalSettings
                 
                 # Step 6: Process and merge scopes
