@@ -256,8 +256,16 @@ function Initialize-ApplicationConfiguration()
                             }
                             else
                             {
-                                Write-Warning "[$functionName] Failed to save merged domain configuration for: $Domain"
-                                Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged domain configuration for: $Domain" -logLevel "Warning"
+                                $errorDetail = ""
+                                if ($Error.Count -gt 0 -and $Error[0] -ne $null) {
+                                    $errorDetail = $Error[0].Exception.Message
+                                }
+                                $errorMsg = "Failed to save merged domain configuration for: $Domain"
+                                if ($errorDetail) {
+                                    $errorMsg += " - Error: $errorDetail"
+                                }
+                                Write-Warning "[$functionName] $errorMsg"
+                                Write-Log -logFile $logFile -module $functionName -Message $errorMsg -logLevel "Warning"
                             }
                         }
                         catch
