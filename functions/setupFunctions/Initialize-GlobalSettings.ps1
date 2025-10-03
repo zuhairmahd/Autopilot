@@ -1,3 +1,30 @@
+<#
+.SYNOPSIS
+    Initializes and processes global settings from the configuration file, supporting command-line overrides and optional overwrite logic.
+
+.DESCRIPTION
+    This function reads global configuration data, applies command-line parameter overrides, and optionally processes overwrite settings from application defaults.
+    It supports boolean value conversion, verbose logging, and batch summary reporting for performance optimization.
+    Overwrite logic applies both global-specific and universal settings when requested.
+
+.PARAMETER GlobalConfigData
+    The object containing global configuration settings to be processed.
+
+.PARAMETER PSBoundParameters
+    Hashtable of parameters passed to the function, used for command-line overrides.
+
+.PARAMETER processConfigOverwrite
+    Switch to enable processing of overwrite configuration from application defaults.
+
+.OUTPUTS
+    Hashtable containing the processed global settings under the 'GlobalSettings' key.
+
+.EXAMPLE
+    $settings = Initialize-GlobalSettings -GlobalConfigData $configData -PSBoundParameters $params -processConfigOverwrite
+
+.NOTES
+    Uses Write-Log for logging and supports verbose output for diagnostics.
+#>
 function Initialize-GlobalSettings()
 {
     <#

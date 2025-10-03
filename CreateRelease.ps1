@@ -62,7 +62,7 @@ param(
     [ValidateSet('Major', 'Minor', 'Build', 'Revision')]
     [string]$versionPartToIncrement = 'Revision',
     [Alias('outputFile')]
-    [string]$OutputPath = '',
+    [string]$OutputPath = 'build',
     [string]$SettingsFile = (Join-Path -Path $PWD -ChildPath "settings.psd1"),
     [string]$Log = (Join-Path -Path $PWD -ChildPath "logs" | Join-Path -ChildPath "createRelease.log"),
     [string]$CompanyName = 'Zuhair Mahmoud',
