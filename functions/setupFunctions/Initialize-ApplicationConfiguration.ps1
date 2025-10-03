@@ -56,19 +56,6 @@ function Initialize-ApplicationConfiguration()
     Write-Verbose "[$functionName] Domain: $Domain"
     Write-Verbose "[$functionName] MenuFile: $menuFile"
 
-    # Ensure required merging functions are available
-    if (-not (Get-Command "Merge-ConfigurationDefaults" -ErrorAction SilentlyContinue))
-    {
-        Write-Warning "[$functionName] Merge-ConfigurationDefaults function not available - settings merging will be skipped"
-        Write-Log -logFile $logFile -module $functionName -Message "Merge-ConfigurationDefaults function not available - settings merging will be skipped" -logLevel "Warning"
-    }
-    
-    if (-not (Get-Command "Merge-SettingsWithDefaults" -ErrorAction SilentlyContinue))
-    {
-        Write-Warning "[$functionName] Merge-SettingsWithDefaults function not available - settings merging will be skipped"
-        Write-Log -logFile $logFile -module $functionName -Message "Merge-SettingsWithDefaults function not available - settings merging will be skipped" -logLevel "Warning"
-    }
-
     # Helper function for batched file validation (Performance Optimization Phase 2)
     function Test-ConfigurationFilesExist() 
     {
@@ -153,52 +140,89 @@ function Initialize-ApplicationConfiguration()
                 $result.Auth = $authResult.Auth
                 
                 # Step 4: Process global settings
-                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -BoundParameters $BoundParameters -processConfigOverwrite
+                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -BoundParameters $BoundParameters
                 $result.GlobalSettings = $globalResult.GlobalSettings
-                
-                # Save merged global settings back to main settings file if changes were made
-                if ($globalResult.GlobalSettings -and $globalResult.GlobalSettings.Count -gt 0)
-                {
-                    Write-Verbose "[$functionName] Saving merged global settings back to main settings file"
-                    Write-Log -logFile $logFile -module $functionName -Message "Saving merged global settings back to main settings file" -logLevel "Information"
-                    
-                    try
-                    {
-                        # Update the global settings section in the main configuration
-                        $initFileContent.globalSettings = $globalResult.GlobalSettings
-                        
-                        # Create backup before saving
-                        $backupFile = "$InitFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
-                        Copy-Item -Path $InitFile -Destination $backupFile -Force
-                        Write-Verbose "[$functionName] Created backup: $backupFile"
-                        Write-Log -logFile $logFile -module $functionName -Message "Created backup: $backupFile" -logLevel "Verbose"
-                        
-                        # Save the updated configuration using Export-PowerShellDataFile
-                        $exportResult = Export-PowerShellDataFile -InputObject $initFileContent -Path $InitFile -Force -Validate
-                        if ($exportResult)
-                        {
-                            Write-Verbose "[$functionName] Successfully saved merged global settings to: $InitFile"
-                            Write-Log -logFile $logFile -module $functionName -Message "Successfully saved merged global settings to: $InitFile" -logLevel "Information"
-                        }
-                        else
-                        {
-                            Write-Warning "[$functionName] Failed to save merged global settings"
-                            Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged global settings" -logLevel "Warning"
-                        }
-                    }
-                    catch
-                    {
-                        Write-Warning "[$functionName] Error saving merged global settings: $($_.Exception.Message)"
-                        Write-Log -logFile $logFile -module $functionName -Message "Error saving merged global settings: $($_.Exception.Message)" -logLevel "Warning"
-                    }
-                }
                 
                 # Step 5: Process domain-specific settings
                 $configurationPath = Split-Path -Parent $InitFile
-                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -BoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath 
+                $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -BoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath
                 $result.LocalSettings = $localResult.LocalSettings
                 
-                # Step 6: Process and merge scopes
+                # Step 6: Save configuration files if any changes were made (centralized save logic)
+                $globalChanged = $globalResult.Changed -eq $true
+                $localChanged = $localResult.Changed -eq $true
+                
+                if ($globalChanged -or $localChanged)
+                {
+                    Write-Verbose "[$functionName] Configuration changes detected - saving files (Global: $globalChanged, Local: $localChanged)"
+                    Write-Log -logFile $logFile -module $functionName -Message "Configuration changes detected - saving files (Global: $globalChanged, Local: $localChanged)" -logLevel "Information"
+                    
+                    # Save main settings file if global settings changed
+                    if ($globalChanged)
+                    {
+                        try
+                        {
+                            # Update the global settings section in the main configuration
+                            $initFileContent.globalSettings = $globalResult.GlobalSettings
+                            
+                            # Create backup before saving
+                            $backupFile = "$InitFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+                            Copy-Item -Path $InitFile -Destination $backupFile -Force
+                            Write-Verbose "[$functionName] Created backup: $backupFile"
+                            Write-Log -logFile $logFile -module $functionName -Message "Created backup: $backupFile" -logLevel "Verbose"
+                            
+                            # Save the updated configuration using Export-PowerShellDataFile
+                            $exportResult = Export-PowerShellDataFile -InputObject $initFileContent -Path $InitFile -Force -Validate
+                            if ($exportResult)
+                            {
+                                Write-Verbose "[$functionName] Successfully saved merged global settings to: $InitFile"
+                                Write-Log -logFile $logFile -module $functionName -Message "Successfully saved merged global settings to: $InitFile" -logLevel "Information"
+                            }
+                            else
+                            {
+                                Write-Warning "[$functionName] Failed to save merged global settings"
+                                Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged global settings" -logLevel "Warning"
+                            }
+                        }
+                        catch
+                        {
+                            Write-Warning "[$functionName] Error saving merged global settings: $($_.Exception.Message)"
+                            Write-Log -logFile $logFile -module $functionName -Message "Error saving merged global settings: $($_.Exception.Message)" -logLevel "Warning"
+                        }
+                    }
+                    
+                    # Save domain configuration file if local settings changed
+                    if ($localChanged)
+                    {
+                        try
+                        {
+                            Write-Verbose "[$functionName] Saving merged domain configuration for: $Domain"
+                            Write-Log -logFile $logFile -module $functionName -Message "Saving merged domain configuration for: $Domain" -logLevel "Information"
+                            
+                            $saveResult = Save-DomainConfiguration -DomainName $localResult.Domain -DomainConfiguration $localResult.LocalSettings -ConfigurationPath $localResult.ConfigurationPath -CreateBackup $true
+                            if ($saveResult)
+                            {
+                                Write-Verbose "[$functionName] Successfully saved merged domain configuration for: $Domain"
+                                Write-Log -logFile $logFile -module $functionName -Message "Successfully saved merged domain configuration for: $Domain" -logLevel "Information"
+                            }
+                            else
+                            {
+                                Write-Warning "[$functionName] Failed to save merged domain configuration for: $Domain"
+                                Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged domain configuration for: $Domain" -logLevel "Warning"
+                            }
+                        }
+                        catch
+                        {
+                            Write-Warning "[$functionName] Error saving merged domain configuration: $($_.Exception.Message)"
+                            Write-Log -logFile $logFile -module $functionName -Message "Error saving merged domain configuration: $($_.Exception.Message)" -logLevel "Warning"
+                        }
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No configuration changes detected - skipping file save"
+                    Write-Log -logFile $logFile -module $functionName -Message "No configuration changes detected - skipping file save" -logLevel "Verbose"
+                }                # Step 6: Process and merge scopes
                 $scopeResult = Initialize-RequiredScopes -InitFileContent $initFileContent -Domain $Domain
                 $result.RequiredScopes = $scopeResult.RequiredScopes
             }

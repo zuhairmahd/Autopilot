@@ -126,10 +126,10 @@
         }
     )
     auth = @{
-        cacheType = 'Memory'
-        changePwOnNextStart = $false
-        delegated = $true
         noSaveRefreshToken = $false
+        changePwOnNextStart = $false
+        authType = 'PublicAuthFlow'
+        delegated = $true
         forceNewToken = $false
         scope = @(
             'offline_access',
@@ -141,7 +141,7 @@
             'DeviceManagementManagedDevices.ReadWrite.All',
             'DeviceManagementServiceConfig.ReadWrite.All'
         )
-        authType = 'PublicAuthFlow'
+        cacheType = 'Memory'
         secureString = $false
         renewalLeadTime = 5
     }

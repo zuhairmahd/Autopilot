@@ -25,6 +25,7 @@ function Initialize-LocalSettings()
     if ($null -eq $domainConfig)
     {
         Write-Verbose "[$functionName] No domain-specific settings found for $Domain"
+        Write-Log -LogFile $logFile -Message "No domain-specific settings found for $Domain" -Module $functionName -LogLevel "Information"
         return @{ LocalSettings = $localSettings }
     }
     
@@ -40,17 +41,20 @@ function Initialize-LocalSettings()
                 $keyBooleanValue = [bool]::Parse($domainConfig[$key])
                 $localSettings.add($key, $keyBooleanValue)
                 Write-Verbose "[$functionName] Set local $key to boolean: $keyBooleanValue"
+                Write-Log -LogFile $logFile -Message "Set local $key to boolean: $keyBooleanValue" -Module $functionName -LogLevel "Verbose"
             }
             else
             {
                 $localSettings.add($key, $domainConfig.$key)
                 Write-Verbose "[$functionName] Set local $key to: $($domainConfig.$key)"
+                Write-Log -LogFile $logFile -Message "Set local $key to: $($domainConfig.$key)" -Module $functionName -LogLevel "Verbose"       
             }
         }
         elseif ($BoundParameters.ContainsKey($key))
         {
             $localSettings.add($key, $BoundParameters[$key])
             Write-Verbose "[$functionName] Used command-line override for local $key"
+            Write-Log -LogFile $logFile -Message "Used command-line override for local $key" -Module $functionName -LogLevel "Verbose"  
         }
     }
     
@@ -106,34 +110,55 @@ function Initialize-LocalSettings()
         }
     }
     
-    # Check against defaults and merge missing keys
+    # Check against defaults and merge missing keys (direct call to Merge-ConfigurationDefaults)
     Write-Log -logFile $logFile -Message "Checking local settings against defaults and merging missing keys" -module $functionName -logLevel "Information"
-    if (Get-Command "Merge-SettingsWithDefaults" -ErrorAction SilentlyContinue)
+    $changesMade = $false
+    
+    try
     {
-        $mergedLocalSettings = Merge-SettingsWithDefaults -ExistingSettings $localSettings -SettingType "Local" -Domain $Domain -BoundParameters $BoundParameters
-        if ($mergedLocalSettings)
+        # Get domain/local defaults
+        $defaultLocalSettings = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $Domain
+        
+        if ($defaultLocalSettings)
         {
-            Write-Log -logFile $logFile -Message "Merged missing keys into local settings for domain: $Domain" -module $functionName -logLevel "Information"
-            $localSettings = $mergedLocalSettings
-            
-            # Save the merged domain configuration back to file
-            Write-Log -logFile $logFile -Message "Saving merged domain configuration for: $Domain" -module $functionName -logLevel "Information"
-            $saveResult = Save-DomainConfiguration -DomainName $Domain -DomainConfiguration $localSettings -ConfigurationPath $ConfigurationPath -CreateBackup $true
-            if ($saveResult)
+            # Filter out keys that are present in BoundParameters (command-line overrides)
+            $filteredDefaults = @{}
+            foreach ($key in $defaultLocalSettings.Keys)
             {
-                Write-Log -logFile $logFile -Message "Successfully saved merged domain configuration for: $Domain" -module $functionName -logLevel "Information"
+                if (-not $BoundParameters.ContainsKey($key))
+                {
+                    $filteredDefaults[$key] = $defaultLocalSettings[$key]
+                }
             }
-            else
+            
+            Write-Verbose "[$functionName] Checking $($filteredDefaults.Keys.Count) default keys after filtering overrides"
+            Write-Log -logFile $logFile -Message "Checking $($filteredDefaults.Keys.Count) default keys after filtering overrides" -module $functionName -logLevel "Verbose"
+            
+            if ($filteredDefaults.Keys.Count -gt 0)
             {
-                Write-Warning "[$functionName] Failed to save merged domain configuration for: $Domain"
-                Write-Log -logFile $logFile -Message "Failed to save merged domain configuration for: $Domain" -module $functionName -logLevel "Warning"
+                # Use Merge-ConfigurationDefaults directly
+                $mergedLocalSettings = Merge-ConfigurationDefaults -ExistingConfig $localSettings -DefaultConfig $filteredDefaults -PreserveExisting $true
+                
+                if ($mergedLocalSettings)
+                {
+                    Write-Log -logFile $logFile -Message "Merged missing keys into local settings for domain: $Domain" -module $functionName -logLevel "Information"
+                    Write-Verbose "[$functionName] Merged missing keys into local settings for domain: $Domain"
+                    $localSettings = $mergedLocalSettings
+                    $changesMade = $true
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No missing keys to merge into local settings"
+                    Write-Log -logFile $logFile -Message "No missing keys to merge into local settings" -module $functionName -logLevel "Verbose"
+                }
             }
         }
     }
-    else
+    catch
     {
-        Write-Log -logFile $logFile -Message "Merge-SettingsWithDefaults function not available - skipping settings merge" -module $functionName -logLevel "Warning"
+        Write-Warning "[$functionName] Error during local settings merge: $($_.Exception.Message)"
+        Write-Log -logFile $logFile -Message "Error during local settings merge: $($_.Exception.Message)" -module $functionName -logLevel "Warning"
     }
     
-    return @{ LocalSettings = $localSettings }
+    return @{ LocalSettings = $localSettings; Changed = $changesMade; ConfigurationPath = $ConfigurationPath; Domain = $Domain }
 }

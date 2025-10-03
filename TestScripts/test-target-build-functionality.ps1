@@ -161,9 +161,12 @@ Write-Host "Test main script"
     # Test 5: Test missing targets file
     Write-Host "Test 5: Testing missing targets file handling..." -ForegroundColor Yellow
     
+    # Use absolute path in test directory to avoid creating artifacts in project root
+    $nonexistentTargetsFile = Join-Path $testDir "nonexistent.psd1"
+    
     $missingFileOutput = pwsh -Command "
         try {
-            & '$createReleaseScript' -TargetsFile 'nonexistent.psd1' -TargetName 'test' -SecretsOnly -NoPasswordChange 2>&1
+            & '$createReleaseScript' -TargetsFile '$nonexistentTargetsFile' -TargetName 'test' -SecretsOnly -NoPasswordChange 2>&1
         } catch {
             Write-Output 'Expected error: ' + `$_.Exception.Message
         }
