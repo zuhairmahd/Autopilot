@@ -149,11 +149,11 @@ function Initialize-ApplicationConfiguration()
                 $initFileContent = Import-PowerShellDataFile -Path $InitFile
                 
                 # Step 3: Process auth configuration
-                $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -PSBoundParameters $BoundParameters
+                $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -BoundParameters $BoundParameters
                 $result.Auth = $authResult.Auth
                 
                 # Step 4: Process global settings
-                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -PSBoundParameters $BoundParameters -processConfigOverwrite
+                $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -BoundParameters $BoundParameters -processConfigOverwrite
                 $result.GlobalSettings = $globalResult.GlobalSettings
                 
                 # Save merged global settings back to main settings file if changes were made

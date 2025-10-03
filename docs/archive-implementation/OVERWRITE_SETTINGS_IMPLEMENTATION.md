@@ -56,7 +56,7 @@ $defaults.Overwrite = @{
 **Usage Example**:
 ```powershell
 # Automatically applies overwrite settings during global settings processing
-$globalResult = Initialize-GlobalSettings -GlobalConfigData $globalData -PSBoundParameters @{}
+$globalResult = Initialize-GlobalSettings -GlobalConfigData $globalData -BoundParameters @{}
 # Result will have overwrite settings applied automatically
 ```
 

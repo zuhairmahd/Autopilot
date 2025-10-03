@@ -7,7 +7,7 @@ function Initialize-AuthConfiguration()
     [CmdletBinding()]
     param(
         $AuthConfiguration,
-        [hashtable]$PSBoundParameters
+        [hashtable]$BoundParameters
     )
     $functionName = $MyInvocation.MyCommand.Name
     $auth = @{}
@@ -33,7 +33,7 @@ function Initialize-AuthConfiguration()
             Write-Verbose "[$functionName] Processing auth key: $key"
         }
         
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $AuthConfiguration.$key)
+        if ($BoundParameters.ContainsKey($key) -eq $false -and $null -ne $AuthConfiguration.$key)
         {
             if ($AuthConfiguration.$key -in ('true', 'false'))
             {
@@ -55,12 +55,12 @@ function Initialize-AuthConfiguration()
             }
             $authProcessedCount++
         }
-        elseif ($PSBoundParameters.ContainsKey($key))
+        elseif ($BoundParameters.ContainsKey($key))
         {
-            $auth.add($key, $PSBoundParameters[$key])
+            $auth.add($key, $BoundParameters[$key])
             if ($VerbosePreference -eq 'Continue')
             {
-                Write-Verbose "[$functionName] Used command-line parameter for $key`: $($PSBoundParameters[$key])"
+                Write-Verbose "[$functionName] Used command-line parameter for $key`: $($BoundParameters[$key])"
             }
             $authOverrideCount++
         }
