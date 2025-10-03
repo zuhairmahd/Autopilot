@@ -388,16 +388,14 @@ Security, encryption, and credential management.
 | `ShowMenu` | Main menu orchestration | Menu display coordination |
 | `Test-MenuItemIncluded` | Check if item should display | Role-based filtering |
 
-### Setup Functions (23 functions)
+### Setup Functions (21 functions)
 
 | Function | Purpose | Usage |
 |----------|---------|-------|
-| `CreateConfiguration` | Create basic configuration | Initial setup |
 | `CreateFullConfiguration` | Create complete configuration | Advanced setup |
 | `Get-InitConfiguration` | Load initialization config | Application startup |
 | `Get-JsonConfiguration` | Load JSON configuration files | Configuration loading |
 | `Get-StringsFromJson` | Load localization strings | UI text management |
-| `InitializeConfiguration` | Initialize app configuration | Startup process |
 | `MergeSettings` | Merge configuration hierarchy | Settings management |
 | `Set-SettingsJsonStructure` | Ensure settings file structure | Configuration validation |
 | `Show-SettingsEditor` | Interactive settings editor | Configuration management |
