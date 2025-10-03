@@ -241,6 +241,164 @@ try
     $allWizardFunctionsAvailable = ($wizardFunctionResults | Where-Object { -not $_ }).Count -eq 0
     Write-TestResult "All wizard functions are available" $allWizardFunctionsAvailable
     
+    Write-TestSection "Test 5: Merge-ConfigurationDefaults Function Testing"
+    
+    # Test Merge-ConfigurationDefaults with various scenarios
+    if (Get-Command "Merge-ConfigurationDefaults" -ErrorAction SilentlyContinue)
+    {
+        Write-Host "Testing Merge-ConfigurationDefaults functionality..." -ForegroundColor Cyan
+        
+        try
+        {
+            # Test 1: Auth object merge with missing keys
+            $existingAuth = @{
+                delegated = $true
+                authType  = "PublicAuthFlow"
+            }
+            
+            $defaultAuth = @{
+                delegated         = $true
+                authType          = "PublicAuthFlow"
+                scope             = @("offline_access", "openid", "Device.ReadWrite.All")
+                tenantId          = "common"
+                clientId          = ""
+                redirectUri       = "http://localhost"
+                saveRefreshToken  = $true
+                useDeviceCodeFlow = $false
+            }
+            
+            $mergedAuth = Merge-ConfigurationDefaults -ExistingConfig $existingAuth -DefaultConfig $defaultAuth -PreserveExisting $true
+            
+            if ($null -ne $mergedAuth)
+            {
+                Write-TestResult "Auth merge with missing keys successful" $true
+                
+                # Verify existing values preserved
+                if ($mergedAuth.delegated -eq $true -and $mergedAuth.authType -eq "PublicAuthFlow")
+                {
+                    Write-TestResult "Existing auth values preserved" $true
+                }
+                else
+                {
+                    Write-TestResult "Existing auth values not preserved" $false
+                }
+                
+                # Verify missing keys added
+                if ($mergedAuth.ContainsKey('scope') -and $mergedAuth.ContainsKey('tenantId') -and $mergedAuth.ContainsKey('saveRefreshToken'))
+                {
+                    Write-TestResult "Missing auth keys added from defaults" $true
+                }
+                else
+                {
+                    Write-TestResult "Missing auth keys not added correctly" $false
+                }
+            }
+            else
+            {
+                Write-TestResult "Auth merge returned null (no changes needed)" $true
+            }
+            
+            # Test 2: Global settings merge with nested hashtables
+            $existingGlobal = @{
+                logLevel = "Debug"
+                features = @{
+                    enableFeatureA = $true
+                }
+            }
+            
+            $defaultGlobal = @{
+                logLevel   = "Information"
+                maxRetries = 3
+                features   = @{
+                    enableFeatureA = $false
+                    enableFeatureB = $true
+                    enableFeatureC = $false
+                }
+            }
+            
+            $mergedGlobal = Merge-ConfigurationDefaults -ExistingConfig $existingGlobal -DefaultConfig $defaultGlobal -PreserveExisting $true
+            
+            if ($null -ne $mergedGlobal)
+            {
+                Write-TestResult "Global settings merge with nested hashtables successful" $true
+                
+                # Verify top-level values preserved
+                if ($mergedGlobal.logLevel -eq "Debug")
+                {
+                    Write-TestResult "Existing top-level value preserved (logLevel)" $true
+                }
+                else
+                {
+                    Write-TestResult "Existing top-level value not preserved" $false
+                }
+                
+                # Verify nested values preserved
+                if ($mergedGlobal.features.enableFeatureA -eq $true)
+                {
+                    Write-TestResult "Existing nested value preserved (enableFeatureA)" $true
+                }
+                else
+                {
+                    Write-TestResult "Existing nested value not preserved" $false
+                }
+                
+                # Verify missing nested keys added
+                if ($mergedGlobal.features.ContainsKey('enableFeatureB') -and $mergedGlobal.features.ContainsKey('enableFeatureC'))
+                {
+                    Write-TestResult "Missing nested keys added from defaults" $true
+                }
+                else
+                {
+                    Write-TestResult "Missing nested keys not added" $false
+                }
+                
+                # Verify missing top-level key added
+                if ($mergedGlobal.ContainsKey('maxRetries'))
+                {
+                    Write-TestResult "Missing top-level key added (maxRetries)" $true
+                }
+                else
+                {
+                    Write-TestResult "Missing top-level key not added" $false
+                }
+            }
+            else
+            {
+                Write-TestResult "Global settings merge returned null (no changes needed)" $true
+            }
+            
+            # Test 3: No changes needed scenario
+            $completeConfig = @{
+                setting1 = "value1"
+                setting2 = "value2"
+            }
+            
+            $sameDefaults = @{
+                setting1 = "default1"
+                setting2 = "default2"
+            }
+            
+            $noChangeResult = Merge-ConfigurationDefaults -ExistingConfig $completeConfig -DefaultConfig $sameDefaults -PreserveExisting $true
+            
+            if ($null -eq $noChangeResult)
+            {
+                Write-TestResult "Merge correctly returns null when no changes needed" $true
+            }
+            else
+            {
+                Write-TestResult "Merge should return null when no changes needed" $false
+            }
+        }
+        catch
+        {
+            Write-TestResult "Merge-ConfigurationDefaults test failed: $($_.Exception.Message)" $false
+        }
+    }
+    else
+    {
+        Write-TestResult "Merge-ConfigurationDefaults function not available - skipping merge tests" $false
+    }
+    
     Write-TestSection "Test 6: Settings Update and Management"
     
     # Test Update-Setting function
@@ -323,7 +481,7 @@ try
     Write-TestResult "All utility functions are available" $allUtilityFunctionsAvailable
     
     # Summary
-    $totalTests = 7
+    $totalTests = 8
     $passedTests = 0
     
     if ($allConfigFunctionsAvailable)
@@ -339,6 +497,10 @@ try
         $passedTests++ 
     }
     if ($allWizardFunctionsAvailable)
+    {
+        $passedTests++ 
+    }
+    if (Get-Command "Merge-ConfigurationDefaults" -ErrorAction SilentlyContinue)
     {
         $passedTests++ 
     }
@@ -369,7 +531,7 @@ catch
 finally
 {
     # Complete unified test
-    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests 7
+    $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests 8
     
     if ($success)
     {

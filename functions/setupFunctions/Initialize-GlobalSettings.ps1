@@ -69,7 +69,6 @@ function Initialize-GlobalSettings()
     # Check against defaults and merge missing keys (direct call to Merge-ConfigurationDefaults)
     Write-Log -logFile $logFile -Message "Checking global settings against defaults and merging missing keys" -module $functionName -logLevel "Information"
     $changesMade = $false
-    
     try
     {
         # Get global defaults

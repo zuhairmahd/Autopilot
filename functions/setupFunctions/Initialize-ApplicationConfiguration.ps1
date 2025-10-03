@@ -2,40 +2,53 @@ function Initialize-ApplicationConfiguration()
 {
     <#
     .SYNOPSIS
-        Initializes application configuration from settings files or defaults.
+        Initializes application configuration from settings files with automatic defaults merging.
     
     .DESCRIPTION
-        Centralized function to handle configuration loading, including settings.psd1 and strings.psd1 
-        file validation, auth configuration processing, and scope merging. Eliminates code duplication
-        and provides robust error handling.
+        Centralized function to handle configuration loading and initialization. Validates and loads
+        settings.psd1, strings.psd1, and menu.psd1 files, processes auth configuration, global settings,
+        and domain-specific settings. Automatically merges missing keys from defaults, preserving
+        command-line overrides. Creates configuration files with defaults if they don't exist.
+        
+        The function performs batch file validation for performance, processes configurations through
+        specialized initializers, and saves changes back to disk when missing keys are merged.
     
     .PARAMETER InitFile
-        Path to the settings.psd1 file.
+        Path to the settings.psd1 file. If the file doesn't exist, it will be created with defaults.
     
     .PARAMETER StringsFile
-        Path to the strings.psd1 file.
+        Path to the strings.psd1 file. If the file doesn't exist, it will be created with defaults.
+    
+    .PARAMETER menuFile
+        Path to the menu.psd1 file. If the file doesn't exist, it will be created with defaults.
     
     .PARAMETER Domain
-        The domain name for configuration defaults.
+        The domain name for configuration defaults (e.g., "contoso.com").
     
     .PARAMETER BoundParameters
-        Parameters passed from the calling script to preserve command-line overrides.
-    
-    .PARAMETER LogFile
-        Path to the log file for logging.
-    
-    .PARAMETER ScriptName
-        Name of the calling script for logging.
+        Hashtable of parameters passed from the calling script to preserve command-line overrides.
+        These parameters take precedence over configuration file values.
     
     .OUTPUTS
         Hashtable containing:
-        - Auth: Auth configuration hashtable
-        - GlobalSettings: Global settings hashtable  
-        - LocalSettings: Local/domain settings hashtable
-        - Menus: Menu configuration array
-        - RequiredScopes: Merged and deduplicated scopes array
-        - Success: Boolean indicating success/failure
-        - ErrorMessage: Error message if Success is false
+        - Auth: Auth configuration hashtable with delegated/authType/scope settings
+        - GlobalSettings: Global settings hashtable (merged with defaults if missing keys detected)
+        - LocalSettings: Local/domain-specific settings hashtable (merged with defaults if missing keys detected)
+        - RequiredScopes: Merged and deduplicated scopes array from auth and domain configurations
+        - Success: Boolean indicating success ($true) or failure ($false)
+        - ErrorMessage: String containing error message if Success is $false, empty string otherwise
+    
+    .EXAMPLE
+        $config = Initialize-ApplicationConfiguration -InitFile "C:\config\settings.psd1" `
+            -StringsFile "C:\config\strings.psd1" -menuFile "C:\config\menu.psd1" `
+            -Domain "contoso.com" -BoundParameters $PSBoundParameters
+        
+        if ($config.Success) {
+            $auth = $config.Auth
+            $settings = $config.GlobalSettings
+            $localSettings = $config.LocalSettings
+            $scopes = $config.RequiredScopes
+        }
     #>
     [CmdletBinding()]
     param(
@@ -50,10 +63,15 @@ function Initialize-ApplicationConfiguration()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Log -logFile $logFile -module $functionName -Message "Initializing application configuration" -logLevel "Information"
     Write-Verbose "[$functionName] Initializing application configuration"
+    Write-Log -logFile $logFile -module $functionName -Message "InitFile: $InitFile" -logLevel "Verbose"
     Write-Verbose "[$functionName] InitFile: $InitFile"
+    Write-Log -logFile $logFile -module $functionName -Message "StringsFile: $StringsFile" -logLevel "Verbose"
     Write-Verbose "[$functionName] StringsFile: $StringsFile"
+    Write-Log -logFile $logFile -module $functionName -Message "Domain: $Domain" -logLevel "Verbose"
     Write-Verbose "[$functionName] Domain: $Domain"
+    Write-Log -logFile $logFile -module $functionName -Message "MenuFile: $menuFile" -logLevel "Verbose"
     Write-Verbose "[$functionName] MenuFile: $menuFile"
 
     # Helper function for batched file validation (Performance Optimization Phase 2)
@@ -110,12 +128,18 @@ function Initialize-ApplicationConfiguration()
         }
         
         # Step 1: Ensure configuration files exist with defaults
+        Write-Log -logFile $logFile -module $functionName -Message "Ensuring configuration files exist with defaults" -logLevel "Information"
+        Write-Verbose "[$functionName] Ensuring configuration files exist with defaults"
         $configResult = Initialize-ConfigurationFiles -InitFile $InitFile -StringsFile $StringsFile -menuFile $menuFile -Domain $Domain
         if (-not $configResult.Success)
         {
             $result.ErrorMessage = $configResult.ErrorMessage
+            Write-Log -logFile $logFile -module $functionName -Message "Configuration file initialization failed: $($result.ErrorMessage)" -logLevel "Error"
+            Write-Verbose "[$functionName] Configuration file initialization failed: $($result.ErrorMessage)"
             return $result
         }
+        Write-Log -logFile $logFile -module $functionName -Message "Configuration files validated successfully" -logLevel "Information"
+        Write-Verbose "[$functionName] Configuration files validated successfully"
         
         # Step 2: Batch validate critical configuration files (Performance Optimization Phase 2)
         $filesToValidate = @(
@@ -129,42 +153,63 @@ function Initialize-ApplicationConfiguration()
         # Step 3: Load and process configuration if settings.psd1 exists
         if ($fileValidation["Settings"].Exists)
         {
+            Write-Log -logFile $logFile -module $functionName -Message "Loading configuration from $InitFile" -logLevel "Information"
             Write-Verbose "[$functionName] Loading configuration from $InitFile"
             try
             {
                 # Load configuration content
                 $initFileContent = Import-PowerShellDataFile -Path $InitFile
+                Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded configuration file" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Successfully loaded configuration file"
                 
                 # Step 3: Process auth configuration
+                Write-Log -logFile $logFile -module $functionName -Message "Processing auth configuration" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing auth configuration"
                 $authResult = Initialize-AuthConfiguration -AuthConfiguration $initFileContent.auth -BoundParameters $BoundParameters
                 $result.Auth = $authResult.Auth
+                Write-Log -logFile $logFile -module $functionName -Message "Auth configuration processed (Changed: $($authResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Auth configuration processed (Changed: $($authResult.Changed))"
                 
                 # Step 4: Process global settings
+                Write-Log -logFile $logFile -module $functionName -Message "Processing global settings" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing global settings"
                 $globalResult = Initialize-GlobalSettings -GlobalConfigData $initFileContent.globalSettings -BoundParameters $BoundParameters
                 $result.GlobalSettings = $globalResult.GlobalSettings
+                Write-Log -logFile $logFile -module $functionName -Message "Global settings processed (Changed: $($globalResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Global settings processed (Changed: $($globalResult.Changed))"
                 
                 # Step 5: Process domain-specific settings
+                Write-Log -logFile $logFile -module $functionName -Message "Processing domain-specific settings for: $Domain" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing domain-specific settings for: $Domain"
                 $configurationPath = Split-Path -Parent $InitFile
                 $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -BoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath
                 $result.LocalSettings = $localResult.LocalSettings
+                Write-Log -logFile $logFile -module $functionName -Message "Domain-specific settings processed (Changed: $($localResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Domain-specific settings processed (Changed: $($localResult.Changed))"
                 
                 # Step 6: Save configuration files if any changes were made (centralized save logic)
                 $globalChanged = $globalResult.Changed -eq $true
                 $localChanged = $localResult.Changed -eq $true
-                
-                if ($globalChanged -or $localChanged)
+                $authChanged = $authResult.Changed -eq $true
+                if ($globalChanged -or $localChanged -or $authChanged)
                 {
-                    Write-Verbose "[$functionName] Configuration changes detected - saving files (Global: $globalChanged, Local: $localChanged)"
-                    Write-Log -logFile $logFile -module $functionName -Message "Configuration changes detected - saving files (Global: $globalChanged, Local: $localChanged)" -logLevel "Information"
-                    
+                    Write-Verbose "[$functionName] Configuration changes detected - saving files (Global: $globalChanged, Local: $localChanged, Auth: $authChanged)"
+                    Write-Log -logFile $logFile -module $functionName -Message "Configuration changes detected - saving files (Global: $globalChanged, Local: $localChanged, Auth: $authChanged)" -logLevel "Information"
                     # Save main settings file if global settings changed
-                    if ($globalChanged)
+                    if ($globalChanged -or $authChanged)
                     {
                         try
                         {
-                            # Update the global settings section in the main configuration
-                            $initFileContent.globalSettings = $globalResult.GlobalSettings
-                            
+                            # Update the global settings and auth sections in the main configuration
+                            if ($globalChanged)
+                            {
+                                $initFileContent.globalSettings = $globalResult.GlobalSettings
+                            }
+                            if ($authChanged)
+                            {
+                                $initFileContent.auth = $authResult.Auth
+                            }
+
                             # Create backup before saving
                             $backupFile = "$InitFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
                             Copy-Item -Path $InitFile -Destination $backupFile -Force
@@ -222,19 +267,27 @@ function Initialize-ApplicationConfiguration()
                 {
                     Write-Verbose "[$functionName] No configuration changes detected - skipping file save"
                     Write-Log -logFile $logFile -module $functionName -Message "No configuration changes detected - skipping file save" -logLevel "Verbose"
-                }                # Step 6: Process and merge scopes
+                }
+                
+                # Step 7: Process and merge scopes
+                Write-Log -logFile $logFile -module $functionName -Message "Processing and merging required scopes" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing and merging required scopes"
                 $scopeResult = Initialize-RequiredScopes -InitFileContent $initFileContent -Domain $Domain
                 $result.RequiredScopes = $scopeResult.RequiredScopes
+                Write-Log -logFile $logFile -module $functionName -Message "Merged $($result.RequiredScopes.Count) unique scopes" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Merged $($result.RequiredScopes.Count) unique scopes"
             }
             catch
             {
                 $result.ErrorMessage = "Error loading configuration from $InitFile`: $($_.Exception.Message)"
+                Write-Log -logFile $logFile -module $functionName -Message $result.ErrorMessage -logLevel "Error"
                 Write-Verbose "[$functionName] $($result.ErrorMessage)"
                 return $result
             }
         }
         else
         {
+            Write-Log -logFile $logFile -module $functionName -Message "Settings file not found, using default configuration" -logLevel "Warning"
             Write-Verbose "[$functionName] Settings file not found, using default configuration"
             
             # Use default auth configuration when no settings file exists
@@ -243,20 +296,26 @@ function Initialize-ApplicationConfiguration()
                 authType  = "PublicAuthFlow"
                 scope     = @("offline_access", "openid", "Device.ReadWrite.All")
             }
+            Write-Log -logFile $logFile -module $functionName -Message "Using default auth configuration" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Using default auth configuration"
             
             # Initialize empty collections for other settings
             $result.GlobalSettings = @{}
             $result.LocalSettings = @{}
             $result.RequiredScopes = @()
+            Write-Log -logFile $logFile -module $functionName -Message "Initialized empty settings collections" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Initialized empty settings collections"
         }
         
         $result.Success = $true
+        Write-Log -logFile $logFile -module $functionName -Message "Configuration initialization completed successfully" -logLevel "Information"
         Write-Verbose "[$functionName] Configuration initialization completed successfully"
         return $result
     }
     catch
     {
         $result.ErrorMessage = "Unexpected error during configuration initialization: $($_.Exception.Message)"
+        Write-Log -logFile $logFile -module $functionName -Message $result.ErrorMessage -logLevel "Error"
         Write-Verbose "[$functionName] $($result.ErrorMessage)"
         return $result
     }

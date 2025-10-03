@@ -20,6 +20,14 @@ function Initialize-RequiredScopes()
         $basicScopes = @() 
     }
     
+    # Get auth scopes if present
+    $authScopes = @()
+    if ($InitFileContent.auth -and $InitFileContent.auth.scope)
+    {
+        $authScopes = @($InitFileContent.auth.scope)
+        Write-Verbose "[$functionName] Found $($authScopes.Count) auth scopes"
+    }
+    
     # Get additional scopes for the domain from separate file
     $additionalScopes = $null
     
@@ -39,13 +47,14 @@ function Initialize-RequiredScopes()
     
     # Ensure arrays and merge
     $basicScopes = @($basicScopes)
+    $authScopes = @($authScopes)
     $additionalScopes = @($additionalScopes)
     
-    Write-Verbose "[$functionName] Basic scopes: $($basicScopes.Count), Additional scopes: $($additionalScopes.Count)"
+    Write-Verbose "[$functionName] Basic scopes: $($basicScopes.Count), Auth scopes: $($authScopes.Count), Additional scopes: $($additionalScopes.Count)"
     
-    # Merge and deduplicate
-    $allScopes = @($basicScopes) + @($additionalScopes)
-    $requiredScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
+    # Merge and deduplicate - scopes are strings, not objects
+    $allScopes = @($basicScopes) + @($authScopes) + @($additionalScopes)
+    $requiredScopes = $allScopes | Select-Object -Unique
     
     Write-Verbose "[$functionName] Merged scopes - Total unique: $($requiredScopes.Count)"
     
