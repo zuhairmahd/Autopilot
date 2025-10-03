@@ -54,6 +54,8 @@ function Initialize-RequiredScopes()
     
     # Merge and deduplicate - scopes are strings, not objects
     $allScopes = @($basicScopes) + @($authScopes) + @($additionalScopes)
+    # Ensure all scopes are strings before deduplication
+    $allScopes = $allScopes | Where-Object { $_ -is [string] }
     $requiredScopes = $allScopes | Select-Object -Unique
     
     Write-Verbose "[$functionName] Merged scopes - Total unique: $($requiredScopes.Count)"
