@@ -67,8 +67,8 @@ try
     $stringArray2 = @("Group1", "Group2")
     $stringArray3 = @("Group1", "Group3")
     
-    $result1 = Compare-ArrayContents -Array1 $stringArray1 -Array2 $stringArray2
-    $result2 = Compare-ArrayContents -Array1 $stringArray1 -Array2 $stringArray3
+    $result1 = Compare-EditorArrayContents -Array1 $stringArray1 -Array2 $stringArray2
+    $result2 = Compare-EditorArrayContents -Array1 $stringArray1 -Array2 $stringArray3
     
     if (-not $result1 -and $result2)
     {
@@ -93,8 +93,8 @@ try
         @{ name = "Group2"; id = "different-id-4321-4321-abcdef123456" }
     )
     
-    $result3 = Compare-ArrayContents -Array1 $hashArray1 -Array2 $hashArray2
-    $result4 = Compare-ArrayContents -Array1 $hashArray1 -Array2 $hashArray3
+    $result3 = Compare-EditorArrayContents -Array1 $hashArray1 -Array2 $hashArray2
+    $result4 = Compare-EditorArrayContents -Array1 $hashArray1 -Array2 $hashArray3
     
     if (-not $result3 -and $result4)
     {
@@ -106,7 +106,7 @@ try
     }
     
     # Test mixed format comparison (should detect change)
-    $result5 = Compare-ArrayContents -Array1 $stringArray1 -Array2 $hashArray1
+    $result5 = Compare-EditorArrayContents -Array1 $stringArray1 -Array2 $hashArray1
     if ($result5)
     {
         Write-Host "✓ Mixed format comparison detects change correctly" -ForegroundColor Green
@@ -199,15 +199,15 @@ try
     # Verify that old string arrays still work with new functions
     $oldStringGroups = @("OldGroup1", "OldGroup2")
     
-    # Test Compare-ArrayContents with old format
-    $oldComparison = Compare-ArrayContents -Array1 $oldStringGroups -Array2 $oldStringGroups
+    # Test Compare-EditorArrayContents with old format
+    $oldComparison = Compare-EditorArrayContents -Array1 $oldStringGroups -Array2 $oldStringGroups
     if (-not $oldComparison)
     {
-        Write-Host "✓ Backward compatibility maintained in Compare-ArrayContents" -ForegroundColor Green
+        Write-Host "✓ Backward compatibility maintained in Compare-EditorArrayContents" -ForegroundColor Green
     }
     else
     {
-        Write-Host "✗ Backward compatibility issue in Compare-ArrayContents" -ForegroundColor Red
+        Write-Host "✗ Backward compatibility issue in Compare-EditorArrayContents" -ForegroundColor Red
     }
     
     # Test VerifyGroupMembership with old format

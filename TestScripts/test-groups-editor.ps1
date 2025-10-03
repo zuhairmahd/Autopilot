@@ -58,7 +58,7 @@ catch
 Write-Host "`n=== Test 2: Helper Functions ===" -ForegroundColor Yellow
 try
 {
-    $helperFunctions = @('Get-GroupArrayInput', 'Compare-ArrayContents', 'Update-DomainGroupSetting')
+    $helperFunctions = @('Get-GroupArrayInput', 'Compare-EditorArrayContents', 'Update-DomainArraySetting', 'Resolve-SingleGroupInteractive')
     foreach ($funcName in $helperFunctions)
     {
         $func = Get-Command $funcName -ErrorAction SilentlyContinue
@@ -83,7 +83,7 @@ Write-Host "`n=== Test 3: Array Comparison Logic ===" -ForegroundColor Yellow
 try
 {
     # Test empty arrays
-    $result1 = Compare-ArrayContents -Array1 @() -Array2 @()
+    $result1 = Compare-EditorArrayContents -Array1 @() -Array2 @()
     if ($result1 -eq $false)
     {
         Write-Host "✓ Empty arrays comparison works correctly (no change)" -ForegroundColor Green
@@ -94,7 +94,7 @@ try
     }
     
     # Test different arrays
-    $result2 = Compare-ArrayContents -Array1 @("group1", "group2") -Array2 @("group1", "group3")
+    $result2 = Compare-EditorArrayContents -Array1 @("group1", "group2") -Array2 @("group1", "group3")
     if ($result2 -eq $true)
     {
         Write-Host "✓ Different arrays comparison works correctly (change detected)" -ForegroundColor Green
@@ -105,7 +105,7 @@ try
     }
     
     # Test same arrays
-    $result3 = Compare-ArrayContents -Array1 @("group1", "group2") -Array2 @("group1", "group2")
+    $result3 = Compare-EditorArrayContents -Array1 @("group1", "group2") -Array2 @("group1", "group2")
     if ($result3 -eq $false)
     {
         Write-Host "✓ Same arrays comparison works correctly (no change)" -ForegroundColor Green

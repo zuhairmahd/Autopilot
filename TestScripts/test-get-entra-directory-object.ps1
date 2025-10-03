@@ -194,11 +194,22 @@ function CallGraphAPI
         return 404
     }
     
-    # Group exact match
-    if ($ResourcePath -eq "groups" -and $Filter -like "displayName eq*")
+    # Group exact match (supports both old case-sensitive and new case-insensitive format)
+    if ($ResourcePath -eq "groups" -and ($Filter -like "displayName eq*" -or $Filter -like "tolower(displayName) eq*"))
     {
-        $groupName = $Filter -replace "displayName eq '(.+)'", '$1'
-        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -eq $groupName }
+        if ($Filter -like "tolower(displayName) eq*")
+        {
+            # Case-insensitive match using tolower()
+            $groupName = ($Filter -replace "tolower\(displayName\) eq '(.+)'", '$1').Trim()
+            $matching = $script:MockGroups.Values | Where-Object { $_.displayName.ToLower() -eq $groupName.ToLower() }
+        }
+        else
+        {
+            # Case-sensitive match (legacy)
+            $groupName = ($Filter -replace "displayName eq '(.+)'", '$1').Trim()
+            $matching = $script:MockGroups.Values | Where-Object { $_.displayName -eq $groupName }
+        }
+        
         if ($matching)
         {
             return [PSCustomObject]@{
@@ -302,7 +313,6 @@ catch
 {
     Write-TestResult "2.1 - Group exact match" $false "Exception: $_"
 }
-
 #endregion
 
 #region Test 3: User Fuzzy Search

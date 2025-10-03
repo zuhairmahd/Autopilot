@@ -47,7 +47,6 @@ function Get-EntraDirectoryObject()
         Version: 1.0.0
         This function replaces GetEntraUser and getEntraGroup to eliminate code duplication.
     #>
-    
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -107,7 +106,6 @@ function Get-EntraDirectoryObject()
     }
     else
     {
-        # Group exact match by displayName
         $resourcePath = "groups"
         $filter = "displayName eq '$EntityName'"
         $extraParameters = "select=displayName,id"
