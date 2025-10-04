@@ -460,6 +460,7 @@ if (Test-Path $configFile)
     Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
     #endregion  Initialize application configuration
+    
     #check if password change is required
     if ($auth.changePWOnNextStart -eq $true)
     {
@@ -660,8 +661,7 @@ foreach ($key in $getTokenParams.Keys)
 }
 Write-Verbose "[$scriptName] Using authentication parameters: $($getTokenParams | ConvertTo-Json -Depth $maxJSONDepth)"
 Write-Verbose "[$scriptName] Loading strings from: $stringsFile"
-$stringsDefaults = Get-ApplicationDefaults -DefaultType "Strings"
-$loadedStrings = Get-ConfigurationData -ConfigurationPath $stringsFile -DefaultValues $stringsDefaults
+$loadedStrings = $configResult.strings
 $global:returnValues = $loadedStrings.returnValues
 $deviceStates = $loadedStrings.deviceStates
 $deviceActions = $loadedStrings.deviceActions
@@ -948,7 +948,7 @@ else
 #endregion initialization block with access token
 
 #region Create menus
-$menuConfig = Import-PowerShellDataFile -Path $menuFile -ErrorAction SilentlyContinue
+$menuConfig = $configResult.menu
 if ($menuConfig)
 {
     # Convert the flat menu.psd1 structure to array format for Test-MenuItemIncluded
