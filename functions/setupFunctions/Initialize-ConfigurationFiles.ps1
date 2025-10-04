@@ -19,7 +19,7 @@ function Initialize-ConfigurationFiles()
     {
         # Ensure settings.psd1 exists with defaults
         Write-Verbose "[$functionName] Ensuring settings.psd1 exists with defaults"
-        $settingsCreated = $true # Get-ConfigurationData will handle defaults
+        $settingsCreated = $true 
         if (-not (Test-Path $InitFile))
         {
             try
@@ -49,7 +49,7 @@ function Initialize-ConfigurationFiles()
         
         # Ensure strings.psd1 exists with defaults
         Write-Verbose "[$functionName] Ensuring strings.psd1 exists with defaults"
-        $stringsCreated = $true # Get-ConfigurationData will handle defaults
+        $stringsCreated = $true 
         if (-not (Test-Path $StringsFile))
         {
             try
