@@ -22,8 +22,6 @@
         configFile = '.\.secrets\config.json'
         deviceContactThresholdInDays = 30
     }
-    description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
-    version = '1.3.0.0'
     requiredScopes = @(
         @{
             Scope = 'User.Read.All'
@@ -125,11 +123,13 @@
             reason = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
         }
     )
+    description = 'This is the configuration file for the Intune Helpdesk script. It contains the settings for the script to run correctly.'
+    version = '1.3.0.0'
     auth = @{
-        noSaveRefreshToken = $false
         changePwOnNextStart = $false
-        authType = 'PublicAuthFlow'
         delegated = $true
+        authType = 'PublicAuthFlow'
+        noSaveRefreshToken = $false
         forceNewToken = $false
         scope = @(
             'offline_access',

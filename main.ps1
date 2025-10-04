@@ -422,76 +422,6 @@ if (Test-Path $configFile)
     $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
     
-    #region Initialize application configuration
-    Write-Verbose "[$scriptName] Initializing application configuration"
-    # Use domain if available, otherwise default to contoso.com
-    $domainForDefaults = if ($domain)
-    {
-        $domain
-    }
-    else
-    {
-        "contoso.com"
-    }
-    $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
-    if (-not $configResult.Success)
-    {
-        Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
-        exit 1
-    }
-    # Extract configuration results
-    $auth = $configResult.Auth
-    $globalSettings = $configResult.GlobalSettings
-    $localSettings = $configResult.LocalSettings
-    $requiredScopes = $configResult.RequiredScopes
-    # Set auth as a script variable so it can be accessed by functions
-    $script:Auth = $auth
-    # Merge global and local settings into a single settings object
-    Write-Verbose "[$scriptName] Merging global and local settings"
-    $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-    Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-    Write-Verbose "[$scriptName] Configuration initialization completed successfully"
-    Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
-    Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
-    Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
-    Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-    Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
-    Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-    #endregion  Initialize application configuration
-    
-    #check if password change is required
-    if ($auth.changePWOnNextStart -eq $true)
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-        # Invoke password change process
-        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-        if ($passwordChangeResult)
-        {
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-            # Reload the configuration with new password
-            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-            if ($reloadResult.Success)
-            {
-                # Update configContent for this session
-                $configContent = $reloadResult.ConfigContent
-            }
-            else
-            {
-                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                exit 1
-            }
-        }
-        else
-        {
-            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
-        }
-    }
-    
     if (-not ($sessionResult.encrypted))
     {
         Write-Host "You need to set a new password to use this application."
@@ -555,7 +485,6 @@ else
             $tenantId = $sessionResult.TenantId
             $name = $sessionResult.Name
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
-            
             # Clear the config content from memory
             $configContent = $null
         }
@@ -575,6 +504,82 @@ else
     }
 }
 #endregion Process login
+
+#region Initialize application configuration
+Write-Verbose "[$scriptName] Initializing application configuration"
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain)
+{
+    $domain
+}
+else
+{
+    "contoso.com"
+}
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+if (-not $configResult.Success)
+{
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    exit 1
+}
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings
+$localSettings = $configResult.LocalSettings
+$requiredScopes = $configResult.RequiredScopes
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+#endregion  Initialize application configuration
+
+#region Check for password change requirement
+# Check if password change is required (only applies to existing config files, not first-run wizard)
+if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
+{
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+    
+    # Need to reload configContent for password change process
+    $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
+    if ($tempSessionResult.Success)
+    {
+        $configContent = $tempSessionResult.ConfigContent
+        
+        # Invoke password change process
+        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+        if ($passwordChangeResult)
+        {
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+            Write-Host "Password changed successfully. Please restart the application and log in with your new password." -ForegroundColor Green
+            Write-Host "To do so, type 'main' and press enter when you see the command prompt." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -FinishLogging
+            exit 0
+        }
+        else
+        {
+            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+        }
+        
+        # Clear the config content from memory
+        $configContent = $null
+    }
+    else
+    {
+        Write-Host "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -LogLevel "Error"
+    }
+}
+#endregion Check for password change requirement
 
 #region Define variables
 #define repo parameters
@@ -673,38 +678,6 @@ $global:previousMenu = New-Object System.Collections.Hashtable
 # Device enrollment state cache content
 $script:DeviceEnrollmentCache = @{}
 #endregion Define variables
-
-#region logging
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Received the following parameters: $($PSBoundParameters | ConvertTo-Json)" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "The current parameter set is $($PSCmdlet.ParameterSetName)" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Configuration file: $configFile" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Initialization file: $InitFile" -LogLevel "Information"
-Write-Verbose "Log filename: $LogFile"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log filename: $LogFile" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show settings: $showSettings" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Show auth: $showAuth" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Log level: $LogLevel" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Group tag: $settings.GroupTag" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Assigned user: $AssignedUser" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Reconfigure: $Reconfigure" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Repository: $settings.Repo" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Release: $settings.Release" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain: $domain" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Max wait time: $settings.maxWaitTime" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Time in seconds: $settings.timeInSeconds" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Auth type: $auth.AuthType" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Cache type: $auth.CacheType" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new token: $auth.ForceNewToken" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Force new refresh token: $auth.ForceNewRefreshToken" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "No save refresh token: $auth.NoSaveRefreshToken" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "delegated: $auth.delegated" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Scope: $auth.Scope" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Secure string: $auth.SecureString" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App mode: $settings.appMode" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Functions folder: $functionsFolder" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Base source URL: $baseSourceURL" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Remote version URL: $remoteVersionURL" -LogLevel "Information"
-#endregion logging
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
