@@ -233,11 +233,7 @@ function Initialize-ApplicationConfiguration()
                             {
                                 Write-Warning "[$functionName] Failed to save merged global settings"
                                 Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged global settings" -logLevel "Warning"
-                                if ($Error.Count -gt 0 -and $Error[0] -ne $null)
-                                {
-                                    Write-Warning "[$functionName] Export-PowerShellDataFile error details: $($Error[0].ToString())"
-                                    Write-Log -logFile $logFile -module $functionName -Message "Export-PowerShellDataFile error details: $($Error[0].ToString())" -logLevel "Warning"
-                                }
+                                # Additional error details are handled in the catch block.
                             }
                         }
                         catch
