@@ -1,5 +1,6 @@
 function Save-RefreshTokenToConfig()
 {
+    [CmdletBinding()]
     param($refreshToken, $configFilePath)
 
     $functionName = $MyInvocation.MyCommand.Name
@@ -7,7 +8,7 @@ function Save-RefreshTokenToConfig()
     $userPassword = $null
     $usingTempConfig = $false
     
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh token save operation" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh token save operation" -LogLevel "Verbose"
     Write-Verbose "[$functionName] Called with configFilePath=$configFilePath, refreshToken provided=$($null -ne $refreshToken)"
     
     if (-not $refreshToken)
@@ -61,13 +62,13 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Starting refresh tok
     if (-not $usingTempConfig)
     {
         Write-Verbose "[$functionName] Temporary config not available, reading from disk"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Temporary config not available, reading from disk file" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Temporary config not available, reading from disk file" -LogLevel "Verbose"
         
         # Read the current config from disk (it should be encrypted)
         try
         {
             $encryptedContent = Get-Content -Raw -Path $configFilePath -ErrorAction Stop
-Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read config file from disk" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read config file from disk" -LogLevel "Information"
         }
         catch
         {
@@ -226,7 +227,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully read co
                 if ($tempEncryptResult.Success)
                 {
                     $script:TempEncryptedConfig = $tempEncryptResult.Content
-Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully updated temporary encrypted config" -LogLevel "Information"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully updated temporary encrypted config" -LogLevel "Information"
                 }
                 else
                 {

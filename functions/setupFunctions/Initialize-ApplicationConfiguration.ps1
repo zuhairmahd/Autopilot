@@ -34,6 +34,8 @@ function Initialize-ApplicationConfiguration()
         - Auth: Auth configuration hashtable with delegated/authType/scope settings
         - GlobalSettings: Global settings hashtable (merged with defaults if missing keys detected)
         - LocalSettings: Local/domain-specific settings hashtable (merged with defaults if missing keys detected)
+        - Strings: Strings configuration hashtable with all UI text (merged with defaults if missing keys detected)
+        - Menu: Menu configuration hashtable with all menu structures (merged with defaults if missing keys detected)
         - RequiredScopes: Merged and deduplicated scopes array from auth and domain configurations
         - Success: Boolean indicating success ($true) or failure ($false)
         - ErrorMessage: String containing error message if Success is $false, empty string otherwise
@@ -47,6 +49,8 @@ function Initialize-ApplicationConfiguration()
             $auth = $config.Auth
             $settings = $config.GlobalSettings
             $localSettings = $config.LocalSettings
+            $strings = $config.Strings
+            $menu = $config.Menu
             $scopes = $config.RequiredScopes
         }
     #>
@@ -122,6 +126,8 @@ function Initialize-ApplicationConfiguration()
             Auth           = @{}
             GlobalSettings = @{}
             LocalSettings  = @{}
+            Strings        = @{}
+            Menu           = @{}
             RequiredScopes = @()
             Success        = $false
             ErrorMessage   = ""
@@ -227,10 +233,7 @@ function Initialize-ApplicationConfiguration()
                             {
                                 Write-Warning "[$functionName] Failed to save merged global settings"
                                 Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged global settings" -logLevel "Warning"
-                                if ($Error.Count -gt 0 -and $Error[0] -ne $null) {
-                                    Write-Warning "[$functionName] Export-PowerShellDataFile error details: $($Error[0].ToString())"
-                                    Write-Log -logFile $logFile -module $functionName -Message "Export-PowerShellDataFile error details: $($Error[0].ToString())" -logLevel "Warning"
-                                }
+                                # Additional error details are handled in the catch block.
                             }
                         }
                         catch
@@ -257,11 +260,13 @@ function Initialize-ApplicationConfiguration()
                             else
                             {
                                 $errorDetail = ""
-                                if ($Error.Count -gt 0 -and $Error[0] -ne $null) {
+                                if ($Error.Count -gt 0 -and $Error[0] -ne $null)
+                                {
                                     $errorDetail = $Error[0].Exception.Message
                                 }
                                 $errorMsg = "Failed to save merged domain configuration for: $Domain"
-                                if ($errorDetail) {
+                                if ($errorDetail)
+                                {
                                     $errorMsg += " - Error: $errorDetail"
                                 }
                                 Write-Warning "[$functionName] $errorMsg"
@@ -288,6 +293,89 @@ function Initialize-ApplicationConfiguration()
                 $result.RequiredScopes = $scopeResult.RequiredScopes
                 Write-Log -logFile $logFile -module $functionName -Message "Merged $($result.RequiredScopes.Count) unique scopes" -logLevel "Verbose"
                 Write-Verbose "[$functionName] Merged $($result.RequiredScopes.Count) unique scopes"
+                
+                # Step 8: Process strings configuration
+                Write-Log -logFile $logFile -module $functionName -Message "Processing strings configuration" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing strings configuration"
+                $stringsResult = Initialize-StringsConfiguration -StringsFilePath $StringsFile
+                $result.Strings = $stringsResult.Strings
+                Write-Log -logFile $logFile -module $functionName -Message "Strings configuration processed (Changed: $($stringsResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Strings configuration processed (Changed: $($stringsResult.Changed))"
+                
+                # Step 9: Process menu configuration
+                Write-Log -logFile $logFile -module $functionName -Message "Processing menu configuration" -logLevel "Information"
+                Write-Verbose "[$functionName] Processing menu configuration"
+                $menuResult = Initialize-MenuConfiguration -MenuFilePath $menuFile
+                $result.Menu = $menuResult.Menu
+                Write-Log -logFile $logFile -module $functionName -Message "Menu configuration processed (Changed: $($menuResult.Changed))" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Menu configuration processed (Changed: $($menuResult.Changed))"
+                
+                # Step 10: Save strings and menu files if changes were made
+                if ($stringsResult.Changed)
+                {
+                    try
+                    {
+                        Write-Verbose "[$functionName] Saving merged strings configuration"
+                        Write-Log -logFile $logFile -module $functionName -Message "Saving merged strings configuration" -logLevel "Information"
+                        
+                        # Create backup before saving
+                        $backupFile = "$StringsFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+                        Copy-Item -Path $StringsFile -Destination $backupFile -Force
+                        Write-Verbose "[$functionName] Created backup: $backupFile"
+                        Write-Log -logFile $logFile -module $functionName -Message "Created backup: $backupFile" -logLevel "Verbose"
+                        
+                        # Save the updated strings configuration
+                        $exportResult = Export-PowerShellDataFile -InputObject $stringsResult.Strings -Path $StringsFile -Force -Validate
+                        if ($exportResult)
+                        {
+                            Write-Verbose "[$functionName] Successfully saved merged strings to: $StringsFile"
+                            Write-Log -logFile $logFile -module $functionName -Message "Successfully saved merged strings to: $StringsFile" -logLevel "Information"
+                        }
+                        else
+                        {
+                            Write-Warning "[$functionName] Failed to save merged strings"
+                            Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged strings" -logLevel "Warning"
+                        }
+                    }
+                    catch
+                    {
+                        Write-Warning "[$functionName] Error saving merged strings: $($_.Exception.Message)"
+                        Write-Log -logFile $logFile -module $functionName -Message "Error saving merged strings: $($_.Exception.Message)" -logLevel "Warning"
+                    }
+                }
+                
+                if ($menuResult.Changed)
+                {
+                    try
+                    {
+                        Write-Verbose "[$functionName] Saving merged menu configuration"
+                        Write-Log -logFile $logFile -module $functionName -Message "Saving merged menu configuration" -logLevel "Information"
+                        
+                        # Create backup before saving
+                        $backupFile = "$menuFile.backup.$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+                        Copy-Item -Path $menuFile -Destination $backupFile -Force
+                        Write-Verbose "[$functionName] Created backup: $backupFile"
+                        Write-Log -logFile $logFile -module $functionName -Message "Created backup: $backupFile" -logLevel "Verbose"
+                        
+                        # Save the updated menu configuration
+                        $exportResult = Export-PowerShellDataFile -InputObject $menuResult.Menu -Path $menuFile -Force -Validate
+                        if ($exportResult)
+                        {
+                            Write-Verbose "[$functionName] Successfully saved merged menu to: $menuFile"
+                            Write-Log -logFile $logFile -module $functionName -Message "Successfully saved merged menu to: $menuFile" -logLevel "Information"
+                        }
+                        else
+                        {
+                            Write-Warning "[$functionName] Failed to save merged menu"
+                            Write-Log -logFile $logFile -module $functionName -Message "Failed to save merged menu" -logLevel "Warning"
+                        }
+                    }
+                    catch
+                    {
+                        Write-Warning "[$functionName] Error saving merged menu: $($_.Exception.Message)"
+                        Write-Log -logFile $logFile -module $functionName -Message "Error saving merged menu: $($_.Exception.Message)" -logLevel "Warning"
+                    }
+                }
             }
             catch
             {
@@ -317,6 +405,22 @@ function Initialize-ApplicationConfiguration()
             $result.RequiredScopes = @()
             Write-Log -logFile $logFile -module $functionName -Message "Initialized empty settings collections" -logLevel "Verbose"
             Write-Verbose "[$functionName] Initialized empty settings collections"
+            
+            # Process strings configuration even without settings file
+            Write-Log -logFile $logFile -module $functionName -Message "Processing strings configuration" -logLevel "Information"
+            Write-Verbose "[$functionName] Processing strings configuration"
+            $stringsResult = Initialize-StringsConfiguration -StringsFilePath $StringsFile
+            $result.Strings = $stringsResult.Strings
+            Write-Log -logFile $logFile -module $functionName -Message "Strings configuration processed (Changed: $($stringsResult.Changed))" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Strings configuration processed (Changed: $($stringsResult.Changed))"
+            
+            # Process menu configuration even without settings file
+            Write-Log -logFile $logFile -module $functionName -Message "Processing menu configuration" -logLevel "Information"
+            Write-Verbose "[$functionName] Processing menu configuration"
+            $menuResult = Initialize-MenuConfiguration -MenuFilePath $menuFile
+            $result.Menu = $menuResult.Menu
+            Write-Log -logFile $logFile -module $functionName -Message "Menu configuration processed (Changed: $($menuResult.Changed))" -logLevel "Verbose"
+            Write-Verbose "[$functionName] Menu configuration processed (Changed: $($menuResult.Changed))"
         }
         
         $result.Success = $true
