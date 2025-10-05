@@ -1,11 +1,15 @@
 ﻿@{
+    Description = 'This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script.'
     deviceActions = @{
         contactAdmin = 'Contact an Intune administrator'
         contactHelpdesk = 'Contact the helpdesk'
         WipeOrClean = 'Wipe or clean the device'
         none = 'No action'
     }
-    Description = 'This is the strings file for the Intune Helpdesk script. It contains all the user-facing strings used in the script.'
+    deviceStates = @{
+        Ready = 'The device is ready for the next user'
+        NotReady = 'The device is not ready for the next user'
+    }
     returnValues = @{
         backoutText = 'Returning to previous menu'
         deviceAssignmentPendingMessage = 'The device is pending assignment to a deployment profile.'
@@ -44,9 +48,5 @@
         '1001' = 'Some updates were installed'
         serialNumberNotFoundMessage = 'The serial number was not found.'
         noLAPSFoundMessage = 'No LAPS password found for this device.'
-    }
-    deviceStates = @{
-        Ready = 'The device is ready for the next user'
-        NotReady = 'The device is not ready for the next user'
     }
 }

@@ -166,10 +166,15 @@ function GetGraphAccessToken()
         }
     }
     
-    # Check for certificate thumbprint
+    # Check for certificate thumbprint (try both "certificateThumbprint" and "thumbprint" for compatibility)
     try
     {
-        $certificateThumbprint = Get-DecryptedConfigValue -PropertyPath "thumbprint"
+        $certificateThumbprint = Get-DecryptedConfigValue -PropertyPath "certificateThumbprint"
+        if (-not $certificateThumbprint)
+        {
+            $certificateThumbprint = Get-DecryptedConfigValue -PropertyPath "thumbprint"
+        }
+        
         if ($certificateThumbprint)
         {
             Write-Verbose "[$functionName] Certificate thumbprint found in config: $certificateThumbprint"
@@ -248,7 +253,15 @@ function GetGraphAccessToken()
     #endregion Log parameters
     
     # Set up cache paths
-    $cacheFolder = Split-Path $configFile
+    if ([string]::IsNullOrWhiteSpace($configFile) -or -not (Test-Path $configFile))
+    {
+        Write-Verbose "[$functionName] Config file is empty or doesn't exist, using current directory for cache"
+        $cacheFolder = $PWD.Path
+    }
+    else
+    {
+        $cacheFolder = Split-Path $configFile
+    }
     $cacheTokenFile = Join-Path $cacheFolder "accessToken.json"
     
     #region Try to get token from cache if not forcing new token

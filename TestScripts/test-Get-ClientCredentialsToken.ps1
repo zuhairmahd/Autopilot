@@ -203,7 +203,6 @@ Test-Assertion "Certificate authentication should fail gracefully when certifica
         -cacheTokenFile "" `
         -cacheFolder "" `
         -secureString $false `
-        -LogFile "test.log" `
         -ErrorAction SilentlyContinue
     
     if ($result -ne $null)
@@ -475,8 +474,6 @@ Test-Assertion "Certificate-only mode should not fall back when certificate auth
         -cacheType "memory" `
         -cacheTokenFile "" `
         -cacheFolder "" `
-        -secureString $false `
-        -LogFile "test.log" `
         -ErrorAction SilentlyContinue
     
     if ($result -ne $null)

@@ -416,7 +416,8 @@ try
                 $script:passedTests++
                 
                 # Verify scopes are deduplicated (Device.ReadWrite.All should appear once)
-                $deviceScope = $result.RequiredScopes | Where-Object { $_ -eq 'Device.ReadWrite.All' }
+                # Note: Scopes are now hashtables with Scope/Endpoints/Reason properties
+                $deviceScope = $result.RequiredScopes | Where-Object { $_.Scope -eq 'Device.ReadWrite.All' }
                 $deviceScopeCount = @($deviceScope).Count
                 
                 if ($deviceScopeCount -eq 1)
@@ -433,9 +434,10 @@ try
                 # Verify all unique scopes included
                 $expectedScopes = @('offline_access', 'openid', 'Device.ReadWrite.All', 'User.Read.All', 'Group.ReadWrite.All')
                 $allScopesPresent = $true
+                $scopeNames = $result.RequiredScopes | ForEach-Object { $_.Scope }
                 foreach ($scope in $expectedScopes)
                 {
-                    if ($result.RequiredScopes -notcontains $scope)
+                    if ($scopeNames -notcontains $scope)
                     {
                         $allScopesPresent = $false
                         break

@@ -42,17 +42,21 @@ function Get-ClientCredentialsToken()
     $useClientSecret = $false
     $tryBothWithFallback = $false
     
-    if ($certificateThumbprint -and $clientSecret)
+    # Check for non-empty certificate and client secret (not just presence)
+    $hasCertificate = -not [string]::IsNullOrWhiteSpace($certificateThumbprint)
+    $hasClientSecret = -not [string]::IsNullOrWhiteSpace($clientSecret)
+    
+    if ($hasCertificate -and $hasClientSecret)
     {
         Write-Verbose "[$functionName] Both certificate and client secret provided - will try certificate first with fallback to secret"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Both certificate and client secret provided - will try certificate first with fallback to secret" -LogLevel Warning
         $tryBothWithFallback = $true
         $useCertificate = $true
     }
-    elseif ($certificateThumbprint)
+    elseif ($hasCertificate)
     {
-        Write-Verbose "[$functionName] Using certificate-based authentication"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Using certificate-based authentication with thumbprint: $certificateThumbprint"
+        Write-Verbose "[$functionName] Using certificate-based authentication (certificate-only mode)"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using certificate-based authentication (certificate-only mode) with thumbprint: $certificateThumbprint"
         $useCertificate = $true
     }
     else
@@ -88,7 +92,7 @@ function Get-ClientCredentialsToken()
             if (-not $certificate)
             {
                 $errorMsg = "Certificate with thumbprint $certificateThumbprint not found in certificate stores"
-                Write-Error "[$functionName] $errorMsg"
+                Write-Warning "[$functionName] $errorMsg"
                 Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel Error
                 
                 if ($tryBothWithFallback)
@@ -113,7 +117,7 @@ function Get-ClientCredentialsToken()
                 if ($certificate.NotAfter -lt (Get-Date))
                 {
                     $errorMsg = "Certificate has expired on $($certificate.NotAfter)"
-                    Write-Error "[$functionName] $errorMsg"
+                    Write-Warning "[$functionName] $errorMsg"
                     Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel Error
                     
                     if ($tryBothWithFallback)
@@ -134,7 +138,7 @@ function Get-ClientCredentialsToken()
                 if ($certificate -and -not $certificate.HasPrivateKey)
                 {
                     $errorMsg = "Certificate does not have a private key"
-                    Write-Error "[$functionName] $errorMsg"
+                    Write-Warning "[$functionName] $errorMsg"
                     Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel Error
                     
                     if ($tryBothWithFallback)
@@ -193,7 +197,7 @@ function Get-ClientCredentialsToken()
                 if (-not $rsa)
                 {
                     $errorMsg = "Failed to access certificate private key"
-                    Write-Error "[$functionName] $errorMsg"
+                    Write-Warning "[$functionName] $errorMsg"
                     Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel Error
                     
                     if ($tryBothWithFallback)

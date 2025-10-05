@@ -302,7 +302,7 @@ else
 }
 #endregion import functions.
 
-#region Initialize script
+#region Initialize application configuration
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -322,15 +322,15 @@ if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "Ex
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
     $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
-    if (Test-Path "$pwd\$scriptNameExe")
-    {
-        Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
-        $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
-    }
-    else
-    {
-        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
-    }
+}
+else
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+}
+if (Test-Path "$pwd\$scriptNameExe")
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
+    $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
 }
 else
 {
@@ -338,8 +338,57 @@ else
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
+$oldExecutableFileName = 'main.exe.old'
+if (Test-Path $oldExecutableFileName)
+{
+    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
+    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
+    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
+}
+Write-Verbose "[$scriptName] Initializing application configuration"
+$filesCleaned = cleanupTempFiles
+if ($filesCleaned.AllRemoved)
+{
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+}
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($appMetaData -and $appMetaData.domain)
+{
+    $appMetaData.domain
+}
+else
+{
+    "contoso.com"
+}
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+if (-not $configResult.Success)
+{
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    write-log -logFile $logFile -finishLogging
+    exit 1
+}
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings
+$localSettings = $configResult.LocalSettings
+$requiredScopes = $configResult.RequiredScopes
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 if (-not $version.version)
 {
     Write-Verbose "[$scriptName] Unable to get file version."
@@ -362,6 +411,7 @@ if (-not $version.version)
         }
     }
 }
+#prioritize version from the domain settings file obtain via the get-appmetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
@@ -378,15 +428,7 @@ if ($ShowVersion)
     Write-Log -LogFile $LogFile -finishLogging
     exit 0
 }
-$oldExecutableFileName = 'main.exe.old'
-if (Test-Path $oldExecutableFileName)
-{
-    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
-    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
-    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
-}
-#endregion Initialize script
+#endregion  Initialize application configuration
 
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -434,6 +476,7 @@ if (Test-Path $configFile)
         {
             Write-Host "Failed to set password. Exiting script." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to set password after initialization" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
             exit 1
         }
     }
@@ -476,6 +519,7 @@ else
                 Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                write-log -logFile $logFile -finishLogging
                 exit 1
             }
             
@@ -492,55 +536,52 @@ else
         {
             Write-Host "Configuration file was not created successfully." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
             exit 1
         }
+        #reload settings since thhey likely have changed.
+        Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
+        write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
+        $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+        if (-not $configResult.Success)
+        {
+            Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
+            exit 1
+        }
+        # Extract configuration results
+        $auth = $configResult.Auth
+        $globalSettings = $configResult.GlobalSettings
+        $localSettings = $configResult.LocalSettings
+        $requiredScopes = $configResult.RequiredScopes
+        # Merge global and local settings into a single settings object
+        Write-Verbose "[$scriptName] Merging global and local settings"
+        $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+        Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+        Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+        Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+        Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+        Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+        Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+
+
     }
     else
     {
         Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
-        Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+        Write-Host "Please create a configuration file manually." -ForegroundColor Yellow
+        write-log -logFile $logFile -finishLogging
         exit 1
     }
 }
-#endregion Process login
 
-#region Initialize application configuration
-Write-Verbose "[$scriptName] Initializing application configuration"
-# Use domain if available, otherwise default to contoso.com
-$domainForDefaults = if ($domain)
-{
-    $domain
-}
-else
-{
-    "contoso.com"
-}
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
-if (-not $configResult.Success)
-{
-    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
-    exit 1
-}
-# Extract configuration results
-$auth = $configResult.Auth
-$globalSettings = $configResult.GlobalSettings
-$localSettings = $configResult.LocalSettings
-$requiredScopes = $configResult.RequiredScopes
-# Merge global and local settings into a single settings object
-Write-Verbose "[$scriptName] Merging global and local settings"
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Configuration initialization completed successfully"
-Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
-Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
-Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
-Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
-Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-#endregion  Initialize application configuration
+
+#endregion Process login
 
 #region Check for password change requirement
 # Check if password change is required (only applies to existing config files, not first-run wizard)
@@ -655,7 +696,7 @@ foreach ($key in $settings.Keys)
     }
 }
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
-$getTokenParams = BuildAuthSplatTable -auth $auth
+$global:getTokenParams = BuildAuthSplatTable -auth $auth
 foreach ($key in $getTokenParams.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
@@ -810,13 +851,14 @@ if ($accessToken)
                 $currentRequestedScopes = $requiredScopes | ForEach-Object { $_.Scope }
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Delegated authentication - using required scopes as requested scopes" -LogLevel "Information"
             }
-        
             # Perform scope validation
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Performing scope validation..." -LogLevel "Information"
             $scopeValidation = Test-ScopeAvailability -AccessToken $accessToken -RequiredScopes $requiredScopes -AuthConfiguration $auth -RequestedScopes $currentRequestedScopes
             if ($scopeValidation.HasAllRequiredScopes)
             {
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "All required Microsoft Graph scopes are available" -LogLevel "Information"
+                Write-Verbose "[$scriptName] All required Microsoft Graph scopes are available."
+                Write-Host "All required Microsoft Graph scopes are available." -ForegroundColor Green
             }
             else
             {
@@ -837,7 +879,6 @@ if ($accessToken)
                         Write-Log -LogFile $LogFile -Module $scriptName -Message "  - $($missingScope.Scope)`n    Impact: $($missingScope.Reason)" -LogLevel "Information"
                     }
                 }
-            
                 Write-Host "`nRecommended action: $($scopeValidation.RecommendedAction)" -ForegroundColor Cyan
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Recommended action: $($scopeValidation.RecommendedAction)" -LogLevel "Information"
                 # For delegated authentication, offer to request additional scopes
@@ -880,6 +921,9 @@ if ($accessToken)
         Write-Host "Forced new token retrieval due to parameters." -ForegroundColor Cyan
         Write-Host "The script will now exit."
         Write-Host "You can run the script again without these parameters to use the new token."
+        Write-Verbose "[$scriptName] Exiting script due to forced new token retrieval."
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Exiting script due to forced new token retrieval." -LogLevel "Information"
+        write-log -logFile $logFile -finishLogging
         exit 0
     }
 }
@@ -915,6 +959,8 @@ else
     else
     {
         Write-Host "Exiting script due to authentication failure." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -message "Exiting script due to authentication failure." -LogLevel "Error"
+        write-log -logFile $logFile -finishLogging
         exit 1
     }
 }
@@ -1872,7 +1918,6 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-
 # Finish logging
 Write-Log -LogFile $LogFile -FinishLogging
 #endregion Cleanup

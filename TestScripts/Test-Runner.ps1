@@ -16,10 +16,12 @@
     - demo: Interactive demonstration scripts
     - syntax: Quick syntax and loading validation
     - core: Essential functionality tests
-    - enhanced: Enhanced functionality tests (new test scripts)
-    - specialized: Specialized and advanced functionality tests
-    - performance: Performance optimization tests (Phase 1-3)
-    - regression: Phase 3 regression testing framework
+    - enhanced: Enhanced functionality tests (directory objects, scope validation, new utilities)
+    - specialized: Specialized and advanced functionality tests (wizards, settings, groups)
+    - performance: Performance optimization and batch processing tests
+    - fixes: Bug fixes and issue-specific validation tests
+    - menu: Menu system tests including appmode and dynamic menu functionality
+    - autopilot: Windows Autopilot profile and device management tests
     - specific: Run specific tests by pattern (requires -TestPattern)
 .PARAMETER TestPattern
     Specific pattern to match test files (e.g., "test-menu*", "test-auth*")
@@ -80,7 +82,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized', 'performance', 'regression')]
+    [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized', 'performance', 'fixes', 'menu', 'autopilot')]
     [string]$TestCategory = 'all',
     [string]$TestPattern = $null,
     [string]$ExcludePattern = "test-helper.ps1,Test-Runner.ps1",
@@ -119,40 +121,40 @@ $TestRegistry = @{
     }
     'core'          = @{
         Description       = 'Essential functionality tests required for basic operation'
-        # Dynamic: any "core" validation and function loading tests
-        Pattern           = 'test-core-*.ps1,test-function-loading*.ps1,test-*-function-loading*.ps1'
+        # Core validation and function loading tests
+        Pattern           = 'test-core-*.ps1,test-function-loading-validation.ps1,test-simple-function-loading.ps1'
         Priority          = 2
         EstimatedDuration = '30-60 seconds'
         Dependencies      = @('syntax')
     }
     'unit'          = @{
         Description       = 'Individual component and function tests'
-        # Dynamic: any test-*.ps1 that is not integration/comprehensive/validation/enhanced/specialized/core/syntax
+        # Individual test files excluding integration/comprehensive/validation/enhanced/specialized/core/syntax patterns
         Pattern           = 'test-*.ps1'
-        ExcludeRegex      = '(?i)(-integration|-comprehensive|^final-|-enhanced-|-wizard|^demo-)|test-(core-|.*function-loading)'
+        ExcludeRegex      = '(?i)(-integration|-comprehensive|-wizard|^final-|-enhanced-)|test-(core-|function-loading|settings-|groups-|menu-|appmode-|issue-|performance-|scope-|auth-flows|autopilot-|device-lookup|configuration-)'
         Priority          = 3
         EstimatedDuration = '2-4 minutes'
         Dependencies      = @('syntax', 'core')
     }
     'integration'   = @{
         Description       = 'Cross-component integration and workflow tests'
-        # Dynamic: suffix-based and common integration keywords
-        Pattern           = 'test-*-integration.ps1,test-e2e-*.ps1,test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system*.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-migration-*.ps1'
+        # Integration tests including e2e, configuration, menu, auth, and migration tests
+        Pattern           = 'test-*-integration.ps1,test-e2e-*.ps1,test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system*.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-auth-configuration-pipeline.ps1,test-migration-*.ps1,test-main-integration.ps1'
         Priority          = 4
         EstimatedDuration = '3-5 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
     }
     'comprehensive' = @{
         Description       = 'Full workflow and end-to-end comprehensive tests'
-        # Dynamic: any test with -comprehensive plus explicit inclusions
-        Pattern           = 'test-comprehensive.ps1,test-*-comprehensive.ps1,test-main-integration.ps1,test-menu-inclusions-e2e.ps1'
+        # Comprehensive tests for full system validation
+        Pattern           = 'test-comprehensive.ps1,test-*-comprehensive.ps1,test-menu-inclusions-e2e.ps1,test-menu-system-comprehensive.ps1'
         Priority          = 5
         EstimatedDuration = '5-8 minutes'
         Dependencies      = @('syntax', 'core', 'unit', 'integration')
     }
     'validation'    = @{
         Description       = 'Final validation and verification tests'
-        # Dynamic: final validation/verification scripts
+        # Final validation and verification scripts
         Pattern           = 'final-validation*.ps1,final-verification.ps1'
         Priority          = 6
         EstimatedDuration = '2-3 minutes'
@@ -166,34 +168,52 @@ $TestRegistry = @{
         Dependencies      = @()
     }
     'enhanced'      = @{
-        Description       = 'Enhanced functionality tests (new test scripts)'
-        # Dynamic: any enhanced-prefixed test, plus known additions
-        Pattern           = 'test-enhanced-*.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1,test-expanded-group-assignments.ps1,test-scope-validation.ps1'
+        Description       = 'Enhanced functionality tests for new features and improvements'
+        # Enhanced functionality including directory objects, scope validation, and new utilities
+        Pattern           = 'test-enhanced-*.ps1,test-new-utility-functions.ps1,test-graph-encryption-functions.ps1,test-expanded-group-assignments.ps1,test-scope-validation.ps1,test-scope-hierarchy.ps1,test-get-entra-directory-object.ps1,test-show-directory-object-list.ps1,test-resolve-directory-object.ps1'
         Priority          = 4
         EstimatedDuration = '2-3 minutes'
         Dependencies      = @('syntax', 'core')
     }
     'specialized'   = @{
         Description       = 'Specialized and advanced functionality tests'
-        # Dynamic: wizard variants + explicit specialized scripts
-        Pattern           = 'test-*-wizard.ps1,test-appmode-refactored.ps1,test-autoupdate-wizard.ps1,test-firstrun-wizard.ps1,test-mnemonic-navigation.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-device-selection.ps1,test-delegated-auth-update.ps1,test-group-assignment-fixes.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1'
+        # Wizard tests, settings management, groups management, and specialized features
+        Pattern           = 'test-*-wizard.ps1,test-appmode-refactored.ps1,test-settings-editor.ps1,test-settings-menu.ps1,test-settings-viewer*.ps1,test-settings-display.ps1,test-settings-functions.ps1,test-groups-editor*.ps1,test-groups-viewer.ps1,test-mnemonic-navigation.ps1,test-delegated-auth-update.ps1,test-update-setting-unified.ps1,test-authentication-types.ps1,test-group-assignment-fixes.ps1,test-functional-group-assignments.ps1,test-verify-group-membership-refactor.ps1'
         Priority          = 5
         EstimatedDuration = '4-6 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
     }
     'performance'   = @{
-        Description       = 'Performance optimization tests and validation (Phase 1-4 + Enhanced Caching)'
-        Pattern           = 'test-performance-*.ps1,test-phase*-*.ps1,test-enhanced-caching-system.ps1'
+        Description       = 'Performance optimization and batch processing tests'
+        # Performance baseline, optimization, and batch processing tests
+        Pattern           = 'test-performance-*.ps1,test-batch-optimization.ps1'
         Priority          = 4
-        EstimatedDuration = '4-7 minutes'
+        EstimatedDuration = '3-5 minutes'
         Dependencies      = @('syntax', 'core')
     }
-    'regression'    = @{
-        Description       = 'Phase 3 regression testing framework'
-        Pattern           = 'test-phase3-regression.ps1'
-        Priority          = 6
-        EstimatedDuration = '2-4 minutes'
-        Dependencies      = @('syntax', 'core', 'unit')
+    'fixes'         = @{
+        Description       = 'Bug fixes and issue-specific validation tests'
+        # Tests for specific issues and fixes
+        Pattern           = 'test-issue-*.ps1,test-*-fix.ps1,test-backward-compatibility.ps1'
+        Priority          = 5
+        EstimatedDuration = '3-4 minutes'
+        Dependencies      = @('syntax', 'core')
+    }
+    'menu'          = @{
+        Description       = 'Menu system tests including appmode and dynamic menu functionality'
+        # Menu-specific tests not covered by integration
+        Pattern           = 'test-menu-appmode-fix.ps1,test-menu-duplication-fix.ps1,test-dynamic-menu-*.ps1,test-appmode-*.ps1,test-remove-menuitem.ps1,show-menu-structure.ps1'
+        Priority          = 4
+        EstimatedDuration = '2-3 minutes'
+        Dependencies      = @('syntax', 'core')
+    }
+    'autopilot'     = @{
+        Description       = 'Windows Autopilot profile and device management tests'
+        # Autopilot-specific functionality tests
+        Pattern           = 'test-autopilot-*.ps1,test-corporate-device-identifier.ps1,test-target-build-functionality.ps1'
+        Priority          = 4
+        EstimatedDuration = '2-3 minutes'
+        Dependencies      = @('syntax', 'core')
     }
 }
 
