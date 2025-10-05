@@ -411,7 +411,7 @@ if (-not $version.version)
         }
     }
 }
-#prioritize version from the domain settings file obtain via the get-appmetaData function
+# Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
