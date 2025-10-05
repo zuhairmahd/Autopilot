@@ -24,102 +24,102 @@
     requiredScopes = @(
         @{
             Reason = 'Required to read user profiles, group memberships, and registered devices.'
-            Endpoints = @(
-                '/ users',
-                'users /`r`n                {`r`n                    id`r`n                }',
-                'users /`r`n                {`r`n                    id`r`n                } / memberOf',
-                'users /`r`n                {`r`n                    id`r`n                } / registeredDevices'
-            )
             Scope = 'User.Read.All'
+            Endpoints = @(
+                '/users',
+                'users/id',
+                'users/id/memberOf',
+                'users/id/registeredDevices'
+            )
         },
         @{
             Reason = 'Required to read Microsoft Entra ID device objects.'
+            Scope = 'Device.Read.All'
             Endpoints = @(
                 'devices'
             )
-            Scope = 'Device.Read.All'
         },
         @{
             Reason = 'Required to read application information and manage app assignments.'
-            Endpoints = @(
-                'deviceAppManagement / mobileApps',
-                'deviceAppManagement / mobileApps /`r`n                {`r`n                    id`r`n                } / assignments'
-            )
             Scope = 'DeviceManagementApps.ReadWrite.All'
+            Endpoints = @(
+                'deviceAppManagement/mobileApps',
+                'deviceAppManagement/mobileApps/id/assignments'
+            )
         },
         @{
             Reason = 'Required to read Intune device configuration policies.'
-            Endpoints = @(
-                'deviceManagement / deviceConfigurations'
-            )
             Scope = 'DeviceManagementConfiguration.Read.All'
+            Endpoints = @(
+                'deviceManagement/deviceConfigurations'
+            )
         },
         @{
             Reason = 'Required to read Intune managed device properties.'
-            Endpoints = @(
-                '/ deviceManagement / managedDevices',
-                'deviceManagement / managedDevices /`r`n                {`r`n                    id`r`n                }'
-            )
             Scope = 'DeviceManagementManagedDevices.Read.All'
+            Endpoints = @(
+                'deviceManagement/managedDevices',
+                'deviceManagement/managedDevices/id'
+            )
         },
         @{
             Reason = 'Required for highly privileged operations, specifically to read local admin (LAPS) passwords.'
-            Endpoints = @(
-                'directory / deviceLocalCredentials'
-            )
             Scope = 'DeviceManagementManagedDevices.PrivilegedOperations.All'
+            Endpoints = @(
+                'directory/deviceLocalCredentials'
+            )
         },
         @{
             Reason = 'Required to read Autopilot events and to read and manage Autopilot device identities.'
-            Endpoints = @(
-                'deviceManagement / autopilotEvents',
-                'deviceManagement / importedWindowsAutopilotDeviceIdentities',
-                'deviceManagement / windowsAutopilotDeviceIdentities'
-            )
             Scope = 'DeviceManagementServiceConfig.ReadWrite.All'
+            Endpoints = @(
+                'deviceManagement/autopilotEvents',
+                'deviceManagement/importedWindowsAutopilotDeviceIdentities',
+                'deviceManagement/windowsAutopilotDeviceIdentities'
+            )
         },
         @{
             Reason = 'Required to read BitLocker recovery keys for all devices.'
-            Endpoints = @(
-                'informationProtection / bitlocker / recoveryKeys'
-            )
             Scope = 'BitlockerKey.Read.All'
-        },
-        @{
-            Reason = 'Standard scope required for user sign -in with OpenID Connect.'
-            Endpoints = @()
-            Scope = 'openid'
-        },
-        @{
-            Reason = 'Standard scope to get basic user profile information during sign -in .'
-            Endpoints = @()
-            Scope = 'profile'
+            Endpoints = @(
+                'informationProtection/bitlocker/recoveryKeys'
+            )
         },
         @{
             reason = 'Required to create, update, and delete Intune device configuration policies.'
-            endpoints = @(
-                'deviceManagement / deviceConfigurations'
-            )
             scope = 'DeviceManagementConfiguration.ReadWrite.All'
+            endpoints = @(
+                'deviceManagement/deviceConfigurations'
+            )
         },
         @{
             reason = 'Required to read application information in Intune.'
-            endpoints = @(
-                'deviceAppManagement / mobileApps'
-            )
             scope = 'DeviceManagementApps.Read.All'
+            endpoints = @(
+                'deviceAppManagement/mobileApps'
+            )
         },
         @{
             reason = 'Required to create, update, and delete Intune managed device properties.'
-            endpoints = @(
-                'deviceManagement / managedDevices'
-            )
             scope = 'DeviceManagementManagedDevices.ReadWrite.All'
+            endpoints = @(
+                'deviceManagement/managedDevices'
+            )
+        },
+        @{
+            Reason = 'Standard scope required for user sign -in with OpenID Connect.'
+            Scope = 'openid'
+            Endpoints = @()
+        },
+        @{
+            Reason = 'Standard scope to get basic user profile information during sign -in .'
+            Scope = 'profile'
+            Endpoints = @()
         },
         @{
             reason = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
-            endpoints = @()
             scope = 'offline_access'
+            endpoints = @()
         }
     )
     globalSettings = @{
@@ -137,9 +137,9 @@
         release = 'auto'
         repoInfo = @{
             baseSourceURL = 'https://raw.githubusercontent.com'
+            repoName = 'Autopilot'
             repoPath = 'zuhairmahd'
             baseURL = 'https://www.github.com'
-            repoName = 'Autopilot'
         }
         testMode = $false
         operatingSystem = 'Windows'
