@@ -193,8 +193,7 @@ function Get-ClientCredentialsToken()
                 Write-Verbose "[$functionName] Signing JWT with certificate private key"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Signing JWT with certificate private key"
                 $privateKey = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($certificate)    
-                $rsa = $privateKey
-                if (-not $rsa)
+                if (-not $privateKey)
                 {
                     $errorMsg = "Failed to access certificate private key"
                     Write-Warning "[$functionName] $errorMsg"
