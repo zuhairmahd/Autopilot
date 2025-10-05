@@ -215,14 +215,14 @@ function Get-ClientCredentialsToken()
                     }
                 }
                 
-                if ($rsa -is [System.Security.Cryptography.RSACryptoServiceProvider])
+                if ($privateKey -is [System.Security.Cryptography.RSACryptoServiceProvider])
                 {
-                    $signature = $rsa.SignData($jwtBytes, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+                    $signature = $privateKey.SignData($jwtBytes, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
                 }
                 else
                 {
                     # For CNG keys
-                    $signature = $rsa.SignData($jwtBytes, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+                    $signature = $privateKey.SignData($jwtBytes, [System.Security.Cryptography.HashAlgorithmName]::SHA256, [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
                 }
                 
                 $jwtSignatureEncoded = [Convert]::ToBase64String($signature) -replace '\+', '-' -replace '/', '_' -replace '='

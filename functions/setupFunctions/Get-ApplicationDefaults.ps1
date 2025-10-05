@@ -182,19 +182,10 @@ function Get-ApplicationDefaults()
                 Scope     = "User.Read.All"
                 Reason    = "Required to read user profiles, group memberships, and registered devices."
                 Endpoints = @(
-                    "/ users",
-                    "users /
-                {
-                    id
-                }",
-                    "users /
-                {
-                    id
-                } / memberOf",
-                    "users /
-                {
-                    id
-                } / registeredDevices"
+                    "/users",
+                    "users/id",
+                    "users/id/memberOf",
+                    "users/id/registeredDevices"
                 )
             },
             @{
@@ -208,52 +199,67 @@ function Get-ApplicationDefaults()
                 Scope     = "DeviceManagementApps.ReadWrite.All"
                 Reason    = "Required to read application information and manage app assignments."
                 Endpoints = @(
-                    "deviceAppManagement / mobileApps",
-                    "deviceAppManagement / mobileApps /
-                {
-                    id
-                } / assignments"
+                    "deviceAppManagement/mobileApps",
+                    "deviceAppManagement/mobileApps/id/assignments"
                 )
             },
             @{
                 Scope     = "DeviceManagementConfiguration.Read.All"
                 Reason    = "Required to read Intune device configuration policies."
                 Endpoints = @(
-                    "deviceManagement / deviceConfigurations"
+                    "deviceManagement/deviceConfigurations"
                 )
             },
             @{
                 Scope     = "DeviceManagementManagedDevices.Read.All"
                 Reason    = "Required to read Intune managed device properties."
                 Endpoints = @(
-                    "/ deviceManagement / managedDevices",
-                    "deviceManagement / managedDevices /
-                {
-                    id
-                }"
+                    "deviceManagement/managedDevices",
+                    "deviceManagement/managedDevices/id"
                 )
             },
             @{
                 Scope     = "DeviceManagementManagedDevices.PrivilegedOperations.All"
                 Reason    = "Required for highly privileged operations, specifically to read local admin (LAPS) passwords."
                 Endpoints = @(
-                    "directory / deviceLocalCredentials"
+                    "directory/deviceLocalCredentials"
                 )
             },
             @{
                 Scope     = "DeviceManagementServiceConfig.ReadWrite.All"
                 Reason    = "Required to read Autopilot events and to read and manage Autopilot device identities."
                 Endpoints = @(
-                    "deviceManagement / autopilotEvents",
-                    "deviceManagement / importedWindowsAutopilotDeviceIdentities",
-                    "deviceManagement / windowsAutopilotDeviceIdentities"
+                    "deviceManagement/autopilotEvents",
+                    "deviceManagement/importedWindowsAutopilotDeviceIdentities",
+                    "deviceManagement/windowsAutopilotDeviceIdentities"
                 )
             },
             @{
                 Scope     = "BitlockerKey.Read.All"
                 Reason    = "Required to read BitLocker recovery keys for all devices."
                 Endpoints = @(
-                    "informationProtection / bitlocker / recoveryKeys"
+                    "informationProtection/bitlocker/recoveryKeys"
+                )
+            },
+            @{
+                scope     = "DeviceManagementConfiguration.ReadWrite.All"
+                reason    = "Required to create, update, and delete Intune device configuration policies."
+                endpoints = @(
+                    "deviceManagement/deviceConfigurations"
+                )
+            },
+            @{
+                scope     = "DeviceManagementApps.Read.All"
+                reason    = "Required to read application information in Intune."
+                endpoints = @(
+                    "deviceAppManagement/mobileApps"
+                )
+            },
+            @{
+                scope     = "DeviceManagementManagedDevices.ReadWrite.All"
+                reason    = "Required to create, update, and delete Intune managed device properties."
+                endpoints = @(
+                    "deviceManagement/managedDevices"
                 )
             },
             @{
@@ -265,27 +271,6 @@ function Get-ApplicationDefaults()
                 Scope     = "profile"
                 Reason    = "Standard scope to get basic user profile information during sign -in ."
                 Endpoints = @()
-            },
-            @{
-                scope     = "DeviceManagementConfiguration.ReadWrite.All"
-                reason    = "Required to create, update, and delete Intune device configuration policies."
-                endpoints = @(
-                    "deviceManagement / deviceConfigurations"
-                )
-            },
-            @{
-                scope     = "DeviceManagementApps.Read.All"
-                reason    = "Required to read application information in Intune."
-                endpoints = @(
-                    "deviceAppManagement / mobileApps"
-                )
-            },
-            @{
-                scope     = "DeviceManagementManagedDevices.ReadWrite.All"
-                reason    = "Required to create, update, and delete Intune managed device properties."
-                endpoints = @(
-                    "deviceManagement / managedDevices"
-                )
             },
             @{
                 scope     = "offline_access"
