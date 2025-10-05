@@ -1,24 +1,24 @@
 @{
     groupsToInclude = @(
         @{
-            id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
             name = 'Cloud Managed PC User 3.26.2023_18:43:44'
+            id = 'f1752bdb-7abd-438c-a54e-7faca7cecf61'
         }
     )
     groupsToExclude = @(
         @{
-            id = 'a0138743-e4fe-45db-a231-737b10a2615d'
             name = 'autoPilot-device-preparation-user'
+            id = 'a0138743-e4fe-45db-a231-737b10a2615d'
         }
     )
     autopilotProfilesToInclude = @(
         @{
-            id = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
             name = 'windowsCloudConfig Autopilot profile'
+            id = 'edaca6f4-58e4-4a55-a985-52c8f74fb6c4'
         },
         @{
-            id = '78a4c8b8-c7fb-4fbb-9db6-7c91eb1db7d1'
             name = 'Hybrid join profile'
+            id = '78a4c8b8-c7fb-4fbb-9db6-7c91eb1db7d1'
         }
     )
     autopilotDeviceAllowedVendors = @(
@@ -39,10 +39,10 @@
     maxGroupMatchDisplay = 20
     release = 'dev'
     repoInfo = @{
-        repoPath = 'zuhairmahd'
+        baseSourceURL = 'https://raw.githubusercontent.com'
         baseURL = 'https://www.github.com'
         repoName = 'Autopilot'
-        baseSourceURL = 'https://raw.githubusercontent.com'
+        repoPath = 'zuhairmahd'
     }
     autoUpdate = $false
     updateLocalSettings = $true
