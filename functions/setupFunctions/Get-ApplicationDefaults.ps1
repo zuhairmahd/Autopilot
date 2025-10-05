@@ -137,7 +137,7 @@ function Get-ApplicationDefaults()
             domain                          = $DomainName
             companyName                     = ""
             version                         = $Version
-            validateScopes                  = $true
+            validateScopes                  = $false
             maxWaitTime                     = 30
             showLicenseBanner               = $true
             deviceContactThresholdInDays    = 30
@@ -145,8 +145,8 @@ function Get-ApplicationDefaults()
             strongMappingOptional           = $true
             appMode                         = "full"
             timeInSeconds                   = 60
-            maxUserMatchDisplay             = 10
-            maxGroupMatchDisplay            = 10
+            maxUserMatchDisplay             = 20
+            maxGroupMatchDisplay            = 20
             release                         = "master"
             repoInfo                        = @{
                 repoName      = "Autopilot"

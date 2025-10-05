@@ -1,5 +1,6 @@
 function Test-RefreshTokenValidity()
 {
+    [CmdletBinding()]   
     param(
         $refreshToken,
         $clientId,

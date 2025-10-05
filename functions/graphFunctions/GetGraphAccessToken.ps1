@@ -26,13 +26,13 @@ function GetGraphAccessToken()
     
     #region Process config files
     $functionName = $MyInvocation.MyCommand.Name
-Write-Log -LogFile $LogFile -Module $functionName -Message "Starting Graph access token retrieval" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting Graph access token retrieval" -LogLevel "Verbose"
     
     # Read and process configuration file
     if (-not $configFile)
     {
         Write-Error "Config file not found. Please provide a valid config file."
-Write-Log -LogFile $LogFile -Module $functionName -Message "Config file not found. Please provide a valid config file." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Config file not found. Please provide a valid config file." -LogLevel "Verbose"
         return $null
     }
 
@@ -46,12 +46,12 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Config file not foun
         if ($configRefreshToken)
         {
             Write-Verbose "[$functionName] Found refresh token in encrypted config."
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found refresh token in encrypted config" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Found refresh token in encrypted config" -LogLevel "Verbose"
         }
         else
         {
             Write-Verbose "[$functionName] No refresh token found in config."
-Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token found in config" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token found in config" -LogLevel "Verbose"
         }
     }
     catch
@@ -69,6 +69,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
         Write-Verbose "[$functionName] Cleared configRefreshToken variable. New refresh token will be obtained and saved to config."
     }    
     
+    #get the tenant Id
     try
     {
         $tenantId = Get-DecryptedConfigValue -PropertyPath "tenantId"
@@ -87,6 +88,8 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
         Write-Error "Tenant ID not found in config file."
         return $null
     }
+    
+    #get the domain
     try
     {
         $domain = Get-DecryptedConfigValue -PropertyPath "domain"
@@ -106,6 +109,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
         return $null
     }
     
+    #get the client id
     try
     {
         $clientId = Get-DecryptedConfigValue -PropertyPath "appId"
@@ -125,12 +129,14 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
         return $null
     }
     
+    #get the client secret
     try
     {
         $clientSecret = Get-DecryptedConfigValue -PropertyPath "AppSecret"
         if ($clientSecret)
         {
             Write-Verbose "[$functionName] Client Secret found in config."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Client Secret found in config" -LogLevel "Verbose"
         }
         else
         {
@@ -138,10 +144,12 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
             Write-Verbose "Checking whether the authtype is public flow which does not require client secret."
             if ($AuthType -ne 'PublicAuthFlow')
             {
-                Write-Error "Client Secret is required for the selected authentication type."
-                return $null
+                Write-Verbose "[$functionName] Will check for certificate thumbprint as alternative authentication method."
             }
-            Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+            else
+            {
+                Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+            }
         }
     }
     catch
@@ -150,10 +158,39 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
         Write-Verbose "Checking whether the authtype is public flow which does not require client secret."
         if ($AuthType -ne 'PublicAuthFlow')
         {
-            Write-Error "Client Secret is required for the selected authentication type."
-            return $null
+            Write-Verbose "[$functionName] Will check for certificate thumbprint as alternative authentication method."
         }
-        Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+        else
+        {
+            Write-Verbose "[$functionName] Public Auth Flow does not require Client Secret."
+        }
+    }
+    
+    # Check for certificate thumbprint
+    try
+    {
+        $certificateThumbprint = Get-DecryptedConfigValue -PropertyPath "thumbprint"
+        if ($certificateThumbprint)
+        {
+            Write-Verbose "[$functionName] Certificate thumbprint found in config: $certificateThumbprint"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Certificate thumbprint found in config: $certificateThumbprint" -LogLevel "Verbose"
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Certificate thumbprint not found in config."
+        }
+    }
+    catch
+    {
+        Write-Verbose "[$functionName] Certificate thumbprint not found in config."
+        $certificateThumbprint = $null
+    }
+    # Validate that we have at least one authentication method for non-delegated flows
+    if (-not $delegated -and -not $clientSecret -and -not $certificateThumbprint)
+    {
+        Write-Error "[$functionName] Either client secret or certificate thumbprint must be provided for non-delegated authentication."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Either client secret or certificate thumbprint must be provided for non-delegated authentication" -LogLevel "Error"
+        return $null
     }
     if ($delegated )
     {
@@ -304,14 +341,52 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No refresh token fou
     }
     else
     {
-        if ($tenantId -and $clientId -and $clientSecret)
+        # Non-delegated (client credentials) authentication
+        Write-Verbose "[$functionName] Using non-delegated (client credentials) authentication flow."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using non-delegated (client credentials) authentication flow" -LogLevel "Verbose"
+        
+        if ($tenantId -and $clientId -and ($clientSecret -or $certificateThumbprint))
         {
-            return Get-ClientCredentialsToken -tenantId $tenantId -clientId $clientId -clientSecret $clientSecret `
-                -domain $domain -cacheType $CacheType -cacheTokenFile $cacheTokenFile -cacheFolder $cacheFolder -secureString $SecureString
+            $params = @{
+                tenantId       = $tenantId
+                clientId       = $clientId
+                domain         = $domain
+                cacheType      = $CacheType
+                cacheTokenFile = $cacheTokenFile
+                cacheFolder    = $cacheFolder
+            }
+            
+            if ($clientSecret)
+            {
+                Write-Verbose "[$functionName] Using client secret for authentication."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Using client secret for authentication" -LogLevel "Verbose"
+                $params['clientSecret'] = $clientSecret
+            }
+            
+            if ($certificateThumbprint)
+            {
+                Write-Verbose "[$functionName] Using certificate thumbprint for authentication: $certificateThumbprint"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Using certificate thumbprint for authentication: $certificateThumbprint" -LogLevel "Verbose"
+                $params['certificateThumbprint'] = $certificateThumbprint
+            }
+            
+            if ($clientSecret -and $certificateThumbprint)
+            {
+                Write-Verbose "[$functionName] Both client secret and certificate available - will try certificate first with fallback to secret."
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Both client secret and certificate available - will try certificate first with fallback to secret" -LogLevel "Warning"
+            }
+            
+            if ($SecureString)
+            {
+                $params['secureString'] = $true
+            }
+            
+            return Get-ClientCredentialsToken @params
         }
         else
         {
-            Write-Error "Missing required authentication parameters (tenantId, clientId, or clientSecret)"
+            Write-Error "[$functionName] Missing required authentication parameters (tenantId, clientId, and either clientSecret or certificateThumbprint)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Missing required authentication parameters" -LogLevel "Error"
             return $null
         }
     }

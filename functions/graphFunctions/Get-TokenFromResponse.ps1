@@ -1,5 +1,6 @@
 function Get-TokenFromResponse()
 {
+    [CmdletBinding()]
     param($tokenResponse, $domain, $refreshToken)
     $functionName = $MyInvocation.MyCommand.Name
     $tokenExpiryTime = (Get-Date).AddSeconds($tokenResponse.expires_in)

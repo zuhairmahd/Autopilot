@@ -1,5 +1,6 @@
 function Start-HttpListener()
 {
+    [CmdletBinding()]
     param (
         [string]$redirectUri
     )
