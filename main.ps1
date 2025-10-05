@@ -321,20 +321,25 @@ else
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
+    Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
     $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
 }
 else
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+    Write-Verbose "[$scriptName] Executable file not found: $scriptNameExe"
+    $scriptNameExe = $scriptName
 }
 if (Test-Path "$pwd\$scriptNameExe")
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
+    Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
 }
 else
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
+    Write-Verbose "[$scriptName] Script file found: $scriptName"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
@@ -386,7 +391,7 @@ Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
 Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
 Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
 if (-not $version.version)
@@ -397,10 +402,12 @@ if (-not $version.version)
     {
         $version = $appMetaData.version
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
     }
     else
     {
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
         $version = @{
             version     = [System.Version]::Parse('1.0.0.0')
             companyName = 'Zuhair Mahmoud'
