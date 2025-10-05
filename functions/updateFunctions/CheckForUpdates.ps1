@@ -14,6 +14,8 @@ function CheckForUpdates()
     try 
     {
         $remoteVersionResponse = Invoke-RestMethod -Uri $remoteVersionURL -Method Get -ErrorAction SilentlyContinue -UseBasicParsing
+        #convert $remoteVersionResponse.date to a datetime object in local time.
+        $remoteVersionResponse.date = [datetime]::Parse($remoteVersionResponse.date).ToLocalTime()
         Write-Verbose "[$functionName] Response received from $($remoteVersionURL): $($remoteVersionResponse.StatusCode)"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($remoteVersionURL): $($remoteVersionResponse.StatusCode)" -LogLevel "Information"
         $returnObject = @{
