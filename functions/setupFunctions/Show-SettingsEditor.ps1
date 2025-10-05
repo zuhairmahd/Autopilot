@@ -461,7 +461,6 @@ function Get-CurrentSettings()
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "Settings file not found, creating with defaults" -LogLevel "Verbose"
             Write-Verbose "Settings file not found, creating with defaults"
-            # Create default settings file using Get-ConfigurationData which will handle defaults
             try
             {
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"

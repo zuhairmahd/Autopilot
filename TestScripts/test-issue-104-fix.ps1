@@ -23,7 +23,8 @@ $failedTests = 0
 # Test 1: Check that main.ps1 uses the new Initialize-ApplicationConfiguration approach
 Write-Host "`nTest 1: Checking for Initialize-ApplicationConfiguration usage in main.ps1..." -ForegroundColor Yellow
 
-try {
+try
+{
     $mainContent = Get-Content -Path "$PWD\main.ps1" -Raw
     
     # Look for the new pattern that indicates the refactored fix is present
@@ -33,19 +34,23 @@ try {
     $match1 = $mainContent -match $pattern1
     $match2 = $mainContent -match $pattern2
     
-    if ($match1 -and $match2) {
+    if ($match1 -and $match2)
+    {
         Write-Host "  ✓ Found Initialize-ApplicationConfiguration call with proper parameters" -ForegroundColor Green
         Write-Host "  ✓ Found success checking pattern" -ForegroundColor Green
         Write-Host "  ✓ Refactored fix is present - using centralized configuration initialization" -ForegroundColor Green
         $passedTests++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Required refactored patterns not found in main.ps1" -ForegroundColor Red
         Write-Host "    Initialize-ApplicationConfiguration pattern found: $match1" -ForegroundColor Red
         Write-Host "    Success checking pattern found: $match2" -ForegroundColor Red
         $failedTests++
     }
 }
-catch {
+catch
+{
     Write-Host "  ✗ Error reading main.ps1: $($_.Exception.Message)" -ForegroundColor Red
     $failedTests++
 }
@@ -53,7 +58,8 @@ catch {
 # Test 2: Check that the old duplicate code paths have been eliminated
 Write-Host "`nTest 2: Checking that old duplicate configuration logic has been removed..." -ForegroundColor Yellow
 
-try {
+try
+{
     $mainContent = Get-Content -Path "$PWD\main.ps1" -Raw
     
     # Count occurrences of the old patterns that should now be eliminated
@@ -63,17 +69,21 @@ try {
     $hasOldIfElse = $mainContent -match $oldIfElsePattern
     $hasOldElse = $mainContent -match $oldElsePattern
     
-    if (-not $hasOldIfElse -and -not $hasOldElse) {
+    if (-not $hasOldIfElse -and -not $hasOldElse)
+    {
         Write-Host "  ✓ Old duplicate configuration logic has been successfully removed" -ForegroundColor Green
         $passedTests++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Old configuration logic patterns still found - refactoring incomplete" -ForegroundColor Red
         Write-Host "    Old if-else pattern found: $hasOldIfElse" -ForegroundColor Red
         Write-Host "    Old else block pattern found: $hasOldElse" -ForegroundColor Red
         $failedTests++
     }
 }
-catch {
+catch
+{
     Write-Host "  ✗ Error analyzing configuration logic: $($_.Exception.Message)" -ForegroundColor Red
     $failedTests++
 }
@@ -84,11 +94,14 @@ Write-Host "`nTest 3: Verifying Initialize-ApplicationConfiguration helper funct
 $helperExists = Test-Path "functions/setupFunctions/Initialize-ApplicationConfiguration.ps1"
 $jsonFunctionsRemoved = -not (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-SettingsJsonExists.ps1") -and -not (Test-Path "functions/setupFunctions/FirstRunWizardFunctions/Test-StringsJsonExists.ps1")
 
-if ($helperExists -and $jsonFunctionsRemoved) {
+if ($helperExists -and $jsonFunctionsRemoved)
+{
     Write-Host "  ✓ Initialize-ApplicationConfiguration.ps1 helper function exists" -ForegroundColor Green
     Write-Host "  ✓ JSON-specific functions successfully removed (legacy code cleanup)" -ForegroundColor Green
     $passedTests++
-} else {
+}
+else
+{
     Write-Host "  ✗ Required changes not complete" -ForegroundColor Red
     Write-Host "    Initialize-ApplicationConfiguration.ps1 exists: $helperExists" -ForegroundColor Red
     Write-Host "    JSON functions removed: $jsonFunctionsRemoved" -ForegroundColor Red
@@ -96,27 +109,33 @@ if ($helperExists -and $jsonFunctionsRemoved) {
 }
 
 # Test 4: Verify that the new approach handles both existing and missing file scenarios
-Write-Host "`nTest 4: Checking that single code path handles all scenarios..." -ForegroundColor Yellow
+Write-Host "`nTest 4: Checking that code path handles all scenarios with wizard fallback..." -ForegroundColor Yellow
 
-try {
+try
+{
     $mainContent = Get-Content -Path "$PWD\main.ps1" -Raw
     
-    # Look for evidence that there's now a single unified path
-    $singleConfigCall = ([regex]'Initialize-ApplicationConfiguration').Matches($mainContent).Count
+    # Look for evidence that there's a primary call and a wizard fallback call
+    $configCalls = ([regex]'Initialize-ApplicationConfiguration').Matches($mainContent).Count
     $duplicateRegions = ([regex]'#region Define variables').Matches($mainContent).Count
     
-    if ($singleConfigCall -eq 1 -and $duplicateRegions -eq 1) {
-        Write-Host "  ✓ Single Initialize-ApplicationConfiguration call found" -ForegroundColor Green
-        Write-Host "  ✓ No duplicate code regions - clean refactoring" -ForegroundColor Green
+    # We expect 2 calls: one in the normal path, one after the wizard completes
+    if ($configCalls -eq 2 -and $duplicateRegions -eq 1)
+    {
+        Write-Host "  ✓ Primary and wizard fallback Initialize-ApplicationConfiguration calls found" -ForegroundColor Green
+        Write-Host "  ✓ No duplicate code regions - clean refactoring with wizard support" -ForegroundColor Green
         $passedTests++
-    } else {
+    }
+    else
+    {
         Write-Host "  ✗ Code structure indicates incomplete refactoring" -ForegroundColor Red
-        Write-Host "    Initialize-ApplicationConfiguration calls: $singleConfigCall (expected: 1)" -ForegroundColor Red
+        Write-Host "    Initialize-ApplicationConfiguration calls: $configCalls (expected: 2 for normal + wizard fallback)" -ForegroundColor Red
         Write-Host "    Define variables regions: $duplicateRegions (expected: 1)" -ForegroundColor Red
         $failedTests++
     }
 }
-catch {
+catch
+{
     Write-Host "  ✗ Error analyzing code structure: $($_.Exception.Message)" -ForegroundColor Red
     $failedTests++
 }
@@ -126,13 +145,23 @@ Write-Host "`n=== Test Summary ===" -ForegroundColor Cyan
 $totalTests = $passedTests + $failedTests
 Write-Host "Total tests: $totalTests" -ForegroundColor White
 Write-Host "Passed: $passedTests" -ForegroundColor Green
-Write-Host "Failed: $failedTests" -ForegroundColor $(if ($failedTests -eq 0) { 'Green' } else { 'Red' })
+Write-Host "Failed: $failedTests" -ForegroundColor $(if ($failedTests -eq 0)
+    {
+        'Green' 
+    }
+    else
+    {
+        'Red' 
+    })
 
-if ($failedTests -eq 0) {
+if ($failedTests -eq 0)
+{
     Write-Host "`n✓ SUCCESS: Issue #104 fix is correctly implemented through comprehensive refactoring!" -ForegroundColor Green
     Write-Host "The main.ps1 file now uses a unified configuration initialization approach that handles all scenarios." -ForegroundColor Green
     exit 0
-} else {
+}
+else
+{
     Write-Host "`n✗ FAILURE: Issue #104 fix needs attention." -ForegroundColor Red
     exit 1
 }

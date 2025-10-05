@@ -1,5 +1,6 @@
 function Format-TokenOutput()
 {
+    [CmdletBinding()]
     param($token, $secureString)
     $functionName = $MyInvocation.MyCommand.Name
     if ($secureString)

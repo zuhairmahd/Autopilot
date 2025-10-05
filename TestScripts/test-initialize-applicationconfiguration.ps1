@@ -416,7 +416,8 @@ try
                 $script:passedTests++
                 
                 # Verify scopes are deduplicated (Device.ReadWrite.All should appear once)
-                $deviceScope = $result.RequiredScopes | Where-Object { $_ -eq 'Device.ReadWrite.All' }
+                # Note: Scopes are now hashtables with Scope/Endpoints/Reason properties
+                $deviceScope = $result.RequiredScopes | Where-Object { $_.Scope -eq 'Device.ReadWrite.All' }
                 $deviceScopeCount = @($deviceScope).Count
                 
                 if ($deviceScopeCount -eq 1)
@@ -433,9 +434,10 @@ try
                 # Verify all unique scopes included
                 $expectedScopes = @('offline_access', 'openid', 'Device.ReadWrite.All', 'User.Read.All', 'Group.ReadWrite.All')
                 $allScopesPresent = $true
+                $scopeNames = $result.RequiredScopes | ForEach-Object { $_.Scope }
                 foreach ($scope in $expectedScopes)
                 {
-                    if ($result.RequiredScopes -notcontains $scope)
+                    if ($scopeNames -notcontains $scope)
                     {
                         $allScopesPresent = $false
                         break
@@ -573,6 +575,141 @@ try
         $script:failedTests += 2
     }
     
+    Write-TestSection "Test 8.5: Strings and Menu Configuration Processing"
+    
+    try
+    {
+        # Create test configuration files
+        $testStringsPath = Join-Path $testContext.TestFolder "test-strings-processing.psd1"
+        $testMenuPath = Join-Path $testContext.TestFolder "test-menu-processing.psd1"
+        $testSettingsPath = Join-Path $testContext.TestFolder "test-settings-processing.psd1"
+        
+        # Create minimal strings file with missing keys
+        $minimalStrings = @{
+            Description   = "Test strings"
+            deviceActions = @{
+                none = "No action"
+            }
+        }
+        $minimalStrings | Export-PowerShellDataFile -Path $testStringsPath -Force
+        
+        # Create minimal menu file with missing keys
+        $minimalMenu = @{
+            version  = "1.3.0.0"
+            mainMenu = @{
+                Title = "Test Menu"
+                items = @()
+            }
+        }
+        $minimalMenu | Export-PowerShellDataFile -Path $testMenuPath -Force
+        
+        # Create minimal settings file
+        $minimalSettings = @"
+@{
+    auth = @{
+        delegated = 'true'
+        authType = 'PublicAuthFlow'
+        scope = @('offline_access', 'openid')
+    }
+    globalSettings = @{
+        logLevel = 'Information'
+    }
+}
+"@
+        Set-Content -Path $testSettingsPath -Value $minimalSettings -Force
+        
+        # Initialize configuration
+        $result = Initialize-ApplicationConfiguration -InitFile $testSettingsPath -StringsFile $testStringsPath -menuFile $testMenuPath -Domain "test.com" -BoundParameters @{}
+        
+        if ($result.Success)
+        {
+            Write-TestResult "Configuration initialization succeeded with strings and menu" $true
+            $script:passedTests++
+            
+            # Verify Strings object is populated
+            if ($result.Strings -and $result.Strings.Keys.Count -gt 0)
+            {
+                Write-TestResult "Strings configuration loaded successfully" $true
+                $script:passedTests++
+                
+                # Verify existing string value preserved
+                if ($result.Strings.deviceActions.none -eq "No action")
+                {
+                    Write-TestResult "Existing string values preserved" $true
+                    $script:passedTests++
+                }
+                else
+                {
+                    Write-TestResult "Existing string values not preserved" $false
+                    $script:failedTests++
+                }
+                
+                # Verify missing string keys were added
+                if ($result.Strings.ContainsKey('returnValues'))
+                {
+                    Write-TestResult "Missing string keys added from defaults" $true
+                    $script:passedTests++
+                }
+                else
+                {
+                    Write-TestResult "Missing string keys not added" $false
+                    $script:failedTests++
+                }
+            }
+            else
+            {
+                Write-TestResult "Strings configuration not loaded" $false
+                $script:failedTests += 3
+            }
+            
+            # Verify Menu object is populated
+            if ($result.Menu -and $result.Menu.Keys.Count -gt 0)
+            {
+                Write-TestResult "Menu configuration loaded successfully" $true
+                $script:passedTests++
+                
+                # Verify existing menu value preserved
+                if ($result.Menu.mainMenu.Title -eq "Test Menu")
+                {
+                    Write-TestResult "Existing menu values preserved" $true
+                    $script:passedTests++
+                }
+                else
+                {
+                    Write-TestResult "Existing menu values not preserved" $false
+                    $script:failedTests++
+                }
+                
+                # Verify missing menu keys were added
+                if ($result.Menu.ContainsKey('autopilotMenu'))
+                {
+                    Write-TestResult "Missing menu keys added from defaults" $true
+                    $script:passedTests++
+                }
+                else
+                {
+                    Write-TestResult "Missing menu keys not added" $false
+                    $script:failedTests++
+                }
+            }
+            else
+            {
+                Write-TestResult "Menu configuration not loaded" $false
+                $script:failedTests += 3
+            }
+        }
+        else
+        {
+            Write-TestResult "Configuration initialization failed: $($result.ErrorMessage)" $false
+            $script:failedTests += 8
+        }
+    }
+    catch
+    {
+        Write-TestResult "Strings and Menu processing test failed: $($_.Exception.Message)" $false
+        $script:failedTests += 8
+    }
+    
     Write-TestSection "Test 9: Return Object Structure Validation"
     
     try
@@ -580,7 +717,7 @@ try
         # Use any previous result to validate structure
         $testResult = Initialize-ApplicationConfiguration -InitFile $testInitFile -StringsFile $testStringsFile -menuFile $testMenuFile -Domain $testDomain -BoundParameters @{}
         
-        $expectedKeys = @('Auth', 'GlobalSettings', 'LocalSettings', 'RequiredScopes', 'Success', 'ErrorMessage')
+        $expectedKeys = @('Auth', 'GlobalSettings', 'LocalSettings', 'Strings', 'Menu', 'RequiredScopes', 'Success', 'ErrorMessage')
         $allKeysPresent = $true
         
         foreach ($key in $expectedKeys)
@@ -595,7 +732,7 @@ try
         
         if ($allKeysPresent)
         {
-            Write-TestResult "All expected return object keys present" $true
+            Write-TestResult "All expected return object keys present (including Strings and Menu)" $true
             $script:passedTests++
             
             # Verify data types
@@ -603,6 +740,8 @@ try
                 @{ Key = 'Auth'; Type = 'hashtable' }
                 @{ Key = 'GlobalSettings'; Type = 'hashtable' }
                 @{ Key = 'LocalSettings'; Type = 'hashtable' }
+                @{ Key = 'Strings'; Type = 'hashtable' }
+                @{ Key = 'Menu'; Type = 'hashtable' }
                 @{ Key = 'RequiredScopes'; Type = 'array' }
                 @{ Key = 'Success'; Type = 'bool' }
                 @{ Key = 'ErrorMessage'; Type = 'string' }
