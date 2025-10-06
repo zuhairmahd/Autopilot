@@ -1627,7 +1627,6 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
     
     # Load Update-AppModeSettings function if available for enhanced multiple mode support
     if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue)
-
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using enhanced app mode settings update (supports multiple modes)" -LogLevel "Information"
         # Prioritize domain settings over global settings

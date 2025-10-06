@@ -895,6 +895,7 @@ function Get-AppModeInput()
         - Maintains full backward compatibility
         - Provides conflict resolution and hierarchy information
     #>
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -989,6 +990,7 @@ function Get-LegacyAppModeInput()
     .OUTPUTS
         String - Selected single app mode
     #>
+    [CmdletBinding()]
     param($CurrentValue)
     
     $functionName = $MyInvocation.MyCommand.Name
