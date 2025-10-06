@@ -35,7 +35,6 @@ function ProcessSerialNumber()
         {
             return GetNextUserReadinessReport -enrollmentState $enrollmentState
         }
-
         
         if ($enrollmentState.inAutopilot)
         {
