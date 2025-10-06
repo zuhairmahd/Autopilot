@@ -7,7 +7,7 @@ function Initialize-GlobalSettings()
     [CmdletBinding()]
     param(
         [object]$GlobalConfigData,
-        [hashtable]$PSBoundParameters,
+        [hashtable]$BoundParameters,
         [switch]$processConfigOverwrite
     )
     
@@ -30,56 +30,90 @@ function Initialize-GlobalSettings()
     
     foreach ($key in $GlobalConfigData.keys)
     {
-        # Conditional verbose logging - only log individual settings when explicit verbose is used
-        if ($VerbosePreference -eq 'Continue')
-        {
-        }
         Write-Log -logFile $logFile -Message "Processing global setting: $key" -module $functionName -logLevel "Verbose"
-        
-        if ($PSBoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key)
+        Write-Verbose "[$functionName] Processing global setting: $key"
+        if ($BoundParameters.ContainsKey($key) -eq $false -and $null -ne $GlobalConfigData.$key)
         {
-            if ($VerbosePreference -eq 'Continue')
-            {
-            }
             Write-Log -logFile $logFile -Message "Checking if $key is a boolean" -module $functionName -logLevel "Verbose"
-            
+            Write-Verbose "[$functionName] Checking if $key is a boolean"
             if ($GlobalConfigData.$key -in ('true', 'false'))
             {
-                if ($VerbosePreference -eq 'Continue')
-                {
-                }
+                Write-Verbose "[$functionName] $key is a boolean"
                 Write-Log -logFile $logFile -Message "$key is a boolean" -module $functionName -logLevel "Verbose"
                 $keyBooleanValue = [bool]::Parse($GlobalConfigData.$key)
                 $globalSettings.add($key, $keyBooleanValue)
-                if ($VerbosePreference -eq 'Continue')
-                {
-                }
                 Write-Log -logFile $logFile -Message "Set global $key to boolean: $keyBooleanValue" -module $functionName -logLevel "Verbose"
                 $booleanCount++
             }
             else
             {
                 $globalSettings.add($key, $GlobalConfigData.$key)
-                if ($VerbosePreference -eq 'Continue')
-                {
-                }
                 Write-Log -logFile $logFile -Message "Set global $key to: $($GlobalConfigData.$key)" -module $functionName -logLevel "Verbose"
+                Write-Verbose "[$functionName] Set global $key to: $($GlobalConfigData.$key)"
             }
             $processedCount++
         }
-        elseif ($PSBoundParameters.ContainsKey($key))
+        elseif ($BoundParameters.ContainsKey($key))
         {
-            $globalSettings.add($key, $PSBoundParameters[$key])
-            if ($VerbosePreference -eq 'Continue')
-            {
-            }
+            $globalSettings.add($key, $BoundParameters[$key])
             Write-Log -logFile $logFile -Message "Used command-line override for global $key" -module $functionName -logLevel "Verbose"
+            Write-Verbose "[$functionName] Used command-line override for global $key"
             $overrideCount++
         }
     }
     
     # Batch summary logging for performance optimization
     Write-Log -logFile $logFile -Message "Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)" -module $functionName -LogLevel "Verbose"
+    Write-Verbose "[$functionName] Completed processing $processedCount global settings ($booleanCount boolean, $overrideCount overrides)"
+    
+    # Check against defaults and merge missing keys (direct call to Merge-ConfigurationDefaults)
+    Write-Log -logFile $logFile -Message "Checking global settings against defaults and merging missing keys" -module $functionName -logLevel "Information"
+    $changesMade = $false
+    try
+    {
+        # Get global defaults
+        $defaultGlobalSettings = Get-ApplicationDefaults -DefaultType "Global"
+        
+        if ($defaultGlobalSettings)
+        {
+            # Filter out keys that are present in BoundParameters (command-line overrides)
+            $filteredDefaults = @{}
+            foreach ($key in $defaultGlobalSettings.Keys)
+            {
+                if (-not $BoundParameters.ContainsKey($key))
+                {
+                    $filteredDefaults[$key] = $defaultGlobalSettings[$key]
+                }
+            }
+            
+            Write-Verbose "[$functionName] Checking $($filteredDefaults.Keys.Count) default keys after filtering overrides"
+            Write-Log -logFile $logFile -Message "Checking $($filteredDefaults.Keys.Count) default keys after filtering overrides" -module $functionName -logLevel "Verbose"
+            
+            if ($filteredDefaults.Keys.Count -gt 0)
+            {
+                # Use Merge-ConfigurationDefaults directly
+                $mergedGlobalSettings = Merge-ConfigurationDefaults -ExistingConfig $globalSettings -DefaultConfig $filteredDefaults -PreserveExisting $true
+                
+                if ($mergedGlobalSettings)
+                {
+                    Write-Log -logFile $logFile -Message "Merged missing keys into global settings" -module $functionName -logLevel "Information"
+                    Write-Verbose "[$functionName] Merged missing keys into global settings"
+                    $globalSettings = $mergedGlobalSettings
+                    $changesMade = $true
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] No missing keys to merge into global settings"
+                    Write-Log -logFile $logFile -Message "No missing keys to merge into global settings" -module $functionName -logLevel "Verbose"
+                }
+            }
+        }
+    }
+    catch
+    {
+        Write-Warning "[$functionName] Error during global settings merge: $($_.Exception.Message)"
+        Write-Log -logFile $logFile -Message "Error during global settings merge: $($_.Exception.Message)" -module $functionName -logLevel "Warning"
+    }
     
     # Apply overwrite settings to global configuration
     if ($processConfigOverwrite)
@@ -133,5 +167,5 @@ function Initialize-GlobalSettings()
             Write-Log -LogFile $logFile -Message "Error applying overwrite configuration: $($_.Exception.Message)" -Module $functionName -LogLevel "Warning"
         }
     }    
-    return @{ GlobalSettings = $globalSettings }
+    return @{ GlobalSettings = $globalSettings; Changed = $changesMade }
 }

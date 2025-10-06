@@ -12,34 +12,44 @@ param()
 
 Write-Host "=== Simple Function Loading Test ===" -ForegroundColor Cyan
 
+# Determine paths
+$RootPath = Split-Path -Parent $PSScriptRoot
+
 # Minimal environment initialization for tests that rely on Write-Log
-$logsFolder = Join-Path $PWD "Logs"
-if (-not (Test-Path $logsFolder)) {
+$logsFolder = Join-Path $RootPath "Logs"
+if (-not (Test-Path $logsFolder))
+{
     New-Item -ItemType Directory -Path $logsFolder -Force | Out-Null
 }
 $global:logFile = Join-Path $logsFolder "simple-function-loading.log"
 
 # Load functions using the same pattern as main.ps1
-$functionsFolder = "$PWD\functions"
-if (Test-Path $functionsFolder) {
+$functionsFolder = Join-Path $RootPath "functions"
+if (Test-Path $functionsFolder)
+{
     Write-Host "Loading functions from $functionsFolder" -ForegroundColor Yellow
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
     
     $loadedCount = 0
-    foreach ($function in $functions) {
-        try {
+    foreach ($function in $functions)
+    {
+        try
+        {
             Write-Verbose "Loading function $function"
             . $function.FullName
             $loadedCount++
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
         }
     }
     
     Write-Host "Loaded $loadedCount functions" -ForegroundColor Green
-} else {
-    Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
+}
+else
+{
+    Write-Host "Cannot find the functions folder at: $functionsFolder. Exiting script." -ForegroundColor Red
     exit 1
 }
 
@@ -50,17 +60,20 @@ $testFunctions = @(
     "Write-Log",
     "Test-SettingsJsonExists", 
     "Test-MenuItemIncluded",
-    "InitializeConfiguration",
     "MergeSettings"
 )
 
 $available = 0
-foreach ($functionName in $testFunctions) {
+foreach ($functionName in $testFunctions)
+{
     $cmd = Get-Command $functionName -ErrorAction SilentlyContinue
-    if ($cmd) {
+    if ($cmd)
+    {
         Write-Host "✓ $functionName is available" -ForegroundColor Green
         $available++
-    } else {
+    }
+    else
+    {
         Write-Host "✗ $functionName is NOT available" -ForegroundColor Red
     }
 }
@@ -68,12 +81,15 @@ foreach ($functionName in $testFunctions) {
 Write-Host "`nResult: $available/$($testFunctions.Count) functions available" -ForegroundColor Cyan
 
 # Test a simple function call
-if (Get-Command "Test-MenuItemIncluded" -ErrorAction SilentlyContinue) {
-    try {
+if (Get-Command "Test-MenuItemIncluded" -ErrorAction SilentlyContinue)
+{
+    try
+    {
         $result = Test-MenuItemIncluded -MenuItemName "Test" -Menus $null
         Write-Host "✓ Test-MenuItemIncluded executed successfully (result: $result)" -ForegroundColor Green
     }
-    catch {
+    catch
+    {
         Write-Host "✗ Test-MenuItemIncluded failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }

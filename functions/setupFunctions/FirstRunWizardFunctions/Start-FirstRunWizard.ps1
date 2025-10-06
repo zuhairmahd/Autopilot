@@ -177,17 +177,19 @@ function Start-FirstRunWizard()
         
         # Step 5: Ensure settings.psd1 exists with defaults
         Write-SafeLog "Ensuring settings.psd1 exists with defaults" "Information"
-        $settingsCreated = $true # Get-ConfigurationData will handle defaults
+        $settingsCreated = $true 
         if (-not (Test-Path $SettingsFile))
         {
-            try {
+            try
+            {
                 $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
                 $defaultSettings.auth.delegated = $authConfig.IsDelegated
                 $defaultSettings.auth.authType = $authConfig.AuthType
                 $null = $defaultSettings | Export-PowerShellDataFile -Path $SettingsFile
                 Write-SafeLog "Created settings.psd1 with defaults" "Information"
             }
-            catch {
+            catch
+            {
                 Write-SafeLog "Failed to create settings.psd1: $($_.Exception.Message)" "Warning"
                 $settingsCreated = $false
             }
@@ -269,15 +271,17 @@ function Start-FirstRunWizard()
         
         # Step 6: Ensure strings.psd1 exists with defaults
         Write-SafeLog "Ensuring strings.psd1 exists with defaults" "Information"
-        $stringsCreated = $true # Get-ConfigurationData will handle defaults
+        $stringsCreated = $true 
         if (-not (Test-Path $StringsFile))
         {
-            try {
+            try
+            {
                 $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
                 $null = $defaultStrings | Export-PowerShellDataFile -Path $StringsFile
                 Write-SafeLog "Created strings.psd1 with defaults" "Information"
             }
-            catch {
+            catch
+            {
                 Write-SafeLog "Failed to create strings.psd1: $($_.Exception.Message)" "Warning"
                 $stringsCreated = $false
             }
@@ -314,9 +318,12 @@ function Start-FirstRunWizard()
             Write-Host "• $ConfigFile (encrypted)" -ForegroundColor Green
             Write-Host "• $SettingsFile" -ForegroundColor Green
             Write-Host "• $StringsFile" -ForegroundColor Green
-            if (Test-Path $MenuFile) {
+            if (Test-Path $MenuFile)
+            {
                 Write-Host "• $MenuFile (existing)" -ForegroundColor Green
-            } else {
+            }
+            else
+            {
                 Write-Host "• Menu configuration (built-in)" -ForegroundColor Yellow
             }
             Write-Host "`nConfiguration Summary:" -ForegroundColor White

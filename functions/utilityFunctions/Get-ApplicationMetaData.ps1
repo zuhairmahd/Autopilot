@@ -81,7 +81,7 @@ function Get-ApplicationMetaData()
         Write-Log -logFile $logFile -module $functionName -Message "Loading global settings from: $GlobalSettingsFile"
         try
         {
-            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile
+            $globalSettings = Import-PowerShellDataFile -Path $GlobalSettingsFile -ErrorAction SilentlyContinue
             Write-Verbose "[$functionName] Successfully loaded global settings."
             Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded global settings."
         }
@@ -139,6 +139,10 @@ function Get-ApplicationMetaData()
         else
         {
             $null 
+        }
+        domain      = if ($domainSettings.domain)
+        {
+            $domainSettings.domain 
         }
     }
     Write-Verbose "[$functionName] Application metadata for domain '$($domainSettings.domain)' retrieved successfully."

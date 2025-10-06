@@ -26,10 +26,13 @@ try {
     # Load the functions
     Write-TestSection "`n1. Loading functions..."
     
+    # Determine paths
+    $RootPath = Split-Path -Parent $PSScriptRoot
+    
     # Load all functions from the functions directory
-    $functionsFolder = "$PWD\functions"
+    $functionsFolder = Join-Path $RootPath "functions"
     if (Test-Path $functionsFolder) {
-        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -ErrorAction Stop
+        $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
         foreach ($function in $functions) {
             . $function.FullName
         }

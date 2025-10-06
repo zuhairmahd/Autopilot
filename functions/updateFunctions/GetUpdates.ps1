@@ -13,6 +13,23 @@ function GetUpdates()
 
     #region define variables and write logs 
     $functionName = $MyInvocation.MyCommand.Name
+    if ($executableFileName -notmatch 'exe')
+    {
+        Write-Verbose "[$functionName] The provided executable file name '$executableFileName' does not match 'exe'."
+        Write-Verbose "[$functionName] Checking whether a similar executable is found."
+        #replace whatever the extension of $executableFileName with .exe
+        $executableFileName = [System.IO.Path]::ChangeExtension($executableFileName, ".exe")
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "The provided executable file name '$executableFileName' does not match 'exe'. Checking for similar executable." -LogLevel "Warning"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable filename resolved to $executableFileName" -LogLevel "Information"
+        if (-not (Test-Path $executableFileName))
+        {
+            Write-Verbose "[$functionName] No similar executable found."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No similar executable found." -LogLevel "Warning"
+            return $returnValues.invalidFileType
+        }
+        Write-Verbose "[$functionName] Found similar executable: $executableFileName"
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Found similar executable: $executableFileName" -LogLevel "Information"        
+    }
     $fileName = Split-Path -Path $executableFileName -Leaf
     $tempUpdateFile = "$env:TEMP\$fileName"
     $executableUpdateURL = "$updateURL/$fileName"
@@ -161,12 +178,6 @@ function GetUpdates()
         return $returnObject
     }
     #endregion
-
-    if ($executableFileName -notmatch 'exe')
-    {
-        Write-Verbose "[$functionName] The provided executable file name '$executableFileName' does not match 'exe'."
-        return $returnValues.invalidFileType
-    }
     
     $localVersion = (getFileVersion -executableFileName $executableFileName).version
     
@@ -219,6 +230,8 @@ function GetUpdates()
         Write-Host "An update is available." -ForegroundColor Yellow
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
+        #convert $fileMetaData.date to a datetime object in local time.
+        $fileMetaData.date = [datetime]::Parse($fileMetaData.date).ToLocalTime()
         Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
         if ($noConfirmation)

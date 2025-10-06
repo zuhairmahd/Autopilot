@@ -47,7 +47,7 @@
                 assignedUser                    = ''
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
-                maxGroupMatchDisplay            = 10
+                maxGroupMatchDisplay            = 20
                 autopilotDeviceAllowedVendors   = @(
                     'vmware'
                 ) 

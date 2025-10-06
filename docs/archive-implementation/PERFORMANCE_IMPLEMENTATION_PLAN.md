@@ -360,7 +360,7 @@ This optimization was already implemented in Phase 1 with conditional flattening
    # Replace individual setting processing with batch approach
    $settingsToProcess = @()
    foreach ($key in $GlobalConfigData.PSObject.Properties.Name) {
-       if ($PSBoundParameters.ContainsKey($key) -eq $false) {
+       if ($BoundParameters.ContainsKey($key) -eq $false) {
            $settingsToProcess += @{ Key = $key; Value = $GlobalConfigData.$key }
        }
    }

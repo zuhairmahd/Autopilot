@@ -453,7 +453,7 @@ else
 {
     "contoso.com"
 }
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -PSBoundParameters $PSBoundParameters
+$global:configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
@@ -522,8 +522,6 @@ $accessToken = GetGraphAccessToken -configFile $configFile -delegated -scope $sc
 # }
 #endregion Define variables
 
-$global:corpDeviceInfo = GetCorpDeviceIdentifier
-$global:deviceInfo = GetDeviceInfo
 
 exit 0
 #region Usage examples for GetGraphObjectMetadata
