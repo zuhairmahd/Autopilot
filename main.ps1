@@ -303,6 +303,7 @@ else
 #endregion import functions.
 
 #region Initialize application configuration
+Write-Host "Initializing application configuration..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -825,6 +826,7 @@ if ($ResetAuth)
         exit 1
     }
 }
+Write-Host "Acquiring access token..."
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
@@ -847,6 +849,7 @@ if ($accessToken)
     if ($settings.validateScopes)
     {
         Write-Verbose "[$scriptName] Validating Microsoft Graph API scope availability..."
+        Write-Host "Validating Microsoft Graph API scope availability..."
         Write-Log -LogFile $LogFile -Module $scriptName -Message "Starting scope validation for retrieved access token" -LogLevel "Verbose"
         try
         {
@@ -933,6 +936,7 @@ if ($accessToken)
         write-log -logFile $logFile -finishLogging
         exit 0
     }
+    Write-Host "Access token retrieved successfully." -ForegroundColor Green
 }
 else
 {
@@ -1680,14 +1684,14 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         Write-Verbose "[$scriptName] User selected Main Menu from device selection"
         return "EXIT_APPLICATION"
     }
-    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber)
+    elseif ([string]::IsNullOrWhiteSpace($SerialNumber) -or $null -eq $serialNumber -or $serialNumber -eq 0 -or $serialNumber -eq "0")
     {
         Write-Verbose "[$scriptName] User requested application exit from device selection."
         return "EXIT_APPLICATION"
     }
     else
     {
-        return $result
+        Write-Verbose "[$scriptName] Continuing script..."
     }
     #endregion Handle navigation responses from GetDeviceByUser
     
@@ -1697,9 +1701,18 @@ $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by User" -Action 
         $result = ProcessSerialNumber -SerialNumber $serialNumber -AccessToken $accessToken -Settings $settings
         Write-Verbose "[$scriptName] Result: $result"
         Write-Verbose "[$scriptName] ProcessSerialNumber returned: $result"
-        $serialNumber = $result
+        if ($null -ne $result)
+        {
+            Write-Verbose "[$scriptName] Result: $result"
+            $serialNumber = $result
+        }
+        else 
+        {
+            Write-Verbose "[$scriptName] ProcessSerialNumber returned exit signal"
+            $result = "EXIT_APPLICATION"
+        }
     } until ($result -in $returnValues.values -or $result -eq "EXIT_APPLICATION" -or $result -eq "Back" -or $result -eq "back" -or $result -eq "Main Menu" -or $result -eq "main menu" -or [string]::IsNullOrWhiteSpace($result))
-
+    return $result
 }
 
 $mainMenu = AddMenuItem -Menu $mainMenu -Name "Give a device to a user" -Action {
