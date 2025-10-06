@@ -4,7 +4,7 @@ function cleanupTempFiles()
     param()
 
     $functionName = $MyInvocation.MyCommand.Name
-    $tempFiles = @(Get-ChildItem "*.backup.*", "test*.*.psd1", "test-*.*", "contoso.com.psd1", "*.tmp", "*.log", "*.old" -ErrorAction SilentlyContinue)
+    $tempFiles = @(Get-ChildItem "*.backup.*", "test*.*.psd1", "test-*.*", "contoso.com.psd1", "*.tmp", "*.log", "*.old", "main.exe.old" -ErrorAction SilentlyContinue)
     $returnObject = [PSCustomObject]@{}
     $removedFiles = 0
     $allRemoved = $true

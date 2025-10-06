@@ -343,14 +343,6 @@ else
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$oldExecutableFileName = 'main.exe.old'
-if (Test-Path $oldExecutableFileName)
-{
-    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
-    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
-    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
-}
 Write-Verbose "[$scriptName] Initializing application configuration"
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
