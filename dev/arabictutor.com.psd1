@@ -33,16 +33,18 @@
     deviceContactThresholdInDays = 30
     checkStrongMapping = $true
     strongMappingOptional = $true
-    appMode = 'full'
+    appModes = @(
+        'full'
+    )
     timeInSeconds = 60
     maxUserMatchDisplay = 10
     maxGroupMatchDisplay = 20
     release = 'dev'
     repoInfo = @{
-        baseURL = 'https://www.github.com'
-        repoName = 'Autopilot'
         baseSourceURL = 'https://raw.githubusercontent.com'
+        repoName = 'Autopilot'
         repoPath = 'zuhairmahd'
+        baseURL = 'https://www.github.com'
     }
     autoUpdate = $false
     updateLocalSettings = $true
@@ -64,4 +66,5 @@
     groupTag = 'ENTRA'
     assignedUser = ''
     additionalScopes = @()
+    appMode = 'full'
 }
