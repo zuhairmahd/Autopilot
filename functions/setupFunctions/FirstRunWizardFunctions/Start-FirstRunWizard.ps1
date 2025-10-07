@@ -122,7 +122,7 @@ function Start-FirstRunWizard()
         if ($appModeResult.isMultipleMode)
         {
             $appModeConfig = @{ 
-                appMode = $appModeResult.appMode      # Primary mode for backward compatibility
+                appMode  = $appModeResult.appMode      # Primary mode for backward compatibility
                 appModes = $appModeResult.appModes    # All modes for new functionality
             }
             Write-SafeLog "Multiple app modes configured: Primary='$($appModeResult.appMode)', All=[$($appModeResult.appModes -join ', ')]" "Information"
@@ -130,7 +130,7 @@ function Start-FirstRunWizard()
         else
         {
             $appModeConfig = @{ 
-                appMode = $appModeResult.appMode 
+                appMode  = $appModeResult.appMode 
                 appModes = $appModeResult.appModes  # Single mode as array for consistency
             }
             Write-SafeLog "Single app mode configured: $($appModeResult.appMode)" "Information"
@@ -229,39 +229,10 @@ function Start-FirstRunWizard()
             
             # Step 5.3: Update app mode settings in settings.psd1
             Write-SafeLog "Updating app mode settings in settings.psd1" "Information"
-            
-            # Load the Update-AppModeSettings function if available
-            if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue)
-            {
-                # Use the enhanced app mode settings function
-                if ($appModeConfig.appModes.Count -gt 1)
-                {
-                    Write-SafeLog "Storing multiple app modes: [$($appModeConfig.appModes -join ', ')]" "Information"
-                    $appModeSuccess = Update-AppModeSettings -AppModeConfiguration $appModeConfig.appModes -SettingsFile $SettingsFile -MaintainLegacy
-                }
-                else
-                {
-                    Write-SafeLog "Storing single app mode: $($appModeConfig.appMode)" "Information"
-                    $appModeSuccess = Update-AppModeSettings -AppModeConfiguration $appModeConfig.appMode -SettingsFile $SettingsFile -MaintainLegacy
-                }
-            }
-            else
-            {
-                # Fallback to legacy single mode update
-                Write-SafeLog "Using legacy app mode update method" "Warning"
-                $appModeSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $appModeConfig.appMode
-            }
-            
+            $appModeSuccess = Update-AppModeSettings -Configuration $appModeConfig.appModes -SettingsFile $SettingsFile    
             if ($appModeSuccess)
             {
-                if ($appModeConfig.appModes.Count -gt 1)
-                {
-                    Write-SafeLog "Successfully updated multiple app modes: Primary='$($appModeConfig.appMode)', All=[$($appModeConfig.appModes -join ', ')]" "Information"
-                }
-                else
-                {
-                    Write-SafeLog "Successfully updated app mode setting to: $($appModeConfig.appMode)" "Information"
-                }
+                Write-SafeLog "Successfully updated app mode settings" "Information"
             }
             else
             {
