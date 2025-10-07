@@ -56,12 +56,11 @@ function Get-AppModeConfigurationFromUser()
 
     # Initialize return object with default values
     $result = @{
-        appMode              = 'full'
         appModes             = @('full')
         selectedChoice       = '1'
         cancelled            = $false
         currentModeUnchanged = $false
-        isMultipleMode       = $false
+        useGlobalStorage     = $false
     }
 
     try
@@ -101,25 +100,15 @@ function Get-AppModeConfigurationFromUser()
             # Use the enhanced app mode input function
             try
             {
-                $selectedConfiguration = Get-AppModeInput -CurrentValue $CurrentMode
+                $selectedConfiguration = Get-MultipleAppModeInput -CurrentValue $CurrentMode
                 
-                if ($selectedConfiguration -is [array])
+                if ($selectedConfiguration.modeSelection)
                 {
                     # Multiple modes selected
-                    $result.appModes = $selectedConfiguration
-                    $result.appMode = $selectedConfiguration[0]  # Primary mode for backward compatibility
-                    $result.isMultipleMode = $true
-                    $result.selectedChoice = "Multiple: [$($selectedConfiguration -join ', ')]"
+                    $result.appModes = $selectedConfiguration.modeSelection
+                    $result.selectedChoice = "Multiple: [$($selectedConfiguration.modeSelection -join ', ')]"
+                    $result.useGlobalStorage = $selectedConfiguration.useGlobalStorage
                     Write-Verbose "[$functionName] Multiple app modes selected: [$($selectedConfiguration -join ', ')]"
-                }
-                else
-                {
-                    # Single mode selected
-                    $result.appMode = $selectedConfiguration
-                    $result.appModes = @($selectedConfiguration)
-                    $result.isMultipleMode = $false
-                    $result.selectedChoice = $selectedConfiguration
-                    Write-Verbose "[$functionName] Single app mode selected: $selectedConfiguration"
                 }
             }
             catch
@@ -132,10 +121,9 @@ function Get-AppModeConfigurationFromUser()
         else
         {
             Write-Verbose "[$functionName] Silent mode - using default 'full' app mode"
-            $result.appMode = 'full'
             $result.appModes = @('full')
         }
-        Write-Verbose "[$functionName] App mode configuration completed successfully: Primary='$($result.appMode)', All=[$($result.appModes -join ', ')], Multiple=$($result.isMultipleMode)"
+        Write-Verbose "[$functionName] App mode configuration completed successfully: [$($result.appModes -join ', ')]"
         return $result
     }
     catch

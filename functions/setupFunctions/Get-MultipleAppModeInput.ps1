@@ -38,6 +38,11 @@ function Get-MultipleAppModeInput()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Getting multiple app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
+
+    $returnObject = @{
+        modeSelection    = $null
+        useGlobalStorage = $false
+    }
     
     $availableModes = @(
         @{ Mode = 'full'; Name = 'Full Mode'; Description = 'Complete access to all features (supersedes all other modes)' }
@@ -125,7 +130,14 @@ function Get-MultipleAppModeInput()
         if ([string]::IsNullOrWhiteSpace($choice))
         {
             Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app modes: [$($currentModes -join ', ')]" -LogLevel "Verbose"
-            return if ($currentModes.Count -eq 1 -and $AllowSingleMode) { $currentModes[0] } else { $currentModes }
+            $returnObject.modeSelection = if ($currentModes.Count -eq 1 -and $AllowSingleMode)
+            {
+                $currentModes[0] 
+            }
+            else
+            {
+                $currentModes 
+            }
         }
         
         if ($choice -eq 'help')
@@ -138,17 +150,6 @@ function Get-MultipleAppModeInput()
         {
             $currentModes = @()
             Write-Host "Selection cleared. Choose your modes:" -ForegroundColor Yellow
-            continue
-        }
-        
-        if ($choice -eq 'single')
-        {
-            $singleMode = Get-SingleAppModeSelection -AvailableModes $availableModes -CurrentModes $currentModes
-            if ($singleMode)
-            {
-                Write-Log -LogFile $logFile -Module $functionName -Message "User selected single app mode: '$singleMode'" -LogLevel "Information"
-                return $singleMode
-            }
             continue
         }
         
@@ -280,40 +281,9 @@ function Get-MultipleAppModeInput()
                 {
                     $selectedModes 
                 }
-                
-                # Use Update-AppModeSettings for specialized handling with storage preference
-                try
-                {
-                    $saveResult = Update-AppModeSettings -Configuration $modesArray -SettingsFile $initFile -UseGlobalSettings:$useGlobalSettings
-                    
-                    if ($saveResult)
-                    {
-                        $storageType = if ($useGlobalSettings)
-                        {
-                            "Global Settings" 
-                        }
-                        else
-                        {
-                            "Domain Settings" 
-                        }
-                        Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
-                        Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
-                        return $modesArray
-                    }
-                    else
-                    {
-                        Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
-                        Write-Host "Failed to save app mode configuration" -ForegroundColor Red
-                        return $null
-                    }
-                }
-                catch
-                {
-                    $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
-                    Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
-                    Write-Host $errorMessage -ForegroundColor Red
-                    return $null
-                }
+                $returnObject.modeSelection = $modesArray
+                $returnObject.useGlobalStorage = $useGlobalSettings
+                return $returnObject
             }
         }
         else
@@ -322,6 +292,6 @@ function Get-MultipleAppModeInput()
             Write-Host "INVALID SELECTION:" -ForegroundColor Red
             Write-Host "$($validationResult.ErrorMessage)" -ForegroundColor Red
         }
-        
     } while ($true)
+    return $returnObject
 }
