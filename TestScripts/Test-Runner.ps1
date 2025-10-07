@@ -202,7 +202,7 @@ $TestRegistry = @{
     'menu'          = @{
         Description       = 'Menu system tests including appmode and dynamic menu functionality'
         # Menu-specific tests not covered by integration
-        Pattern           = 'test-menu-appmode-fix.ps1,test-menu-duplication-fix.ps1,test-dynamic-menu-*.ps1,test-appmode-*.ps1,test-remove-menuitem.ps1,show-menu-structure.ps1'
+        Pattern           = 'test-menu-appmode-fix.ps1,test-menu-duplication-fix.ps1,test-dynamic-menu-*.ps1,test-appmode-*.ps1,test-appmode-functions-comprehensive.ps1,test-remove-menuitem.ps1,show-menu-structure.ps1'
         Priority          = 4
         EstimatedDuration = '2-3 minutes'
         Dependencies      = @('syntax', 'core')
