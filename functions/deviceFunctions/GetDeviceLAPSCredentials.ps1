@@ -25,15 +25,17 @@ function GetDeviceLAPSCredentials()
         }
         $clearTextPassword = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($latestCredential.passwordBase64))
         $returnObject = @{
-            AccountName       = $latestCredential.accountName
-            BackupDateTime    = $latestCredential.backupDateTime
-            ClearTextPassword = $clearTextPassword
+            AccountName        = $latestCredential.accountName
+            BackupDateTime     = $latestCredential.backupDateTime
+            ClearTextPassword  = $clearTextPassword
+            NextPasswordChange = $enrollmentState.managedDevice.laps.refreshDateTime
         }
         #display the LAPS credentials
         Write-Host "LAPS Credentials for device: $DeviceId" -ForegroundColor Cyan
         Write-Host "Account Name: $($returnObject.AccountName)" -ForegroundColor Cyan
         Write-Host "Backup DateTime: $($returnObject.BackupDateTime | FormatDateWithTimeZone)" -ForegroundColor Cyan
         Write-Host "Clear Text Password: $($returnObject.ClearTextPassword)" -ForegroundColor Cyan
+        Write-Host "Next Password Change: $($returnObject.NextPasswordChange | FormatDateWithTimeZone)" -ForegroundColor Cyan
         # return $lapsCredentials 
         return "`n"
     }

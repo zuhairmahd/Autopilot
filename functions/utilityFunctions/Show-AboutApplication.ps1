@@ -2,11 +2,11 @@ function Show-AboutApplication()
 {
     [CmdletBinding()]
     param(
+        $updateAvailable = $updateAvailable,
         [string]$accessToken,
         [string]$Release,
         [string]$appId,
         [string]$tenantId,
-        $appModes,
         [string]$name
     )
     
@@ -25,7 +25,7 @@ function Show-AboutApplication()
     Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
     if ($updateAvailable.success -eq $true)
     {
-        Write-Host "Last updated on $($updateAvailable.ReleaseDate)"
+        Write-Host "Last updated on $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)"
         Write-Host "File checksum: $($updateAvailable.Hash)"
         if ($version.hash -eq $updateAvailable.hash)
         {
@@ -55,12 +55,4 @@ function Show-AboutApplication()
     }
     Write-Host "Auto Update enabled: $($settings.autoUpdate)" -ForegroundColor Cyan
     Write-Host "Update branch: $Release" -ForegroundColor Cyan
-    if ($appModes.count -eq 1)
-    {
-        Write-Host "Application mode: $($appModes[0])"
-    }       
-    elseif ($appModes.count -gt 1)
-    {
-        Write-Host "Application modes: $($appModes -join ', ')"
-    }
 }

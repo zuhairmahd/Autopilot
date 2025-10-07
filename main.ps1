@@ -524,7 +524,7 @@ else
 #endregion Process login
 
 #region initialize script
-Write-Host "Building script artifacts..."
+Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
@@ -746,7 +746,7 @@ if ($updateAvailable.success -eq $true -and $updateAvailable.version -gt $versio
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "An update is available: $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))"
     Write-Host "==========================================================`n" -ForegroundColor Yellow
     Write-Host "An update is available to version $($updateAvailable.version.major).$($updateAvailable.version.minor).$($updateAvailable.version.build) (revision $($updateAvailable.version.revision))" -ForegroundColor Yellow
-    Write-Host "Release date: $($updateAvailable.ReleaseDate)" -ForegroundColor Yellow
+    Write-Host "Release date: $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)" -ForegroundColor Yellow
     if ($settings.autoUpdate)
     {
         Write-Host "Automatic updates are enabled." -ForegroundColor Green
@@ -1875,7 +1875,7 @@ if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus)
 if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus)
 {
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-        Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -appModes $settings.appModes
+        $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
     }
 }
 
