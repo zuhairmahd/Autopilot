@@ -524,7 +524,7 @@ else
 #endregion Process login
 
 #region initialize script
-Write-Host "Loading configuration..."
+Write-Host "Building script artifacts..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
@@ -1875,7 +1875,7 @@ if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus)
 if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus)
 {
     $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-        Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
+        Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -appModes $settings.appModes
     }
 }
 
