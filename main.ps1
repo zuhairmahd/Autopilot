@@ -302,7 +302,7 @@ else
 }
 #endregion import functions.
 
-#region Initialize application configuration
+#region Initialize script parameters
 Write-Host "Loading configuration..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
@@ -353,64 +353,6 @@ if ($filesCleaned.AllRemoved)
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
-# Use domain if available, otherwise default to contoso.com
-$domainForDefaults = if ($appMetaData -and $appMetaData.domain)
-{
-    $appMetaData.domain
-}
-else
-{
-    "contoso.com"
-}
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
-if (-not $configResult.Success)
-{
-    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
-    write-log -logFile $logFile -finishLogging
-    exit 1
-}
-# Extract configuration results
-$auth = $configResult.Auth
-$globalSettings = $configResult.GlobalSettings
-$localSettings = $configResult.LocalSettings
-$requiredScopes = $configResult.RequiredScopes
-# Merge global and local settings into a single settings object
-Write-Verbose "[$scriptName] Merging global and local settings"
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Configuration initialization completed successfully"
-Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
-Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
-Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
-Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
-Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-if (-not $version.version)
-{
-    Write-Verbose "[$scriptName] Unable to get file version."
-    #see if you can find it in the metadata.
-    if ($appMetaData -and $appMetaData.version)
-    {
-        $version = $appMetaData.version
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
-        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
-        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
-        $version = @{
-            version     = [System.Version]::Parse('1.0.0.0')
-            companyName = 'Zuhair Mahmoud'
-            major       = 1
-            minor       = 0
-            build       = 0
-            revision    = 0
-        }
-    }
-}
 # Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
@@ -428,7 +370,7 @@ if ($ShowVersion)
     Write-Log -LogFile $LogFile -finishLogging
     exit 0
 }
-#endregion  Initialize application configuration
+#endregion  Initialize script parameters
 
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -579,29 +521,68 @@ else
         exit 1
     }
 }
+#endregion Process login
 
-if ($settings.domain -ne $domain -and (-not ([string]::IsNullOrWhiteSpace($domain))))
+#region initialize script
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain)
 {
-    Write-Verbose "[$scriptName] Updating settings domain from '$($settings.domain)' to '$domain'"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Updating settings domain from '$($settings.domain)' to '$domain'" -LogLevel "Information"
-    $settings.domain = $domain
-    if (Initialize-ConfigurationFiles -domain $domain -domainOnly)
+    $domain
+}
+else
+{
+    "contoso.com"
+}
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+if (-not $configResult.Success)
+{
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    write-log -logFile $logFile -finishLogging
+    exit 1
+}
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings
+$localSettings = $configResult.LocalSettings
+$requiredScopes = $configResult.RequiredScopes
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
     {
-        Write-Verbose "[$scriptName] Domain-specific configuration files initialized successfully"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Domain-specific configuration files initialized successfully" -LogLevel "Information"
+        $version = $appMetaData.version
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
     }
     else
     {
-        Write-Verbose "[$scriptName] Failed to initialize domain-specific configuration files"
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to initialize domain-specific configuration files" -LogLevel "Warning"
-    }   
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
 }
-else 
-{
-    Write-Verbose "[$scriptName] Domain is already set to '$domain', no update needed"
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Domain is already set to '$domain', no update needed" -LogLevel "Information"
-}
-#endregion Process login
+#endregion Initialize script
 
 #region Check for password change requirement
 # Check if password change is required (only applies to existing config files, not first-run wizard)
