@@ -11,6 +11,7 @@
         NotReady = 'The device is not ready for the next user'
     }
     returnValues = @{
+        partialUpdateMessage = 'Only partial update applied.'
         backoutText = 'Returning to previous menu'
         deviceAssignmentPendingMessage = 'The device is pending assignment to a deployment profile.'
         '1003' = 'Updates failed to install'

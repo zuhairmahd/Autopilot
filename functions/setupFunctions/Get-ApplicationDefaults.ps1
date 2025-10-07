@@ -302,6 +302,7 @@ function Get-ApplicationDefaults()
                 noUserDeviceFoundMessage       = "No user or device found."
                 EnrollmentFailedMessage        = "The device enrollment failed."
                 noUserFoundInDirectoryMessage  = "This user does not exist"
+                partialUpdateMessage           = "Only partial update applied."
                 deviceSyncFailedMessage        = "The device sync failed."
                 "1003"                         = "Updates failed to install"
                 noRestartMessage               = "Device not restarted."
