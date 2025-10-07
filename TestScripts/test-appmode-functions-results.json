@@ -1,0 +1,320 @@
+[
+  {
+    "Name": "Full mode returns wildcard (*)",
+    "Result": true,
+    "Details": "Returned: [full]",
+    "Time": "2025-10-07T04:21:58.2908982-04:00"
+  },
+  {
+    "Name": "Admin mode includes expected modes",
+    "Result": true,
+    "Details": "Expected: admin at minimum, Got: [admin]",
+    "Time": "2025-10-07T04:21:58.2925623-04:00"
+  },
+  {
+    "Name": "Advanced mode includes expected modes",
+    "Result": true,
+    "Details": "Expected: advanced at minimum, Got: [advanced]",
+    "Time": "2025-10-07T04:21:58.2940115-04:00"
+  },
+  {
+    "Name": "HelpDesk mode returns itself",
+    "Result": true,
+    "Details": "Returned: [helpdesk]",
+    "Time": "2025-10-07T04:21:58.2955307-04:00"
+  },
+  {
+    "Name": "Registration mode includes helpdesk and registration",
+    "Result": true,
+    "Details": "Expected: registration at minimum, Returned: [registration]",
+    "Time": "2025-10-07T04:21:58.2970813-04:00"
+  },
+  {
+    "Name": "AdvancedRegistration mode includes registration",
+    "Result": true,
+    "Details": "Expected: advancedRegistration at minimum, Returned: [advancedRegistration]",
+    "Time": "2025-10-07T04:21:58.29856-04:00"
+  },
+  {
+    "Name": "Custom mode returns empty or minimal hierarchy",
+    "Result": true,
+    "Details": "Returned: [custom]",
+    "Time": "2025-10-07T04:21:58.3000423-04:00"
+  },
+  {
+    "Name": "Invalid mode returns fallback",
+    "Result": true,
+    "Details": "Returned: [invalidMode]",
+    "Time": "2025-10-07T04:21:58.3015182-04:00"
+  },
+  {
+    "Name": "Single mode string works",
+    "Result": true,
+    "Details": "Returned: [helpdesk]",
+    "Time": "2025-10-07T04:21:58.304173-04:00"
+  },
+  {
+    "Name": "Single mode array works",
+    "Result": true,
+    "Details": "Returned: [admin]",
+    "Time": "2025-10-07T04:21:58.3059606-04:00"
+  },
+  {
+    "Name": "Multiple modes with additive strategy combines permissions",
+    "Result": true,
+    "Details": "Returned: [helpdesk, registration]",
+    "Time": "2025-10-07T04:21:58.3539107-04:00"
+  },
+  {
+    "Name": "Multiple modes with precedence strategy uses highest precedence",
+    "Result": true,
+    "Details": "Returned: [admin]",
+    "Time": "2025-10-07T04:21:58.3826416-04:00"
+  },
+  {
+    "Name": "Full mode with other modes returns wildcard",
+    "Result": true,
+    "Details": "Returned: [*]",
+    "Time": "2025-10-07T04:21:58.4021807-04:00"
+  },
+  {
+    "Name": "Empty modes array defaults to full",
+    "Result": true,
+    "Details": "Returned: [full]",
+    "Time": "2025-10-07T04:21:58.4045416-04:00"
+  },
+  {
+    "Name": "Null modes defaults to full",
+    "Result": true,
+    "Details": "Returned: [full]",
+    "Time": "2025-10-07T04:21:58.4066939-04:00"
+  },
+  {
+    "Name": "Reads appModes array format",
+    "Result": true,
+    "Details": "ConfigType: MultipleMode, Modes: [helpdesk, registration]",
+    "Time": "2025-10-07T04:21:58.4210563-04:00"
+  },
+  {
+    "Name": "Reads legacy appMode format",
+    "Result": true,
+    "Details": "ConfigType: LegacyMode, Legacy: admin",
+    "Time": "2025-10-07T04:21:58.4379658-04:00"
+  },
+  {
+    "Name": "Prioritizes appModes over legacy appMode",
+    "Result": true,
+    "Details": "ConfigType: SingleMode, Effective: [helpdesk]",
+    "Time": "2025-10-07T04:21:58.4523215-04:00"
+  },
+  {
+    "Name": "Missing file defaults to full mode",
+    "Result": true,
+    "Details": "ConfigType: Default, Effective: [full]",
+    "Time": "2025-10-07T04:21:58.4614895-04:00"
+  },
+  {
+    "Name": "Single mode in appModes array detected as SingleMode",
+    "Result": true,
+    "Details": "ConfigType: SingleMode, Modes: [registration]",
+    "Time": "2025-10-07T04:21:58.4744171-04:00"
+  },
+  {
+    "Name": "Valid configuration sets IsValid flag",
+    "Result": true,
+    "Details": "IsValid: True",
+    "Time": "2025-10-07T04:21:58.4857572-04:00"
+  },
+  {
+    "Name": "Hashtable with appModes array",
+    "Result": true,
+    "Details": "Returned: [helpdesk, registration]",
+    "Time": "2025-10-07T04:21:58.4993703-04:00"
+  },
+  {
+    "Name": "PSCustomObject with appModes",
+    "Result": true,
+    "Details": "Returned: [admin]",
+    "Time": "2025-10-07T04:21:58.5084554-04:00"
+  },
+  {
+    "Name": "Legacy appMode fallback",
+    "Result": true,
+    "Details": "Returned: [advanced]",
+    "Time": "2025-10-07T04:21:58.5189574-04:00"
+  },
+  {
+    "Name": "appModes takes priority over legacy appMode",
+    "Result": true,
+    "Details": "Returned: [helpdesk]",
+    "Time": "2025-10-07T04:21:58.5298167-04:00"
+  },
+  {
+    "Name": "Invalid modes are filtered out",
+    "Result": true,
+    "Details": "Returned: [helpdesk, registration]",
+    "Time": "2025-10-07T04:21:58.5707798-04:00"
+  },
+  {
+    "Name": "Empty settings defaults to full",
+    "Result": true,
+    "Details": "Returned: [full]",
+    "Time": "2025-10-07T04:21:58.5988872-04:00"
+  },
+  {
+    "Name": "Null settings defaults to full",
+    "Result": true,
+    "Details": "Returned: [full]",
+    "Time": "2025-10-07T04:21:58.6217121-04:00"
+  },
+  {
+    "Name": "Duplicate modes are removed",
+    "Result": true,
+    "Details": "Returned: [helpdesk, registration] (Count: 2)",
+    "Time": "2025-10-07T04:21:58.6343143-04:00"
+  },
+  {
+    "Name": "Single mode string in appModes converted to array",
+    "Result": true,
+    "Details": "Returned: [registration] (Type: String)",
+    "Time": "2025-10-07T04:21:58.6450346-04:00"
+  },
+  {
+    "Name": "All invalid modes defaults to full",
+    "Result": true,
+    "Details": "Returned: [full]",
+    "Time": "2025-10-07T04:21:58.698294-04:00"
+  },
+  {
+    "Name": "Single mode returns simple hierarchy",
+    "Result": true,
+    "Details": "Modes: [helpdesk], Conflicts: 0",
+    "Time": "2025-10-07T04:21:58.7013067-04:00"
+  },
+  {
+    "Name": "Full mode overrides all other modes",
+    "Result": true,
+    "Details": "Modes: [*]",
+    "Time": "2025-10-07T04:21:58.7091115-04:00"
+  },
+  {
+    "Name": "Additive strategy combines all permissions",
+    "Result": true,
+    "Details": "Modes: [helpdesk, registration], Strategy: Additive",
+    "Time": "2025-10-07T04:21:58.7292747-04:00"
+  },
+  {
+    "Name": "Precedence strategy uses highest precedence mode",
+    "Result": true,
+    "Details": "Modes: [admin], Strategy: Precedence",
+    "Time": "2025-10-07T04:21:58.754998-04:00"
+  },
+  {
+    "Name": "Conflicts detected when modes have overlapping hierarchies",
+    "Result": true,
+    "Details": "Conflicts: 0, Resolution: Additive strategy applied: Combined all permissions from 2 modes",
+    "Time": "2025-10-07T04:21:58.7778876-04:00"
+  },
+  {
+    "Name": "Precedence order established correctly",
+    "Result": true,
+    "Details": "Precedence: [admin, helpDesk, registration]",
+    "Time": "2025-10-07T04:21:58.8064268-04:00"
+  },
+  {
+    "Name": "Resolution description provided",
+    "Result": true,
+    "Details": "Resolution: Additive strategy applied: Combined all permissions from 2 modes",
+    "Time": "2025-10-07T04:21:58.8325702-04:00"
+  },
+  {
+    "Name": "Valid single mode selection",
+    "Result": true,
+    "Details": "IsValid: True, Permissions: 1",
+    "Time": "2025-10-07T04:21:58.8366008-04:00"
+  },
+  {
+    "Name": "Valid multiple mode selection",
+    "Result": true,
+    "Details": "IsValid: True, Permissions: 2",
+    "Time": "2025-10-07T04:21:58.8642777-04:00"
+  },
+  {
+    "Name": "Detects redundancy when full mode combined with others",
+    "Result": true,
+    "Details": "HasRedundancy: True, Redundancies: 1",
+    "Time": "2025-10-07T04:21:58.8789976-04:00"
+  },
+  {
+    "Name": "Detects hierarchical redundancy",
+    "Result": true,
+    "Details": "HasRedundancy: False, HasConflicts: False, IsValid: True",
+    "Time": "2025-10-07T04:21:58.9025883-04:00"
+  },
+  {
+    "Name": "Conflict detection works",
+    "Result": true,
+    "Details": "HasConflicts: False, HasRedundancy: False, IsValid: True",
+    "Time": "2025-10-07T04:21:58.9257985-04:00"
+  },
+  {
+    "Name": "Resolution message provided",
+    "Result": true,
+    "Details": "Resolution: Additive strategy applied: Combined all permissions from 2 modes",
+    "Time": "2025-10-07T04:21:58.9583092-04:00"
+  },
+  {
+    "Name": "Non-conflicting single mode has no conflicts",
+    "Result": true,
+    "Details": "HasConflicts: False",
+    "Time": "2025-10-07T04:21:58.9613766-04:00"
+  },
+  {
+    "Name": "Single mode stored as single-element array",
+    "Result": true,
+    "Details": "appModes: [helpdesk], IsArray: True",
+    "Time": "2025-10-07T04:21:59.0922874-04:00"
+  },
+  {
+    "Name": "Multiple modes stored as array",
+    "Result": true,
+    "Details": "appModes: [helpdesk, registration]",
+    "Time": "2025-10-07T04:21:59.2362643-04:00"
+  },
+  {
+    "Name": "Invalid modes filtered during update",
+    "Result": true,
+    "Details": "appModes: [helpdesk, registration], ContainsInvalid: False",
+    "Time": "2025-10-07T04:21:59.4236481-04:00"
+  },
+  {
+    "Name": "Duplicate modes removed during update",
+    "Result": true,
+    "Details": "appModes: [helpdesk, registration], Count: 2",
+    "Time": "2025-10-07T04:21:59.5763455-04:00"
+  },
+  {
+    "Name": "Empty configuration defaults to full",
+    "Result": true,
+    "Details": "appModes: [full]",
+    "Time": "2025-10-07T04:21:59.7419959-04:00"
+  },
+  {
+    "Name": "Get-AppModeConfigurationFromUser silent mode works",
+    "Result": true,
+    "Details": "Modes: [full], Cancelled: False",
+    "Time": "2025-10-07T04:21:59.7438944-04:00"
+  },
+  {
+    "Name": "Show-AppModeHierarchyInfo function exists",
+    "Result": true,
+    "Details": "Function found: True",
+    "Time": "2025-10-07T04:21:59.7443672-04:00"
+  },
+  {
+    "Name": "Get-MultipleAppModeInput function exists",
+    "Result": true,
+    "Details": "Function found: True",
+    "Time": "2025-10-07T04:21:59.7447646-04:00"
+  }
+]
