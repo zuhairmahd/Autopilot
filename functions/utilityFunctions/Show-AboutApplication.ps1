@@ -2,6 +2,7 @@ function Show-AboutApplication()
 {
     [CmdletBinding()]
     param(
+        $updateAvailable = $updateAvailable,
         [string]$accessToken,
         [string]$Release,
         [string]$appId,
@@ -24,7 +25,7 @@ function Show-AboutApplication()
     Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
     if ($updateAvailable.success -eq $true)
     {
-        Write-Host "Last updated on $($updateAvailable.ReleaseDate)"
+        Write-Host "Last updated on $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)"
         Write-Host "File checksum: $($updateAvailable.Hash)"
         if ($version.hash -eq $updateAvailable.hash)
         {

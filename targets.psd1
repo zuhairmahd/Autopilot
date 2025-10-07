@@ -43,7 +43,9 @@
                 )
                 companyName                     = 'ZM Consulting'
                 maxUserMatchDisplay             = 10
-                appMode                         = 'full'
+                appModes                        = @(
+                    'full'
+                )
                 assignedUser                    = ''
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
@@ -88,7 +90,7 @@
                     repoName      = 'Autopilot'
                 }
                 release                         = 'dev'
-                updateLocalSettings             = $true
+                updateLocalSettings             = $false
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 userPatternsToExclude           = @(
@@ -146,7 +148,9 @@
                 privateSession                  = $true
                 groupsToExclude                 = @()
                 maxUserMatchDisplay             = 10
-                appMode                         = 'registration'
+                appModes                        = @(
+                    'registration'
+                )
                 autopilotDeviceAllowedVendors   = @(
                     'Dell'
                 )
@@ -169,7 +173,7 @@
                 maxGroupMatchDisplay            = 20
                 maxWaitTime                     = 30
                 autoUpdate                      = $true
-                updateLocalSettings             = $true
+                updateLocalSettings             = $false
                 checkStrongMapping              = $true
                 strongMappingOptional           = $false
                 preferredBrowser                = 'Chrome'

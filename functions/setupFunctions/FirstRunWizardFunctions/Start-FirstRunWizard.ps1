@@ -118,8 +118,23 @@ function Start-FirstRunWizard()
             return $false
         }
         
-        # Extract app mode from result for backward compatibility
-        $appModeConfig = @{ appMode = $appModeResult.appMode }
+        # Extract app mode configuration from result
+        if ($appModeResult.isMultipleMode)
+        {
+            $appModeConfig = @{ 
+                appMode  = $appModeResult.appMode      # Primary mode for backward compatibility
+                appModes = $appModeResult.appModes    # All modes for new functionality
+            }
+            Write-SafeLog "Multiple app modes configured: Primary='$($appModeResult.appMode)', All=[$($appModeResult.appModes -join ', ')]" "Information"
+        }
+        else
+        {
+            $appModeConfig = @{ 
+                appMode  = $appModeResult.appMode 
+                appModes = $appModeResult.appModes  # Single mode as array for consistency
+            }
+            Write-SafeLog "Single app mode configured: $($appModeResult.appMode)" "Information"
+        }
         
         # Step 3: Merge configurations
         $finalConfig = @{
@@ -212,13 +227,12 @@ function Start-FirstRunWizard()
                 Write-SafeLog "Failed to update autoUpdate setting" "Warning"
             }
             
-            # Step 5.3: Update app mode setting in settings.psd1
-            Write-SafeLog "Updating app mode setting in settings.psd1" "Information"
-            $appModeSuccess = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName "appMode" -SettingValue $appModeConfig.appMode
-            
+            # Step 5.3: Update app mode settings in settings.psd1
+            Write-SafeLog "Updating app mode settings in settings.psd1" "Information"
+            $appModeSuccess = Update-AppModeSettings -Configuration $appModeConfig.appModes -SettingsFile $SettingsFile    
             if ($appModeSuccess)
             {
-                Write-SafeLog "Successfully updated app mode setting to: $($appModeConfig.appMode)" "Information"
+                Write-SafeLog "Successfully updated app mode settings" "Information"
             }
             else
             {

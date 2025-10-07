@@ -184,26 +184,6 @@ function GetUpdates()
     $localVersion = (getFileVersion -executableFileName $executableFileName).version
     
     #region get the remote version.
-    Write-Verbose "[$functionName] Checking whether the temp update file $tempUpdateFile exists."
-    if (Test-Path $tempUpdateFile)
-    {
-        Write-Verbose "[$functionName] Temp update file $tempUpdateFile exists. Removing it."
-        Remove-Item -Path $tempUpdateFile -Force
-    }
-    Write-Verbose "[$functionName] Getting remote file from $executableUpdateURL"
-    $response = DownloadRemoteFile -url $executableUpdateURL -outputFile $tempUpdateFile
-    if (-not $response.Success)
-    {
-        Write-Error "[$functionName] Failed to download the update file from $updateURL. Please check the URLs and try again."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from $updateURL. Please check the URLs and try again." -LogLevel "Error"
-        return $response
-    }
-    else
-    {
-        Write-Verbose "[$functionName] Successfully downloaded the update file from $updateURL"
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from $updateURL" -LogLevel "Information"
-    }
-    $remoteVersion = (GetFileVersion -executableFileName $tempUpdateFile).version
     Write-Verbose "[$functionName] Getting metadata from $metaDataURL"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting metadata from $metaDataURL" -LogLevel "Information"
     try 
@@ -214,6 +194,7 @@ function GetUpdates()
         Write-Verbose "Response: $fileMetaData"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response: $fileMetaData" -LogLevel "Information"
         Write-Verbose "[$functionName] Metadata content: $($fileMetaData.Content)"
+        $remoteVersion = $fileMetaData.version
     }
     catch 
     {
@@ -234,7 +215,7 @@ function GetUpdates()
         Write-Host "New version: $remoteVersion" -ForegroundColor Cyan
         #convert $fileMetaData.date to a datetime object in local time.
         $fileMetaData.date = [datetime]::Parse($fileMetaData.date).ToLocalTime()
-        Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
+        Write-Host "Release date: $($fileMetaData.date | FormatDateWithTimeZone)" -ForegroundColor Cyan
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Current version: $localVersion, New version: $remoteVersion" -LogLevel "Information"
         if ($noConfirmation)
         {
@@ -260,6 +241,25 @@ function GetUpdates()
         Write-Host "Proceeding with the update..." -ForegroundColor Green
         Write-Verbose "[$functionName] Proceeding with the update."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Proceeding with the update..."
+        Write-Verbose "[$functionName] Checking whether the temp update file $tempUpdateFile exists."
+        if (Test-Path $tempUpdateFile)
+        {
+            Write-Verbose "[$functionName] Temp update file $tempUpdateFile exists. Removing it."
+            Remove-Item -Path $tempUpdateFile -Force
+        }
+        Write-Verbose "[$functionName] Getting remote file from $executableUpdateURL"
+        $response = DownloadRemoteFile -url $executableUpdateURL -outputFile $tempUpdateFile
+        if (-not $response.Success)
+        {
+            Write-Error "[$functionName] Failed to download the update file from $updateURL. Please check the URLs and try again."
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download the update file from $updateURL. Please check the URLs and try again." -LogLevel "Error"
+            return $response
+        }
+        else
+        {
+            Write-Verbose "[$functionName] Successfully downloaded the update file from $updateURL"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded the update file from $updateURL" -LogLevel "Information"
+        }
         Write-Host "Checking file signature..."
         if (-not (Invoke-FileCertVerification -FilePath $tempUpdateFile))
         {
@@ -269,7 +269,6 @@ function GetUpdates()
         Write-Host "File signature is valid"
         Write-Verbose "[$functionName] File signature is valid."
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "File signature is valid." -LogLevel "Information"
-        
         Write-Verbose "[$functionName] Getting file hash for $tempUpdateFile"
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Getting file hash for $tempUpdateFile" -LogLevel "Information"
         $fileHash = Get-FileHash -Path $tempUpdateFile -Algorithm SHA256        
