@@ -43,7 +43,9 @@
                 )
                 companyName                     = 'ZM Consulting'
                 maxUserMatchDisplay             = 10
-                appMode                         = 'full'
+                appModes                        = @(
+                    'full'
+                )
                 assignedUser                    = ''
                 minimumDevicePhysicalMemoryInGB = 8
                 maxNumberOfDevicesAllowed       = 15
@@ -146,7 +148,9 @@
                 privateSession                  = $true
                 groupsToExclude                 = @()
                 maxUserMatchDisplay             = 10
-                appMode                         = 'registration'
+                appModes                        = @(
+                    'registration'
+                )
                 autopilotDeviceAllowedVendors   = @(
                     'Dell'
                 )
