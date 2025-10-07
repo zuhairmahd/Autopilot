@@ -1239,7 +1239,7 @@ function Save-GlobalSettings()
                 }
                 
                 # Use specialized app mode settings update
-                $success = Update-AppModeSettings -AppModeConfiguration $value -SettingsFile $SettingsFile -MaintainLegacy
+                $success = Update-AppModeSettings -Configuration $value -SettingsFile $SettingsFile 
                 
                 if (-not $success)
                 {
