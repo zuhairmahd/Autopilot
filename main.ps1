@@ -303,7 +303,7 @@ else
 #endregion import functions.
 
 #region Initialize script parameters
-Write-Host "Loading configuration..."
+Write-Host "Starting script..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -524,6 +524,7 @@ else
 #endregion Process login
 
 #region initialize script
+Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
