@@ -41,10 +41,10 @@
     maxGroupMatchDisplay = 20
     release = 'dev'
     repoInfo = @{
-        baseSourceURL = 'https://raw.githubusercontent.com'
         repoName = 'Autopilot'
-        repoPath = 'zuhairmahd'
+        baseSourceURL = 'https://raw.githubusercontent.com'
         baseURL = 'https://www.github.com'
+        repoPath = 'zuhairmahd'
     }
     autoUpdate = $false
     updateLocalSettings = $true
@@ -66,5 +66,4 @@
     groupTag = 'ENTRA'
     assignedUser = ''
     additionalScopes = @()
-    appMode = 'full'
 }
