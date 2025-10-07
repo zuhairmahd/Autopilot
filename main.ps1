@@ -580,7 +580,27 @@ else
     }
 }
 
-
+if ($settings.domain -ne $domain -and (-not ([string]::IsNullOrWhiteSpace($domain))))
+{
+    Write-Verbose "[$scriptName] Updating settings domain from '$($settings.domain)' to '$domain'"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Updating settings domain from '$($settings.domain)' to '$domain'" -LogLevel "Information"
+    $settings.domain = $domain
+    if (Initialize-ConfigurationFiles -domain $domain -domainOnly)
+    {
+        Write-Verbose "[$scriptName] Domain-specific configuration files initialized successfully"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Domain-specific configuration files initialized successfully" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Verbose "[$scriptName] Failed to initialize domain-specific configuration files"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to initialize domain-specific configuration files" -LogLevel "Warning"
+    }   
+}
+else 
+{
+    Write-Verbose "[$scriptName] Domain is already set to '$domain', no update needed"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Domain is already set to '$domain', no update needed" -LogLevel "Information"
+}
 #endregion Process login
 
 #region Check for password change requirement
@@ -818,7 +838,7 @@ if ($ResetAuth)
         exit 1
     }
 }
-Write-Host "Acquiring access token..."
+Write-Host "Retrieving access token..."
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
@@ -1596,83 +1616,36 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
         return $returnValues.backoutText
     }
-    
-    # Handle both single and multiple app mode results
-    if ($result.isMultipleMode -and $result.appModes)
+    # Use Update-AppModeSettings for specialized handling with storage preference
+    try
     {
-        $newAppModeConfig = $result.appModes
-        $newAppMode = $result.appMode  # Primary mode for display
-        Write-Host "`nYou selected multiple app modes: [$($result.appModes -join ', ')]" -ForegroundColor Green
-        Write-Host "Primary mode: $newAppMode" -ForegroundColor Cyan
-    }
-    else
-    {
-        $newAppModeConfig = $result.appMode
-        $newAppMode = $result.appMode
-        Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
-    }
-    Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
-    Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
-    Write-Host ""
-    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
-    {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        [console]::beep(1000, 500)
-        $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    }
-    if ($confirmChoice -in @('no', 'n'))
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
-        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
-        return $returnValues.backoutText
-    }
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppModeConfig'" -LogLevel "Information"
-    
-    # Load Update-AppModeSettings function if available for enhanced multiple mode support
-    if (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue)
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using enhanced app mode settings update (supports multiple modes)" -LogLevel "Information"
-        # Prioritize domain settings over global settings
-        $updateResult = Update-AppModeSettings -Configuration $newAppModeConfig -SettingsFile $initFile -MaintainLegacy
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Using legacy app mode update method" -LogLevel "Warning"
-        # Try domain settings first, fall back to global
-        $updateResult = $false
-        if ($settings.domain)
+        if ($result.useGlobalStorage)
         {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Attempting to save app mode in domain settings for '$($settings.domain)'" -LogLevel "Information"
-            $updateResult = Update-Setting -SettingType "Domain" -Domain $settings.domain -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode
+            $storageType = "Global settings"
+            $saveResult = Update-AppModeSettings -Configuration $result.appModes -SettingsFile $initFile -UseGlobalSettings
         }
-        if (-not $updateResult)
+        else
         {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Domain update failed or not available, using global settings" -LogLevel "Warning"
-            $updateResult = Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode
+            $storageType = "Domain settings"
+            $saveResult = Update-AppModeSettings -Configuration $result.appModes -SettingsFile $initFile -Settings $settings
+        }
+        if ($saveResult)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+            Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
+        }
+        else
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
+            Write-Host "Failed to save app mode configuration" -ForegroundColor Red
         }
     }
-    
-    if ($updateResult)
+    catch
     {
-        Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
-        if ($filesCleaned.AllRemoved)
-        {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
-        }
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
-        Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Log -logFile $logFile -finishLogging
-        exit 0
-    }
-    else
-    {
-        Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
+        $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
+        Write-Host $errorMessage -ForegroundColor Red
+        return $null
     }
 }
 #endregion Settings menu

@@ -128,7 +128,9 @@
         showLicenseBanner = $true
         validateScopes = $true
         deviceContactThresholdInDays = 30
-        appMode = 'full'
+        appModes = @(
+            'full'
+        )
         timeInSeconds = 60
         maxUserMatchDisplay = 10
         checkStrongMapping = $false
