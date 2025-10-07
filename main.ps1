@@ -303,7 +303,7 @@ else
 #endregion import functions.
 
 #region Initialize application configuration
-Write-Host "Initializing application configuration..."
+Write-Host "Loading configuration..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
