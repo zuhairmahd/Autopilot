@@ -302,8 +302,8 @@ else
 }
 #endregion import functions.
 
-#region Initialize application configuration
-Write-Host "Initializing application configuration..."
+#region Initialize script parameters
+Write-Host "Loading configuration..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -344,14 +344,6 @@ else
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$oldExecutableFileName = 'main.exe.old'
-if (Test-Path $oldExecutableFileName)
-{
-    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
-    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
-    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
-}
 Write-Verbose "[$scriptName] Initializing application configuration"
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
@@ -361,64 +353,6 @@ if ($filesCleaned.AllRemoved)
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
-# Use domain if available, otherwise default to contoso.com
-$domainForDefaults = if ($appMetaData -and $appMetaData.domain)
-{
-    $appMetaData.domain
-}
-else
-{
-    "contoso.com"
-}
-$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
-if (-not $configResult.Success)
-{
-    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
-    write-log -logFile $logFile -finishLogging
-    exit 1
-}
-# Extract configuration results
-$auth = $configResult.Auth
-$globalSettings = $configResult.GlobalSettings
-$localSettings = $configResult.LocalSettings
-$requiredScopes = $configResult.RequiredScopes
-# Merge global and local settings into a single settings object
-Write-Verbose "[$scriptName] Merging global and local settings"
-$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
-Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Configuration initialization completed successfully"
-Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
-Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
-Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
-Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
-Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-if (-not $version.version)
-{
-    Write-Verbose "[$scriptName] Unable to get file version."
-    #see if you can find it in the metadata.
-    if ($appMetaData -and $appMetaData.version)
-    {
-        $version = $appMetaData.version
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
-        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
-        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
-        $version = @{
-            version     = [System.Version]::Parse('1.0.0.0')
-            companyName = 'Zuhair Mahmoud'
-            major       = 1
-            minor       = 0
-            build       = 0
-            revision    = 0
-        }
-    }
-}
 # Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
@@ -436,7 +370,7 @@ if ($ShowVersion)
     Write-Log -LogFile $LogFile -finishLogging
     exit 0
 }
-#endregion  Initialize application configuration
+#endregion  Initialize script parameters
 
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -587,9 +521,68 @@ else
         exit 1
     }
 }
-
-
 #endregion Process login
+
+#region initialize script
+# Use domain if available, otherwise default to contoso.com
+$domainForDefaults = if ($domain)
+{
+    $domain
+}
+else
+{
+    "contoso.com"
+}
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+if (-not $configResult.Success)
+{
+    Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    write-log -logFile $logFile -finishLogging
+    exit 1
+}
+# Extract configuration results
+$auth = $configResult.Auth
+$globalSettings = $configResult.GlobalSettings
+$localSettings = $configResult.LocalSettings
+$requiredScopes = $configResult.RequiredScopes
+# Merge global and local settings into a single settings object
+Write-Verbose "[$scriptName] Merging global and local settings"
+$global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
+Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
+    {
+        $version = $appMetaData.version
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
+    }
+    else
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
+}
+#endregion Initialize script
 
 #region Check for password change requirement
 # Check if password change is required (only applies to existing config files, not first-run wizard)
@@ -826,7 +819,7 @@ if ($ResetAuth)
         exit 1
     }
 }
-Write-Host "Acquiring access token..."
+Write-Host "Retrieving access token..."
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
@@ -1604,48 +1597,38 @@ $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change App Mode settings"
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User selected the same app mode that is already set." -LogLevel "Information"
         return $returnValues.backoutText
     }
-    $newAppMode = $result.appMode
-    Write-Host "`nYou selected: $newAppMode" -ForegroundColor Green
-    Write-Host "`nChanging the app mode will affect which menu items and features are available." -ForegroundColor Yellow
-    Write-Host "The application will need to restart to apply the new app mode." -ForegroundColor Yellow
-    Write-Host ""
-    $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    while ($confirmChoice -notin @('yes', 'no', 'y', 'n'))
+    # Use Update-AppModeSettings for specialized handling with storage preference
+    try
     {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Red
-        [console]::beep(1000, 500)
-        $confirmChoice = Read-Host "Are you sure you want to change the app mode? (yes/no)"
-    }
-    if ($confirmChoice -in @('no', 'n'))
-    {
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "User chose not to change app mode setting." -LogLevel "Information"
-        Write-Host "`nApp mode change cancelled." -ForegroundColor Yellow
-        return $returnValues.backoutText
-    }
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Updating app mode setting from '$($settings.appMode)' to '$newAppMode'" -LogLevel "Information"
-    if (Update-Setting -SettingType "Global" -SettingsFile $initFile -SettingName "appMode" -SettingValue $newAppMode)
-    {
-        Write-Host "`nApp Mode settings saved successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "App Mode settings saved successfully." -LogLevel "Information"
-        $filesCleaned = cleanupTempFiles
-        if ($filesCleaned.AllRemoved)
+        if ($result.useGlobalStorage)
         {
-            Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
+            $storageType = "Global settings"
+            $saveResult = Update-AppModeSettings -Configuration $result.appModes -SettingsFile $initFile -UseGlobalSettings
         }
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
-        Write-Host "`nThe app mode has been changed to: $newAppMode" -ForegroundColor Green
-        Write-Host "Please restart the application for the changes to take effect." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Log -logFile $logFile -finishLogging
-        exit 0
+        else
+        {
+            $storageType = "Domain settings"
+            $saveResult = Update-AppModeSettings -Configuration $result.appModes -SettingsFile $initFile -Settings $settings
+        }
+        if ($saveResult)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Successfully saved app mode configuration to $storageType" -LogLevel "Information"
+            Write-Host "App mode configuration saved successfully to $storageType" -ForegroundColor Green
+        }
+        else
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to save app mode configuration" -LogLevel "Error"
+            Write-Host "Failed to save app mode configuration" -ForegroundColor Red
+        }
     }
-    else
+    catch
     {
-        Write-Host "`nFailed to update app mode setting" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Failed to update app mode setting" -LogLevel "Error"
+        $errorMessage = "Error saving app mode configuration: $($_.Exception.Message)"
+        Write-Log -LogFile $logFile -Module $functionName -Message $errorMessage -LogLevel "Error"
+        Write-Host $errorMessage -ForegroundColor Red
+        return $null
     }
 }
-
 #endregion Settings menu
 
 $CheckMenu = AddMenuItem -Menu $CheckMenu -Name "Lookup device by Serial Number" -Submenu $serialNumberMenu
@@ -1884,9 +1867,15 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $result
     }
 }
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
-$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-    Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
+if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+}
+if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus)
+{
+    $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+        Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name 
+    }
 }
 
 #region show menus

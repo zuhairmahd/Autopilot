@@ -2,27 +2,32 @@ function FilterMenuItemsByAppMode()
 {
     <#
     .SYNOPSIS
-        Filters menu items based on current application mode with extensive logging.
+        Filters menu items based on current application mode(s) with extensive logging.
     
     .DESCRIPTION
-        Filters menu items based on the current application mode hierarchy, providing
-        comprehensive logging for performance monitoring and troubleshooting.
+        Filters menu items based on the current application mode hierarchy, supporting both
+        single and multiple app modes. Provides comprehensive logging for performance 
+        monitoring and troubleshooting.
     
     .PARAMETER MenuItems
         Array of menu items to filter
         
     .PARAMETER CurrentAppMode
-        Current application mode (defaults to settings.appMode)
+        Current application mode (defaults to settings.appMode for backward compatibility)
+        
+    .PARAMETER CurrentAppModes
+        Array of current application modes (takes precedence over CurrentAppMode)
         
     .PARAMETER MenuConfigFile
         Path to menu configuration file
         
     .OUTPUTS
-        Array - Filtered menu items appropriate for the current app mode
+        Array - Filtered menu items appropriate for the current app mode(s)
         
     .NOTES
         - Extensive logging for performance optimization monitoring
-        - Maintains PowerShell 5.1 compatibility
+        - Supports both single and multiple app modes
+        - Maintains full backward compatibility
         - Part of menu loading optimization system
     #>
     [CmdletBinding()]
@@ -30,37 +35,62 @@ function FilterMenuItemsByAppMode()
         [Parameter(Mandatory = $true)]
         [array]$MenuItems,
         [Parameter(Mandatory = $false)]
-        [string]$CurrentAppMode = $settings.appMode,
+        [string]$CurrentAppMode = $null,
+        [Parameter(Mandatory = $false)]
+        [array]$CurrentAppModes = $null,
         [Parameter(Mandatory = $false)]
         [string]$MenuConfigFile = "$pwd\menu.psd1"
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    
+    # Determine effective app modes to use
+    $effectiveAppModes = $null
+    
+    if ($CurrentAppModes -and $CurrentAppModes.Count -gt 0)
+    {
+        # Use provided multiple modes
+        $effectiveAppModes = $CurrentAppModes
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using provided app modes: [$($CurrentAppModes -join ', ')] ($($CurrentAppModes.Count) modes)" -LogLevel "Debug"
+    }
+    elseif ($CurrentAppMode)
+    {
+        # Use provided single mode for backward compatibility
+        $effectiveAppModes = @($CurrentAppMode)
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Using provided single app mode: '$CurrentAppMode' (backward compatibility)" -LogLevel "Debug"
+    }
+    else
+    {
+        # Auto-detect from settings
+        $effectiveAppModes = Get-EffectiveAppModes -Settings $settings
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Auto-detected effective app modes: [$($effectiveAppModes -join ', ')] ($($effectiveAppModes.Count) modes)" -LogLevel "Debug"
+    }
+    
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item filtering operation" -LogLevel "Debug"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Input parameters - Items: $($MenuItems.Count), AppMode: '$CurrentAppMode', ConfigFile: '$MenuConfigFile'" -LogLevel "Debug"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Input parameters - Items: $($MenuItems.Count), AppModes: [$($effectiveAppModes -join ', ')], ConfigFile: '$MenuConfigFile'" -LogLevel "Debug"
     
     # Performance tracking
     $startTime = Get-Date
     
-    # If no app mode specified, return all items
-    if (-not $CurrentAppMode)
+    # If no app modes specified, return all items
+    if (-not $effectiveAppModes -or $effectiveAppModes.Count -eq 0)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "No app mode specified, returning all $($MenuItems.Count) items" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "No app modes specified, returning all $($MenuItems.Count) items" -LogLevel "Verbose"
         Write-Log -LogFile $LogFile -Module $functionName -Message "Filter operation completed in $((Get-Date) - $startTime) milliseconds" -LogLevel "Debug"
         return $MenuItems
     }
     
-    # Get app mode hierarchy for filtering
+    # Get combined app mode hierarchy for filtering
     try
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving app mode hierarchy for: $CurrentAppMode" -LogLevel "Debug"
-        $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $CurrentAppMode
-        Write-Log -LogFile $LogFile -Module $functionName -Message "App mode hierarchy resolved: [$($hierarchyAllowed -join ', ')] - $($hierarchyAllowed.Count) modes" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Retrieving combined app mode hierarchy for: [$($effectiveAppModes -join ', ')]" -LogLevel "Debug"
+        $hierarchyAllowed = Get-MultipleAppModeHierarchy -AppModes $effectiveAppModes -ResolutionStrategy 'Additive'
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Combined app mode hierarchy resolved: [$($hierarchyAllowed -join ', ')] - $($hierarchyAllowed.Count) modes" -LogLevel "Verbose"
     }
     catch
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Error getting app mode hierarchy: $_, defaulting to current mode only" -LogLevel "Warning"
-        $hierarchyAllowed = @($CurrentAppMode)
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error getting combined app mode hierarchy: $_, defaulting to provided modes only" -LogLevel "Warning"
+        $hierarchyAllowed = $effectiveAppModes
         Write-Log -LogFile $LogFile -Module $functionName -Message "Using fallback hierarchy: [$($hierarchyAllowed -join ', ')]" -LogLevel "Debug"
     }
     

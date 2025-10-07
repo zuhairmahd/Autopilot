@@ -12,8 +12,10 @@ function Test-MenuItemIncluded()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Checking if menu item '$MenuItemName' should be included"
-    Write-Verbose "[$functionName] App mode: $($settings.appMode)"  
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with app mode: $($settings.appMode)" -LogLevel "Verbose"
+    # Get effective app modes (handle both single and multiple modes)
+    $effectiveAppModes = Get-EffectiveAppModes -Settings $settings
+    Write-Verbose "[$functionName] Effective app modes: [$($effectiveAppModes -join ', ')]"  
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Starting menu item inclusion check for '$MenuItemName' with effective app modes: [$($effectiveAppModes -join ', ')]" -LogLevel "Verbose"
 
     # If $Menus parameter is null, check if we can load menu configuration from file
     if ($null -eq $Menus)
@@ -84,9 +86,17 @@ function Test-MenuItemIncluded()
         return $true
     }
     
-    # Get app mode hierarchy from menu configuration
-    $hierarchyAllowed = Get-AppModeHierarchy -CurrentAppMode $settings.appMode
-    Write-Log -LogFile $LogFile -Module $functionName -Message "App mode hierarchy for '$($settings.appMode)': [$($hierarchyAllowed -join ', ')]" -LogLevel "Debug"
+    # Get combined app mode hierarchy from menu configuration for all effective modes
+    $hierarchyResult = Get-CombinedAppModeHierarchy -AppModes $effectiveAppModes
+    
+    # Extract the actual allowed modes array from the result
+    $hierarchyAllowed = if ($hierarchyResult -is [hashtable] -and $hierarchyResult.AllowedModes) {
+        $hierarchyResult.AllowedModes
+    } else {
+        $hierarchyResult
+    }
+    
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Combined app mode hierarchy for [$($effectiveAppModes -join ', ')]: [$($hierarchyAllowed -join ', ')]" -LogLevel "Debug"
 
     # If the $settings.appMode hierarchy includes '*', assume the menu needs to be displayed (full mode)
     if ($hierarchyAllowed -contains '*')

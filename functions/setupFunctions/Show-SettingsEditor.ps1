@@ -765,7 +765,7 @@ function Get-SettingInputType()
     Write-Log -LogFile $logFile -Module $functionName -Message "Determining input type for setting '$SettingName' with value type: $($Value.GetType().Name)" -LogLevel "Verbose"
     
     # Check for specific known enumerated types
-    if ($SettingName -eq 'appMode')
+    if ($SettingName -eq 'appMode' -or $SettingName -eq 'appModes')
     { 
         Write-Verbose "[$functionName] Detected AppMode setting"
         return 'AppMode' 
@@ -869,56 +869,6 @@ function Get-BooleanInput()
                 Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
             }
         }
-    } while ($true)
-}
-
-function Get-AppModeInput()
-{
-    <#
-    .SYNOPSIS
-        Gets app mode input from user.
-    #>
-    param($CurrentValue)
-    
-    $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $logFile -Module $functionName -Message "Getting app mode input. Current value: '$CurrentValue'" -LogLevel "Verbose"
-    
-    $modes = @('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')
-    
-    Write-Host "Available app modes:" -ForegroundColor White
-    for ($i = 0; $i -lt $modes.Count; $i++)
-    {
-        $mode = $modes[$i]
-        if ($mode -eq $CurrentValue)
-        {
-            Write-Host "$($i + 1). $mode (Current)" -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host "$($i + 1). $mode" -ForegroundColor White
-        }
-    }
-    Write-Host "Press Enter to keep current value" -ForegroundColor Yellow
-    
-    do
-    {
-        $choice = Read-Host "Enter choice (1-$($modes.Count))"
-        
-        if ([string]::IsNullOrWhiteSpace($choice))
-        {
-            Write-Log -LogFile $logFile -Module $functionName -Message "User chose to keep current app mode: '$CurrentValue'" -LogLevel "Verbose"
-            return $CurrentValue
-        }
-        
-        if ($choice -match '^\d+$' -and [int]$choice -ge 1 -and [int]$choice -le $modes.Count)
-        {
-            $selectedMode = $modes[[int]$choice - 1]
-            Write-Log -LogFile $logFile -Module $functionName -Message "User selected app mode: '$selectedMode'" -LogLevel "Information"
-            return $selectedMode
-        }
-        
-        Write-Host "Invalid choice. Please enter a number between 1 and $($modes.Count)." -ForegroundColor Red
-        Write-Log -LogFile $logFile -Module $functionName -Message "Invalid choice entered: '$choice'" -LogLevel "Warning"
     } while ($true)
 }
 
@@ -1260,6 +1210,47 @@ function Save-GlobalSettings()
         {
             $value = $Settings[$key]
             Write-Log -LogFile $logFile -Module $functionName -Message "Updating global setting: $key = $value" -LogLevel "Verbose"
+            
+            # Special handling for app mode settings
+            if ($key -eq 'appMode' -or $key -eq 'appModes')
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Using specialized app mode settings handler for: $key" -LogLevel "Debug"
+                
+                # Load the Update-AppModeSettings function if not available
+                if (-not (Get-Command Update-AppModeSettings -ErrorAction SilentlyContinue))
+                {
+                    try
+                    {
+                        . "$PWD/functions/setupFunctions/Update-AppModeSettings.ps1"
+                    }
+                    catch
+                    {
+                        Write-Log -LogFile $logFile -Module $functionName -Message "Could not load Update-AppModeSettings function: $($_.Exception.Message)" -LogLevel "Warning"
+                        # Fall back to regular Update-Setting
+                        $success = Update-Setting -SettingType "Global" -SettingsFile $SettingsFile -SettingName $key -SettingValue $value
+                        if (-not $success)
+                        {
+                            Write-Warning "[$functionName] Failed to update global setting: $key"
+                            Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update global setting: $key" -LogLevel "Error"
+                            return $false
+                        }
+                        continue
+                    }
+                }
+                
+                # Use specialized app mode settings update
+                $success = Update-AppModeSettings -AppModeConfiguration $value -SettingsFile $SettingsFile -MaintainLegacy
+                
+                if (-not $success)
+                {
+                    Write-Warning "[$functionName] Failed to update app mode setting: $key"
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to update app mode setting: $key" -LogLevel "Error"
+                    return $false
+                }
+                
+                # Skip the regular processing for this setting
+                continue
+            }
             
             # Handle nested settings (e.g., repoInfo.repoPath)
             if ($key.Contains('.'))

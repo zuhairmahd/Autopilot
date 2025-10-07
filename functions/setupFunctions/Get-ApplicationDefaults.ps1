@@ -13,7 +13,7 @@ function Get-ApplicationDefaults()
         Type of defaults to return: 'Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'Overwrite', 'All'
     
     .PARAMETER DomainName
-        Domain name to use for domain-specific defaults. Defaults to "example.com"
+        Domain name to use for domain-specific defaults.
     
     .PARAMETER Version
         Version string to use in configurations. If not provided, uses global version.
@@ -46,7 +46,7 @@ function Get-ApplicationDefaults()
         [Parameter(Mandatory = $true)]
         [ValidateSet('Settings', 'Auth', 'Global', 'Domain', 'Menus', 'Strings', 'Overwrite', 'All')]
         [string]$DefaultType,
-        [string]$DomainName = "example.com",
+        [string]$DomainName,
         [string]$Version
     )
     
@@ -110,7 +110,9 @@ function Get-ApplicationDefaults()
             showLicenseBanner            = $true
             validateScopes               = $true
             deviceContactThresholdInDays = 30
-            appMode                      = "full"
+            appModes                     = @(
+                "full"
+            )
             timeInSeconds                = 60
             maxUserMatchDisplay          = 10
             checkStrongMapping           = $false
@@ -143,7 +145,9 @@ function Get-ApplicationDefaults()
             deviceContactThresholdInDays    = 30
             checkStrongMapping              = $false
             strongMappingOptional           = $true
-            appMode                         = "full"
+            appModes                        = @(
+                "full"
+            )
             timeInSeconds                   = 60
             maxUserMatchDisplay             = 20
             maxGroupMatchDisplay            = 20
@@ -302,6 +306,7 @@ function Get-ApplicationDefaults()
                 noUserDeviceFoundMessage       = "No user or device found."
                 EnrollmentFailedMessage        = "The device enrollment failed."
                 noUserFoundInDirectoryMessage  = "This user does not exist"
+                partialUpdateMessage           = "Only partial update applied."
                 deviceSyncFailedMessage        = "The device sync failed."
                 "1003"                         = "Updates failed to install"
                 noRestartMessage               = "Device not restarted."
@@ -1414,7 +1419,7 @@ function Get-DomainDefaults()
     #>
     [CmdletBinding()]
     param(
-        [string]$DomainName = "example.com"
+        [string]$DomainName
     )
     
     return Get-ApplicationDefaults -DefaultType "Domain" -DomainName $DomainName

@@ -6,10 +6,11 @@ function Initialize-ConfigurationFiles()
     #>
     [CmdletBinding()]
     param(
-        [string]$InitFile,
-        [string]$StringsFile,
-        [string]$MenuFile,
-        [string]$Domain
+        [string]$InitFile = "$pwd\settings.psd1",
+        [string]$StringsFile = "$pwd\strings.psd1",
+        [string]$MenuFile = "$pwd\menu.psd1",
+        [string]$Domain,
+        [switch]$domainOnly
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -18,94 +19,97 @@ function Initialize-ConfigurationFiles()
     
     try
     {
-        # Ensure settings.psd1 exists with defaults
-        Write-Verbose "[$functionName] Ensuring settings.psd1 exists with defaults"
-        $settingsCreated = $true 
-        if (-not (Test-Path $InitFile))
+        if (-not $domainOnly)   
         {
-            try
+            # Ensure settings.psd1 exists with defaults
+            Write-Verbose "[$functionName] Ensuring settings.psd1 exists with defaults"
+            $settingsCreated = $true 
+            if (-not (Test-Path $InitFile))
             {
-                # Get default settings and save as PSD1
-                $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
-                Write-Verbose "[$functionName] Saving to path $InitFile"
-                $defaultSettings | Export-PowerShellDataFile -Path $InitFile -validate -Force
-                Write-Verbose "[$functionName] Created settings.psd1 with defaults"
+                try
+                {
+                    # Get default settings and save as PSD1
+                    $defaultSettings = Get-ApplicationDefaults -DefaultType "Settings"
+                    Write-Verbose "[$functionName] Saving to path $InitFile"
+                    $defaultSettings | Export-PowerShellDataFile -Path $InitFile -validate -Force
+                    Write-Verbose "[$functionName] Created settings.psd1 with defaults"
+                }
+                catch
+                {
+                    Write-Warning "[$functionName] Failed to create settings.psd1: $($_.Exception.Message)"
+                    $settingsCreated = $false
+                }
             }
-            catch
+            else
             {
-                Write-Warning "[$functionName] Failed to create settings.psd1: $($_.Exception.Message)"
-                $settingsCreated = $false
+                Write-Verbose "[$functionName] settings.psd1 already exists, skipping creation"
             }
-        }
-        else
-        {
-            Write-Verbose "[$functionName] settings.psd1 already exists, skipping creation"
-        }
-        if (-not $settingsCreated)
-        {
-            $result.ErrorMessage = "Failed to create or validate settings.psd1 file"
-            Write-Verbose "[$functionName] $($result.ErrorMessage)"
-            return $result
-        }
+            if (-not $settingsCreated)
+            {
+                $result.ErrorMessage = "Failed to create or validate settings.psd1 file"
+                Write-Verbose "[$functionName] $($result.ErrorMessage)"
+                return $result
+            }
         
-        # Ensure strings.psd1 exists with defaults
-        Write-Verbose "[$functionName] Ensuring strings.psd1 exists with defaults"
-        $stringsCreated = $true 
-        if (-not (Test-Path $StringsFile))
-        {
-            try
+            # Ensure strings.psd1 exists with defaults
+            Write-Verbose "[$functionName] Ensuring strings.psd1 exists with defaults"
+            $stringsCreated = $true 
+            if (-not (Test-Path $StringsFile))
             {
-                # Get default strings and save as PSD1
-                $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
-                $defaultStrings | Export-PowerShellDataFile -Path $StringsFile -validate -Force
-                Write-Verbose "[$functionName] Created strings.psd1 with defaults"
+                try
+                {
+                    # Get default strings and save as PSD1
+                    $defaultStrings = Get-ApplicationDefaults -DefaultType "Strings"
+                    $defaultStrings | Export-PowerShellDataFile -Path $StringsFile -validate -Force
+                    Write-Verbose "[$functionName] Created strings.psd1 with defaults"
+                }
+                catch
+                {
+                    Write-Warning "[$functionName] Failed to create strings.psd1: $($_.Exception.Message)"
+                    $stringsCreated = $false
+                }
             }
-            catch
+            else
             {
-                Write-Warning "[$functionName] Failed to create strings.psd1: $($_.Exception.Message)"
-                $stringsCreated = $false
+                Write-Verbose "[$functionName] strings.psd1 already exists, skipping creation"
             }
-        }
-        else
-        {
-            Write-Verbose "[$functionName] strings.psd1 already exists, skipping creation"
-        }
-        if (-not $stringsCreated)
-        {
-            $result.ErrorMessage = "Failed to create or validate strings.psd1 file"
-            Write-Verbose "[$functionName] $($result.ErrorMessage)"
-            return $result
+            if (-not $stringsCreated)
+            {
+                $result.ErrorMessage = "Failed to create or validate strings.psd1 file"
+                Write-Verbose "[$functionName] $($result.ErrorMessage)"
+                return $result
+            }
+
+            #ensure menu.psd1 exists
+            Write-Verbose "[$functionName] Ensuring menu.psd1 exists with defaults"
+            $menuCreated = $true
+            if (-not (Test-Path $MenuFile))
+            {
+                try
+                {
+                    # Get default menu and save as PSD1
+                    $defaultMenu = Get-ApplicationDefaults -DefaultType "Menus"
+                    $defaultMenu | Export-PowerShellDataFile -Path $MenuFile -validate -Force
+                    Write-Verbose "[$functionName] Created menu.psd1 with defaults"
+                }
+                catch
+                {
+                    Write-Warning "[$functionName] Failed to create menu.psd1: $($_.Exception.Message)"
+                    $menuCreated = $false
+                }
+            }
+            else
+            {
+                Write-Verbose "[$functionName] menu.psd1 already exists, skipping creation"
+            }
+            if (-not $menuCreated)
+            {
+                $result.ErrorMessage = "Failed to create or validate menu.psd1 file"
+                Write-Verbose "[$functionName] $($result.ErrorMessage)"
+                return $result
+            }   
         }
 
-        #ensure menu.psd1 exists
-        Write-Verbose "[$functionName] Ensuring menu.psd1 exists with defaults"
-        $menuCreated = $true
-        if (-not (Test-Path $MenuFile))
-        {
-            try
-            {
-                # Get default menu and save as PSD1
-                $defaultMenu = Get-ApplicationDefaults -DefaultType "Menus"
-                $defaultMenu | Export-PowerShellDataFile -Path $MenuFile -validate -Force
-                Write-Verbose "[$functionName] Created menu.psd1 with defaults"
-            }
-            catch
-            {
-                Write-Warning "[$functionName] Failed to create menu.psd1: $($_.Exception.Message)"
-                $menuCreated = $false
-            }
-        }
-        else
-        {
-            Write-Verbose "[$functionName] menu.psd1 already exists, skipping creation"
-        }
-        if (-not $menuCreated)
-        {
-            $result.ErrorMessage = "Failed to create or validate menu.psd1 file"
-            Write-Verbose "[$functionName] $($result.ErrorMessage)"
-            return $result
-        }   
-        
         # Ensure domain.psd1 exists with defaults
         Write-Verbose "[$functionName] Ensuring domain.psd1 exists with defaults"
         $domainCreated = $true

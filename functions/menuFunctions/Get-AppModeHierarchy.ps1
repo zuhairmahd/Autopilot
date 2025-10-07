@@ -29,7 +29,7 @@ function Get-AppModeHierarchy()
             if ($hierarchy.PSObject.Properties.Name -contains $CurrentAppMode)
             {
                 $allowedModes = $hierarchy.$CurrentAppMode
-Write-Log -LogFile $LogFile -Module $functionName -Message "Found hierarchy for '$CurrentAppMode': [$($allowedModes -join ', ')]" -LogLevel "Verbose"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Found hierarchy for '$CurrentAppMode': [$($allowedModes -join ', ')]" -LogLevel "Verbose"
                 return $allowedModes
             }
             else
@@ -40,7 +40,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Found hierarchy for 
         }
         else
         {
-Write-Log -LogFile $LogFile -Module $functionName -Message "No appModeHierarchy found in menu configuration, using current mode only" -LogLevel "Verbose"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "No appModeHierarchy found in menu configuration, using current mode only" -LogLevel "Verbose"
             return @($CurrentAppMode)
         }
     }
@@ -49,5 +49,102 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "No appModeHierarchy 
         Write-Log -LogFile $LogFile -Module $functionName -Message "Error getting app mode hierarchy: $_" -LogLevel "Error"
         # Fallback to current mode only
         return @($CurrentAppMode)
+    }
+}
+
+function Get-MultipleAppModeHierarchy()
+{
+    <#
+    .SYNOPSIS
+        Gets combined app mode hierarchy for multiple modes with conflict resolution.
+    
+    .DESCRIPTION
+        Wrapper function that handles both single and multiple app modes. For multiple modes,
+        it uses Get-CombinedAppModeHierarchy to resolve conflicts and combine permissions.
+        Maintains backward compatibility with single mode configurations.
+    
+    .PARAMETER AppModes
+        Array of app modes or single app mode string
+        
+    .PARAMETER ResolutionStrategy
+        Strategy for resolving conflicts when multiple modes are provided
+        
+    .OUTPUTS
+        Array - Combined hierarchy of allowed modes
+        
+    .EXAMPLE
+        $hierarchy = Get-MultipleAppModeHierarchy -AppModes @('helpDesk', 'registration')
+        
+    .EXAMPLE  
+        $hierarchy = Get-MultipleAppModeHierarchy -AppModes 'admin' -ResolutionStrategy 'Precedence'
+        
+    .NOTES
+        - Maintains full backward compatibility with single mode usage
+        - Automatically determines if multiple modes are being used
+        - Uses additive strategy by default for multiple modes
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        $AppModes = (Get-EffectiveAppModes -Settings $settings),
+        [Parameter(Mandatory = $false)]
+        [ValidateSet('Additive', 'Precedence')]
+        [string]$ResolutionStrategy = 'Additive'
+    )
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    
+    # Normalize input to array
+    if ($AppModes -is [string])
+    {
+        $AppModes = @($AppModes)
+    }
+    elseif ($null -eq $AppModes -or $AppModes.Count -eq 0)
+    {
+        $AppModes = @('full')  # Default fallback
+    }
+    
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Getting hierarchy for modes: [$($AppModes -join ', ')] using $ResolutionStrategy strategy" -LogLevel "Debug"
+    
+    # For single mode, use existing function
+    if ($AppModes.Count -eq 1)
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Single mode detected, using standard hierarchy function" -LogLevel "Debug"
+        return Get-AppModeHierarchy -CurrentAppMode $AppModes[0]
+    }
+    
+    # For multiple modes, use combined hierarchy function
+    try
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Multiple modes detected, using combined hierarchy resolution" -LogLevel "Information"
+        $combinedResult = Get-CombinedAppModeHierarchy -AppModes $AppModes -ResolutionStrategy $ResolutionStrategy
+        
+        if ($combinedResult.Conflicts.Count -gt 0)
+        {
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Conflicts detected and resolved: $($combinedResult.Resolution)" -LogLevel "Information"
+        }
+        
+        return $combinedResult.AllowedModes
+    }
+    catch
+    {
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Error getting combined hierarchy: $($_.Exception.Message) - falling back to union" -LogLevel "Warning"
+        
+        # Fallback: simple union of individual hierarchies
+        $allModes = @()
+        foreach ($mode in $AppModes)
+        {
+            try
+            {
+                $hierarchy = Get-AppModeHierarchy -CurrentAppMode $mode
+                $allModes += $hierarchy
+            }
+            catch
+            {
+                $allModes += $mode
+            }
+        }
+        
+        return ($allModes | Select-Object -Unique)
     }
 }
