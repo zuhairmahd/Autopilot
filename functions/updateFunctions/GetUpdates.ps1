@@ -7,7 +7,6 @@ function GetUpdates()
         [Parameter(Mandatory = $true)]
         [string]$updateURL,
         [string]$metaDataURL = "$updateURL/lastrun.json",
-        [string[]]$SupportingFiles,
         [switch]$noConfirmation
     )
 
@@ -41,21 +40,6 @@ function GetUpdates()
     Write-Verbose "[$functionName] Temp Update File: $tempUpdateFile"
     Write-Verbose "[$functionName] Executable Update URL: $executableUpdateURL"
     Write-Verbose "[$functionName] No confirmation: $noConfirmation"
-    Write-Verbose "[$functionName] Supporting Files count: $($SupportingFiles.Count)"
-    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Supporting Files count: $($SupportingFiles.Count)" -LogLevel "Information"
-    if ($SupportingFiles.count -gt 0)
-    {
-        foreach ($file in $SupportingFiles)
-        {
-            Write-Verbose "[$functionName] Supporting File: $file"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Supporting File: $file" -LogLevel "Information"
-        }
-    }
-    else
-    {
-        Write-Verbose "[$functionName] No supporting files provided."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No supporting files provided." -LogLevel "Information"
-    }
     #now write-log the above
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Executable File Name: $executableFileName" -LogLevel "Information"
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "updateURL: $updateURL" -LogLevel "Information"
@@ -98,85 +82,6 @@ function GetUpdates()
             $returnObject.StatusCode = $_.Exception.Response.StatusCode.Value__
             $returnObject.Content = $_.Exception.Message
         }    
-        return $returnObject
-    }
-    
-    function DownloadSupportingFiles()
-    {
-        [CmdletBinding()]
-        param(
-            [string[]]$SupportingFiles
-        )
-
-        $functionName = $MyInvocation.MyCommand.Name    
-        $backupFolder = $env:TEMP
-        $returnObject = [PSCustomObject]@{
-            Success    = $false
-            StatusCode = $null
-            Content    = $null
-        }
-        Write-Verbose "[$functionName] Downloading $($SupportingFiles.Count) supporting files..."
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading $($SupportingFiles.Count) supporting files..." -LogLevel "Information"
-        foreach ($file in $SupportingFiles)
-        {
-            Write-Verbose "[$functionName] Processing supporting file: $file"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processing supporting file: $file" -LogLevel "Information"
-            if ($file -eq $settings.domain)
-            {
-                $fileName = "$file.psd1"
-                $fileURL = "$updateURL/$($settings.release)/$fileName"
-                Write-Verbose "[$functionName] File matches domain. Constructed URL: $fileURL"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File matches domain. Constructed URL: $fileURL" -LogLevel "Information"
-            }
-            else
-            {
-                $fileName = Split-Path -Path $file -Leaf
-                Write-Verbose "[$functionName] Extracted file name: $fileName"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Extracted file name: $fileName" -LogLevel "Information"
-                $fileURL = "$updateURL/$fileName"
-                Write-Verbose "[$functionName] File does not match domain. Constructed URL: $fileURL"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "File does not match domain. Constructed URL: $fileURL" -LogLevel "Information"
-            }            
-            $localFilePath = Join-Path -Path (Split-Path -Path $executableFileName -Parent) -ChildPath $fileName
-            Write-Verbose "[$functionName] Local file path for $file is $localFilePath"
-            $backupFilePath = Join-Path -Path $backupFolder -ChildPath "$fileName.bak"
-            Write-Verbose "[$functionName] Backup file path for $file is $backupFilePath"
-            Write-Verbose "[$functionName] Backing up current $fileName to $backupFilePath"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Backing up current $fileName to $backupFilePath" -LogLevel "Information"
-            Copy-Item -Path $localFilePath -Destination $backupFilePath -Force -ErrorAction SilentlyContinue
-            Write-Verbose "[$functionName] Downloading supporting file from $fileURL to $localFilePath"
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Downloading supporting file from $fileURL to $localFilePath" -LogLevel "Information"
-            $response = DownloadRemoteFile -url $fileURL -outputFile $localFilePath
-            $returnObject.StatusCode = $response.StatusCode
-            $returnObject.Content = $response.Content
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Response received from $($fileURL): $($response.StatusCode)" -LogLevel "Information"
-            if ($response.Success)
-            {
-                Write-Verbose "[$functionName] Successfully downloaded supporting file from $fileURL to $localFilePath"
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully downloaded supporting file from $fileURL to $localFilePath" -LogLevel "Information"
-                $returnObject.Success = $true
-            }    
-            else
-            {
-                Write-Error "[$functionName] Failed to download supporting file from $fileURL. Please check the URL and try again."
-                Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to download supporting file from $fileURL. Please check the URL and try again." -LogLevel "Error"
-                if (Test-Path $backupFilePath)
-                {
-                    Write-Verbose "[$functionName] Restoring backup of $fileName from $backupFilePath to $localFilePath"
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Restoring backup of $fileName from $backupFilePath to $localFilePath" -LogLevel "Information"
-                    Copy-Item -Path $backupFilePath -Destination $localFilePath -Force
-                    Write-Verbose "[$functionName] Successfully restored backup of $fileName"
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Successfully restored backup of $fileName" -LogLevel "Information"
-                }
-                else
-                {
-                    Write-Error "[$functionName] No backup found for $fileName. The file may be missing or corrupted."
-                    Write-Log -LogFile $LogFile -Module "$functionName" -Message "No backup found for $fileName. The file may be missing or corrupted." -LogLevel "Error"
-                }
-                $returnObject.Success = $false
-                return $returnObject
-            }
-        }
         return $returnObject
     }
     #endregion
@@ -319,15 +224,6 @@ function GetUpdates()
                 Copy-Item -Path $tempUpdateFile -Destination $executableFileName -Force
                 Write-Verbose "[$functionName] Update completed successfully. New version: $remoteVersion"
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Update completed successfully. New version: $remoteVersion" -LogLevel "Information"
-                if ($SupportingFiles)
-                {
-                    $response = DownloadSupportingFiles -SupportingFiles $SupportingFiles
-                    if (-not $response.Success)
-                    {
-                        Write-Error "[$functionName] Failed to download one or more supporting files. Only partial update applied."
-                        $returnMessage = $returnValues.partialUpdateMessage           
-                    }
-                }
             }
             catch
             {

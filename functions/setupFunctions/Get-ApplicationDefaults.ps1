@@ -159,7 +159,6 @@ function Get-ApplicationDefaults()
                 repoPath      = "zuhairmahd"
             }
             autoUpdate                      = $true
-            updateLocalSettings             = $false
             deviceNamePrefix                = ""
             operatingSystem                 = "Windows"
             minUsernameLength               = 3
