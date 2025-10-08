@@ -1846,17 +1846,10 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $result
     }
 }
-if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus)
-{
-    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+    $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
 }
-if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus)
-{
-    $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-        $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
-    }
-}
-
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try
