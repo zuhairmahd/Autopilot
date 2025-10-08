@@ -90,7 +90,6 @@
                     repoName      = 'Autopilot'
                 }
                 release                         = 'dev'
-                updateLocalSettings             = $false
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 userPatternsToExclude           = @(
@@ -173,7 +172,6 @@
                 maxGroupMatchDisplay            = 20
                 maxWaitTime                     = 30
                 autoUpdate                      = $true
-                updateLocalSettings             = $false
                 checkStrongMapping              = $true
                 strongMappingOptional           = $false
                 preferredBrowser                = 'Chrome'
