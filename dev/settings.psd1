@@ -23,102 +23,102 @@
     }
     requiredScopes = @(
         @{
-            Scope = 'User.Read.All'
             Endpoints = @(
                 '/users',
                 'users/id',
                 'users/id/memberOf',
                 'users/id/registeredDevices'
             )
+            Scope = 'User.Read.All'
             Reason = 'Required to read user profiles, group memberships, and registered devices.'
         },
         @{
-            Scope = 'Device.Read.All'
             Endpoints = @(
                 'devices'
             )
+            Scope = 'Device.Read.All'
             Reason = 'Required to read Microsoft Entra ID device objects.'
         },
         @{
-            Scope = 'DeviceManagementApps.ReadWrite.All'
             Endpoints = @(
                 'deviceAppManagement/mobileApps',
                 'deviceAppManagement/mobileApps/id/assignments'
             )
+            Scope = 'DeviceManagementApps.ReadWrite.All'
             Reason = 'Required to read application information and manage app assignments.'
         },
         @{
-            Scope = 'DeviceManagementConfiguration.Read.All'
             Endpoints = @(
                 'deviceManagement/deviceConfigurations'
             )
+            Scope = 'DeviceManagementConfiguration.Read.All'
             Reason = 'Required to read Intune device configuration policies.'
         },
         @{
-            Scope = 'DeviceManagementManagedDevices.Read.All'
             Endpoints = @(
                 'deviceManagement/managedDevices',
                 'deviceManagement/managedDevices/id'
             )
+            Scope = 'DeviceManagementManagedDevices.Read.All'
             Reason = 'Required to read Intune managed device properties.'
         },
         @{
-            Scope = 'DeviceManagementManagedDevices.PrivilegedOperations.All'
             Endpoints = @(
                 'directory/deviceLocalCredentials'
             )
+            Scope = 'DeviceManagementManagedDevices.PrivilegedOperations.All'
             Reason = 'Required for highly privileged operations, specifically to read local admin (LAPS) passwords.'
         },
         @{
-            Scope = 'DeviceManagementServiceConfig.ReadWrite.All'
             Endpoints = @(
                 'deviceManagement/autopilotEvents',
                 'deviceManagement/importedWindowsAutopilotDeviceIdentities',
                 'deviceManagement/windowsAutopilotDeviceIdentities'
             )
+            Scope = 'DeviceManagementServiceConfig.ReadWrite.All'
             Reason = 'Required to read Autopilot events and to read and manage Autopilot device identities.'
         },
         @{
-            Scope = 'BitlockerKey.Read.All'
             Endpoints = @(
                 'informationProtection/bitlocker/recoveryKeys'
             )
+            Scope = 'BitlockerKey.Read.All'
             Reason = 'Required to read BitLocker recovery keys for all devices.'
         },
         @{
-            scope = 'DeviceManagementConfiguration.ReadWrite.All'
             endpoints = @(
                 'deviceManagement/deviceConfigurations'
             )
+            scope = 'DeviceManagementConfiguration.ReadWrite.All'
             reason = 'Required to create, update, and delete Intune device configuration policies.'
         },
         @{
-            scope = 'DeviceManagementApps.Read.All'
             endpoints = @(
                 'deviceAppManagement/mobileApps'
             )
+            scope = 'DeviceManagementApps.Read.All'
             reason = 'Required to read application information in Intune.'
         },
         @{
-            scope = 'DeviceManagementManagedDevices.ReadWrite.All'
             endpoints = @(
                 'deviceManagement/managedDevices'
             )
+            scope = 'DeviceManagementManagedDevices.ReadWrite.All'
             reason = 'Required to create, update, and delete Intune managed device properties.'
         },
         @{
-            Scope = 'openid'
             Endpoints = @()
+            Scope = 'openid'
             Reason = 'Standard scope required for user sign -in with OpenID Connect.'
         },
         @{
-            Scope = 'profile'
             Endpoints = @()
+            Scope = 'profile'
             Reason = 'Standard scope to get basic user profile information during sign -in .'
         },
         @{
-            scope = 'offline_access'
             endpoints = @()
+            scope = 'offline_access'
             reason = 'Standard scope that provides refresh tokens to maintain access when the user is not active.'
         }
     )
@@ -139,9 +139,9 @@
         release = 'auto'
         repoInfo = @{
             baseSourceURL = 'https://raw.githubusercontent.com'
-            baseURL = 'https://www.github.com'
-            repoName = 'Autopilot'
             repoPath = 'zuhairmahd'
+            repoName = 'Autopilot'
+            baseURL = 'https://www.github.com'
         }
         testMode = $false
         operatingSystem = 'Windows'
