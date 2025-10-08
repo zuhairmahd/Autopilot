@@ -282,7 +282,7 @@ function GetUpdates()
         Write-Verbose "[$functionName] Local version $localVersion is up to date with remote version $remoteVersion. No update required."
         Write-Host "Current version: $localVersion" -ForegroundColor Cyan
         Write-Host "Remote version: $remoteVersion" -ForegroundColor Cyan
-        Write-Host "Release date: $($fileMetaData.date)" -ForegroundColor Cyan
+        Write-Host "Release date: $($fileMetaData.date | FormatDateWithTimeZone)" -ForegroundColor Cyan
         return $returnValues.UpdateNotNeededMessage
     }
     #endregion
