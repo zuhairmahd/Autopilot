@@ -484,7 +484,7 @@ else
         #reload settings since thhey likely have changed.
         Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
         write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
-        $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+        $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
         if (-not $configResult.Success)
         {
             Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
