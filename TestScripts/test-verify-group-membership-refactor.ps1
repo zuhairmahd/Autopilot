@@ -194,17 +194,3 @@ catch
 {
     Write-Warning "Could not clean up temporary folder: $($_.Exception.Message)"
 }
-
-# Cleanup temporary folder
-try
-{
-    if (Test-Path $TestTempFolder)
-    {
-        Remove-Item -Path $TestTempFolder -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "`nCleaned up temporary test folder" -ForegroundColor Gray
-    }
-}
-catch
-{
-    Write-Warning "Could not clean up temporary folder: $($_.Exception.Message)"
-}
