@@ -47,13 +47,14 @@ function Get-DomainConfigurationFromFiles()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Full loading domain configuration for: $DomainName"
-    Write-Log -LogFile $logFile -Message "Loading domain configuration for: $DomainName" -Module $functionName -LogLevel "Information"
-    
+    # Write-Log -LogFile $logFile -Message "Loading domain configuration for: $DomainName" -Module $functionName -LogLevel "Information"
+    # Construct the expected filename for this domain
+    $domainConfigFile = Join-Path $ConfigurationPath "$DomainName.psd1"
+    Write-Verbose "[$functionName] Looking for domain config file: $domainConfigFile"
+
     try
     {
-        # Construct the expected filename for this domain
-        $domainConfigFile = Join-Path $ConfigurationPath "$DomainName.psd1"
-        Write-Verbose "[$functionName] Looking for domain config file: $domainConfigFile"
+        
         if (Test-Path $domainConfigFile)
         {
             Write-Verbose "[$functionName] Found existing domain configuration file"
@@ -79,7 +80,7 @@ function Get-DomainConfigurationFromFiles()
         Write-Warning "[$functionName] Error loading domain configuration for $DomainName : $($_.Exception.Message)"
         Write-Log -LogFile $logFile -Message "Error loading domain configuration for $DomainName : $($_.Exception.Message)" -Module $functionName -LogLevel "Error"
         # Return a minimal default configuration
-    $fallbackConfig = [ordered]@{
+        $fallbackConfig = [ordered]@{
             groupsToInclude  = @()
             groupsToExclude  = @()
             domain           = $DomainName

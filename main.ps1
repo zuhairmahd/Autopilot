@@ -352,6 +352,28 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+
+# $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+$migrationCheck = Invoke-SettingsMigration -Force
+if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
+{
+    Write-Host "Migration completed successfully." -ForegroundColor Green
+    write-log -logFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+}
+elseif ($migrationCheck.migrationNeeded -and -not $migrationCheck.success)
+{
+    $migrationCheck.errorMessages | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    Write-Host "Please rerun the script or contact support." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration failed with errors: $($migrationCheck.errorMessages -join '; ')" -LogLevel "Error"
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 1
+}
+else
+{
+    Write-Verbose "[$scriptName] No migration needed."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
+}
+
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
 # Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
@@ -959,6 +981,29 @@ else
     }
 }
 #endregion initialization block with access token
+
+Write-Verbose "[$scriptName] Migration needed: $($migrationCheck.MigrationNeeded)"
+Write-Verbose "[$scriptName] Migration successful: $($migrationCheck.success)"
+write-log -logFile $logFile -Module $scriptName -Message "Migration needed: $($migrationCheck.MigrationNeeded)"
+if ($migrationCheck.success -and $migrationCheck.migrationNeeded -and $migrationCheck.migratedAutopilotProfiles.$domain.count -gt 0)
+{
+    Write-Host "\nProcessing $($migrationCheck.migratedAutopilotProfiles.$domain.count) migrated Autopilot profile(s) for domain '$domain'..." -ForegroundColor Cyan
+    Write-Log -LogFile $logFile -Module $scriptName -Message "Processing migrated Autopilot profiles for domain: $domain" -LogLevel "Information"
+    
+    # Call the function to resolve autopilot profiles
+    $autopilotProfiles = $migrationCheck.migratedAutopilotProfiles.$domain
+    $profileResolutionResult = Resolve-MigratedAutopilotProfiles -accessToken $accessToken -autopilotProfiles $autopilotProfiles -domain $domain -SettingsFile $InitFile
+    
+    # Log the results
+    if ($profileResolutionResult.success)
+    {
+        Write-Log -LogFile $logFile -Module $scriptName -Message "Autopilot profile resolution completed successfully: $($profileResolutionResult.resolvedCount) resolved, $($profileResolutionResult.savedWithoutIdCount) saved without ID, $($profileResolutionResult.skippedCount) skipped" -LogLevel "Information"
+    }
+    else
+    {
+        Write-Log -LogFile $logFile -Module $scriptName -Message "Autopilot profile resolution completed with errors: $($profileResolutionResult.errorMessages.Count) error(s)" -LogLevel "Warning"
+    }
+}
 
 #region Create menus
 $menuConfig = $configResult.menu
