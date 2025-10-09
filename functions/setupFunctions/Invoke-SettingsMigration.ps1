@@ -457,17 +457,21 @@ function ConvertTo-Psd1Structure()
     # Step 3: Add autopilotDeviceAllowedVendors if not present (common in PSD1)
     if (-not $psd1Config.ContainsKey('autopilotDeviceAllowedVendors'))
     {
-        $psd1Config['autopilotDeviceAllowedVendors'] = @()
+        $psd1Config['autopilotDeviceAllowedVendors'] = @(
+            'Dell',
+            'VMWare'
+        )
         Write-Verbose "[$functionName] Added default empty 'autopilotDeviceAllowedVendors' array"
     }
     
     # Step 4: Add additional PSD1-specific fields with defaults if missing
     $psd1Defaults = @{
-        'checkStrongMapping'    = $false
-        'strongMappingOptional' = $true
-        'updateLocalSettings'   = $false
-        'groupTag'              = ''
-        'assignedUser'          = ''
+        'checkStrongMapping'         = $false
+        'strongMappingOptional'      = $true
+        'updateLocalSettings'        = $false
+        'groupTag'                   = ''
+        'assignedUser'               = ''
+        'migrateLegacyConfiguration' = $true
     }
     
     foreach ($key in $psd1Defaults.Keys)

@@ -135,7 +135,10 @@ function Get-ApplicationDefaults()
             groupsToInclude                 = @()
             groupsToExclude                 = @()
             autopilotProfilesToInclude      = @()
-            autopilotDeviceAllowedVendors   = @()  	    
+            autopilotDeviceAllowedVendors   = @(
+                "Dell",
+                "VMWare"
+            )
             domain                          = $DomainName
             companyName                     = ""
             version                         = $Version
@@ -145,6 +148,7 @@ function Get-ApplicationDefaults()
             deviceContactThresholdInDays    = 30
             checkStrongMapping              = $false
             strongMappingOptional           = $true
+            migrateLegacyConfiguration      = $true
             appModes                        = @(
                 "full"
             )

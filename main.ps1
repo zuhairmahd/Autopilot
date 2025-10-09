@@ -359,7 +359,6 @@ if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
     Write-Host "Migration completed successfully." -ForegroundColor Green
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
-    $legacyAutopilotProfilesPresent = $migrationCheck.migratedAutopilotProfiles.count -eq 0
     Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $legacyAutopilotProfilesPresent"
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
 }
@@ -983,63 +982,89 @@ else
         exit 1
     }
 }
-#endregion initialization block with access token
-
-Write-Verbose "[$scriptName] Migration needed: $($migrationCheck.MigrationNeeded)"
-Write-Verbose "[$scriptName] Migration successful: $($migrationCheck.success)"
-Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $($migrationCheck.migratedAutopilotProfiles.$domain.count -gt 0)"
-Write-Log -LogFile $logFile -Module $scriptName -Message "Migration needed: $($migrationCheck.MigrationNeeded)"
-if (($migrationCheck.success -and $migrationCheck.migrationNeeded -and $migrationCheck.migratedAutopilotProfiles.$domain.count -gt 0) -or $settings.migrateLegacyAutopilotProfiles)
+Write-Verbose "[$scriptName] Migrate legacy configuration: $($settings.migrateLegacyConfiguration)"
+write-log -logFile $logFile -module $scriptName -message "Migrate legacy configuration: $($settings.migrateLegacyConfiguration)" -LogLevel "Information"
+if ($settings.migrateLegacyConfiguration)
 {
-    Write-Host "\nProcessing $($migrationCheck.migratedAutopilotProfiles.$domain.count) migrated Autopilot profile(s) for domain '$domain'..." -ForegroundColor Cyan
-    Write-Log -LogFile $logFile -Module $scriptName -Message "Processing migrated Autopilot profiles for domain: $domain" -LogLevel "Information"
+    Write-Verbose "Starting migration of legacy configuration"
+    write-log -logFile $logFile -module $scriptName -message "Starting migration of legacy configuration." -LogLevel "Information"
+    $resolvedLegacyObjects = Resolve-MigratedLegacyObjects -accessToken $accessToken -settings $settings -domain $domain -SettingsFile $InitFile
+    write-log -logFile $logFile -module $scriptName -message "Resolved migrated legacy objects: $($resolvedLegacyObjects | Out-String)" -LogLevel "Information"
+    $newSetting = @{
+        migrateLegacyConfiguration = $settings.migrateLegacyConfiguration
+    }
     
-    # Call the function to resolve autopilot profiles
-    $autopilotProfiles = if ($migrationCheck.migratedAutopilotProfiles.$domain) { $migrationCheck.migratedAutopilotProfiles.$domain } else { $settings.autopilotProfilesToInclude }
-    Write-Verbose "[$scriptName] Resolving $($autopilotProfiles.Count) migrated Autopilot profiles for domain '$domain'"
-    write-log -logFile $logFile -Module $scriptName -Message "Resolving migrated Autopilot profiles for domain: $domain" -LogLevel "Information"
-    $profileResolutionResult = Resolve-MigratedAutopilotProfiles -accessToken $accessToken -autopilotProfiles $autopilotProfiles -domain $domain -SettingsFile $InitFile
-    
-    # Log the results
-    if ($profileResolutionResult.success)
+    # Check if user deferred the resolution
+    if ($resolvedLegacyObjects.userDeferred)
     {
-        Write-Log -LogFile $logFile -Module $scriptName -Message "Autopilot profile resolution completed successfully: $($profileResolutionResult.resolvedCount) resolved, $($profileResolutionResult.savedWithoutIdCount) saved without ID, $($profileResolutionResult.skippedCount) skipped" -LogLevel "Information"
+        Write-Host "Legacy object resolution has been deferred." -ForegroundColor Yellow
+        Write-Host "You will be prompted again the next time the script starts." -ForegroundColor Yellow
+        write-log -logFile $logFile -module $scriptName -message "User deferred legacy object resolution. Will prompt on next start." -LogLevel "Information"
+        # Keep migrateLegacyConfiguration as true so user is prompted next time
+        $newSetting = @{
+            migrateLegacyConfiguration = $true
+        }
+    }
+    elseif ($resolvedLegacyObjects.success)
+    {
+        Write-Host "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects"
+        write-log -logFile $logFile -module $scriptName -message "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects." -LogLevel "Information"
+        $newSetting = @{
+            migrateLegacyConfiguration = $false
+        }
     }
     else
     {
-        Write-Log -LogFile $logFile -Module $scriptName -Message "Autopilot profile resolution completed with errors: $($profileResolutionResult.errorMessages.Count) error(s)" -LogLevel "Warning"
-        Write-Host "Would you like to attempt resolution the next time the application starts? (yes/no)"
-        $response = Read-Host
-        while ($response -notin @("yes", "no", "y", "n"))
+        Write-Host "Failed to resolve legacy objects." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -message "Failed to resolve legacy objects." -LogLevel "Error"
+        $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+        write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start: $retry" -LogLevel "Information"
+        Write-Verbose "User chose to be prompted to resolve legacy objects on next start: $retry"
+        while ($retry -notin @('yes', 'no', 'y', 'n'))
         {
-            Write-Host "Please enter 'yes' or 'no'."
-            #beep
+            Write-Host "Invalid choice. Please enter 'yes' or 'no'."
             [console]::beep()
-            $response = Read-Host
+            $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
         }
-        if ($response -in @("yes", "y"))
+        if ($retry -in @('no', 'n'))
         {
-            # Create a hashtable with the setting to update
-            $domainSettings = @{
-                migrateLegacyAutopilotProfiles = $true
-            }
-            $updateSuccess = Update-Setting -SettingType "Domain" -DomainName $domain -Settings $domainSettings -SettingsFile $initFile -MergeSettings
-            if ($updateSuccess.Success)
-            {
-                Write-Host "The application will attempt to resolve legacy Autopilot profiles on the next run." -ForegroundColor Green
-            }
-            else
-            {
-                Write-Host "Failed to update settings. The application will not attempt to resolve legacy Autopilot profiles on the next run." -ForegroundColor Red
+            Write-Verbose "User chose not to be prompted to resolve legacy objects on next start."
+            write-log -logFile $logFile -module $scriptName -message "User chose not to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+            $newSetting = @{
+                migrateLegacyConfiguration = $false
             }
         }
         else
         {
-            Write-Host "The application will not attempt to resolve legacy Autopilot profiles on the next run." -ForegroundColor Yellow
+            Write-Host "You will be prompted to resolve them the next time the script starts."
+            write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+            $newSetting = @{
+                migrateLegacyConfiguration = $true
+            }
         }
-    
+    }
+    if ($newSetting.migrateLegacyConfiguration -ne $settings.migrateLegacyConfiguration)
+    {
+        $updatedSetting = Update-Setting -SettingType "Domain" -DomainName $domain -Settings $newSetting -SettingsFile $InitFile -MergeSettings
+        write-log -logFile $logFile -module $scriptName -message "Settings updated: $($updatedSetting | Out-String)" -LogLevel "Information"
+        if ($updatedSetting)
+        {
+            Write-Host "Settings updated successfully." -ForegroundColor Green
+            write-log -logFile $logFile -module $scriptName -message "Settings updated successfully." -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "Failed to update settings." -ForegroundColor Red
+            write-log -logFile $logFile -module $scriptName -message "Failed to update settings." -LogLevel "Error"
+        }
+    }
+    else
+    {
+        Write-Verbose "No changes made to migrateLegacyConfiguration setting."
+        write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
     }
 }
+#endregion initialization block with access token
 
 #region Create menus
 $menuConfig = $configResult.menu
