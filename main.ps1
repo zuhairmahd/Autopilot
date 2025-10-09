@@ -353,12 +353,15 @@ if ($filesCleaned.AllRemoved)
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
-# $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
-$migrationCheck = Invoke-SettingsMigration -Force
+$migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+# $migrationCheck = Invoke-SettingsMigration -Force
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
     Write-Host "Migration completed successfully." -ForegroundColor Green
-    write-log -logFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+    $legacyAutopilotProfilesPresent = $migrationCheck.migratedAutopilotProfiles.count -eq 0
+    Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $legacyAutopilotProfilesPresent"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
 }
 elseif ($migrationCheck.migrationNeeded -and -not $migrationCheck.success)
 {
@@ -720,7 +723,7 @@ foreach ($key in $settings.Keys)
     }
 }
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
-$global:getTokenParams = BuildAuthSplatTable -auth $auth
+$getTokenParams = BuildAuthSplatTable -auth $auth
 foreach ($key in $getTokenParams.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
@@ -984,14 +987,17 @@ else
 
 Write-Verbose "[$scriptName] Migration needed: $($migrationCheck.MigrationNeeded)"
 Write-Verbose "[$scriptName] Migration successful: $($migrationCheck.success)"
-write-log -logFile $logFile -Module $scriptName -Message "Migration needed: $($migrationCheck.MigrationNeeded)"
-if ($migrationCheck.success -and $migrationCheck.migrationNeeded -and $migrationCheck.migratedAutopilotProfiles.$domain.count -gt 0)
+Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $($migrationCheck.migratedAutopilotProfiles.$domain.count -gt 0)"
+Write-Log -LogFile $logFile -Module $scriptName -Message "Migration needed: $($migrationCheck.MigrationNeeded)"
+if (($migrationCheck.success -and $migrationCheck.migrationNeeded -and $migrationCheck.migratedAutopilotProfiles.$domain.count -gt 0) -or $settings.migrateLegacyAutopilotProfiles)
 {
     Write-Host "\nProcessing $($migrationCheck.migratedAutopilotProfiles.$domain.count) migrated Autopilot profile(s) for domain '$domain'..." -ForegroundColor Cyan
     Write-Log -LogFile $logFile -Module $scriptName -Message "Processing migrated Autopilot profiles for domain: $domain" -LogLevel "Information"
     
     # Call the function to resolve autopilot profiles
-    $autopilotProfiles = $migrationCheck.migratedAutopilotProfiles.$domain
+    $autopilotProfiles = if ($migrationCheck.migratedAutopilotProfiles.$domain) { $migrationCheck.migratedAutopilotProfiles.$domain } else { $settings.autopilotProfilesToInclude }
+    Write-Verbose "[$scriptName] Resolving $($autopilotProfiles.Count) migrated Autopilot profiles for domain '$domain'"
+    write-log -logFile $logFile -Module $scriptName -Message "Resolving migrated Autopilot profiles for domain: $domain" -LogLevel "Information"
     $profileResolutionResult = Resolve-MigratedAutopilotProfiles -accessToken $accessToken -autopilotProfiles $autopilotProfiles -domain $domain -SettingsFile $InitFile
     
     # Log the results
@@ -1002,6 +1008,36 @@ if ($migrationCheck.success -and $migrationCheck.migrationNeeded -and $migration
     else
     {
         Write-Log -LogFile $logFile -Module $scriptName -Message "Autopilot profile resolution completed with errors: $($profileResolutionResult.errorMessages.Count) error(s)" -LogLevel "Warning"
+        Write-Host "Would you like to attempt resolution the next time the application starts? (yes/no)"
+        $response = Read-Host
+        while ($response -notin @("yes", "no", "y", "n"))
+        {
+            Write-Host "Please enter 'yes' or 'no'."
+            #beep
+            [console]::beep()
+            $response = Read-Host
+        }
+        if ($response -in @("yes", "y"))
+        {
+            # Create a hashtable with the setting to update
+            $domainSettings = @{
+                migrateLegacyAutopilotProfiles = $true
+            }
+            $updateSuccess = Update-Setting -SettingType "Domain" -DomainName $domain -Settings $domainSettings -SettingsFile $initFile -MergeSettings
+            if ($updateSuccess.Success)
+            {
+                Write-Host "The application will attempt to resolve legacy Autopilot profiles on the next run." -ForegroundColor Green
+            }
+            else
+            {
+                Write-Host "Failed to update settings. The application will not attempt to resolve legacy Autopilot profiles on the next run." -ForegroundColor Red
+            }
+        }
+        else
+        {
+            Write-Host "The application will not attempt to resolve legacy Autopilot profiles on the next run." -ForegroundColor Yellow
+        }
+    
     }
 }
 

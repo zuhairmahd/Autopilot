@@ -321,7 +321,7 @@ function GetAutopilotProfile()
                         $searchTermLower = $searchTerm.ToLower()
                         $matchedProfiles = @()
                         
-                        foreach ($profile in $allProfilesResult.value)
+                        foreach ($autopilotProfile in $allProfilesResult.value)
                         {
                             $displayNameLower = if ($profile.displayName) { $profile.displayName.ToLower() } else { "" }
                             

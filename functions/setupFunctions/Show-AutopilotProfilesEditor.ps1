@@ -542,7 +542,15 @@ function Resolve-SingleAutopilotProfileInteractive()
     try
     {
         # First try exact match
-        Write-Host "  Searching for Autopilot profile: '$ProfileName'..." -ForegroundColor Cyan
+        if (-not $Silent)
+        {
+            Write-Host "  Searching for Autopilot profile: '$ProfileName'..." -ForegroundColor Cyan
+        }
+        else
+        {
+            Write-Verbose "[$FunctionName] Searching for Autopilot profile: '$ProfileName' (Silent mode)"
+        }
+        
         $result, $wasSubstringSearch = GetAutopilotProfile -AccessToken $AccessToken -ProfileName $ProfileName
         
         if ($result -and $result.value -and $result.value.Count -gt 0)
@@ -551,15 +559,6 @@ function Resolve-SingleAutopilotProfileInteractive()
             {
                 # Single exact match found
                 $autopilotProfile = $result.value[0]
-                
-                if (-not $Silent)
-                {
-                    Write-Host "  Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
-                }
-                else
-                {
-                    Write-Verbose "[$FunctionName] Found single match: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))"
-                }
                 
                 # Check for duplicate
                 if (Test-ItemExists -ItemName $autopilotProfile.displayName -ItemId $autopilotProfile.id -ExistingList $ExistingItems)
@@ -570,6 +569,17 @@ function Resolve-SingleAutopilotProfileInteractive()
                     }
                     Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($autopilotProfile.displayName)'" -LogLevel "Warning"
                     return $null
+                }
+                
+                # In Silent mode with exact match, automatically accept without prompting
+                if ($Silent)
+                {
+                    Write-Verbose "[$FunctionName] Silent mode: Auto-accepted exact match '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))"
+                    Write-Log -LogFile $logFile -Module $FunctionName -Message "Silent mode: Auto-accepted exact match '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -LogLevel "Verbose"
+                }
+                else
+                {
+                    Write-Host "  Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
                 }
                 
                 return @{
