@@ -323,12 +323,12 @@ function GetAutopilotProfile()
                         
                         foreach ($autopilotProfile in $allProfilesResult.value)
                         {
-                            $displayNameLower = if ($profile.displayName) { $profile.displayName.ToLower() } else { "" }
+                            $displayNameLower = if ($autopilotProfile.displayName) { $autopilotProfile.displayName.ToLower() } else { "" }
                             
                             # Match if display name contains the search term (case-insensitive)
                             if ($displayNameLower.Contains($searchTermLower))
                             {
-                                $matchedProfiles += $profile
+                                $matchedProfiles += $autopilotProfile
                             }
                         }
                         
