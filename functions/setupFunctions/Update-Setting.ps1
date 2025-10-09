@@ -252,9 +252,10 @@ function Update-Setting()
                 
                 if ($null -eq $domainConfig)
                 {
-                    Write-Warning "[$functionName] Failed to load domain configuration for: $DomainName"
-                    Write-Log -LogFile $logFile -Message "Failed to load domain configuration for: $DomainName" -Module $functionName -LogLevel "Warning"
-                    return $false
+                    Write-Verbose "[$functionName] No existing domain configuration found, creating new configuration"
+                    Write-Log -LogFile $logFile -Message "No existing domain configuration found for '$DomainName', creating new configuration" -Module $functionName -LogLevel "Information"
+                    # Initialize empty hashtable for new domain configuration
+                    $domainConfig = @{}
                 }
                 
                 # Update domain settings

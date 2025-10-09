@@ -515,12 +515,17 @@ function Resolve-SingleAutopilotProfileInteractive()
         Resolves a single Autopilot profile name to profile object using interactive search.
         Uses GetAutopilotProfile function for better search capabilities.
         Checks for duplicates against existing items.
+    
+    .PARAMETER Silent
+        If specified and a single exact match is found, returns the profile without prompting.
+        Interactive prompts still occur for multiple matches or no matches.
     #>
     [CmdletBinding()]
     param(
         [string]$ProfileName,
         [string]$AccessToken,
-        [array]$ExistingItems = @()
+        [array]$ExistingItems = @(),
+        [switch]$Silent
     )
     
     $FunctionName = $MyInvocation.MyCommand.Name    
@@ -537,7 +542,15 @@ function Resolve-SingleAutopilotProfileInteractive()
     try
     {
         # First try exact match
-        Write-Host "  Searching for Autopilot profile: '$ProfileName'..." -ForegroundColor Cyan
+        if (-not $Silent)
+        {
+            Write-Host "  Searching for Autopilot profile: '$ProfileName'..." -ForegroundColor Cyan
+        }
+        else
+        {
+            Write-Verbose "[$FunctionName] Searching for Autopilot profile: '$ProfileName' (Silent mode)"
+        }
+        
         $result, $wasSubstringSearch = GetAutopilotProfile -AccessToken $AccessToken -ProfileName $ProfileName
         
         if ($result -and $result.value -and $result.value.Count -gt 0)
@@ -545,15 +558,28 @@ function Resolve-SingleAutopilotProfileInteractive()
             if ($result.value.Count -eq 1)
             {
                 # Single exact match found
-                $autopilotProfile = $result.value[0]    
-                Write-Host "  Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
+                $autopilotProfile = $result.value[0]
                 
                 # Check for duplicate
                 if (Test-ItemExists -ItemName $autopilotProfile.displayName -ItemId $autopilotProfile.id -ExistingList $ExistingItems)
                 {
-                    Write-Host "  WARNING: Profile '$($autopilotProfile.displayName)' is already in the list. Please choose a different profile." -ForegroundColor Yellow
+                    if (-not $Silent)
+                    {
+                        Write-Host "  WARNING: Profile '$($autopilotProfile.displayName)' is already in the list. Please choose a different profile." -ForegroundColor Yellow
+                    }
                     Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($autopilotProfile.displayName)'" -LogLevel "Warning"
                     return $null
+                }
+                
+                # In Silent mode with exact match, automatically accept without prompting
+                if ($Silent)
+                {
+                    Write-Verbose "[$FunctionName] Silent mode: Auto-accepted exact match '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))"
+                    Write-Log -LogFile $logFile -Module $FunctionName -Message "Silent mode: Auto-accepted exact match '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -LogLevel "Verbose"
+                }
+                else
+                {
+                    Write-Host "  Found profile: '$($autopilotProfile.displayName)' (ID: $($autopilotProfile.id))" -ForegroundColor Green
                 }
                 
                 return @{
@@ -673,12 +699,13 @@ function Resolve-SingleAutopilotProfileInteractive()
                 Write-Host "  No Autopilot profiles found matching '$ProfileName'." -ForegroundColor Red
                 Write-Host "  Options:" -ForegroundColor White
                 Write-Host "    1. Try different profile name" -ForegroundColor White
-                Write-Host "    2. Save profile name without ID (will resolve later)" -ForegroundColor White
-                Write-Host "    3. Skip this profile" -ForegroundColor White
+                Write-Host "    2. View all Autopilot profiles" -ForegroundColor White
+                Write-Host "    3. Save profile name without ID (will resolve later)" -ForegroundColor White
+                Write-Host "    4. Skip this profile" -ForegroundColor White
                 
                 do
                 {
-                    $choice = Read-Host "  Select option (1-3)"
+                    $choice = Read-Host "  Select option (1-4)"
                     switch ($choice)
                     {
                         '1'
@@ -697,6 +724,62 @@ function Resolve-SingleAutopilotProfileInteractive()
                         }
                         '2'
                         {
+                            # View all Autopilot profiles
+                            Write-Host ""
+                            Write-Host "  Retrieving all Autopilot profiles..." -ForegroundColor Cyan
+                            Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to view all Autopilot profiles" -LogLevel "Verbose"
+                            
+                            $allProfilesResult, $wasSubstringSearch = GetAutopilotProfile -AccessToken $AccessToken -GetAll
+                            
+                            if ($allProfilesResult -and $allProfilesResult.value -and $allProfilesResult.value.Count -gt 0)
+                            {
+                                Write-Host "  All Autopilot profiles ($($allProfilesResult.value.Count) total):" -ForegroundColor Yellow
+                                for ($i = 0; $i -lt $allProfilesResult.value.Count; $i++)
+                                {
+                                    $autopilotProfile = $allProfilesResult.value[$i]
+                                    Write-Host "    $($i + 1). $($autopilotProfile.displayName) (ID: $($autopilotProfile.id))" -ForegroundColor White
+                                }
+                                Write-Host "    0. Go back to options" -ForegroundColor Gray
+                                
+                                do
+                                {
+                                    $profileChoice = Read-Host "  Select profile (0-$($allProfilesResult.value.Count))"
+                                    if ($profileChoice -eq "0")
+                                    {
+                                        Write-Host "  Returning to options menu" -ForegroundColor Yellow
+                                        continue  # This will go back to the outer do-while loop
+                                    }
+                                    elseif ($profileChoice -match '^\d+$' -and [int]$profileChoice -ge 1 -and [int]$profileChoice -le $allProfilesResult.value.Count)
+                                    {
+                                        $selectedProfile = $allProfilesResult.value[[int]$profileChoice - 1]
+                                        Write-Host "  Selected: '$($selectedProfile.displayName)'" -ForegroundColor Green
+                                        Write-Log -LogFile $logFile -Module $FunctionName -Message "User selected Autopilot profile from all profiles list: '$($selectedProfile.displayName)' (ID: $($selectedProfile.id))" -LogLevel "Verbose"
+                                        
+                                        # Check for duplicate
+                                        if (Test-ItemExists -ItemName $selectedProfile.displayName -ItemId $selectedProfile.id -ExistingList $ExistingItems)
+                                        {
+                                            Write-Host "  WARNING: Profile '$($selectedProfile.displayName)' is already in the list. Please choose a different profile." -ForegroundColor Yellow
+                                            Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate profile detected: '$($selectedProfile.displayName)'" -LogLevel "Warning"
+                                            return $null
+                                        }
+                                        
+                                        return @{
+                                            name = $selectedProfile.displayName
+                                            id   = $selectedProfile.id
+                                        }
+                                    }
+                                    Write-Host "  Invalid choice. Please enter a number between 0 and $($allProfilesResult.value.Count)." -ForegroundColor Red
+                                } while ($true)
+                            }
+                            else
+                            {
+                                Write-Host "  Failed to retrieve Autopilot profiles or no profiles exist" -ForegroundColor Red
+                                Write-Log -LogFile $logFile -Module $FunctionName -Message "Failed to retrieve all Autopilot profiles" -LogLevel "Error"
+                                continue  # Go back to options menu
+                            }
+                        }
+                        '3'
+                        {
                             Write-Host "  Saving Autopilot profile '$ProfileName' without ID" -ForegroundColor Yellow
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User chose to save Autopilot profile without ID: '$ProfileName'" -LogLevel "Verbose"
                             return @{
@@ -704,7 +787,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                                 id   = $null
                             }
                         }
-                        '3'
+                        '4'
                         {
                             Write-Host "  Skipping Autopilot profile '$ProfileName'" -ForegroundColor Yellow
                             Write-Log -LogFile $logFile -Module $FunctionName -Message "User skipped Autopilot profile: '$ProfileName'" -LogLevel "Verbose"
@@ -712,7 +795,7 @@ function Resolve-SingleAutopilotProfileInteractive()
                         }
                         default
                         {
-                            Write-Host "  Invalid choice. Please enter 1, 2, or 3." -ForegroundColor Red
+                            Write-Host "  Invalid choice. Please enter 1, 2, 3, or 4." -ForegroundColor Red
                             continue
                         }
                     }

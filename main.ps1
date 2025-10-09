@@ -352,6 +352,30 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+
+$migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+# $migrationCheck = Invoke-SettingsMigration -Force
+if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
+{
+    Write-Host "Migration completed successfully." -ForegroundColor Green
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $legacyAutopilotProfilesPresent"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+}
+elseif ($migrationCheck.migrationNeeded -and -not $migrationCheck.success)
+{
+    $migrationCheck.errorMessages | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    Write-Host "Please rerun the script or contact support." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration failed with errors: $($migrationCheck.errorMessages -join '; ')" -LogLevel "Error"
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 1
+}
+else
+{
+    Write-Verbose "[$scriptName] No migration needed."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
+}
+
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
 # Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
@@ -698,7 +722,7 @@ foreach ($key in $settings.Keys)
     }
 }
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
-$global:getTokenParams = BuildAuthSplatTable -auth $auth
+$getTokenParams = BuildAuthSplatTable -auth $auth
 foreach ($key in $getTokenParams.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
@@ -956,6 +980,88 @@ else
         write-log -logFile $logFile -module $scriptName -message "Exiting script due to authentication failure." -LogLevel "Error"
         write-log -logFile $logFile -finishLogging
         exit 1
+    }
+}
+Write-Verbose "[$scriptName] Migrate legacy configuration: $($settings.migrateLegacyConfiguration)"
+write-log -logFile $logFile -module $scriptName -message "Migrate legacy configuration: $($settings.migrateLegacyConfiguration)" -LogLevel "Information"
+if ($settings.migrateLegacyConfiguration)
+{
+    Write-Verbose "Starting migration of legacy configuration"
+    write-log -logFile $logFile -module $scriptName -message "Starting migration of legacy configuration." -LogLevel "Information"
+    $resolvedLegacyObjects = Resolve-MigratedLegacyObjects -accessToken $accessToken -settings $settings -domain $domain -SettingsFile $InitFile
+    write-log -logFile $logFile -module $scriptName -message "Resolved migrated legacy objects: $($resolvedLegacyObjects | Out-String)" -LogLevel "Information"
+    $newSetting = @{
+        migrateLegacyConfiguration = $settings.migrateLegacyConfiguration
+    }
+    
+    # Check if user deferred the resolution
+    if ($resolvedLegacyObjects.userDeferred)
+    {
+        Write-Host "Legacy object resolution has been deferred." -ForegroundColor Yellow
+        Write-Host "You will be prompted again the next time the script starts." -ForegroundColor Yellow
+        write-log -logFile $logFile -module $scriptName -message "User deferred legacy object resolution. Will prompt on next start." -LogLevel "Information"
+        # Keep migrateLegacyConfiguration as true so user is prompted next time
+        $newSetting = @{
+            migrateLegacyConfiguration = $true
+        }
+    }
+    elseif ($resolvedLegacyObjects.success)
+    {
+        Write-Host "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects"
+        write-log -logFile $logFile -module $scriptName -message "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects." -LogLevel "Information"
+        $newSetting = @{
+            migrateLegacyConfiguration = $false
+        }
+    }
+    else
+    {
+        Write-Host "Failed to resolve legacy objects." -ForegroundColor Red
+        write-log -logFile $logFile -module $scriptName -message "Failed to resolve legacy objects." -LogLevel "Error"
+        $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+        write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start: $retry" -LogLevel "Information"
+        Write-Verbose "User chose to be prompted to resolve legacy objects on next start: $retry"
+        while ($retry -notin @('yes', 'no', 'y', 'n'))
+        {
+            Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+            [console]::beep()
+            $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+        }
+        if ($retry -in @('no', 'n'))
+        {
+            Write-Verbose "User chose not to be prompted to resolve legacy objects on next start."
+            write-log -logFile $logFile -module $scriptName -message "User chose not to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+            $newSetting = @{
+                migrateLegacyConfiguration = $false
+            }
+        }
+        else
+        {
+            Write-Host "You will be prompted to resolve them the next time the script starts."
+            write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+            $newSetting = @{
+                migrateLegacyConfiguration = $true
+            }
+        }
+    }
+    if ($newSetting.migrateLegacyConfiguration -ne $settings.migrateLegacyConfiguration)
+    {
+        $updatedSetting = Update-Setting -SettingType "Domain" -DomainName $domain -Settings $newSetting -SettingsFile $InitFile -MergeSettings
+        write-log -logFile $logFile -module $scriptName -message "Settings updated: $($updatedSetting | Out-String)" -LogLevel "Information"
+        if ($updatedSetting)
+        {
+            Write-Host "Settings updated successfully." -ForegroundColor Green
+            write-log -logFile $logFile -module $scriptName -message "Settings updated successfully." -LogLevel "Information"
+        }
+        else
+        {
+            Write-Host "Failed to update settings." -ForegroundColor Red
+            write-log -logFile $logFile -module $scriptName -message "Failed to update settings." -LogLevel "Error"
+        }
+    }
+    else
+    {
+        Write-Verbose "No changes made to migrateLegacyConfiguration setting."
+        write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
     }
 }
 #endregion initialization block with access token
