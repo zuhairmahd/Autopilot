@@ -141,7 +141,7 @@ $TestRegistry = @{
         # Integration tests including e2e, configuration, menu, auth, and migration tests
         Pattern           = 'test-*-integration.ps1,test-e2e-*.ps1,test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system*.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-auth-configuration-pipeline.ps1,test-migration-*.ps1,test-main-integration.ps1'
         Priority          = 4
-        EstimatedDuration = '3-5 minutes'
+        EstimatedDuration = '4-6 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
     }
     'comprehensive' = @{
