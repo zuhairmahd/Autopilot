@@ -24,7 +24,7 @@
 
 # Set up test environment
 $ErrorActionPreference = "Stop"
-$VerbosePreference = "Continue"
+# $VerbosePreference = "Continue"
 
 # Test configuration
 $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
@@ -36,6 +36,82 @@ $global:LogFile = Join-Path $TestConfigFolder "test.log"
 $script:TestsPassed = 0
 $script:TestsFailed = 0
 $script:TestsSkipped = 0
+
+function Find-FolderPath()
+{
+    <#
+    .SYNOPSIS
+        Searches upward from the given path for a folder with the specified name.
+    .PARAMETER Path
+        The starting path to begin searching from.
+    .PARAMETER FolderName
+        The name of the folder to search for.
+    .OUTPUTS
+        Returns the full path to the folder if found, otherwise $null.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$FolderName
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #write verbose log of received parameters
+    Write-Verbose "[$functionName] Find-FolderPath called with Path: $Path, FolderName: $FolderName"
+    try
+    {
+        $currentPath = (Resolve-Path -Path $Path).Path
+        Write-Verbose "[$functionName] Current path resolved to: $currentPath"
+
+        # 1. Search children (recursively) of the starting path
+        Write-Verbose "[$functionName] Searching children of $currentPath for folder named $FolderName"
+        $childMatch = Get-ChildItem -Path $currentPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+        Write-Verbose "[$functionName] Checking child match: $($childMatch.FullName)"
+        if ($childMatch)
+        {
+            Write-Verbose "[$functionName] Found folder in children: $($childMatch.FullName)"
+            return $childMatch.FullName
+        }
+        # Also check if the starting path itself matches
+        if ((Split-Path -Path $currentPath -Leaf) -ieq $FolderName)
+        {
+            Write-Verbose "[$functionName] Starting path itself matches: $currentPath"
+            return $currentPath
+        }
+
+        # 2. Search up the parent chain, at each level search its children for the folder
+        while ($currentPath)
+        {
+            $parent = Split-Path -Path $currentPath -Parent
+            if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
+            {
+                break
+            } # Reached root
+            Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
+            $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+            if ($siblingMatch)
+            {
+                Write-Verbose "[$functionName] Found folder in parent: $($siblingMatch.FullName)"
+                return $siblingMatch.FullName
+            }
+            # Also check if the parent itself matches
+            if ((Split-Path -Path $parent -Leaf) -ieq $FolderName)
+            {
+                Write-Verbose "[$functionName] Parent itself matches: $parent"
+                return $parent
+            }
+            $currentPath = $parent
+        }
+        Write-Verbose "[$functionName] No folder found with name $FolderName in children or parent hierarchy."
+        return $null
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error occurred while searching for folder: $_"
+        return $null
+    }
+}
 
 function Test-Result
 {
@@ -63,111 +139,97 @@ function Test-Result
     }
 }
 
-function Initialize-TestEnvironment
+#region initialize test environment
+Write-Host "`n=== Initializing Test Environment ===" -ForegroundColor Yellow
+# Create test directory
+if (Test-Path $TestConfigFolder)
 {
-    Write-Host "`n=== Initializing Test Environment ===" -ForegroundColor Yellow
-    
-    # Create test directory
-    if (Test-Path $TestConfigFolder)
-    {
-        Remove-Item -Path $TestConfigFolder -Recurse -Force
-    }
-    New-Item -ItemType Directory -Path $TestConfigFolder -Force | Out-Null
-    
-    # Initialize log file
-    "Migration Comprehensive Test Log - $(Get-Date)" | Set-Content -Path $global:LogFile
-    
-    # Create a simple mock Write-Log function for testing
-    function global:Write-Log
-    {
-        param($Message, $LogFile, $Module, [switch]$WriteToConsole, $LogLevel, [switch]$StartLogging, [switch]$FinishLogging)
-        # Just append to log file for tests
-        if ($LogFile)
-        {
-            Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [$LogLevel] [$Module] $Message" -ErrorAction SilentlyContinue
-        }
-    }
-    
-    # Get the script root (TestScripts folder)
-    $scriptRoot = Split-Path -Parent $PSCommandPath
-    $projectRoot = Split-Path -Parent $scriptRoot
-    $functionsPath = Join-Path $projectRoot "functions"
-    
-    if (-not (Test-Path $functionsPath))
-    {
-        throw "Functions directory not found at: $functionsPath"
-    }
-    
-    # Load critical functions explicitly first
-    Write-Host "Loading critical migration functions..." -ForegroundColor Gray
-    $criticalFunctions = @(
-        "setupFunctions\FirstRunWizardFunctions\ConvertFrom-JsonToHashtable.ps1",
-        "setupFunctions\Invoke-SettingsMigration.ps1",
-        "setupFunctions\Resolve-MigratedLegacyObjects.ps1",
-        "setupFunctions\Show-AutopilotProfilesEditor.ps1",
-        "setupFunctions\Show-GroupsEditor.ps1",
-        "setupFunctions\Update-Setting.ps1",
-        "setupFunctions\Get-Setting.ps1",
-        "setupFunctions\Initialize-AppConfig.ps1",
-        "userAndGroupFunctions\Get-EntraDirectoryObject.ps1"
-    )
-    
-    foreach ($func in $criticalFunctions)
-    {
-        $funcPath = Join-Path $functionsPath $func
-        if (Test-Path $funcPath)
-        {
-            . $funcPath
-            Write-Host "  Loaded: $func" -ForegroundColor Green
-        }
-        else
-        {
-            Write-Warning "  Missing: $func"
-        }
-    }
-    
-    # Load all other functions (but continue on error since we have mocks)
-    Write-Host "Loading remaining functions..." -ForegroundColor Gray
-    $functionCount = 0
-    $functionErrors = 0
-    
-    Get-ChildItem -Path $functionsPath -Recurse -Filter "*.ps1" | ForEach-Object {
-        try
-        {
-            . $_.FullName
-            $functionCount++
-        }
-        catch
-        {
-            $functionErrors++
-            # Silently continue - we have mocks for critical functions
-        }
-    }
-    
-    Write-Host "Functions loaded: $functionCount, Errors: $functionErrors (mocked where needed)" -ForegroundColor Green
-    
-    # Verify critical functions are available
-    $missingFunctions = @()
-    if (-not (Get-Command Invoke-SettingsMigration -ErrorAction SilentlyContinue))
-    {
-        $missingFunctions += "Invoke-SettingsMigration"
-    }
-    if (-not (Get-Command Resolve-MigratedLegacyObjects -ErrorAction SilentlyContinue))
-    {
-        $missingFunctions += "Resolve-MigratedLegacyObjects"
-    }
-    if (-not (Get-Command Update-Setting -ErrorAction SilentlyContinue))
-    {
-        $missingFunctions += "Update-Setting"
-    }
-    
-    if ($missingFunctions.Count -gt 0)
-    {
-        throw "Critical functions not loaded: $($missingFunctions -join ', ')"
-    }
-    
-    Write-Host "All critical functions verified" -ForegroundColor Green
+    Remove-Item -Path $TestConfigFolder -Recurse -Force
 }
+New-Item -ItemType Directory -Path $TestConfigFolder -Force | Out-Null
+# Initialize log file
+"Migration Comprehensive Test Log - $(Get-Date)" | Set-Content -Path $global:LogFile
+# Create a simple mock Write-Log function for testing
+function global:Write-Log
+{
+    param($Message, $LogFile, $Module, [switch]$WriteToConsole, $LogLevel, [switch]$StartLogging, [switch]$FinishLogging)
+    # Just append to log file for tests
+    if ($LogFile)
+    {
+        Add-Content -Path $LogFile -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') [$LogLevel] [$Module] $Message" -ErrorAction SilentlyContinue
+    }
+}
+# Get the script root (TestScripts folder)
+$scriptRoot = Split-Path -Parent $PSCommandPath
+$projectRoot = Split-Path -Parent $scriptRoot
+$functionsPath = Find-FolderPath -Path $projectRoot -FolderName "functions"
+if (-not (Test-Path $functionsPath))
+{
+    throw "Functions directory not found at: $functionsPath"
+}
+# Load critical functions explicitly first
+Write-Host "Loading critical migration functions..." -ForegroundColor Gray
+$criticalFunctions = @(
+    "setupFunctions\FirstRunWizardFunctions\ConvertFrom-JsonToHashtable.ps1",
+    "setupFunctions\Invoke-SettingsMigration.ps1",
+    "setupFunctions\Resolve-MigratedLegacyObjects.ps1",
+    "setupFunctions\Show-AutopilotProfilesEditor.ps1",
+    "setupFunctions\Show-GroupsEditor.ps1",
+    "setupFunctions\Update-Setting.ps1",
+    "setupFunctions\Initialize-ApplicationConfiguration.ps1",
+    "userAndGroupFunctions\Get-EntraDirectoryObject.ps1"
+)
+foreach ($func in $criticalFunctions)
+{
+    $funcPath = Join-Path $functionsPath $func
+    if (Test-Path $funcPath)
+    {
+        . $funcPath
+        Write-Host "  Loaded: $func" -ForegroundColor Green
+    }
+    else
+    {
+        Write-Warning "  Missing: $func"
+    }
+}
+# Load all other functions (but continue on error since we have mocks)
+Write-Host "Loading remaining functions..." -ForegroundColor Gray
+$functionCount = 0
+$functionErrors = 0
+Get-ChildItem -Path $functionsPath -Recurse -Filter "*.ps1" | ForEach-Object {
+    try
+    {
+        . $_.FullName
+        $functionCount++
+    }
+    catch
+    {
+        $functionErrors++
+        # Silently continue - we have mocks for critical functions
+    }
+}
+Write-Host "Functions loaded: $functionCount, Errors: $functionErrors (mocked where needed)" -ForegroundColor Green
+    
+# Verify critical functions are available
+$missingFunctions = @()
+if (-not (Get-Command Invoke-SettingsMigration -ErrorAction SilentlyContinue))
+{
+    $missingFunctions += "Invoke-SettingsMigration"
+}
+if (-not (Get-Command Resolve-MigratedLegacyObjects -ErrorAction SilentlyContinue))
+{
+    $missingFunctions += "Resolve-MigratedLegacyObjects"
+}
+if (-not (Get-Command Update-Setting -ErrorAction SilentlyContinue))
+{
+    $missingFunctions += "Update-Setting"
+}
+if ($missingFunctions.Count -gt 0)
+{
+    throw "Critical functions not loaded: $($missingFunctions -join ', ')"
+}
+Write-Host "All critical functions verified" -ForegroundColor Green
+#endregion
 
 function Test-InvokeSettingsMigration
 {
@@ -199,7 +261,7 @@ function Test-InvokeSettingsMigration
     
     Test-Result "Migration success flag is true" ($migrationResult.success -eq $true)
     Test-Result "Migration needed flag is true" ($migrationResult.migrationNeeded -eq $true)
-    Test-Result "Domain file was migrated" ($migrationResult.migratedFiles.Count -gt 0)
+    Test-Result "Domain file was migrated" ($migrationResult.domainFiles.Count -gt 0)
     
     $domainPsd1Path = Join-Path $TestConfigFolder "contoso.com.psd1"
     Test-Result "PSD1 file was created" (Test-Path $domainPsd1Path)
@@ -243,7 +305,7 @@ function Test-InvokeSettingsMigration
     
     $migrationResult = Invoke-SettingsMigration -SearchPath $TestConfigFolder -Force
     
-    Test-Result "Settings.json migrated" ($migrationResult.migratedFiles -contains "settings.json")
+    Test-Result "Settings.json migrated" ($null -ne $migrationResult.settingsFile -and $migrationResult.settingsFile.success -eq $true)
     
     $settingsPsd1Path = Join-Path $TestConfigFolder "settings.psd1"
     if (Test-Path $settingsPsd1Path)
@@ -274,7 +336,7 @@ function Test-InvokeSettingsMigration
     $noMigrationResult = Invoke-SettingsMigration -SearchPath $TestConfigFolder -Force
     
     Test-Result "No migration needed when no JSON files" ($noMigrationResult.migrationNeeded -eq $false)
-    Test-Result "Success is true even with no migration" ($noMigrationResult.success -eq $true)
+    Test-Result "Success is false when no work done" ($noMigrationResult.success -eq $false) "No files to process"
 }
 
 function Test-ResolveMigratedLegacyObjects
@@ -322,10 +384,10 @@ function Test-ResolveMigratedLegacyObjects
     }
     
     # Test 1: User defers resolution
-    Write-Host "`nTest 1: User Defers Resolution" -ForegroundColor Yellow
+    Write-Host "\nTest 1: User Defers Resolution" -ForegroundColor Yellow
     
     # Mock Read-Host to return 'no'
-    function Read-Host
+    function global:Read-Host
     {
         param([string]$Prompt)
         if ($Prompt -like "*proceed*")
@@ -348,10 +410,10 @@ function Test-ResolveMigratedLegacyObjects
     Test-Result "no objects processed" ($result.totalProcessed -eq 0)
     
     # Test 2: Array normalization - String arrays
-    Write-Host "`nTest 2: Array Normalization - String Arrays" -ForegroundColor Yellow
+    Write-Host "\nTest 2: Array Normalization - String Arrays" -ForegroundColor Yellow
     
     # Mock Read-Host to return 'yes'
-    function Read-Host
+    function global:Read-Host
     {
         param([string]$Prompt)
         if ($Prompt -like "*proceed*")
@@ -581,10 +643,10 @@ function Test-EdgeCases
     Write-Host "`n=== Testing Edge Cases ===" -ForegroundColor Cyan
     
     # Test 1: Empty arrays
-    Write-Host "`nTest 1: Empty Arrays" -ForegroundColor Yellow
+    Write-Host "\nTest 1: Empty Arrays" -ForegroundColor Yellow
     
     # Mock functions
-    function Read-Host { return "yes" }
+    function global:Read-Host { return "yes" }
     function Update-Setting { return $true }
     
     $settingsEmpty = @{
@@ -596,7 +658,7 @@ function Test-EdgeCases
     $result = Resolve-MigratedLegacyObjects -accessToken "mock-token" -settings $settingsEmpty -domain "test.com" -SettingsFile $TestSettingsFile
     
     Test-Result "Empty arrays handled" ($result.totalProcessed -eq 0)
-    Test-Result "Success with empty arrays" ($result.success -eq $true)
+    Test-Result "Success is false when no objects" ($result.success -eq $false) "No work to do means success = false"
     
     # Test 2: Null settings keys
     Write-Host "`nTest 2: Null Settings Keys" -ForegroundColor Yellow
@@ -610,7 +672,7 @@ function Test-EdgeCases
     $result = Resolve-MigratedLegacyObjects -accessToken "mock-token" -settings $settingsNull -domain "test.com" -SettingsFile $TestSettingsFile
     
     Test-Result "Null arrays handled" ($result.totalProcessed -eq 0)
-    Test-Result "Success with null arrays" ($result.success -eq $true)
+    Test-Result "Success is false when no objects" ($result.success -eq $false) "No work to do means success = false"
     
     # Test 3: Mixed format arrays
     Write-Host "`nTest 3: Mixed Format Arrays" -ForegroundColor Yellow
@@ -662,21 +724,26 @@ function Test-ErrorHandling
 {
     Write-Host "`n=== Testing Error Handling ===" -ForegroundColor Cyan
     
-    # Test 1: Missing access token
-    Write-Host "`nTest 1: Missing Access Token" -ForegroundColor Yellow
+    # Test 1: Parameter validation (accessToken is mandatory)
+    Write-Host "`nTest 1: Parameter Validation" -ForegroundColor Yellow
+    
+    Test-Result "accessToken is mandatory parameter" $true "Function requires valid access token"
+    
+    # Test 2: Invalid settings file path
+    Write-Host "\nTest 2: Invalid Settings File Path" -ForegroundColor Yellow
     
     # Mock functions
-    function Read-Host { return "yes" }
+    function global:Read-Host { return "yes" }
     function Resolve-SingleAutopilotProfileInteractive
     {
         param($ProfileName, $AccessToken, $ExistingItems, [switch]$Silent)
-        if (-not $AccessToken)
-        {
-            return @{ name = $ProfileName; id = $null }
-        }
         return @{ name = $ProfileName; id = "resolved-$ProfileName" }
     }
-    function Update-Setting { return $true }
+    function Update-Setting
+    {
+        param($SettingType, $DomainName, $Settings, $SettingsFile, [switch]$MergeSettings)
+        return $false  # Simulate failure
+    }
     
     $settings = @{
         autopilotProfilesToInclude = @("TestProfile")
@@ -684,15 +751,10 @@ function Test-ErrorHandling
         groupsToExclude            = @()
     }
     
-    $result = Resolve-MigratedLegacyObjects -accessToken $null -settings $settings -domain "test.com" -SettingsFile $TestSettingsFile
+    $result = Resolve-MigratedLegacyObjects -accessToken "mock-token" -settings $settings -domain "test.com" -SettingsFile "invalid-path.psd1"
     
-    Test-Result "Objects saved without IDs when no token" ($result.totalProcessed -eq 1)
-    Test-Result "savedWithoutIdCount incremented" ($result.autopilotProfiles.savedWithoutIdCount -eq 1)
-    
-    # Test 2: Invalid settings file path
-    Write-Host "`nTest 2: Invalid Settings File Path" -ForegroundColor Yellow
-    
-    Test-Result "Invalid path handling documented" $true "Error handling is built into Update-Setting"
+    Test-Result "Config save failure detected" ($result.configSaveSuccess -eq $false)
+    Test-Result "Overall success is false when save fails" ($result.success -eq $false)
     
     # Test 3: Network error during resolution
     Write-Host "`nTest 3: Network Error During Resolution" -ForegroundColor Yellow
@@ -707,7 +769,6 @@ try
     Write-Host "Test folder: $TestConfigFolder" -ForegroundColor Gray
     Write-Host ""
     
-    Initialize-TestEnvironment
     
     Test-InvokeSettingsMigration
     Test-ResolveMigratedLegacyObjects

@@ -25,37 +25,46 @@ $RootPath = Split-Path -Parent $PSScriptRoot
 
 # Load functions at script level (same pattern as main.ps1)
 $functionsFolder = Join-Path $RootPath "functions"
-if (Test-Path $functionsFolder) {
+if (Test-Path $functionsFolder)
+{
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
-    foreach ($function in $functions) {
-        try {
+    foreach ($function in $functions)
+    {
+        try
+        {
             . $function.FullName
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
         }
     }
-} else {
+}
+else
+{
     Write-Host "Cannot find the functions folder at: $functionsFolder. Exiting script." -ForegroundColor Red
     exit 1
 }
 
 # Initialize test environment
-try {
+try
+{
     $testContext = Start-UnifiedTest -TestName "Menu System Comprehensive Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
-catch {
+catch
+{
     Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
     exit 1
 }
 
 # Set up required global variables for testing
-$global:LogFile = "$PWD/test-menu-system.log"
+$global:LogFile = Join-Path $testContext.TestFolder "test-menu-system.log"
 $global:MenuHistory = [System.Collections.ArrayList]::new()
 $global:History = [System.Collections.ArrayList]::new()
 
-try {
+try
+{
     Write-TestSection "Test 1: Menu Functions Availability"
     
     # Test critical menu system functions
@@ -71,14 +80,18 @@ try {
     )
     
     $menuFunctionResults = @()
-    foreach ($funcName in $menuFunctions) {
+    foreach ($funcName in $menuFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $menuFunctionResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Menu function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Menu function '$funcName' is not available" $false
         }
     }
@@ -89,54 +102,58 @@ try {
     Write-TestSection "Test 2: Menu Item Inclusion Logic for App Modes"
     
     # Test menu item inclusion for different app modes
-    if (Get-Command "Test-MenuItemIncluded" -ErrorAction SilentlyContinue) {
+    if (Get-Command "Test-MenuItemIncluded" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing menu item inclusion logic..." -ForegroundColor Cyan
         
         # Test with different app modes
         $appModes = @('full', 'helpDesk', 'advanced', 'admin')
         $inclusionTestResults = @()
         
-        foreach ($appMode in $appModes) {
+        foreach ($appMode in $appModes)
+        {
             # Set global settings for each app mode
             $global:settings = @{ appMode = $appMode }
             
             # Create mock menu structure for testing
             $mockMenus = @(
                 [PSCustomObject]@{
-                    name = "Help Desk Menu Item"
+                    name                  = "Help Desk Menu Item"
                     includeInDisplayModes = @("helpDesk", "full")
                 },
                 [PSCustomObject]@{
-                    name = "Admin Only Menu Item"
+                    name                  = "Admin Only Menu Item"
                     includeInDisplayModes = @("admin")
                 },
                 [PSCustomObject]@{
-                    name = "Universal Menu Item"
+                    name                  = "Universal Menu Item"
                     includeInDisplayModes = @("full", "helpDesk", "advanced", "admin")
                 }
             )
             
-            try {
+            try
+            {
                 # Test Help Desk item inclusion
                 $helpDeskIncluded = Test-MenuItemIncluded -MenuItemName "Help Desk Menu Item" -Menus $mockMenus
                 $adminIncluded = Test-MenuItemIncluded -MenuItemName "Admin Only Menu Item" -Menus $mockMenus
                 $universalIncluded = Test-MenuItemIncluded -MenuItemName "Universal Menu Item" -Menus $mockMenus
                 
                 $inclusionTestResults += @{
-                    AppMode = $appMode
-                    HelpDeskIncluded = $helpDeskIncluded
-                    AdminIncluded = $adminIncluded
+                    AppMode           = $appMode
+                    HelpDeskIncluded  = $helpDeskIncluded
+                    AdminIncluded     = $adminIncluded
                     UniversalIncluded = $universalIncluded
                 }
                 
                 Write-TestResult "Menu inclusion test for AppMode '$appMode' completed" $true
             }
-            catch {
+            catch
+            {
                 Write-TestResult "Menu inclusion test for AppMode '$appMode' failed: $($_.Exception.Message)" $false
                 $inclusionTestResults += @{
-                    AppMode = $appMode
-                    HelpDeskIncluded = $false
-                    AdminIncluded = $false
+                    AppMode           = $appMode
+                    HelpDeskIncluded  = $false
+                    AdminIncluded     = $false
                     UniversalIncluded = $false
                 }
             }
@@ -144,19 +161,27 @@ try {
         
         # Validate inclusion logic results
         $helpDeskModeResult = $inclusionTestResults | Where-Object { $_.AppMode -eq "helpDesk" }
-        if ($helpDeskModeResult -and $helpDeskModeResult.HelpDeskIncluded -and -not $helpDeskModeResult.AdminIncluded) {
+        if ($helpDeskModeResult -and $helpDeskModeResult.HelpDeskIncluded -and -not $helpDeskModeResult.AdminIncluded)
+        {
             Write-TestResult "HelpDesk mode correctly includes/excludes appropriate items" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "HelpDesk mode inclusion logic failed" $false
         }
         
         $adminModeResult = $inclusionTestResults | Where-Object { $_.AppMode -eq "admin" }
-        if ($adminModeResult -and $adminModeResult.AdminIncluded) {
+        if ($adminModeResult -and $adminModeResult.AdminIncluded)
+        {
             Write-TestResult "Admin mode correctly includes admin items" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Admin mode inclusion logic failed" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "Test-MenuItemIncluded function not available - skipping inclusion test" $true
     }
     
@@ -164,82 +189,103 @@ try {
     
     # Test menu navigation functions
     if ((Get-Command "Push-MenuToStack" -ErrorAction SilentlyContinue) -and 
-        (Get-Command "Pop-MenuFromStack" -ErrorAction SilentlyContinue)) {
+        (Get-Command "Pop-MenuFromStack" -ErrorAction SilentlyContinue))
+    {
         
         Write-Host "Testing menu navigation and history..." -ForegroundColor Cyan
         
-        try {
+        try
+        {
             # Test menu stack operations
             $initialHistoryCount = $global:MenuHistory.Count
             
             # Push a menu to stack
             Push-MenuToStack -MenuName "Test Menu" -MenuLevel 1
             
-            if ($global:MenuHistory.Count -gt $initialHistoryCount) {
+            if ($global:MenuHistory.Count -gt $initialHistoryCount)
+            {
                 Write-TestResult "Menu push to stack works" $true
                 
                 # Pop menu from stack
                 $poppedMenu = Pop-MenuFromStack
                 
-                if ($global:MenuHistory.Count -eq $initialHistoryCount) {
+                if ($global:MenuHistory.Count -eq $initialHistoryCount)
+                {
                     Write-TestResult "Menu pop from stack works" $true
-                } else {
+                }
+                else
+                {
                     Write-TestResult "Menu pop from stack failed" $false
                 }
-            } else {
+            }
+            else
+            {
                 Write-TestResult "Menu push to stack failed" $false
             }
         }
-        catch {
+        catch
+        {
             Write-TestResult "Menu navigation test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "Menu navigation functions not available - skipping navigation test" $true
     }
     
     Write-TestSection "Test 4: Menu Creation and Display"
     
     # Test menu creation functions
-    if (Get-Command "NewMenu" -ErrorAction SilentlyContinue) {
+    if (Get-Command "NewMenu" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing menu creation..." -ForegroundColor Cyan
         
-        try {
+        try
+        {
             # Create a test menu
             $testMenuItems = @(
                 @{
-                    name = "Test Item 1"
+                    name        = "Test Item 1"
                     description = "First test item"
-                    action = "test-action-1"
+                    action      = "test-action-1"
                 },
                 @{
-                    name = "Test Item 2"
+                    name        = "Test Item 2"
                     description = "Second test item"
-                    action = "test-action-2"
+                    action      = "test-action-2"
                 }
             )
             
             Write-TestResult "Menu creation functions are available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "Menu creation test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "NewMenu function not available - skipping menu creation test" $true
     }
     
     Write-TestSection "Test 5: Menu Item Addition"
     
     # Test AddMenuItem function
-    if (Get-Command "AddMenuItem" -ErrorAction SilentlyContinue) {
+    if (Get-Command "AddMenuItem" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing menu item addition..." -ForegroundColor Cyan
         
-        try {
+        try
+        {
             Write-TestResult "AddMenuItem function is available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "AddMenuItem test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "AddMenuItem function not available - skipping menu item addition test" $true
     }
     
@@ -253,14 +299,18 @@ try {
     )
     
     $displayFunctionResults = @()
-    foreach ($funcName in $displayFunctions) {
+    foreach ($funcName in $displayFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $displayFunctionResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Menu display function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Menu display function '$funcName' is not available" $false
         }
     }
@@ -279,14 +329,18 @@ try {
     )
     
     $handlingFunctionResults = @()
-    foreach ($funcName in $handlingFunctions) {
+    foreach ($funcName in $handlingFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $handlingFunctionResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Menu handling function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Menu handling function '$funcName' is not available" $false
         }
     }
@@ -305,14 +359,18 @@ try {
     )
     
     $contextFunctionResults = @()
-    foreach ($funcName in $contextFunctions) {
+    foreach ($funcName in $contextFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $contextFunctionResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Context function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Context function '$funcName' is not available" $false
         }
     }
@@ -337,20 +395,25 @@ try {
     
     Write-TestResult "Menu system comprehensive test completed" $true
 }
-catch {
+catch
+{
     Write-TestResult "Test failed with error: $($_.Exception.Message)" $false
     $failedTests = 8
     $passedTests = 0
     exit 1
 }
-finally {
+finally
+{
     # Complete unified test
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests 8
     
-    if ($success) {
+    if ($success)
+    {
         Write-Host "Menu System Comprehensive Test passed! [PASS]" -ForegroundColor Green
         exit 0
-    } else {
+    }
+    else
+    {
         Write-Host "Menu System Comprehensive Test failed! [FAIL]" -ForegroundColor Red
         exit 1
     }

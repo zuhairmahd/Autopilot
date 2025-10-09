@@ -21,6 +21,10 @@
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $functionsPath = Join-Path $scriptRoot "../functions"
 
+# Create temporary folder for test artifacts
+$TestTempFolder = Join-Path $env:TEMP "autopilot-issue118-test-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $TestTempFolder -Force | Out-Null
+
 # Load all functions recursively
 Write-Host "Loading functions..." -ForegroundColor Cyan
 $functionFiles = Get-ChildItem -Path $functionsPath -Filter "*.ps1" -Recurse
@@ -39,7 +43,7 @@ foreach ($file in $functionFiles)
 
 # Set global variables that the functions expect
 $global:maxJSONDepth = 10
-$global:logFile = Join-Path $scriptRoot "test.log"
+$global:logFile = Join-Path $TestTempFolder "test.log"
 
 Write-Host "`n=== Issue #118 Comprehensive Validation ===" -ForegroundColor Yellow
 Write-Host "Testing: Refactor VerifyGroupMembership to prioritize group ids" -ForegroundColor White
@@ -323,6 +327,20 @@ Write-Host "✅ 4. Automatic migration capability added" -ForegroundColor Green
 Write-Host "✅ 5. Groups viewer enhanced" -ForegroundColor Green
 Write-Host "✅ 6. Documentation updated" -ForegroundColor Green
 Write-Host "✅ 7. Comprehensive testing implemented" -ForegroundColor Green
+
+# Cleanup temporary folder
+try
+{
+    if (Test-Path $TestTempFolder)
+    {
+        Remove-Item -Path $TestTempFolder -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "`nCleaned up temporary test folder" -ForegroundColor Gray
+    }
+}
+catch
+{
+    Write-Warning "Could not clean up temporary folder: $($_.Exception.Message)"
+}
 Write-Host ""
 Write-Host "🎉 ALL REQUIREMENTS SATISFIED" -ForegroundColor Green
 Write-Host "Issue #118 implementation is complete and validated." -ForegroundColor White

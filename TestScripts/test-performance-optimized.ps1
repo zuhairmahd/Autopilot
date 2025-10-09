@@ -23,15 +23,28 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$CompareWithBaseline,
     [Parameter(Mandatory = $false)]
-    [string]$LogFile = "performance-optimized.log"
+    [string]$LogFile = $null
 )
 
 $ErrorActionPreference = "Stop"
 
+# Create temporary folder for test artifacts
+$TestTempFolder = Join-Path $env:TEMP "autopilot-perf-test-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $TestTempFolder -Force | Out-Null
+
+# Set log file to temp folder if not specified
+if (-not $LogFile)
+{
+    $LogFile = Join-Path $TestTempFolder "performance-optimized.log"
+}
+
 # Import test helper
-try {
+try
+{
     . "$PSScriptRoot/test-helper.ps1"
-} catch {
+}
+catch
+{
     Write-Warning "Could not load test helper, continuing without helper functions"
 }
 
@@ -45,7 +58,8 @@ $testResults = @()
 # Test 1: Optimized Function Performance
 Write-Host "Test 1: Optimized Function Performance" -ForegroundColor Cyan
 
-try {
+try
+{
     # Import optimized functions
     . "$PSScriptRoot/../functions/setupFunctions/Get-ApplicationDefaults.ps1"
     . "$PSScriptRoot/../functions/setupFunctions/MergeSettings.ps1"
@@ -54,18 +68,21 @@ try {
     Write-Host "  Testing default value caching..." -ForegroundColor Gray
     
     # Clear cache
-    if (Get-Variable -Name "script:defaultsCache" -Scope Script -ErrorAction SilentlyContinue) {
+    if (Get-Variable -Name "script:defaultsCache" -Scope Script -ErrorAction SilentlyContinue)
+    {
         Remove-Variable -Name "script:defaultsCache" -Scope Script
     }
     
     $measurements = @()
-    for ($i = 1; $i -le $Iterations; $i++) {
+    for ($i = 1; $i -le $Iterations; $i++)
+    {
         $startTime = Get-Date
         $result = Get-ApplicationDefaults -DefaultType "Settings" -Version "test.cache.1.0"
         $duration = ((Get-Date) - $startTime).TotalMilliseconds
         $measurements += $duration
         
-        if ($DetailedOutput) {
+        if ($DetailedOutput)
+        {
             Write-Host "    Iteration $i`: $($duration)ms" -ForegroundColor Gray
         }
     }
@@ -87,19 +104,21 @@ try {
     Write-Host "  ✓ Cache improvement: $($cacheImprovement)%" -ForegroundColor Green
     
     $testResults += @{
-        Test = "Default Value Caching"
-        Success = $true
-        AverageTime = $avgCacheTime
+        Test             = "Default Value Caching"
+        Success          = $true
+        AverageTime      = $avgCacheTime
         CacheImprovement = $cacheImprovement
-        Details = "First: $($firstCall)ms, Cached: $($cachedCall)ms"
+        Details          = "First: $($firstCall)ms, Cached: $($cachedCall)ms"
     }
     
-} catch {
+}
+catch
+{
     Write-Host "  ✗ Caching test failed: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{
-        Test = "Default Value Caching"
+        Test    = "Default Value Caching"
         Success = $false
-        Error = $_.Exception.Message
+        Error   = $_.Exception.Message
     }
 }
 
@@ -107,7 +126,8 @@ try {
 Write-Host ""
 Write-Host "Test 2: Conditional Flattening Performance" -ForegroundColor Cyan
 
-try {
+try
+{
     # Import required functions
     . "$PSScriptRoot/../functions/setupFunctions/FirstRunWizardFunctions/ConvertFrom-JsonToHashtable.ps1"
     
@@ -119,7 +139,7 @@ try {
     }
     
     $complexConfig = @{
-        repoInfo = @{
+        repoInfo    = @{
             repoName = "TestRepo"
             repoPath = "test/path"
             settings = @{
@@ -133,14 +153,16 @@ try {
     
     # Measure simple config processing
     $start = Get-Date
-    for ($i = 1; $i -le 10; $i++) {
+    for ($i = 1; $i -le 10; $i++)
+    {
         $merged = MergeSettings -localSettings $simpleConfig -globalSettings @{} -Verbose:$false
     }
     $simpleTime = ((Get-Date) - $start).TotalMilliseconds / 10
     
     # Measure complex config processing
     $start = Get-Date
-    for ($i = 1; $i -le 10; $i++) {
+    for ($i = 1; $i -le 10; $i++)
+    {
         $merged = MergeSettings -localSettings $complexConfig -globalSettings @{} -Verbose:$false
     }
     $complexTime = ((Get-Date) - $start).TotalMilliseconds / 10
@@ -149,19 +171,21 @@ try {
     Write-Host "  ✓ Complex config processing: $($complexTime)ms average" -ForegroundColor Green
     
     $testResults += @{
-        Test = "Conditional Flattening"
-        Success = $true
-        SimpleConfigTime = $simpleTime
+        Test              = "Conditional Flattening"
+        Success           = $true
+        SimpleConfigTime  = $simpleTime
         ComplexConfigTime = $complexTime
-        Details = "Simple: $($simpleTime)ms, Complex: $($complexTime)ms"
+        Details           = "Simple: $($simpleTime)ms, Complex: $($complexTime)ms"
     }
     
-} catch {
+}
+catch
+{
     Write-Host "  ✗ Conditional flattening test failed: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{
-        Test = "Conditional Flattening"
+        Test    = "Conditional Flattening"
         Success = $false
-        Error = $_.Exception.Message
+        Error   = $_.Exception.Message
     }
 }
 
@@ -169,7 +193,8 @@ try {
 Write-Host ""
 Write-Host "Test 3: Lazy Loading Performance" -ForegroundColor Cyan
 
-try {
+try
+{
     # Import domain configuration function
     . "$PSScriptRoot/../functions/setupFunctions/Get-DomainConfigurationFromFiles.ps1"
     
@@ -194,20 +219,22 @@ try {
     Write-Host "  ✓ Lazy loading improvement: $($lazyImprovement)%" -ForegroundColor Green
     
     $testResults += @{
-        Test = "Lazy Loading"
-        Success = $true
-        LazyTime = $lazyTime
-        FullTime = $fullTime
+        Test        = "Lazy Loading"
+        Success     = $true
+        LazyTime    = $lazyTime
+        FullTime    = $fullTime
         Improvement = $lazyImprovement
-        Details = "Lazy: $($lazyTime)ms, Full: $($fullTime)ms, Improvement: $($lazyImprovement)%"
+        Details     = "Lazy: $($lazyTime)ms, Full: $($fullTime)ms, Improvement: $($lazyImprovement)%"
     }
     
-} catch {
+}
+catch
+{
     Write-Host "  ✗ Lazy loading test failed: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{
-        Test = "Lazy Loading"
+        Test    = "Lazy Loading"
         Success = $false
-        Error = $_.Exception.Message
+        Error   = $_.Exception.Message
     }
 }
 
@@ -215,7 +242,8 @@ try {
 Write-Host ""
 Write-Host "Test 4: Application Startup Performance" -ForegroundColor Cyan
 
-try {
+try
+{
     $scenarios = @(
         @{ AppMode = "full"; Description = "Full application mode" }
         @{ AppMode = "helpDesk"; Description = "Help desk mode" }
@@ -224,49 +252,63 @@ try {
     
     $startupResults = @{}
     
-    foreach ($scenario in $scenarios) {
+    foreach ($scenario in $scenarios)
+    {
         Write-Host "  Testing: $($scenario.Description)" -ForegroundColor Gray
         
         $measurements = @()
-        for ($i = 1; $i -le $Iterations; $i++) {
+        for ($i = 1; $i -le $Iterations; $i++)
+        {
             # Clear any cached modules
-            if (Get-Module -Name "Autopilot*") {
+            if (Get-Module -Name "Autopilot*")
+            {
                 Remove-Module -Name "Autopilot*" -Force
             }
             [System.GC]::Collect()
             
             $startTime = Get-Date
-            try {
+            try
+            {
                 # Test application startup with optimizations
                 $result = & pwsh -NoProfile -Command {
                     param($mode, $scriptPath)
                     $env:SKIP_INTERACTIVE = "true"
-                    try {
+                    try
+                    {
                         . $scriptPath -appMode $mode -LogLevel "Warning" 2>&1 | Out-Null
                         return @{ Success = $true; Error = $null }
-                    } catch {
+                    }
+                    catch
+                    {
                         return @{ Success = $false; Error = $_.Exception.Message }
                     }
                 } -ArgumentList $scenario.AppMode, "$PSScriptRoot/../main.ps1"
                 
                 $duration = ((Get-Date) - $startTime).TotalSeconds
                 
-                if ($result.Success) {
+                if ($result.Success)
+                {
                     $measurements += $duration
-                    if ($DetailedOutput) {
+                    if ($DetailedOutput)
+                    {
                         Write-Host "    Iteration $i`: $($duration)s" -ForegroundColor Gray
                     }
-                } else {
+                }
+                else
+                {
                     Write-Host "    Iteration $i failed: $($result.Error)" -ForegroundColor Red
                 }
-            } catch {
+            }
+            catch
+            {
                 Write-Host "    Iteration $i failed: $($_.Exception.Message)" -ForegroundColor Red
             }
             
             Start-Sleep -Milliseconds 200
         }
         
-        if ($measurements.Count -gt 0) {
+        if ($measurements.Count -gt 0)
+        {
             $avgTime = [math]::Round(($measurements | Measure-Object -Average).Average, 2)
             $minTime = [math]::Round(($measurements | Measure-Object -Minimum).Minimum, 2)
             $maxTime = [math]::Round(($measurements | Measure-Object -Maximum).Maximum, 2)
@@ -274,30 +316,34 @@ try {
             Write-Host "  ✓ Average: $($avgTime)s (Range: $($minTime)s - $($maxTime)s)" -ForegroundColor Green
             
             $startupResults[$scenario.AppMode] = @{
-                Average = $avgTime
-                Minimum = $minTime
-                Maximum = $maxTime
+                Average        = $avgTime
+                Minimum        = $minTime
+                Maximum        = $maxTime
                 SuccessfulRuns = $measurements.Count
-                TotalRuns = $Iterations
+                TotalRuns      = $Iterations
             }
-        } else {
+        }
+        else
+        {
             Write-Host "  ✗ All iterations failed for $($scenario.Description)" -ForegroundColor Red
         }
     }
     
     $testResults += @{
-        Test = "Application Startup"
+        Test    = "Application Startup"
         Success = $startupResults.Count -gt 0
         Results = $startupResults
         Details = "Measured startup across $($scenarios.Count) scenarios"
     }
     
-} catch {
+}
+catch
+{
     Write-Host "  ✗ Startup performance test failed: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{
-        Test = "Application Startup"
+        Test    = "Application Startup"
         Success = $false
-        Error = $_.Exception.Message
+        Error   = $_.Exception.Message
     }
 }
 
@@ -305,12 +351,14 @@ try {
 Write-Host ""
 Write-Host "Test 5: Memory Usage Validation" -ForegroundColor Cyan
 
-try {
+try
+{
     # Measure memory usage before and after optimizations
     $initialMemory = [System.GC]::GetTotalMemory($false)
     
     # Simulate optimized function usage
-    for ($i = 1; $i -le 50; $i++) {
+    for ($i = 1; $i -le 50; $i++)
+    {
         $result = Get-ApplicationDefaults -DefaultType "Settings" -Version "memory.test.$i"
         $merged = MergeSettings -localSettings @{test = "value$i"} -globalSettings @{}
     }
@@ -322,18 +370,20 @@ try {
     Write-Host "  ✓ Memory usage for 50 operations: $($memoryUsed)MB" -ForegroundColor Green
     
     $testResults += @{
-        Test = "Memory Usage"
-        Success = $true
+        Test         = "Memory Usage"
+        Success      = $true
         MemoryUsedMB = $memoryUsed
-        Details = "50 operations used $($memoryUsed)MB"
+        Details      = "50 operations used $($memoryUsed)MB"
     }
     
-} catch {
+}
+catch
+{
     Write-Host "  ✗ Memory usage test failed: $($_.Exception.Message)" -ForegroundColor Red
     $testResults += @{
-        Test = "Memory Usage"
+        Test    = "Memory Usage"
         Success = $false
-        Error = $_.Exception.Message
+        Error   = $_.Exception.Message
     }
 }
 
@@ -353,42 +403,51 @@ Write-Host "Success Rate: $($successRate)%" -ForegroundColor $(if ($successRate 
 Write-Host ""
 Write-Host "=== Detailed Results ===" -ForegroundColor Yellow
 
-foreach ($result in $testResults) {
+foreach ($result in $testResults)
+{
     $status = if ($result.Success) { "✓" } else { "✗" }
     $color = if ($result.Success) { "Green" } else { "Red" }
     
     Write-Host "$status $($result.Test)" -ForegroundColor $color
-    if ($result.Success -and $result.Details) {
+    if ($result.Success -and $result.Details)
+    {
         Write-Host "  $($result.Details)" -ForegroundColor Gray
-    } elseif (-not $result.Success -and $result.Error) {
+    }
+    elseif (-not $result.Success -and $result.Error)
+    {
         Write-Host "  Error: $($result.Error)" -ForegroundColor Red
     }
 }
 
 # Compare with baseline if requested
-if ($CompareWithBaseline) {
+if ($CompareWithBaseline)
+{
     Write-Host ""
     Write-Host "=== Baseline Comparison ===" -ForegroundColor Yellow
     Write-Host "To compare with baseline, run: .\test-performance-baseline.ps1" -ForegroundColor Gray
 }
 
 # Log results if requested
-if ($LogFile) {
-    try {
+if ($LogFile)
+{
+    try
+    {
         $logData = @{
-            Timestamp = Get-Date
+            Timestamp   = Get-Date
             TestResults = $testResults
-            Summary = @{
-                TotalTests = $totalTests
+            Summary     = @{
+                TotalTests      = $totalTests
                 SuccessfulTests = $successfulTests
-                SuccessRate = $successRate
+                SuccessRate     = $successRate
             }
         }
         
         $logData | ConvertTo-Json -Depth 10 | Out-File -FilePath $LogFile -Encoding UTF8
         Write-Host ""
         Write-Host "Results logged to: $LogFile" -ForegroundColor Gray
-    } catch {
+    }
+    catch
+    {
         Write-Warning "Could not write log file: $($_.Exception.Message)"
     }
 }
@@ -396,11 +455,28 @@ if ($LogFile) {
 Write-Host ""
 Write-Host "Test completed: $(Get-Date)" -ForegroundColor Gray
 
+# Cleanup temporary folder
+try
+{
+    if (Test-Path $TestTempFolder)
+    {
+        Remove-Item -Path $TestTempFolder -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "Cleaned up temporary test folder" -ForegroundColor Gray
+    }
+}
+catch
+{
+    Write-Warning "Could not clean up temporary folder: $($_.Exception.Message)"
+}
+
 # Return exit code based on success rate
-if ($successRate -eq 100) {
+if ($successRate -eq 100)
+{
     Write-Host "✓ All performance optimization tests passed!" -ForegroundColor Green
     exit 0
-} else {
+}
+else
+{
     Write-Host "⚠ Some performance optimization tests failed!" -ForegroundColor Yellow
     exit 1
 }

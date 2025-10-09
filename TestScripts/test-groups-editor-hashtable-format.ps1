@@ -13,6 +13,10 @@
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $functionsPath = Join-Path $scriptRoot "../functions"
 
+# Create temporary folder for test artifacts
+$TestTempFolder = Join-Path $env:TEMP "autopilot-groups-hashtable-test-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $TestTempFolder -Force | Out-Null
+
 # Load all functions recursively
 Write-Host "Loading functions..." -ForegroundColor Cyan
 $functionFiles = Get-ChildItem -Path $functionsPath -Filter "*.ps1" -Recurse
@@ -31,7 +35,7 @@ foreach ($file in $functionFiles)
 
 # Set global variables that the functions expect
 $global:maxJSONDepth = 10
-$global:logFile = Join-Path $scriptRoot "test.log"
+$global:logFile = Join-Path $TestTempFolder "test.log"
 
 Write-Host "`n=== Groups Editor Hashtable Format Tests ===" -ForegroundColor Yellow
 

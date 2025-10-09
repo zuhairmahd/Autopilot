@@ -13,6 +13,10 @@
 $scriptRoot = Split-Path -Parent $PSCommandPath
 $functionsPath = Join-Path $scriptRoot "../functions"
 
+# Create temporary folder for test artifacts
+$TestTempFolder = Join-Path $env:TEMP "autopilot-groups-editor-test-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $TestTempFolder -Force | Out-Null
+
 # Load all functions recursively
 Write-Host "Loading functions..." -ForegroundColor Cyan
 $functionFiles = Get-ChildItem -Path $functionsPath -Filter "*.ps1" -Recurse
@@ -31,7 +35,7 @@ foreach ($file in $functionFiles)
 
 # Set global variables that the functions expect
 $global:maxJSONDepth = 10
-$global:logFile = Join-Path $scriptRoot "test.log"
+$global:logFile = Join-Path $TestTempFolder "test.log"
 
 # Test 1: Function exists and can be called
 Write-Host "`n=== Test 1: Function Availability ===" -ForegroundColor Yellow
@@ -228,3 +232,17 @@ else
 
 Write-Host "`n=== Groups Editor Tests Complete ===" -ForegroundColor Cyan
 Write-Host "All basic functionality tests completed." -ForegroundColor White
+
+# Cleanup temporary folder
+try
+{
+    if (Test-Path $TestTempFolder)
+    {
+        Remove-Item -Path $TestTempFolder -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "`nCleaned up temporary test folder" -ForegroundColor Gray
+    }
+}
+catch
+{
+    Write-Warning "Could not clean up temporary folder: $($_.Exception.Message)"
+}

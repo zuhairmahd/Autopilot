@@ -25,54 +25,67 @@ $RootPath = Split-Path -Parent $PSScriptRoot
 
 # Load functions at script level (same pattern as main.ps1)
 $functionsFolder = Join-Path $RootPath "functions"
-if (Test-Path $functionsFolder) {
+if (Test-Path $functionsFolder)
+{
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
-    foreach ($function in $functions) {
-        try {
+    foreach ($function in $functions)
+    {
+        try
+        {
             . $function.FullName
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
         }
     }
-} else {
+}
+else
+{
     Write-Host "Cannot find the functions folder at: $functionsFolder. Exiting script." -ForegroundColor Red
     exit 1
 }
 
 # Initialize test environment
-try {
+try
+{
     $testContext = Start-UnifiedTest -TestName "Authentication Flows Comprehensive Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
-catch {
+catch
+{
     Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
     exit 1
 }
 
 # Set up required global variables for testing
-$global:LogFile = "$PWD/test-auth-flows.log"
+$global:LogFile = Join-Path $testContext.TestFolder "test-auth-flows.log"
 
-try {
+try
+{
     Write-TestSection "Test 1: Valid Authentication Types"
     
     # Test all valid AuthType values based on main.ps1 ValidateSet
     $validAuthTypes = @('PublicAuthFlow', 'Interactive', 'Private')
     $authValidationResults = @()
     
-    foreach ($authType in $validAuthTypes) {
+    foreach ($authType in $validAuthTypes)
+    {
         Write-Host "Testing AuthType: $authType" -ForegroundColor Cyan
         
         # Test that the type is in the valid list
         $isValid = $authType -in @('PublicAuthFlow', 'Interactive', 'Private')
         $authValidationResults += @{
-            Type = $authType
+            Type  = $authType
             Valid = $isValid
         }
         
-        if ($isValid) {
+        if ($isValid)
+        {
             Write-TestResult "AuthType '$authType' is valid" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "AuthType '$authType' is invalid" $false
         }
     }
@@ -86,19 +99,23 @@ try {
     $validCacheTypes = @('file', 'memory')
     $cacheValidationResults = @()
     
-    foreach ($cacheType in $validCacheTypes) {
+    foreach ($cacheType in $validCacheTypes)
+    {
         Write-Host "Testing CacheType: $cacheType" -ForegroundColor Cyan
         
         # Test that the type is in the valid list
         $isValid = $cacheType -in @('file', 'memory')
         $cacheValidationResults += @{
-            Type = $cacheType
+            Type  = $cacheType
             Valid = $isValid
         }
         
-        if ($isValid) {
+        if ($isValid)
+        {
             Write-TestResult "CacheType '$cacheType' is valid" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "CacheType '$cacheType' is invalid" $false
         }
     }
@@ -109,22 +126,25 @@ try {
     Write-TestSection "Test 3: Authentication Configuration Building"
     
     # Test BuildAuthSplatTable function if available
-    if (Get-Command "BuildAuthSplatTable" -ErrorAction SilentlyContinue) {
+    if (Get-Command "BuildAuthSplatTable" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing BuildAuthSplatTable function..." -ForegroundColor Cyan
         
         # Create mock auth configuration
         $mockAuth = @{
-            AuthType = "PublicAuthFlow"
+            AuthType  = "PublicAuthFlow"
             delegated = $true
-            tenantId = "test-tenant-id"
-            clientId = "test-client-id"
-            scope = @("User.Read", "Device.Read.All")
+            tenantId  = "test-tenant-id"
+            clientId  = "test-client-id"
+            scope     = @("User.Read", "Device.Read.All")
         }
         
-        try {
+        try
+        {
             $authSplat = BuildAuthSplatTable -auth $mockAuth
             
-            if ($authSplat -and $authSplat.GetType().Name -eq "Hashtable") {
+            if ($authSplat -and $authSplat.GetType().Name -eq "Hashtable")
+            {
                 Write-TestResult "BuildAuthSplatTable returns hashtable" $true
                 
                 # Verify expected properties
@@ -133,14 +153,19 @@ try {
                 
                 Write-TestResult "AuthSplat contains AuthType: $hasAuthType" $hasAuthType
                 Write-TestResult "AuthSplat contains delegated: $hasDelegated" $hasDelegated
-            } else {
+            }
+            else
+            {
                 Write-TestResult "BuildAuthSplatTable does not return hashtable" $false
             }
         }
-        catch {
+        catch
+        {
             Write-TestResult "BuildAuthSplatTable function failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "BuildAuthSplatTable function not available - skipping test" $true
     }
     
@@ -164,9 +189,12 @@ try {
     $allScopes = @($basicScopes) + @($additionalScopes)
     $uniqueScopes = $allScopes | Group-Object -Property Scope | ForEach-Object { $_.Group | Select-Object -First 1 }
     
-    if ($uniqueScopes.Count -eq 3) {
+    if ($uniqueScopes.Count -eq 3)
+    {
         Write-TestResult "Scope deduplication works correctly (3 unique scopes)" $true
-    } else {
+    }
+    else
+    {
         Write-TestResult "Scope deduplication failed - got $($uniqueScopes.Count) scopes" $false
     }
     
@@ -185,13 +213,17 @@ try {
     $tokenFunctions = @("Get-TokenFromCache", "Save-TokenToCache", "Get-NormalizedExpiryTime")
     $tokenFunctionResults = @()
     
-    foreach ($funcName in $tokenFunctions) {
+    foreach ($funcName in $tokenFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $tokenFunctionResults += $null -ne $funcExists
         
-        if ($funcExists) {
+        if ($funcExists)
+        {
             Write-TestResult "Token function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Token function '$funcName' is not available" $false
         }
     }
@@ -209,7 +241,8 @@ try {
     )
     
     $paramValidationResults = @()
-    foreach ($combo in $validParamCombinations) {
+    foreach ($combo in $validParamCombinations)
+    {
         $isValidCombination = $combo.Valid
         $paramValidationResults += $isValidCombination
         
@@ -234,20 +267,25 @@ try {
     
     Write-TestResult "Authentication flows comprehensive test completed" $true
 }
-catch {
+catch
+{
     Write-TestResult "Test failed with error: $($_.Exception.Message)" $false
     $failedTests = 6
     $passedTests = 0
     exit 1
 }
-finally {
+finally
+{
     # Complete unified test
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests 6
     
-    if ($success) {
+    if ($success)
+    {
         Write-Host "Authentication Flows Comprehensive Test passed! [PASS]" -ForegroundColor Green
         exit 0
-    } else {
+    }
+    else
+    {
         Write-Host "Authentication Flows Comprehensive Test failed! [FAIL]" -ForegroundColor Red
         exit 1
     }

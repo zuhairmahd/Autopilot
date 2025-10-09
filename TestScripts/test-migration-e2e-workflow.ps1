@@ -167,7 +167,7 @@ try
     
     Test-Result "Migration succeeded" ($migrationResult.success -eq $true)
     Test-Result "Migration was needed" ($migrationResult.migrationNeeded -eq $true)
-    Test-Result "Files were migrated" ($migrationResult.migratedFiles.Count -ge 1)
+    Test-Result "Files were migrated" ($migrationResult.totalProcessed -ge 1)
     
     # Verify PSD1 files created
     $domainPsd1Path = Join-Path $TestConfigFolder "testcompany.com.psd1"
@@ -197,10 +197,10 @@ try
     # ===================================================================
     # PHASE 3: Legacy Object Resolution - User Defers
     # ===================================================================
-    Write-Host "`n=== PHASE 3: Legacy Object Resolution - User Defers ===" -ForegroundColor Cyan
+    Write-Host "\n=== PHASE 3: Legacy Object Resolution - User Defers ===" -ForegroundColor Cyan
     
     # Mock Read-Host to simulate user deferring
-    function Read-Host
+    function global:Read-Host
     {
         param([string]$Prompt)
         if ($Prompt -like "*proceed*")
@@ -231,10 +231,10 @@ try
     # ===================================================================
     # PHASE 4: Legacy Object Resolution - Success
     # ===================================================================
-    Write-Host "`n=== PHASE 4: Legacy Object Resolution - Success ===" -ForegroundColor Cyan
+    Write-Host "\n=== PHASE 4: Legacy Object Resolution - Success ===" -ForegroundColor Cyan
     
     # Mock Read-Host to simulate user proceeding
-    function Read-Host
+    function global:Read-Host
     {
         param([string]$Prompt)
         if ($Prompt -like "*proceed*")

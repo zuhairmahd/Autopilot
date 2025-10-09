@@ -193,7 +193,7 @@ function Invoke-SettingsMigration()
             Write-Host "`nRemoving original JSON files..." -ForegroundColor Cyan
             $filesToRemove = @()
             #see if any of init.json, strings.json and menu.json exist and if so add them to the $filesToRemove array
-            $extraFiles = @("lastrun.json", "init.json", "strings.json", "menu.json") | ForEach-Object { Join-Path -Path $scriptPath -ChildPath $_ } | Where-Object { Test-Path $_ }
+            $extraFiles = @("lastrun.json", "init.json", "strings.json", "menu.json") | ForEach-Object { Join-Path -Path $SearchPath -ChildPath $_ } | Where-Object { Test-Path $_ }
             $filesToRemove += $extraFiles
             if ($settingsJsonExists) { $filesToRemove += $settingsJsonPath }
             $filesToRemove += $domainJsonFiles.FullName
