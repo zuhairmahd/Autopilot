@@ -1,6 +1,24 @@
 # Integration Tests for Menu Inclusions Functionality
 # Migrated from: TestScripts/test-menu-inclusions.ps1
 
+<#
+.SYNOPSIS
+    Integration tests for menu inclusion filtering functionality
+
+.DESCRIPTION
+    Tests the Test-MenuItemIncluded function and menu filtering logic
+    for different app modes and display mode filtering
+
+.NOTES
+    Test Category: Integration
+    Template Compliance: Full
+    Uses: AutopilotMenuMocks for menu structure and environment setup
+    Helper Enhancement: Created AutopilotMenuMocks.psm1 for reusable menu testing patterns
+#>
+
+# Import menu mocking helper
+Import-Module "$PSScriptRoot/../Helpers/AutopilotMenuMocks.psm1" -Force
+
 BeforeAll {
     # Get repository root
     $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -9,75 +27,35 @@ BeforeAll {
     $functionsPath = Join-Path $script:RepoRoot "functions"
     $functionFiles = Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue
     
-    foreach ($file in $functionFiles) {
-        try {
+    foreach ($file in $functionFiles)
+    {
+        try
+        {
             . $file.FullName
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load $($file.Name): $_"
         }
     }
     
-    # Initialize global variables needed by menu functions
-    $Global:MenuHistory = @()
-    $Global:History = @()
-    $Global:settings = @{ appMode = "helpdesk" }
-    $Global:LogFile = Join-Path $TestDrive "test.log"
+    # Initialize menu environment using helper
+    Initialize-MenuTestEnvironment -AppMode "helpdesk"
     
-    # Create mock menu structure for testing
-    $script:MockMenus = @(
-        [PSCustomObject]@{
-            name                  = "Give a device to a user"
-            description           = "Start the user and device readiness check"
-            type                  = "action"
-            includeInDisplayModes = @("helpdesk")
-        },
-        [PSCustomObject]@{
-            name                  = "Check device status"
-            description           = "Troubleshoot a device"
-            type                  = "submenu"
-            includeInDisplayModes = @("helpdesk", "admin")
-            items                 = @(
-                [PSCustomObject]@{
-                    name                  = "Lookup device by Serial Number"
-                    description           = "Lookup a device by its serial number"
-                    type                  = "submenu"
-                    includeInDisplayModes = @("helpdesk")
-                    items                 = @(
-                        [PSCustomObject]@{
-                            name                  = "Enter a serial number"
-                            description           = "Lookup a device by its serial number"
-                            type                  = "action"
-                            includeInDisplayModes = @("helpdesk")
-                        }
-                    )
-                }
-            )
-        },
-        [PSCustomObject]@{
-            name                  = "Admin Only Menu"
-            description           = "Admin only functionality"
-            type                  = "action"
-            includeInDisplayModes = @("admin")
-        }
-    )
+    # Create mock menu structure using helper
+    $script:MockMenus = New-MockMenuStructure -IncludeNestedMenus -IncludeActions -IncludeSubmenus
 }
 
 AfterAll {
-    # Cleanup global variables
-    Remove-Variable -Name MenuHistory -Scope Global -ErrorAction SilentlyContinue
-    Remove-Variable -Name History -Scope Global -ErrorAction SilentlyContinue
-    Remove-Variable -Name settings -Scope Global -ErrorAction SilentlyContinue
-    Remove-Variable -Name LogFile -Scope Global -ErrorAction SilentlyContinue
+    # Cleanup using helper
+    Clear-MenuTestEnvironment
 }
 
 Describe "Menu Inclusions Functionality" -Tags 'Integration', 'Menu' {
     
     Context "Test-MenuItemIncluded with null menus parameter" {
         
-        BeforeEach {
-            $Global:settings = @{ appMode = "helpdesk" }
-        }
+        # No BeforeEach needed - environment already initialized in BeforeAll
         
         It "Should return true when menus parameter is null" {
             # Act
@@ -90,9 +68,7 @@ Describe "Menu Inclusions Functionality" -Tags 'Integration', 'Menu' {
     
     Context "Menu structure search and inclusion logic" {
         
-        BeforeEach {
-            $Global:settings = @{ appMode = "helpdesk" }
-        }
+        # No BeforeEach needed - environment already initialized in BeforeAll
         
         It "Should return true for menu item with matching includeInDisplayModes" {
             # Act
@@ -129,11 +105,8 @@ Describe "Menu Inclusions Functionality" -Tags 'Integration', 'Menu' {
     
     Context "Menu filtering integration" {
         
-        BeforeEach {
-            $Global:settings = @{ appMode = "helpdesk" }
-            $Global:MenuHistory = @()
-            $Global:History = @()
-        }
+        # No BeforeEach needed - MenuHistory and History are already initialized
+        # Environment is set up in BeforeAll using Initialize-MenuTestEnvironment
         
         It "Should filter out items that don't match includeInDisplayModes" {
             # Arrange
@@ -153,8 +126,10 @@ Describe "Menu Inclusions Functionality" -Tags 'Integration', 'Menu' {
             $choices = @()
             $menuItems = @()
             
-            foreach ($item in $testMenu.Items) {
-                if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:MockMenus) {
+            foreach ($item in $testMenu.Items)
+            {
+                if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:MockMenus)
+                {
                     $choices += $item.Name
                     $menuItems += $item
                 }
@@ -176,8 +151,10 @@ Describe "Menu Inclusions Functionality" -Tags 'Integration', 'Menu' {
             
             # Act
             $choices = @()
-            foreach ($item in $testMenu.Items) {
-                if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:MockMenus) {
+            foreach ($item in $testMenu.Items)
+            {
+                if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:MockMenus)
+                {
                     $choices += $item.Name
                 }
             }
@@ -199,8 +176,10 @@ Describe "Menu Inclusions Functionality" -Tags 'Integration', 'Menu' {
             
             # Act
             $choices = @()
-            foreach ($item in $testMenu.Items) {
-                if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:MockMenus) {
+            foreach ($item in $testMenu.Items)
+            {
+                if (Test-MenuItemIncluded -MenuItemName $item.Name -Menus $script:MockMenus)
+                {
                     $choices += $item.Name
                 }
             }

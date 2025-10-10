@@ -58,23 +58,23 @@ $script:DefaultMockUsers = @{
 # Default mock group data
 $script:DefaultMockGroups = @{
     "Marketing Team"    = @{
-        displayName = "Marketing Team"
-        id          = "group-001"
+        displayName  = "Marketing Team"
+        id           = "group-001"
         mailNickname = "marketing-team"
     }
     "Sales Team"        = @{
-        displayName = "Sales Team"
-        id          = "group-002"
+        displayName  = "Sales Team"
+        id           = "group-002"
         mailNickname = "sales-team"
     }
     "Archive Marketing" = @{
-        displayName = "Archive Marketing"
-        id          = "group-003"
+        displayName  = "Archive Marketing"
+        id           = "group-003"
         mailNickname = "archive-marketing"
     }
     "Disabled Group"    = @{
-        displayName = "Disabled Group"
-        id          = "group-004"
+        displayName  = "Disabled Group"
+        id           = "group-004"
         mailNickname = "disabled-group"
     }
 }
@@ -500,13 +500,293 @@ function Clear-GraphMockEnvironment
 
 #endregion
 
+#region Device Mocks
+
+# Default mock device data
+$script:DefaultMockDevices = @{
+    "DEVICE001" = @{
+        serialNumber      = "DEVICE001"
+        deviceName        = "WIN11-DEVICE001"
+        id                = "device-001"
+        manufacturer      = "Microsoft Corporation"
+        model             = "Surface Laptop 4"
+        operatingSystem   = "Windows 11"
+        osVersion         = "10.0.22000.795"
+        enrollmentState   = "enrolled"
+        managementState   = "managed"
+        azureADDeviceId   = "azuread-device-001"
+        autopilotEnrolled = $true
+        groupTag          = "Corporate"
+        userPrincipalName = "john.doe@contoso.com"
+    }
+    "DEVICE002" = @{
+        serialNumber      = "DEVICE002"
+        deviceName        = "WIN11-DEVICE002"
+        id                = "device-002"
+        manufacturer      = "Dell Inc."
+        model             = "Latitude 7420"
+        operatingSystem   = "Windows 11"
+        osVersion         = "10.0.22000.795"
+        enrollmentState   = "enrolled"
+        managementState   = "managed"
+        azureADDeviceId   = "azuread-device-002"
+        autopilotEnrolled = $true
+        groupTag          = "IT"
+        userPrincipalName = $null
+    }
+}
+
+# Active mock device data
+$script:MockDevices = $script:DefaultMockDevices.Clone()
+
+<#
+.SYNOPSIS
+    Adds a mock device to the test data
+
+.PARAMETER SerialNumber
+    The serial number of the device
+
+.PARAMETER DeviceName
+    The device name
+
+.PARAMETER Manufacturer
+    Device manufacturer
+
+.PARAMETER Model
+    Device model
+
+.PARAMETER GroupTag
+    Autopilot group tag
+
+.PARAMETER UserPrincipalName
+    Primary user UPN
+
+.PARAMETER Id
+    Optional custom ID (auto-generated if not provided)
+
+.EXAMPLE
+    Add-MockDevice -SerialNumber "TEST001" -DeviceName "WIN11-TEST001" -Manufacturer "HP" -Model "EliteBook"
+#>
+function Add-MockDevice
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$SerialNumber,
+        
+        [Parameter(Mandatory)]
+        [string]$DeviceName,
+        
+        [string]$Manufacturer = "Unknown",
+        [string]$Model = "Unknown",
+        [string]$GroupTag = $null,
+        [string]$UserPrincipalName = $null,
+        [string]$Id = "device-$([guid]::NewGuid().ToString().Substring(0, 8))"
+    )
+    
+    $script:MockDevices[$SerialNumber] = @{
+        serialNumber      = $SerialNumber
+        deviceName        = $DeviceName
+        id                = $Id
+        manufacturer      = $Manufacturer
+        model             = $Model
+        operatingSystem   = "Windows 11"
+        osVersion         = "10.0.22000.795"
+        enrollmentState   = "enrolled"
+        managementState   = "managed"
+        azureADDeviceId   = "azuread-$Id"
+        autopilotEnrolled = $true
+        groupTag          = $GroupTag
+        userPrincipalName = $UserPrincipalName
+    }
+}
+
+<#
+.SYNOPSIS
+    Gets mock device data
+
+.EXAMPLE
+    $devices = Get-MockDevices
+#>
+function Get-MockDevices
+{
+    [CmdletBinding()]
+    param()
+    
+    return $script:MockDevices
+}
+
+#endregion
+
+#region Autopilot Profile Mocks
+
+# Default mock Autopilot profile data
+$script:DefaultMockProfiles = @{
+    "Corporate-Profile" = @{
+        displayName                    = "Corporate-Profile"
+        id                             = "profile-001"
+        description                    = "Standard corporate deployment profile"
+        deviceNameTemplate             = "CORP-%SERIAL%"
+        enableWhiteGlove               = $false
+        outOfBoxExperienceSettings     = @{
+            hidePrivacySettings       = $true
+            hideEULA                  = $true
+            userType                  = "standard"
+            deviceUsageType           = "shared"
+            skipKeyboardSelectionPage = $true
+            hideEscapeLink            = $true
+        }
+        enrollmentStatusScreenSettings = @{
+            hideInstallationProgress                         = $false
+            allowDeviceUseBeforeProfileAndAppInstallComplete = $false
+            blockDeviceSetupRetryByUser                      = $true
+        }
+    }
+    "IT-Profile"        = @{
+        displayName                    = "IT-Profile"
+        id                             = "profile-002"
+        description                    = "IT department deployment profile"
+        deviceNameTemplate             = "IT-%SERIAL%"
+        enableWhiteGlove               = $true
+        outOfBoxExperienceSettings     = @{
+            hidePrivacySettings       = $true
+            hideEULA                  = $true
+            userType                  = "administrator"
+            deviceUsageType           = "single"
+            skipKeyboardSelectionPage = $true
+            hideEscapeLink            = $false
+        }
+        enrollmentStatusScreenSettings = @{
+            hideInstallationProgress                         = $false
+            allowDeviceUseBeforeProfileAndAppInstallComplete = $false
+            blockDeviceSetupRetryByUser                      = $false
+        }
+    }
+}
+
+# Active mock profile data
+$script:MockProfiles = $script:DefaultMockProfiles.Clone()
+
+<#
+.SYNOPSIS
+    Adds a mock Autopilot profile to the test data
+
+.PARAMETER DisplayName
+    The display name of the profile
+
+.PARAMETER DeviceNameTemplate
+    Device naming template
+
+.PARAMETER EnableWhiteGlove
+    Enable white glove provisioning
+
+.PARAMETER Description
+    Profile description
+
+.PARAMETER Id
+    Optional custom ID (auto-generated if not provided)
+
+.EXAMPLE
+    Add-MockAutopilotProfile -DisplayName "Test-Profile" -DeviceNameTemplate "TEST-%SERIAL%"
+#>
+function Add-MockAutopilotProfile
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$DisplayName,
+        
+        [string]$DeviceNameTemplate = "%SERIAL%",
+        [bool]$EnableWhiteGlove = $false,
+        [string]$Description = "Test profile",
+        [string]$Id = "profile-$([guid]::NewGuid().ToString().Substring(0, 8))"
+    )
+    
+    $script:MockProfiles[$DisplayName] = @{
+        displayName                    = $DisplayName
+        id                             = $Id
+        description                    = $Description
+        deviceNameTemplate             = $DeviceNameTemplate
+        enableWhiteGlove               = $EnableWhiteGlove
+        outOfBoxExperienceSettings     = @{
+            hidePrivacySettings       = $true
+            hideEULA                  = $true
+            userType                  = "standard"
+            deviceUsageType           = "shared"
+            skipKeyboardSelectionPage = $true
+            hideEscapeLink            = $true
+        }
+        enrollmentStatusScreenSettings = @{
+            hideInstallationProgress                         = $false
+            allowDeviceUseBeforeProfileAndAppInstallComplete = $false
+            blockDeviceSetupRetryByUser                      = $true
+        }
+    }
+}
+
+<#
+.SYNOPSIS
+    Gets mock Autopilot profile data
+
+.EXAMPLE
+    $profiles = Get-MockAutopilotProfiles
+#>
+function Get-MockAutopilotProfiles
+{
+    [CmdletBinding()]
+    param()
+    
+    return $script:MockProfiles
+}
+
+#endregion
+
+#region Authentication Token Mocks
+
+<#
+.SYNOPSIS
+    Creates a mock authentication token
+
+.PARAMETER TokenType
+    Type of token (e.g., "Bearer", "Certificate")
+
+.PARAMETER ExpiresIn
+    Token expiration time in seconds (default: 3600)
+
+.EXAMPLE
+    $token = New-MockAuthToken
+#>
+function New-MockAuthToken
+{
+    [CmdletBinding()]
+    param(
+        [string]$TokenType = "Bearer",
+        [int]$ExpiresIn = 3600
+    )
+    
+    return @{
+        access_token = "mock-token-$([guid]::NewGuid().ToString())"
+        token_type   = $TokenType
+        expires_in   = $ExpiresIn
+        scope        = "User.Read Group.Read Device.Read"
+        timestamp    = Get-Date
+    }
+}
+
+#endregion
+
 # Export module members
 Export-ModuleMember -Function @(
     'Add-MockUser',
     'Add-MockGroup',
+    'Add-MockDevice',
+    'Add-MockAutopilotProfile',
     'Reset-MockData',
     'Get-MockUsers',
     'Get-MockGroups',
+    'Get-MockDevices',
+    'Get-MockAutopilotProfiles',
+    'New-MockAuthToken',
     'Invoke-MockGraphAPI',
     'Initialize-GraphMockEnvironment',
     'Clear-GraphMockEnvironment'

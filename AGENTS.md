@@ -27,6 +27,7 @@ The project now uses **Pester v5** as the primary testing framework for new test
   - Import `tests/Helpers/AutopilotTestHelpers.psm1` for temp folder management and cleanup
   - Import `tests/Helpers/AutopilotGraphMocks.psm1` for Graph API mocking
   - See guidelines for when helpers are required vs optional
+- **Improve helpers, not workarounds:** When encountering testing needs not supported by helpers, enhance the helper modules rather than creating workarounds in individual tests. This ensures all tests benefit from improvements.
 - **Document deviations:** If not using helpers, add `.NOTES` section explaining why (simple test, no state management, etc.)
 - **Mandatory:** All tests must pass (100% success rate) before committing
 
@@ -52,9 +53,10 @@ The project now uses **Pester v5** as the primary testing framework for new test
 **Before creating a test:**
 1. Review `docs/TEST_TEMPLATE_GUIDELINES.md`
 2. Check similar existing tests for patterns
-3. Use helpers only when you need their specific features
-4. Document your approach in test header
-5. Ensure 100% test pass rate
+3. Use helpers when you need their features (temp files, cleanup, mocking)
+4. If helpers don't support your need, enhance the helpers first
+5. Document your approach in test header
+6. Ensure 100% test pass rate
 
 ### Migrating Existing Tests
 When migrating legacy tests to Pester:
