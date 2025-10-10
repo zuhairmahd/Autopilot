@@ -10,7 +10,37 @@ Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirr
 Stick to four-space indentation, ~120-character lines, and approved PowerShell verb-noun PascalCase (`Get-DeviceProfileStatus`). Variables use camelCase, constants use ALL_CAPS, and every public function needs comment-based help plus `$functionName = $MyInvocation.MyCommand.Name` for logging context. Favor `try/catch`, `Write-Verbose`, and the shared `Write-Log` helper; avoid 5.1-incompatible constructs such as ordered hashtables or string interpolation. **Do not use Unicode characters** (checkmarks, arrows, emoji, etc.) as PowerShell 5.1 console output may not render them correctly—stick to ASCII characters only. For newlines in `Write-Host` statements, use separate `Write-Host` calls instead of `\n` escape sequences. No automated formatter runs here—the style guidance and reviewers are the guardrails.
 
 ## Testing Guidelines
-The unified runner is mandatory. Start with `.\TestScripts\Test-Runner.ps1 -TestCategory syntax` to confirm modules load, add `core` for functional confidence, and escalate to `integration` or `comprehensive` when touching cross-cutting workflows. New features should add focused scripts under `TestScripts/test-*.ps1` and update the registry in `Test-Runner.ps1` when new categories are needed. Preserve verbose logging so failures ship actionable diagnostics.
+The project now uses **Pester v5** as the primary testing framework for new tests, while legacy tests are being gradually migrated. Both frameworks coexist during the migration period.
+
+### Running Tests
+- **Quick validation:** `.\Invoke-PesterTests.ps1 -TestType Unit` (runs fast Pester unit tests)
+- **Full Pester suite:** `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` (all Pester tests with coverage)
+- **Complete suite:** `.\Invoke-AllTests.ps1` (runs both Pester and remaining legacy tests)
+- **Legacy tests:** `.\TestScripts\Test-Runner.ps1 -TestCategory <category>` (for tests not yet migrated)
+
+### Writing New Tests
+- **Use Pester format** with Describe/Context/It blocks
+- **Follow the template:** `tests/Template.Tests.ps1`
+- **Tag appropriately:** Use `'Unit'`, `'Integration'`, or `'Comprehensive'` tags
+- **Load functions:** Dot-source functions directly in BeforeAll blocks (see FunctionLoading.Tests.ps1)
+- **Use helpers:** Import `tests/Helpers/AutopilotTestHelpers.psm1` for common utilities
+
+### Migrating Existing Tests
+When migrating legacy tests to Pester:
+1. Create new test in `tests/Unit/`, `tests/Integration/`, or `tests/Comprehensive/`
+2. Follow patterns in existing Pester tests
+3. Validate equivalence with `.\tools\Validate-PesterMigration.ps1`
+4. Archive legacy test to `TestScripts/archived/` after validation
+5. See `docs/PESTER_MIGRATION_PLAN.md` for detailed migration guide
+
+### Test Categories
+- **syntax**: PowerShell syntax validation (migrated to Pester)
+- **core**: Critical functionality tests (being migrated)
+- **unit**: Component-level tests (being migrated)
+- **integration**: Cross-component tests (to be migrated)
+- **comprehensive**: End-to-end scenarios (selective migration)
+- **performance**: Benchmarks (remaining in legacy framework)
+- **migration**: Migration-specific tests (remaining in legacy framework)
 
 ## Commit & Pull Request Guidelines
 Craft single-line commit subjects in sentence case (`Fix vendor validation logging`), keeping them under 72 characters, and reference issues in the body (`Fixes #123`) when relevant. Before opening a PR, ensure the runner passes for the categories you impacted, update any affected docs in `docs/`, and attach screenshots or log snippets for menu or UI changes. PR descriptions should outline scope, validation commands, and configuration prerequisites so reviewers can reproduce quickly.
