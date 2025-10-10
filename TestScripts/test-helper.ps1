@@ -52,10 +52,13 @@ function Load-AllFunctions()
                     Write-Host "  Loading: $($function.Name)" -ForegroundColor Gray
                 }
                 
-                if ($ReturnScriptBlock) {
+                if ($ReturnScriptBlock)
+                {
                     # Add to script block for execution at caller level
                     $scriptBlockCommands += ". '$($function.FullName)'"
-                } else {
+                }
+                else
+                {
                     # Use global scope specification to ensure functions are defined globally
                     $functionContent = Get-Content $function.FullName -Raw
                     $Global:ExecutionContext.InvokeCommand.InvokeScript($false, [scriptblock]::Create($functionContent), $null, $null)
@@ -92,7 +95,8 @@ function Load-AllFunctions()
             }
         }
         
-        if ($ReturnScriptBlock) {
+        if ($ReturnScriptBlock)
+        {
             return [scriptblock]::Create($scriptBlockCommands -join "`n")
         }
         
@@ -403,43 +407,50 @@ function New-MockSettingsFile()
     
     # Base settings structure
     $settings = @{
-        description = "Test settings file"
-        version = "1.0.0"
+        description    = "Test settings file"
+        version        = "1.0.0"
         globalSettings = @{
             appMode = "test"
         }
     }
     
     # Add auth section if requested
-    if ($IncludeAuth) {
+    if ($IncludeAuth)
+    {
         $settings.auth = @{
             changePwOnNextStart = $false
-            authType = "PublicAuthFlow"
-            noSaveRefreshToken = $false
-            forceNewToken = $false
-            renewalLeadTime = 5
-            scope = @("offline_access", "openid", "Device.ReadWrite.All", "DeviceManagementManagedDevices.ReadWrite.All", "User.Read.All", "DeviceManagementServiceConfig.ReadWrite.All", "DeviceManagementApps.Read.All")
-            cacheType = "FileSystem"
-            secureString = $true
-            delegated = $true
+            authType            = "PublicAuthFlow"
+            noSaveRefreshToken  = $false
+            forceNewToken       = $false
+            renewalLeadTime     = 5
+            scope               = @("offline_access", "openid", "Device.ReadWrite.All", "DeviceManagementManagedDevices.ReadWrite.All", "User.Read.All", "DeviceManagementServiceConfig.ReadWrite.All", "DeviceManagementApps.Read.All")
+            cacheType           = "FileSystem"
+            secureString        = $true
+            delegated           = $true
         }
     }
     
     # Merge custom content
-    foreach ($key in $CustomContent.Keys) {
+    foreach ($key in $CustomContent.Keys)
+    {
         $settings[$key] = $CustomContent[$key]
     }
     
     # Export to PSD1 format using Export-PowerShellDataFile
-    try {
+    try
+    {
         $exportResult = Export-PowerShellDataFile -InputObject $settings -Path $filePath -Force
-        if ($exportResult) {
+        if ($exportResult)
+        {
             return $filePath
-        } else {
+        }
+        else
+        {
             throw "Export-PowerShellDataFile failed"
         }
     }
-    catch {
+    catch
+    {
         # Fallback: create using direct PSD1 content
         $psd1Content = "@{`n"
         $psd1Content += "    description = '$($settings.description)'`n"
@@ -448,7 +459,8 @@ function New-MockSettingsFile()
         $psd1Content += "        appMode = '$($settings.globalSettings.appMode)'`n"
         $psd1Content += "    }`n"
         
-        if ($IncludeAuth) {
+        if ($IncludeAuth)
+        {
             $psd1Content += "    auth = @{`n"
             $psd1Content += "        changePwOnNextStart = `$$($settings.auth.changePwOnNextStart)`n"
             $psd1Content += "        authType = '$($settings.auth.authType)'`n"
@@ -456,7 +468,8 @@ function New-MockSettingsFile()
             $psd1Content += "        forceNewToken = `$$($settings.auth.forceNewToken)`n"
             $psd1Content += "        renewalLeadTime = $($settings.auth.renewalLeadTime)`n"
             $psd1Content += "        scope = @(`n"
-            foreach ($scope in $settings.auth.scope) {
+            foreach ($scope in $settings.auth.scope)
+            {
                 $psd1Content += "            '$scope',`n"
             }
             $psd1Content = $psd1Content.TrimEnd(",`n") + "`n"
@@ -696,7 +709,7 @@ function Start-UnifiedTest-WithFunctionLoading()
         Legacy unified test initialization that includes function loading (has scoping issues)
     .DESCRIPTION  
         This is the old version that loads functions within the function scope.
-        Use Start-UnifiedTest and load functions at script level instead.
+        Use Start-UnifiedTest and load functions at the script level instead.
     #>
     param(
         [Parameter(Mandatory = $true)]
@@ -819,4 +832,79 @@ function Complete-UnifiedTest()
     Write-TestResult "Overall Test Result: $(if ($success) { 'SUCCESS' } else { 'FAILURE' })" $success
     
     return $success
+}
+
+function Find-FolderPath
+{
+    <#
+    .SYNOPSIS
+        Searches upward from the given path for a folder with the specified name.
+    .PARAMETER Path
+        The starting path to begin searching from.
+    .PARAMETER FolderName
+        The name of the folder to search for.
+    .OUTPUTS
+        Returns the full path to the folder if found, otherwise $null.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$FolderName
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Find-FolderPath called with Path: $Path, FolderName: $FolderName"
+    try
+    {
+        $currentPath = (Resolve-Path -Path $Path).Path
+        Write-Verbose "[$functionName] Current path resolved to: $currentPath"
+
+        # 1. Search children (recursively) of the starting path
+        Write-Verbose "[$functionName] Searching children of $currentPath for folder named $FolderName"
+        $childMatch = Get-ChildItem -Path $currentPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+        Write-Verbose "[$functionName] Checking child match: $($childMatch.FullName)"
+        if ($childMatch)
+        {
+            Write-Verbose "[$functionName] Found folder in children: $($childMatch.FullName)"
+            return $childMatch.FullName
+        }
+        # Also check if the starting path itself matches
+        if ((Split-Path -Path $currentPath -Leaf) -ieq $FolderName)
+        {
+            Write-Verbose "[$functionName] Starting path itself matches: $currentPath"
+            return $currentPath
+        }
+
+        # 2. Search up the parent chain, at each level search its children for the folder
+        while ($currentPath)
+        {
+            $parent = Split-Path -Path $currentPath -Parent
+            if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
+            {
+                break
+            } # Reached root
+            Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
+            $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+            if ($siblingMatch)
+            {
+                Write-Verbose "[$functionName] Found folder in parent: $($siblingMatch.FullName)"
+                return $siblingMatch.FullName
+            }
+            # Also check if the parent itself matches
+            if ((Split-Path -Path $parent -Leaf) -ieq $FolderName)
+            {
+                Write-Verbose "[$functionName] Parent itself matches: $parent"
+                return $parent
+            }
+            $currentPath = $parent
+        }
+        Write-Verbose "[$functionName] No folder found with name $FolderName in children or parent hierarchy."
+        return $null
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error occurred while searching for folder: $_"
+        return $null
+    }
 }

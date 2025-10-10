@@ -198,7 +198,17 @@ try
     # PHASE 3: Legacy Object Resolution - User Defers
     # ===================================================================
     Write-Host "\n=== PHASE 3: Legacy Object Resolution - User Defers ===" -ForegroundColor Cyan
-    
+
+    # Save original Read-Host if present
+    if (Get-Command Read-Host -ErrorAction SilentlyContinue)
+    {
+        $script:OriginalReadHost = (Get-Command Read-Host).ScriptBlock
+    }
+    else
+    {
+        $script:OriginalReadHost = $null
+    }
+
     # Mock Read-Host to simulate user deferring
     function global:Read-Host
     {
@@ -232,7 +242,7 @@ try
     # PHASE 4: Legacy Object Resolution - Success
     # ===================================================================
     Write-Host "\n=== PHASE 4: Legacy Object Resolution - Success ===" -ForegroundColor Cyan
-    
+
     # Mock Read-Host to simulate user proceeding
     function global:Read-Host
     {
@@ -397,6 +407,16 @@ catch
 }
 finally
 {
+    # Restore original Read-Host if it was saved
+    if ($script:OriginalReadHost)
+    {
+        Set-Item -Path function:\Read-Host -Value $script:OriginalReadHost
+    }
+    else
+    {
+        Remove-Item -Path function:\Read-Host -ErrorAction SilentlyContinue
+    }
+
     # Cleanup
     if (Test-Path $TestConfigFolder)
     {

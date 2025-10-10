@@ -125,7 +125,6 @@ function Get-ApplicationDefaults()
                 baseURL       = "https://www.github.com"
                 repoPath      = "zuhairmahd"
             }
-            testMode                     = $false
             operatingSystem              = "Windows"
             autoUpdate                   = $true
         }

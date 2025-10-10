@@ -21,6 +21,9 @@ function Load-EncryptedConfigFile()
     .PARAMETER PasswordPrompt
     Custom prompt message for password input.
     
+    .PARAMETER Silent
+    If specified, suppresses interactive prompts and uses stored password. Useful for automated testing.
+    
     .OUTPUTS
     System.Object
     Returns an object with Success (boolean), Content (string), and ErrorMessage (string) properties.
@@ -31,12 +34,13 @@ function Load-EncryptedConfigFile()
         [string]$ConfigFile,
         [int]$MaxRetries = 3,
         [switch]$UseStoredPassword,
-        [string]$PasswordPrompt = "Enter your password"
+        [string]$PasswordPrompt = "Enter your password",
+        [switch]$Silent
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Loading encrypted configuration file: $ConfigFile" -LogLevel "Debug"
-    Write-Verbose "[$functionName] Loading encrypted configuration file: $ConfigFile"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Loading encrypted configuration file: $ConfigFile (Silent: $Silent)" -LogLevel "Debug"
+    Write-Verbose "[$functionName] Loading encrypted configuration file: $ConfigFile (Silent: $Silent)"
     
     $result = @{
         Success      = $false
@@ -68,7 +72,14 @@ function Load-EncryptedConfigFile()
         if ($encryptionStatus.IsEncrypted)
         {
             # Write-Host "Please enter your password to continue." -ForegroundColor Cyan
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file is encrypted, prompting for password" -LogLevel "Information"
+            if (-not $Silent)
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file is encrypted, prompting for password" -LogLevel "Information"
+            }
+            else
+            {
+                Write-Log -LogFile $LogFile -Module $functionName -Message "Configuration file is encrypted, using silent mode" -LogLevel "Debug"
+            }
             $result.encrypted = $true
             $retryCount = 0
             $decryptResult = $null
@@ -88,8 +99,8 @@ function Load-EncryptedConfigFile()
                 }
                 else
                 {
-                    # Prompt for password
-                    $userPasswordSecure = Get-SecurePassword -Message "$PasswordPrompt (Attempt $retryCount of $MaxRetries)"
+                    # Prompt for password (silently if Silent mode is active)
+                    $userPasswordSecure = Get-SecurePassword -Message "$PasswordPrompt (Attempt $retryCount of $MaxRetries)" -Silent:$Silent
                     $userPassword = ConvertFrom-SecureString-ToPlainText -SecureString $userPasswordSecure
                 }
                 
@@ -111,16 +122,25 @@ function Load-EncryptedConfigFile()
                 else
                 {
                     $errorMsg = "Incorrect password"
-                    Write-Host $errorMsg -ForegroundColor Red
+                    if (-not $Silent)
+                    {
+                        Write-Host $errorMsg -ForegroundColor Red
+                    }
                     Write-Log -LogFile $LogFile -Module $functionName -Message $errorMsg -LogLevel "Error"
                     
                     if ($retryCount -lt $MaxRetries)
                     {
-                        Write-Host "Please try again." -ForegroundColor Yellow
+                        if (-not $Silent)
+                        {
+                            Write-Host "Please try again." -ForegroundColor Yellow
+                        }
                         if ($MaxRetries - $retryCount -le 2)
                         {
-                            Write-Host "Warning: Only $($MaxRetries - $retryCount) attempts left." -ForegroundColor Red
-                            Write-Host "If you exceed the maximum number of attempts, the authentication information will be erased." -ForegroundColor Red
+                            if (-not $Silent)
+                            {
+                                Write-Host "Warning: Only $($MaxRetries - $retryCount) attempts left." -ForegroundColor Red
+                                Write-Host "If you exceed the maximum number of attempts, the authentication information will be erased." -ForegroundColor Red
+                            }
                             Write-Log -LogFile $LogFile -Module $functionName -Message "Warning: Only $($MaxRetries - $retryCount) attempts left." -LogLevel "Warning"
                         }
                     }
