@@ -15,12 +15,14 @@ BeforeAll {
     Initialize-GraphMockEnvironment -ClearCache
     
     # Mock Write-Log to avoid log file dependencies
-    function global:Write-Log {
+    function global:Write-Log
+    {
         param($LogFile, $Module, $Message, $LogLevel)
     }
     
     # Mock CallGraphAPI to use our mock infrastructure
-    function global:CallGraphAPI {
+    function global:CallGraphAPI
+    {
         param(
             $accessToken,
             $ResourcePath,
@@ -36,28 +38,40 @@ BeforeAll {
     $script:MockMenuResponse = $null
     $script:MenuCallCount = 0
     
-    function global:NewMenu {
-        param($Title, $Description)
+    function global:NewMenu
+    {
+        param($Title, $Description, $MenuName)
         return @{
-            Title = $Title
+            Title       = $Title
             Description = $Description
-            Items = @()
+            MenuName    = $MenuName
+            Items       = @()
         }
     }
     
-    function global:AddMenuItem {
+    function global:AddMenuItem
+    {
         param($Menu, $Name, $Display, $ReturnValue, $Action, [switch]$ReturnsValue)
         $Menu.Items += @{
-            Name = if ($Name) { $Name } else { $Display }
+            Name        = if ($Name) { $Name } else { $Display }
             ReturnValue = if ($Action) { $Action } else { $ReturnValue }
         }
         return $Menu
     }
     
-    function global:ShowMenu {
+    function global:ShowMenu
+    {
         param($Menu, $CalledBy, $StackOperation)
         $script:MenuCallCount++
         return $script:MockMenuResponse
+    }
+    
+    # Mock Read-Host to prevent user prompts during tests
+    function global:Read-Host
+    {
+        param([string]$Prompt)
+        # Default to "Y" for confirmation prompts
+        return "Y"
     }
 }
 
@@ -74,7 +88,8 @@ Describe "Resolve-DirectoryObject" -Tag 'Unit', 'DirectoryObject' {
         $script:MenuCallCount = 0
         
         # Clear cache
-        if (Get-Variable -Name DirectoryObjectCache -Scope Global -ErrorAction SilentlyContinue) {
+        if (Get-Variable -Name DirectoryObjectCache -Scope Global -ErrorAction SilentlyContinue)
+        {
             $global:DirectoryObjectCache = @{}
         }
     }
