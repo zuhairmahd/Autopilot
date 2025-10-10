@@ -44,6 +44,8 @@ function Get-AutopilotPesterConfiguration
         'All'
         {
             $config.Run.Path = '.\tests'
+            # Exclude template and helper files from test execution
+            $config.Run.ExcludePath = @('*Template.Tests.ps1', '*Helpers*')
         }
     }
     
