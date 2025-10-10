@@ -6,6 +6,8 @@
     Supports filtering by test type, tags, and CI/CD integration
 .PARAMETER TestType
     Type of tests to run: Unit, Integration, Comprehensive, All
+.PARAMETER TestFile
+    Path to a single test file to run (overrides TestType)
 .PARAMETER EnableCodeCoverage
     Enable code coverage analysis
 .PARAMETER CI
@@ -15,12 +17,16 @@
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestType Unit
 .EXAMPLE
+    .\Invoke-PesterTests.ps1 -TestFile "tests\Integration\SettingsFunctions.Tests.ps1"
+.EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -CI
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
     [string]$TestType = 'All',
+    
+    [string]$TestFile,
     
     [switch]$EnableCodeCoverage,
     
@@ -41,8 +47,31 @@ Write-Host "=" * 63 -ForegroundColor Cyan
 # Get Pester configuration
 $config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI
 
+# Override path if specific test file requested
+if ($TestFile)
+{
+    $resolvedPath = if ([System.IO.Path]::IsPathRooted($TestFile))
+    {
+        $TestFile
+    }
+    else
+    {
+        Join-Path $PSScriptRoot $TestFile
+    }
+    
+    if (-not (Test-Path $resolvedPath))
+    {
+        Write-Host "ERROR: Test file not found: $resolvedPath" -ForegroundColor Red
+        exit 1
+    }
+    
+    $config.Run.Path = $resolvedPath
+    Write-Host "`nRunning single test file: $TestFile" -ForegroundColor Yellow
+}
+
 # Apply tag filter if specified
-if ($Tags.Count -gt 0) {
+if ($Tags.Count -gt 0)
+{
     $config.Filter.Tag = $Tags
 }
 
@@ -51,7 +80,8 @@ Write-Host "`nTest Configuration:" -ForegroundColor Cyan
 Write-Host "  Test Type: $TestType" -ForegroundColor White
 Write-Host "  Test Path: $($config.Run.Path)" -ForegroundColor White
 Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
-if ($Tags.Count -gt 0) {
+if ($Tags.Count -gt 0)
+{
     Write-Host "  Tags: $($Tags -join ', ')" -ForegroundColor White
 }
 Write-Host ""
@@ -60,7 +90,8 @@ Write-Host ""
 $startTime = Get-Date
 Write-Host "Starting Pester tests..." -ForegroundColor Cyan
 
-try {
+try
+{
     $result = Invoke-Pester -Configuration $config
     
     $endTime = Get-Date
@@ -77,11 +108,14 @@ try {
     Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor Gray
     Write-Host "  Duration: $($duration.TotalSeconds.ToString('F2'))s" -ForegroundColor White
     
-    if ($config.CodeCoverage.Enabled) {
+    if ($config.CodeCoverage.Enabled)
+    {
         $coverage = $result.CodeCoverage
-        $coveragePercent = if ($coverage.NumberOfCommandsAnalyzed -gt 0) {
+        $coveragePercent = if ($coverage.NumberOfCommandsAnalyzed -gt 0)
+        {
             ($coverage.NumberOfCommandsExecuted / $coverage.NumberOfCommandsAnalyzed) * 100
-        } else { 0 }
+        }
+        else { 0 }
         
         Write-Host "`nCode Coverage:" -ForegroundColor Cyan
         Write-Host "  Commands Analyzed: $($coverage.NumberOfCommandsAnalyzed)" -ForegroundColor White
@@ -90,7 +124,8 @@ try {
         Write-Host "  Report: $($config.CodeCoverage.OutputPath)" -ForegroundColor Gray
     }
     
-    if ($config.TestResult.Enabled) {
+    if ($config.TestResult.Enabled)
+    {
         Write-Host "`nTest Results XML: $($config.TestResult.OutputPath)" -ForegroundColor Gray
     }
     
@@ -100,7 +135,8 @@ try {
     # Exit with appropriate code
     exit $result.FailedCount
 }
-catch {
+catch
+{
     Write-Host "`nERROR: Pester execution failed" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     exit 1

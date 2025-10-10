@@ -207,20 +207,23 @@ function ConvertTo-Psd1String
     
     foreach ($key in $Hashtable.Keys)
     {
+        # Quote keys that contain special characters (dots, spaces, etc.)
+        $quotedKey = if ($key -match '[.\s\-@]') { "'$key'" } else { $key }
+        
         $value = $Hashtable[$key]
         if ($value -is [hashtable])
         {
-            $result += "$indent$key = @{`n"
+            $result += "$indent$quotedKey = @{`n"
             $result += ConvertTo-Psd1String -Hashtable $value -IndentLevel ($IndentLevel + 1)
             $result += "$indent}`n"
         }
         elseif ($value -is [string])
         {
-            $result += "$indent$key = '$value'`n"
+            $result += "$indent$quotedKey = '$value'`n"
         }
         elseif ($value -is [array])
         {
-            $result += "$indent$key = @("
+            $result += "$indent$quotedKey = @("
             $arrayItems = $value | ForEach-Object {
                 if ($_ -is [string]) { "'$_'" } else { $_ }
             }
@@ -229,7 +232,7 @@ function ConvertTo-Psd1String
         }
         else
         {
-            $result += "$indent$key = $value`n"
+            $result += "$indent$quotedKey = $value`n"
         }
     }
     
