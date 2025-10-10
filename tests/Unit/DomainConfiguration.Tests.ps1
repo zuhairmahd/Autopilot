@@ -4,7 +4,19 @@
 .DESCRIPTION
     Tests PSD1-based domain configuration load, save, and creation functionality
     Converted from TestScripts/test-domain-config-simple.ps1
+
+.NOTES
+    Test Category: Unit
+    Template Compliance: Full
+    Uses: AutopilotTestHelpers (temp folder management, global variables)
+    
+    Refactored: 2025-10-10 to use helper infrastructure
+    Previous: Manual temp folder creation with timestamp and manual cleanup
+    Current: Clean helper-based temp folder management with auto-cleanup tracking
 #>
+
+# Import helper module
+Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
 
 Describe "Domain Configuration" -Tags 'Unit', 'Configuration', 'Domain' {
     
@@ -12,13 +24,13 @@ Describe "Domain Configuration" -Tags 'Unit', 'Configuration', 'Domain' {
         # Get repository root
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
         
-        # Setup test folder
-        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
-        $script:TestFolder = Join-Path $tempPath "DomainConfigTest_$(Get-Date -Format 'yyyyMMddHHmmss')"
-        New-Item -Path $script:TestFolder -ItemType Directory -Force | Out-Null
+        # Initialize test environment using helper
+        $script:TestContext = Initialize-AutopilotTestEnvironment
+        $script:TestFolder = $script:TestContext.TestFolder
         
-        # Setup global variables
-        $global:LogFile = Join-Path $script:TestFolder "test.log"
+        # Setup global variables using helper (LogFile with full path)
+        $logPath = Join-Path $script:TestFolder "test.log"
+        Initialize-MockGlobalVariables -LogFile $logPath
         
         # Load essential functions
         . (Join-Path $script:RepoRoot "functions/setupFunctions/Get-DomainConfigurationFromFiles.ps1")
@@ -32,10 +44,9 @@ Describe "Domain Configuration" -Tags 'Unit', 'Configuration', 'Domain' {
     }
     
     AfterAll {
-        # Cleanup test folder
-        if (Test-Path $script:TestFolder) {
-            Remove-Item -Path $script:TestFolder -Recurse -Force -ErrorAction SilentlyContinue
-        }
+        # Cleanup using helpers
+        Clear-MockGlobalVariables
+        Remove-TestEnvironment -TestContext $script:TestContext
     }
     
     Context "Domain PSD1 file creation" {

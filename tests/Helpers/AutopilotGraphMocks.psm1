@@ -87,6 +87,13 @@ $script:MockGroups = $script:DefaultMockGroups.Clone()
 .SYNOPSIS
     Adds a mock user to the test data
 
+.DESCRIPTION
+    Creates a mock user object with the specified properties for testing.
+    The user will be available for mock Graph API calls.
+    
+    Supports custom properties for advanced scenarios like certificate data,
+    authorization info, or any other user properties needed for testing.
+
 .PARAMETER UserPrincipalName
     The UPN of the user to add
 
@@ -102,8 +109,33 @@ $script:MockGroups = $script:DefaultMockGroups.Clone()
 .PARAMETER Id
     Optional custom ID (auto-generated if not provided)
 
+.PARAMETER Mail
+    Optional email address (defaults to UserPrincipalName)
+
+.PARAMETER CustomProperties
+    Optional hashtable of additional properties to add to the user object.
+    Useful for scenarios like certificate data, authorization info, etc.
+    Properties are merged into the user object.
+
 .EXAMPLE
     Add-MockUser -UserPrincipalName "test@contoso.com" -DisplayName "Test User" -GivenName "Test" -Surname "User"
+
+.EXAMPLE
+    # User with certificate data
+    Add-MockUser -UserPrincipalName "admin@contoso.com" -DisplayName "Admin User" `
+        -GivenName "Admin" -Surname "User" -CustomProperties @{
+            authorizationInfo = @{
+                certificateUserIds = @("C=US,O=Microsoft,CN=Admin")
+            }
+        }
+
+.EXAMPLE
+    # User with custom properties
+    Add-MockUser -UserPrincipalName "user@contoso.com" -DisplayName "Test User" `
+        -GivenName "Test" -Surname "User" -CustomProperties @{
+            jobTitle = "Developer"
+            department = "Engineering"
+        }
 #>
 function Add-MockUser
 {
@@ -123,10 +155,13 @@ function Add-MockUser
         
         [string]$Id = "user-$([guid]::NewGuid().ToString().Substring(0, 8))",
         
-        [string]$Mail = $UserPrincipalName
+        [string]$Mail = $UserPrincipalName,
+        
+        [hashtable]$CustomProperties = @{}
     )
     
-    $script:MockUsers[$UserPrincipalName] = @{
+    # Create base user object
+    $user = @{
         userPrincipalName = $UserPrincipalName
         displayName       = $DisplayName
         givenName         = $GivenName
@@ -134,6 +169,17 @@ function Add-MockUser
         mail              = $Mail
         id                = $Id
     }
+    
+    # Merge custom properties
+    foreach ($key in $CustomProperties.Keys)
+    {
+        $user[$key] = $CustomProperties[$key]
+    }
+    
+    $script:MockUsers[$UserPrincipalName] = $user
+    
+    $customPropsInfo = if ($CustomProperties.Count -gt 0) { " (with $($CustomProperties.Count) custom properties)" } else { "" }
+    Write-Verbose "[Add-MockUser] Added user: $UserPrincipalName$customPropsInfo"
 }
 
 <#

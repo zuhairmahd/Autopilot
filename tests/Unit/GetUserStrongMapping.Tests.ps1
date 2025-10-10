@@ -4,7 +4,21 @@
 .DESCRIPTION
     Tests the Get-UserStrongMapping function with various scenarios
     Converted from TestScripts/test-get-user-strong-mapping-simple.ps1
+
+.NOTES
+    Test Category: Unit
+    Template Compliance: Full
+    Uses: AutopilotTestHelpers (global variables, Write-Log mock)
+          AutopilotGraphMocks (Graph API mocking with CustomProperties for certificates)
+    
+    Refactored: 2025-10-10 to use helper infrastructure
+    Previous: Manual CallGraphAPI mock with 80+ lines of switch logic
+    Current: Clean helper-based mocking with CustomProperties support
 #>
+
+# Import helper modules
+Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
+Import-Module "$PSScriptRoot/../Helpers/AutopilotGraphMocks.psm1" -Force
 
 Describe "Get-UserStrongMapping Function" -Tags 'Unit', 'User', 'StrongMapping' {
     
@@ -12,71 +26,95 @@ Describe "Get-UserStrongMapping Function" -Tags 'Unit', 'User', 'StrongMapping' 
         # Get repository root
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
         
-        # Setup global log file
-        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
-        $global:LogFile = Join-Path $tempPath "test-user-strong-mapping.log"
+        # Setup mock global variables using helper
+        Initialize-MockGlobalVariables -LogFile "test-user-strong-mapping.log"
         
-        # Create global CallGraphApi mock function
-        function global:CallGraphApi {
-            param($accessToken, $ResourcePath, $ExtraParameters)
-            
-            switch -Wildcard ($ResourcePath) {
-                "*user-with-certs*" {
-                    return @{
-                        id                = "user123"
-                        displayName       = "Test User With Certs"
-                        userPrincipalName = "user-with-certs@test.com"
-                        authorizationInfo = @{
-                            certificateUserIds = @(
-                                "C=US,O=Entrust,OU=Certification Authorities,OU=Entrust Managed Services SSP CA",
-                                "C=US,O=Microsoft,OU=Microsoft IT,CN=Microsoft IT TLS CA 5"
-                            )
-                        }
-                    }
-                }
-                "*user-no-certs*" {
-                    return @{
-                        id                = "user456"
-                        displayName       = "Test User No Certs"
-                        userPrincipalName = "user-no-certs@test.com"
-                        authorizationInfo = @{
-                            certificateUserIds = @()
-                        }
-                    }
-                }
-                "*user-null-certs*" {
-                    return @{
-                        id                = "user789"
-                        displayName       = "Test User Null Certs"
-                        userPrincipalName = "user-null-certs@test.com"
-                        authorizationInfo = @{
-                            certificateUserIds = $null
-                        }
-                    }
-                }
-                "*nonexistent-user*" {
-                    return $null
-                }
-                default {
-                    return @{
-                        id                = "defaultuser"
-                        displayName       = "Default Test User"
-                        userPrincipalName = "default@test.com"
-                        authorizationInfo = @{
-                            certificateUserIds = @("C=US,O=Test,CN=Test Cert")
-                        }
-                    }
-                }
+        # Setup Write-Log mock using helper
+        New-MockWriteLog
+        
+        # Initialize Graph mocking environment
+        Initialize-GraphMockEnvironment -ClearCache
+        
+        # Add mock users with certificate data using CustomProperties
+        # Note: Tests call with short names like "user-with-certs", so we add both forms
+        Add-MockUser -UserPrincipalName "user-with-certs" `
+            -DisplayName "Test User With Certs" `
+            -GivenName "Test" -Surname "WithCerts" `
+            -Id "user123" `
+            -Mail "user-with-certs@test.com" `
+            -CustomProperties @{
+            authorizationInfo = @{
+                certificateUserIds = @(
+                    "C=US,O=Entrust,OU=Certification Authorities,OU=Entrust Managed Services SSP CA",
+                    "C=US,O=Microsoft,OU=Microsoft IT,CN=Microsoft IT TLS CA 5"
+                )
             }
         }
         
-        # Create global Write-Log mock function
-        function global:Write-Log { 
-            param($LogFile, $Module, $Message, $LogLevel) 
+        Add-MockUser -UserPrincipalName "user-no-certs" `
+            -DisplayName "Test User No Certs" `
+            -GivenName "Test" -Surname "NoCerts" `
+            -Id "user456" `
+            -Mail "user-no-certs@test.com" `
+            -CustomProperties @{
+            authorizationInfo = @{
+                certificateUserIds = @()
+            }
+        }
+        
+        Add-MockUser -UserPrincipalName "user-null-certs" `
+            -DisplayName "Test User Null Certs" `
+            -GivenName "Test" -Surname "NullCerts" `
+            -Id "user789" `
+            -Mail "user-null-certs@test.com" `
+            -CustomProperties @{
+            authorizationInfo = @{
+                certificateUserIds = $null
+            }
+        }
+        
+        # Add default user (called as "test-user" in tests)
+        Add-MockUser -UserPrincipalName "test-user" `
+            -DisplayName "Default Test User" `
+            -GivenName "Default" -Surname "User" `
+            -Id "defaultuser" `
+            -Mail "default@test.com" `
+            -CustomProperties @{
+            authorizationInfo = @{
+                certificateUserIds = @("C=US,O=Test,CN=Test Cert")
+            }
+        }
+        
+        # Mock CallGraphApi to use helper infrastructure
+        function global:CallGraphApi
+        {
+            param($accessToken, $ResourcePath, $ExtraParameters)
+            
+            Write-Verbose "[CallGraphApi Mock] ResourcePath: $ResourcePath, ExtraParameters: $ExtraParameters"
+            
+            # Use Invoke-MockGraphAPI directly - it handles users/{upn} pattern
+            $result = Invoke-MockGraphAPI -accessToken $accessToken `
+                -ResourcePath $ResourcePath `
+                -ExtraParameters $ExtraParameters
+            
+            # Return null if 404 (user not found)
+            if ($result -eq 404)
+            {
+                Write-Verbose "[CallGraphApi Mock] User not found (404)"
+                return $null
+            }
+            
+            return $result
         }
         
         # Load the specific function being tested
         . (Join-Path $script:RepoRoot "functions/UserAndGroupFunctions/Get-UserStrongMapping.ps1")
+    }
+    
+    AfterAll {
+        # Cleanup using helpers
+        Clear-MockGlobalVariables
+        Clear-GraphMockEnvironment
     }
     
     Context "Function availability" {
