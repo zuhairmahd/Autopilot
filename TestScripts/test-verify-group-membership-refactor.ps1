@@ -180,3 +180,17 @@ Write-Host "`nNext Steps:" -ForegroundColor Yellow
 Write-Host "1. Update Groups Editor to handle new hashtable format" -ForegroundColor White
 Write-Host "2. Test with real Graph API credentials" -ForegroundColor White
 Write-Host "3. Test automatic migration from old to new format" -ForegroundColor White
+
+# Cleanup temporary folder
+try
+{
+    if (Test-Path $TestTempFolder)
+    {
+        Remove-Item -Path $TestTempFolder -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "`nCleaned up temporary test folder" -ForegroundColor Gray
+    }
+}
+catch
+{
+    Write-Warning "Could not clean up temporary folder: $($_.Exception.Message)"
+}

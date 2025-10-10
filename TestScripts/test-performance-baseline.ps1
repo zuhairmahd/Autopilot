@@ -26,7 +26,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Performance measurement function
-function Measure-StartupPerformance {
+function Measure-StartupPerformance
+{
     param(
         [string]$AppMode,
         [string]$Description,
@@ -35,11 +36,13 @@ function Measure-StartupPerformance {
     
     $measurements = @()
     
-    for ($i = 1; $i -le $Iterations; $i++) {
+    for ($i = 1; $i -le $Iterations; $i++)
+    {
         Write-Host "  [$i/$Iterations] Testing $Description..." -ForegroundColor Cyan
         
         # Clear any cached modules or variables from previous runs
-        if (Get-Module -Name "Autopilot*") {
+        if (Get-Module -Name "Autopilot*")
+        {
             Remove-Module -Name "Autopilot*" -Force
         }
         [System.GC]::Collect()
@@ -47,28 +50,31 @@ function Measure-StartupPerformance {
         $startTime = Get-Date
         $startMemory = [System.GC]::GetTotalMemory($false)
         
-        try {
+        try
+        {
             # Test application startup with minimal interaction
             $result = & pwsh -NoProfile -Command {
                 param($mode, $scriptPath)
                 $startTime = Get-Date
                 
-                try {
-                    # Load the application but don't run interactive menu
-                    $env:SKIP_INTERACTIVE = "true"
-                    . $scriptPath -appMode $mode -LogLevel "Warning" 2>&1 | Out-Null
+                try
+                {
+                    # Load the application in test mode to avoid interactive prompts
+                    . $scriptPath -appMode $mode -LogLevel "Warning" -testMode 2>&1 | Out-Null
                     $endTime = Get-Date
                     return @{
-                        Success = $true
+                        Success  = $true
                         Duration = ($endTime - $startTime).TotalSeconds
-                        Error = $null
+                        Error    = $null
                     }
-                } catch {
+                }
+                catch
+                {
                     $endTime = Get-Date
                     return @{
-                        Success = $false
+                        Success  = $false
                         Duration = ($endTime - $startTime).TotalSeconds
-                        Error = $_.Exception.Message
+                        Error    = $_.Exception.Message
                     }
                 }
             } -ArgumentList $AppMode, "$PSScriptRoot/../main.ps1"
@@ -76,38 +82,43 @@ function Measure-StartupPerformance {
             $endTime = Get-Date
             $endMemory = [System.GC]::GetTotalMemory($false)
             
-            if ($result.Success) {
+            if ($result.Success)
+            {
                 $duration = $result.Duration
                 $memoryUsed = [math]::Round(($endMemory - $startMemory) / 1MB, 2)
                 
                 $measurements += @{
-                    Iteration = $i
-                    Duration = $duration
+                    Iteration    = $i
+                    Duration     = $duration
                     MemoryUsedMB = $memoryUsed
-                    Success = $true
+                    Success      = $true
                 }
                 
                 Write-Host "    Duration: $([math]::Round($duration, 2))s, Memory: ${memoryUsed}MB" -ForegroundColor Green
-            } else {
+            }
+            else
+            {
                 Write-Host "    Failed: $($result.Error)" -ForegroundColor Red
                 $measurements += @{
-                    Iteration = $i
-                    Duration = $result.Duration
+                    Iteration    = $i
+                    Duration     = $result.Duration
                     MemoryUsedMB = 0
-                    Success = $false
-                    Error = $result.Error
+                    Success      = $false
+                    Error        = $result.Error
                 }
             }
-        } catch {
+        }
+        catch
+        {
             $endTime = Get-Date
             $duration = ($endTime - $startTime).TotalSeconds
             Write-Host "    Failed: $($_.Exception.Message)" -ForegroundColor Red
             $measurements += @{
-                Iteration = $i
-                Duration = $duration
+                Iteration    = $i
+                Duration     = $duration
                 MemoryUsedMB = 0
-                Success = $false
-                Error = $_.Exception.Message
+                Success      = $false
+                Error        = $_.Exception.Message
             }
         }
         
@@ -132,7 +143,8 @@ Write-Host ""
 
 $allResults = @{}
 
-foreach ($scenario in $scenarios) {
+foreach ($scenario in $scenarios)
+{
     Write-Host "Testing: $($scenario.Description)" -ForegroundColor Yellow
     
     $measurements = Measure-StartupPerformance -AppMode $scenario.AppMode -Description $scenario.Description -Iterations $Iterations
@@ -140,7 +152,8 @@ foreach ($scenario in $scenarios) {
     
     # Calculate statistics for successful runs
     $successfulRuns = $measurements | Where-Object { $_.Success -eq $true }
-    if ($successfulRuns.Count -gt 0) {
+    if ($successfulRuns.Count -gt 0)
+    {
         $avgDuration = [math]::Round(($successfulRuns | Measure-Object -Property Duration -Average).Average, 2)
         $minDuration = [math]::Round(($successfulRuns | Measure-Object -Property Duration -Minimum).Minimum, 2)
         $maxDuration = [math]::Round(($successfulRuns | Measure-Object -Property Duration -Maximum).Maximum, 2)
@@ -149,7 +162,9 @@ foreach ($scenario in $scenarios) {
         Write-Host "  Average: ${avgDuration}s (Range: ${minDuration}s - ${maxDuration}s)" -ForegroundColor Green
         Write-Host "  Avg Memory: ${avgMemory}MB" -ForegroundColor Green
         Write-Host "  Success Rate: $($successfulRuns.Count)/$($measurements.Count) ($([math]::Round(($successfulRuns.Count / $measurements.Count) * 100, 1))%)" -ForegroundColor Green
-    } else {
+    }
+    else
+    {
         Write-Host "  All iterations failed" -ForegroundColor Red
     }
     Write-Host ""
@@ -159,16 +174,18 @@ foreach ($scenario in $scenarios) {
 Write-Host "=== Performance Summary ===" -ForegroundColor Yellow
 $overallStats = @()
 
-foreach ($scenario in $scenarios) {
+foreach ($scenario in $scenarios)
+{
     $measurements = $allResults[$scenario.AppMode]
     $successfulRuns = $measurements | Where-Object { $_.Success -eq $true }
     
-    if ($successfulRuns.Count -gt 0) {
+    if ($successfulRuns.Count -gt 0)
+    {
         $avgDuration = [math]::Round(($successfulRuns | Measure-Object -Property Duration -Average).Average, 2)
         $avgMemory = [math]::Round(($successfulRuns | Measure-Object -Property MemoryUsedMB -Average).Average, 2)
         
         $overallStats += [PSCustomObject]@{
-            Mode = $scenario.AppMode
+            Mode        = $scenario.AppMode
             Description = $scenario.Description
             AvgDuration = $avgDuration
             AvgMemoryMB = $avgMemory
@@ -177,7 +194,8 @@ foreach ($scenario in $scenarios) {
     }
 }
 
-if ($overallStats.Count -gt 0) {
+if ($overallStats.Count -gt 0)
+{
     $overallStats | Format-Table -Property Mode, Description, AvgDuration, AvgMemoryMB, SuccessRate -AutoSize
     
     $totalAvgDuration = [math]::Round(($overallStats | Measure-Object -Property AvgDuration -Average).Average, 2)
@@ -188,12 +206,13 @@ if ($overallStats.Count -gt 0) {
 }
 
 # Save detailed results if requested
-if ($DetailedOutput) {
+if ($DetailedOutput)
+{
     $detailedResults = @{
-        TestDate = Get-Date
+        TestDate  = Get-Date
         Scenarios = $scenarios
-        Results = $allResults
-        Summary = $overallStats
+        Results   = $allResults
+        Summary   = $overallStats
     }
     
     $jsonOutput = $detailedResults | ConvertTo-Json -Depth 5
@@ -205,8 +224,8 @@ Write-Host "Performance baseline measurement completed: $(Get-Date)" -Foreground
 
 # Return summary for automation
 return @{
-    OverallStats = $overallStats
+    OverallStats     = $overallStats
     TotalAvgDuration = $totalAvgDuration
-    TotalAvgMemory = $totalAvgMemory
-    AllResults = $allResults
+    TotalAvgMemory   = $totalAvgMemory
+    AllResults       = $allResults
 }

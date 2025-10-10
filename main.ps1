@@ -159,6 +159,8 @@ param(
     [switch]$showSettings,
     [switch]$OverwriteLogs,
     [switch]$SecureString,
+    [switch]$testMode,
+    [string]$TestPassword,
     [switch]$ResetAuth,
     [switch]$ForceNewToken,
     [parameter(parameterSetName = 'delegated')]
@@ -183,6 +185,13 @@ param(
     [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug')]
     [string]$LogLevel = 'Information'
 )
+
+# Store test password in script scope if provided (only works with testMode for security)
+if ($testMode -and $TestPassword)
+{
+    $script:UserEncryptionPassword = $TestPassword
+    $global:UserEncryptionPassword = $TestPassword
+}
 
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
@@ -352,6 +361,30 @@ if ($filesCleaned.AllRemoved)
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+
+$migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+# $migrationCheck = Invoke-SettingsMigration -Force
+if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
+{
+    Write-Host "Migration completed successfully." -ForegroundColor Green
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+    Write-Verbose "[$scriptName] Legacy Autopilot profiles present: $legacyAutopilotProfilesPresent"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration completed successfully." -LogLevel "Information"
+}
+elseif ($migrationCheck.migrationNeeded -and -not $migrationCheck.success)
+{
+    $migrationCheck.errorMessages | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    Write-Host "Please rerun the script or contact support." -ForegroundColor Yellow
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Migration failed with errors: $($migrationCheck.errorMessages -join '; ')" -LogLevel "Error"
+    Write-Log -LogFile $LogFile -FinishLogging
+    exit 1
+}
+else
+{
+    Write-Verbose "[$scriptName] No migration needed."
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
+}
+
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
 # Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
@@ -386,10 +419,21 @@ if (-not (Test-Path $secretsDir))
 $configContent = $null
 $script:maxRetries = 6
 
-if (Test-Path $configFile)
+# In test mode without a test password and config file exists, skip config loading
+if ($testMode -and -not $TestPassword -and (Test-Path $configFile))
 {
-    # Initialize configuration session
-    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password"
+    Write-Verbose "[$scriptName] Test mode enabled without test password, skipping encrypted config file loading"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode enabled without test password, skipping encrypted config file loading" -LogLevel "Information"
+    # Set dummy values for required variables
+    $domain = "test.local"
+    $appId = "test-app-id"
+    $tenantId = "test-tenant-id"
+    $name = "Test Configuration"
+}
+elseif (Test-Path $configFile)
+{
+    # Initialize configuration session (use Silent mode if testMode is active)
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -PasswordPrompt "Enter your password" -Silent:$testMode
     
     if (-not $sessionResult.Success)
     {
@@ -432,56 +476,85 @@ if (Test-Path $configFile)
 }
 else
 {
-    # Configuration file not found - launch first run wizard
-    Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
-    
-    Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
-    
-    # Launch the first run wizard
-    $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1"
+    # Configuration file not found
+    if ($testMode)
+    {
+        # In test mode, skip first run wizard and create minimal configuration
+        Write-Verbose "[$scriptName] Test mode enabled: Skipping first run wizard and using default test configuration"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping first run wizard" -LogLevel "Information"
+        
+        # Set default test values
+        $domain = "test.contoso.com"
+        $appId = "00000000-0000-0000-0000-000000000000"
+        $tenantId = "00000000-0000-0000-0000-000000000000"
+        $name = "Test Application"
+        
+        # Skip config file loading in test mode
+        Write-Verbose "[$scriptName] Test mode: Using default test configuration without config file"
+        $wizardResult = $true
+    }
+    else
+    {
+        # Configuration file not found - launch first run wizard
+        Write-Host "Configuration file $configFile not found." -ForegroundColor Yellow
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file not found. Starting first run wizard" -LogLevel "Verbose"
+        
+        Write-Host "Starting first run wizard to set up your configuration..." -ForegroundColor Green
+        
+        # Launch the first run wizard (pass Silent switch if testMode is active)
+        $wizardResult = Start-FirstRunWizard -ConfigFile $configFile -SettingsFile $InitFile -StringsFile "$PWD\strings.psd1" -Silent:$testMode
+    }
     
     if ($wizardResult)
     {
-        Write-Host "First run wizard completed successfully." -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
-        
-        # Now try to load the newly created configuration
-        Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
-        
-        # Re-run the configuration loading logic
-        if (Test-Path $configFile)
+        if (-not $testMode)
         {
-            # Initialize configuration session after wizard
-            $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
+            Write-Host "First run wizard completed successfully." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard completed successfully" -LogLevel "Information"
             
-            if (-not $sessionResult.Success)
+            # Now try to load the newly created configuration
+            Write-Host "Loading the newly created configuration..." -ForegroundColor Cyan
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Loading newly created configuration file" -LogLevel "Information"
+            
+            # Re-run the configuration loading logic
+            if (Test-Path $configFile)
             {
-                Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
-                Write-Host "Please check file permissions and try again." -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                # Initialize configuration session after wizard (use Silent mode if testMode is active)
+                $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
+                
+                if (-not $sessionResult.Success)
+                {
+                    Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
+                    Write-Host "Please check file permissions and try again." -ForegroundColor Red
+                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                    write-log -logFile $logFile -finishLogging
+                    exit 1
+                }
+                
+                $configContent = $sessionResult.ConfigContent
+                $domain = $sessionResult.Domain
+                $appId = $sessionResult.AppId
+                $tenantId = $sessionResult.TenantId
+                $name = $sessionResult.Name
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
+                # Clear the config content from memory
+                $configContent = $null
+            }
+            else
+            {
+                Write-Host "Configuration file was not created successfully." -ForegroundColor Red
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
                 write-log -logFile $logFile -finishLogging
                 exit 1
             }
-            
-            $configContent = $sessionResult.ConfigContent
-            $domain = $sessionResult.Domain
-            $appId = $sessionResult.AppId
-            $tenantId = $sessionResult.TenantId
-            $name = $sessionResult.Name
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
-            # Clear the config content from memory
-            $configContent = $null
         }
         else
         {
-            Write-Host "Configuration file was not created successfully." -ForegroundColor Red
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
-            write-log -logFile $logFile -finishLogging
-            exit 1
+            Write-Verbose "[$scriptName] Test mode: Skipping configuration file loading"
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Using default test configuration" -LogLevel "Information"
         }
-        #reload settings since thhey likely have changed.
+        
+        #reload settings since they likely have changed.
         Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
         write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
         $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
@@ -586,40 +659,47 @@ if (-not $version.version)
 #endregion Initialize script
 
 #region Check for password change requirement
-# Check if password change is required (only applies to existing config files, not first-run wizard)
-if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
+if ($testMode)
 {
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-    
-    # Need to reload configContent for password change process
-    $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
-    if ($tempSessionResult.Success)
+    Write-Verbose "[$scriptName] Test mode enabled, skipping password change check."
+    write-log -logFile $logFile -Module $scriptName -Message "Test mode enabled, skipping password change check." -LogLevel "Information"
+}
+else 
+{
+    if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
     {
-        $configContent = $tempSessionResult.ConfigContent
-        
-        # Invoke password change process
-        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-        if ($passwordChangeResult)
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+    
+        # Need to reload configContent for password change process
+        $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password" -Silent:$testMode
+        if ($tempSessionResult.Success)
         {
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-            Write-Host "Password changed successfully. Please restart the application and log in with your new password." -ForegroundColor Green
-            Write-Host "To do so, type 'main' and press enter when you see the command prompt." -ForegroundColor Green
-            Write-Log -LogFile $LogFile -FinishLogging
-            exit 0
+            $configContent = $tempSessionResult.ConfigContent
+        
+            # Invoke password change process
+            $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+            if ($passwordChangeResult)
+            {
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+                Write-Host "Password changed successfully. Please restart the application and log in with your new password." -ForegroundColor Green
+                Write-Host "To do so, type 'main' and press enter when you see the command prompt." -ForegroundColor Green
+                Write-Log -LogFile $LogFile -FinishLogging
+                exit 0
+            }
+            else
+            {
+                Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+                Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+            }
+        
+            # Clear the config content from memory
+            $configContent = $null
         }
         else
         {
-            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+            Write-Host "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -LogLevel "Error"
         }
-        
-        # Clear the config content from memory
-        $configContent = $null
-    }
-    else
-    {
-        Write-Host "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -LogLevel "Error"
     }
 }
 #endregion Check for password change requirement
@@ -698,7 +778,7 @@ foreach ($key in $settings.Keys)
     }
 }
 Write-Verbose "[$scriptName] Auth configuration loaded from $configFile"
-$global:getTokenParams = BuildAuthSplatTable -auth $auth
+$getTokenParams = BuildAuthSplatTable -auth $auth
 foreach ($key in $getTokenParams.Keys)
 {
     Write-Verbose "[$scriptName] $($key): $($getTokenParams[$key])"
@@ -812,11 +892,21 @@ if ($ResetAuth)
 Write-Host "Retrieving access token..."
 Write-Verbose "[$scriptName] Initialization block started."
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Initialization block started" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
-Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
-Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
-$accessToken = GetGraphAccessToken @getTokenParams
+
+if ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode: Skipping Graph API token retrieval"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Test mode: Skipping Graph API authentication" -LogLevel "Information"
+    $accessToken = "test-mode-fake-token"
+}
+else
+{
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new token: $($auth.ForceNewToken )" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Force new refresh token: $($auth.ForceNewRefreshToken )" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "No save refresh token: $($auth.NoSaveRefreshToken )" -LogLevel "Information"
+    Write-Log -logFile $LogFile -Module $scriptName -Message "Getting access token..." -LogLevel "Information"
+    $accessToken = GetGraphAccessToken @getTokenParams
+}
 # Clear the cached user password now that authentication is complete
 if ($script:UserEncryptionPassword)
 {
@@ -956,6 +1046,96 @@ else
         write-log -logFile $logFile -module $scriptName -message "Exiting script due to authentication failure." -LogLevel "Error"
         write-log -logFile $logFile -finishLogging
         exit 1
+    }
+}
+if ($testMode)
+{
+    Write-Verbose "[$scriptName] Test mode enabled, skipping legacy configuration migration."
+    write-log -logFile $logFile -module $scriptName -message "Test mode enabled, skipping legacy configuration migration." -LogLevel "Information"
+}
+else 
+{
+    Write-Verbose "[$scriptName] Migrate legacy configuration: $($settings.migrateLegacyConfiguration)"
+    write-log -logFile $logFile -module $scriptName -message "Migrate legacy configuration: $($settings.migrateLegacyConfiguration)" -LogLevel "Information"
+    if ($settings.migrateLegacyConfiguration)
+    {
+        Write-Verbose "Starting migration of legacy configuration"
+        write-log -logFile $logFile -module $scriptName -message "Starting migration of legacy configuration." -LogLevel "Information"
+        $resolvedLegacyObjects = Resolve-MigratedLegacyObjects -accessToken $accessToken -settings $settings -domain $domain -SettingsFile $InitFile
+        write-log -logFile $logFile -module $scriptName -message "Resolved migrated legacy objects: $($resolvedLegacyObjects | Out-String)" -LogLevel "Information"
+        $newSetting = @{
+            migrateLegacyConfiguration = $settings.migrateLegacyConfiguration
+        }
+    
+        # Check if user deferred the resolution
+        if ($resolvedLegacyObjects.userDeferred)
+        {
+            Write-Host "Legacy object resolution has been deferred." -ForegroundColor Yellow
+            Write-Host "You will be prompted again the next time the script starts." -ForegroundColor Yellow
+            write-log -logFile $logFile -module $scriptName -message "User deferred legacy object resolution. Will prompt on next start." -LogLevel "Information"
+            # Keep migrateLegacyConfiguration as true so user is prompted next time
+            $newSetting = @{
+                migrateLegacyConfiguration = $true
+            }
+        }
+        elseif ($resolvedLegacyObjects.success)
+        {
+            Write-Host "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects"
+            write-log -logFile $logFile -module $scriptName -message "Successfully resolved $($resolvedLegacyObjects.totalResolved) legacy objects." -LogLevel "Information"
+            $newSetting = @{
+                migrateLegacyConfiguration = $false
+            }
+        }
+        else
+        {
+            Write-Host "Failed to resolve legacy objects." -ForegroundColor Red
+            write-log -logFile $logFile -module $scriptName -message "Failed to resolve legacy objects." -LogLevel "Error"
+            $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+            write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start: $retry" -LogLevel "Information"
+            Write-Verbose "User chose to be prompted to resolve legacy objects on next start: $retry"
+            while ($retry -notin @('yes', 'no', 'y', 'n'))
+            {
+                Write-Host "Invalid choice. Please enter 'yes' or 'no'."
+                [console]::beep()
+                $retry = Read-Host "Would you like to be prompted to resolve them the next time the script starts? (yes/no)"
+            }
+            if ($retry -in @('no', 'n'))
+            {
+                Write-Verbose "User chose not to be prompted to resolve legacy objects on next start."
+                write-log -logFile $logFile -module $scriptName -message "User chose not to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+                $newSetting = @{
+                    migrateLegacyConfiguration = $false
+                }
+            }
+            else
+            {
+                Write-Host "You will be prompted to resolve them the next time the script starts."
+                write-log -logFile $logFile -module $scriptName -message "User chose to be prompted to resolve legacy objects on next start." -LogLevel "Information"
+                $newSetting = @{
+                    migrateLegacyConfiguration = $true
+                }
+            }
+        }
+        if ($newSetting.migrateLegacyConfiguration -ne $settings.migrateLegacyConfiguration)
+        {
+            $updatedSetting = Update-Setting -SettingType "Domain" -DomainName $domain -Settings $newSetting -SettingsFile $InitFile -MergeSettings
+            write-log -logFile $logFile -module $scriptName -message "Settings updated: $($updatedSetting | Out-String)" -LogLevel "Information"
+            if ($updatedSetting)
+            {
+                Write-Host "Settings updated successfully." -ForegroundColor Green
+                write-log -logFile $logFile -module $scriptName -message "Settings updated successfully." -LogLevel "Information"
+            }
+            else
+            {
+                Write-Host "Failed to update settings." -ForegroundColor Red
+                write-log -logFile $logFile -module $scriptName -message "Failed to update settings." -LogLevel "Error"
+            }
+        }
+        else
+        {
+            Write-Verbose "No changes made to migrateLegacyConfiguration setting."
+            write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
+        }
     }
 }
 #endregion initialization block with access token
@@ -1846,17 +2026,10 @@ $mainMenu = AddMenuItem -menu $mainMenu -name "Show Group Assignments" -action {
         return $result
     }
 }
-if (Test-MenuItemIncluded -MenuItemName "Export Menu" -Menus $script:menus)
-{
-    $mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "Export Menu" -Submenu $exportMenu
+$mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
+    $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
 }
-if (Test-MenuItemIncluded -MenuItemName "About" -Menus $script:menus)
-{
-    $mainMenu = AddMenuItem -Menu $mainMenu -Name "About" -Action {
-        $null = Show-AboutApplication -accessToken $accessToken -Release $latestRelease -appId $appId -tenantId $tenantId -name $name -updateAvailable $updateAvailable
-    }
-}
-
 #region show menus
 # Add the main menu to both history arrays for proper stack synchronization
 try
@@ -1874,9 +2047,14 @@ catch
 }
 
 # Only show menu if not in test mode
-if ($settings.testMode -eq $false)
+if ($testMode)
 {
-    Write-Verbose "Test mode: $($settings.testMode)"
+    Write-Host "Test mode: $($testMode). No menu will be shown." -ForegroundColor Yellow
+    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
+}
+else
+{
+    Write-Verbose "Test mode: $($testMode)"
     if ($null -ne $mainMenu)
     {
         Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Showing main menu." -LogLevel "Information"
@@ -1886,11 +2064,6 @@ if ($settings.testMode -eq $false)
             Write-Host "`nThank you for using the Intune Helpdesk menu. Goodbye!" -ForegroundColor Green
         }
     }
-}
-else
-{
-    Write-Host "Test mode: $($settings.testMode). No menu will be shown." -ForegroundColor Yellow
-    Write-Host "You can run the script in test mode to validate functionality without showing the menu."
 }
 #endregion show menus
 

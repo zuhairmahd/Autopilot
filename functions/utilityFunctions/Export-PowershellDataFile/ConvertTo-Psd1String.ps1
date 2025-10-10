@@ -49,10 +49,16 @@ function ConvertTo-Psd1String()
         }
         
         $result += "$childIndent$validKey = "
-        Write-Verbose "[$functionName] Processing key: $key with value type: $($value.GetType().Name)"
         
-        if ($value -is [hashtable] -or $value -is [System.Collections.Specialized.OrderedDictionary])
+        # Handle null values first before trying to access GetType()
+        if ($null -eq $value)
         {
+            Write-Verbose "[$functionName] Processing key: $key with null value"
+            $result += '$null'
+        }
+        elseif ($value -is [hashtable] -or $value -is [System.Collections.Specialized.OrderedDictionary])
+        {
+            Write-Verbose "[$functionName] Processing key: $key with value type: $($value.GetType().Name)"
             Write-Verbose "[$functionName] Processing nested $($value.GetType().Name)"
             $result += (ConvertTo-Psd1String -Configuration $value -IndentLevel ($IndentLevel + 1))
         }
@@ -70,7 +76,12 @@ function ConvertTo-Psd1String()
                 {
                     $result += "$childIndent    "
                     
-                    if ($item -is [hashtable] -or $item -is [System.Collections.Specialized.OrderedDictionary])
+                    if ($null -eq $item)
+                    {
+                        Write-Verbose "[$functionName] Processing null item in array"
+                        $result += '$null'
+                    }
+                    elseif ($item -is [hashtable] -or $item -is [System.Collections.Specialized.OrderedDictionary])
                     {
                         Write-Verbose "[$functionName] Processing nested $($item.GetType().Name) in array"
                         $result += (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 2))
@@ -85,10 +96,6 @@ function ConvertTo-Psd1String()
                     elseif ($item -is [bool])
                     {
                         $result += if ($item) { '$true' } else { '$false' }
-                    }
-                    elseif ($null -eq $item)
-                    {
-                        $result += '$null'
                     }
                     elseif ($item -is [int] -or $item -is [long] -or $item -is [double] -or $item -is [float])
                     {
@@ -107,34 +114,29 @@ function ConvertTo-Psd1String()
         }
         elseif ($value -is [string])
         {
-            Write-Verbose "[$functionName] Processing string: $value"
+            Write-Verbose "[$functionName] Processing key: $key with value type: String"
             # Enhanced string escaping for PowerShell compatibility
             $escapedValue = $value -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
             $result += "'$escapedValue'"
         }
         elseif ($value -is [bool])
         {
-            Write-Verbose "[$functionName] Processing boolean: $value"  
+            Write-Verbose "[$functionName] Processing key: $key with value type: Boolean"
             $result += if ($value) { '$true' } else { '$false' }
-        }
-        elseif ($null -eq $value)
-        {
-            Write-Verbose "[$functionName] Processing null value"
-            $result += '$null'
         }
         elseif ($value -is [int] -or $value -is [long] -or $value -is [double] -or $value -is [float])
         {
-            Write-Verbose "[$functionName] Processing numeric value: $value"
+            Write-Verbose "[$functionName] Processing key: $key with numeric value type: $($value.GetType().Name)"
             $result += $value.ToString()
         }
         elseif ($value -is [datetime])
         {
-            Write-Verbose "[$functionName] Processing datetime value: $value"
+            Write-Verbose "[$functionName] Processing key: $key with datetime value"
             $result += "'$($value.ToString('o'))'"  # ISO 8601 format
         }
         else
         {
-            Write-Verbose "[$functionName] Processing other type: $($value.GetType().Name)"
+            Write-Verbose "[$functionName] Processing key: $key with other type: $($value.GetType().Name)"
             # Convert to string and escape
             $stringValue = $value.ToString() -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
             $result += "'$stringValue'"

@@ -125,7 +125,6 @@ function Get-ApplicationDefaults()
                 baseURL       = "https://www.github.com"
                 repoPath      = "zuhairmahd"
             }
-            testMode                     = $false
             operatingSystem              = "Windows"
             autoUpdate                   = $true
         }
@@ -135,7 +134,10 @@ function Get-ApplicationDefaults()
             groupsToInclude                 = @()
             groupsToExclude                 = @()
             autopilotProfilesToInclude      = @()
-            autopilotDeviceAllowedVendors   = @()  	    
+            autopilotDeviceAllowedVendors   = @(
+                "Dell",
+                "VMWare"
+            )
             domain                          = $DomainName
             companyName                     = ""
             version                         = $Version
@@ -145,6 +147,7 @@ function Get-ApplicationDefaults()
             deviceContactThresholdInDays    = 30
             checkStrongMapping              = $false
             strongMappingOptional           = $true
+            migrateLegacyConfiguration      = $true
             appModes                        = @(
                 "full"
             )

@@ -22,6 +22,7 @@
     - fixes: Bug fixes and issue-specific validation tests
     - menu: Menu system tests including appmode and dynamic menu functionality
     - autopilot: Windows Autopilot profile and device management tests
+    - migration: Settings and configuration migration tests
     - specific: Run specific tests by pattern (requires -TestPattern)
 .PARAMETER TestPattern
     Specific pattern to match test files (e.g., "test-menu*", "test-auth*")
@@ -82,7 +83,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized', 'performance', 'fixes', 'menu', 'autopilot')]
+    [ValidateSet('all', 'unit', 'integration', 'comprehensive', 'validation', 'demo', 'syntax', 'core', 'specific', 'enhanced', 'specialized', 'performance', 'fixes', 'menu', 'autopilot', 'migration')]
     [string]$TestCategory = 'all',
     [string]$TestPattern = $null,
     [string]$ExcludePattern = "test-helper.ps1,Test-Runner.ps1",
@@ -138,11 +139,19 @@ $TestRegistry = @{
     }
     'integration'   = @{
         Description       = 'Cross-component integration and workflow tests'
-        # Integration tests including e2e, configuration, menu, auth, and migration tests
-        Pattern           = 'test-*-integration.ps1,test-e2e-*.ps1,test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system*.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-auth-configuration-pipeline.ps1,test-migration-*.ps1,test-main-integration.ps1'
+        # Integration tests including e2e, configuration, menu, and auth tests
+        Pattern           = 'test-*-integration.ps1,test-e2e-*.ps1,test-menu-inclusions.ps1,test-menu-logic-validation.ps1,test-menu-search-logic.ps1,test-configuration-system*.ps1,test-settings-integration.ps1,test-auth-settings.ps1,test-auth-configuration-pipeline.ps1,test-main-integration.ps1'
         Priority          = 4
         EstimatedDuration = '3-5 minutes'
         Dependencies      = @('syntax', 'core', 'unit')
+    }
+    'migration'     = @{
+        Description       = 'Settings and configuration migration tests'
+        # Migration workflow tests including comprehensive, e2e, silent mode, and caller validation
+        Pattern           = 'test-migration-*.ps1'
+        Priority          = 4
+        EstimatedDuration = '2-3 minutes'
+        Dependencies      = @('syntax', 'core')
     }
     'comprehensive' = @{
         Description       = 'Full workflow and end-to-end comprehensive tests'

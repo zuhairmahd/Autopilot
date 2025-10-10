@@ -21,6 +21,9 @@ function Initialize-ConfigurationSession()
     .PARAMETER PasswordPrompt
     Custom prompt message for password input.
     
+    .PARAMETER Silent
+    If specified, suppresses interactive prompts and uses stored password. Useful for automated testing.
+    
     .OUTPUTS
     System.Object
     Returns an object with Success (boolean), ConfigContent (string), ParsedConfig (object),
@@ -32,6 +35,9 @@ function Initialize-ConfigurationSession()
         $domain = $sessionResult.Domain
         $configContent = $sessionResult.ConfigContent
     }
+    
+    .EXAMPLE
+    $sessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -Silent
     #>
     [CmdletBinding()]
     param(
@@ -39,12 +45,13 @@ function Initialize-ConfigurationSession()
         [string]$ConfigFile,
         [int]$MaxRetries = 3,
         [switch]$UseStoredPassword,
-        [string]$PasswordPrompt = "Enter your password"
+        [string]$PasswordPrompt = "Enter your password",
+        [switch]$Silent
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Initializing configuration session for: $ConfigFile" -LogLevel "Debug"
-    Write-Verbose "[$functionName] Initializing configuration session for: $ConfigFile"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Initializing configuration session for: $ConfigFile (Silent: $Silent)" -LogLevel "Debug"
+    Write-Verbose "[$functionName] Initializing configuration session for: $ConfigFile (Silent: $Silent)"
     
     $result = @{
         Success       = $false
@@ -61,7 +68,7 @@ function Initialize-ConfigurationSession()
     try
     {
         # Load the encrypted configuration file
-        $loadResult = Load-EncryptedConfigFile -ConfigFile $ConfigFile -MaxRetries $MaxRetries -UseStoredPassword:$UseStoredPassword -PasswordPrompt $PasswordPrompt
+        $loadResult = Load-EncryptedConfigFile -ConfigFile $ConfigFile -MaxRetries $MaxRetries -UseStoredPassword:$UseStoredPassword -PasswordPrompt $PasswordPrompt -Silent:$Silent
         
         if (-not $loadResult.Success)
         {

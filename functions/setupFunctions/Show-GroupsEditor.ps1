@@ -617,12 +617,17 @@ function Resolve-SingleGroupInteractive()
     .SYNOPSIS
         Resolves a single group name to group object using interactive search.
         Checks for duplicates against existing items.
+    
+    .PARAMETER Silent
+        If specified and a single exact match is found, returns the group without prompting.
+        Interactive prompts still occur for multiple matches or no matches.
     #>
     [CmdletBinding()]
     param(
         [string]$GroupName,
         [string]$AccessToken,
-        [array]$ExistingItems = @()
+        [array]$ExistingItems = @(),
+        [switch]$Silent
     )
     $FunctionName = $MyInvocation.MyCommand.Name    
     Write-Log -LogFile $logFile -Module $FunctionName -Message "Resolving group: '$GroupName'" -LogLevel "Verbose"
@@ -639,20 +644,41 @@ function Resolve-SingleGroupInteractive()
     try
     {
         # First try exact match
-        Write-Host "  Searching for group: '$GroupName'..." -ForegroundColor Cyan
+        if (-not $Silent)
+        {
+            Write-Host "  Searching for group: '$GroupName'..." -ForegroundColor Cyan
+        }
+        else
+        {
+            Write-Verbose "[$FunctionName] Searching for group: '$GroupName' (Silent mode)"
+        }
+        
         $result = Get-EntraDirectoryObject -EntityType Group -EntityName $groupName -AccessToken $accessToken
         if ($result -and $result.value -and $result[1] -eq $false -and $result[0].value.count -eq 1)
         {
             # Single exact match found
             $group = $result.value[0]
-            Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
             
             # Check for duplicate
             if (Test-ItemExists -ItemName $group.displayName -ItemId $group.id -ExistingList $ExistingItems)
             {
-                Write-Host "  WARNING: Group '$($group.displayName)' is already in the list. Please choose a different group." -ForegroundColor Yellow
+                if (-not $Silent)
+                {
+                    Write-Host "  WARNING: Group '$($group.displayName)' is already in the list. Please choose a different group." -ForegroundColor Yellow
+                }
                 Write-Log -LogFile $logFile -Module $FunctionName -Message "Duplicate group detected: '$($group.displayName)'" -LogLevel "Warning"
                 return $null
+            }
+            
+            # In Silent mode with exact match, automatically accept without prompting
+            if ($Silent)
+            {
+                Write-Verbose "[$FunctionName] Silent mode: Auto-accepted exact match '$($group.displayName)' (ID: $($group.id))"
+                Write-Log -LogFile $logFile -Module $FunctionName -Message "Silent mode: Auto-accepted exact match '$($group.displayName)' (ID: $($group.id))" -LogLevel "Verbose"
+            }
+            else
+            {
+                Write-Host "  Found group: '$($group.displayName)' (ID: $($group.id))" -ForegroundColor Green
             }
             
             return @{

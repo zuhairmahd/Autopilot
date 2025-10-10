@@ -156,7 +156,8 @@ else
 }
 #endregion import functions.
 
-#region Initialize script
+#region Initialize script parameters
+Write-Host "Starting script..."
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -171,51 +172,56 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
+
+$migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
+{
+    Write-Host "Migration completed successfully." -ForegroundColor Green
+}
+else
+{
+    {
+        $migrationCheck.errorMessages | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+        exit 1
+    }
+}
+
 #If the scriptname is a Powershell, change the extension to an exe.
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
+    Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
     $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
-    if (Test-Path "$pwd\$scriptNameExe")
-    {
-        Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
-        $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
-    }
-    else
-    {
-        Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
-    }
+}
+else
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
+    Write-Verbose "[$scriptName] Executable file not found: $scriptNameExe"
+    $scriptNameExe = $scriptName
+}
+if (Test-Path "$pwd\$scriptNameExe")
+{
+    Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
+    Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
+    $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
 }
 else
 {
     Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
+    Write-Verbose "[$scriptName] Script file found: $scriptName"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-$appMetaData = Get-ApplicationMetaData
-Write-Log -LogFile $LogFile -Module $scriptName -Message "Application metadata retrieved successfully." -LogLevel "Information"
-if (-not $version.version)
+Write-Verbose "[$scriptName] Initializing application configuration"
+$filesCleaned = cleanupTempFiles
+if ($filesCleaned.AllRemoved)
 {
-    Write-Verbose "[$scriptName] Unable to get file version."
-    #see if you can find it in the metadata.
-    if ($appMetaData -and $appMetaData.version)
-    {
-        $version = $appMetaData.version
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
-        $version = @{
-            version     = [System.Version]::Parse('1.0.0.0')
-            companyName = 'Zuhair Mahmoud'
-            major       = 1
-            minor       = 0
-            build       = 0
-            revision    = 0
-        }
-    }
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
+$appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
+# Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
@@ -232,15 +238,7 @@ if ($ShowVersion)
     Write-Log -LogFile $LogFile -finishLogging
     exit 0
 }
-$oldExecutableFileName = 'main.exe.old'
-if (Test-Path $oldExecutableFileName)
-{
-    Write-Verbose "[$scriptName] Old backup executable file found: $oldExecutableFileName"
-    Write-Verbose "[$scriptName] removing old executable file: $oldExecutableFileName."
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Removing old executable file: $oldExecutableFileName" -LogLevel "Information"
-    Remove-Item -Path $oldExecutableFileName -Force -ErrorAction SilentlyContinue
-}
-#endregion Initialize script
+#endregion  Initialize script parameters
 
 #region Process login
 Write-Verbose "[$scriptName] Checking configuration file: $configFile"
@@ -276,43 +274,6 @@ if (Test-Path $configFile)
     $tenantId = $sessionResult.TenantId
     $name = $sessionResult.Name
     
-    # Check if password change is required
-    # Create empty defaults for init file - structure will be created by Get-ConfigurationData if needed
-    $initDefaults = @{}
-    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
-    if ($initFileContent -and $initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
-    {
-        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
-        
-        # Invoke password change process
-        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-        
-        if ($passwordChangeResult)
-        {
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
-            
-            # Reload the configuration with new password
-            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-            if ($reloadResult.Success)
-            {
-                # Update configContent for this session
-                $configContent = $reloadResult.ConfigContent
-            }
-            else
-            {
-                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                exit 1
-            }
-        }
-        else
-        {
-            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
-        }
-    }
-    
     if (-not ($sessionResult.encrypted))
     {
         Write-Host "You need to set a new password to use this application."
@@ -325,6 +286,7 @@ if (Test-Path $configFile)
         {
             Write-Host "Failed to set password. Exiting script." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to set password after initialization" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
             exit 1
         }
     }
@@ -367,61 +329,16 @@ else
                 Write-Host "Configuration file exists but cannot be read: $($sessionResult.ErrorMessage)" -ForegroundColor Red
                 Write-Host "Please check file permissions and try again." -ForegroundColor Red
                 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file cannot be read: $($sessionResult.ErrorMessage)" -LogLevel "Warning"
+                write-log -logFile $logFile -finishLogging
                 exit 1
             }
             
             $configContent = $sessionResult.ConfigContent
             $domain = $sessionResult.Domain
+            $appId = $sessionResult.AppId
+            $tenantId = $sessionResult.TenantId
+            $name = $sessionResult.Name
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully for domain: $domain" -LogLevel "Information"
-            
-            # Check if password change is required (wizard path)
-            if (Test-Path $InitFile)
-            {
-                try 
-                {
-                    $initDefaults = @{}
-                    $initFileContent = Get-ConfigurationData -ConfigurationPath $InitFile -DefaultValues $initDefaults
-                    if ($initFileContent.auth -and $initFileContent.auth.changePWOnNextStart -eq $true)
-                    {
-                        Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required after wizard (changePWOnNextStart=true)" -LogLevel "Information"
-                        
-                        # Invoke password change process
-                        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
-                        
-                        if ($passwordChangeResult)
-                        {
-                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully after wizard" -LogLevel "Information"
-                            
-                            # Reload the configuration with new password
-                            Write-Host "Reloading configuration with new password..." -ForegroundColor Cyan
-                            $reloadResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword
-                            
-                            if ($reloadResult.Success)
-                            {
-                                # Update configContent for this session
-                                $configContent = $reloadResult.ConfigContent
-                            }
-                            else
-                            {
-                                Write-Host "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -ForegroundColor Red
-                                Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration after password change: $($reloadResult.ErrorMessage)" -LogLevel "Error"
-                                exit 1
-                            }
-                        }
-                        else
-                        {
-                            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
-                            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed after wizard. Continuing with current password." -LogLevel "Warning"
-                        }
-                    }
-                }
-                catch
-                {
-                    Write-Warning "Failed to check password change requirement after wizard: $($_.Exception.Message)"
-                    Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to check password change requirement after wizard: $($_.Exception.Message)" -LogLevel "Warning"
-                }
-            }
-            
             # Clear the config content from memory
             $configContent = $null
         }
@@ -429,21 +346,53 @@ else
         {
             Write-Host "Configuration file was not created successfully." -ForegroundColor Red
             Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration file was not created by wizard" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
             exit 1
         }
+        #reload settings since thhey likely have changed.
+        Write-Verbose "[$scriptName] Initializing application configuration since the earlier initialization attempt failed or did not take place."
+        write-log -logFile $logFile -module $scriptName -message "Initializing application configuration since earlier attempt failed or did not take place."
+        $configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domain -BoundParameters $PSBoundParameters
+        if (-not $configResult.Success)
+        {
+            Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+            write-log -logFile $logFile -finishLogging
+            exit 1
+        }
+        # Extract configuration results
+        $auth = $configResult.Auth
+        $globalSettings = $configResult.GlobalSettings
+        $localSettings = $configResult.LocalSettings
+        $requiredScopes = $configResult.RequiredScopes
+        # Merge global and local settings into a single settings object
+        Write-Verbose "[$scriptName] Merging global and local settings"
+        $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
+        Write-Verbose "[$scriptName] Settings merged successfully. Final settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Configuration initialization completed successfully"
+        Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
+        Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
+        Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
+        Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
+        Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+        Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
+
+
     }
     else
     {
         Write-Host "First run wizard failed or was cancelled." -ForegroundColor Red
         Write-Log -LogFile $LogFile -Module $scriptName -Message "First run wizard failed or was cancelled" -LogLevel "Error"
-        Write-Host "Please create a configuration file manually or run the script with the -Reconfigure parameter." -ForegroundColor Yellow
+        Write-Host "Please create a configuration file manually." -ForegroundColor Yellow
+        write-log -logFile $logFile -finishLogging
         exit 1
     }
 }
 #endregion Process login
 
-#region Initialize application configuration
-Write-Verbose "[$scriptName] Initializing application configuration"
+#region initialize script
+Write-Host "Loading configuration..."
 # Use domain if available, otherwise default to contoso.com
 $domainForDefaults = if ($domain)
 {
@@ -453,23 +402,19 @@ else
 {
     "contoso.com"
 }
-$global:configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
+$configResult = Initialize-ApplicationConfiguration -InitFile $InitFile -StringsFile $stringsFile -menuFile $menuFile -Domain $domainForDefaults -BoundParameters $PSBoundParameters
 if (-not $configResult.Success)
 {
     Write-Host "Error initializing configuration: $($configResult.ErrorMessage)" -ForegroundColor Red
     Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration initialization failed: $($configResult.ErrorMessage)" -LogLevel "Error"
+    write-log -logFile $logFile -finishLogging
     exit 1
 }
-
 # Extract configuration results
 $auth = $configResult.Auth
 $globalSettings = $configResult.GlobalSettings
 $localSettings = $configResult.LocalSettings
 $requiredScopes = $configResult.RequiredScopes
-
-# Set auth as a script variable so it can be accessed by functions
-$script:Auth = $auth
-
 # Merge global and local settings into a single settings object
 Write-Verbose "[$scriptName] Merging global and local settings"
 $global:settings = MergeSettings -localSettings $localSettings -globalSettings $globalSettings -ConflictResolution 'Local'
@@ -479,10 +424,73 @@ Write-Verbose "[$scriptName] Auth settings count: $($auth.Count)"
 Write-Verbose "[$scriptName] Global settings count: $($globalSettings.Count)"
 Write-Verbose "[$scriptName] Local settings count: $($localSettings.Count)"
 Write-Verbose "[$scriptName] Merged settings count: $($settings.Count)"
-Write-Verbose "[$scriptName] Menus count: $($menus.Count)"
+Write-Verbose "[$scriptName] Menus count: $($configResult.menu.Count)"
 Write-Verbose "[$scriptName] Required scopes count: $($requiredScopes.Count)"
 Write-Log -LogFile $LogFile -Module $scriptName -Message "Configuration loaded successfully. Menus: $($menus.Count), Scopes: $($requiredScopes.Count), Settings: $($settings.Count)" -LogLevel "Information"
-#endregion  Initialize application configuration
+if (-not $version.version)
+{
+    Write-Verbose "[$scriptName] Unable to get file version."
+    #see if you can find it in the metadata.
+    if ($appMetaData -and $appMetaData.version)
+    {
+        $version = $appMetaData.version
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Found version in metadata: $($version | Out-String)" -LogLevel "Verbose"
+        Write-Verbose "[$scriptName] Found version in metadata: $($version | Out-String)"
+    }
+    else
+    {
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Unable to find version information. Defaulting to 1.0.0.0." -LogLevel "Warning"
+        Write-Verbose "[$scriptName] Defaulting version to 1.0.0.0"
+        $version = @{
+            version     = [System.Version]::Parse('1.0.0.0')
+            companyName = 'Zuhair Mahmoud'
+            major       = 1
+            minor       = 0
+            build       = 0
+            revision    = 0
+        }
+    }
+}
+#endregion Initialize script
+
+#region Check for password change requirement
+# Check if password change is required (only applies to existing config files, not first-run wizard)
+if ((Test-Path $configFile) -and $auth.changePWOnNextStart -eq $true)
+{
+    Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change required (changePWOnNextStart=true)" -LogLevel "Information"
+    
+    # Need to reload configContent for password change process
+    $tempSessionResult = Initialize-ConfigurationSession -ConfigFile $configFile -MaxRetries $maxRetries -UseStoredPassword -PasswordPrompt "Enter your password"
+    if ($tempSessionResult.Success)
+    {
+        $configContent = $tempSessionResult.ConfigContent
+        
+        # Invoke password change process
+        $passwordChangeResult = Invoke-PasswordChangeProcess -ConfigFile $configFile -ConfigContent $configContent -SettingsFile $InitFile
+        if ($passwordChangeResult)
+        {
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change completed successfully" -LogLevel "Information"
+            Write-Host "Password changed successfully. Please restart the application and log in with your new password." -ForegroundColor Green
+            Write-Host "To do so, type 'main' and press enter when you see the command prompt." -ForegroundColor Green
+            Write-Log -LogFile $LogFile -FinishLogging
+            exit 0
+        }
+        else
+        {
+            Write-Host "Password change failed. Continuing with current password." -ForegroundColor Yellow
+            Write-Log -LogFile $LogFile -Module $scriptName -Message "Password change failed. Continuing with current password." -LogLevel "Warning"
+        }
+        
+        # Clear the config content from memory
+        $configContent = $null
+    }
+    else
+    {
+        Write-Host "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -ForegroundColor Red
+        Write-Log -LogFile $LogFile -Module $scriptName -Message "Failed to reload configuration for password change: $($tempSessionResult.ErrorMessage)" -LogLevel "Error"
+    }
+}
+#endregion Check for password change requirement
 
 #region Define variables
 $scope = $auth.scope

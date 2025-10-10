@@ -60,7 +60,7 @@ catch
 }
 
 # Set up required global variables for testing
-$global:LogFile = "$PWD/test-config-mgmt.log"
+$global:LogFile = Join-Path $testContext.TestFolder "test-config-mgmt.log"
 
 try
 {

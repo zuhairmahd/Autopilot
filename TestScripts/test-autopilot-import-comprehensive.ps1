@@ -25,35 +25,44 @@ $RootPath = Split-Path -Parent $PSScriptRoot
 
 # Load functions at script level (same pattern as main.ps1)
 $functionsFolder = Join-Path $RootPath "functions"
-if (Test-Path $functionsFolder) {
+if (Test-Path $functionsFolder)
+{
     $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse -ErrorAction Stop
-    foreach ($function in $functions) {
-        try {
+    foreach ($function in $functions)
+    {
+        try
+        {
             . $function.FullName
         }
-        catch {
+        catch
+        {
             Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
         }
     }
-} else {
+}
+else
+{
     Write-Host "Cannot find the functions folder at: $functionsFolder. Exiting script." -ForegroundColor Red
     exit 1
 }
 
 # Initialize test environment
-try {
+try
+{
     $testContext = Start-UnifiedTest -TestName "Autopilot Import Functionality Test" -SkipFunctionCheck
     Write-TestResult "Test environment initialized successfully" $true
 }
-catch {
+catch
+{
     Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
     exit 1
 }
 
 # Set up required global variables for testing
-$global:LogFile = "$PWD/test-autopilot-import.log"
+$global:LogFile = Join-Path $testContext.TestFolder "test-autopilot-import.log"
 
-try {
+try
+{
     Write-TestSection "Test 1: Autopilot Import Functions Availability"
     
     # Test critical autopilot import functions
@@ -67,14 +76,18 @@ try {
     )
     
     $functionAvailabilityResults = @()
-    foreach ($funcName in $autopilotFunctions) {
+    foreach ($funcName in $autopilotFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $functionAvailabilityResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Autopilot function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Autopilot function '$funcName' is not available" $false
         }
     }
@@ -85,110 +98,130 @@ try {
     Write-TestSection "Test 2: Device Hash Generation and Validation"
     
     # Test GetDeviceHash function if available
-    if (Get-Command "GetDeviceHash" -ErrorAction SilentlyContinue) {
+    if (Get-Command "GetDeviceHash" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing GetDeviceHash function..." -ForegroundColor Cyan
         
         # Mock device data for hash generation
         $mockDevice = @{
             SerialNumber = "TEST123456"
-            HardwareId = "TEST-HARDWARE-ID"
-            ProductKey = $null
+            HardwareId   = "TEST-HARDWARE-ID"
+            ProductKey   = $null
         }
         
-        try {
+        try
+        {
             # Test hash generation (may require parameters we don't have in test)
             Write-TestResult "GetDeviceHash function is available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "GetDeviceHash function test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "GetDeviceHash function not available - skipping hash test" $true
     }
     
     Write-TestSection "Test 3: Device Enrollment State Handling"
     
     # Test HandleDeviceEnrollmentState function if available
-    if (Get-Command "HandleDeviceEnrollmentState" -ErrorAction SilentlyContinue) {
+    if (Get-Command "HandleDeviceEnrollmentState" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing HandleDeviceEnrollmentState function..." -ForegroundColor Cyan
         
         # Create mock enrollment state
         $mockEnrollmentState = @{
-            inAutopilot = $true
-            managed = $true
-            autopilot = @{
+            inAutopilot   = $true
+            managed       = $true
+            autopilot     = @{
                 device = @{
-                    displayName = "TEST-DEVICE"
-                    serialNumber = "TEST123456"
+                    displayName     = "TEST-DEVICE"
+                    serialNumber    = "TEST123456"
                     enrollmentState = "enrolled"
                 }
             }
             managedDevice = @{
                 device = @{
-                    deviceName = "TEST-DEVICE"
+                    deviceName      = "TEST-DEVICE"
                     operatingSystem = "Windows"
                     complianceState = "compliant"
                 }
             }
         }
         
-        try {
+        try
+        {
             # Test enrollment state handling
             Write-TestResult "HandleDeviceEnrollmentState function is available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "HandleDeviceEnrollmentState function test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "HandleDeviceEnrollmentState function not available - skipping enrollment test" $true
     }
     
     Write-TestSection "Test 4: Import Preparation Functions"
     
     # Test PrepareImportDevice function if available
-    if (Get-Command "PrepareImportDevice" -ErrorAction SilentlyContinue) {
+    if (Get-Command "PrepareImportDevice" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing PrepareImportDevice function..." -ForegroundColor Cyan
         
         # Mock device preparation data
         $mockDeviceData = @{
             SerialNumber = "TEST123456"
             HardwareHash = "TESTHASH123"
-            ProductKey = $null
-            GroupTag = "TestGroup"
+            ProductKey   = $null
+            GroupTag     = "TestGroup"
         }
         
-        try {
+        try
+        {
             Write-TestResult "PrepareImportDevice function is available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "PrepareImportDevice function test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "PrepareImportDevice function not available - skipping preparation test" $true
     }
     
     Write-TestSection "Test 5: Import Result Processing"
     
     # Test ProcessImportResult function if available
-    if (Get-Command "ProcessImportResult" -ErrorAction SilentlyContinue) {
+    if (Get-Command "ProcessImportResult" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing ProcessImportResult function..." -ForegroundColor Cyan
         
         # Mock import result
         $mockImportResult = @{
-            Success = $true
-            DeviceId = "test-device-id"
+            Success      = $true
+            DeviceId     = "test-device-id"
             SerialNumber = "TEST123456"
-            Status = "Imported"
-            Errors = @()
+            Status       = "Imported"
+            Errors       = @()
         }
         
-        try {
+        try
+        {
             Write-TestResult "ProcessImportResult function is available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "ProcessImportResult function test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "ProcessImportResult function not available - skipping result processing test" $true
     }
     
@@ -202,14 +235,18 @@ try {
     )
     
     $assignmentFunctionResults = @()
-    foreach ($funcName in $assignmentFunctions) {
+    foreach ($funcName in $assignmentFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $assignmentFunctionResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Assignment function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Assignment function '$funcName' is not available" $false
         }
     }
@@ -220,16 +257,21 @@ try {
     Write-TestSection "Test 7: Device Deletion and Cleanup"
     
     # Test DeleteAutopilotDevice function if available
-    if (Get-Command "DeleteAutopilotDevice" -ErrorAction SilentlyContinue) {
+    if (Get-Command "DeleteAutopilotDevice" -ErrorAction SilentlyContinue)
+    {
         Write-Host "Testing DeleteAutopilotDevice function..." -ForegroundColor Cyan
         
-        try {
+        try
+        {
             Write-TestResult "DeleteAutopilotDevice function is available for testing" $true
         }
-        catch {
+        catch
+        {
             Write-TestResult "DeleteAutopilotDevice function test failed: $($_.Exception.Message)" $false
         }
-    } else {
+    }
+    else
+    {
         Write-TestResult "DeleteAutopilotDevice function not available - skipping deletion test" $true
     }
     
@@ -243,14 +285,18 @@ try {
     )
     
     $corpDeviceFunctionResults = @()
-    foreach ($funcName in $corpDeviceFunctions) {
+    foreach ($funcName in $corpDeviceFunctions)
+    {
         $funcExists = Get-Command $funcName -ErrorAction SilentlyContinue
         $isAvailable = $null -ne $funcExists
         $corpDeviceFunctionResults += $isAvailable
         
-        if ($isAvailable) {
+        if ($isAvailable)
+        {
             Write-TestResult "Corporate device function '$funcName' is available" $true
-        } else {
+        }
+        else
+        {
             Write-TestResult "Corporate device function '$funcName' is not available" $false
         }
     }
@@ -275,20 +321,25 @@ try {
     
     Write-TestResult "Autopilot import functionality test completed" $true
 }
-catch {
+catch
+{
     Write-TestResult "Test failed with error: $($_.Exception.Message)" $false
     $failedTests = 8
     $passedTests = 0
     exit 1
 }
-finally {
+finally
+{
     # Complete unified test
     $success = Complete-UnifiedTest -TestContext $testContext -PassedTests $passedTests -FailedTests $failedTests -TotalTests 8
     
-    if ($success) {
+    if ($success)
+    {
         Write-Host "Autopilot Import Functionality Test passed! [PASS]" -ForegroundColor Green
         exit 0
-    } else {
+    }
+    else
+    {
         Write-Host "Autopilot Import Functionality Test failed! [FAIL]" -ForegroundColor Red
         exit 1
     }
