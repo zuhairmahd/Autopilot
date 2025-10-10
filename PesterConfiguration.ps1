@@ -6,7 +6,8 @@
     Compatible with PowerShell 5.1 and Pester 5.x
 #>
 
-function Get-AutopilotPesterConfiguration {
+function Get-AutopilotPesterConfiguration
+{
     [CmdletBinding()]
     param(
         [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
@@ -23,20 +24,25 @@ function Get-AutopilotPesterConfiguration {
     $config.Output.Verbosity = 'Detailed'
     
     # Test discovery
-    switch ($TestType) {
-        'Unit' {
+    switch ($TestType)
+    {
+        'Unit'
+        {
             $config.Run.Path = '.\tests\Unit'
             $config.Filter.Tag = 'Unit'
         }
-        'Integration' {
+        'Integration'
+        {
             $config.Run.Path = '.\tests\Integration'
             $config.Filter.Tag = 'Integration'
         }
-        'Comprehensive' {
+        'Comprehensive'
+        {
             $config.Run.Path = '.\tests\Comprehensive'
             $config.Filter.Tag = 'Comprehensive'
         }
-        'All' {
+        'All'
+        {
             $config.Run.Path = '.\tests'
         }
     }
@@ -46,15 +52,17 @@ function Get-AutopilotPesterConfiguration {
     $config.Run.PassThru = $true  # Return test results object
     
     # Code coverage
-    if ($EnableCodeCoverage) {
+    if ($EnableCodeCoverage)
+    {
         $config.CodeCoverage.Enabled = $true
         $config.CodeCoverage.Path = '.\functions\**\*.ps1'
         $config.CodeCoverage.OutputPath = '.\coverage.xml'
-        $config.CodeCoverage.OutputFormat = 'JaCoCoXml'
+        $config.CodeCoverage.OutputFormat = 'JaCoCo'
     }
     
     # CI/CD integration
-    if ($CI) {
+    if ($CI)
+    {
         $config.TestResult.Enabled = $true
         $config.TestResult.OutputFormat = 'NUnitXml'
         $config.TestResult.OutputPath = '.\TestResults.xml'
