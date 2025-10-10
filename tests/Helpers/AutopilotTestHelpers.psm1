@@ -69,7 +69,9 @@ function Import-AutopilotFunctions {
     $functionFiles = Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1
     
     foreach ($file in $functionFiles) {
-        . $file.FullName
+        # Use Invoke-Expression with Get-Content to load functions in the calling scope
+        $content = Get-Content $file.FullName -Raw
+        $ExecutionContext.InvokeCommand.InvokeScript($false, [scriptblock]::Create($content), $null, $null)
     }
     
     Write-Verbose "Loaded $($functionFiles.Count) function files"
