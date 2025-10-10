@@ -20,16 +20,10 @@
 #region Mock Data Management
 
 # Default mock user data
+# Note: Regular hashtable used to support .Clone() method
+# Results are sorted in query functions to ensure consistent order across PS versions
 $script:DefaultMockUsers = @{
-    "john.doe@contoso.com"   = @{
-        userPrincipalName = "john.doe@contoso.com"
-        displayName       = "John Doe"
-        givenName         = "John"
-        surname           = "Doe"
-        mail              = "john.doe@contoso.com"
-        id                = "user-001"
-    }
-    "jane.smith@contoso.com" = @{
+    "jane.smith@contoso.com"   = @{
         userPrincipalName = "jane.smith@contoso.com"
         displayName       = "Jane Smith"
         givenName         = "Jane"
@@ -37,15 +31,7 @@ $script:DefaultMockUsers = @{
         mail              = "jane.smith@contoso.com"
         id                = "user-002"
     }
-    "john.admin@contoso.com" = @{
-        userPrincipalName = "john.admin@contoso.com"
-        displayName       = "John Admin"
-        givenName         = "John"
-        surname           = "Admin"
-        mail              = "john.admin@contoso.com"
-        id                = "user-003"
-    }
-    "jane.test@contoso.com"  = @{
+    "jane.test@contoso.com"    = @{
         userPrincipalName = "jane.test@contoso.com"
         displayName       = "Jane Test"
         givenName         = "Jane"
@@ -53,20 +39,36 @@ $script:DefaultMockUsers = @{
         mail              = "jane.test@contoso.com"
         id                = "user-004"
     }
+    "john.admin@contoso.com"   = @{
+        userPrincipalName = "john.admin@contoso.com"
+        displayName       = "John Admin"
+        givenName         = "John"
+        surname           = "Admin"
+        mail              = "john.admin@contoso.com"
+        id                = "user-003"
+    }
+    "john.doe@contoso.com"     = @{
+        userPrincipalName = "john.doe@contoso.com"
+        displayName       = "John Doe"
+        givenName         = "John"
+        surname           = "Doe"
+        mail              = "john.doe@contoso.com"
+        id                = "user-001"
+    }
+    "john.johnson@contoso.com" = @{
+        userPrincipalName = "john.johnson@contoso.com"
+        displayName       = "John Johnson"
+        givenName         = "John"
+        surname           = "Johnson"
+        mail              = "john.johnson@contoso.com"
+        id                = "user-005"
+    }
 }
 
 # Default mock group data
+# Note: Regular hashtable used to support .Clone() method
+# Results are sorted in query functions to ensure consistent order across PS versions
 $script:DefaultMockGroups = @{
-    "Marketing Team"    = @{
-        displayName  = "Marketing Team"
-        id           = "group-001"
-        mailNickname = "marketing-team"
-    }
-    "Sales Team"        = @{
-        displayName  = "Sales Team"
-        id           = "group-002"
-        mailNickname = "sales-team"
-    }
     "Archive Marketing" = @{
         displayName  = "Archive Marketing"
         id           = "group-003"
@@ -76,6 +78,21 @@ $script:DefaultMockGroups = @{
         displayName  = "Disabled Group"
         id           = "group-004"
         mailNickname = "disabled-group"
+    }
+    "Marketing Support" = @{
+        displayName  = "Marketing Support"
+        id           = "group-005"
+        mailNickname = "marketing-support"
+    }
+    "Marketing Team"    = @{
+        displayName  = "Marketing Team"
+        id           = "group-001"
+        mailNickname = "marketing-team"
+    }
+    "Sales Team"        = @{
+        displayName  = "Sales Team"
+        id           = "group-002"
+        mailNickname = "sales-team"
     }
 }
 
@@ -387,7 +404,7 @@ function Invoke-MockGraphAPI
         Write-Verbose "[MockGraphAPI] User fuzzy search for: $searchTerm"
         $matching = $script:MockUsers.Values | Where-Object { 
             $_.givenName -like "$searchTerm*" -or $_.surname -like "$searchTerm*" 
-        }
+        } | Sort-Object userPrincipalName
         
         return [PSCustomObject]@{
             '@odata.context' = 'https://graph.microsoft.com/v1.0/$metadata#users'
@@ -402,7 +419,7 @@ function Invoke-MockGraphAPI
         $searchTerm = $searchTerm -replace '"displayName:(.+)"', '$1'
         Write-Verbose "[MockGraphAPI] Group search for: $searchTerm"
         
-        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -like "*$searchTerm*" }
+        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -like "*$searchTerm*" } | Sort-Object displayName
         return [PSCustomObject]@{
             '@odata.context' = 'https://graph.microsoft.com/v1.0/$metadata#groups'
             value            = @($matching)
@@ -415,7 +432,7 @@ function Invoke-MockGraphAPI
         $searchTerm = ($Filter -replace "startsWith\(displayName, '(.+?)'\)", '$1').Trim()
         Write-Verbose "[MockGraphAPI] Group startsWith search for: $searchTerm"
         
-        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -like "$searchTerm*" }
+        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -like "$searchTerm*" } | Sort-Object displayName
         return [PSCustomObject]@{
             '@odata.context' = 'https://graph.microsoft.com/v1.0/$metadata#groups'
             value            = @($matching)
@@ -428,7 +445,7 @@ function Invoke-MockGraphAPI
         $searchTerm = ($Filter -replace "contains\(displayName, '(.+?)'\)", '$1').Trim()
         Write-Verbose "[MockGraphAPI] Group contains search for: $searchTerm"
         
-        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -like "*$searchTerm*" }
+        $matching = $script:MockGroups.Values | Where-Object { $_.displayName -like "*$searchTerm*" } | Sort-Object displayName
         return [PSCustomObject]@{
             '@odata.context' = 'https://graph.microsoft.com/v1.0/$metadata#groups'
             value            = @($matching)

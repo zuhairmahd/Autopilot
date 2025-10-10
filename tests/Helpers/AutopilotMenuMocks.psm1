@@ -416,7 +416,5 @@ Export-ModuleMember -Function @(
     'New-MockShowMenuFunction',
     'Set-MockShowMenuResponse',
     'Get-MockShowMenuCalls',
-    'Reset-MockShowMenuCalls',
-    'New-MockReadHostFunction',
-    'Set-MockReadHostResponse'
+    'Reset-MockShowMenuCalls'
 )

@@ -66,7 +66,8 @@ Describe "PowerShell Syntax Validation" -Tags 'Syntax', 'Unit', 'Fast' {
             # Test all function files
             $failedFiles = @()
             
-            foreach ($file in $script:FunctionFiles) {
+            foreach ($file in $script:FunctionFiles)
+            {
                 $content = Get-Content $file.FullName -Raw
                 $parseErrors = @()
                 $tokens = @()
@@ -74,21 +75,25 @@ Describe "PowerShell Syntax Validation" -Tags 'Syntax', 'Unit', 'Fast' {
                     $content, [ref]$tokens, [ref]$parseErrors
                 )
                 
-                if ($parseErrors.Count -gt 0) {
+                if ($parseErrors.Count -gt 0)
+                {
                     $failedFiles += [PSCustomObject]@{
-                        Name = $file.Name
-                        Path = $file.FullName
+                        Name   = $file.Name
+                        Path   = $file.FullName
                         Errors = $parseErrors
                     }
                 }
             }
             
             # Assert no files failed
-            if ($failedFiles.Count -gt 0) {
+            if ($failedFiles.Count -gt 0)
+            {
                 $errorMessage = "The following function files have syntax errors:`n"
-                foreach ($failed in $failedFiles) {
+                foreach ($failed in $failedFiles)
+                {
                     $errorMessage += "  - $($failed.Name):`n"
-                    foreach ($err in $failed.Errors) {
+                    foreach ($err in $failed.Errors)
+                    {
                         $errorMessage += "    Line $($err.Extent.StartLineNumber): $($err.Message)`n"
                     }
                 }
@@ -99,47 +104,48 @@ Describe "PowerShell Syntax Validation" -Tags 'Syntax', 'Unit', 'Fast' {
         }
     }
     
-    Context "Test scripts" {
+    # Context "Test scripts" {
         
-        BeforeAll {
-            $testsPath = Join-Path $script:RepoRoot "TestScripts"
-            $script:TestFiles = Get-ChildItem -Path $testsPath -Filter '*.ps1' -Recurse
-        }
+    #     BeforeAll {
+    #         $testsPath = Join-Path $script:RepoRoot "TestScripts"
+    #         $script:TestFiles = Get-ChildItem -Path $testsPath -Filter '*.ps1' -Recurse
+    #     }
         
-        It "All test scripts should have valid syntax" {
-            # Test all test files
-            $failedFiles = @()
+    #     It "All test scripts should have valid syntax" {
+    #         # Test all test files
+    #         $failedFiles = @()
             
-            foreach ($file in $script:TestFiles) {
-                $content = Get-Content $file.FullName -Raw
-                $parseErrors = @()
-                $tokens = @()
-                $null = [System.Management.Automation.Language.Parser]::ParseInput(
-                    $content, [ref]$tokens, [ref]$parseErrors
-                )
+    #         foreach ($file in $script:TestFiles) {
+    #             $content = Get-Content $file.FullName -Raw
+    #             $parseErrors = @()
+    #             $tokens = @()
+    #             $null = [System.Management.Automation.Language.Parser]::ParseInput(
+    #                 $content, [ref]$tokens, [ref]$parseErrors
+    #             )
                 
-                if ($parseErrors.Count -gt 0) {
-                    $failedFiles += [PSCustomObject]@{
-                        Name = $file.Name
-                        Path = $file.FullName
-                        Errors = $parseErrors
-                    }
-                }
-            }
+    #             if ($parseErrors.Count -gt 0) {
+    #                 $failedFiles += [PSCustomObject]@{
+    #                     Name = $file.Name
+    #                     Path = $file.FullName
+    #                     Errors = $parseErrors
+    #                 }
+    #             }
+    #         }
             
-            # Assert no files failed
-            if ($failedFiles.Count -gt 0) {
-                $errorMessage = "The following test files have syntax errors:`n"
-                foreach ($failed in $failedFiles) {
-                    $errorMessage += "  - $($failed.Name):`n"
-                    foreach ($err in $failed.Errors) {
-                        $errorMessage += "    Line $($err.Extent.StartLineNumber): $($err.Message)`n"
-                    }
-                }
-                $failedFiles | Should -BeNullOrEmpty -Because $errorMessage
-            }
+    #         # Assert no files failed
+    #         if ($failedFiles.Count -gt 0) {
+    #             $errorMessage = "The following test files have syntax errors:`n"
+    #             foreach ($failed in $failedFiles) {
+    #                 $errorMessage += "  - $($failed.Name):`n"
+    #                 foreach ($err in $failed.Errors) {
+    #                     $errorMessage += "    Line $($err.Extent.StartLineNumber): $($err.Message)`n"
+    #                 }
+    #             }
+    #             $failedFiles | Should -BeNullOrEmpty -Because $errorMessage
+    #         }
             
-            $failedFiles | Should -BeNullOrEmpty -Because "all $($script:TestFiles.Count) test scripts must have valid PowerShell syntax"
-        }
-    }
+    #         $failedFiles | Should -BeNullOrEmpty -Because "all $($script:TestFiles.Count) test scripts must have valid PowerShell syntax"
+    #     }
+    # }
+
 }

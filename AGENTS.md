@@ -10,70 +10,96 @@ Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirr
 Stick to four-space indentation, ~120-character lines, and approved PowerShell verb-noun PascalCase (`Get-DeviceProfileStatus`). Variables use camelCase, constants use ALL_CAPS, and every public function needs comment-based help plus `$functionName = $MyInvocation.MyCommand.Name` for logging context. Favor `try/catch`, `Write-Verbose`, and the shared `Write-Log` helper; avoid 5.1-incompatible constructs such as ordered hashtables or string interpolation. **Do not use Unicode characters** (checkmarks, arrows, emoji, etc.) as PowerShell 5.1 console output may not render them correctly—stick to ASCII characters only. For newlines in `Write-Host` statements, use separate `Write-Host` calls instead of `\n` escape sequences. No automated formatter runs here—the style guidance and reviewers are the guardrails.
 
 ## Testing Guidelines
-The project now uses **Pester v5** as the primary testing framework for new tests, while legacy tests are being gradually migrated. Both frameworks coexist during the migration period.
 
-### Running Tests
+**⚠️ IMPORTANT:** For detailed test writing and migration guidance, see **[`tests/AGENTS.md`](tests/AGENTS.md)** (AI-optimized step-by-step instructions) and **[`docs/PESTER_MIGRATION_README.md`](docs/PESTER_MIGRATION_README.md)** (complete migration documentation hub).
+
+The project uses **Pester v5** as the primary testing framework for new tests, while legacy tests are being gradually migrated (82% complete as of October 2025). Both frameworks coexist during the migration period.
+
+### Quick Reference Commands
 - **Quick validation:** `.\Invoke-PesterTests.ps1 -TestType Unit` (runs fast Pester unit tests)
 - **Full Pester suite:** `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` (all Pester tests with coverage)
 - **Complete suite:** `.\Invoke-AllTests.ps1` (runs both Pester and remaining legacy tests)
 - **Legacy tests:** `.\TestScripts\Test-Runner.ps1 -TestCategory <category>` (for tests not yet migrated)
 
-### Writing New Tests
-- **Use Pester format** with Describe/Context/It blocks
-- **Follow the template:** `tests/Template.Tests.ps1` - see `docs/TEST_TEMPLATE_GUIDELINES.md` for when and how to use it
-- **Tag appropriately:** Use `'Unit'`, `'Integration'`, or `'Comprehensive'` tags
-- **Load functions:** Dot-source functions directly in BeforeAll blocks (most reliable method for PS 5.1 + Pester 5.x)
-- **Use helpers when appropriate:**
-  - Import `tests/Helpers/AutopilotTestHelpers.psm1` for temp folder management and cleanup
-  - Import `tests/Helpers/AutopilotGraphMocks.psm1` for Graph API mocking
-  - See guidelines for when helpers are required vs optional
-- **Improve helpers, not workarounds:** When encountering testing needs not supported by helpers, enhance the helper modules rather than creating workarounds in individual tests. This ensures all tests benefit from improvements.
-- **Document deviations:** If not using helpers, add `.NOTES` section explaining why (simple test, no state management, etc.)
-- **Mandatory:** All tests must pass (100% success rate) before committing
+### Core Testing Principles
+- ✅ **Improve helpers first** - Enhance helper modules rather than creating workarounds in individual tests
+- ✅ **Direct dot-sourcing** - Load functions directly in BeforeAll blocks (most reliable method for PS 5.1 + Pester 5.x)
+- ✅ **100% pass rate** - All tests must pass before committing (non-negotiable)
+- ✅ **Cross-version compatibility** - Test on both PowerShell 5.1 and 7+
+- ✅ **Use Sort-Object** - Apply to collections for deterministic ordering across PS versions
 
-### Test Template Guidelines (STRICT ENFORCEMENT)
+### Helper Modules (Three-Tiered Architecture)
+- **Layer 1 (Core):** `tests/Helpers/AutopilotTestHelpers.psm1` - Temp folders, settings files, cleanup
+- **Layer 2a (Graph API):** `tests/Helpers/AutopilotGraphMocks.psm1` - Users, devices, groups, profiles, API mocking
+- **Layer 2b (Menu System):** `tests/Helpers/AutopilotMenuMocks.psm1` - Menu navigation, user interactions
 
-**READ THIS FIRST:** `docs/TEST_TEMPLATE_GUIDELINES.md` - Comprehensive guide on template usage
+**When to use helpers:**
+- Temp files/folders needed → AutopilotTestHelpers
+- Graph API calls needed → AutopilotGraphMocks
+- Menu interactions needed → AutopilotMenuMocks
+- Simple tests may not need helpers at all (document why in `.NOTES`)
 
-**Key Rules:**
-1. **Use helpers for:** Tests with temp files, Graph API calls, complex state management
-2. **Dot-source directly for:** Function loading (most reliable in PS 5.1 + Pester 5.x)
-3. **Document all deviations:** Add `.NOTES` section explaining why template isn't fully used
-4. **Examples to follow:**
-   - `tests/Unit/GetEntraDirectoryObject.Tests.ps1` - Exemplary Graph API mocking
-   - `tests/Unit/Syntax.Tests.ps1` - Acceptable simple test without helpers
-   - `tests/Integration/MenuInclusions.Tests.ps1` - Appropriate direct loading pattern
+### Writing New Tests (Quick Start)
 
-**Why direct dot-sourcing in BeforeAll:**
-- PowerShell 5.1 + Pester 5.x have complex scoping behavior
-- Module functions cannot reliably dot-source into caller's scope
-- Direct dot-sourcing in BeforeAll is the ONLY reliable method
-- This is a known limitation, not a template violation
+**For AI Agents:** See **[`tests/AGENTS.md`](tests/AGENTS.md)** for detailed step-by-step workflows
 
-**Before creating a test:**
-1. Review `docs/TEST_TEMPLATE_GUIDELINES.md`
-2. Check similar existing tests for patterns
-3. Use helpers when you need their features (temp files, cleanup, mocking)
-4. If helpers don't support your need, enhance the helpers first
-5. Document your approach in test header
-6. Ensure 100% test pass rate
+**For Developers:**
+1. Review `docs/TEST_TEMPLATE_GUIDELINES.md` - Comprehensive patterns guide
+2. Choose test category: Unit / Integration / Comprehensive
+3. Check existing tests in `tests/[Category]/` for similar examples
+4. Use helpers when needed (enhance if gaps exist)
+5. Load functions via direct dot-sourcing in BeforeAll
+6. Tag appropriately: `'Unit'`, `'Integration'`, or `'Comprehensive'`
+7. Validate: Run on both PS 5.1 and 7+, ensure 100% pass rate
+8. Document: Add `.NOTES` section explaining approach
+
+**Example Test Structure:**
+```powershell
+Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
+
+Describe "Function: Get-Something" -Tags 'Unit' {
+    BeforeAll {
+        # Direct dot-sourcing for PS 5.1 compatibility
+        $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
+        . "$script:RepoRoot/functions/category/Get-Something.ps1"
+    }
+    
+    It "Should do something" {
+        $result = Get-Something
+        $result | Should -Be "Expected"
+    }
+}
+```
 
 ### Migrating Existing Tests
-When migrating legacy tests to Pester:
-1. Create new test in `tests/Unit/`, `tests/Integration/`, or `tests/Comprehensive/`
+
+**For step-by-step migration guide:** See **[`tests/AGENTS.md`](tests/AGENTS.md)** → Section 3
+
+**Quick workflow:**
+1. Create new test in `tests/[Category]/[FunctionName].Tests.ps1`
 2. Follow patterns in existing Pester tests
-3. Validate equivalence with `.\tools\Validate-PesterMigration.ps1`
-4. Archive legacy test to `TestScripts/archived/` after validation
-5. See `docs/PESTER_MIGRATION_PLAN.md` for detailed migration guide
+3. Use helpers (enhance if needed)
+4. Validate equivalence: `.\tools\Validate-PesterMigration.ps1`
+5. Test on PS 5.1 and 7+ (results must match)
+6. Archive legacy test to `TestScripts/archived/` after validation
+
+**Migration Status:** 155 of ~190 tests migrated (82%), 100% pass rate, 2-3s execution time
 
 ### Test Categories
-- **syntax**: PowerShell syntax validation (migrated to Pester)
-- **core**: Critical functionality tests (being migrated)
-- **unit**: Component-level tests (being migrated)
-- **integration**: Cross-component tests (to be migrated)
-- **comprehensive**: End-to-end scenarios (selective migration)
-- **performance**: Benchmarks (remaining in legacy framework)
-- **migration**: Migration-specific tests (remaining in legacy framework)
+- **syntax**: PowerShell syntax validation ✅ Migrated to Pester
+- **core**: Critical functionality tests 🔄 Being migrated
+- **unit**: Component-level tests ✅ Migrated to Pester (144 tests)
+- **integration**: Cross-component tests 🔄 In progress (8/12 migrated)
+- **comprehensive**: End-to-end scenarios ⏳ Planned (Weeks 7-10)
+- **performance**: Benchmarks ⚠️ Remaining in legacy framework (separate from Pester)
+- **migration**: Migration-specific tests ⏳ To be evaluated (Week 11-12)
+
+### Documentation Resources
+- **[`tests/AGENTS.md`](tests/AGENTS.md)** - AI-optimized step-by-step guide (primary reference for test creation/migration)
+- **[`docs/PESTER_MIGRATION_README.md`](docs/PESTER_MIGRATION_README.md)** - Migration documentation hub (quick links to all resources)
+- **[`docs/TEST_TEMPLATE_GUIDELINES.md`](docs/TEST_TEMPLATE_GUIDELINES.md)** - Comprehensive patterns and helper usage
+- **[`docs/PESTER_MIGRATION_LESSONS_LEARNED.md`](docs/PESTER_MIGRATION_LESSONS_LEARNED.md)** - Technical challenges and solutions
+- **[`docs/PESTER_MIGRATION_COMPLETION_PLAN.md`](docs/PESTER_MIGRATION_COMPLETION_PLAN.md)** - Roadmap for remaining work
 
 ## Commit & Pull Request Guidelines
 Craft single-line commit subjects in sentence case (`Fix vendor validation logging`), keeping them under 72 characters, and reference issues in the body (`Fixes #123`) when relevant. Before opening a PR, ensure the runner passes for the categories you impacted, update any affected docs in `docs/`, and attach screenshots or log snippets for menu or UI changes. PR descriptions should outline scope, validation commands, and configuration prerequisites so reviewers can reproduce quickly.
