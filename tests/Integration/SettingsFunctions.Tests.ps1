@@ -1,0 +1,188 @@
+<#
+.SYNOPSIS
+    Pester tests for settings configuration functions
+
+.DESCRIPTION
+    Integration tests for MergeSettings, Get-ConfigurationData, and Update-Setting functions.
+    Tests configuration file operations and settings management.
+    
+    Migrated from TestScripts/test-settings-functions.ps1
+
+.NOTES
+    Test Category: Integration
+    Dependencies: Settings functions, configuration management
+#>
+
+Describe "Settings Configuration Functions" -Tags 'Integration', 'Settings', 'Configuration' {
+    
+    BeforeAll {
+        # Get repository root
+        $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+        
+        # Load settings functions
+        $settingsFunctionsPath = Join-Path $script:RepoRoot "functions/settingsFunctions"
+        Get-ChildItem -Path $settingsFunctionsPath -Filter *.ps1 -Recurse | ForEach-Object {
+            . $_.FullName
+        }
+        
+        # Setup test folder
+        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+        $script:TestFolder = Join-Path $tempPath "PesterSettingsTest_$(Get-Random)"
+        New-Item -Path $script:TestFolder -ItemType Directory -Force | Out-Null
+        
+        # Setup global log file
+        $global:LogFile = Join-Path $script:TestFolder "test.log"
+    }
+    
+    AfterAll {
+        # Cleanup test folder
+        if (Test-Path $script:TestFolder)
+        {
+            Remove-Item -Path $script:TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    
+    Context "Function availability" {
+        
+        It "MergeSettings function should be available" {
+            Get-Command "MergeSettings" -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Get-ConfigurationData function should be available" {
+            Get-Command "Get-ConfigurationData" -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Update-Setting function should be available" {
+            Get-Command "Update-Setting" -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
+    }
+    
+    Context "Update-Setting function - Global settings" {
+        
+        BeforeEach {
+            # Create basic settings file
+            $script:SettingsFile = Join-Path $script:TestFolder "settings_$(Get-Random).json"
+            $basicSettings = @{
+                description    = "Test settings file"
+                version        = "1.0"
+                globalSettings = @{}
+                domains        = @{}
+            }
+            $basicSettings | ConvertTo-Json -Depth 10 | Set-Content $script:SettingsFile
+        }
+        
+        It "Should update global setting successfully" {
+            $success = Update-Setting -SettingType "Global" -SettingsFile $script:SettingsFile `
+                -SettingName "testSetting" -SettingValue "testValue"
+            
+            $success | Should -Be $true
+        }
+        
+        It "Should persist global setting to file" {
+            Update-Setting -SettingType "Global" -SettingsFile $script:SettingsFile `
+                -SettingName "testSetting" -SettingValue "testValue" | Out-Null
+            
+            $updatedContent = Get-Content $script:SettingsFile -Raw | ConvertFrom-Json
+            $updatedContent.globalSettings.testSetting | Should -Be "testValue"
+        }
+        
+        It "Should update existing global setting" {
+            # Set initial value
+            Update-Setting -SettingType "Global" -SettingsFile $script:SettingsFile `
+                -SettingName "testSetting" -SettingValue "initialValue" | Out-Null
+            
+            # Update value
+            Update-Setting -SettingType "Global" -SettingsFile $script:SettingsFile `
+                -SettingName "testSetting" -SettingValue "updatedValue" | Out-Null
+            
+            $updatedContent = Get-Content $script:SettingsFile -Raw | ConvertFrom-Json
+            $updatedContent.globalSettings.testSetting | Should -Be "updatedValue"
+        }
+    }
+    
+    Context "Update-Setting function - Domain settings" {
+        
+        BeforeEach {
+            # Create settings file with domain
+            $script:SettingsFile = Join-Path $script:TestFolder "settings_domain_$(Get-Random).json"
+            $settingsWithDomain = @{
+                description    = "Test settings file"
+                version        = "1.0"
+                globalSettings = @{}
+                domains        = @{
+                    "contoso.com" = @{
+                        domainSettings = @{}
+                    }
+                }
+            }
+            $settingsWithDomain | ConvertTo-Json -Depth 10 | Set-Content $script:SettingsFile
+        }
+        
+        It "Should update domain setting successfully" {
+            $success = Update-Setting -SettingType "Domain" -SettingsFile $script:SettingsFile `
+                -DomainName "contoso.com" -SettingName "domainTestSetting" -SettingValue "domainValue"
+            
+            $success | Should -Be $true
+        }
+        
+        It "Should persist domain setting to file" {
+            Update-Setting -SettingType "Domain" -SettingsFile $script:SettingsFile `
+                -DomainName "contoso.com" -SettingName "domainTestSetting" -SettingValue "domainValue" | Out-Null
+            
+            $updatedContent = Get-Content $script:SettingsFile -Raw | ConvertFrom-Json
+            $updatedContent.domains.'contoso.com'.domainSettings.domainTestSetting | Should -Be "domainValue"
+        }
+    }
+    
+    Context "Get-ConfigurationData function" {
+        
+        It "Should load configuration data from file" {
+            # Create a valid settings file
+            $settingsFile = Join-Path $script:TestFolder "config_$(Get-Random).json"
+            $configData = @{
+                description = "Test configuration"
+                version     = "1.0"
+                testData    = "test value"
+            }
+            $configData | ConvertTo-Json -Depth 10 | Set-Content $settingsFile
+            
+            $loaded = Get-ConfigurationData -FilePath $settingsFile
+            
+            $loaded | Should -Not -BeNullOrEmpty
+            $loaded.testData | Should -Be "test value"
+        }
+    }
+    
+    Context "MergeSettings function" {
+        
+        It "Should merge default and override settings" {
+            $defaults = @{
+                setting1 = "default1"
+                setting2 = "default2"
+                setting3 = "default3"
+            }
+            
+            $overrides = @{
+                setting2 = "override2"
+                setting4 = "override4"
+            }
+            
+            $merged = MergeSettings -DefaultSettings $defaults -OverrideSettings $overrides
+            
+            $merged.setting1 | Should -Be "default1"
+            $merged.setting2 | Should -Be "override2"
+            $merged.setting3 | Should -Be "default3"
+            $merged.setting4 | Should -Be "override4"
+        }
+        
+        It "Should handle empty override settings" {
+            $defaults = @{
+                setting1 = "default1"
+            }
+            
+            $merged = MergeSettings -DefaultSettings $defaults -OverrideSettings @{}
+            
+            $merged.setting1 | Should -Be "default1"
+        }
+    }
+}
