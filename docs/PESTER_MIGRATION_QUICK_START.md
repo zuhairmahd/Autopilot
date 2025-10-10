@@ -113,9 +113,9 @@ Migrate these simple tests in order:
 
 | Legacy | Pester |
 |--------|--------|
-| `Write-Host "[PASS]"` | `$result \| Should -Be $expected` |
+| `Write-Host "[PASS]"` | `$result | Should -Be $expected` |
 | `Write-TestSection "Title"` | `Context "Title" { }` |
-| `Write-TestResult "Msg" -Success $bool` | `$result \| Should -Be $true` |
+| `Write-TestResult "Msg" -Success $bool` | `$result | Should -Be $true` |
 | `exit 0` | Remove (Pester handles) |
 | `function Override { }` | `Mock FunctionName { }` |
 | `Load-AllFunctions` | `Import-AutopilotFunctions` |
