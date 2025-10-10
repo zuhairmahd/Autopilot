@@ -259,12 +259,6 @@ function New-MockNewMenuFunction
     [CmdletBinding()]
     param()
     
-    if (Get-Command NewMenu -ErrorAction SilentlyContinue)
-    {
-        Write-Warning "NewMenu function already exists. Mock not created."
-        return
-    }
-    
     $script:MockNewMenuFunction = {
         param(
             [string]$MenuName,
@@ -279,7 +273,7 @@ function New-MockNewMenuFunction
         }
     }
     
-    # Create global function
+    # Create global function (use -Force to overwrite if exists)
     New-Item -Path "Function:\global:NewMenu" -Value $script:MockNewMenuFunction -Force | Out-Null
     
     Write-Verbose "[New-MockNewMenuFunction] NewMenu mock registered"
@@ -315,11 +309,8 @@ function New-MockShowMenuFunction
         [switch]$EnableCallTracking
     )
     
-    if (Get-Command ShowMenu -ErrorAction SilentlyContinue)
-    {
-        Write-Warning "ShowMenu function already exists. Mock not created."
-        return
-    }
+    # Store tracking enable flag at script scope
+    $script:ShowMenuCallTrackingEnabled = $EnableCallTracking.IsPresent
     
     # Initialize tracking variables if requested
     if ($EnableCallTracking)
@@ -333,7 +324,7 @@ function New-MockShowMenuFunction
     $script:MockShowMenuFunction = {
         param($Menu, $CalledBy)
         
-        if ($EnableCallTracking)
+        if ($script:ShowMenuCallTrackingEnabled)
         {
             $script:ShowMenuCallCount++
             $script:ShowMenuCalls += @{
@@ -347,7 +338,7 @@ function New-MockShowMenuFunction
         return $script:MockShowMenuResponse
     }
     
-    # Create global function
+    # Create global function (use -Force to overwrite if exists)
     New-Item -Path "Function:\global:ShowMenu" -Value $script:MockShowMenuFunction -Force | Out-Null
     
     Write-Verbose "[New-MockShowMenuFunction] ShowMenu mock registered"
@@ -392,6 +383,27 @@ function Get-MockShowMenuCalls
     }
 }
 
+<#
+.SYNOPSIS
+    Resets the call tracking counters for ShowMenu mock
+
+.DESCRIPTION
+    Clears the call count and call history for the ShowMenu mock.
+    Useful in BeforeEach blocks to reset state between tests.
+
+.EXAMPLE
+    Reset-MockShowMenuCalls
+#>
+function Reset-MockShowMenuCalls
+{
+    [CmdletBinding()]
+    param()
+    
+    $script:ShowMenuCallCount = 0
+    $script:ShowMenuCalls = @()
+    Write-Verbose "[Reset-MockShowMenuCalls] Call tracking reset"
+}
+
 #endregion
 
 # Export functions
@@ -403,5 +415,8 @@ Export-ModuleMember -Function @(
     'New-MockNewMenuFunction',
     'New-MockShowMenuFunction',
     'Set-MockShowMenuResponse',
-    'Get-MockShowMenuCalls'
+    'Get-MockShowMenuCalls',
+    'Reset-MockShowMenuCalls',
+    'New-MockReadHostFunction',
+    'Set-MockReadHostResponse'
 )

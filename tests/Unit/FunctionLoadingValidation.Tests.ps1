@@ -6,29 +6,34 @@
     Converted from TestScripts/test-function-loading-validation.ps1
 #>
 
+Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
+
 Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
     
     BeforeAll {
         # Get repository root
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
         
-        # Setup minimal global variables that some functions require
-        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
-        $global:LogFile = Join-Path $tempPath "test-function-loading-validation.log"
-        $global:settings = @{ appMode = "full" }
+        # Initialize helpers for LogFile and settings
+        $logPath = Join-Path $env:TEMP "test-function-loading-validation.log"
+        Initialize-MockGlobalVariables -LogFile $logPath `
+            -Settings @{ appMode = "full" }
         
         # Load all functions directly using dot-sourcing
         $functionsPath = Join-Path $script:RepoRoot "functions"
         $functionFiles = Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 -ErrorAction Stop
         
         $script:LoadErrors = @()
-        foreach ($file in $functionFiles) {
-            try {
+        foreach ($file in $functionFiles)
+        {
+            try
+            {
                 . $file.FullName
             }
-            catch {
+            catch
+            {
                 $script:LoadErrors += @{
-                    File = $file.Name
+                    File  = $file.Name
                     Error = $_.Exception.Message
                 }
             }
@@ -38,13 +43,17 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
         
         # Define critical functions from each category
         $script:CriticalFunctions = @{
-            'Write-Log' = 'Core utility function'
-            'Get-ConfigurationData' = 'Setup function'
-            'Test-MenuItemIncluded' = 'Menu function'
-            'MergeSettings' = 'Settings function'
+            'Write-Log'                  = 'Core utility function'
+            'Get-ConfigurationData'      = 'Setup function'
+            'Test-MenuItemIncluded'      = 'Menu function'
+            'MergeSettings'              = 'Settings function'
             'GetNextUserReadinessReport' = 'User readiness function'
-            'Start-FirstRunWizard' = 'Wizard function'
+            'Start-FirstRunWizard'       = 'Wizard function'
         }
+    }
+    
+    AfterAll {
+        Clear-MockGlobalVariables
     }
     
     Context "Core utility functions" {
@@ -60,7 +69,8 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
             { Write-Log -LogFile $testLogFile -Module "Test" -Message "Function loading test" -LogLevel "Information" } | Should -Not -Throw
             
             # Clean up
-            if (Test-Path $testLogFile) {
+            if (Test-Path $testLogFile)
+            {
                 Remove-Item $testLogFile -Force -ErrorAction SilentlyContinue
             }
         }
@@ -82,7 +92,8 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
             
             # Clean up any created file
             $createdFile = "$tempConfigPath.psd1"
-            if (Test-Path $createdFile) {
+            if (Test-Path $createdFile)
+            {
                 Remove-Item $createdFile -Force -ErrorAction SilentlyContinue
             }
         }
@@ -107,14 +118,17 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
         It "All critical functions should be available" {
             $missingFunctions = @()
             
-            foreach ($functionName in $script:CriticalFunctions.Keys) {
+            foreach ($functionName in $script:CriticalFunctions.Keys)
+            {
                 $isAvailable = Get-Command $functionName -ErrorAction SilentlyContinue
-                if (-not $isAvailable) {
+                if (-not $isAvailable)
+                {
                     $missingFunctions += "$functionName ($($script:CriticalFunctions[$functionName]))"
                 }
             }
             
-            if ($missingFunctions.Count -gt 0) {
+            if ($missingFunctions.Count -gt 0)
+            {
                 $errorMessage = "Missing critical functions:`n  - $($missingFunctions -join "`n  - ")"
                 $missingFunctions | Should -BeNullOrEmpty -Because $errorMessage
             }

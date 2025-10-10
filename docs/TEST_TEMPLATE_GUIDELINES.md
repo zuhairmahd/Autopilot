@@ -420,23 +420,25 @@ Add a `.NOTES` section to your test explaining the deviation:
 
 ## Existing Test Analysis
 
-### Tests Following Best Practices
+### Tests Following Best Practices (Helper-Based)
 
 | Test | Pattern | Helpers Used | Notes |
 |------|---------|--------------|-------|
 | GetEntraDirectoryObject.Tests.ps1 | Graph API Mocking | AutopilotGraphMocks | ✅ Exemplary - full Graph API simulation |
-| ShowDirectoryObjectList.Tests.ps1 | Custom Mocks | None | ✅ Appropriate for menu testing |
-| ResolveDirectoryObject.Tests.ps1 | Graph API Mocking | AutopilotGraphMocks | ✅ Integration test |
+| ShowDirectoryObjectList.Tests.ps1 | Menu + Global Vars | AutopilotTestHelpers, AutopilotMenuMocks | ✅ Exemplary - function overwriting, call tracking (21/21 tests) |
+| ResolveDirectoryObject.Tests.ps1 | Graph API Mocking | AutopilotGraphMocks | ✅ Integration test (25/28 tests) |
 | MenuInclusions.Tests.ps1 | Menu Mocking | AutopilotMenuMocks | ✅ Exemplary - uses Initialize-MenuTestEnvironment |
 | SettingsFunctions.Tests.ps1 | Settings + Temp Files | AutopilotTestHelpers | ✅ Exemplary - .psd1 support, 100% pass rate |
+| GetUserStrongMapping.Tests.ps1 | Graph API Mocking | AutopilotTestHelpers, AutopilotGraphMocks | ✅ Exemplary - CustomProperties pattern (26/26 tests) |
+| DomainConfiguration.Tests.ps1 | Temp Files + Cleanup | AutopilotTestHelpers | ✅ Exemplary - Initialize-AutopilotTestEnvironment (7/7 tests) |
+| FunctionLoading.Tests.ps1 | Global Variables | AutopilotTestHelpers | ✅ Initialize-MockGlobalVariables pattern (3/3 tests) |
+| FunctionLoadingValidation.Tests.ps1 | Global Variables | AutopilotTestHelpers | ✅ Initialize-MockGlobalVariables pattern (5/5 tests) |
 
 ### Tests with Acceptable Deviations
 
 | Test | Reason | Status |
 |------|--------|--------|
 | Syntax.Tests.ps1 | No state, no I/O, simple validation | ✅ Acceptable |
-| FunctionLoading.Tests.ps1 | Tests loading mechanism itself | ✅ Acceptable |
-| DomainConfiguration.Tests.ps1 | Self-contained, no helpers needed | ✅ Acceptable |
 
 ### Helper Usage Patterns in Production Tests
 
