@@ -1,19 +1,19 @@
 # Pester Migration Progress Report
 
 **Migration Started:** 2025-10-10  
-**Status:** ✅ Phase 0 Complete, ✅ Phase 1 Complete, 🔄 Phase 2 In Progress (Milestone 2.1 & 2.2 Complete)  
+**Status:** ✅ Phase 0 Complete, ✅ Phase 1 Complete, 🔄 Phase 2 In Progress (Milestones 2.1, 2.2, 2.3 Complete)  
 **Last Updated:** 2025-10-10
 
 ---
 
 ## Current Statistics
 
-- **Tests Migrated:** 7 of 101 planned (Phase 1 complete + 1 Phase 2)
-- **Tests Archived:** 7
-- **Tests Remaining in Legacy:** 94
-- **Total Pester Test Files:** 8 (7 tests + 1 template)
-- **Total Pester Test Cases:** 88 (all passing - 100%)
-- **Infrastructure Files Created:** 8
+- **Tests Migrated:** 8 of 101 planned (Phase 1: 6 tests + Phase 2: 2 tests)
+- **Tests Archived:** 8
+- **Tests Remaining in Legacy:** 93
+- **Total Pester Test Files:** 9 (8 tests + 1 template)
+- **Total Pester Test Cases:** 109 (all passing - 100%)
+- **Infrastructure Files Created:** 9 (includes AutopilotGraphMocks.psm1)
 - **Code Coverage:** Not yet measured
 
 ---
@@ -22,7 +22,8 @@
 
 ### Created Files
 - ✅ `PesterConfiguration.ps1` - Central Pester configuration function
-- ✅ `tests/Helpers/AutopilotTestHelpers.psm1` - Helper functions module  
+- ✅ `tests/Helpers/AutopilotTestHelpers.psm1` - Helper functions module
+- ✅ `tests/Helpers/AutopilotGraphMocks.psm1` - Graph API mocking framework (Phase 2 Milestone 2.1)
 - ✅ `Invoke-PesterTests.ps1` - Pester test runner
 - ✅ `Invoke-AllTests.ps1` - Unified runner for Pester + Legacy tests
 - ✅ `tests/Template.Tests.ps1` - Template for new test files
@@ -34,8 +35,9 @@
 - ✅ PesterConfiguration function works correctly
 - ✅ Helper module imports successfully
 - ✅ Test runner executes without errors
+- ✅ Graph mocking framework validated
 
-**Commits:** 1 (Phase 0: Setup Pester infrastructure)
+**Commits:** 2 (Phase 0 + Milestone 2.1)
 
 ---
 
@@ -46,8 +48,7 @@
 #### 1. test-syntax.ps1 → tests/Unit/Syntax.Tests.ps1 ✅
 - **Lines of Code:** 145
 - **Test Count:** 5 (3 main scripts + 185 function files + 120 test scripts aggregated)
-- **Status:** 4 passing, 1 failing → ✅ 5 passing (main.ps1 fixed)
-- **Failure Note:** ~~main.ps1 has pre-existing syntax error (reported as resolved)~~ Resolved
+- **Status:** ✅ All 5 passing (main.ps1 syntax error fixed)
 - **Execution Time:** ~1.0 second
 - **Legacy Comparison:** ✅ Matches legacy behavior
 
@@ -121,16 +122,100 @@
 
 ---
 
+## Phase 2: High-Value Unit Tests (🔄 IN PROGRESS - Milestones 2.1, 2.2, 2.3 Complete)
+
+### ✅ Milestone 2.1: Mock Infrastructure (COMPLETE)
+
+**Created:** `tests/Helpers/AutopilotGraphMocks.psm1` - Comprehensive Graph API mocking framework
+
+**Features:**
+- Mock Data Management: Add-MockUser, Add-MockGroup, Reset-MockData, Get-MockUsers/Groups
+- Graph API Mocking: Invoke-MockGraphAPI with full OData response structure
+- Test Environment Helpers: Initialize-GraphMockEnvironment, Clear-GraphMockEnvironment
+- Supports: Exact match, fuzzy search, case-insensitive queries, error simulation
+
+**Design Quality:**
+- ✅ Robust: Handles all GraphAPI call patterns
+- ✅ Maintainable: Clear separation, well-documented
+- ✅ Extensible: Simple API for custom test data
+- ✅ Reusable: Designed for all directory object tests
+
+**Lines of Code:** ~500 lines, 8 exported functions
+
+### ✅ Milestone 2.2: Get-EntraDirectoryObject Test (COMPLETE)
+
+**File:** `tests/Unit/GetEntraDirectoryObject.Tests.ps1`
+
+**Test Count:** 33 tests across 8 contexts
+- User exact match (5 tests)
+- Group exact match (5 tests)
+- User fuzzy search with exclusions (5 tests)
+- Group fuzzy search with exclusions (5 tests)
+- Caching behavior (4 tests)
+- Error handling (5 tests)
+- No fuzzy search without FindSimilar flag (2 tests)
+- Custom mock data extensibility (2 tests)
+
+**Status:** All 33 passing (100%)  
+**Execution Time:** ~1.9 seconds  
+**Legacy Comparison:** ✅ Matches legacy behavior
+
+### ✅ Milestone 2.3: Show-DirectoryObjectList Test (COMPLETE)
+
+**File:** `tests/Unit/ShowDirectoryObjectList.Tests.ps1`
+
+**Test Count:** 21 tests across 6 contexts
+- Empty list handling (4 tests)
+- Single item with NoPrompt (4 tests)
+- Multiple items menu selection - Users (3 tests)
+- Multiple items menu selection - Groups (3 tests)
+- MaxDisplay truncation (3 tests)
+- Menu creation and structure (4 tests)
+
+**Status:** All 21 passing (100%)  
+**Execution Time:** ~0.96 seconds  
+**Legacy Comparison:** ✅ Matches legacy behavior
+
+**Mocking Strategy:**
+- Global mocks in BeforeAll (NewMenu, ShowMenu)
+- Script-level variables for test control (MockMenuResponse, MenuCallCount)
+- Clean separation avoids complex menu configuration system
+
+### ⏳ Milestone 2.4: Resolve-DirectoryObject Test (REMAINING)
+
+**Target File:** test-resolve-directory-object.ps1 → tests/Unit/ResolveDirectoryObject.Tests.ps1
+
+**Estimated:**
+- Lines of Code: ~939 lines (legacy test)
+- Test Count: ~28 tests
+- Complexity: Integration test combining Get-EntraDirectoryObject + Show-DirectoryObjectList
+- Estimated Effort: 6-8 hours
+
+**Phase 2 Summary (Current):**
+- Milestones Complete: 3 of 4 (75%)
+- Tests Migrated: 2 (GetEntraDirectoryObject, ShowDirectoryObjectList)
+- Test Cases: 54 (33 + 21)
+- All Passing: 100%
+- Duration: ~2.9 seconds (combined)
+
+**Commits:** 2 (Milestone 2.1 & 2.2 + Milestone 2.3)
+
+---
+
 ## Performance Comparison
 
 | Test | Legacy Time | Pester Time | Speedup |
 |------|------------|-------------|---------|
+| **Phase 1** | | | |
 | Syntax validation | ~2s | ~1s | 2x faster |
 | Function loading | ~1s | ~1s | Same |
 | Function loading validation | ~1.5s | ~1.1s | 1.4x faster |
 | GetUserStrongMapping | ~1.2s | ~0.9s | 1.3x faster |
 | Domain configuration | ~1s | ~0.7s | 1.4x faster |
 | Replace/Add logic | ~0.8s | ~0.6s | 1.3x faster |
+| **Phase 2** | | | |
+| GetEntraDirectoryObject | ~2.5s | ~1.9s | 1.3x faster |
+| ShowDirectoryObjectList | ~1.3s | ~0.96s | 1.4x faster |
 
 **Overall:** Pester tests run 1-2x faster than legacy equivalents, with an average of 1.4x speedup
 
@@ -162,37 +247,63 @@
 
 ## Files Summary
 
-### Infrastructure Created (7 files)
+### Infrastructure Created (9 files)
 1. PesterConfiguration.ps1
 2. Invoke-PesterTests.ps1
 3. Invoke-AllTests.ps1
 4. tests/Helpers/AutopilotTestHelpers.psm1
-5. tests/Template.Tests.ps1
-6. tools/Validate-PesterMigration.ps1
-7. docs/PESTER_MIGRATION_PROGRESS.md (this file)
+5. tests/Helpers/AutopilotGraphMocks.psm1 (Phase 2 Milestone 2.1)
+6. tests/Template.Tests.ps1
+7. tools/Validate-PesterMigration.ps1
+8. docs/PESTER_MIGRATION_PROGRESS.md (this file)
+9. Directory structure (tests/Unit, Integration, Comprehensive, Helpers, TestScripts/archived, tools)
 
-### Tests Migrated (2 files)
+### Tests Migrated (8 files)
+**Phase 1:**
 1. tests/Unit/Syntax.Tests.ps1
 2. tests/Unit/FunctionLoading.Tests.ps1
+3. tests/Unit/FunctionLoadingValidation.Tests.ps1
+4. tests/Unit/GetUserStrongMapping.Tests.ps1
+5. tests/Unit/DomainConfiguration.Tests.ps1
+6. tests/Unit/ReplaceAddLogic.Tests.ps1
 
-### Tests Archived (2 files)
+**Phase 2:**
+7. tests/Unit/GetEntraDirectoryObject.Tests.ps1
+8. tests/Unit/ShowDirectoryObjectList.Tests.ps1
+
+### Tests Archived (8 files)
 1. TestScripts/archived/test-syntax.ps1
 2. TestScripts/archived/test-simple-function-loading.ps1
+3. TestScripts/archived/test-function-loading-validation.ps1
+4. TestScripts/archived/test-get-user-strong-mapping-simple.ps1
+5. TestScripts/archived/test-domain-config-simple.ps1
+6. TestScripts/archived/test-replace-logic-simple.ps1
+7. TestScripts/archived/test-get-entra-directory-object.ps1
+8. TestScripts/archived/test-show-directory-object-list.ps1
 
 ---
 
 ## Next Immediate Steps
 
-### Complete Phase 1
-1. Migrate test-function-loading-validation.ps1
-2. Migrate test-get-user-strong-mapping-simple.ps1  
-3. Migrate test-domain-config-simple.ps1
-4. Migrate test-replace-logic-simple.ps1
+### Complete Phase 2
+1. ✅ Milestone 2.1: Mock Infrastructure (COMPLETE)
+2. ✅ Milestone 2.2: Get-EntraDirectoryObject test (COMPLETE)
+3. ✅ Milestone 2.3: Show-DirectoryObjectList test (COMPLETE)
+4. ⏳ Milestone 2.4: test-resolve-directory-object.ps1 (28 tests, 6-8 hours estimated)
 
-### Phase 2 Preparation (High-Value Unit Tests)
-1. test-get-entra-directory-object.ps1 (25 tests)
-2. test-show-directory-object-list.ps1 (18 tests)
-3. test-resolve-directory-object.ps1 (28 tests)
+### Phase 3 (Integration Tests - 12 tests estimated)
+1. test-menu-inclusions.ps1
+2. test-menuitem-included-multiple-modes.ps1
+3. test-menu-logic-validation.ps1
+4. test-settings-display.ps1
+5. test-settings-viewer-simple.ps1
+6. Additional menu and settings integration tests
+
+### Phase 4 (Comprehensive Tests - 7 tests estimated)
+1. test-scope-hierarchy.ps1
+2. test-batch-optimization.ps1
+3. test-device-lookup-comprehensive.ps1
+4. Selected other comprehensive tests
 
 ---
 
@@ -242,9 +353,11 @@
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Tests Migrated | 6 (Phase 1) | 2 | 🟡 33% |
+| Phase 1 Tests Migrated | 6 | 6 | ✅ 100% |
+| Phase 2 Milestones | 4 | 3 | 🟡 75% |
+| Total Tests Migrated | 8 | 8 | ✅ |
 | Pass Rate | 100% | 100% | ✅ |
-| Performance | ≤ Legacy | 1-2x faster | ✅ |
+| Performance | ≤ Legacy | 1.4x faster | ✅ |
 | Test Equivalence | 100% | 100% | ✅ |
 
 ---
@@ -258,15 +371,15 @@
 - **Weeks 7-8 (Phase 4):** ⏳ Not started (Selective complex tests)
 - **Week 9 (Phase 5):** ⏳ Not started (Finalization)
 
-**Current Status:** Phase 1 complete. Phase 2 Milestone 2.1 (Mock Infrastructure) and 2.2 (Get-EntraDirectoryObject test) complete. 88 tests passing (100%).
+**Current Status:** Phase 1 complete (6 tests, 55 test cases). Phase 2 Milestones 2.1 (Mock Infrastructure), 2.2 (GetEntraDirectoryObject - 33 tests), and 2.3 (ShowDirectoryObjectList - 21 tests) complete. Total: 109 tests passing (100%).
 
 ---
 
 ## Recommendations
 
-1. **Phase 2.3:** Continue with test-show-directory-object-list.ps1 migration using established infrastructure
-2. **Phase 2.4:** Complete test-resolve-directory-object.ps1 integration test
-3. **Code Coverage:** Enable coverage reporting after Phase 2 complete
+1. **Phase 2.4:** Complete test-resolve-directory-object.ps1 integration test (28 tests remaining)
+2. **Phase 3:** Begin integration tests migration (menu and settings tests)
+3. **Code Coverage:** Enable coverage reporting after Phase 2.4 complete
 4. **Documentation:** Infrastructure patterns well-established and documented
 
 ---
