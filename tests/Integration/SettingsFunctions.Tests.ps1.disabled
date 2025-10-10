@@ -19,9 +19,15 @@ Describe "Settings Configuration Functions" -Tags 'Integration', 'Settings', 'Co
         # Get repository root
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
         
-        # Load settings functions
-        $settingsFunctionsPath = Join-Path $script:RepoRoot "functions/settingsFunctions"
+        # Load settings functions from setupFunctions folder
+        $settingsFunctionsPath = Join-Path $script:RepoRoot "functions/setupFunctions"
         Get-ChildItem -Path $settingsFunctionsPath -Filter *.ps1 -Recurse | ForEach-Object {
+            . $_.FullName
+        }
+        
+        # Load utility functions
+        $utilityFunctionsPath = Join-Path $script:RepoRoot "functions/utilityFunctions"
+        Get-ChildItem -Path $utilityFunctionsPath -Filter *.ps1 -Recurse | ForEach-Object {
             . $_.FullName
         }
         

@@ -20,10 +20,41 @@ The project now uses **Pester v5** as the primary testing framework for new test
 
 ### Writing New Tests
 - **Use Pester format** with Describe/Context/It blocks
-- **Follow the template:** `tests/Template.Tests.ps1`
+- **Follow the template:** `tests/Template.Tests.ps1` - see `docs/TEST_TEMPLATE_GUIDELINES.md` for when and how to use it
 - **Tag appropriately:** Use `'Unit'`, `'Integration'`, or `'Comprehensive'` tags
-- **Load functions:** Dot-source functions directly in BeforeAll blocks (see FunctionLoading.Tests.ps1)
-- **Use helpers:** Import `tests/Helpers/AutopilotTestHelpers.psm1` for common utilities
+- **Load functions:** Dot-source functions directly in BeforeAll blocks (most reliable method for PS 5.1 + Pester 5.x)
+- **Use helpers when appropriate:**
+  - Import `tests/Helpers/AutopilotTestHelpers.psm1` for temp folder management and cleanup
+  - Import `tests/Helpers/AutopilotGraphMocks.psm1` for Graph API mocking
+  - See guidelines for when helpers are required vs optional
+- **Document deviations:** If not using helpers, add `.NOTES` section explaining why (simple test, no state management, etc.)
+- **Mandatory:** All tests must pass (100% success rate) before committing
+
+### Test Template Guidelines (STRICT ENFORCEMENT)
+
+**READ THIS FIRST:** `docs/TEST_TEMPLATE_GUIDELINES.md` - Comprehensive guide on template usage
+
+**Key Rules:**
+1. **Use helpers for:** Tests with temp files, Graph API calls, complex state management
+2. **Dot-source directly for:** Function loading (most reliable in PS 5.1 + Pester 5.x)
+3. **Document all deviations:** Add `.NOTES` section explaining why template isn't fully used
+4. **Examples to follow:**
+   - `tests/Unit/GetEntraDirectoryObject.Tests.ps1` - Exemplary Graph API mocking
+   - `tests/Unit/Syntax.Tests.ps1` - Acceptable simple test without helpers
+   - `tests/Integration/MenuInclusions.Tests.ps1` - Appropriate direct loading pattern
+
+**Why direct dot-sourcing in BeforeAll:**
+- PowerShell 5.1 + Pester 5.x have complex scoping behavior
+- Module functions cannot reliably dot-source into caller's scope
+- Direct dot-sourcing in BeforeAll is the ONLY reliable method
+- This is a known limitation, not a template violation
+
+**Before creating a test:**
+1. Review `docs/TEST_TEMPLATE_GUIDELINES.md`
+2. Check similar existing tests for patterns
+3. Use helpers only when you need their specific features
+4. Document your approach in test header
+5. Ensure 100% test pass rate
 
 ### Migrating Existing Tests
 When migrating legacy tests to Pester:
