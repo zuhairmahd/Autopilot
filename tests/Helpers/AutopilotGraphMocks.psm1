@@ -13,7 +13,7 @@
 
 .NOTES
     Author: Autopilot Test Framework
-    Version: 1.0.0
+    Version: 1.3.0
     Compatible with: PowerShell 5.1+, Pester 5.x
 #>
 
@@ -99,6 +99,9 @@ $script:DefaultMockGroups = @{
 # Active mock data (can be customized per test)
 $script:MockUsers = $script:DefaultMockUsers.Clone()
 $script:MockGroups = $script:DefaultMockGroups.Clone()
+$script:MockImportedDevices = @{}
+$script:MockDeviceAssignments = @{}
+$script:MockProfileAssignments = @{}
 
 <#
 .SYNOPSIS
@@ -333,9 +336,13 @@ function Invoke-MockGraphAPI
         [string]$ResourcePath,
         [string]$Filter,
         [string]$ExtraParameters,
-        [switch]$consistencyLevel
+        [switch]$consistencyLevel,
+        [string]$Method = "GET",
+        [string]$Body = $null,
+        [string]$apiVersion = 'v1.0'
     )
     
+    Write-Verbose "[MockGraphAPI] Method: $Method"
     Write-Verbose "[MockGraphAPI] ResourcePath: $ResourcePath"
     Write-Verbose "[MockGraphAPI] Filter: $Filter"
     Write-Verbose "[MockGraphAPI] ExtraParameters: $ExtraParameters"
@@ -451,6 +458,58 @@ function Invoke-MockGraphAPI
             value            = @($matching)
         }
     }
+
+    # POST to importedWindowsAutopilotDeviceIdentities
+    if ($ResourcePath -eq "deviceManagement/importedWindowsAutopilotDeviceIdentities" -and $Method -eq "POST") {
+        $bodyJson = $Body | ConvertFrom-Json
+        $serial = $bodyJson.serialNumber
+        $userId = $bodyJson.assignedUserPrincipalName
+
+        # Basic validation
+        if (-not $script:MockDevices.ContainsKey($serial)) {
+            Write-Warning "[MockGraphAPI] Device with serial '$serial' not found in mock data."
+            return 404
+        }
+        if (-not [string]::IsNullOrEmpty($userId) -and -not $script:MockUsers.ContainsKey($userId)) {
+            Write-Warning "[MockGraphAPI] User with UPN '$userId' not found in mock data."
+            return 400 # Bad Request
+        }
+
+        $importId = "import-id-$([guid]::NewGuid().ToString().Substring(0,8))"
+        $newImport = @{
+            id = $importId
+            serialNumber = $serial
+            assignedUserPrincipalName = $userId
+            state = @{
+                deviceImportStatus = 'complete' # Simulate immediate completion for tests
+            }
+        }
+        $script:MockImportedDevices[$importId] = $newImport
+        $script:MockDeviceAssignments[$($script:MockDevices[$serial].id)] = $userId
+
+        return $newImport
+    }
+
+    # GET for importedWindowsAutopilotDeviceIdentities/{id}
+    if ($ResourcePath -like "deviceManagement/importedWindowsAutopilotDeviceIdentities/*" -and $Method -eq "GET") {
+        $importId = $ResourcePath.Split('/')[-1]
+        if ($script:MockImportedDevices.ContainsKey($importId)) {
+            return $script:MockImportedDevices[$importId]
+        }
+        return 404
+    }
+
+    # GET for windowsAutopilotDeploymentProfiles/{id}/assignments
+    if ($ResourcePath -like "*windowsAutopilotDeploymentProfiles/*/assignments" -and $Method -eq "GET") {
+        $profileId = ($ResourcePath -split '/')[-2]
+        $assignments = @()
+        foreach ($assignment in $script:MockProfileAssignments.GetEnumerator()) {
+            if ($assignment.Name -eq $profileId) {
+                $assignments += $assignment.Value
+            }
+        }
+        return @{ value = $assignments }
+    }
     
     # Default: not found
     Write-Verbose "[MockGraphAPI] No matching mock found, returning 404"
@@ -559,6 +618,8 @@ function Clear-GraphMockEnvironment
     {
         Remove-Variable -Name settings -Scope Global -Force
     }
+    Clear-MockDeviceAssignments
+    Clear-MockProfileAssignments
 }
 
 #endregion
@@ -678,6 +739,38 @@ function Get-MockDevices
     
     return $script:MockDevices
 }
+
+<#
+.SYNOPSIS
+    (Mock) Assigns a user to a device.
+#>
+function Add-MockDeviceUserAssignment {
+    param(
+        [string]$DeviceId,
+        [string]$UserId
+    )
+    $script:MockDeviceAssignments[$DeviceId] = $UserId
+    Write-Verbose "[MockGraphAPI] Assigned user $UserId to device $DeviceId"
+}
+
+<#
+.SYNOPSIS
+    (Mock) Gets user assignments for a device.
+#>
+function Get-MockDeviceUserAssignments {
+    param([string]$DeviceId)
+    return $script:MockDeviceAssignments[$DeviceId]
+}
+
+<#
+.SYNOPSIS
+    Clears all mock device assignments.
+#>
+function Clear-MockDeviceAssignments {
+    $script:MockDeviceAssignments.Clear()
+    $script:MockImportedDevices.Clear()
+}
+
 
 #endregion
 
@@ -802,6 +895,43 @@ function Get-MockAutopilotProfiles
     return $script:MockProfiles
 }
 
+<#
+.SYNOPSIS
+    (Mock) Assigns a profile to a target.
+#>
+function Add-MockProfileAssignment {
+    param(
+        [string]$ProfileId,
+        [string]$TargetId,
+        [ValidateSet('Device', 'Group')]
+        [string]$TargetType = 'Group'
+    )
+    $assignment = @{
+        target = @{
+            '@odata.type' = "microsoft.graph.groupAssignmentTarget"
+            groupId = $TargetId
+        }
+    }
+    $script:MockProfileAssignments[$ProfileId] = $assignment
+}
+
+<#
+.SYNOPSIS
+    (Mock) Gets assignments for a profile.
+#>
+function Get-MockProfileAssignments {
+    param([string]$ProfileId)
+    return $script:MockProfileAssignments[$ProfileId]
+}
+
+<#
+.SYNOPSIS
+    Clears all mock profile assignments.
+#>
+function Clear-MockProfileAssignments {
+    $script:MockProfileAssignments.Clear()
+}
+
 #endregion
 
 #region Authentication Token Mocks
@@ -852,5 +982,12 @@ Export-ModuleMember -Function @(
     'New-MockAuthToken',
     'Invoke-MockGraphAPI',
     'Initialize-GraphMockEnvironment',
-    'Clear-GraphMockEnvironment'
+    'Clear-GraphMockEnvironment',
+    'Add-MockDeviceUserAssignment',
+    'Get-MockDeviceUserAssignments',
+    'Clear-MockDeviceAssignments',
+    'Add-MockProfileAssignment',
+    'Get-MockProfileAssignments',
+    'Clear-MockProfileAssignments'
 )
+

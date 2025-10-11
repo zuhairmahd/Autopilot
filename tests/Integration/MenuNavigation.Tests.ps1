@@ -1,0 +1,207 @@
+<#
+.SYNOPSIS
+    Integration tests for menu navigation flows.
+
+.DESCRIPTION
+    Tests menu history, back, main menu, and exit navigation.
+    This test simulates the main menu loop from main.ps1 to verify navigation logic.
+    Converted from TestScripts/test-mnemonic-navigation.ps1
+
+.NOTES
+    Test Category: Integration
+    Template Compliance: Full
+    Uses: AutopilotMenuMocks, AutopilotTestHelpers
+#>
+
+Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
+Import-Module "$PSScriptRoot/../Helpers/AutopilotMenuMocks.psm1" -Force
+
+Describe "Menu Navigation Flows" -Tags 'Integration', 'Menu' {
+
+    # Helper function to simulate the core menu navigation loop from main.ps1
+    function Simulate-MenuNavigation {
+        param(
+            [hashtable]$StartMenu,
+            [array]$InputSequence
+        )
+
+        $Global:currentMenu = $StartMenu
+        $Global:MenuHistory.Clear()
+        $Global:MenuHistory.Add($StartMenu) | Out-Null
+        $Global:previousMenu = $StartMenu
+
+        foreach ($userInput in $InputSequence) {
+            Set-MockShowMenuResponse -NewResponse $userInput
+
+            $itemsToShow = Get-MenuItemsToShow -menus $Global:currentMenu.items -settings $Global:settings
+            $choice = Show-Menu -Menu $Global:currentMenu -items $itemsToShow
+
+            if ($choice -eq $Global:returnValues.backMessage) {
+                if ($Global:MenuHistory.Count -gt 1) {
+                    $Global:MenuHistory.RemoveAt($Global:MenuHistory.Count - 1)
+                    $Global:currentMenu = $Global:MenuHistory[$Global:MenuHistory.Count - 1]
+                }
+            }
+            elseif ($choice -eq $Global:returnValues.mainMenuMessage) {
+                $Global:currentMenu = $Global:MenuHistory[0]
+                $Global:MenuHistory.Clear()
+                $Global:MenuHistory.Add($Global:currentMenu) | Out-Null
+            }
+            elseif ($choice -eq $Global:returnValues.exitMessage) {
+                break # Exit loop
+            }
+            else {
+                $selectedItem = $itemsToShow[$choice - 1]
+                if ($selectedItem.type -eq 'submenu') {
+                    $Global:previousMenu = $Global:currentMenu
+                    $Global:currentMenu = $selectedItem.submenu
+                    $Global:MenuHistory.Add($Global:currentMenu) | Out-Null
+                }
+            }
+        }
+    }
+
+    BeforeAll {
+        $script:TestContext = Initialize-AutopilotTestEnvironment
+        $script:RepoRoot = $TestContext.RootPath
+        
+        # Load all menu functions needed for the simulation
+        $functionsPath = Join-Path $script:RepoRoot "functions/menuFunctions"
+        Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 | ForEach-Object {
+            . $_.FullName
+        }
+
+        Initialize-MenuTestEnvironment -AppMode "helpdesk"
+        New-MockShowMenuFunction -EnableCallTracking
+
+        # Create a nested menu structure for testing
+        $nestedSubMenu = @{
+            name  = "Level 2 Menu"
+            items = @(
+                @{ name = "Level 2 Action"; type = "action" }
+            )
+        }
+
+        $topSubMenu = @{
+            name  = "Level 1 SubMenu"
+            type  = "submenu"
+            submenu = $nestedSubMenu
+            items = $nestedSubMenu.items
+        }
+
+        $script:mainMenu = @{
+            name  = "Main Menu"
+            items = @(
+                $topSubMenu,
+                @{ name = "Main Menu Action"; type = "action" }
+            )
+        }
+        $nestedSubMenu.parent = $topSubMenu
+        $topSubMenu.parent = $script:mainMenu
+    }
+
+    AfterAll {
+        Remove-TestEnvironment -TestContext $script:TestContext
+        Clear-MenuTestEnvironment
+    }
+
+    BeforeEach {
+        Reset-MockShowMenuCalls
+        $Global:MenuHistory.Clear()
+        $Global:currentMenu = $null
+        $Global:previousMenu = $null
+    }
+
+    Context "Submenu Navigation" {
+        It "Should add a menu to the history when navigating into a submenu" {
+            # Arrange
+            $inputs = @("1") # Select the first item, which is a submenu
+
+            # Act
+            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
+
+            # Assert
+            $Global:MenuHistory.Count | Should -Be 2
+            $Global:MenuHistory[0].name | Should -Be "Main Menu"
+            $Global:MenuHistory[1].name | Should -Be "Level 2 Menu"
+        }
+
+        It "Should navigate multiple levels deep" {
+            # Arrange: This test requires a deeper menu
+            $level3 = @{ name = "Level 3"; items = @(@{ name = "L3 Action" }) }
+            $level2 = @{ name = "Level 2"; type = "submenu"; submenu = $level3; items = $level3.items }
+            $level1 = @{ name = "Level 1"; type = "submenu"; submenu = $level2; items = $level2.items }
+            $deepMenu = @{ name = "Deep Main"; items = @($level1) }
+            
+            $inputs = @("1", "1") # Go into Level 1, then into Level 2
+
+            # Act
+            Simulate-MenuNavigation -StartMenu $deepMenu -InputSequence $inputs
+
+            # Assert
+            $Global:MenuHistory.Count | Should -Be 3
+            $Global:MenuHistory[2].name | Should -Be "Level 3"
+        }
+    }
+
+    Context "Back Navigation" {
+        It "Should navigate back to the previous menu" {
+            # Arrange
+            $inputs = @("1", "B") # Go into submenu, then go back
+
+            # Act
+            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
+
+            # Assert
+            $Global:MenuHistory.Count | Should -Be 1
+            $Global:MenuHistory[0].name | Should -Be "Main Menu"
+            $Global:currentMenu.name | Should -Be "Main Menu"
+            
+            $calls = Get-MockShowMenuCalls
+            $calls.CallCount | Should -Be 2
+            $calls.Calls[0].Menu.name | Should -Be "Main Menu"
+            $calls.Calls[1].Menu.name | Should -Be "Level 2 Menu" # Show-Menu is called before 'B' is processed
+        }
+
+        It "Should not go back if at the main menu" {
+            # Arrange
+            $inputs = @("B") # Try to go back from the main menu
+
+            # Act
+            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
+
+            # Assert
+            $Global:MenuHistory.Count | Should -Be 1
+            $Global:currentMenu.name | Should -Be "Main Menu"
+        }
+    }
+
+    Context "Main Menu Navigation" {
+        It "Should navigate to the main menu from a nested menu" {
+            # Arrange
+            $inputs = @("1", "M") # Go into submenu, then go to main menu
+
+            # Act
+            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
+
+            # Assert
+            $Global:MenuHistory.Count | Should -Be 1
+            $Global:MenuHistory[0].name | Should -Be "Main Menu"
+            $Global:currentMenu.name | Should -Be "Main Menu"
+        }
+    }
+
+    Context "Exit Navigation" {
+        It "Should exit the menu loop" {
+            # Arrange
+            $inputs = @("X")
+
+            # Act
+            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
+
+            # Assert
+            $calls = Get-MockShowMenuCalls
+            $calls.CallCount | Should -Be 1 # Loop should break after first call
+        }
+    }
+}

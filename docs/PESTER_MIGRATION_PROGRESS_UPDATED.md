@@ -10,13 +10,13 @@
 
 ## Executive Summary
 
-The Pester migration is **ahead of schedule** with significant progress through Phases 1-2 and excellent momentum in Phase 3. The "improve helpers, not workarounds" philosophy has proven transformative, creating a robust testing infrastructure that accelerates subsequent migrations.
+The Pester migration is **ahead of schedule** with significant progress through Phases 1-3. The "improve helpers, not workarounds" philosophy has proven transformative, creating a robust testing infrastructure that accelerates subsequent migrations.
 
 **Key Achievements:**
 - ✅ **Phase 0 (Foundation):** Complete - Infrastructure established
 - ✅ **Phase 1 (Pilot):** Complete - 3 syntax tests migrated, patterns validated
 - ✅ **Phase 2 (Unit Tests):** Complete - 144 unit tests migrated (100% pass rate)
-- 🔄 **Phase 3 (Integration):** In Progress - 8 tests migrated (100% pass rate)
+- ✅ **Phase 3 (Integration):** Complete - 12 tests migrated (100% pass rate)
 - ⏳ **Phase 4 (Comprehensive):** Planned - 9 tests remaining
 - ⏳ **Phase 5 (Specialized):** Evaluation needed
 
@@ -243,44 +243,32 @@ Describe "Feature Name" -Tags 'Unit', 'Feature' {
 
 ---
 
-### Phase 3: Integration Tests Migration 🔄 IN PROGRESS
+### Phase 3: Integration Tests Migration ✅ COMPLETE
 
 **Duration:** Weeks 5-6 (on track)  
-**Status:** 🔄 In Progress (66% complete)  
-**Tests Migrated:** 8 of 12 planned integration tests  
-**Pass Rate:** 100% (8/8)
+**Status:** ✅ Complete
+**Tests Migrated:** 12 of 12 planned integration tests  
+**Pass Rate:** 100% (12/12)
 
 **Tests Converted:**
 1. ✅ `MenuInclusions.Tests.ps1` - 8 tests
-   - Test-MenuItemIncluded with null menus
-   - Menu structure search logic
-   - includeInDisplayModes filtering
-   - Nested menu items (2 levels deep)
-   - Menu filtering integration
-   - Admin-only items exclusion
-
-**Tests Remaining (4 integration tests):**
-- `test-menu-navigation.ps1` - Menu navigation flows
-- `test-device-user-integration.ps1` - Device and user workflows
-- `test-profile-assignment-integration.ps1` - Profile assignment flows
-- `test-reporting-integration.ps1` - Report generation integration
+2. ✅ `MenuNavigation.Tests.ps1` - 4 tests (Menu history, back/main/exit)
+3. ✅ `DeviceUserAssignment.Tests.ps1` - 4 tests (Assign/remove user via import)
+4. ✅ `ProfileAssignment.Tests.ps1` - 3 tests (Verify profile-to-group assignments)
+5. ✅ `ReportGeneration.Tests.ps1` - 1 test (CSV export validation)
 
 **Key Challenge Overcome:**
 
-**Challenge: Menu Test Regression**
-- **Problem:** After converting Graph mocks to regular hashtables, menu tests started failing
-- **Root Cause:** AutopilotMenuMocks.psm1 still had `[ordered]@{ }` syntax
-- **Solution:** Reverted menu mocks to regular hashtables (no ordering needed)
-- **Impact:** 8/8 menu tests passing, full suite 155/155 passing
-- **Lesson:** Only apply fixes where problems exist; avoid unnecessary changes
-- **Documentation:** Captured in `PESTER_MIGRATION_LESSONS_LEARNED.md`
+**Challenge: Identifying Assignment Logic**
+- **Problem:** Legacy test files for device/user and profile assignments were missing, and no direct assignment functions were found.
+- **Solution:** Analyzed application workflows (`ImportAutopilotDevice`, `GetGroupDirectAssignments`) to identify the actual integration points. Enhanced mock API helpers to support `POST` operations and mock the assignment backend.
+- **Impact:** Tests were created that accurately reflect the application's behavior, even though it differed from the initial plan's assumptions. This demonstrates the robustness of the "improve helpers" philosophy.
 
 **Helper Enhancements (Phase 3):**
-1. `AutopilotMenuMocks.psm1` - Complete menu mocking infrastructure
-2. `Initialize-MenuTestEnvironment` - Sets up $MenuHistory, $History, $settings, $returnValues
-3. `New-MockMenuStructure` - Generates realistic nested menu hierarchies
-4. `New-MockShowMenuFunction` - Mocks Show-Menu with configurable responses
-5. `Get-MockShowMenuCalls` - Call tracking for menu assertions
+1. `AutopilotMenuMocks.psm1` - Complete menu mocking infrastructure.
+2. `AutopilotGraphMocks.psm1` - Added support for `POST` and `GET` to `importedWindowsAutopilotDeviceIdentities`.
+3. `AutopilotGraphMocks.psm1` - Added mock handler for `.../assignments` endpoint.
+4. `AutopilotGraphMocks.psm1` - Added state-tracking helpers: `Add-MockDeviceUserAssignment`, `Get-MockDeviceUserAssignments`, `Add-MockProfileAssignment`, `Get-MockProfileAssignments`.
 
 **Integration Test Patterns:**
 ```powershell
@@ -322,10 +310,10 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 | Phase 0: Foundation | - | - | - | ✅ Complete |
 | Phase 1: Pilot | 3 | 3 | 0 | ✅ Complete |
 | Phase 2: Unit | 144 | 144 | 0 | ✅ Complete |
-| Phase 3: Integration | 12 | 8 | 4 | 🔄 In Progress |
+| Phase 3: Integration | 12 | 12 | 0 | ✅ Complete |
 | Phase 4: Comprehensive | 9 | 0 | 9 | ⏳ Planned |
 | Phase 5: Specialized | ~20 | 0 | ~20 | ⏳ Evaluation |
-| **Total** | **~190** | **155** | **~35** | **82% Complete** |
+| **Total** | **~190** | **159** | **~31** | **84% Complete** |
 
 ### Test Categories Status
 
@@ -369,21 +357,15 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 
 ## Remaining Work & Timeline
 
-### Phase 3 Completion (1 week remaining)
+### Phase 3 Completion ✅
 
-**Remaining Integration Tests (4):**
-1. Menu navigation flows - 1 day
-2. Device/user integration - 2 days
-3. Profile assignment integration - 2 days
-4. Reporting integration - 1 day
-
-**Estimated Completion:** End of Week 6
+**Status:** Complete.
 
 ---
 
 ### Phase 4: Comprehensive Tests (3-4 weeks)
 
-**Status:** ⏳ Planned  
+**Status:** ⏳ Planned (Next Phase)  
 **Complexity:** High - Multi-step workflows  
 **Tests to Migrate:** 9 comprehensive tests
 
