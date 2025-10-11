@@ -1139,7 +1139,7 @@ else
             Write-Verbose "No changes made to migrateLegacyConfiguration setting."
             write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
         }
-        Write-Host "`nPress any key to continue""
+        Write-Host "`nPress any key to continue"
         $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
     }
 }
