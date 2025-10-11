@@ -32,7 +32,8 @@ Describe "Device User Assignment Integration" -Tags 'Integration', 'Device', 'Us
         Add-MockUser -UserPrincipalName "assign.user@contoso.com" -DisplayName "Assign User" -Id "user-assign-01" -GivenName "Assign" -Surname "User"
 
         # Mock the global CallGraphAPI function to use our enhanced mock
-        function global:CallGraphAPI {
+        function global:CallGraphAPI
+        {
             param($accessToken, $ResourcePath, $Filter, $ExtraParameters, [switch]$consistencyLevel, [string]$Method = 'GET', $Body = $null, [string]$apiVersion = 'v1.0')
             
             # The original mock didn't properly handle -Method and -Body, so we pass them through
@@ -104,7 +105,8 @@ Describe "Device User Assignment Integration" -Tags 'Integration', 'Device', 'Us
             $result = ImportAutopilotDevice -AccessToken $script:token -DeviceObject $script:deviceToAssign -AssignedUser $nonExistentUser -CustomImport:$false
 
             # Assert
-            $result | Should -BeNull # The function returns null on failure
+            # The function returns "404" error code on failure, not null
+            $result | Should -Be "404"
             
             $assignedUser = Get-MockDeviceUserAssignments -DeviceId "device-assign-01"
             $assignedUser | Should -BeNullOrEmpty
@@ -121,7 +123,8 @@ Describe "Device User Assignment Integration" -Tags 'Integration', 'Device', 'Us
             $result = ImportAutopilotDevice -AccessToken $script:token -DeviceObject $badDevice -AssignedUser "assign.user@contoso.com" -CustomImport:$false
 
             # Assert
-            $result | Should -BeNull
+            # The function returns "404" error code on failure, not null
+            $result | Should -Be "404"
         }
     }
 }

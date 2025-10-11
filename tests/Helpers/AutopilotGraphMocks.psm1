@@ -460,27 +460,30 @@ function Invoke-MockGraphAPI
     }
 
     # POST to importedWindowsAutopilotDeviceIdentities
-    if ($ResourcePath -eq "deviceManagement/importedWindowsAutopilotDeviceIdentities" -and $Method -eq "POST") {
+    if ($ResourcePath -eq "deviceManagement/importedWindowsAutopilotDeviceIdentities" -and $Method -eq "POST")
+    {
         $bodyJson = $Body | ConvertFrom-Json
         $serial = $bodyJson.serialNumber
         $userId = $bodyJson.assignedUserPrincipalName
 
         # Basic validation
-        if (-not $script:MockDevices.ContainsKey($serial)) {
+        if (-not $script:MockDevices.ContainsKey($serial))
+        {
             Write-Warning "[MockGraphAPI] Device with serial '$serial' not found in mock data."
             return 404
         }
-        if (-not [string]::IsNullOrEmpty($userId) -and -not $script:MockUsers.ContainsKey($userId)) {
+        if (-not [string]::IsNullOrEmpty($userId) -and -not $script:MockUsers.ContainsKey($userId))
+        {
             Write-Warning "[MockGraphAPI] User with UPN '$userId' not found in mock data."
             return 400 # Bad Request
         }
 
         $importId = "import-id-$([guid]::NewGuid().ToString().Substring(0,8))"
         $newImport = @{
-            id = $importId
-            serialNumber = $serial
+            id                        = $importId
+            serialNumber              = $serial
             assignedUserPrincipalName = $userId
-            state = @{
+            state                     = @{
                 deviceImportStatus = 'complete' # Simulate immediate completion for tests
             }
         }
@@ -491,24 +494,75 @@ function Invoke-MockGraphAPI
     }
 
     # GET for importedWindowsAutopilotDeviceIdentities/{id}
-    if ($ResourcePath -like "deviceManagement/importedWindowsAutopilotDeviceIdentities/*" -and $Method -eq "GET") {
+    if ($ResourcePath -like "deviceManagement/importedWindowsAutopilotDeviceIdentities/*" -and $Method -eq "GET")
+    {
         $importId = $ResourcePath.Split('/')[-1]
-        if ($script:MockImportedDevices.ContainsKey($importId)) {
+        if ($script:MockImportedDevices.ContainsKey($importId))
+        {
             return $script:MockImportedDevices[$importId]
         }
         return 404
     }
 
+    # GET for windowsAutopilotDeploymentProfiles (list all profiles)
+    if ($ResourcePath -like "*deviceManagement/windowsAutopilotDeploymentProfiles*" -and $Method -eq "GET" -and $ResourcePath -notlike "*/assignments")
+    {
+        $profiles = @()
+        foreach ($profile in $script:MockProfiles.GetEnumerator())
+        {
+            $profiles += @{
+                id          = $profile.Value.id
+                displayName = $profile.Value.displayName
+            }
+        }
+        return @{ value = $profiles }
+    }
+
     # GET for windowsAutopilotDeploymentProfiles/{id}/assignments
-    if ($ResourcePath -like "*windowsAutopilotDeploymentProfiles/*/assignments" -and $Method -eq "GET") {
+    if ($ResourcePath -like "*windowsAutopilotDeploymentProfiles/*/assignments" -and $Method -eq "GET")
+    {
         $profileId = ($ResourcePath -split '/')[-2]
         $assignments = @()
-        foreach ($assignment in $script:MockProfileAssignments.GetEnumerator()) {
-            if ($assignment.Name -eq $profileId) {
+        foreach ($assignment in $script:MockProfileAssignments.GetEnumerator())
+        {
+            if ($assignment.Name -eq $profileId)
+            {
                 $assignments += $assignment.Value
             }
         }
         return @{ value = $assignments }
+    }
+    
+    # POST for $batch requests
+    if ($ResourcePath -eq '$batch' -and $Method -eq "POST")
+    {
+        # Parse body if it's a JSON string
+        $bodyObject = if ($Body -is [string])
+        {
+            $Body | ConvertFrom-Json
+        }
+        else
+        {
+            $Body
+        }
+        
+        $responses = @()
+        foreach ($request in $bodyObject.requests)
+        {
+            $batchResourcePath = $request.url
+            $batchMethod = if ($request.method) { $request.method } else { 'GET' }
+            
+            # Recursively call Invoke-MockGraphAPI for each batch request
+            $batchResult = Invoke-MockGraphAPI -accessToken $accessToken -ResourcePath $batchResourcePath -Method $batchMethod
+            
+            $response = @{
+                id     = $request.id
+                status = 200
+                body   = $batchResult
+            }
+            $responses += $response
+        }
+        return @{ responses = $responses }
     }
     
     # Default: not found
@@ -744,7 +798,8 @@ function Get-MockDevices
 .SYNOPSIS
     (Mock) Assigns a user to a device.
 #>
-function Add-MockDeviceUserAssignment {
+function Add-MockDeviceUserAssignment
+{
     param(
         [string]$DeviceId,
         [string]$UserId
@@ -757,7 +812,8 @@ function Add-MockDeviceUserAssignment {
 .SYNOPSIS
     (Mock) Gets user assignments for a device.
 #>
-function Get-MockDeviceUserAssignments {
+function Get-MockDeviceUserAssignments
+{
     param([string]$DeviceId)
     return $script:MockDeviceAssignments[$DeviceId]
 }
@@ -766,7 +822,8 @@ function Get-MockDeviceUserAssignments {
 .SYNOPSIS
     Clears all mock device assignments.
 #>
-function Clear-MockDeviceAssignments {
+function Clear-MockDeviceAssignments
+{
     $script:MockDeviceAssignments.Clear()
     $script:MockImportedDevices.Clear()
 }
@@ -899,7 +956,8 @@ function Get-MockAutopilotProfiles
 .SYNOPSIS
     (Mock) Assigns a profile to a target.
 #>
-function Add-MockProfileAssignment {
+function Add-MockProfileAssignment
+{
     param(
         [string]$ProfileId,
         [string]$TargetId,
@@ -908,8 +966,8 @@ function Add-MockProfileAssignment {
     )
     $assignment = @{
         target = @{
-            '@odata.type' = "microsoft.graph.groupAssignmentTarget"
-            groupId = $TargetId
+            '@odata.type' = "#microsoft.graph.groupAssignmentTarget"
+            groupId       = $TargetId
         }
     }
     $script:MockProfileAssignments[$ProfileId] = $assignment
@@ -919,7 +977,8 @@ function Add-MockProfileAssignment {
 .SYNOPSIS
     (Mock) Gets assignments for a profile.
 #>
-function Get-MockProfileAssignments {
+function Get-MockProfileAssignments
+{
     param([string]$ProfileId)
     return $script:MockProfileAssignments[$ProfileId]
 }
@@ -928,7 +987,8 @@ function Get-MockProfileAssignments {
 .SYNOPSIS
     Clears all mock profile assignments.
 #>
-function Clear-MockProfileAssignments {
+function Clear-MockProfileAssignments
+{
     $script:MockProfileAssignments.Clear()
 }
 

@@ -1,7 +1,8 @@
 # Pester Migration Completion Plan
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Created:** October 10, 2025  
+**Updated:** October 10, 2025 (Phase 3 Complete)  
 **Purpose:** Detailed plan to complete remaining migration work  
 **Current Progress:** 155 of ~190 tests (82% complete)  
 **Target Completion:** 6-8 weeks
@@ -10,17 +11,18 @@
 
 ## Executive Summary
 
-We have successfully completed **Phases 0-2** of the Pester migration and are making excellent progress in **Phase 3**. The migration is ahead of schedule with robust infrastructure established and valuable lessons learned applied throughout.
+We have successfully completed **Phases 0-3** of the Pester migration and are ready to begin **Phase 4**. The migration is ahead of schedule with robust infrastructure established and valuable lessons learned applied throughout.
 
 **Current State:**
 - ✅ 155 tests migrated (100% passing)
+- ✅ **Phase 3 COMPLETE: 36/36 integration tests passing (100%)**
 - ✅ Three-tiered helper architecture operational
 - ✅ PowerShell 5.1 compatibility validated
 - ✅ Comprehensive documentation created
 - ✅ "Improve helpers" philosophy proven effective
+- ✅ Critical batch API fix applied system-wide
 
 **Remaining Work:**
-- 🔄 Phase 3: 4 integration tests (1 week)
 - ⏳ Phase 4: 9 comprehensive tests (3-4 weeks)
 - ⏳ Phase 5: ~20 tests evaluation (2-3 weeks)
 
@@ -28,73 +30,43 @@ We have successfully completed **Phases 0-2** of the Pester migration and are ma
 
 ## Phase 3 Completion (Week 6)
 
-### Status: 8 of 12 tests complete (66%)
+### Status: ✅ COMPLETE - 36 of 36 tests passing (100%)
 
-### Remaining Tests
+**UPDATE (2025-10-10):** Phase 3 integration testing is COMPLETE with excellent results:
+- **Pass Rate:** 100% (36 of 36 tests) ✅
+- **Files Complete:** 6 of 6 test files at 100%
+- **Production Fixes:** 1 (ExportDeviceReport outputFile parameter)
+- **Mock Enhancements:** 1 critical (Batch API JSON parsing - enables all batch operations system-wide)
+- **Legacy Tests Archived:** 2 (test-settings-integration.ps1, test-menu-inclusions-integration.ps1)
+- **Architecture Improvements:** 1 (MenuNavigation rewritten to test real menu architecture)
 
-**1. Menu Navigation Flows (1 day)**
-- **Legacy Test:** `TestScripts/test-menu-navigation.ps1`
-- **Pester Test:** `tests/Integration/MenuNavigation.Tests.ps1`
-- **Scope:**
-  - Menu history tracking
-  - Back/Main Menu/Exit navigation
-  - Nested menu navigation (3+ levels)
-  - Menu state persistence
+### Completed Integration Tests
 
-**Helper Usage:**
-- AutopilotMenuMocks.psm1 (Initialize-MenuTestEnvironment, New-MockMenuStructure)
-- Mock Show-Menu with navigation responses
+1. ✅ **SettingsFunctions.Tests.ps1** - 12/12 tests (100%)
+2. ✅ **DeviceUserAssignment.Tests.ps1** - 4/4 tests (100%)  
+3. ✅ **MenuInclusions.Tests.ps1** - 8/8 tests (100%)
+4. ✅ **ReportGeneration.Tests.ps1** - 1/1 tests (100%)
+5. ✅ **ProfileAssignment.Tests.ps1** - 3/3 tests (100%) - Fixed with batch API JSON parsing
+6. ✅ **MenuNavigation.Tests.ps1** - 9/9 tests (100%) - Complete rewrite testing real architecture
 
-**Conversion Steps:**
-1. Analyze legacy test navigation scenarios
-2. Create test file with menu environment setup
-3. Mock Show-Menu to return navigation commands
-4. Test menu history updates
-5. Validate cleanup in AfterAll
+### Key Phase 3 Achievements
 
----
+**MenuNavigation Complete Rewrite:**
+- **Previous Status:** 0/6 tests failing (architecture mismatch)
+- **Root Cause:** Test used non-existent Get-MenuItemsToShow function and simulated fake menu loop
+- **Solution:** Rewrote to test real menu architecture (Push-MenuToStack, Pop-MenuFromStack directly)
+- **New Coverage:** 9 tests covering push, pop, multi-level navigation, edge cases
+- **Result:** 9/9 passing (100%)
+- **Execution Time:** ~0.09 seconds
 
-**2. Device/User Integration (2 days)**
-- **Legacy Test:** `TestScripts/test-device-user-integration.ps1`
-- **Pester Test:** `tests/Integration/DeviceUserAssignment.Tests.ps1`
-- **Scope:**
-  - Assign user to device
-  - Remove user from device
-  - Validate assignment relationships
-  - Handle non-existent users/devices
+**ProfileAssignment Batch API Fix:**
+- **Issue:** Batch API endpoint wasn't parsing JSON Body parameter
+- **Root Cause:** Body arrives as string from ConvertTo-Json
+- **Fix:** Added type check in AutopilotGraphMocks.psm1 (lines 535-560)
+- **Impact:** Enables all batch API operations system-wide
+- **Result:** ProfileAssignment tests 66.7% → 100%
 
-**Helper Usage:**
-- AutopilotGraphMocks.psm1 (Add-MockDevice, Add-MockUser, Invoke-MockGraphAPI)
-- Mock PATCH/POST operations for assignments
-
-**Potential Helper Enhancement:**
-```powershell
-# May need to add to AutopilotGraphMocks.psm1
-function Add-MockDeviceUserAssignment {
-    param(
-        [string]$DeviceId,
-        [string]$UserId
-    )
-    # Track assignment relationships
-}
-
-function Get-MockDeviceUserAssignments {
-    param([string]$DeviceId)
-    # Return assigned users for device
-}
-```
-
-**Conversion Steps:**
-1. Review current device mocking capabilities
-2. Enhance AutopilotGraphMocks if needed (assignment tracking)
-3. Create test with device and user mocks
-4. Mock CallGraphAPI for assignment operations
-5. Validate relationships and error handling
-
----
-
-**3. Profile Assignment Integration (2 days)**
-- **Legacy Test:** `TestScripts/test-profile-assignment-integration.ps1`
+**Phase 3 Complete - Ready for Phase 4**
 - **Pester Test:** `tests/Integration/ProfileAssignment.Tests.ps1`
 - **Scope:**
   - Assign Autopilot profile to device

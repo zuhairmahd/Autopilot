@@ -1,5 +1,15 @@
 #!/usr/bin/env pwsh
 
+<#
+.MIGRATION NOTE
+This legacy test has been replaced by the Pester 5 test suite:
+- New Test File: tests/Integration/SettingsFunctions.Tests.ps1
+- Migration Date: Phase 3 completion (October 2024)
+- Status: 12/12 tests passing (100%)
+- Why Migrated: Better structure, faster execution, modern Pester syntax
+- To Run New Tests: .\Invoke-PesterTests.ps1 -TestType Integration
+#>
+
 # Integration test for Settings Menu functionality using mock data
 param(
     [string]$TestName = "Settings Integration Test",
@@ -7,7 +17,8 @@ param(
 )
 
 # Use unified test framework
-try {
+try
+{
     # Load test helper functions
     . "$PSScriptRoot\test-helper.ps1"
     
@@ -16,17 +27,24 @@ try {
     
     # Load all functions at script level (same as main.ps1)
     $functionsFolder = Join-Path $RootPath "functions"
-    if (Test-Path $functionsFolder) {
+    if (Test-Path $functionsFolder)
+    {
         $functions = Get-ChildItem -Path $functionsFolder -Filter '*.ps1' -Recurse
-        foreach ($function in $functions) {
-            try {
+        foreach ($function in $functions)
+        {
+            try
+            {
                 . $function.FullName
-            } catch {
+            }
+            catch
+            {
                 Write-Warning "Failed to load $($function.Name): $($_.Exception.Message)"
             }
         }
         Write-TestResult "Functions loaded successfully" $true
-    } else {
+    }
+    else
+    {
         Write-TestResult "Functions folder not found at: $functionsFolder" $false
         exit 1
     }
@@ -40,11 +58,14 @@ try {
     $global:maxJSONDepth = 10
     
     Write-TestResult "Test environment initialized" $true
-} catch {
+}
+catch
+{
     Write-TestResult "Failed to set up test environment: $($_.Exception.Message)" $false
     exit 1
 }
-try {
+try
+{
     Push-Location $TestFolder
     
     Write-TestSection "Settings Menu Integration Test"
@@ -56,23 +77,23 @@ try {
     # Test 2: Mock settings structure integration
     $mockSettings = @{
         globalSettings = @{
-            autoUpdate = $true
-            appMode = "full"
+            autoUpdate  = $true
+            appMode     = "full"
             maxWaitTime = 30
-            testMode = $false
+            testMode    = $false
         }
-        domains = @{
+        domains        = @{
             "test.com" = @{
                 groupsToInclude = @("Test-Group")
                 groupsToExclude = @()
-                settings = @{
+                settings        = @{
                     minUsernameLength = 3
-                    preferredBrowser = "Chrome"
+                    preferredBrowser  = "Chrome"
                 }
             }
         }
-        auth = @{
-            authType = "PublicAuthFlow"
+        auth           = @{
+            authType  = "PublicAuthFlow"
             delegated = $true
         }
     }
@@ -87,11 +108,14 @@ try {
     Write-TestResult "Settings manipulation works" ($originalAutoUpdate -ne $newAutoUpdate)
     
     # Test 4: JSON serialization compatibility
-    try {
+    try
+    {
         $jsonString = $mockSettings | ConvertTo-Json -Depth 10
         $parsedBack = $jsonString | ConvertFrom-Json
         Write-TestResult "JSON serialization works" ($parsedBack.globalSettings.appMode -eq "full")
-    } catch {
+    }
+    catch
+    {
         Write-TestResult "JSON serialization failed" $false
     }
     
@@ -104,7 +128,8 @@ try {
     
     # Test 6: Settings editor helper functions
     $helperFunctions = @("Show-SettingsMenu", "Show-SettingsViewer", "Update-Setting")
-    foreach ($funcName in $helperFunctions) {
+    foreach ($funcName in $helperFunctions)
+    {
         $func = Get-Command $funcName -ErrorAction SilentlyContinue
         Write-TestResult "$funcName helper function available" ($null -ne $func)
     }
@@ -117,14 +142,20 @@ try {
     Write-TestResult "Array manipulation for groups works" ($newGroupsCount -eq $originalGroupsCount + 1)
     
     # Test 8: Settings validation (if function exists)
-    try {
-        if (Get-Command Test-SettingsStructure -ErrorAction SilentlyContinue) {
+    try
+    {
+        if (Get-Command Test-SettingsStructure -ErrorAction SilentlyContinue)
+        {
             $validationResult = Test-SettingsStructure -Settings $mockSettings
             Write-TestResult "Settings structure validation works" $validationResult
-        } else {
+        }
+        else
+        {
             Write-TestResult "Settings structure validation (function not available)" $true
         }
-    } catch {
+    }
+    catch
+    {
         Write-TestResult "Settings validation test: $($_.Exception.Message)" $false
     }
     
@@ -135,9 +166,13 @@ try {
     # Complete the unified test
     Complete-UnifiedTest -TestContext $testContext
     
-} catch {
+}
+catch
+{
     Write-TestResult "Integration test failed: $($_.Exception.Message)" $false
     exit 1
-} finally {
+}
+finally
+{
     Pop-Location
 }

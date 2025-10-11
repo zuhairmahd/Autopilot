@@ -36,11 +36,11 @@ Describe "Report Generation Integration" -Tags 'Integration', 'Reporting' {
         It "Should export a report to a CSV file in the specified path" {
             # Arrange
             $reportData = [ordered]@{
-                "Device Name" = "TEST-DEVICE"
+                "Device Name"   = "TEST-DEVICE"
                 "Serial Number" = "TEST-SERIAL"
-                "Status" = "Ready"
+                "Status"        = "Ready"
             }
-            $outputPath = Join-Path $script:TestContext.TempPath "test-report.csv"
+            $outputPath = Join-Path $script:TestContext.TestFolder "test-report.csv"
 
             # Act
             $result = ExportDeviceReport -formattedOutput $reportData -ExportFormat "CSV" -outputFile $outputPath

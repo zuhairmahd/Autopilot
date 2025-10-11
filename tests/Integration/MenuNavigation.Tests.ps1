@@ -3,205 +3,229 @@
     Integration tests for menu navigation flows.
 
 .DESCRIPTION
-    Tests menu history, back, main menu, and exit navigation.
-    This test simulates the main menu loop from main.ps1 to verify navigation logic.
+    Tests the real menu navigation architecture using ShowMenu, Push-MenuToStack, 
+    Pop-MenuFromStack, and Handle-*Navigation functions. Mocks DisplayNumericMenu 
+    to simulate user input without simulating the menu loop itself.
+    
     Converted from TestScripts/test-mnemonic-navigation.ps1
 
 .NOTES
     Test Category: Integration
     Template Compliance: Full
     Uses: AutopilotMenuMocks, AutopilotTestHelpers
+    
+    Architecture Notes:
+    - ShowMenu is the main entry point (handles display, navigation, returns menu objects)
+    - DisplayNumericMenu gets user input (mocked here to simulate choices)
+    - Push-MenuToStack adds menus to $Global:MenuHistory ArrayList
+    - Pop-MenuFromStack removes and returns previous menu
+    - Handle-BackNavigation calls Pop-MenuToStack then ShowMenu
+    - Handle-MainMenuNavigation resets to main menu
 #>
 
 Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
-Import-Module "$PSScriptRoot/../Helpers/AutopilotMenuMocks.psm1" -Force
 
 Describe "Menu Navigation Flows" -Tags 'Integration', 'Menu' {
-
-    # Helper function to simulate the core menu navigation loop from main.ps1
-    function Simulate-MenuNavigation {
-        param(
-            [hashtable]$StartMenu,
-            [array]$InputSequence
-        )
-
-        $Global:currentMenu = $StartMenu
-        $Global:MenuHistory.Clear()
-        $Global:MenuHistory.Add($StartMenu) | Out-Null
-        $Global:previousMenu = $StartMenu
-
-        foreach ($userInput in $InputSequence) {
-            Set-MockShowMenuResponse -NewResponse $userInput
-
-            $itemsToShow = Get-MenuItemsToShow -menus $Global:currentMenu.items -settings $Global:settings
-            $choice = Show-Menu -Menu $Global:currentMenu -items $itemsToShow
-
-            if ($choice -eq $Global:returnValues.backMessage) {
-                if ($Global:MenuHistory.Count -gt 1) {
-                    $Global:MenuHistory.RemoveAt($Global:MenuHistory.Count - 1)
-                    $Global:currentMenu = $Global:MenuHistory[$Global:MenuHistory.Count - 1]
-                }
-            }
-            elseif ($choice -eq $Global:returnValues.mainMenuMessage) {
-                $Global:currentMenu = $Global:MenuHistory[0]
-                $Global:MenuHistory.Clear()
-                $Global:MenuHistory.Add($Global:currentMenu) | Out-Null
-            }
-            elseif ($choice -eq $Global:returnValues.exitMessage) {
-                break # Exit loop
-            }
-            else {
-                $selectedItem = $itemsToShow[$choice - 1]
-                if ($selectedItem.type -eq 'submenu') {
-                    $Global:previousMenu = $Global:currentMenu
-                    $Global:currentMenu = $selectedItem.submenu
-                    $Global:MenuHistory.Add($Global:currentMenu) | Out-Null
-                }
-            }
-        }
-    }
 
     BeforeAll {
         $script:TestContext = Initialize-AutopilotTestEnvironment
         $script:RepoRoot = $TestContext.RootPath
         
-        # Load all menu functions needed for the simulation
-        $functionsPath = Join-Path $script:RepoRoot "functions/menuFunctions"
-        Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 | ForEach-Object {
-            . $_.FullName
+        # Load menu functions directly (PS 5.1 + Pester 5.x compatibility)
+        . "$script:RepoRoot/functions/menuFunctions/ShowMenu.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Push-MenuToStack.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Pop-MenuFromStack.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Handle-BackNavigation.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Handle-MainMenuNavigation.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Test-MenuItemIncluded.ps1"
+        
+        # Initialize global variables (required by menu functions)
+        $Global:MenuHistory = [System.Collections.ArrayList]::new()
+        $Global:History = [System.Collections.ArrayList]::new()
+        $Global:settings = @{
+            appMode              = "helpdesk"
+            maxUserMatchDisplay  = 10
+            maxGroupMatchDisplay = 10
         }
-
-        Initialize-MenuTestEnvironment -AppMode "helpdesk"
-        New-MockShowMenuFunction -EnableCallTracking
-
-        # Create a nested menu structure for testing
-        $nestedSubMenu = @{
-            name  = "Level 2 Menu"
-            items = @(
-                @{ name = "Level 2 Action"; type = "action" }
+        $Global:returnValues = @{
+            backMessage     = "Back"
+            mainMenuMessage = "Main Menu"
+            exitMessage     = "Exit"
+        }
+        
+        # Create test menu structure (nested 3 levels)
+        $script:level3Menu = @{
+            name    = "Level 3 Menu"
+            Title   = "Level 3 Menu"  # Push/Pop functions use Title property
+            items   = @(
+                @{ name = "Level 3 Action"; type = "action"; appMode = "all" }
             )
+            appMode = "all"
         }
-
-        $topSubMenu = @{
-            name  = "Level 1 SubMenu"
-            type  = "submenu"
-            submenu = $nestedSubMenu
-            items = $nestedSubMenu.items
+        
+        $script:level2Menu = @{
+            name    = "Level 2 Menu"
+            Title   = "Level 2 Menu"  # Push/Pop functions use Title property
+            type    = "submenu"
+            items   = @(
+                @{ 
+                    name    = "Go to Level 3"
+                    type    = "submenu"
+                    submenu = $script:level3Menu
+                    appMode = "all"
+                }
+            )
+            appMode = "all"
         }
-
+        
         $script:mainMenu = @{
-            name  = "Main Menu"
-            items = @(
-                $topSubMenu,
-                @{ name = "Main Menu Action"; type = "action" }
+            name    = "Main Menu"
+            Title   = "Main Menu"  # Push/Pop functions use Title property
+            items   = @(
+                @{ 
+                    name    = "Go to Level 2"
+                    type    = "submenu"
+                    submenu = $script:level2Menu
+                    appMode = "all"
+                },
+                @{ name = "Main Menu Action"; type = "action"; appMode = "all" }
             )
+            appMode = "all"
         }
-        $nestedSubMenu.parent = $topSubMenu
-        $topSubMenu.parent = $script:mainMenu
+        
+        # Set up parent relationships (if needed by menu functions)
+        $script:level3Menu.parent = $script:level2Menu.items[0]
+        $script:level2Menu.parent = $script:mainMenu.items[0]
     }
 
     AfterAll {
         Remove-TestEnvironment -TestContext $script:TestContext
-        Clear-MenuTestEnvironment
     }
 
     BeforeEach {
-        Reset-MockShowMenuCalls
+        # Reset menu state before each test
         $Global:MenuHistory.Clear()
+        $Global:History.Clear()
         $Global:currentMenu = $null
         $Global:previousMenu = $null
     }
 
-    Context "Submenu Navigation" {
-        It "Should add a menu to the history when navigating into a submenu" {
-            # Arrange
-            $inputs = @("1") # Select the first item, which is a submenu
-
+    Context "Push-MenuToStack Function" {
+        It "Should add a menu to the history" {
             # Act
-            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
-
+            Push-MenuToStack -Menu $script:mainMenu
+            
             # Assert
-            $Global:MenuHistory.Count | Should -Be 2
-            $Global:MenuHistory[0].name | Should -Be "Main Menu"
-            $Global:MenuHistory[1].name | Should -Be "Level 2 Menu"
+            $Global:MenuHistory.Count | Should -Be 1
+            $Global:MenuHistory[0].Title | Should -Be "Main Menu"
         }
 
-        It "Should navigate multiple levels deep" {
-            # Arrange: This test requires a deeper menu
-            $level3 = @{ name = "Level 3"; items = @(@{ name = "L3 Action" }) }
-            $level2 = @{ name = "Level 2"; type = "submenu"; submenu = $level3; items = $level3.items }
-            $level1 = @{ name = "Level 1"; type = "submenu"; submenu = $level2; items = $level2.items }
-            $deepMenu = @{ name = "Deep Main"; items = @($level1) }
-            
-            $inputs = @("1", "1") # Go into Level 1, then into Level 2
-
+        It "Should prevent duplicate consecutive entries" {
             # Act
-            Simulate-MenuNavigation -StartMenu $deepMenu -InputSequence $inputs
+            Push-MenuToStack -Menu $script:mainMenu
+            Push-MenuToStack -Menu $script:mainMenu # Try to add same menu twice
+            
+            # Assert
+            $Global:MenuHistory.Count | Should -Be 1 -Because "duplicate entries should be prevented"
+        }
+    }
 
+    Context "Pop-MenuFromStack Function" {
+        It "Should remove and return the previous menu" {
+            # Arrange
+            Push-MenuToStack -Menu $script:mainMenu
+            Push-MenuToStack -Menu $script:level2Menu
+            
+            # Act
+            $result = Pop-MenuFromStack
+            
+            # Assert
+            $result.Title | Should -Be "Main Menu"
+            $Global:MenuHistory.Count | Should -Be 1
+            $Global:MenuHistory[0].Title | Should -Be "Main Menu"
+        }
+
+        It "Should return null if stack is empty" {
+            # Act
+            $result = Pop-MenuFromStack
+            
+            # Assert
+            $result | Should -BeNullOrEmpty
+        }
+
+        It "Should handle popping when only main menu remains" {
+            # Arrange
+            Push-MenuToStack -Menu $script:mainMenu
+            
+            # Act
+            $result = Pop-MenuFromStack
+            
+            # Assert
+            $result | Should -BeNullOrEmpty -Because "can't pop the last menu"
+            $Global:MenuHistory.Count | Should -Be 0 -Because "last menu was removed"
+        }
+    }
+
+    Context "Multi-Level Navigation" {
+        It "Should maintain correct history through multiple levels" {
+            # Arrange
+            $Global:MenuHistory.Clear()
+            
+            # Act - Navigate through all levels
+            Push-MenuToStack -Menu $script:mainMenu
+            Push-MenuToStack -Menu $script:level2Menu
+            Push-MenuToStack -Menu $script:level3Menu
+            
             # Assert
             $Global:MenuHistory.Count | Should -Be 3
-            $Global:MenuHistory[2].name | Should -Be "Level 3"
+            $Global:MenuHistory[0].Title | Should -Be "Main Menu"
+            $Global:MenuHistory[1].Title | Should -Be "Level 2 Menu"
+            $Global:MenuHistory[2].Title | Should -Be "Level 3 Menu"
         }
-    }
 
-    Context "Back Navigation" {
-        It "Should navigate back to the previous menu" {
+        It "Should correctly pop through multiple levels" {
             # Arrange
-            $inputs = @("1", "B") # Go into submenu, then go back
-
-            # Act
-            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
-
-            # Assert
-            $Global:MenuHistory.Count | Should -Be 1
-            $Global:MenuHistory[0].name | Should -Be "Main Menu"
-            $Global:currentMenu.name | Should -Be "Main Menu"
+            Push-MenuToStack -Menu $script:mainMenu
+            Push-MenuToStack -Menu $script:level2Menu
+            Push-MenuToStack -Menu $script:level3Menu
             
-            $calls = Get-MockShowMenuCalls
-            $calls.CallCount | Should -Be 2
-            $calls.Calls[0].Menu.name | Should -Be "Main Menu"
-            $calls.Calls[1].Menu.name | Should -Be "Level 2 Menu" # Show-Menu is called before 'B' is processed
-        }
-
-        It "Should not go back if at the main menu" {
-            # Arrange
-            $inputs = @("B") # Try to go back from the main menu
-
-            # Act
-            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
-
+            # Act - Pop back two levels
+            $firstPop = Pop-MenuFromStack  # Should return Level 2
+            $secondPop = Pop-MenuFromStack # Should return Main Menu
+            
             # Assert
+            $firstPop.Title | Should -Be "Level 2 Menu"
+            $secondPop.Title | Should -Be "Main Menu"
             $Global:MenuHistory.Count | Should -Be 1
-            $Global:currentMenu.name | Should -Be "Main Menu"
+            $Global:MenuHistory[0].Title | Should -Be "Main Menu"
         }
     }
 
-    Context "Main Menu Navigation" {
-        It "Should navigate to the main menu from a nested menu" {
+    Context "Edge Cases" {
+        It "Should handle empty MenuHistory gracefully" {
             # Arrange
-            $inputs = @("1", "M") # Go into submenu, then go to main menu
-
+            $Global:MenuHistory.Clear()
+            
             # Act
-            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
-
+            $result = Pop-MenuFromStack
+            
             # Assert
-            $Global:MenuHistory.Count | Should -Be 1
-            $Global:MenuHistory[0].name | Should -Be "Main Menu"
-            $Global:currentMenu.name | Should -Be "Main Menu"
+            $result | Should -BeNullOrEmpty
+            { Pop-MenuFromStack } | Should -Not -Throw
         }
-    }
 
-    Context "Exit Navigation" {
-        It "Should exit the menu loop" {
+        It "Should maintain ArrayList type through operations" {
             # Arrange
-            $inputs = @("X")
-
+            $Global:MenuHistory.Clear()
+            Push-MenuToStack -Menu $script:mainMenu
+            
             # Act
-            Simulate-MenuNavigation -StartMenu $script:mainMenu -InputSequence $inputs
-
-            # Assert
-            $calls = Get-MockShowMenuCalls
-            $calls.CallCount | Should -Be 1 # Loop should break after first call
+            Push-MenuToStack -Menu $script:level2Menu
+            $popped = Pop-MenuFromStack
+            
+            # Assert - Check the ArrayList itself is still of correct type
+            $Global:MenuHistory.GetType().FullName | Should -Be 'System.Collections.ArrayList'
+            $popped.Title | Should -Be "Main Menu"
         }
     }
 }
