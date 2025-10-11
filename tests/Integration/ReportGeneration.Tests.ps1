@@ -50,11 +50,23 @@ Describe "Report Generation Integration" -Tags 'Integration', 'Reporting' {
             (Test-Path $outputPath) | Should -Be $true
 
             $csvContent = Import-Csv -Path $outputPath
-            $csvContent.Count | Should -Be 3
-            $csvContent[0].Property | Should -Be "Device Name"
-            $csvContent[0].Value | Should -Be "TEST-DEVICE"
-            $csvContent[2].Property | Should -Be "Status"
-            $csvContent[2].Value | Should -Be "Ready"
+            $csvContent.Count | Should -Be 3 -Because "should have 3 rows (one per property)"
+            
+            # Check that all expected properties are present (order may vary)
+            $properties = $csvContent.Property
+            $properties | Should -Contain "Device Name"
+            $properties | Should -Contain "Serial Number"
+            $properties | Should -Contain "Status"
+            
+            # Verify values match properties
+            $deviceNameRow = $csvContent | Where-Object { $_.Property -eq "Device Name" }
+            $deviceNameRow.Value | Should -Be "TEST-DEVICE"
+            
+            $serialNumberRow = $csvContent | Where-Object { $_.Property -eq "Serial Number" }
+            $serialNumberRow.Value | Should -Be "TEST-SERIAL"
+            
+            $statusRow = $csvContent | Where-Object { $_.Property -eq "Status" }
+            $statusRow.Value | Should -Be "Ready"
         }
     }
 }
