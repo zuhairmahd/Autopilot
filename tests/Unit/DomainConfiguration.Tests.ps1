@@ -93,7 +93,10 @@ Describe "Domain Configuration" -Tags 'Unit', 'Configuration', 'Domain' {
             # Load and modify
             $loadedConfig = Get-ConfigurationData -ConfigurationPath $script:DomainPsd1File -DefaultValues @{}
             $loadedConfig.minUsernameLength = 5
-            $loadedConfig.groupsToExclude += "New-Exclude-Group"
+            
+            # Properly add to array (flatten in case it's nested)
+            $currentExcludes = @($loadedConfig.groupsToExclude | ForEach-Object { $_ })
+            $loadedConfig.groupsToExclude = $currentExcludes + "New-Exclude-Group"
             
             # Save
             $saveResult = Export-PowerShellDataFile -InputObject $loadedConfig -Path $script:DomainPsd1File -Force
@@ -105,7 +108,10 @@ Describe "Domain Configuration" -Tags 'Unit', 'Configuration', 'Domain' {
             $verifyConfig = Get-ConfigurationData -ConfigurationPath $script:DomainPsd1File -DefaultValues @{}
             
             $verifyConfig.minUsernameLength | Should -Be 5
-            $verifyConfig.groupsToExclude | Should -Contain "New-Exclude-Group"
+            
+            # Flatten array in case of nested structure
+            $allExcludes = @($verifyConfig.groupsToExclude | ForEach-Object { $_ })
+            $allExcludes | Should -Contain "New-Exclude-Group"
         }
     }
     
