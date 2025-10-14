@@ -23,8 +23,8 @@
 ```
 tests/
 ├── Unit/                      # Unit tests (144 tests, 100% passing)
-├── Integration/               # Integration tests (8 tests, 100% passing)
-├── Comprehensive/             # Comprehensive tests (planned)
+├── Integration/               # Integration tests (36 tests, 100% passing)
+├── Comprehensive/             # Comprehensive tests (1 test, 14 passed, 4 skipped)
 ├── Helpers/
 │   ├── AutopilotTestHelpers.psm1       # Layer 1: Core utilities
 │   ├── AutopilotGraphMocks.psm1        # Layer 2a: Graph API mocking
