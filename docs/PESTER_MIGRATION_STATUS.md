@@ -20,15 +20,15 @@
 
 
 
-### Test Infrastructure Status ✅ OPERATIONALThe Pester migration has successfully completed Phases 0-3 and begun Phase 4, establishing robust testing infrastructure and migrating 17 critical test files with 178 test cases (100% pass rate). The project is now in Phase 4: selective migration of high-value comprehensive tests, with the first comprehensive test (CoreValidation) successfully migrated.
+### Test Infrastructure Status ✅ OPERATIONALThe Pester migration has successfully completed Phases 0-3 and is progressing through Phase 4, establishing robust testing infrastructure and migrating 19 critical test files with 245 test cases (98.8% pass rate). The project is now in Phase 4: selective migration of high-value comprehensive tests, with three comprehensive tests (CoreValidation, AuthFlowsComprehensive, AppModeComprehensive) successfully migrated.
 
 
 
 | Component | Status | Details |### Quick Stats
 
-|-----------|--------|---------|- **Total Pester Tests:** 178 test cases across 17 test files
+|-----------|--------|---------|- **Total Pester Tests:** 245 test cases across 19 test files
 
-| **Pester Framework** | ✅ Operational | v5.7.1, fully configured |- **Pass Rate:** 100% (178/178 passing)
+| **Pester Framework** | ✅ Operational | v5.7.1, fully configured |- **Pass Rate:** 98.8% (242/245 passing, 2 skipped)
 
 | **Helper Modules** | ✅ Complete | 3-tier architecture, 35+ functions |- **Execution Time:** ~47 seconds for full suite
 
@@ -166,9 +166,13 @@ tests/
 
 **Technical Breakthroughs:**
 
-- Solved hashtable ordering issues with Sort-Object strategy**Tests Migrated:** 1 test file, 6 test cases
+- Solved hashtable ordering issues with Sort-Object strategy**Tests Migrated:** 3 test files, 54 test cases
 
 - Avoided [ordered] hashtable pitfalls1. CoreValidation.Tests.ps1 (6 tests) ✅
+
+2. AuthFlowsComprehensive.Tests.ps1 (20 tests) ✅
+
+3. AppModeComprehensive.Tests.ps1 (28 tests) ✅
 
 - Created robust Graph API mocking system
 
@@ -184,7 +188,7 @@ tests/
 
 - Integration test suite operational
 
-- Menu system mocking infrastructure**Status:** 6/6 passing (100%) - Core validation migration complete
+- Menu system mocking infrastructure**Status:** 54/54 passing (100%) - AppMode, auth flows, and core validation migration complete
 
 - Workflow testing capabilities
 
@@ -194,7 +198,11 @@ tests/
 
 **Key Capabilities:**- Core auth settings validation migrated
 
-- Menu navigation testing- Legacy test archived (test-core-validation.ps1)
+- Menu navigation testing- Legacy tests archived (test-core-validation.ps1, test-auth-flows-comprehensive.ps1, test-appmode-comprehensive.ps1)
+
+- Authentication flow validation migrated
+
+- AppMode validation and configuration testing
 
 - Device/user/profile integration workflows
 
@@ -388,7 +396,20 @@ tests/
 
 
 
-2. **Prepare for Phase 5**### 2025-10-15
+2. **Prepare for Phase 5**### 2025-10-15 (Update 3)
+- ✅ **Phase 4 Continued:** AppModeComprehensive.Tests.ps1 migrated (28 test cases)
+- ✅ **Legacy Test Archived:** test-appmode-comprehensive.ps1 moved to archived/
+- 📝 **Test Suite:** 245 tests total, 242/245 passing (98.8%), 2 skipped
+- ✅ **AppMode Validation:** All 7 valid modes tested, case sensitivity validated, settings merging tested
+- 🔧 **Case-Sensitive Operators:** Fixed test to use -cin for case-sensitive comparisons
+
+### 2025-10-15 (Update 2)
+- ✅ **Phase 4 Continued:** AuthFlowsComprehensive.Tests.ps1 migrated (20 test cases)
+- ✅ **Legacy Test Archived:** test-auth-flows-comprehensive.ps1 moved to archived/
+- 📝 **Test Suite:** 217 tests total, 214/217 passing (98.6%), 2 skipped
+- ✅ **Authentication Validation:** Token functions, scope deduplication, auth types validated
+
+### 2025-10-15
 
    - Inventory remaining legacy tests- ✅ **Phase 4 Started:** CoreValidation.Tests.ps1 migrated (6 test cases)
 
