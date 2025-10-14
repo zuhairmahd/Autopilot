@@ -159,7 +159,26 @@ function New-MockReportData {
 
 ## Phase 4: Comprehensive Tests (Weeks 7-10)
 
-### Status: Not Started (9 tests to migrate)
+### Status: In Progress (1 of 9 tests complete - CoreValidation)
+
+**Updated:** October 14, 2025  
+**Progress:** CoreValidation.Tests.ps1 migrated and passing (14 tests)
+
+### Completed Tests
+
+**1. CoreValidation.Tests.ps1 ✅**
+- **Status:** Complete (14 tests passing, 4 skipped)
+- **Legacy:** TestScripts/test-core-validation.ps1 → archived
+- **Coverage:**
+  - Array storage validation (PSD1 format)
+  - Core function availability (Write-Log, Test-AuthDefaults, Update-Setting)
+  - Auth defaults functionality (scope array, authType configuration)
+  - Auth setting updates and persistence
+  - Menu integration verification
+  - Get-AuthDefaults function validation
+- **Helper Usage:** AutopilotTestHelpers (Initialize-AutopilotTestEnvironment)
+- **Migration Date:** October 14, 2025
+- **Notes:** Uses direct dot-sourcing for function loading; minimal helper needs
 
 ### Pre-Migration Analysis (Week 7)
 
@@ -190,19 +209,22 @@ foreach ($test in $comprehensiveTests) {
 
 Create categorization matrix:
 
-| Test Name | Complexity | Graph API | Menu | Files | Multi-Step | Estimated Effort |
-|-----------|------------|-----------|------|-------|------------|------------------|
-| test-comprehensive-device-lifecycle.ps1 | High | ✅ | ❌ | ✅ | ✅ | 3 days |
-| test-comprehensive-profile-management.ps1 | High | ✅ | ✅ | ✅ | ✅ | 4 days |
-| test-comprehensive-user-provisioning.ps1 | Very High | ✅ | ✅ | ✅ | ✅ | 5 days |
-| test-comprehensive-group-sync.ps1 | Medium | ✅ | ❌ | ✅ | ✅ | 2 days |
-| test-comprehensive-reporting.ps1 | Medium | ✅ | ❌ | ✅ | ❌ | 2 days |
-| test-comprehensive-certificate-auth.ps1 | High | ✅ | ❌ | ✅ | ✅ | 3 days |
-| test-comprehensive-migration-workflow.ps1 | Very High | ✅ | ✅ | ✅ | ✅ | 5 days |
-| test-comprehensive-bulk-operations.ps1 | High | ✅ | ❌ | ✅ | ✅ | 3 days |
-| test-comprehensive-error-handling.ps1 | Medium | ✅ | ✅ | ❌ | ✅ | 2 days |
+| Test Name | Complexity | Graph API | Menu | Files | Multi-Step | Status | Estimated Effort |
+|-----------|------------|-----------|------|-------|------------|--------|------------------|
+| test-core-validation.ps1 (CoreValidation) | Low | ❌ | ❌ | ✅ | ❌ | ✅ Complete | - |
+| test-comprehensive-device-lifecycle.ps1 | High | ✅ | ❌ | ✅ | ✅ | ⏳ Planned | 3 days |
+| test-comprehensive-profile-management.ps1 | High | ✅ | ✅ | ✅ | ✅ | ⏳ Planned | 4 days |
+| test-comprehensive-user-provisioning.ps1 | Very High | ✅ | ✅ | ✅ | ✅ | ⏳ Planned | 5 days |
+| test-comprehensive-group-sync.ps1 | Medium | ✅ | ❌ | ✅ | ✅ | ⏳ Planned | 2 days |
+| test-comprehensive-reporting.ps1 | Medium | ✅ | ❌ | ✅ | ❌ | ⏳ Planned | 2 days |
+| test-comprehensive-certificate-auth.ps1 | High | ✅ | ❌ | ✅ | ✅ | ⏳ Planned | 3 days |
+| test-comprehensive-migration-workflow.ps1 | Very High | ✅ | ✅ | ✅ | ✅ | ⏳ Planned | 5 days |
+| test-comprehensive-bulk-operations.ps1 | High | ✅ | ❌ | ✅ | ✅ | ⏳ Planned | 3 days |
+| test-comprehensive-error-handling.ps1 | Medium | ✅ | ✅ | ❌ | ✅ | ⏳ Planned | 2 days |
 
 **Total Estimated Effort:** 29 days → ~6 weeks with helper enhancements
+**Completed:** 1 test (CoreValidation)
+**Remaining:** 8 tests
 
 **Step 3: Identify Helper Gaps**
 
