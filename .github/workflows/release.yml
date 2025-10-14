@@ -22,9 +22,15 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Run tests - all
+      - name: Install build dependencies
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name pester -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Pester test suite
+        shell: pwsh
+        run: .\Invoke-pester.ps1
 
   build:
     name: Build (CreateRelease)
@@ -121,7 +127,7 @@ jobs:
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
           write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -updateHash
-      
+
       - name: Upload signed artifacts
         uses: actions/upload-artifact@v4
         with:
