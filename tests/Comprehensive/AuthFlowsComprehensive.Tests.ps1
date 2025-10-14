@@ -31,11 +31,15 @@ Describe "Authentication Flows Comprehensive" -Tags 'Comprehensive', 'Authentica
         
         # Dot-source functions directly (PS 5.1 compatible)
         $functionsPath = Join-Path $script:RepoRoot "functions"
-        if (Test-Path $functionsPath) {
+        if (Test-Path $functionsPath)
+        {
             Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 -ErrorAction SilentlyContinue | ForEach-Object {
-                try {
+                try
+                {
                     . $_.FullName
-                } catch {
+                }
+                catch
+                {
                     Write-Verbose "Failed to load $($_.Name): $($_.Exception.Message)"
                 }
             }
@@ -103,7 +107,7 @@ Describe "Authentication Flows Comprehensive" -Tags 'Comprehensive', 'Authentica
             $funcExists | Should -Not -BeNullOrEmpty
         }
         
-        It "Should return hashtable from BuildAuthSplatTable" -Skip:(-not (Get-Command "BuildAuthSplatTable" -ErrorAction SilentlyContinue)) {
+        It "Should return hashtable from BuildAuthSplatTable" {
             $mockAuth = @{
                 AuthType  = "PublicAuthFlow"
                 delegated = $true
@@ -116,7 +120,7 @@ Describe "Authentication Flows Comprehensive" -Tags 'Comprehensive', 'Authentica
             $authSplat | Should -BeOfType [hashtable]
         }
         
-        It "Should include AuthType in auth splat" -Skip:(-not (Get-Command "BuildAuthSplatTable" -ErrorAction SilentlyContinue)) {
+        It "Should include AuthType in auth splat" {
             $mockAuth = @{
                 AuthType  = "PublicAuthFlow"
                 delegated = $true
