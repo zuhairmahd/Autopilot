@@ -1,10 +1,10 @@
 # Pester Migration Progress - Updated Status Report
 
-**Document Version:** 2.0  
-**Updated:** October 10, 2025  
-**Status:** Phases 1-2 Complete, Phase 3 In Progress  
-**Overall Progress:** 155 of ~250 tests migrated (62%)  
-**Pass Rate:** 100% (155/155 passing)
+**Document Version:** 2.1  
+**Updated:** October 14, 2025  
+**Status:** Phases 1-3 Complete, Phase 4 In Progress  
+**Overall Progress:** 169 of ~250 tests migrated (68%)  
+**Pass Rate:** 100% (169/169 passing)
 
 ---
 
@@ -16,8 +16,8 @@ The Pester migration is **ahead of schedule** with significant progress through 
 - ✅ **Phase 0 (Foundation):** Complete - Infrastructure established
 - ✅ **Phase 1 (Pilot):** Complete - 3 syntax tests migrated, patterns validated
 - ✅ **Phase 2 (Unit Tests):** Complete - 144 unit tests migrated (100% pass rate)
-- ✅ **Phase 3 (Integration):** Complete - 12 tests migrated (100% pass rate)
-- ⏳ **Phase 4 (Comprehensive):** Planned - 9 tests remaining
+- ✅ **Phase 3 (Integration):** Complete - 36 tests migrated (100% pass rate)
+- 🔄 **Phase 4 (Comprehensive):** In Progress - 1 of 9 tests migrated (CoreValidation)
 - ⏳ **Phase 5 (Specialized):** Evaluation needed
 
 **Critical Success Factors:**
@@ -310,10 +310,10 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 | Phase 0: Foundation | - | - | - | ✅ Complete |
 | Phase 1: Pilot | 3 | 3 | 0 | ✅ Complete |
 | Phase 2: Unit | 144 | 144 | 0 | ✅ Complete |
-| Phase 3: Integration | 12 | 12 | 0 | ✅ Complete |
-| Phase 4: Comprehensive | 9 | 0 | 9 | ⏳ Planned |
+| Phase 3: Integration | 36 | 36 | 0 | ✅ Complete |
+| Phase 4: Comprehensive | 9 | 1 | 8 | 🔄 In Progress |
 | Phase 5: Specialized | ~20 | 0 | ~20 | ⏳ Evaluation |
-| **Total** | **~190** | **159** | **~31** | **84% Complete** |
+| **Total** | **~212** | **184** | **~28** | **87% Complete** |
 
 ### Test Categories Status
 
@@ -322,8 +322,8 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 | syntax | 1 | 1 | 0 | ✅ Complete |
 | core | 8 | 8 | 0 | ✅ Complete (part of Unit) |
 | unit | 35 | 144 | 0 | ✅ Complete (expanded with subtests) |
-| integration | 12 | 8 | 4 | 🔄 In Progress |
-| comprehensive | 9 | 0 | 9 | ⏳ Planned |
+| integration | 12 | 36 | 0 | ✅ Complete (expanded with subtests) |
+| comprehensive | 9 | 1 | 8 | 🔄 In Progress (CoreValidation complete) |
 | validation | 8 | 0 | 8 | ⏳ Evaluate (may merge with Unit) |
 | enhanced | 6 | 0 | 6 | ⏳ Evaluate (may be redundant) |
 | specialized | 5 | 0 | 5 | ⏳ Evaluate |
@@ -365,15 +365,23 @@ Describe "Menu Integration" -Tags 'Integration', 'Menu' {
 
 ### Phase 4: Comprehensive Tests (3-4 weeks)
 
-**Status:** ⏳ Planned (Next Phase)  
+**Status:** 🔄 In Progress (Week 7)  
 **Complexity:** High - Multi-step workflows  
-**Tests to Migrate:** 9 comprehensive tests
+**Tests to Migrate:** 9 comprehensive tests (1 complete, 8 remaining)
+
+**Completed Tests:**
+1. ✅ **CoreValidation.Tests.ps1** (14 tests passing, 4 skipped)
+   - Comprehensive authentication and settings validation
+   - Array storage validation (PSD1 format)
+   - Auth defaults functionality
+   - Settings updates and menu integration
+   - Legacy test archived: `TestScripts/archived/test-core-validation.ps1`
 
 **Approach:**
-1. **Week 1:** Analyze each test for helper needs
-2. **Week 1-2:** Enhance helpers FIRST (expected: 3-5 new helper functions)
-3. **Week 2-3:** Migrate tests with new helper capabilities
-4. **Week 3-4:** Validation and documentation
+1. **Week 7:** Analyze each test for helper needs
+2. **Week 7-8:** Enhance helpers FIRST (expected: 3-5 new helper functions)
+3. **Week 8-9:** Migrate tests with new helper capabilities
+4. **Week 9-10:** Validation and documentation
 
 **Expected Helper Enhancements:**
 - Multi-step workflow orchestration helpers
