@@ -184,7 +184,8 @@ function Initialize-MenuTestEnvironment
     # Set log file
     if (-not $LogFile)
     {
-        $LogFile = Join-Path $env:TEMP "autopilot-menu-test-$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+        $LogFile = Join-Path $tempPath "autopilot-menu-test-$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
     }
     $Global:LogFile = $LogFile
     

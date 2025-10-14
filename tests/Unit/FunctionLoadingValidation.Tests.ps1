@@ -15,7 +15,8 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
         $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
         
         # Initialize helpers for LogFile and settings
-        $logPath = Join-Path $env:TEMP "test-function-loading-validation.log"
+        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+        $logPath = Join-Path $tempPath "test-function-loading-validation.log"
         Initialize-MockGlobalVariables -LogFile $logPath `
             -Settings @{ appMode = "full" }
         

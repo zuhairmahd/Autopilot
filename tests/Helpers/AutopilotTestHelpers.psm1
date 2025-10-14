@@ -25,7 +25,8 @@ function Initialize-AutopilotTestEnvironment
     # Create test folder if not specified
     if (-not $TestFolder)
     {
-        $TestFolder = Join-Path $env:TEMP "AutopilotTest_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+        $tempPath = if ($env:TEMP) { $env:TEMP } else { "/tmp" }
+        $TestFolder = Join-Path $tempPath "AutopilotTest_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
     }
     
     if (-not (Test-Path $TestFolder))
