@@ -38,7 +38,7 @@ jobs:
 
       - name: Run Pester test suite
         shell: pwsh
-        run: .\Invoke-pester.ps1
+        run: .\Invoke-PesterTests.ps1
 
   # ===================== DYNAMIC BRANCH BUILD & SIGN =====================
   build:
