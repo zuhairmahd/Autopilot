@@ -14,11 +14,14 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         $functionFiles = Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 -File
         
         Write-Verbose "Loading functions from $functionsPath..."
-        foreach ($file in $functionFiles) {
-            try {
+        foreach ($file in $functionFiles)
+        {
+            try
+            {
                 . $file.FullName
             }
-            catch {
+            catch
+            {
                 Write-Warning "Failed to load $($file.Name): $_"
             }
         }
@@ -26,34 +29,37 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         # Setup global variables that functions may need
         $global:LogFile = Join-Path $script:TestContext.TestFolder "test.log"
         
-        # Create test settings file
-        $script:TestSettingsFile = Join-Path $script:TestContext.TestFolder "test-settings.json"
+        # Create test settings file (use PSD1 format, not JSON)
+        $script:TestSettingsFile = Join-Path $script:TestContext.TestFolder "test-settings.psd1"
     }
     
     AfterAll {
         # Cleanup test environment
-        if ($script:TestContext -and $script:TestContext.TestFolder) {
+        if ($script:TestContext -and $script:TestContext.TestFolder)
+        {
             Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
     
     Context "Array Storage Validation" {
         
-        It "Should preserve single-item arrays in JSON serialization" {
+        It "Should preserve single-item arrays in PSD1 roundtrip" {
             $testData = @{ singleItem = @('one'); multiItem = @('a', 'b') }
-            $json = $testData | ConvertTo-Json -Depth 5
-            $parsed = $json | ConvertFrom-Json
+            $tempFile = Join-Path $script:TestContext.TestFolder "array-test.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $tempFile -Force | Out-Null
+            $parsed = Import-PowerShellDataFile -Path $tempFile
             
-            $parsed.singleItem | Should -BeOfType [array]
+            $parsed.singleItem -is [array] | Should -Be $true
             $parsed.singleItem.Count | Should -Be 1
         }
         
-        It "Should preserve multi-item arrays in JSON serialization" {
+        It "Should preserve multi-item arrays in PSD1 roundtrip" {
             $testData = @{ multiItem = @('a', 'b', 'c') }
-            $json = $testData | ConvertTo-Json -Depth 5
-            $parsed = $json | ConvertFrom-Json
+            $tempFile = Join-Path $script:TestContext.TestFolder "array-test2.psd1"
+            Export-PowerShellDataFile -InputObject $testData -Path $tempFile -Force | Out-Null
+            $parsed = Import-PowerShellDataFile -Path $tempFile
             
-            $parsed.multiItem | Should -BeOfType [array]
+            $parsed.multiItem -is [array] | Should -Be $true
             $parsed.multiItem.Count | Should -Be 3
         }
     }
@@ -76,8 +82,9 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
     Context "Auth Defaults Functionality" {
         
         BeforeEach {
-            # Create fresh settings file for each test
-            @{ testData = "initial" } | ConvertTo-Json | Set-Content -Path $script:TestSettingsFile
+            # Create fresh settings file for each test (PSD1 format)
+            $initialSettings = @{ testData = "initial"; version = "1.0" }
+            Export-PowerShellDataFile -InputObject $initialSettings -Path $script:TestSettingsFile -Force | Out-Null
         }
         
         It "Should create test settings file successfully" {
@@ -88,22 +95,22 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
             $result = Test-AuthDefaults -SettingsFile $script:TestSettingsFile -Silent
             $result | Should -Be $true
             
-            $content = Get-Content -Path $script:TestSettingsFile -Raw | ConvertFrom-Json
+            $content = Import-PowerShellDataFile -Path $script:TestSettingsFile
             $content.auth | Should -Not -BeNullOrEmpty -Because "Test-AuthDefaults should create auth section in settings file"
         }
         
         It "Should configure scope array in auth defaults" {
             Test-AuthDefaults -SettingsFile $script:TestSettingsFile -Silent | Out-Null
             
-            $content = Get-Content -Path $script:TestSettingsFile -Raw | ConvertFrom-Json
-            $content.auth.scope | Should -BeOfType [array] -Because "Scope should be stored as array"
+            $content = Import-PowerShellDataFile -Path $script:TestSettingsFile
+            $content.auth.scope -is [array] | Should -Be $true -Because "Scope should be stored as array"
             $content.auth.scope.Count | Should -BeGreaterThan 0 -Because "Scope array should have at least one element"
         }
         
         It "Should set authType correctly to PublicAuthFlow" {
             Test-AuthDefaults -SettingsFile $script:TestSettingsFile -Silent | Out-Null
             
-            $content = Get-Content -Path $script:TestSettingsFile -Raw | ConvertFrom-Json
+            $content = Import-PowerShellDataFile -Path $script:TestSettingsFile
             $content.auth.authType | Should -Be 'PublicAuthFlow' -Because "Default auth type should be PublicAuthFlow"
         }
     }
@@ -111,8 +118,9 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
     Context "Auth Setting Updates" {
         
         BeforeEach {
-            # Create and initialize settings file
-            @{ testData = "initial" } | ConvertTo-Json | Set-Content -Path $script:TestSettingsFile
+            # Create and initialize settings file (PSD1 format)
+            $initialSettings = @{ testData = "initial"; version = "1.0" }
+            Export-PowerShellDataFile -InputObject $initialSettings -Path $script:TestSettingsFile -Force | Out-Null
             Test-AuthDefaults -SettingsFile $script:TestSettingsFile -Silent | Out-Null
         }
         
@@ -124,7 +132,7 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         It "Should persist updated setting value correctly" {
             Update-Setting -SettingType "Auth" -SettingsFile $script:TestSettingsFile -SettingName "renewalLeadTime" -SettingValue 15 | Out-Null
             
-            $content = Get-Content -Path $script:TestSettingsFile -Raw | ConvertFrom-Json
+            $content = Import-PowerShellDataFile -Path $script:TestSettingsFile
             $content.auth.renewalLeadTime | Should -Be 15 -Because "Updated value should be persisted to file"
         }
     }
