@@ -1,38 +1,53 @@
-# Pester Migration Documentation Hub
+# Pester Migration Documentation Hub - SUPERSEDED
 
-**Migration Status:** Phase 3 In Progress (82% Complete)  
-**Last Updated:** October 10, 2025  
-**Current Sprint:** Week 6 of 12-16
+**⚠️ This document has been superseded by consolidated documentation:**
+
+## New Authoritative Documents (October 14, 2025)
+
+**Primary Documents:**
+1. **[`PESTER_MIGRATION_GUIDE.md`](PESTER_MIGRATION_GUIDE.md)** - Complete technical guide
+   - Comprehensive patterns and examples
+   - Helper module usage
+   - Step-by-step migration workflow
+   - Troubleshooting guide
+   - AI agent instructions
+
+2. **[`PESTER_MIGRATION_STATUS.md`](PESTER_MIGRATION_STATUS.md)** - Current accurate status
+   - Real test inventory (17 files, 197 tests)
+   - Phase completion status
+   - Performance metrics
+   - Timeline and next actions
+
+**Supporting Documents:**
+- **[`PESTER_MIGRATION_COMPLETION_PLAN.md`](PESTER_MIGRATION_COMPLETION_PLAN.md)** - Detailed roadmap
+- **[`PESTER_MIGRATION_LESSONS_LEARNED.md`](PESTER_MIGRATION_LESSONS_LEARNED.md)** - Technical insights
+
+**Archived Documents:**
+- Multiple contradictory files moved to `docs/archive/`
+- See archive for historical reference
 
 ---
 
-## Quick Links
+## Why This Consolidation Was Needed
 
-| Document | Purpose | Audience |
-|----------|---------|----------|
-| **[Completion Plan](PESTER_MIGRATION_COMPLETION_PLAN.md)** | Detailed roadmap for finishing migration | Project managers, developers |
-| **[Lessons Learned](PESTER_MIGRATION_LESSONS_LEARNED.md)** | Technical insights and solutions | Developers, AI agents |
-| **[Progress Report](PESTER_MIGRATION_PROGRESS_UPDATED.md)** | Current statistics and status | Stakeholders, team leads |
-| **[AI Agent Guide](../tests/AGENTS.md)** | Step-by-step implementation guide | AI agents, new developers |
-| **[Test Templates](TEST_TEMPLATE_GUIDELINES.md)** | Patterns and helper usage | Test authors |
-| **[Original Plan](PESTER_MIGRATION_PLAN.md)** | Initial migration strategy | Historical reference |
+**Problems Found:**
+- 11+ migration documents with contradictory information
+- Conflicting test counts (155/~190 vs 155/~250)
+- Overlapping "progress", "status", and "summary" documents
+- Outdated information throughout multiple files
+
+**Solution Implemented:**
+- Audited actual test status (17 Pester files, 197 individual tests)
+- Consolidated accurate information into 2 primary documents
+- Archived contradictory/redundant files
+- Created single source of truth for migration status
 
 ---
 
-## At-a-Glance Status
+**Use the new documents above for current information.**
 
-```
-Phase 0: Foundation        ✅ Complete
-Phase 1: Pilot (3 tests)   ✅ Complete  
-Phase 2: Unit (144 tests)  ✅ Complete
-Phase 3: Integration       🔄 8/12 tests (66%)
-Phase 4: Comprehensive     ⏳ Planned (Weeks 7-10)
-Phase 5: Evaluation        ⏳ Planned (Weeks 11-12)
-
-Overall: 155 of ~190 tests (82%)
-Pass Rate: 100%
-Execution Time: 2-3 seconds (was 30-45 seconds)
-```
+**Last Updated:** October 14, 2025  
+**Status:** Superseded by consolidated documentation
 
 ---
 
