@@ -77,6 +77,10 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         It "Should have Update-Setting function available" {
             Get-Command -Name Update-Setting -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
+        
+        It "Should have Get-ApplicationDefaults function available" {
+            Get-Command -Name Get-ApplicationDefaults -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
     }
     
     Context "Auth Defaults Functionality" {
@@ -154,31 +158,79 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         }
     }
     
-    Context "Get-AuthDefaults Function" {
+    Context "Get-ApplicationDefaults Function" {
         
-        It "Should have Get-AuthDefaults function available" {
-            Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty -Because "Get-AuthDefaults function should be loaded"
+        It "Should have Get-ApplicationDefaults function available" {
+            Get-Command -Name Get-ApplicationDefaults -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty -Because "Get-ApplicationDefaults function should be loaded"
         }
         
-        It "Should return data from Get-AuthDefaults" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
-            $defaults = Get-AuthDefaults
-            $defaults | Should -Not -BeNullOrEmpty -Because "Get-AuthDefaults should return default configuration"
+        It "Should return auth defaults from Get-ApplicationDefaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Auth"
+            $defaults | Should -Not -BeNullOrEmpty -Because "Get-ApplicationDefaults should return auth configuration"
         }
         
-        It "Should return required keys (authType and scope)" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
-            $defaults = Get-AuthDefaults
+        It "Should return required keys (authType and scope) from auth defaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Auth"
             $defaults.Contains('authType') | Should -Be $true -Because "Auth defaults should include authType"
             $defaults.Contains('scope') | Should -Be $true -Because "Auth defaults should include scope"
         }
         
-        It "Should return scope as array" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
-            $defaults = Get-AuthDefaults
+        It "Should return scope as array from auth defaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Auth"
             $defaults.scope -is [array] | Should -Be $true -Because "Scope should be an array"
+            $defaults.scope.Count | Should -BeGreaterThan 0 -Because "Scope array should have elements"
         }
         
-        It "Should have default authType value" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
-            $defaults = Get-AuthDefaults
+        It "Should have default authType value from auth defaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Auth"
             $defaults.authType | Should -Not -BeNullOrEmpty -Because "Default authType should be set"
+            $defaults.authType | Should -Be "PublicAuthFlow" -Because "Default authType should be PublicAuthFlow"
+        }
+        
+        It "Should return global defaults from Get-ApplicationDefaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Global"
+            $defaults | Should -Not -BeNullOrEmpty -Because "Get-ApplicationDefaults should return global configuration"
+            $defaults.Contains('maxWaitTime') | Should -Be $true -Because "Global defaults should include maxWaitTime"
+            $defaults.Contains('validateScopes') | Should -Be $true -Because "Global defaults should include validateScopes"
+        }
+        
+        It "Should return domain defaults from Get-ApplicationDefaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Domain" -DomainName "contoso.com"
+            $defaults | Should -Not -BeNullOrEmpty -Because "Get-ApplicationDefaults should return domain configuration"
+            $defaults.Contains('groupsToInclude') | Should -Be $true -Because "Domain defaults should include groupsToInclude"
+            $defaults.Contains('groupsToExclude') | Should -Be $true -Because "Domain defaults should include groupsToExclude"
+            $defaults.domain | Should -Be "contoso.com" -Because "Domain name should be set correctly"
+        }
+        
+        It "Should return strings defaults from Get-ApplicationDefaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "Strings"
+            $defaults | Should -Not -BeNullOrEmpty -Because "Get-ApplicationDefaults should return strings configuration"
+            $defaults.Contains('returnValues') | Should -Be $true -Because "Strings defaults should include returnValues"
+            $defaults.Contains('deviceStates') | Should -Be $true -Because "Strings defaults should include deviceStates"
+        }
+        
+        It "Should return all defaults from Get-ApplicationDefaults" {
+            $defaults = Get-ApplicationDefaults -DefaultType "All"
+            $defaults | Should -Not -BeNullOrEmpty -Because "Get-ApplicationDefaults should return all configurations"
+            $defaults.Contains('Auth') | Should -Be $true -Because "All defaults should include Auth section"
+            $defaults.Contains('Global') | Should -Be $true -Because "All defaults should include Global section"
+            $defaults.Contains('Domain') | Should -Be $true -Because "All defaults should include Domain section"
+            $defaults.Contains('Strings') | Should -Be $true -Because "All defaults should include Strings section"
+        }
+    }
+    
+    Context "Backward Compatibility Functions" {
+        
+        It "Should have Get-AuthDefaults wrapper function available" {
+            Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty -Because "Get-AuthDefaults wrapper function should be loaded"
+        }
+        
+        It "Should return same data from wrapper as direct call" {
+            $directCall = Get-ApplicationDefaults -DefaultType "Auth"
+            $wrapperCall = Get-AuthDefaults
+            
+            $directCall.authType | Should -Be $wrapperCall.authType -Because "Wrapper should return same authType as direct call"
+            $directCall.scope.Count | Should -Be $wrapperCall.scope.Count -Because "Wrapper should return same scope array as direct call"
         }
     }
 }
