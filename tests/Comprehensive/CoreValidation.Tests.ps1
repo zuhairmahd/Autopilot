@@ -167,13 +167,13 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         
         It "Should return required keys (authType and scope)" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
             $defaults = Get-AuthDefaults
-            $defaults.ContainsKey('authType') | Should -Be $true -Because "Auth defaults should include authType"
-            $defaults.ContainsKey('scope') | Should -Be $true -Because "Auth defaults should include scope"
+            $defaults.Contains('authType') | Should -Be $true -Because "Auth defaults should include authType"
+            $defaults.Contains('scope') | Should -Be $true -Because "Auth defaults should include scope"
         }
         
         It "Should return scope as array" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
             $defaults = Get-AuthDefaults
-            $defaults.scope | Should -BeOfType [array] -Because "Scope should be an array"
+            $defaults.scope -is [array] | Should -Be $true -Because "Scope should be an array"
         }
         
         It "Should have default authType value" -Skip:(-not (Get-Command -Name Get-AuthDefaults -ErrorAction SilentlyContinue)) {
