@@ -12,9 +12,7 @@ function Get-AutopilotPesterConfiguration
     param(
         [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
         [string]$TestType = 'All',
-        
         [switch]$EnableCodeCoverage,
-        
         [switch]$CI
     )
     
