@@ -4,7 +4,7 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
     
     BeforeAll {
         # Get repository root
-        $script:RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+        $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
         
         # Initialize test environment
         $script:TestContext = Initialize-AutopilotTestEnvironment
@@ -12,9 +12,19 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         # Load all functions
         $functionsPath = Join-Path $script:RepoRoot "functions"
         $functionFiles = Get-ChildItem -Path $functionsPath -Recurse -Filter *.ps1 -File
+        
+        Write-Verbose "Loading functions from $functionsPath..."
         foreach ($file in $functionFiles) {
-            . $file.FullName
+            try {
+                . $file.FullName
+            }
+            catch {
+                Write-Warning "Failed to load $($file.Name): $_"
+            }
         }
+        
+        # Setup global variables that functions may need
+        $global:LogFile = Join-Path $script:TestContext.TestFolder "test.log"
         
         # Create test settings file
         $script:TestSettingsFile = Join-Path $script:TestContext.TestFolder "test-settings.json"
