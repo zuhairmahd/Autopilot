@@ -224,6 +224,130 @@
             description     = 'Government build for gao.gov with enhanced security and compliance settings'
         }
         
+        # Production build target
+        production = @{
+            # Build parameters that are passed to CreateRelease.ps1
+            buildParameters = @{
+                inputFile       = 'main.ps1'
+                OutputPath      = 'bin'
+                NoVersionUpdate = $false
+                Overwrite       = $true
+                noCleanup       = $false
+            }
+            
+            # Settings to apply to global settings.psd1
+            globalSettings  = @{
+                autoUpdate        = $true
+                showLicenseBanner = $true
+                validateScopes    = $true
+            }
+            
+            authSettings    = @{
+                changePwOnNextStart = $true
+                validateScopes      = $false
+                authType            = 'PublicAuthFlow'
+                noSaveRefreshToken  = $false
+                forceNewToken       = $false
+                scope               = @(
+                    'offline_access',
+                    'openid',
+                    'Device.ReadWrite.All',
+                    'DeviceManagementApps.Read.All',
+                    'DeviceManagementConfiguration.ReadWrite.All',
+                    'DeviceManagementManagedDevices.PrivilegedOperations.All',
+                    'DeviceManagementManagedDevices.ReadWrite.All',
+                    'DeviceManagementServiceConfig.ReadWrite.All'
+                )
+                delegated           = $false
+                cacheType           = 'Memory'
+                secureString        = $false
+                renewalLeadTime     = 5
+            }
+            
+            # Domain to use for domain-specific settings (optional)
+            domain          = 'gao.gov'            
+            
+            # Settings to apply to domain configuration (when domain is specified)
+            domainSettings  = @{
+                privateSession                  = $true
+                groupsToExclude                 = @()
+                maxUserMatchDisplay             = 10
+                appModes                        = @(
+                    'registration',
+                    'helpdesk'
+                )
+                autopilotDeviceAllowedVendors   = @(
+                    'Dell'
+                )
+                autopilotProfilesToInclude      = @(
+                    @{
+                        id   = '20f6050d-263f-401b-847c-3a399e6aa8ac'
+                        name = 'msb'
+                    }
+                )
+                userPatternsToExclude           = @(
+                    '-test',
+                    'onmicrosoft.com',
+                    '-cma',
+                    '-a',
+                    '-rsa',
+                    '-sup'
+                )
+                assignedUser                    = ''
+                minimumDevicePhysicalMemoryInGB = 16
+                maxGroupMatchDisplay            = 20
+                maxWaitTime                     = 30
+                autoUpdate                      = $true
+                checkStrongMapping              = $true
+                strongMappingOptional           = $false
+                preferredBrowser                = 'Chrome'
+                maxSerialNumberLength           = 11
+                minUsernameLength               = 3
+                version                         = '1.3.0.0'
+                operatingSystem                 = 'Windows'
+                minSerialNumberLength           = 7
+                maxUserNameLength               = 50
+                validateScopes                  = $false
+                groupsToInclude                 = @(
+                    @{
+                        id   = 'be87a9ef-3e44-4e6b-8a9e-d1696e2f7db5'
+                        name = 'sg_passwrd_hash_stage'
+                    },
+                    @{
+                        id   = '74d8cfe5-7934-4bd7-bcf3-593dcc6639ed'
+                        name = 'sg_Office_365_License_G5_wth_windows_pilot'
+                    },
+                    @{
+                        id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
+                        name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    },
+                    @{
+                        id   = '27d943bc-77cc-44eb-9f81-13c76841129b'
+                        name = 'ITN-USR-CON-WIN-ENROLLMENT-PROD-ALLMSB'
+                    }
+                )
+                groupTag                        = 'MSB01'
+                groupPatternsToExclude          = @()
+                repoInfo                        = @{
+                    repoPath      = 'zuhairmahd'
+                    baseURL       = 'https://www.github.com'
+                    baseSourceURL = 'https://raw.githubusercontent.com'
+                    repoName      = 'Autopilot'
+                }
+                companyName                     = 'Government Accountability Office'
+                release                         = 'lhm'
+                deviceContactThresholdInDays    = 30
+                additionalScopes                = @()
+                maxNumberOfDevicesAllowed       = 20
+                timeInSeconds                   = 60
+                showLicenseBanner               = $false
+                domain                          = 'gao.gov'
+                deviceNamePrefix                = 'w11-'
+            }
+            
+            description     = 'Production build with full settings and signing enabled'
+        }
+        
         # Testing target for CI/CD validation
         ci_test    = @{
             buildParameters = @{

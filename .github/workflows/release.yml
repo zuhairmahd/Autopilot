@@ -8,13 +8,14 @@ permissions:
   contents: write
 
 jobs:
-  test:
-    name: Test (pwsh on Windows)
+  test-unit:
+    name: Unit Tests (pwsh on Windows)
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Verify PowerShell 7
         shell: pwsh
@@ -22,22 +23,125 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Run tests - all
-        shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1
+      - name: Cache Pester module
+        uses: actions/cache@v3
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
 
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Unit Tests with Coverage
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Unit -EnableCodeCoverage -CI
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+
+  test-integration:
+    name: Integration Tests (pwsh on Windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    needs: test-unit
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Cache Pester module
+        uses: actions/cache@v3
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Integration Tests
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Integration -CI
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+
+  test-comprehensive:
+    name: Comprehensive Tests (pwsh on Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: test-integration
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Cache Pester module
+        uses: actions/cache@v3
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Comprehensive Tests
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Comprehensive -CI
+
+      - name: Upload comprehensive test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: comprehensive-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+  
   build:
     name: Build (CreateRelease)
     runs-on: windows-latest
     timeout-minutes: 25
-    needs: test
+    needs: [test-unit, test-integration, test-comprehensive]
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Cache PowerShell modules
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: ~\Documents\PowerShell\Modules
           key: ${{ runner.os }}-pwsh-modules-${{ hashFiles('CreateRelease.ps1') }}
@@ -63,7 +167,7 @@ jobs:
           write-host "Build complete (release using target: production). Executable and lastrun.json are in the bin directory."
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: autopilot-build
           path: bin
@@ -74,31 +178,36 @@ jobs:
     timeout-minutes: 20
     needs: build
     if: github.event_name == 'release' && github.event.action == 'published'
+      # fail-fast is not valid at the job level; removed
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           persist-credentials: true
           fetch-depth: 0
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: autopilot-build
           path: bin
 
-      - name: Skip signing (missing secrets)
-        if: env.AZURE_TENANT_ID == '' || env.AZURE_CLIENT_ID == '' || env.AZURE_CLIENT_SECRET == ''
+      - name: Check for signing secrets
+        id: check_secrets
         shell: pwsh
         run: |
-          Write-Host "Signing skipped: required Azure Trusted Signing secrets not configured."
+          if (-not "$env:AZURE_TENANT_ID" -or -not "$env:AZURE_CLIENT_ID" -or -not "$env:AZURE_CLIENT_SECRET") {
+            Write-Host "::set-output name=skip_signing::true"
+          } else {
+            Write-Host "::set-output name=skip_signing::false"
+          }
 
       - name: Sign files with Trusted Signing
-        if: env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
+        if: steps.check_secrets.outputs.skip_signing == 'false'
         uses: azure/trusted-signing-action@v0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -121,9 +230,9 @@ jobs:
           Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
           write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -updateHash
-      
+
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: signed-artifacts
           path: |
@@ -137,27 +246,16 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Download signed artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: signed-artifacts
           path: ./release-assets
 
-      - name: Upload assets to release
-        uses: actions/upload-release-asset@v1
+      - name: Upload assets to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./release-assets/main.exe
+            ./release-assets/lastrun.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./release-assets/main.exe
-          asset_name: main.exe
-          asset_content_type: application/octet-stream
-
-      - name: Upload lastrun.json to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./release-assets/lastrun.json
-          asset_name: lastrun.json
-          asset_content_type: application/json

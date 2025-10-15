@@ -12,7 +12,7 @@ function ExportDeviceReport()
     )
 
     $functionName = "ExportDeviceReport"
-Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'" -LogLevel "Verbose"
+    Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export with parameters: output file='$outputFile', ExportFormat='$ExportFormat'" -LogLevel "Verbose"
     # Validate ExportFormat
     if ($ExportFormat -notin @("HTML", "CSV"))
     {
@@ -42,7 +42,14 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export wi
     $finalExportFormat = $ExportFormat.ToUpper()
     if ($finalExportFormat -eq "HTML")
     {
-        $htmlPath = "$pwd\$fileName.html"
+        if ($outputFile)
+        {
+            $htmlPath = $outputFile
+        }
+        else
+        {
+            $htmlPath = "$pwd\$fileName.html"
+        }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to HTML: $htmlPath" -LogLevel "Information"
         $htmlHeader = @"
 <!DOCTYPE html>
@@ -100,7 +107,14 @@ Write-Log -LogFile $LogFile -Module "$functionName" -Message "Starting export wi
     }
     elseif ($finalExportFormat -eq "CSV")
     {
-        $csvPath = "$pwd\$fileName.csv"
+        if ($outputFile)
+        {
+            $csvPath = $outputFile
+        }
+        else
+        {
+            $csvPath = "$pwd\$fileName.csv"
+        }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting to CSV: $csvPath" -LogLevel "Information"
         try
         {

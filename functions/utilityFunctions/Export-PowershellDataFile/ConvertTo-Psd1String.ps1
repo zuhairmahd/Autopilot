@@ -69,6 +69,44 @@ function ConvertTo-Psd1String()
             {
                 $result += "@()"
             }
+            elseif ($value.Count -eq 1)
+            {
+                # Force single-item arrays to remain arrays using ,@() syntax
+                Write-Verbose "[$functionName] Processing single-item array (forcing array type)"
+                $result += ",@("
+                $item = $value[0]
+                
+                if ($null -eq $item)
+                {
+                    Write-Verbose "[$functionName] Processing null item in single-item array"
+                    $result += '$null'
+                }
+                elseif ($item -is [hashtable] -or $item -is [System.Collections.Specialized.OrderedDictionary])
+                {
+                    Write-Verbose "[$functionName] Processing nested $($item.GetType().Name) in single-item array"
+                    $result += (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 1))
+                }
+                elseif ($item -is [string])
+                {
+                    Write-Verbose "[$functionName] Processing string in single-item array: $item"
+                    $escapedItem = $item -replace "'", "''" -replace "`n", "``n" -replace "`r", "``r" -replace "`t", "``t"
+                    $result += "'$escapedItem'"
+                }
+                elseif ($item -is [bool])
+                {
+                    $result += if ($item) { '$true' } else { '$false' }
+                }
+                elseif ($item -is [int] -or $item -is [long] -or $item -is [double] -or $item -is [float])
+                {
+                    $result += $item.ToString()
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] Processing other type in single-item array: $($item.GetType().Name)"
+                    $result += "'$($item.ToString())'"
+                }
+                $result += ")"
+            }
             else
             {
                 $result += "@(`n"

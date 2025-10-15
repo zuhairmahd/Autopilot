@@ -13,7 +13,7 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'delegated')]
         [string[]]$Scope,
         [parameter(parameterSetName = 'delegated')]
-        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private', 'MGGraph')]
+        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
         [string]$AuthType = 'Private', 
         [parameter(parameterSetName = 'delegated')]
         [switch]$ForceNewToken,
@@ -255,8 +255,10 @@ function GetGraphAccessToken()
     # Set up cache paths
     if ([string]::IsNullOrWhiteSpace($configFile) -or -not (Test-Path $configFile))
     {
-        Write-Verbose "[$functionName] Config file is empty or doesn't exist, using current directory for cache"
-        $cacheFolder = $PWD.Path
+        # Use temp directory instead of current directory to avoid creating folders in project root
+        $tempPath = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+        $cacheFolder = Join-Path $tempPath "AutopilotCache"
+        Write-Verbose "[$functionName] Config file is empty or doesn't exist, using temp directory for cache: $cacheFolder"
     }
     else
     {
@@ -327,13 +329,6 @@ function GetGraphAccessToken()
                     clientSecret = $clientSecret
                 }
             }        
-            MGGraph
-            {
-                Write-Verbose "[$functionName] Using Microsoft Graph authentication flow for delegated token."
-                $params += @{
-                    APIVersion = $APIVersion
-                }
-            }
         }
         if ($NoSaveRefreshToken)
         {
