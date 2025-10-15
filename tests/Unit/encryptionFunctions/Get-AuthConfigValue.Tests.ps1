@@ -140,10 +140,10 @@ Describe "Function: Get-AuthConfigValue" -Tags 'Unit', 'EncryptionFunctions' {
         }
         
         It "Should write an error when Auth is unavailable" {
-            $errorCount = $Error.Count
-            $null = Get-AuthConfigValue -PropertyPath "AppId" -ErrorAction SilentlyContinue
+            # Call should write an error
+            $result = Get-AuthConfigValue -PropertyPath "AppId" -ErrorVariable err -ErrorAction SilentlyContinue
             
-            $Error.Count | Should -BeGreaterThan $errorCount
+            $err | Should -Not -BeNullOrEmpty
         }
         
         It "Should handle missing Auth gracefully" {
