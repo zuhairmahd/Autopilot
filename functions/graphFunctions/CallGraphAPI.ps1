@@ -46,7 +46,7 @@ function CallGraphAPI()
     #region Encode filter and add headers
     if ($Filter)
     {
-Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter string: $Filter" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter string: $Filter" -LogLevel "Verbose"
         Write-Log -LogFile $logFile -Module $functionName -Message "Splitting filter by logical operators while preserving operators." -LogLevel "Information"
         $filterParts = [System.Collections.ArrayList]::new()
         $logicalOperators = [System.Collections.ArrayList]::new()
@@ -55,11 +55,11 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter st
         $lastIndex = 0
         # Find all logical operators and their positions
         $logicalOperaterMatches = [regex]::Matches($Filter, $pattern)
-Write-Log -LogFile $logFile -Module $functionName -Message "Found $($logicalOperaterMatches.Count) logical operators." -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Found $($logicalOperaterMatches.Count) logical operators." -LogLevel "Verbose"
         # If no logical operators, process as a single condition
         if ($logicalOperaterMatches.Count -eq 0)
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "No logical operators found. Processing as a single filter condition." -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No logical operators found. Processing as a single filter condition." -LogLevel "Verbose"
             $processedFilter = ProcessFilterCondition -condition $Filter
             Write-Log -LogFile $logFile -Module $functionName -Message "Processed single filter condition: $processedFilter" -LogLevel "Information"
             $encodedFilter = $processedFilter
@@ -68,10 +68,10 @@ Write-Log -LogFile $logFile -Module $functionName -Message "No logical operators
         else
         {
             # Process each part of the filter
-Write-Log -LogFile $logFile -Module $functionName -Message "Logical operators found. Processing filter as multiple conditions." -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Logical operators found. Processing filter as multiple conditions." -LogLevel "Verbose"
             foreach ($logicalOperatorMatch in $logicalOperaterMatches)
             {
-Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))" -LogLevel "Debug"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter condition before logical operator: $($Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex))" -LogLevel "Debug"
                 $condition = $Filter.Substring($lastIndex, $logicalOperatorMatch.Index - $lastIndex)
                 Write-Log -LogFile $logFile -Module $functionName -Message "Condition to process: $condition" -LogLevel "Information"
                 [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
@@ -84,7 +84,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter co
             # Don't forget the last part after the last logical operator
             if ($lastIndex -lt $Filter.Length)
             {
-Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter condition after the last logical operator." -LogLevel "Verbose"
+                Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter condition after the last logical operator." -LogLevel "Verbose"
                 $condition = $Filter.Substring($lastIndex)
                 [void]$filterParts.Add((ProcessFilterCondition -condition $condition))
                 Write-Log -LogFile $logFile -Module $functionName -Message "Processed filter condition: $($filterParts[$filterParts.Count - 1])" -LogLevel "Information"
@@ -111,7 +111,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Processing filter co
     # Handle search parameter
     if ($Search)
     {
-Write-Log -LogFile $logFile -Module $functionName -Message "Processing search parameter: $Search" -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Processing search parameter: $Search" -LogLevel "Verbose"
         
         # URL encode the search string
         $encodedSearch = [uri]::EscapeUriString($Search)
@@ -141,10 +141,10 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Processing search pa
         $paramsList = @()
         # Split by ampersand to get individual key-value pairs
         $keyValuePairs = $extraParameters -split '&'
-Write-Log -LogFile $logFile -Module $functionName -Message "Found $($keyValuePairs.Count) key-value pairs." -LogLevel "Verbose"
+        Write-Log -LogFile $logFile -Module $functionName -Message "Found $($keyValuePairs.Count) key-value pairs." -LogLevel "Verbose"
         foreach ($pair in $keyValuePairs)
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "Processing key-value pair: $pair" -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "Processing key-value pair: $pair" -LogLevel "Verbose"
             # Split each pair by equals sign to separate key and value
             $keyAndValue = $pair -split '=', 2
             if ($keyAndValue.Count -eq 2)
@@ -222,7 +222,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "Processing key-value
     #Add statusCodeVariable if we are running under powershell  7.0 or higher
     if ($PSVersionTable.PSVersion.Major -ge 7)
     {
-Write-Log -LogFile $logFile -Module $functionName -Message "PowerShell version is $($PSVersionTable.PSVersion.Major ). Adding StatusCodeVariable to the request." -LogLevel "Debug"
+        Write-Log -LogFile $logFile -Module $functionName -Message "PowerShell version is $($PSVersionTable.PSVersion.Major ). Adding StatusCodeVariable to the request." -LogLevel "Debug"
         $restParams['StatusCodeVariable'] = 'statusCode'
     }
     Write-Log -LogFile $logFile -Module $functionName -Message "Making the following call to Microsoft Graph:" -LogLevel "Information"
@@ -236,7 +236,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "PowerShell version i
         Write-Log -LogFile $logFile -Module $functionName -Message "Response count: $($response.value.count)" -LogLevel "Information"
         if ($response.'@odata.nextLink')
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "NextLink found. Fetching additional pages." -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "NextLink found. Fetching additional pages." -LogLevel "Verbose"
             # Initialize an array to hold all items
             $allItems = @()
             $allItems += $response.value
@@ -258,7 +258,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "NextLink found. Fetc
         }
         else 
         {
-Write-Log -LogFile $logFile -Module $functionName -Message "No nextLink found. Single page response received." -LogLevel "Verbose"
+            Write-Log -LogFile $logFile -Module $functionName -Message "No nextLink found. Single page response received." -LogLevel "Verbose"
         }
         Write-Log -LogFile $logFile -Module $functionName -Message "The call was successful." -LogLevel "Information"
         if ($response.count)
@@ -335,6 +335,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "No nextLink found. S
             }
             catch
             { 
+                $statusDescription = $null 
             }
 
             # Headers (handle both WebHeaderCollection and IDictionary-like)
@@ -488,6 +489,7 @@ Write-Log -LogFile $logFile -Module $functionName -Message "No nextLink found. S
                 }
                 catch
                 {
+                    Write-Log -LogFile $logFile -Module $functionName -Message "Failed to retrieve inner error date: $($_.Exception.Message)" -LogLevel "Warning"
                 }
                 Write-Log -LogFile $logFile -Module $functionName -Message "Graph innerError: request-id=$requestId client-request-id=$clientRequestId date=$serverDate" -LogLevel "Information"
                 # Some APIs include nested innererror with additional code/message
