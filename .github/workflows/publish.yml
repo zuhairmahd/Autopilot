@@ -169,6 +169,7 @@ jobs:
         with:
           name: autopilot-build-${{ github.ref_name }}
           path: ${{ github.ref_name }}
+          retention-days: 14
 
   sign:
     name: Code Signing (${{ github.ref_name }})

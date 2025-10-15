@@ -175,9 +175,9 @@ jobs:
         run: |
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
           Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
-          
+
           $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings PSGallery -ExcludeRule PSAvoidUsingWriteHost
-          
+
           if ($results) {
             $results | Format-Table -AutoSize
             $errorCount = ($results | Where-Object Severity -eq 'Error').Count
@@ -205,15 +205,16 @@ jobs:
           $unitResult = '${{ needs.test-unit.result }}'
           $integrationResult = '${{ needs.test-integration.result }}'
           $codeQualityResult = '${{ needs.code-quality.result }}'
-          
+
           Write-Host "Test Results Summary:" -ForegroundColor Cyan
           Write-Host "  Unit Tests: $unitResult" -ForegroundColor $(if ($unitResult -eq 'success') { 'Green' } else { 'Red' })
           Write-Host "  Integration Tests: $integrationResult" -ForegroundColor $(if ($integrationResult -eq 'success') { 'Green' } else { 'Red' })
           Write-Host "  Code Quality: $codeQualityResult" -ForegroundColor $(if ($codeQualityResult -eq 'success') { 'Green' } else { 'Red' })
-          
+
           if ($unitResult -ne 'success' -or $integrationResult -ne 'success' -or $codeQualityResult -ne 'success') {
             Write-Error "One or more checks failed. Please review the results above."
             exit 1
           }
-          
-          Write-Host "`nAll checks passed! ✓" -ForegroundColor Green
+          else {
+            Write-Host "`nAll checks passed! ✓" -ForegroundColor Green
+          }
