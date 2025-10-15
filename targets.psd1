@@ -72,6 +72,7 @@
                 maxUserNameLength               = 50
                 validateScopes                  = $false
                 showLicenseBanner               = $false
+                migrateLegacyConfiguration      = $true
                 checkStrongMapping              = $true
                 strongMappingOptional           = $true
                 timeInSeconds                   = 60
@@ -213,6 +214,7 @@
                 deviceContactThresholdInDays    = 30
                 additionalScopes                = @()
                 maxNumberOfDevicesAllowed       = 20
+                migrateLegacyConfiguration      = $true
                 timeInSeconds                   = 60
                 showLicenseBanner               = $false
                 domain                          = 'gao.gov'
