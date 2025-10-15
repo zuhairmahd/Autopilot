@@ -159,6 +159,49 @@ Describe "My Tests" {
 
 ---
 
+### 5. Binary Cmdlet Mocking (Special Cases)
+
+**⚠️ IMPORTANT:** Binary cmdlets (like `Get-CimInstance`, `Get-WmiObject`) require special handling in PowerShell 5.1 due to strict type validation.
+
+**🚫 WRONG - Using incorrect parameter names:**
+```powershell
+Mock Get-CimInstance {
+    param($CimSession, [string]$Class)  # WRONG: parameter is -ClassName, not -Class!
+    return @{ SerialNumber = "ABC123" }
+}
+```
+
+**✅ RIGHT - Exact parameter names and type bypass:**
+```powershell
+# Mock New-CimSession to return simple string (bypasses type validation)
+Mock New-CimSession { return "MockCimSession" }
+
+# Mock Get-CimInstance with EXACT parameter names
+Mock Get-CimInstance {
+    param(
+        $CimSession,
+        [string]$ClassName,  # CORRECT: -ClassName (not -Class)
+        [string]$Namespace,
+        [string]$Filter
+    )
+    
+    switch ($ClassName) {
+        "Win32_BIOS" { return @{ SerialNumber = "ABC123" } }
+        "Win32_ComputerSystem" { return @{ Manufacturer = "Dell"; Model = "Latitude" } }
+    }
+}
+```
+
+**Common Binary Cmdlet Gotchas:**
+- `Get-CimInstance` uses `-ClassName` (not `-Class`)
+- Use `Get-Help <cmdlet> -Parameter <name>` to verify exact parameter names
+- Return simple strings/objects instead of complex types (e.g., `"MockCimSession"` instead of `[Microsoft.Management.Infrastructure.CimSession]`)
+- Binary cmdlets perform parameter validation BEFORE Pester mocks can intercept
+
+**Why:** Binary cmdlets have strict type checking that occurs before mock interception. Using wrong parameter names or complex types causes "parameter not found" or "cannot bind argument" errors.
+
+---
+
 ## Test Migration Workflow (Step-by-Step)
 
 ### Step 1: Analyze Legacy Test
@@ -698,6 +741,38 @@ BeforeAll {
     }
 }
 ```
+
+---
+
+### Problem: Binary cmdlet mocking fails with "parameter not found"
+
+**Symptom:**
+```
+A parameter cannot be found that matches parameter name 'ClassName'
+```
+
+**Cause:** Mock uses wrong parameter name (e.g., `$Class` when cmdlet expects `-ClassName`)
+
+**Solution:** Use `Get-Help` to find exact parameter names
+```powershell
+# Verify parameter names
+Get-Help Get-CimInstance -Parameter ClassName
+
+# Update mock with EXACT parameter names
+Mock Get-CimInstance {
+    param(
+        $CimSession,
+        [string]$ClassName,  # NOT $Class!
+        [string]$Namespace,
+        [string]$Filter
+    )
+    # Mock logic
+}
+```
+
+**Related Issues:**
+- "Cannot bind argument to parameter 'CimSession' because it is null" → Mock `New-CimSession` to return simple string
+- "Cannot convert PSCustomObject to CimSession[]" → Don't try to create fake typed objects, use strings
 
 ---
 

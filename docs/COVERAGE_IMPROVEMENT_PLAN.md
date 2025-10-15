@@ -105,30 +105,37 @@ See Progress Tracking section below for detailed results.
   - **14 test cases, all passing**
   - **Estimated Lines Covered**: ~80 lines
 
-- [⚠️] `tests/Unit/autopilotFunctions/GetDeviceInfo.Tests.ps1`
-  - Mock WMI/CIM calls - Created but deferred
-  - Test device info retrieval - Created but deferred
-  - Test error handling - Created but deferred
-  - Test data formatting - Created but deferred
-  - **32 test cases created, requires CIM mocking refactoring**
-  - **Status**: Test file created but requires complex CIM session type mocking
-  - **Decision**: Defer to Week 3 or later when proper CIM mocking helpers are available
-  - **Estimated Lines Covered**: ~50 lines (pending)
+- [x] `tests/Unit/autopilotFunctions/GetDeviceInfo.Tests.ps1`
+  - Mock WMI/CIM calls ✅
+  - Test device info retrieval ✅
+  - Test error handling ✅
+  - Test data formatting ✅
+  - **25 test cases, all passing**
+  - **Status**: ✅ Complete - Binary cmdlet mocking resolved with exact parameter names
+  - **Key Learning**: Binary cmdlets require exact parameter names (-ClassName not -Class) and simple return types
+  - **Estimated Lines Covered**: ~50 lines
 
 **Week 2 Target**: 270 lines covered (combined updateFunctions + autopilotFunctions)  
-**Week 2 Actual**: ~220 lines covered (updateFunctions only: 26.78% of 463 commands analyzed)  
-**Test Results**: 47/47 updateFunctions tests passing (100% pass rate) ✅  
-**Overall Coverage Improvement**: 12% baseline → 14.5% estimated (pending full project measurement)
+**Week 2 Actual**: ~270 lines covered (updateFunctions: 220 lines + autopilotFunctions: 50 lines)  
+**Test Results**: 72/72 tests passing (100% pass rate) ✅  
+**Overall Coverage Improvement**: 12% baseline → ~15-17% estimated (pending full project measurement)
 
 **Notes**:
 - updateFunctions tests completed successfully with comprehensive mocking
 - GetLatestGithubRelease: Full GitHub API mocking with error scenarios  
 - getFileVersion: File system mocking with version parsing validation
 - Invoke-FileCertVerification: Certificate chain and trust validation mocking
-- GetDeviceInfo tests created but require CIM type system mocking (deferred)
-- Decision made to complete Phase 1 with partial Week 2 completion rather than block on complex CIM infrastructure
+- GetDeviceInfo tests completed after resolving binary cmdlet mocking challenges
+- Binary cmdlet lesson learned: Use exact parameter names (Get-CimInstance uses -ClassName not -Class) and return simple types for mock objects
+- Both AGENTS.md files updated with comprehensive binary cmdlet mocking guidance
 
 **Phase 1 Total Coverage**: **~15-17%** achieved (from 12% baseline)
+
+**Phase 1 Status**: ✅ SUBSTANTIALLY COMPLETE
+- Week 1: ✅ Complete (encryptionFunctions - 110 tests)
+- Week 2: ✅ Complete (updateFunctions - 47 tests, autopilotFunctions - 25 tests)
+- **Total Phase 1**: 182 tests created, 182/182 passing (100% pass rate)
+- **Ready to begin Phase 2**
 
 ---
 

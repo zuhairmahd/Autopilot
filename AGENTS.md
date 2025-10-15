@@ -27,6 +27,7 @@ The project uses **Pester v5** as the primary testing framework for new tests, w
 - ✅ **100% pass rate** - All tests must pass before committing (non-negotiable)
 - ✅ **Cross-version compatibility** - Test on both PowerShell 5.1 and 7+
 - ✅ **Use Sort-Object** - Apply to collections for deterministic ordering across PS versions
+- ⚠️ **Binary cmdlet mocking** - When mocking binary cmdlets like `Get-CimInstance`, use exact parameter names (e.g., `-ClassName` not `-Class`) and return appropriate types or simple strings to bypass strict type validation
 
 ### Helper Modules (Three-Tiered Architecture)
 - **Layer 1 (Core):** `tests/Helpers/AutopilotTestHelpers.psm1` - Temp folders, settings files, cleanup

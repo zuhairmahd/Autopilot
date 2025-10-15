@@ -33,9 +33,9 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         }
         
         # Mock CIM session and queries
-        # Return null to avoid type casting issues - Get-CimInstance will still work with mocked responses
+        # Return simple string to avoid type casting issues - Get-CimInstance will still work with mocked responses
         Mock New-CimSession {
-            return $null
+            return "MockCimSession"
         }
         
         Mock Remove-CimSession {}
@@ -44,15 +44,15 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
     Context "When retrieving device info without hardware hash" {
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class)
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
                 
-                if ($Class -eq 'Win32_BIOS')
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return [PSCustomObject]@{
                         SerialNumber = 'ABC123456789'
                     }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return [PSCustomObject]@{
                         Manufacturer = 'Dell Inc.    '
@@ -107,22 +107,22 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
     Context "When retrieving device info with hardware hash" {
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class, $Namespace, $Filter)
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
                 
-                if ($Class -eq 'Win32_BIOS')
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return [PSCustomObject]@{
                         SerialNumber = 'XYZ987654321'
                     }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return [PSCustomObject]@{
                         Manufacturer = 'HP'
                         Model        = 'EliteBook 840'
                     }
                 }
-                elseif ($Class -eq 'MDM_DevDetail_Ext01')
+                elseif ($ClassName -eq 'MDM_DevDetail_Ext01')
                 {
                     return [PSCustomObject]@{
                         DeviceHardwareData = 'BASE64ENCODEDHASH=='
@@ -142,22 +142,22 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
             
             Should -Invoke Get-CimInstance -ParameterFilter {
                 $Namespace -eq 'root/cimv2/mdm/dmmap' -and
-                $Class -eq 'MDM_DevDetail_Ext01'
+                $ClassName -eq 'MDM_DevDetail_Ext01'
             }
         }
         
         It "Should return null when hardware hash is not found" {
             Mock Get-CimInstance {
-                param($Class)
-                if ($Class -eq 'Win32_BIOS')
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return @{ Manufacturer = 'Dell'; Model = 'Test' }
                 }
-                elseif ($Class -eq 'MDM_DevDetail_Ext01')
+                elseif ($ClassName -eq 'MDM_DevDetail_Ext01')
                 {
                     return $null
                 }
@@ -174,12 +174,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
     Context "When testing manufacturer override" {
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class)
-                if ($Class -eq 'Win32_BIOS')
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return @{ SerialNumber = 'TEST123' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return @{ Manufacturer = 'RealManufacturer'; Model = 'TestModel' }
                 }
@@ -202,12 +202,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
     Context "When testing vendor validation" {
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class)
-                if ($Class -eq 'Win32_BIOS')
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return @{ Manufacturer = 'TestManufacturer'; Model = 'TestModel' }
                 }
@@ -279,12 +279,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class)
-                if ($Class -eq 'Win32_BIOS')
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return @{ Manufacturer = 'AnyManufacturer'; Model = 'AnyModel' }
                 }
@@ -308,12 +308,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
     Context "When testing CIM session management" {
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class)
-                if ($Class -eq 'Win32_BIOS')
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return @{ Manufacturer = 'Dell'; Model = 'Test' }
                 }
@@ -336,12 +336,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
     Context "When testing logging behavior" {
         BeforeEach {
             Mock Get-CimInstance {
-                param($Class)
-                if ($Class -eq 'Win32_BIOS')
+                param($CimSession, [string]$ClassName, [string]$Namespace, [string]$Filter)
+                if ($ClassName -eq 'Win32_BIOS')
                 {
                     return @{ SerialNumber = 'LOG-TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem')
+                elseif ($ClassName -eq 'Win32_ComputerSystem')
                 {
                     return @{ Manufacturer = 'Dell'; Model = 'LogTest' }
                 }
