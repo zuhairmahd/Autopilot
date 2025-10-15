@@ -13,7 +13,7 @@ function GetGraphAccessToken()
         [parameter(parameterSetName = 'delegated')]
         [string[]]$Scope,
         [parameter(parameterSetName = 'delegated')]
-        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private', 'MGGraph')]
+        [ValidateSet('PublicAuthFlow', 'Interactive', 'Private')]
         [string]$AuthType = 'Private', 
         [parameter(parameterSetName = 'delegated')]
         [switch]$ForceNewToken,
@@ -327,13 +327,6 @@ function GetGraphAccessToken()
                     clientSecret = $clientSecret
                 }
             }        
-            MGGraph
-            {
-                Write-Verbose "[$functionName] Using Microsoft Graph authentication flow for delegated token."
-                $params += @{
-                    APIVersion = $APIVersion
-                }
-            }
         }
         if ($NoSaveRefreshToken)
         {

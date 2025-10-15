@@ -176,7 +176,7 @@ param(
     [string]$AuthType,
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
-    [ValidateSet('github', 'gitlab')]
+    [ValidateSet('github')]
     [string]$Repo,
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
@@ -362,8 +362,11 @@ if ($filesCleaned.AllRemoved)
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
+write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
+Write-Verbose "[$scriptName] Checking for settings migration need."
 $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
 # $migrationCheck = Invoke-SettingsMigration -Force
+write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
     Write-Host "Migration completed successfully." -ForegroundColor Green
@@ -1136,6 +1139,8 @@ else
             Write-Verbose "No changes made to migrateLegacyConfiguration setting."
             write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
         }
+        Write-Host "`nPress any key to continue"
+        $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
     }
 }
 #endregion initialization block with access token
