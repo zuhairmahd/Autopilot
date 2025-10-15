@@ -8,12 +8,11 @@ permissions:
   contents: write
 
 jobs:
-  test:
-    name: Test (pwsh on Windows)
+  test-unit:
+    name: Unit Tests (pwsh on Windows)
     runs-on: windows-latest
     timeout-minutes: 10
     if: github.event_name == 'release' && github.event.action == 'published'
-      # fail-fast is not valid at the job level; removed
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -24,21 +23,118 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Install build dependencies
+      - name: Cache Pester module
+        uses: actions/cache@v3
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
         shell: pwsh
         run: |
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module -Name pester -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Run Pester test suite
+      - name: Run Unit Tests with Coverage
         shell: pwsh
-        run: .\Invoke-PesterTests.ps1
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Unit -EnableCodeCoverage -CI
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+
+  test-integration:
+    name: Integration Tests (pwsh on Windows)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    needs: test-unit
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Cache Pester module
+        uses: actions/cache@v3
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Integration Tests
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Integration -CI
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
+
+  test-comprehensive:
+    name: Comprehensive Tests (pwsh on Windows)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: test-integration
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Cache Pester module
+        uses: actions/cache@v3
+        with:
+          path: ~\Documents\PowerShell\Modules\Pester
+          key: ${{ runner.os }}-pester-${{ hashFiles('**/Invoke-PesterTests.ps1') }}
+          restore-keys: |
+            ${{ runner.os }}-pester-
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run Comprehensive Tests
+        shell: pwsh
+        run: |
+          .\Invoke-PesterTests.ps1 -TestType Comprehensive -CI
+
+      - name: Upload comprehensive test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: comprehensive-test-results
+          path: |
+            TestResults*.xml
+            coverage.xml
+          retention-days: 30
   
   build:
     name: Build (CreateRelease)
     runs-on: windows-latest
     timeout-minutes: 25
-    needs: test
+    needs: [test-unit, test-integration, test-comprehensive]
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Checkout code
