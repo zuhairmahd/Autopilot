@@ -25,7 +25,7 @@
     "github.copilot.chat.languageContext.inline.typescript.enabled": true,
     "chat.agent.enabled": true,
     "editor.formatOnSave": true,
-    "security.workspace.trust.enabled": false,
+    "security.workspace.trust.enabled": true,
     "inlineChat.enableV2": true,
     "inlineChat.hideOnRequest": true,
     "terminal.integrated.focusAfterRun": "accessible-buffer",
