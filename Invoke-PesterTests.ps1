@@ -102,8 +102,6 @@ try
     
     $endTime = Get-Date
     $duration = $endTime - $startTime
-    $global:res = $result
-    $global:cf = $config
     # Display results
     Write-Host "`n" -NoNewline
     Write-Host "=" * 63 -ForegroundColor Cyan
@@ -179,7 +177,6 @@ try
     if ($EnableCodeCoverage -and $result.CodeCoverage)
     {
         $coverage = $result.CodeCoverage
-        $global:cv = $coverage
         Write-Host "`nCode Coverage:" -ForegroundColor Cyan
         Write-Host "  Commands Analyzed: $($coverage.CommandsAnalyzedCount)" -ForegroundColor White
         Write-Host "  Commands Executed: $($coverage.CommandsExecutedCount)" -ForegroundColor White
