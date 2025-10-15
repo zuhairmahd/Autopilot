@@ -38,38 +38,9 @@
         "icon": "terminal-powershell"
     },
     "powershell.analyzeOpenDocumentsOnly": true,
-    "terminal.integrated.profiles.windows": {
-        "Windows PowerShell": {
-            "source": "Windows PowerShell",
-            "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
-            "icon": "terminal-powershell"
-        },
-        "PowerShell Core": {
-            "source": "PowerShell",
-            "path": "$env:programfiles\\PowerShell\\7\\pwsh.exe",
-            "icon": "terminal-powershell"
-        },
-        "Command Prompt": {
-            "path": [
-                "${env:windir}\\Sysnative\\cmd.exe",
-                "${env:windir}\\System32\\cmd.exe"
-            ],
-            "args": [],
-            "icon": "terminal-cmd"
-        },
-        "Git Bash": {
-            "source": "Git Bash"
-        }
-    },
-    "chat.tools.autoApprove": true,
     "workbench.settings.showAISearchToggle": true,
     "search.searchView.keywordSuggestions": true,
     "search.searchView.semanticSearchBehavior": "runOnEmpty",
-    "chat.mcp.serverSampling": {
-        "Azure MCP Server Provider: Azure MCP": {
-            "allowedDuringChat": true
-        }
-    },
     "chat.todoListTool.enabled": true,
     "github.copilot.chat.newWorkspace.useContext7": true,
     "githubPullRequests.codingAgent.uiIntegration": true,
@@ -79,7 +50,7 @@
     "terminal.integrated.hideOnStartup": "whenEmpty",
     "workbench.editor.showTabIndex": true,
     "powershell.powerShellAdditionalExePaths": {
-        "pwsh": "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+        "pwsh": "$env:programfiles\\PowerShell\\7\\pwsh.exe"
     },
     "powershell.powerShellDefaultVersion": "pwsh",
     "editor.inlineSuggest.minShowDelay": 1500,
@@ -90,7 +61,6 @@
     "chat.mcp.gallery.enabled": true,
     "github.copilot.nextEditSuggestions.allowWhitespaceOnlyChanges": false,
     "task.notifyWindowOnTaskCompletion": 200,
-    "chat.tools.global.autoApprove": true,
     "terminal.integrated.accessibleViewFocusOnCommandExecution": true,
     "accessibility.verbosity.terminal": false,
     "chat.agent.maxRequests": 75,
@@ -98,7 +68,7 @@
         "*.exe": true
     },
     "chat.tools.terminal.terminalProfile.windows": {
-        "path": "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+        "path": "$env:programfiles\\PowerShell\\7\\pwsh.exe",
         "args": [
             "-ExecutionPolicy",
             "Bypass",
