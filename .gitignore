@@ -45,6 +45,7 @@ TestScripts/*.json
 
 # Misc. files.
 *.csv
+*.xml
 *.backup.*
 config.json
 *.zuh

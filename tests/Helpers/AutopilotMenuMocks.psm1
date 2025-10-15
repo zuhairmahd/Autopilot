@@ -189,9 +189,9 @@ function Initialize-MenuTestEnvironment
     }
     $Global:LogFile = $LogFile
     
-    # Initialize menu history
-    $Global:MenuHistory = @()
-    $Global:History = @()
+    # Initialize menu history as ArrayLists to support .RemoveAt() operations
+    $Global:MenuHistory = [System.Collections.ArrayList]::new()
+    $Global:History = [System.Collections.ArrayList]::new()
     
     # Initialize settings with defaults
     $defaultSettings = @{
