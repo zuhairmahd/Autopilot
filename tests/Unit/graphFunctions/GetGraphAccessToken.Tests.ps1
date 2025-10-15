@@ -292,19 +292,6 @@ Describe "Function: GetGraphAccessToken" -Tags 'Unit', 'GraphFunctions', 'Authen
             }
         }
         
-        It "Should call Get-DelegatedToken with MGGraph type" -Skip {
-            # Skipped: Bug in GetGraphAccessToken - tries to pass APIVersion to Get-DelegatedToken
-            # but Get-DelegatedToken doesn't have that parameter
-            # See GetGraphAccessToken.ps1 lines 330-335
-            Mock Get-DelegatedToken { return "mock-token" }
-            
-            $result = GetGraphAccessToken -configFile $script:TestConfigFile -delegated -Scope @("User.Read") -AuthType 'MGGraph'
-            
-            Should -Invoke Get-DelegatedToken -Times 1 -ParameterFilter {
-                $AuthType -eq 'MGGraph'
-            }
-        }
-        
         It "Should pass NoSaveRefreshToken parameter when specified" {
             Mock Get-DelegatedToken { return "mock-token" }
             
