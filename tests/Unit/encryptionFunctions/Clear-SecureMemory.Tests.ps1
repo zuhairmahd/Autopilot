@@ -33,7 +33,8 @@ Describe "Function: Clear-SecureMemory" -Tags 'Unit', 'EncryptionFunctions' {
     
     AfterAll {
         # Cleanup test environment
-        if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder)) {
+        if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder))
+        {
             Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
     }

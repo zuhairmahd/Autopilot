@@ -34,7 +34,8 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
     
     AfterAll {
         # Cleanup test environment
-        if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder)) {
+        if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder))
+        {
             Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -49,7 +50,8 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
         }
         
         AfterEach {
-            if (Test-Path $script:EncryptedFile) {
+            if (Test-Path $script:EncryptedFile)
+            {
                 Remove-Item -Path $script:EncryptedFile -Force
             }
         }
@@ -90,7 +92,8 @@ d2l0aCBtdWx0aXBsZSBsaW5lcw==
         }
         
         AfterEach {
-            if (Test-Path $script:JsonFile) {
+            if (Test-Path $script:JsonFile)
+            {
                 Remove-Item -Path $script:JsonFile -Force
             }
         }
@@ -98,7 +101,7 @@ d2l0aCBtdWx0aXBsZSBsaW5lcw==
         It "Should detect a valid JSON file as unencrypted" {
             $jsonContent = @{
                 auth = @{
-                    AppId = "test-app-id"
+                    AppId    = "test-app-id"
                     TenantId = "test-tenant-id"
                 }
             } | ConvertTo-Json
@@ -132,7 +135,7 @@ d2l0aCBtdWx0aXBsZSBsaW5lcw==
         
         It "Should handle JSON with special characters" {
             $jsonContent = @{
-                text = "Special chars: @#`$%^&*()_+-=[]{}|;:',.<>?/~``"
+                text    = "Special chars: @#`$%^&*()_+-=[]{}|;:',.<>?/~``"
                 unicode = "Unicode text with accents"
             } | ConvertTo-Json
             
@@ -205,8 +208,8 @@ d2l0aCBtdWx0aXBsZSBsaW5lcw==
             $largeJson = @{
                 data = 1..1000 | ForEach-Object {
                     @{
-                        id = $_
-                        name = "Item$_"
+                        id          = $_
+                        name        = "Item$_"
                         description = "Description for item $_"
                     }
                 }
@@ -243,7 +246,8 @@ d2l0aCBtdWx0aXBsZSBsaW5lcw==
         }
         
         AfterEach {
-            if (Test-Path $script:TestFile) {
+            if (Test-Path $script:TestFile)
+            {
                 Remove-Item -Path $script:TestFile -Force
             }
         }
@@ -278,7 +282,8 @@ d2l0aCBtdWx0aXBsZSBsaW5lcw==
         }
         
         AfterEach {
-            if (Test-Path $script:TestFile) {
+            if (Test-Path $script:TestFile)
+            {
                 Remove-Item -Path $script:TestFile -Force
             }
         }

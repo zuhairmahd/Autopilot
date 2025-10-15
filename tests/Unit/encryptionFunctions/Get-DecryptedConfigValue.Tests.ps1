@@ -33,17 +33,17 @@ Describe "Function: Get-DecryptedConfigValue" -Tags 'Unit', 'EncryptionFunctions
         
         # Sample decrypted configuration
         $script:MockConfig = @{
-            auth = @{
-                AppId = "test-app-id"
+            auth     = @{
+                AppId    = "test-app-id"
                 TenantId = "test-tenant-id"
                 authType = "ClientSecret"
             }
             settings = @{
                 maxRetries = 3
-                timeout = 30
-                debugMode = $true
+                timeout    = 30
+                debugMode  = $true
             }
-            nested = @{
+            nested   = @{
                 level1 = @{
                     level2 = @{
                         value = "deep-value"
@@ -55,7 +55,8 @@ Describe "Function: Get-DecryptedConfigValue" -Tags 'Unit', 'EncryptionFunctions
     
     AfterAll {
         # Cleanup test environment
-        if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder)) {
+        if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder))
+        {
             Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
         }
         
@@ -173,7 +174,7 @@ Describe "Function: Get-DecryptedConfigValue" -Tags 'Unit', 'EncryptionFunctions
             # Mock Invoke-JsonFileEncryption to return failed decryption
             Mock Invoke-JsonFileEncryption {
                 return @{
-                    Success = $false
+                    Success      = $false
                     ErrorMessage = "Decryption failed"
                 }
             }

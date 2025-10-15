@@ -36,17 +36,17 @@ Describe "Function: Get-AuthConfigValue" -Tags 'Unit', 'EncryptionFunctions' {
         BeforeEach {
             # Set up script-level Auth configuration
             $script:Auth = @{
-                AppId = "test-app-id-12345"
-                TenantId = "test-tenant-id-67890"
-                authType = "ClientSecret"
-                scope = "https://graph.microsoft.com/.default"
+                AppId       = "test-app-id-12345"
+                TenantId    = "test-tenant-id-67890"
+                authType    = "ClientSecret"
+                scope       = "https://graph.microsoft.com/.default"
                 redirectUri = "http://localhost:8080"
-                settings = @{
-                    timeout = 30
-                    maxRetries = 3
+                settings    = @{
+                    timeout       = 30
+                    maxRetries    = 3
                     enableLogging = $true
                 }
-                nested = @{
+                nested      = @{
                     level1 = @{
                         level2 = "deep-value"
                     }
@@ -157,12 +157,12 @@ Describe "Function: Get-AuthConfigValue" -Tags 'Unit', 'EncryptionFunctions' {
         
         BeforeEach {
             $script:Auth = @{
-                simpleValue = "test"
-                emptyString = ""
-                nullValue = $null
-                zeroValue = 0
-                falseValue = $false
-                arrayValue = @(1, 2, 3)
+                simpleValue    = "test"
+                emptyString    = ""
+                nullValue      = $null
+                zeroValue      = 0
+                falseValue     = $false
+                arrayValue     = @(1, 2, 3)
                 hashtableValue = @{ key = "value" }
             }
         }
@@ -255,10 +255,10 @@ Describe "Function: Get-AuthConfigValue" -Tags 'Unit', 'EncryptionFunctions' {
         It "Should handle Auth with mixed data types" {
             $script:Auth = @{
                 stringValue = "test"
-                intValue = 42
-                boolValue = $true
-                arrayValue = @("a", "b", "c")
-                dateValue = Get-Date "2025-01-01"
+                intValue    = 42
+                boolValue   = $true
+                arrayValue  = @("a", "b", "c")
+                dateValue   = Get-Date "2025-01-01"
             }
             
             $result = Get-AuthConfigValue -PropertyPath "intValue"
