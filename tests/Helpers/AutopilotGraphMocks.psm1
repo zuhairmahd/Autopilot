@@ -1026,6 +1026,84 @@ function New-MockAuthToken
     }
 }
 
+<#
+.SYNOPSIS
+    Creates a mock JWT token for testing
+
+.DESCRIPTION
+    Generates a properly formatted JWT token string with customizable claims.
+    The token can be decoded using DecodeJwtToken and contains valid Base64 encoding.
+
+.PARAMETER Scopes
+    Array of Microsoft Graph scopes/roles to include in the token
+
+.PARAMETER CustomPayload
+    Optional custom payload hashtable to use instead of default structure.
+    Useful for testing specific token formats or edge cases.
+
+.EXAMPLE
+    $token = New-MockGraphToken -Scopes @('User.Read.All', 'Group.Read.All')
+
+.EXAMPLE
+    $token = New-MockGraphToken -CustomPayload @{
+        roles = 'User.Read.All, Group.Read.All'
+        aud = 'https://graph.microsoft.com'
+    }
+#>
+function New-MockGraphToken
+{
+    [CmdletBinding()]
+    param(
+        [string[]]$Scopes = @(),
+        [hashtable]$CustomPayload
+    )
+    
+    # Create payload
+    if ($CustomPayload)
+    {
+        $payload = $CustomPayload
+    }
+    else
+    {
+        $payload = @{
+            roles = $Scopes
+            aud   = 'https://graph.microsoft.com'
+            iss   = 'https://sts.windows.net/test-tenant-id/'
+            exp   = ([DateTimeOffset]::UtcNow.AddHours(1).ToUnixTimeSeconds())
+            iat   = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            nbf   = ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            tid   = 'test-tenant-id'
+            ver   = '2.0'
+        }
+    }
+    
+    # Convert payload to JSON
+    $payloadJson = $payload | ConvertTo-Json -Compress
+    
+    # Base64 encode the payload (JWT format)
+    $payloadBytes = [System.Text.Encoding]::UTF8.GetBytes($payloadJson)
+    $payloadBase64 = [System.Convert]::ToBase64String($payloadBytes)
+    
+    # URL-safe Base64 encoding (replace + with -, / with _, remove =)
+    $payloadBase64 = $payloadBase64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+    
+    # Create a simple header (we don't need to validate signature in tests)
+    $header = @{
+        alg = 'RS256'
+        typ = 'JWT'
+    } | ConvertTo-Json -Compress
+    
+    $headerBytes = [System.Text.Encoding]::UTF8.GetBytes($header)
+    $headerBase64 = [System.Convert]::ToBase64String($headerBytes)
+    $headerBase64 = $headerBase64.Replace('+', '-').Replace('/', '_').TrimEnd('=')
+    
+    # Create mock signature (not validated in tests)
+    $signature = 'mock-signature'
+    
+    # Combine parts with dots
+    return "$headerBase64.$payloadBase64.$signature"
+}
+
 #endregion
 
 # Export module members
@@ -1040,6 +1118,7 @@ Export-ModuleMember -Function @(
     'Get-MockDevices',
     'Get-MockAutopilotProfiles',
     'New-MockAuthToken',
+    'New-MockGraphToken',
     'Invoke-MockGraphAPI',
     'Initialize-GraphMockEnvironment',
     'Clear-GraphMockEnvironment',

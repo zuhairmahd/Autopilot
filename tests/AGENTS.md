@@ -427,7 +427,7 @@ Remove-TestEnvironment -TestContext $script:TestContext
 
 ### Layer 2a: AutopilotGraphMocks (Microsoft Graph API)
 
-**When to use:** Tests that call Microsoft Graph API (users, groups, devices, profiles).
+**When to use:** Tests that call Microsoft Graph API (users, groups, devices, profiles) or need JWT tokens.
 
 **Key Functions:**
 
@@ -435,6 +435,21 @@ Remove-TestEnvironment -TestContext $script:TestContext
 ```powershell
 # Set up mock data store (call once in BeforeAll)
 Initialize-GraphMockEnvironment -ClearCache
+```
+
+**New-MockGraphToken** *(New in Oct 2025)*
+```powershell
+# Create mock JWT token with specified scopes
+$token = New-MockGraphToken -Scopes @('User.Read.All', 'Group.Read.All')
+
+# Create token with custom payload (for edge case testing)
+$token = New-MockGraphToken -CustomPayload @{
+    roles = 'User.Read.All, Group.Read.All'  # Comma-separated string
+    aud = 'https://graph.microsoft.com'
+}
+
+# Use with HasScope or similar scope-checking functions
+$result = HasScope -ResourcePath @('users') -accessToken $token
 ```
 
 **Add-MockUser**
