@@ -34,28 +34,29 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
         It "Should return true for valid signature with Microsoft root" {
             # Mock certificate objects
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Zuhair Mahmoud"
-                Issuer = "CN=Microsoft Identity Verification"
-                NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                Subject    = "CN=Test, O=Zuhair Mahmoud"
+                Issuer     = "CN=Microsoft Identity Verification"
+                NotBefore  = (Get-Date).AddDays(-30)
+                NotAfter   = (Get-Date).AddDays(365)
                 Thumbprint = "ABC123"
             }
             
             $mockRootCert = [PSCustomObject]@{
-                Subject = "CN=Microsoft Identity Verification Root"
+                Subject    = "CN=Microsoft Identity Verification Root"
                 Thumbprint = "ABC123"
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             
             Mock New-Object {
                 param($TypeName)
-                if ($TypeName -eq "System.Security.Cryptography.X509Certificates.X509Chain") {
+                if ($TypeName -eq "System.Security.Cryptography.X509Certificates.X509Chain")
+                {
                     return [PSCustomObject]@{
                         ChainElements = @(
                             @{ Certificate = $mockCert },
@@ -67,7 +68,8 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
             
             Mock Get-ChildItem {
                 param($Path, $Recurse)
-                if ($Path -eq "Cert:\\LocalMachine\\Root") {
+                if ($Path -eq "Cert:\\LocalMachine\\Root")
+                {
                     return @($mockRootCert)
                 }
             }
@@ -83,7 +85,7 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
                 $FilePath | Should -Be "C:\TestFile.exe"
                 return @{
                     SignerCertificate = $null
-                    Status = "NotSigned"
+                    Status            = "NotSigned"
                 }
             }
             
@@ -96,7 +98,7 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $null
-                    Status = "NotSigned"
+                    Status            = "NotSigned"
                 }
             }
             
@@ -109,7 +111,7 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $null
-                    Status = "NotSigned"
+                    Status            = "NotSigned"
                 }
             }
             Mock Write-Output {} -ParameterFilter { $InputObject -match "not signed" }
@@ -123,16 +125,16 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
     Context "When certificate is invalid or untrusted" {
         It "Should return false when certificate status is not Valid" {
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Zuhair Mahmoud"
-                Issuer = "CN=Unknown CA"
+                Subject   = "CN=Test, O=Zuhair Mahmoud"
+                Issuer    = "CN=Unknown CA"
                 NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                NotAfter  = (Get-Date).AddDays(365)
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "UnknownError"
+                    Status            = "UnknownError"
                 }
             }
             
@@ -143,16 +145,16 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
         
         It "Should return false when certificate is not from Zuhair Mahmoud" {
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Other Organization"
-                Issuer = "CN=Some CA"
+                Subject   = "CN=Test, O=Other Organization"
+                Issuer    = "CN=Some CA"
                 NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                NotAfter  = (Get-Date).AddDays(365)
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             
@@ -165,27 +167,28 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
     Context "When certificate chain validation fails" {
         It "Should return false when root cert is not Microsoft" {
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Zuhair Mahmoud"
-                Issuer = "CN=Some CA"
+                Subject   = "CN=Test, O=Zuhair Mahmoud"
+                Issuer    = "CN=Some CA"
                 NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                NotAfter  = (Get-Date).AddDays(365)
             }
             
             $mockNonMSRootCert = [PSCustomObject]@{
-                Subject = "CN=Other Root"
+                Subject    = "CN=Other Root"
                 Thumbprint = "XYZ789"
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             
             Mock New-Object {
                 param($TypeName)
-                if ($TypeName -eq "System.Security.Cryptography.X509Certificates.X509Chain") {
+                if ($TypeName -eq "System.Security.Cryptography.X509Certificates.X509Chain")
+                {
                     return [PSCustomObject]@{
                         ChainElements = @(
                             @{ Certificate = $mockCert },
@@ -202,28 +205,29 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
         
         It "Should return false when root cert is not in trusted store" {
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Zuhair Mahmoud"
-                Issuer = "CN=Microsoft CA"
-                NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                Subject    = "CN=Test, O=Zuhair Mahmoud"
+                Issuer     = "CN=Microsoft CA"
+                NotBefore  = (Get-Date).AddDays(-30)
+                NotAfter   = (Get-Date).AddDays(365)
                 Thumbprint = "ABC123"
             }
             
             $mockRootCert = [PSCustomObject]@{
-                Subject = "CN=Microsoft Identity Verification Root"
+                Subject    = "CN=Microsoft Identity Verification Root"
                 Thumbprint = "DIFFERENT123"
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             
             Mock New-Object {
                 param($TypeName)
-                if ($TypeName -eq "System.Security.Cryptography.X509Certificates.X509Chain") {
+                if ($TypeName -eq "System.Security.Cryptography.X509Certificates.X509Chain")
+                {
                     return [PSCustomObject]@{
                         ChainElements = @(
                             @{ Certificate = $mockCert },
@@ -235,7 +239,8 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
             
             Mock Get-ChildItem {
                 param($Path)
-                if ($Path -eq "Cert:\\LocalMachine\\Root") {
+                if ($Path -eq "Cert:\\LocalMachine\\Root")
+                {
                     # Return cert with different thumbprint
                     return @([PSCustomObject]@{ Thumbprint = "OTHER456" })
                 }
@@ -262,16 +267,16 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
         
         It "Should return false for chain building exception" {
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Zuhair Mahmoud"
-                Issuer = "CN=Test CA"
+                Subject   = "CN=Test, O=Zuhair Mahmoud"
+                Issuer    = "CN=Test CA"
                 NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                NotAfter  = (Get-Date).AddDays(365)
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             
@@ -306,7 +311,7 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
                     SignerCertificate = [PSCustomObject]@{
                         Subject = "CN=Test, O=Zuhair Mahmoud"
                     }
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             Mock New-Object { throw "Chain test" }  # Force early exit
@@ -319,16 +324,16 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
         
         It "Should log certificate details" {
             $mockCert = [PSCustomObject]@{
-                Subject = "CN=Test, O=Zuhair Mahmoud"
-                Issuer = "CN=Test Issuer"
+                Subject   = "CN=Test, O=Zuhair Mahmoud"
+                Issuer    = "CN=Test Issuer"
                 NotBefore = (Get-Date).AddDays(-30)
-                NotAfter = (Get-Date).AddDays(365)
+                NotAfter  = (Get-Date).AddDays(365)
             }
             
             Mock Get-AuthenticodeSignature {
                 return @{
                     SignerCertificate = $mockCert
-                    Status = "Valid"
+                    Status            = "Valid"
                 }
             }
             Mock New-Object { throw "Chain test" }  # Force early exit

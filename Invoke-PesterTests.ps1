@@ -6,6 +6,8 @@
     Supports filtering by test type, tags, and CI/CD integration
 .PARAMETER TestType
     Type of tests to run: Unit, Integration, Comprehensive, All
+.PARAMETER OutputVerbosity
+    Level of output detail: None, Minimal, Normal, Detailed     
 .PARAMETER TestFile
     Path to a single test file to run (overrides TestType)
 .PARAMETER EnableCodeCoverage
@@ -29,6 +31,8 @@
 param(
     [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
     [string]$TestType = 'All',
+    [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
+    [string]$OutputVerbosity = 'Normal',
     [string]$TestFile,
     [switch]$EnableCodeCoverage,
     [switch]$ShowCodeCoverageDetails,
@@ -46,7 +50,7 @@ Write-Host "  Autopilot Pester Test Suite" -ForegroundColor Cyan
 Write-Host "=" * 63 -ForegroundColor Cyan
 
 # Get Pester configuration
-$config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI
+$config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI -OutputVerbosity $OutputVerbosity
 
 # Override path if specific test file requested
 if ($TestFile)
@@ -75,6 +79,7 @@ if ($Tags.Count -gt 0)
 {
     $config.Filter.Tag = $Tags
 }
+
 
 # Display configuration
 Write-Host "`nTest Configuration:" -ForegroundColor Cyan

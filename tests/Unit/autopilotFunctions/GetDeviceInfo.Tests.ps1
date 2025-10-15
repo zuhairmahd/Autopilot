@@ -46,15 +46,17 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
             Mock Get-CimInstance {
                 param($Class)
                 
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return [PSCustomObject]@{
                         SerialNumber = 'ABC123456789'
                     }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return [PSCustomObject]@{
                         Manufacturer = 'Dell Inc.    '
-                        Model = 'Latitude 7490   '
+                        Model        = 'Latitude 7490   '
                     }
                 }
             }
@@ -107,18 +109,21 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
             Mock Get-CimInstance {
                 param($Class, $Namespace, $Filter)
                 
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return [PSCustomObject]@{
                         SerialNumber = 'XYZ987654321'
                     }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return [PSCustomObject]@{
                         Manufacturer = 'HP'
-                        Model = 'EliteBook 840'
+                        Model        = 'EliteBook 840'
                     }
                 }
-                elseif ($Class -eq 'MDM_DevDetail_Ext01') {
+                elseif ($Class -eq 'MDM_DevDetail_Ext01')
+                {
                     return [PSCustomObject]@{
                         DeviceHardwareData = 'BASE64ENCODEDHASH=='
                     }
@@ -144,13 +149,16 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         It "Should return null when hardware hash is not found" {
             Mock Get-CimInstance {
                 param($Class)
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return @{ Manufacturer = 'Dell'; Model = 'Test' }
                 }
-                elseif ($Class -eq 'MDM_DevDetail_Ext01') {
+                elseif ($Class -eq 'MDM_DevDetail_Ext01')
+                {
                     return $null
                 }
             }
@@ -167,10 +175,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         BeforeEach {
             Mock Get-CimInstance {
                 param($Class)
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return @{ SerialNumber = 'TEST123' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return @{ Manufacturer = 'RealManufacturer'; Model = 'TestModel' }
                 }
             }
@@ -193,10 +203,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         BeforeEach {
             Mock Get-CimInstance {
                 param($Class)
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return @{ Manufacturer = 'TestManufacturer'; Model = 'TestModel' }
                 }
             }
@@ -268,10 +280,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         BeforeEach {
             Mock Get-CimInstance {
                 param($Class)
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return @{ Manufacturer = 'AnyManufacturer'; Model = 'AnyModel' }
                 }
             }
@@ -295,10 +309,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         BeforeEach {
             Mock Get-CimInstance {
                 param($Class)
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return @{ SerialNumber = 'TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return @{ Manufacturer = 'Dell'; Model = 'Test' }
                 }
             }
@@ -321,10 +337,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
         BeforeEach {
             Mock Get-CimInstance {
                 param($Class)
-                if ($Class -eq 'Win32_BIOS') {
+                if ($Class -eq 'Win32_BIOS')
+                {
                     return @{ SerialNumber = 'LOG-TEST' }
                 }
-                elseif ($Class -eq 'Win32_ComputerSystem') {
+                elseif ($Class -eq 'Win32_ComputerSystem')
+                {
                     return @{ Manufacturer = 'Dell'; Model = 'LogTest' }
                 }
             }

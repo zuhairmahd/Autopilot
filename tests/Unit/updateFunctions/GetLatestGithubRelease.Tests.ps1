@@ -23,7 +23,7 @@ Describe "Function: GetLatestGithubRelease" -Tags 'Unit', 'UpdateFunctions' {
             Mock Invoke-RestMethod {
                 return @{
                     tag_name = "v1.2.3"
-                    name = "Release 1.2.3"
+                    name     = "Release 1.2.3"
                 }
             }
             
@@ -80,7 +80,7 @@ Describe "Function: GetLatestGithubRelease" -Tags 'Unit', 'UpdateFunctions' {
             Mock Invoke-RestMethod {
                 return @{
                     name = "Some Release"
-                    id = 12345
+                    id   = 12345
                 }
             }
             Mock Write-Host {}
@@ -95,7 +95,7 @@ Describe "Function: GetLatestGithubRelease" -Tags 'Unit', 'UpdateFunctions' {
             Mock Invoke-RestMethod {
                 return @{
                     tag_name = $null
-                    name = "Release"
+                    name     = "Release"
                 }
             }
             Mock Write-Host {}

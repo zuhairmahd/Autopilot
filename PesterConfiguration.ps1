@@ -12,6 +12,8 @@ function Get-AutopilotPesterConfiguration
     param(
         [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
         [string]$TestType = 'All',
+        [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
+        [string]$OutputVerbosity = 'Normal',
         [switch]$EnableCodeCoverage,
         [switch]$CI
     )
@@ -19,7 +21,7 @@ function Get-AutopilotPesterConfiguration
     $config = New-PesterConfiguration
     
     # Output configuration
-    $config.Output.Verbosity = 'Normal'
+    $config.Output.Verbosity = $OutputVerbosity
     
     # Test discovery
     switch ($TestType)

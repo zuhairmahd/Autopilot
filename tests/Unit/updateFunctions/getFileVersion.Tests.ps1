@@ -130,7 +130,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
                 return [PSCustomObject]@{
                     VersionInfo = @{
                         ProductVersion = "1.2.3.4"
-                        CompanyName = "Test Company"
+                        CompanyName    = "Test Company"
                     }
                 }
             }
@@ -152,7 +152,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
                 return [PSCustomObject]@{
                     VersionInfo = @{
                         ProductVersion = "5.6.7"
-                        CompanyName = "Test Co"
+                        CompanyName    = "Test Co"
                     }
                 }
             }
@@ -175,7 +175,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
                 return [PSCustomObject]@{
                     VersionInfo = @{
                         ProductVersion = "1.0.0.0"
-                        CompanyName = "Test"
+                        CompanyName    = "Test"
                     }
                 }
             }
@@ -196,7 +196,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
                 return [PSCustomObject]@{
                     VersionInfo = @{
                         ProductVersion = "2.0.0.0"
-                        CompanyName = "Test"
+                        CompanyName    = "Test"
                     }
                 }
             }
