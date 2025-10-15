@@ -646,7 +646,47 @@ The following legacy tests remain available for selective migration if needed:
 
 
 
-**The Pester migration is complete and production-ready!** ✅1. **Robust Helper Architecture:** 3-tier system with 35+ reusable functions- Comprehensive documentation in test headers
+**The Pester migration is complete and production-ready!** ✅
+
+---
+
+## Test Cleanup and Archiving
+
+### Cleanup Summary (October 14, 2025)
+A comprehensive cleanup of legacy test files was completed:
+- **71 additional tests archived** (obsolete, duplicates, one-off fixes)
+- **92 total tests archived** (21 previously + 71 this session)
+- **28 files retained** (12 demos, 4 utilities, 2 performance tests, 8 evaluation candidates, 2 data files)
+- **Test organization complete** - All test files categorized and documented
+
+For complete details, see **[PESTER_MIGRATION_CLEANUP_SUMMARY.md](PESTER_MIGRATION_CLEANUP_SUMMARY.md)**
+
+### Archived Test Categories
+- Obsolete/refactored tests (covered by new Pester tests)
+- Duplicate tests (functionality now in Pester tests)
+- One-off issue fix tests (no longer needed as continuous tests)
+- Final validation scripts (one-time use)
+- Menu, settings, auth, group, migration, wizard tests (all covered by comprehensive Pester tests)
+
+### Retained Files
+- **Demo scripts** (12 files) - For documentation and training
+- **Utilities** (4 files) - Test-Runner.ps1, helpers, visualization tools
+- **Performance tests** (2 files) - Baseline and optimized benchmarks
+- **Evaluation candidates** (8 files) - May contain unique scenarios worth reviewing
+- **Data files** (2 files) - Test configurations
+
+### Optional Follow-Up
+8 tests remain for evaluation to determine if they contain unique coverage scenarios:
+- test-issue-118-comprehensive-validation.ps1
+- test-comprehensive.ps1
+- test-appmode-functions-comprehensive.ps1
+- test-autopilot-profile-validation.ps1
+- test-authentication-types.ps1
+- test-scope-validation.ps1, test-scope-hierarchy.ps1
+- test-certificate-thumbprint-initialization.ps1, test-GetGraphAccessToken-Certificate.ps1
+- test-batch-optimization.ps1
+
+These can be reviewed and either migrated (if unique scenarios found) or archived (if redundant).1. **Robust Helper Architecture:** 3-tier system with 35+ reusable functions- Comprehensive documentation in test headers
 
 
 2. **Cross-Version Compatibility:** Reliable operation on PS 5.1 and 7+

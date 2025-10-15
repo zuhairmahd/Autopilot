@@ -25,13 +25,9 @@
 param(
     [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
     [string]$TestType = 'All',
-    
     [string]$TestFile,
-    
     [switch]$EnableCodeCoverage,
-    
     [switch]$CI,
-    
     [string[]]$Tags = @()
 )
 
@@ -78,7 +74,7 @@ if ($Tags.Count -gt 0)
 # Display configuration
 Write-Host "`nTest Configuration:" -ForegroundColor Cyan
 Write-Host "  Test Type: $TestType" -ForegroundColor White
-Write-Host "  Test Path: $($config.Run.Path)" -ForegroundColor White
+Write-Host "  Test Path ($($config.Run.Path.DESCRIPTION)): $($config.Run.Path.Value)" -ForegroundColor White
 Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
 if ($Tags.Count -gt 0)
 {
@@ -107,6 +103,38 @@ try
     Write-Host "  Failed: $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0) { 'Red' } else { 'Gray' })
     Write-Host "  Skipped: $($result.SkippedCount)" -ForegroundColor Gray
     Write-Host "  Duration: $($duration.TotalSeconds.ToString('F2'))s" -ForegroundColor White
+    
+    # Display failed test details if any
+    if ($result.FailedCount -gt 0)
+    {
+        Write-Host "`n  Failed Tests:" -ForegroundColor Red
+        
+        # Group failed tests by file
+        $failedByFile = $result.Failed | Group-Object -Property { 
+            if ($_.ScriptBlock.File)
+            {
+                Split-Path $_.ScriptBlock.File -Leaf
+            }
+            else
+            {
+                "Unknown File"
+            }
+        } | Sort-Object Name
+        
+        foreach ($fileGroup in $failedByFile)
+        {
+            Write-Host "`n    $($fileGroup.Name) ($($fileGroup.Count) failure$(if ($fileGroup.Count -ne 1) {'s'})):" -ForegroundColor Yellow
+            foreach ($test in $fileGroup.Group)
+            {
+                Write-Host "      - $($test.ExpandedName)" -ForegroundColor Red
+                if ($test.ErrorRecord)
+                {
+                    Write-Host "        Error: $($test.ErrorRecord.Exception.Message)" -ForegroundColor DarkRed
+                }
+            }
+        }
+        Write-Host ""
+    }
     
     if ($config.CodeCoverage.Enabled)
     {
