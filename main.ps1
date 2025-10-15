@@ -176,7 +176,7 @@ param(
     [string]$AuthType,
     [ValidateSet('file', 'memory')]
     [string]$CacheType,
-    [ValidateSet('github', 'gitlab')]
+    [ValidateSet('github')]
     [string]$Repo,
     [string]$Release,
     [ValidateSet('full', 'helpDesk', 'advanced', 'advancedRegistration', 'registration', 'admin', 'custom')]
