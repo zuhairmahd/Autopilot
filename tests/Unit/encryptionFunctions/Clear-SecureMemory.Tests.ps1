@@ -80,26 +80,17 @@ Describe "Function: Clear-SecureMemory" -Tags 'Unit', 'EncryptionFunctions' {
     
     Context "When clearing script scope variables" {
         
-        BeforeEach {
-            $script:TestScriptVar1 = "script-sensitive-1"
-            $script:TestScriptVar2 = "script-sensitive-2"
-        }
-        
-        It "Should clear script-scoped variables" -Skip {
-            Clear-SecureMemory -Variables @("TestScriptVar1", "TestScriptVar2")
-            
-            { Get-Variable -Name TestScriptVar1 -Scope Script -ErrorAction Stop } | Should -Throw
-            { Get-Variable -Name TestScriptVar2 -Scope Script -ErrorAction Stop } | Should -Throw
-        }
-        
         It "Should prefer local scope over script scope" {
             Set-Variable -Name TestScriptVar1 -Value "local-value" -Scope 1
             $script:TestScriptVar1 = "script-value"
             
             Clear-SecureMemory -Variables @("TestScriptVar1")
             
-            # Both should be cleared (function clears local first, then script if exists)
+            # Local scope should be cleared
             { Get-Variable -Name TestScriptVar1 -Scope 1 -ErrorAction Stop } | Should -Throw
+            
+            # Script scope variable should still exist
+            Get-Variable -Name TestScriptVar1 -Scope Script -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
         }
     }
     

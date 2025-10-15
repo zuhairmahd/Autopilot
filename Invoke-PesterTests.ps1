@@ -10,6 +10,8 @@
     Path to a single test file to run (overrides TestType)
 .PARAMETER EnableCodeCoverage
     Enable code coverage analysis
+.PARAMETER ShowMissedCommands
+    Show detailed list of commands without coverage (requires -EnableCodeCoverage)
 .PARAMETER CI
     Run in CI/CD mode with NUnit XML output
 .PARAMETER Tags
@@ -20,6 +22,8 @@
     .\Invoke-PesterTests.ps1 -TestFile "tests\Integration\SettingsFunctions.Tests.ps1"
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -CI
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -EnableCodeCoverage -ShowMissedCommands
 #>
 [CmdletBinding()]
 param(
@@ -27,6 +31,7 @@ param(
     [string]$TestType = 'All',
     [string]$TestFile,
     [switch]$EnableCodeCoverage,
+    [switch]$ShowCodeCoverageDetails,
     [switch]$CI,
     [string[]]$Tags = @()
 )
@@ -92,7 +97,8 @@ try
     
     $endTime = Get-Date
     $duration = $endTime - $startTime
-    
+    $global:res = $result
+    $global:cf = $config
     # Display results
     Write-Host "`n" -NoNewline
     Write-Host "=" * 63 -ForegroundColor Cyan
@@ -136,19 +142,67 @@ try
         Write-Host ""
     }
     
-    if ($config.CodeCoverage.Enabled)
+    # Display skipped test details if any
+    if ($result.SkippedCount -gt 0)
+    {
+        Write-Host "`n  Skipped Tests:" -ForegroundColor Yellow
+        
+        # Group skipped tests by file
+        $skippedByFile = $result.Skipped | Group-Object -Property { 
+            if ($_.ScriptBlock.File)
+            {
+                Split-Path $_.ScriptBlock.File -Leaf
+            }
+            else
+            {
+                "Unknown File"
+            }
+        } | Sort-Object Name
+        
+        foreach ($fileGroup in $skippedByFile)
+        {
+            Write-Host "`n    $($fileGroup.Name) ($($fileGroup.Count) skipped):" -ForegroundColor DarkYellow
+            foreach ($test in $fileGroup.Group)
+            {
+                Write-Host "      - $($test.ExpandedName)" -ForegroundColor Gray
+            }
+        }
+        Write-Host ""
+    }
+    
+    # Display code coverage only if enabled
+    if ($EnableCodeCoverage -and $result.CodeCoverage)
     {
         $coverage = $result.CodeCoverage
-        $coveragePercent = if ($coverage.NumberOfCommandsAnalyzed -gt 0)
-        {
-            ($coverage.NumberOfCommandsExecuted / $coverage.NumberOfCommandsAnalyzed) * 100
-        }
-        else { 0 }
-        
+        $global:cv = $coverage
         Write-Host "`nCode Coverage:" -ForegroundColor Cyan
-        Write-Host "  Commands Analyzed: $($coverage.NumberOfCommandsAnalyzed)" -ForegroundColor White
-        Write-Host "  Commands Executed: $($coverage.NumberOfCommandsExecuted)" -ForegroundColor White
-        Write-Host "  Coverage: $($coveragePercent.ToString('F2'))%" -ForegroundColor $(if ($coveragePercent -ge 80) { 'Green' } elseif ($coveragePercent -ge 60) { 'Yellow' } else { 'Red' })
+        Write-Host "  Commands Analyzed: $($coverage.CommandsAnalyzedCount)" -ForegroundColor White
+        Write-Host "  Commands Executed: $($coverage.CommandsExecutedCount)" -ForegroundColor White
+        Write-Host "Commands missed: $($coverage.CommandsMissedCount)" -ForegroundColor White
+        Write-Host "Files analyzed: $($coverage.FilesAnalyzedCount)" -ForegroundColor White
+        Write-Host "  Coverage: $($coverage.CoveragePercent)" -ForegroundColor $(if ($coverage.CoveragePercent -ge 80) { 'Green' } elseif ($coverage.CoveragePercent -ge 60) { 'Yellow' } else { 'Red' })
+        Write-Host "Coverage target: $($coverage.CoveragePercentTarget)"
+        
+        # Show detailed list ONLY if requested
+        if ($ShowCodeCoverageDetails)
+        {
+            if ($coverage.CommandsMissedCount -gt 0)
+            {
+                Write-Host "`n  Missed Commands:" -ForegroundColor Yellow    
+                Write-Host $coverage.CommandsMissed
+            }
+            if ($coverage.CommandsExecutedCount -gt 0)
+            {
+                Write-Host "`n  Executed Commands:" -ForegroundColor Green
+                Write-Host $coverage.CommandsExecuted
+            }
+            if ($coverage.FilesAnalyzedCount -gt 0)
+            {
+                Write-Host "`n Analyzed Files:" -ForegroundColor Green
+                Write-Host $coverage.FilesAnalyzed
+            }
+        }
+        
         Write-Host "  Report: $($config.CodeCoverage.OutputPath)" -ForegroundColor Gray
     }
     

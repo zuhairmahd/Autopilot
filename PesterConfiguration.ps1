@@ -19,7 +19,7 @@ function Get-AutopilotPesterConfiguration
     $config = New-PesterConfiguration
     
     # Output configuration
-    $config.Output.Verbosity = 'Detailed'
+    $config.Output.Verbosity = 'Normal'
     
     # Test discovery
     switch ($TestType)

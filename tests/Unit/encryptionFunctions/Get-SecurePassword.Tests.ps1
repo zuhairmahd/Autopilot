@@ -230,10 +230,13 @@ Describe "Function: Get-SecurePassword" -Tags 'Unit', 'EncryptionFunctions' {
             # In Silent mode, function returns the stored variable directly
             # Convert the stored password to verify correctness
             $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($script:UserEncryptionPassword)
-            try {
+            try
+            {
                 $plainText = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
                 $plainText | Should -Be $originalPassword
-            } finally {
+            }
+            finally
+            {
                 [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
             }
         }
