@@ -3,8 +3,11 @@ name: test-build-release
 on:
   push:
     branches:
-      - '**'
-  
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
 permissions:
   contents: write
 
@@ -27,21 +30,15 @@ jobs:
           Write-Host "Using PowerShell version: $($PSVersionTable.PSVersion)"
           if ($PSVersionTable.PSVersion.Major -lt 7) { Write-Error "PowerShell 7+ is required."; exit 1 }
 
-      - name: Run tests - syntax
+      - name: Install build dependencies
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory syntax
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name pester -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Run tests - core
+      - name: Run Pester test suite
         shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory core
-
-      - name: Run tests - unit
-        shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory unit
-
-      - name: Run tests - integration
-        shell: pwsh
-        run: .\TestScripts\Test-Runner.ps1 -TestCategory integration
+        run: .\Invoke-PesterTests.ps1
 
   # ===================== DYNAMIC BRANCH BUILD & SIGN =====================
   build:
