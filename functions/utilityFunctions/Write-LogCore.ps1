@@ -1,83 +1,63 @@
-<#
-.SYNOPSIS
-Writes log messages using the C# LogCore engine with automatic fallback to PowerShell logging.
-
-.DESCRIPTION
-This function provides a unified interface to the Autopilot.LogCore C# logging engine.
-If the LogCore DLL is loaded, it uses the high-performance C# logger with async capabilities.
-If the DLL is not available, it falls back to the PowerShell Write-Log function.
-
-The LogCore engine provides:
-- 5-15x performance improvement over PowerShell logging
-- Thread-safe synchronous and asynchronous logging
-- CMTrace format support
-- Automatic log rotation
-- Batch writing for improved I/O performance
-
-.PARAMETER Message
-The message to write to the log file.
-
-.PARAMETER Level
-The log level: Error (1), Warning (2), Information (3), Verbose (4), Debug (5).
-Default is Information (3).
-
-.PARAMETER Component
-The component or function name generating the log entry.
-Default is extracted from the calling function.
-
-.PARAMETER LogFilePath
-Full path to the log file.
-Default is retrieved from global $settings.LogFilePath.
-
-.PARAMETER UseCMTraceFormat
-Whether to use CMTrace format for log entries.
-Default is $true.
-
-.PARAMETER Async
-Whether to use asynchronous logging (non-blocking).
-Default is $false (synchronous logging).
-
-.PARAMETER MaxLogSizeMB
-Maximum log file size in MB before rotation.
-Default is 10 MB.
-
-.EXAMPLE
-Write-LogCore -Message "Device registration completed successfully" -Level Information
-
-.EXAMPLE
-Write-LogCore -Message "Failed to connect to Graph API" -Level Error -Component "Get-GraphAccessToken"
-
-.EXAMPLE
-Write-LogCore -Message "Starting batch processing" -Level Verbose -Async
-
-.NOTES
-Author: Autopilot Team
-Requires: Autopilot.LogCore.dll (optional - falls back to PowerShell if unavailable)
-#>
-
-function Write-LogCore
+function Write-LogCore()
 {
+    <#
+    .SYNOPSIS
+        Writes log messages using the C# LogCore engine with automatic fallback to PowerShell logging.
+    .DESCRIPTION
+        This function provides a unified interface to the Autopilot.LogCore C# logging engine.
+        If the LogCore DLL is loaded, it uses the high-performance C# logger with async capabilities.
+        If the DLL is not available, it falls back to the PowerShell Write-Log function.
+        The LogCore engine provides:
+        - 5-15x performance improvement over PowerShell logging
+        - Thread-safe synchronous and asynchronous logging
+        - CMTrace format support
+        - Automatic log rotation
+        - Batch writing for improved I/O performance
+    .PARAMETER Message
+        The message to write to the log file.
+    .PARAMETER Level
+        The log level: Error (1), Warning (2), Information (3), Verbose (4), Debug (5).
+        Default is Information (3).
+    .PARAMETER Component
+        The component or function name generating the log entry.
+        Default is extracted from the calling function.
+    .PARAMETER LogFilePath
+        Full path to the log file.
+        Default is retrieved from global $settings.LogFilePath.
+    .PARAMETER UseCMTraceFormat
+        Whether to use CMTrace format for log entries.
+        Default is $true.
+    .PARAMETER Async
+        Whether to use asynchronous logging (non-blocking).
+        Default is $false (synchronous logging).
+    .PARAMETER MaxLogSizeMB
+        Maximum log file size in MB before rotation.
+        Default is 10 MB.
+    .EXAMPLE
+        Write-LogCore -Message "Device registration completed successfully" -Level Information
+    .EXAMPLE
+        Write-LogCore -Message "Failed to connect to Graph API" -Level Error -Component "Get-GraphAccessToken"
+    .EXAMPLE
+        Write-LogCore -Message "Starting batch processing" -Level Verbose -Async
+    .NOTES
+        Author: Autopilot Team
+        Requires: Autopilot.LogCore.dll (optional - falls back to PowerShell if unavailable)
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
         [string]$Message,
-        
         [Parameter(Mandatory = $false)]
         [ValidateSet('Error', 'Warning', 'Information', 'Verbose', 'Debug', 1, 2, 3, 4, 5)]
         $Level = 'Information',
-        
         [Parameter(Mandatory = $false)]
         [string]$Component = "",
-        
         [Parameter(Mandatory = $false)]
         [string]$LogFilePath = "",
-        
         [Parameter(Mandatory = $false)]
         [bool]$UseCMTraceFormat = $true,
-        
         [Parameter(Mandatory = $false)]
         [switch]$Async,
-        
         [Parameter(Mandatory = $false)]
         [int]$MaxLogSizeMB = 10
     )
@@ -204,33 +184,26 @@ function Write-LogCore
     }
 }
 
-<#
-.SYNOPSIS
-Writes a separator line to the log file.
-
-.DESCRIPTION
-Writes a visual separator to the log file for better readability.
-
-.PARAMETER Text
-Optional text to include in the separator line.
-
-.PARAMETER Async
-Whether to use asynchronous logging.
-
-.EXAMPLE
-Write-LogCoreSeparator -Text "Starting New Session"
-
-.EXAMPLE
-Write-LogCoreSeparator
-#>
-
-function Write-LogCoreSeparator
+function Write-LogCoreSeparator()
 {
+    <#
+    .SYNOPSIS
+        Writes a separator line to the log file.
+    .DESCRIPTION
+        Writes a visual separator to the log file for better readability.
+    .PARAMETER Text
+        Optional text to include in the separator line.
+    .PARAMETER Async
+        Whether to use asynchronous logging.
+    .EXAMPLE
+        Write-LogCoreSeparator -Text "Starting New Session"
+    .EXAMPLE
+        Write-LogCoreSeparator
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
         [string]$Text = "",
-        
         [Parameter(Mandatory = $false)]
         [switch]$Async
     )
@@ -263,27 +236,22 @@ function Write-LogCoreSeparator
     }
 }
 
-<#
-.SYNOPSIS
-Gracefully shuts down the LogCore logger.
-
-.DESCRIPTION
-Flushes any pending async log entries and shuts down the background logging thread.
-Should be called before application exit when using async logging.
-
-.PARAMETER TimeoutSeconds
-Maximum time to wait for pending entries to flush.
-Default is 5 seconds.
-
-.EXAMPLE
-Stop-LogCore
-
-.EXAMPLE
-Stop-LogCore -TimeoutSeconds 10
-#>
-
-function Stop-LogCore
+function Stop-LogCore()
 {
+    <#
+    .SYNOPSIS
+        Gracefully shuts down the LogCore logger.
+    .DESCRIPTION
+        Flushes any pending async log entries and shuts down the background logging thread.
+        Should be called before application exit when using async logging.
+    .PARAMETER TimeoutSeconds
+        Maximum time to wait for pending entries to flush.
+        Default is 5 seconds.
+    .EXAMPLE
+        Stop-LogCore
+    .EXAMPLE
+        Stop-LogCore -TimeoutSeconds 10
+    #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $false)]
@@ -318,31 +286,28 @@ function Stop-LogCore
     }
 }
 
-<#
-.SYNOPSIS
-Gets logging statistics from the LogCore logger.
-
-.DESCRIPTION
-Retrieves performance metrics and statistics from the C# logger.
-
-.EXAMPLE
-Get-LogCoreStatistics
-
-.OUTPUTS
-PSCustomObject with logging statistics
-#>
-
-function Get-LogCoreStatistics
+function Get-LogCoreStatistics()
 {
+    <#
+    .SYNOPSIS
+        Gets logging statistics from the LogCore logger.
+    .DESCRIPTION
+        Retrieves performance metrics and statistics from the C# logger.
+    .EXAMPLE
+        Get-LogCoreStatistics
+    .OUTPUTS
+        PSCustomObject with logging statistics
+    #>
     [CmdletBinding()]
     param()
-    
+
+    $functionName = $MyInvocation.MyCommand.Name
     if ($global:AutopilotLogger)
     {
         try
         {
             $stats = $global:AutopilotLogger.GetStatistics()
-            
+            Write-Verbose "[$functionName] Retrieved LogCore statistics"        
             return [PSCustomObject]@{
                 TotalEntriesWritten = $stats.TotalEntriesWritten
                 AsyncEntriesWritten = $stats.AsyncEntriesWritten
@@ -354,16 +319,17 @@ function Get-LogCoreStatistics
                 LastEntryTime       = $stats.LastEntryTime
                 AverageWriteTimeMs  = $stats.AverageWriteTimeMs
             }
+            Write-Verbose "[$functionName] LogCore statistics retrieval complete"
         }
         catch
         {
-            Write-Warning "Error getting LogCore statistics: $_"
+            Write-Warning "[$functionName] Error getting LogCore statistics: $_"
             return $null
         }
     }
     else
     {
-        Write-Warning "LogCore logger not initialized"
+        Write-Warning "[$functionName] LogCore logger not initialized"
         return $null
     }
 }

@@ -44,6 +44,19 @@ Thread-safe directory object caching with LRU eviction.
 - Thread-safe operations: No locking overhead
 - LRU eviction: Automatic memory management
 
+### 4. **Autopilot.LogCore**
+High-performance logging engine with CMTrace format support.
+
+**Components:**
+- `Logger` - Thread-safe logging with synchronous and asynchronous operations
+- `LogStatistics` - Real-time logging statistics and performance metrics
+
+**Performance:**
+- Log writes: **10-20x faster** than PowerShell file operations
+- CMTrace format: Native support for Configuration Manager trace logs
+- Async logging: Non-blocking background queue processing
+- Log rotation: Automatic size-based rotation
+
 ## Building
 
 ### Requirements
@@ -68,7 +81,8 @@ Compiled DLLs are placed in:
 bin/Release/
 ├── Autopilot.GraphCore.dll
 ├── Autopilot.DeviceCore.dll
-└── Autopilot.CacheCore.dll
+├── Autopilot.CacheCore.dll
+└── Autopilot.LogCore.dll
 ```
 
 ## Usage in PowerShell
@@ -78,6 +92,7 @@ bin/Release/
 Add-Type -Path "bin/Release/Autopilot.GraphCore.dll"
 Add-Type -Path "bin/Release/Autopilot.DeviceCore.dll"
 Add-Type -Path "bin/Release/Autopilot.CacheCore.dll"
+Add-Type -Path "bin/Release/Autopilot.LogCore.dll"
 ```
 
 ### Example: Graph API Client
@@ -127,16 +142,38 @@ $cache.Set("user-john@contoso.com", $userObject)
 
 # Retrieve object
 $result = $cache.Get("user-john@contoso.com")
-if ($result.Found) {
-    $user = $result.Value
+if ($result.Item1) {  # Item1 = Found (bool)
+    $user = $result.Item2  # Item2 = Value (object)
 }
 
 # Get statistics
 $stats = $cache.GetStats()
-Write-Host "Cache: $($stats.ValidEntries)/$($stats.MaxSize) ($($stats.FillPercentage)% full)"
+Write-Host "Cache: $($stats.TotalEntries)/$($stats.MaxSize) entries"
+Write-Host "Hit rate: $($stats.HitRate.ToString('P1'))"
 
 # Cleanup expired entries
 $removed = $cache.CleanupExpired()
+```
+
+### Example: Logging
+```powershell
+# Initialize logger (file path, log level, CMTrace format, max size MB, async)
+$logLevel = [Autopilot.LogCore.Logger+LogLevel]::Information
+$logger = [Autopilot.LogCore.Logger]::new("C:\Logs\Autopilot.log", $logLevel, $true, 10, $false)
+
+# Write log entries
+$logger.WriteLog("DeviceModule", "Device registered successfully", [Autopilot.LogCore.Logger+LogLevel]::Information)
+$logger.WriteLog("GraphModule", "API call failed", [Autopilot.LogCore.Logger+LogLevel]::Error)
+
+# Write separator
+$logger.WriteSeparator()
+
+# Get statistics
+$stats = $logger.GetStatistics()
+Write-Host "Total logs: $($stats.TotalLogs)"
+
+# Shutdown (flush async queue)
+$logger.Shutdown()
 ```
 
 ## Wrapper Functions
@@ -204,9 +241,12 @@ src/
 ├── Autopilot.DeviceCore/
 │   ├── DeviceFilter.cs
 │   └── Autopilot.DeviceCore.csproj
-└── Autopilot.CacheCore/
-    ├── DirectoryObjectCache.cs
-    └── Autopilot.CacheCore.csproj
+├── Autopilot.CacheCore/
+│   ├── DirectoryObjectCache.cs
+│   └── Autopilot.CacheCore.csproj
+└── Autopilot.LogCore/
+    ├── Logger.cs
+    └── Autopilot.LogCore.csproj
 ```
 
 ### Adding New Features
@@ -237,13 +277,18 @@ Measure-Command {
 
 ## Documentation
 
-For comprehensive guides, see the [`docs/dotnet/`](../docs/dotnet/) directory:
+### 📚 Complete Documentation
 
-- **[DLL_REFERENCE.md](../docs/dotnet/DLL_REFERENCE.md)** - Complete usage guide and API reference
+For comprehensive guides and detailed information, see **[`docs/dotnet/README.md`](../docs/dotnet/README.md)** - the complete documentation index.
+
+### Quick Links
+
+- **[DLL_REFERENCE.md](../docs/dotnet/DLL_REFERENCE.md)** - Complete usage guide and API reference for all 4 DLLs
 - **[BUILD_GUIDE.md](../docs/dotnet/BUILD_GUIDE.md)** - Building, compilation, and multi-targeting
 - **[TROUBLESHOOTING.md](../docs/dotnet/TROUBLESHOOTING.md)** - Diagnostics and error resolution
 - **[NUGET_CONFIGURATION.md](../docs/dotnet/NUGET_CONFIGURATION.md)** - NuGet package management
 - **[PS51_COMPATIBILITY.md](../docs/dotnet/PS51_COMPATIBILITY.md)** - PowerShell 5.1 specific information
+- **[VERIFICATION_SCRIPT_UPDATE.md](../docs/dotnet/VERIFICATION_SCRIPT_UPDATE.md)** - DLL verification tool details
 
 ## Quick Troubleshooting
 
