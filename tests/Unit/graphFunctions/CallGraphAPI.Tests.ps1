@@ -556,4 +556,12 @@ Describe "Function: CallGraphAPI" -Tags 'Unit', 'GraphFunctions' {
             Should -Invoke Write-Log -ParameterFilter { $Message -match "call was successful" }
         }
     }
+    
+    AfterAll {
+        # Clean up TestDrive to prevent GUID folder remnants
+        if (Test-Path "TestDrive:\")
+        {
+            Get-ChildItem "TestDrive:\" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+    }
 }

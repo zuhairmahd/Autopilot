@@ -364,4 +364,12 @@ Describe "Function: GetDeviceInfo" -Tags 'Unit', 'AutopilotFunctions' {
             Should -Invoke Write-Log -ParameterFilter { $message -match "Checking whether the device manufacturer" }
         }
     }
+    
+    AfterAll {
+        # Clean up TestDrive to prevent GUID folder remnants
+        if (Test-Path "TestDrive:\")
+        {
+            Get-ChildItem "TestDrive:\" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
