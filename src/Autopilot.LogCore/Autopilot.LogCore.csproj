@@ -1,10 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;net9.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AssemblyName>Autopilot.LogCore</AssemblyName>
+    <RootNamespace>Autopilot.LogCore</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>Windows Autopilot Management Tool Team</Authors>
+    <Description>High-performance logging engine for Autopilot with async operations and CMTrace format support</Description>
   </PropertyGroup>
 
   <!-- Conditional ImplicitUsings only for net9.0 -->
@@ -12,7 +16,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <!-- System.Text.Json required for netstandard2.0 -->
+  <!-- System.Text.Json for both targets (built into net9.0, needs package for netstandard2.0) -->
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
