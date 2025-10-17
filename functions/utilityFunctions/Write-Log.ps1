@@ -72,11 +72,13 @@ function Write-Log()
         [string]$MinimumLogLevel
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
     # Check if LogCore DLL is available for high-performance logging
     $useLogCore = $false
     if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.LogCoreLoaded -and -not ($StartLogging -or $FinishLogging))
     {
         $useLogCore = $true
+        Write-Verbose "[$functionName] Using LogCore DLL for logging in function $functionName."
     }
     
     try
@@ -85,6 +87,7 @@ function Write-Log()
         if ($useLogCore)
         {
             # Initialize global logger if not already done
+            Write-Verbose "[$functionName] Initializing AutopilotLogger in function $functionName."
             if (-not $global:AutopilotLogger)
             {
                 $global:AutopilotLogger = New-Object Autopilot.LogCore.Logger(
@@ -92,6 +95,7 @@ function Write-Log()
                     $CMTraceFormat.IsPresent,
                     $MaxLogSizeMB
                 )
+                Write-Verbose "[$functionName] AutopilotLogger initialized."
             }
             
             # Convert LogLevel string to numeric for LogCore
@@ -118,10 +122,11 @@ function Write-Log()
                 
                 $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
                 $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
-                
+                Write-Verbose "[$functionName] Current log level value: $currentLogLevelValue, Minimum log level value: $minimumLogLevelValue."
                 if ($currentLogLevelValue -gt $minimumLogLevelValue)
                 {
                     # Skip logging but still write to console if requested
+                    Write-Verbose "[$functionName] Skipping log entry due to minimum log level filtering."
                     if ($WriteToConsole)
                     {
                         switch ($LogLevel)
@@ -155,6 +160,7 @@ function Write-Log()
             # Return log entry if PassThru is specified
             if ($PassThru)
             {
+                Write-Verbose "[$functionName] Returning log entry object since Passthru is $passThru."
                 return [PSCustomObject]@{
                     Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
                     LogLevel  = $LogLevel
@@ -173,10 +179,12 @@ function Write-Log()
         if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
         {
             $MinimumLogLevel = $Global:MinimumLogLevel
+            Write-Verbose "[$functionName] Using global MinimumLogLevel: $MinimumLogLevel."
         }
         elseif (-not $MinimumLogLevel)
         {
             $MinimumLogLevel = 'Information'
+            Write-Verbose "[$functionName] Using default MinimumLogLevel: $MinimumLogLevel."
         }
         
         # Define log level hierarchy (higher numbers = more detailed logging)
@@ -194,7 +202,7 @@ function Write-Log()
             # Set default values when using StartLogging or FinishLogging
             $Module = $MyInvocation.MyCommand.Name
             $LogLevel = "Information"
-            
+            Write-Verbose "[$functionName] Creating separator line for logging."
             # Create separator line
             $separatorLine = "=" * 80
             
@@ -203,11 +211,13 @@ function Write-Log()
             if (-not (Test-Path $logDir))
             {
                 New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+                Write-Verbose "[$functionName] Created log directory: $logDir."
             }
             
             if ($OverwriteLog)
             {
                 Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue
+                Write-Verbose "[$functionName] Overwritten existing log file: $LogFile."
             }   
             
             # Check for log rotation if file exists and is too large
@@ -225,11 +235,13 @@ function Write-Log()
                 $cmDate = Get-Date -Format "MM-dd-yyyy"
                 $thread = [System.Threading.Thread]::CurrentThread.ManagedThreadId
                 $logEntry = "<![LOG[$separatorLine]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"1`" thread=`"$thread`" file=`"`">"
+                Write-Verbose "[$functionName] Created CMTrace formatted separator line."
             }
             else
             {
                 # For standard format, just use the separator line without timestamp
                 $logEntry = $separatorLine
+                Write-Verbose "[$functionName] Created standard log entry."
             }
             
             # Use mutex for thread safety
@@ -240,11 +252,13 @@ function Write-Log()
             {
                 $mutex.WaitOne() | Out-Null
                 Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+                Write-Verbose "[$functionName] Log entry added to file: $LogFile."
             }
             finally
             {
                 $mutex.ReleaseMutex()
                 $mutex.Dispose()
+                Write-Verbose "[$functionName] Released mutex and disposed."
             }
             
             # Write to console
@@ -261,7 +275,7 @@ function Write-Log()
         {
             $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
             $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
-            
+            Write-Verbose "[$functionName] Current log level value: $currentLogLevelValue, Minimum log level value: $minimumLogLevelValue."
             if ($currentLogLevelValue -gt $minimumLogLevelValue)
             {
                 # Current log level is more detailed than the minimum, skip logging to file
@@ -301,6 +315,7 @@ function Write-Log()
                         # For Information level, we don't output to console in this case
                     }
                 }
+                Write-Verbose "[$functionName] Skipping log entry due to minimum log level filtering."
                 return
             }
         }
@@ -310,6 +325,7 @@ function Write-Log()
         if (-not (Test-Path $logDir))
         {
             New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+            Write-Verbose "[$functionName] Created log directory: $logDir."
         }
         
         # Check for log rotation if file exists and is too large
@@ -329,15 +345,18 @@ function Write-Log()
             if ($IsWindows -or ($null -eq $IsWindows -and $env:OS -eq "Windows_NT"))
             {
                 $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+                Write-Verbose "[$functionName] Detected Windows context: $Context."
             }
             else
             {
                 $Context = $env:USER
+                Write-Verbose "[$functionName] Detected non-Windows context: $Context."
             }
         }
         catch 
         {
             $Context = "Unknown"
+            Write-Verbose "[$functionName] Failed to detect context, set to Unknown."
         }
         if ($CMTraceFormat)
         {
@@ -360,11 +379,14 @@ function Write-Log()
                 }
             }
             $logEntry = "<![LOG[$Message]LOG]!><time=`"$cmTime`" date=`"$cmDate`" component=`"$Module`" context=`"`" type=`"$severity`" thread=`"$thread`" file=`"`">"
+            Write-Verbose "[$functionName] Created CMTrace formatted log entry."
         }
         else
         {
             # Enhanced standard format with thread ID
             $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] [Context:$Context] $Message"
+            Write-Verbose
+            Write-Verbose "[$functionName] Created standard log entry."
         }
         
         # Use mutex for thread safety in concurrent scenarios
@@ -375,11 +397,13 @@ function Write-Log()
         {
             $mutex.WaitOne() | Out-Null
             Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8 -Force
+            Write-Verbose "[$functionName] Log entry added to file: $LogFile."
         }
         finally
         {
             $mutex.ReleaseMutex()
             $mutex.Dispose()
+            Write-Verbose "[$functionName] Released mutex and disposed."
         }
         
         # Write to appropriate PowerShell stream based on log level
@@ -421,10 +445,11 @@ function Write-Log()
                 }
             }
         }
-        
+        Write-Verbose "[$functionName] Completed writing log entry and console output."
         # Return log entry if PassThru is specified
         if ($PassThru)
         {
+            Write-Verbose "[$functionName] Returning log entry object since Passthru is $passThru."
             return [PSCustomObject]@{
                 Timestamp = $timestamp
                 LogLevel  = $LogLevel
@@ -462,5 +487,6 @@ function Write-Log()
                 }
             }
         )
+        Write-Verbose "[$functionName] Fallback to console output."
     }
 }
