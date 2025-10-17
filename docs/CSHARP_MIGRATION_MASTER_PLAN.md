@@ -61,8 +61,7 @@ Systematic migration plan to achieve **10-40x performance improvements** across 
 ### 1.2 Build Infrastructure ✅
 
 **Files Created**:
-- `Build-NativeDlls.ps1` - Automated compilation (Debug/Release)
-- `Build-And-Publish-Dlls.ps1` - Multi-target publishing (netstandard2.0 + net9.0)
+- `Build-NativeDlls.ps1` - Multi-target build with publish (netstandard2.0 + net9.0)
 - `nuget.config` - NuGet package management
 - `Copy-MultiTargetDlls.ps1` - DLL distribution helper
 
@@ -72,14 +71,21 @@ Systematic migration plan to achieve **10-40x performance improvements** across 
 
 **Build Commands**:
 ```powershell
-# Quick build (default: Release, netstandard2.0)
+# Multi-target build (both frameworks with all dependencies)
 .\Build-NativeDlls.ps1
-
-# Multi-target build (both frameworks)
-.\Build-And-Publish-Dlls.ps1
 
 # Clean build
 .\Build-NativeDlls.ps1 -Configuration Release -Clean
+
+# Verbose output
+.\Build-NativeDlls.ps1 -Verbose
+```
+
+**Output Structure**:
+```
+bin/Release/
+├── netstandard2.0/    # PS 5.1 + dependencies
+└── net9.0/            # PS 7+ + dependencies
 ```
 
 ### 1.3 Testing & Verification ✅
@@ -1238,8 +1244,7 @@ Before submitting changes, verify:
 - **[src/Autopilot.LogCore/](../src/Autopilot.LogCore/)** - High-performance logging
 
 ### Scripts
-- **[Build-NativeDlls.ps1](../Build-NativeDlls.ps1)** - Compile DLLs
-- **[Build-And-Publish-Dlls.ps1](../Build-And-Publish-Dlls.ps1)** - Multi-target build
+- **[Build-NativeDlls.ps1](../Build-NativeDlls.ps1)** - Multi-target build with publish
 - **[tools/Verify-DotNetSetup.ps1](../tools/Verify-DotNetSetup.ps1)** - Verify DLL loading
 - **[tools/Benchmark-DllPerformance.ps1](../tools/Benchmark-DllPerformance.ps1)** - Performance testing
 - **[Invoke-PesterTests.ps1](../Invoke-PesterTests.ps1)** - Run tests

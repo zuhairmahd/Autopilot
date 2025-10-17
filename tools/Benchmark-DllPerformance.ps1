@@ -11,11 +11,20 @@ param()
 Write-Host "`n=== Performance Benchmark: PowerShell vs C# DLLs ===" -ForegroundColor Cyan
 Write-Host "Testing device filtering and caching operations`n" -ForegroundColor Gray
 
+# Determine framework path based on PowerShell version
+$psVersion = $PSVersionTable.PSVersion.Major
+$framework = if ($psVersion -ge 7) { "net9.0" } else { "netstandard2.0" }
+$dllPath = "bin/Release/$framework"
+
+Write-Host "PowerShell Version: $($PSVersionTable.PSVersion)" -ForegroundColor Gray
+Write-Host "Using Framework: $framework" -ForegroundColor Gray
+Write-Host ""
+
 # Load DLLs
-$dllPath = "bin/Release"
 if (-not (Test-Path "$dllPath/Autopilot.DeviceCore.dll"))
 {
-    Write-Host "ERROR: DLLs not found. Run .\Build-NativeDlls.ps1 first" -ForegroundColor Red
+    Write-Host "ERROR: DLLs not found in $dllPath" -ForegroundColor Red
+    Write-Host "Run .\Build-NativeDlls.ps1 first" -ForegroundColor Yellow
     exit 1
 }
 

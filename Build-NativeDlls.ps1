@@ -1,9 +1,10 @@
 <#
 .SYNOPSIS
-    Compiles all C# performance DLLs for Autopilot
+    Builds and publishes all C# performance DLLs for Autopilot with multi-target support
 .DESCRIPTION
-    Builds Autopilot.GraphCore, Autopilot.DeviceCore, and Autopilot.CacheCore
-    projects into optimized DLLs for PowerShell integration.
+    Publishes Autopilot.GraphCore, Autopilot.DeviceCore, Autopilot.CacheCore, and Autopilot.LogCore
+    projects into optimized DLLs for PowerShell integration with all dependencies.
+    Outputs to bin/Release/netstandard2.0 (PS 5.1) and bin/Release/net9.0 (PS 7+).
     Provides 5-50x performance improvement for critical operations.
 .PARAMETER Configuration
     Build configuration: Debug or Release
@@ -15,20 +16,22 @@
     .\Build-NativeDlls.ps1 -Configuration Release
 .EXAMPLE
     .\Build-NativeDlls.ps1 -Clean -Verbose
+.NOTES
+    Uses 'dotnet publish' to ensure all NuGet dependencies are included.
+    Creates multi-target output for PowerShell 5.1 (netstandard2.0) and PowerShell 7+ (net9.0).
 #>
 
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
-    
     [switch]$Clean
 )
 
 $ErrorActionPreference = 'Stop'
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "  Autopilot C# DLL Build Script" -ForegroundColor Cyan
+Write-Host "  Autopilot C# DLL Build & Publish" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
 # Verify .NET SDK
@@ -60,6 +63,13 @@ $projects | ForEach-Object {
 }
 Write-Host ""
 
+# Define target frameworks for multi-target support
+$frameworks = @('netstandard2.0', 'net9.0')
+Write-Host "Target Frameworks: $($frameworks -join ', ')" -ForegroundColor Cyan
+Write-Host "  netstandard2.0 -> PowerShell 5.1 (.NET Framework 4.x)" -ForegroundColor Gray
+Write-Host "  net9.0 -> PowerShell 7+ (.NET 9.0)" -ForegroundColor Gray
+Write-Host ""
+
 # Clean if requested
 if ($Clean)
 {
@@ -69,7 +79,8 @@ if ($Clean)
     {
         Remove-Item "bin" -Recurse -Force
     }
-    Write-Host "  [OK] Cleaned`n" -ForegroundColor Green
+    Write-Host "  [OK] Cleaned" -ForegroundColor Green
+    Write-Host ""
 }
 
 # Restore NuGet packages
@@ -83,7 +94,8 @@ try
         Write-Host $restoreOutput -ForegroundColor Red
         exit 1
     }
-    Write-Host "  [OK] Packages restored`n" -ForegroundColor Green
+    Write-Host "  [OK] Packages restored" -ForegroundColor Green
+    Write-Host ""
 }
 catch
 {
@@ -91,74 +103,117 @@ catch
     exit 1
 }
 
-# Create output directory
-$outputDir = "bin/$Configuration"
-New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+# Create output directories for multi-target support
+$publishRoot = "bin\$Configuration"
+foreach ($framework in $frameworks)
+{
+    $frameworkPath = Join-Path $publishRoot $framework
+    New-Item -ItemType Directory -Path $frameworkPath -Force | Out-Null
+}
 
-# Build each project
+# Publish each project for each target framework
 $buildSuccess = $true
-$builtDlls = @()
+$builtDlls = @{}  # Dictionary: framework -> array of DLL paths
+$totalBuilds = $projects.Count * $frameworks.Count
+$successCount = 0
 
 foreach ($project in $projects)
 {
     $projectName = [System.IO.Path]::GetFileNameWithoutExtension($project.Name)
-    Write-Host "Building $projectName..." -ForegroundColor Cyan
     
-    $buildArgs = @(
-        'build'
-        $project.FullName
-        '--configuration', $Configuration
-        '--output', $outputDir
-        '--nologo'
-    )
-    
-    if ($VerbosePreference -eq 'Continue')
+    foreach ($framework in $frameworks)
     {
-        $buildArgs += '--verbosity', 'detailed'
-    }
-    else
-    {
-        $buildArgs += '--verbosity', 'minimal'
-    }
-    
-    $buildOutput = & dotnet @buildArgs 2>&1
-    
-    if ($LASTEXITCODE -ne 0)
-    {
-        Write-Host "  [FAILED] Build failed for $projectName" -ForegroundColor Red
-        Write-Host $buildOutput -ForegroundColor Red
-        $buildSuccess = $false
-    }
-    else
-    {
-        $dllPath = Join-Path $outputDir "$projectName.dll"
-        if (Test-Path $dllPath)
+        $frameworkPath = Join-Path $publishRoot $framework
+        Write-Host "Publishing $projectName ($framework)..." -ForegroundColor Cyan
+        
+        $publishArgs = @(
+            'publish'
+            $project.FullName
+            '--configuration', $Configuration
+            '--framework', $framework
+            '--output', $frameworkPath
+            '--no-self-contained'
+            '/p:DebugType=portable'
+            '--nologo'
+        )
+        
+        if ($VerbosePreference -eq 'Continue')
         {
-            $dllSize = (Get-Item $dllPath).Length / 1KB
-            Write-Host "  [OK] $projectName.dll ($($dllSize.ToString('F1')) KB)" -ForegroundColor Green
-            $builtDlls += $dllPath
+            $publishArgs += '--verbosity', 'detailed'
+        }
+        else
+        {
+            $publishArgs += '--verbosity', 'minimal'
+        }
+        
+        $publishOutput = & dotnet @publishArgs 2>&1
+        
+        if ($LASTEXITCODE -ne 0)
+        {
+            Write-Host "  [FAILED] Publish failed for $projectName ($framework)" -ForegroundColor Red
+            if ($VerbosePreference -eq 'Continue')
+            {
+                Write-Host $publishOutput -ForegroundColor Red
+            }
+            $buildSuccess = $false
+        }
+        else
+        {
+            $dllPath = Join-Path $frameworkPath "$projectName.dll"
+            if (Test-Path $dllPath)
+            {
+                $dllSize = (Get-Item $dllPath).Length / 1KB
+                Write-Host "  [OK] $projectName.dll ($($dllSize.ToString('F1')) KB)" -ForegroundColor Green
+                
+                if (-not $builtDlls.ContainsKey($framework))
+                {
+                    $builtDlls[$framework] = @()
+                }
+                $builtDlls[$framework] += $dllPath
+                $successCount++
+            }
         }
     }
+    Write-Host ""
 }
 
-Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 
-if ($buildSuccess)
+if ($buildSuccess -and $successCount -eq $totalBuilds)
 {
     Write-Host "  BUILD SUCCESSFUL" -ForegroundColor Green
     Write-Host "========================================`n" -ForegroundColor Cyan
     
-    Write-Host "Compiled DLLs:" -ForegroundColor Yellow
-    $builtDlls | ForEach-Object {
-        Write-Host "  $_" -ForegroundColor Gray
+    Write-Host "Build Summary:" -ForegroundColor Yellow
+    Write-Host "  Success: $successCount / $totalBuilds builds" -ForegroundColor Green
+    Write-Host ""
+    
+    foreach ($framework in $frameworks)
+    {
+        if ($builtDlls.ContainsKey($framework))
+        {
+            $dllCount = $builtDlls[$framework].Count
+            $allDllCount = (Get-ChildItem "$publishRoot\$framework\*.dll" -ErrorAction SilentlyContinue).Count
+            Write-Host "$framework ($allDllCount DLL files total):" -ForegroundColor Cyan
+            $builtDlls[$framework] | ForEach-Object {
+                $fileName = Split-Path $_ -Leaf
+                Write-Host "  - $fileName" -ForegroundColor Gray
+            }
+            Write-Host ""
+        }
     }
     
-    Write-Host "`nTo use in PowerShell:" -ForegroundColor Yellow
-    Write-Host "  Add-Type -Path '$outputDir\Autopilot.GraphCore.dll'" -ForegroundColor Gray
-    Write-Host "  Add-Type -Path '$outputDir\Autopilot.DeviceCore.dll'" -ForegroundColor Gray
-    Write-Host "  Add-Type -Path '$outputDir\Autopilot.CacheCore.dll'" -ForegroundColor Gray
+    Write-Host "Output Directories:" -ForegroundColor Yellow
+    Write-Host "  $publishRoot\netstandard2.0 (PowerShell 5.1)" -ForegroundColor Gray
+    Write-Host "  $publishRoot\net9.0 (PowerShell 7+)" -ForegroundColor Gray
+    Write-Host ""
     
-    Write-Host "`nExample usage:" -ForegroundColor Yellow
+    Write-Host "To use in PowerShell:" -ForegroundColor Yellow
+    Write-Host "  `$dllStatus = Initialize-AutopilotDlls -DLLPath '$publishRoot'" -ForegroundColor Gray
+    Write-Host "  # Automatically selects correct framework based on PS version" -ForegroundColor DarkGray
+    Write-Host ""
+    
+    Write-Host "Example usage:" -ForegroundColor Yellow
     Write-Host "  `$client = [Autopilot.GraphCore.GraphHttpClient]::new(`$accessToken)" -ForegroundColor Gray
     Write-Host "  `$devices = `$client.GetAsync('devices').GetAwaiter().GetResult()" -ForegroundColor Gray
     Write-Host ""
@@ -167,5 +222,7 @@ else
 {
     Write-Host "  BUILD FAILED" -ForegroundColor Red
     Write-Host "========================================`n" -ForegroundColor Cyan
+    Write-Host "Success: $successCount / $totalBuilds builds" -ForegroundColor Red
+    Write-Host ""
     exit 1
 }

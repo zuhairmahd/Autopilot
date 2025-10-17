@@ -100,7 +100,7 @@ foreach ($location in $dllLocations)
 
 if (-not $dllPath -or -not $allFound)
 {
-    Write-Host "`n   [WARN] DLLs not found. Run .\Build-NativeDlls.ps1 or .\Build-And-Publish-Dlls.ps1 first" -ForegroundColor Yellow
+    Write-Host "`n   [WARN] DLLs not found. Run .\Build-NativeDlls.ps1 first" -ForegroundColor Yellow
     exit 0
 }
 

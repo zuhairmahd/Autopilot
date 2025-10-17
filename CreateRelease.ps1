@@ -1552,27 +1552,43 @@ if (Test-Path $buildDllsScript)
         Write-Host "C# DLLs built successfully" -ForegroundColor Green
         Write-Log -logFile $logFile -Message "C# DLLs built successfully" -module $scriptName
         
-        # Verify DLLs were created
-        $dllPath = Join-Path -Path $PWD -ChildPath "bin\Release"
+        # Verify DLLs were created (check both netstandard2.0 and net9.0)
+        $dllBasePath = Join-Path -Path $PWD -ChildPath "bin\Release"
+        $frameworks = @('netstandard2.0', 'net9.0')
         $dlls = @(
             "Autopilot.GraphCore.dll",
             "Autopilot.DeviceCore.dll",
-            "Autopilot.CacheCore.dll"
+            "Autopilot.CacheCore.dll",
+            "Autopilot.LogCore.dll"
         )
         
         $missingDlls = @()
-        foreach ($dll in $dlls)
+        $verifiedFrameworks = @()
+        
+        foreach ($framework in $frameworks)
         {
-            $dllFile = Join-Path -Path $dllPath -ChildPath $dll
-            if (-not (Test-Path $dllFile))
+            $dllPath = Join-Path -Path $dllBasePath -ChildPath $framework
+            $frameworkComplete = $true
+            
+            foreach ($dll in $dlls)
             {
-                $missingDlls += $dll
-                Write-Warning "[$scriptName] Expected DLL not found: $dllFile"
-                Write-Log -logFile $logFile -Message "Expected DLL not found: $dllFile" -module $scriptName -LogLevel "Warning"
+                $dllFile = Join-Path -Path $dllPath -ChildPath $dll
+                if (-not (Test-Path $dllFile))
+                {
+                    $missingDlls += "$dll ($framework)"
+                    Write-Warning "[$scriptName] Expected DLL not found: $dllFile"
+                    Write-Log -logFile $logFile -Message "Expected DLL not found: $dllFile" -module $scriptName -LogLevel "Warning"
+                    $frameworkComplete = $false
+                }
+                else
+                {
+                    Write-Verbose "[$scriptName] Verified DLL exists: $dllFile"
+                }
             }
-            else
+            
+            if ($frameworkComplete)
             {
-                Write-Verbose "[$scriptName] Verified DLL exists: $dllFile"
+                $verifiedFrameworks += $framework
             }
         }
         
@@ -1584,35 +1600,41 @@ if (Test-Path $buildDllsScript)
         }
         else
         {
-            Write-Host "All C# DLLs verified successfully" -ForegroundColor Green
-            Write-Log -logFile $logFile -Message "All C# DLLs verified: $($dlls -join ', ')" -module $scriptName
+            Write-Host "All C# DLLs verified successfully for $($verifiedFrameworks -join ' and ')" -ForegroundColor Green
+            Write-Log -logFile $logFile -Message "All C# DLLs verified for: $($verifiedFrameworks -join ', ')" -module $scriptName
         }
         
-        # Copy DLLs to output folder
-        if (Test-Path $dllPath)
+        # Copy DLLs to output folder (multi-target structure)
+        if (Test-Path $dllBasePath)
         {
-            $outputDllPath = Join-Path -Path $parentFolder -ChildPath "bin\Release"
-            if (-not (Test-Path $outputDllPath))
-            {
-                New-Item -Path $outputDllPath -ItemType Directory -Force | Out-Null
-                Write-Verbose "[$scriptName] Created output DLL directory: $outputDllPath"
-            }
+            $outputDllBasePath = Join-Path -Path $parentFolder -ChildPath "bin\Release"
             
-            Write-Host "Copying DLLs to release folder: $outputDllPath" -ForegroundColor Cyan
-            Write-Log -logFile $logFile -Message "Copying DLLs to $outputDllPath" -module $scriptName
-            
-            foreach ($dll in $dlls)
+            foreach ($framework in $frameworks)
             {
-                $sourceDll = Join-Path -Path $dllPath -ChildPath $dll
-                if (Test-Path $sourceDll)
+                $sourceDllPath = Join-Path -Path $dllBasePath -ChildPath $framework
+                $outputDllPath = Join-Path -Path $outputDllBasePath -ChildPath $framework
+                
+                if (Test-Path $sourceDllPath)
                 {
-                    Copy-Item -Path $sourceDll -Destination $outputDllPath -Force
-                    Write-Verbose "[$scriptName] Copied $dll to output folder"
+                    if (-not (Test-Path $outputDllPath))
+                    {
+                        New-Item -Path $outputDllPath -ItemType Directory -Force | Out-Null
+                        Write-Verbose "[$scriptName] Created output DLL directory: $outputDllPath"
+                    }
+                    
+                    Write-Host "Copying DLLs ($framework) to release folder: $outputDllPath" -ForegroundColor Cyan
+                    Write-Log -logFile $logFile -Message "Copying DLLs ($framework) to $outputDllPath" -module $scriptName
+                    
+                    # Copy all DLL files (including dependencies)
+                    Get-ChildItem -Path $sourceDllPath -Filter "*.dll" | ForEach-Object {
+                        Copy-Item -Path $_.FullName -Destination $outputDllPath -Force
+                        Write-Verbose "[$scriptName] Copied $($_.Name) to output folder"
+                    }
                 }
             }
             
             Write-Host "DLLs copied to release folder successfully" -ForegroundColor Green
-            Write-Log -logFile $logFile -Message "DLLs copied to release folder" -module $scriptName
+            Write-Log -logFile $logFile -Message "DLLs copied to release folder (multi-target structure)" -module $scriptName
         }
     }
     catch

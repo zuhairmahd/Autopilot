@@ -90,10 +90,28 @@ function Write-Log()
             Write-Verbose "[$functionName] Initializing AutopilotLogger in function $functionName."
             if (-not $global:AutopilotLogger)
             {
+                # Logger constructor: (logFilePath, minimumLogLevel, useCMTraceFormat, maxLogSizeMB, enableAsync)
+                # Use Information as default minimum level, sync logging (false for async)
+                $minimumLevel = [Autopilot.LogCore.Logger+LogLevel]::Information
+                if ($MinimumLogLevel)
+                {
+                    $minimumLevel = switch ($MinimumLogLevel)
+                    {
+                        'Error' { [Autopilot.LogCore.Logger+LogLevel]::Error }
+                        'Warning' { [Autopilot.LogCore.Logger+LogLevel]::Warning }
+                        'Information' { [Autopilot.LogCore.Logger+LogLevel]::Information }
+                        'Verbose' { [Autopilot.LogCore.Logger+LogLevel]::Verbose }
+                        'Debug' { [Autopilot.LogCore.Logger+LogLevel]::Debug }
+                        default { [Autopilot.LogCore.Logger+LogLevel]::Information }
+                    }
+                }
+                
                 $global:AutopilotLogger = New-Object Autopilot.LogCore.Logger(
                     $LogFile,
+                    $minimumLevel,
                     $CMTraceFormat.IsPresent,
-                    $MaxLogSizeMB
+                    $MaxLogSizeMB,
+                    $false  # enableAsync = false (use sync logging)
                 )
                 Write-Verbose "[$functionName] AutopilotLogger initialized."
             }
@@ -101,12 +119,12 @@ function Write-Log()
             # Convert LogLevel string to numeric for LogCore
             $numericLevel = switch ($LogLevel)
             {
-                'Error' { 1 }
-                'Warning' { 2 }
-                'Information' { 3 }
-                'Verbose' { 4 }
-                'Debug' { 5 }
-                default { 3 }
+                'Error' { [Autopilot.LogCore.Logger+LogLevel]::Error }
+                'Warning' { [Autopilot.LogCore.Logger+LogLevel]::Warning }
+                'Information' { [Autopilot.LogCore.Logger+LogLevel]::Information }
+                'Verbose' { [Autopilot.LogCore.Logger+LogLevel]::Verbose }
+                'Debug' { [Autopilot.LogCore.Logger+LogLevel]::Debug }
+                default { [Autopilot.LogCore.Logger+LogLevel]::Information }
             }
             
             # Check minimum log level filtering
@@ -142,7 +160,8 @@ function Write-Log()
             }
             
             # Use high-performance C# logging
-            $global:AutopilotLogger.WriteLog($Message, $numericLevel, $Module)
+            # WriteLog signature: WriteLog(string module, string message, LogLevel level)
+            $global:AutopilotLogger.WriteLog($Module, $Message, $numericLevel)
             
             # Write to console if requested
             if ($WriteToConsole)
@@ -225,7 +244,7 @@ function Write-Log()
             {
                 $archiveFile = $LogFile -replace '\.log$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
                 Move-Item -Path $LogFile -Destination $archiveFile -Force
-                Write-Verbose "Log file rotated to: $archiveFile"
+                Write-Verbose "[$functionName] Log file rotated to: $archiveFile"
             }
             
             if ($CMTraceFormat)
@@ -333,7 +352,7 @@ function Write-Log()
         {
             $archiveFile = $LogFile -replace '\.log$', "_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
             Move-Item -Path $LogFile -Destination $archiveFile -Force
-            Write-Verbose "Log file rotated to: $archiveFile"
+            Write-Verbose "[$functionName] Log file rotated to: $archiveFile"
         }
         
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
@@ -385,7 +404,6 @@ function Write-Log()
         {
             # Enhanced standard format with thread ID
             $logEntry = "$timestamp [$LogLevel] [$Module] [Thread:$thread] [Context:$Context] $Message"
-            Write-Verbose
             Write-Verbose "[$functionName] Created standard log entry."
         }
         
@@ -441,7 +459,7 @@ function Write-Log()
             {
                 if ($WriteToConsole)
                 {
-                    Write-Verbose "Logged: $logEntry" 
+                    Write-Verbose "[$functionName] Logged: $logEntry" 
                 }
             }
         }

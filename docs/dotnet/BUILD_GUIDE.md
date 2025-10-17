@@ -60,19 +60,18 @@ Autopilot/
 │   │   └── ... (12 DLLs total)
 │   └── net9.0/                            # PowerShell 7+ DLLs
 │       └── Autopilot.*.dll                # 4 DLLs (no separate dependencies)
-├── Build-NativeDlls.ps1                   # Simple build script
-├── Build-And-Publish-Dlls.ps1             # Multi-target publish script
+├── Build-NativeDlls.ps1                   # Multi-target build script
 └── nuget.config                           # NuGet configuration
 ```
 
-## Build Scripts
+## Build Script
 
-### Build-NativeDlls.ps1 (Simple Build)
+### Build-NativeDlls.ps1 (Multi-Target Build)
 
-**Use when**: Quick development builds to single output directory
+**Primary build tool**: Handles all build scenarios with multi-target support
 
 ```powershell
-# Standard release build
+# Standard release build (both frameworks)
 .\Build-NativeDlls.ps1 -Configuration Release
 
 # Debug build with symbols
@@ -85,34 +84,24 @@ Autopilot/
 .\Build-NativeDlls.ps1 -Verbose -Configuration Release
 ```
 
-**Output**: `bin\Release\` (single directory, framework-dependent)
-
-**When to use**:
-- Quick iteration during development
-- Testing changes in one PowerShell version
-- CI/CD builds that target single framework
-
-### Build-And-Publish-Dlls.ps1 (Multi-Target Publish)
-
-**Use when**: Production deployments requiring both PowerShell versions
-
-```powershell
-# Build for both PowerShell 5.1 and 7+
-.\Build-And-Publish-Dlls.ps1 -Configuration Release
-
-# Debug build with both frameworks
-.\Build-And-Publish-Dlls.ps1 -Configuration Debug
-```
-
 **Output**:
-- `bin\Release\netstandard2.0\` - 12 DLLs (PS 5.1 + dependencies)
-- `bin\Release\net9.0\` - 4 DLLs (PS 7+, dependencies built-in)
+- `bin\Release\netstandard2.0\` - 12+ DLLs (PS 5.1 + all dependencies)
+- `bin\Release\net9.0\` - 12+ DLLs (PS 7+ + all dependencies)
+
+**Features**:
+- ✅ Multi-target support (netstandard2.0 + net9.0)
+- ✅ Includes all NuGet dependencies via `dotnet publish`
+- ✅ Auto-discovers all C# projects in `src/`
+- ✅ `-Clean` switch for fresh builds
+- ✅ `-Verbose` switch for detailed output
+- ✅ Works in both PowerShell 5.1 and 7+
 
 **When to use**:
-- Production releases
-- Testing both PowerShell versions
-- Creating distribution packages
-- Ensuring complete dependency inclusion
+- ✅ All scenarios (development, testing, production)
+- ✅ Quick iteration during development
+- ✅ Production releases
+- ✅ CI/CD pipelines
+- ✅ Testing both PowerShell versions
 
 ## Multi-Targeting Architecture
 

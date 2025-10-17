@@ -65,7 +65,7 @@ High-performance logging engine with CMTrace format support.
 
 ### Build Script
 ```powershell
-# Build all DLLs
+# Build all DLLs for both PowerShell 5.1 and 7+
 .\Build-NativeDlls.ps1 -Configuration Release
 
 # Clean build
@@ -76,23 +76,37 @@ High-performance logging engine with CMTrace format support.
 ```
 
 ### Output
-Compiled DLLs are placed in:
+Compiled DLLs are placed in multi-target directories:
 ```
 bin/Release/
-├── Autopilot.GraphCore.dll
-├── Autopilot.DeviceCore.dll
-├── Autopilot.CacheCore.dll
-└── Autopilot.LogCore.dll
+├── netstandard2.0/           # PowerShell 5.1 (.NET Framework 4.x)
+│   ├── Autopilot.GraphCore.dll
+│   ├── Autopilot.DeviceCore.dll
+│   ├── Autopilot.CacheCore.dll
+│   ├── Autopilot.LogCore.dll
+│   └── [NuGet dependencies...]
+└── net9.0/                   # PowerShell 7+ (.NET 9.0)
+    ├── Autopilot.GraphCore.dll
+    ├── Autopilot.DeviceCore.dll
+    ├── Autopilot.CacheCore.dll
+    ├── Autopilot.LogCore.dll
+    └── [NuGet dependencies...]
 ```
 
 ## Usage in PowerShell
 
-### Loading DLLs
+### Loading DLLs (Automatic Framework Selection)
 ```powershell
-Add-Type -Path "bin/Release/Autopilot.GraphCore.dll"
-Add-Type -Path "bin/Release/Autopilot.DeviceCore.dll"
-Add-Type -Path "bin/Release/Autopilot.CacheCore.dll"
-Add-Type -Path "bin/Release/Autopilot.LogCore.dll"
+# Recommended: Use Initialize-AutopilotDlls (auto-selects framework)
+$dllStatus = Initialize-AutopilotDlls -DLLPath "bin\Release"
+# Loads netstandard2.0 on PS 5.1, net9.0 on PS 7+
+
+# Manual loading (if needed)
+$framework = if ($PSVersionTable.PSVersion.Major -ge 7) { "net9.0" } else { "netstandard2.0" }
+Add-Type -Path "bin/Release/$framework/Autopilot.GraphCore.dll"
+Add-Type -Path "bin/Release/$framework/Autopilot.DeviceCore.dll"
+Add-Type -Path "bin/Release/$framework/Autopilot.CacheCore.dll"
+Add-Type -Path "bin/Release/$framework/Autopilot.LogCore.dll"
 ```
 
 ### Example: Graph API Client
@@ -300,7 +314,7 @@ $status = Initialize-AutopilotDlls -DLLPath "$PSScriptRoot\..\bin\Release"
 Show-DllLoadStatus -Status $status -ShowErrors
 
 # Rebuild if needed
-..\Build-And-Publish-Dlls.ps1 -Configuration Release
+..\Build-NativeDlls.ps1 -Configuration Release
 ```
 
 For more troubleshooting, see **[TROUBLESHOOTING.md](../docs/dotnet/TROUBLESHOOTING.md)**.
