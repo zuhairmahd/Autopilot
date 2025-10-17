@@ -309,6 +309,23 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
+
+# Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
+Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
+$global:AutopilotDllStatus = Initialize-AutopilotDlls
+if ($global:AutopilotDllStatus.CacheCoreLoaded -or $global:AutopilotDllStatus.DeviceCoreLoaded -or $global:AutopilotDllStatus.GraphCoreLoaded)
+{
+    $loadedDlls = @()
+    if ($global:AutopilotDllStatus.GraphCoreLoaded) { $loadedDlls += "GraphCore" }
+    if ($global:AutopilotDllStatus.DeviceCoreLoaded) { $loadedDlls += "DeviceCore" }
+    if ($global:AutopilotDllStatus.CacheCoreLoaded) { $loadedDlls += "CacheCore" }
+    Write-Verbose "[$scriptName] Performance DLLs loaded: $($loadedDlls -join ', ')"
+}
+else
+{
+    Write-Verbose "[$scriptName] No performance DLLs loaded, using PowerShell implementations"
+}
+
 #endregion import functions.
 
 #region Initialize script parameters

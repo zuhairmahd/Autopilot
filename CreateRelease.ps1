@@ -1534,6 +1534,102 @@ else
 }
 #endregion
 
+#region Build C# DLLs for performance optimization
+Write-Host "Building C# DLLs for performance optimization..." -ForegroundColor Cyan
+Write-Log -logFile $logFile -Message "Starting C# DLL build process" -module $scriptName
+
+$buildDllsScript = Join-Path -Path $PWD -ChildPath "Build-NativeDlls.ps1"
+if (Test-Path $buildDllsScript)
+{
+    try
+    {
+        Write-Verbose "[$scriptName] Found Build-NativeDlls.ps1, attempting to build DLLs"
+        Write-Log -logFile $logFile -Message "Executing Build-NativeDlls.ps1 for Release configuration" -module $scriptName
+        
+        # Build DLLs in Release mode
+        & $buildDllsScript -Configuration Release -ErrorAction Stop
+        
+        Write-Host "C# DLLs built successfully" -ForegroundColor Green
+        Write-Log -logFile $logFile -Message "C# DLLs built successfully" -module $scriptName
+        
+        # Verify DLLs were created
+        $dllPath = Join-Path -Path $PWD -ChildPath "bin\Release"
+        $dlls = @(
+            "Autopilot.GraphCore.dll",
+            "Autopilot.DeviceCore.dll",
+            "Autopilot.CacheCore.dll"
+        )
+        
+        $missingDlls = @()
+        foreach ($dll in $dlls)
+        {
+            $dllFile = Join-Path -Path $dllPath -ChildPath $dll
+            if (-not (Test-Path $dllFile))
+            {
+                $missingDlls += $dll
+                Write-Warning "[$scriptName] Expected DLL not found: $dllFile"
+                Write-Log -logFile $logFile -Message "Expected DLL not found: $dllFile" -module $scriptName -LogLevel "Warning"
+            }
+            else
+            {
+                Write-Verbose "[$scriptName] Verified DLL exists: $dllFile"
+            }
+        }
+        
+        if ($missingDlls.Count -gt 0)
+        {
+            Write-Warning "[$scriptName] Some DLLs were not created: $($missingDlls -join ', ')"
+            Write-Warning "[$scriptName] Application will fall back to PowerShell implementations"
+            Write-Log -logFile $logFile -Message "Some DLLs missing: $($missingDlls -join ', '), fallback enabled" -module $scriptName -LogLevel "Warning"
+        }
+        else
+        {
+            Write-Host "All C# DLLs verified successfully" -ForegroundColor Green
+            Write-Log -logFile $logFile -Message "All C# DLLs verified: $($dlls -join ', ')" -module $scriptName
+        }
+        
+        # Copy DLLs to output folder
+        if (Test-Path $dllPath)
+        {
+            $outputDllPath = Join-Path -Path $parentFolder -ChildPath "bin\Release"
+            if (-not (Test-Path $outputDllPath))
+            {
+                New-Item -Path $outputDllPath -ItemType Directory -Force | Out-Null
+                Write-Verbose "[$scriptName] Created output DLL directory: $outputDllPath"
+            }
+            
+            Write-Host "Copying DLLs to release folder: $outputDllPath" -ForegroundColor Cyan
+            Write-Log -logFile $logFile -Message "Copying DLLs to $outputDllPath" -module $scriptName
+            
+            foreach ($dll in $dlls)
+            {
+                $sourceDll = Join-Path -Path $dllPath -ChildPath $dll
+                if (Test-Path $sourceDll)
+                {
+                    Copy-Item -Path $sourceDll -Destination $outputDllPath -Force
+                    Write-Verbose "[$scriptName] Copied $dll to output folder"
+                }
+            }
+            
+            Write-Host "DLLs copied to release folder successfully" -ForegroundColor Green
+            Write-Log -logFile $logFile -Message "DLLs copied to release folder" -module $scriptName
+        }
+    }
+    catch
+    {
+        Write-Warning "[$scriptName] Failed to build C# DLLs: $($_.Exception.Message)"
+        Write-Warning "[$scriptName] Application will fall back to PowerShell implementations"
+        Write-Log -logFile $logFile -Message "DLL build failed: $($_.Exception.Message), fallback enabled" -module $scriptName -LogLevel "Warning"
+    }
+}
+else
+{
+    Write-Verbose "[$scriptName] Build-NativeDlls.ps1 not found, skipping DLL build"
+    Write-Verbose "[$scriptName] Application will use PowerShell implementations"
+    Write-Log -logFile $logFile -Message "Build-NativeDlls.ps1 not found, using PowerShell implementations" -module $scriptName -LogLevel "Information"
+}
+#endregion Build C# DLLs
+
 #region Main code
 if (Test-Path $OutputFile)
 {

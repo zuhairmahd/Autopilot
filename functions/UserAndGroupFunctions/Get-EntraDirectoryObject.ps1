@@ -67,23 +67,52 @@ function Get-EntraDirectoryObject()
     Write-Verbose "[$functionName] Starting function to get $EntityType from Entra ID"
     Write-Log -LogFile $LogFile -Module $functionName -Message "Starting $EntityType search for: $EntityName" -LogLevel "Verbose"
     
-    # Initialize unified cache if it doesn't exist
-    if (-not $global:DirectoryObjectCache)
+    # Initialize cache (use C# if available, otherwise PowerShell hashtable)
+    $useCSharpCache = $global:AutopilotDllStatus -and $global:AutopilotDllStatus.CacheCoreLoaded
+    
+    if ($useCSharpCache)
     {
-        $global:DirectoryObjectCache = @{}
-        Write-Verbose "[$functionName] Initialized directory object cache"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized directory object cache" -LogLevel "Verbose"
+        # Initialize C# DirectoryObjectCache (thread-safe LRU cache with TTL)
+        if (-not $global:DirectoryObjectCacheInstance)
+        {
+            $global:DirectoryObjectCacheInstance = [Autopilot.CacheCore.DirectoryObjectCache]::new()
+            Write-Verbose "[$functionName] Initialized C# DirectoryObjectCache (LRU with TTL)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized C# DirectoryObjectCache for enhanced performance" -LogLevel "Information"
+        }
+    }
+    else
+    {
+        # Fallback to PowerShell hashtable
+        if (-not $global:DirectoryObjectCache)
+        {
+            $global:DirectoryObjectCache = @{}
+            Write-Verbose "[$functionName] Initialized PowerShell directory object cache (hashtable)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Initialized PowerShell directory object cache" -LogLevel "Verbose"
+        }
     }
     
     # Create cache key including EntityType and FindSimilar flag
     $cacheKey = "$EntityType|$EntityName|$FindSimilar"
     
     # Check cache first
-    if ($global:DirectoryObjectCache.ContainsKey($cacheKey))
+    if ($useCSharpCache)
     {
-        Write-Verbose "[$functionName] Found cached result for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Found cached result for $EntityType`: $EntityName" -LogLevel "Verbose"
-        return $global:DirectoryObjectCache[$cacheKey]
+        $cachedResult = $global:DirectoryObjectCacheInstance.Get($cacheKey)
+        if ($null -ne $cachedResult)
+        {
+            Write-Verbose "[$functionName] Found cached result in C# cache for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "C# cache hit for $EntityType`: $EntityName" -LogLevel "Verbose"
+            return $cachedResult
+        }
+    }
+    else
+    {
+        if ($global:DirectoryObjectCache.ContainsKey($cacheKey))
+        {
+            Write-Verbose "[$functionName] Found cached result in PowerShell cache for $EntityType`: $EntityName (FindSimilar: $FindSimilar)"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "PowerShell cache hit for $EntityType`: $EntityName" -LogLevel "Verbose"
+            return $global:DirectoryObjectCache[$cacheKey]
+        }
     }
     
     # Validate access token
@@ -148,9 +177,19 @@ function Get-EntraDirectoryObject()
         
         # Cache and return
         $result = $exactMatchResponse, $substringSearch
-        $global:DirectoryObjectCache[$cacheKey] = $result
-        Write-Verbose "[$functionName] Cached exact match result for $EntityType`: $EntityName"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Cached exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
+        
+        if ($useCSharpCache)
+        {
+            $global:DirectoryObjectCacheInstance.Set($cacheKey, $result)
+            Write-Verbose "[$functionName] Cached exact match result in C# cache for $EntityType`: $EntityName"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "C# cache: stored exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
+        }
+        else
+        {
+            $global:DirectoryObjectCache[$cacheKey] = $result
+            Write-Verbose "[$functionName] Cached exact match result in PowerShell cache for $EntityType`: $EntityName"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "PowerShell cache: stored exact match for $EntityType`: $EntityName" -LogLevel "Verbose"
+        }
         
         return $result
     }
@@ -327,9 +366,19 @@ function Get-EntraDirectoryObject()
             
             # Cache and return
             $result = $filteredResponse, $substringSearch
-            $global:DirectoryObjectCache[$cacheKey] = $result
-            Write-Verbose "[$functionName] Cached fuzzy search result for $EntityType`: $EntityName"
-            Write-Log -LogFile $LogFile -Module $functionName -Message "Cached fuzzy search result for $EntityType`: $EntityName" -LogLevel "Verbose"
+            
+            if ($useCSharpCache)
+            {
+                $global:DirectoryObjectCacheInstance.Set($cacheKey, $result)
+                Write-Verbose "[$functionName] Cached fuzzy search result in C# cache for $EntityType`: $EntityName"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "C# cache: stored fuzzy search for $EntityType`: $EntityName" -LogLevel "Verbose"
+            }
+            else
+            {
+                $global:DirectoryObjectCache[$cacheKey] = $result
+                Write-Verbose "[$functionName] Cached fuzzy search result in PowerShell cache for $EntityType`: $EntityName"
+                Write-Log -LogFile $LogFile -Module $functionName -Message "PowerShell cache: stored fuzzy search for $EntityType`: $EntityName" -LogLevel "Verbose"
+            }
             
             return $result
         }

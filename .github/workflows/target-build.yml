@@ -49,6 +49,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Build C# DLLs
+        shell: pwsh
+        run: |
+          Write-Host "Building C# DLLs for performance optimization..."
+          .\Build-NativeDlls.ps1 -Configuration Release
+          Write-Host "C# DLLs built successfully"
+
       - name: Verify PowerShell 7
         shell: pwsh
         run: |
