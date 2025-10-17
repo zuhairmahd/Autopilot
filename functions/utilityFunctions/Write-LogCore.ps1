@@ -367,6 +367,3 @@ function Get-LogCoreStatistics
         return $null
     }
 }
-
-# Export functions
-Export-ModuleMember -Function Write-LogCore, Write-LogCoreSeparator, Stop-LogCore, Get-LogCoreStatistics

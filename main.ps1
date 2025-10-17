@@ -309,11 +309,17 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
+Write-Host "Starting script..."
+
+#initialize global variables
+$global:maxJSONDepth = 20
+# Set global log level for all Write-Log calls
+$global:LogFile = $logFilePath
+$Global:MinimumLogLevel = $LogLevel
 
 # Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
 Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
-$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release" -verbose 
-
+$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
 # Display DLL load status
 if ($global:AutopilotDllStatus.Success)
 {
@@ -333,11 +339,6 @@ else
 #endregion import functions.
 
 #region Initialize script parameters
-Write-Host "Starting script..."
-$global:maxJSONDepth = 20
-# Set global log level for all Write-Log calls
-$global:LogFile = $logFilePath
-$Global:MinimumLogLevel = $LogLevel
 if ($OverwriteLogs)
 {
     Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
