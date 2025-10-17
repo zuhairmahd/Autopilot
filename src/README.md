@@ -235,37 +235,30 @@ Measure-Command {
 - **PowerShell:** 5.1, 7.0+
 - **OS:** Windows, Linux, macOS (via .NET Core)
 
-## Troubleshooting
+## Documentation
+
+For comprehensive guides, see the [`docs/dotnet/`](../docs/dotnet/) directory:
+
+- **[DLL_REFERENCE.md](../docs/dotnet/DLL_REFERENCE.md)** - Complete usage guide and API reference
+- **[BUILD_GUIDE.md](../docs/dotnet/BUILD_GUIDE.md)** - Building, compilation, and multi-targeting
+- **[TROUBLESHOOTING.md](../docs/dotnet/TROUBLESHOOTING.md)** - Diagnostics and error resolution
+- **[NUGET_CONFIGURATION.md](../docs/dotnet/NUGET_CONFIGURATION.md)** - NuGet package management
+- **[PS51_COMPATIBILITY.md](../docs/dotnet/PS51_COMPATIBILITY.md)** - PowerShell 5.1 specific information
+
+## Quick Troubleshooting
 
 ### DLLs Not Loading
 ```powershell
-# Check .NET SDK
-dotnet --version
+# Check status with detailed errors
+. "$PSScriptRoot\..\functions\utilityFunctions\Initialize-AutopilotDlls.ps1"
+$status = Initialize-AutopilotDlls -DLLPath "$PSScriptRoot\..\bin\Release"
+Show-DllLoadStatus -Status $status -ShowErrors
 
-# Rebuild DLLs
-.\Build-NativeDlls.ps1 -Clean -Verbose
-
-# Verify paths
-Test-Path "bin/Release/Autopilot.GraphCore.dll"
+# Rebuild if needed
+..\Build-And-Publish-Dlls.ps1 -Configuration Release
 ```
 
-### Type Not Found Errors
-```powershell
-# Ensure DLLs are loaded in correct order
-Add-Type -Path "bin/Release/Autopilot.CacheCore.dll"
-Add-Type -Path "bin/Release/Autopilot.DeviceCore.dll"
-Add-Type -Path "bin/Release/Autopilot.GraphCore.dll"
-
-# Check loaded types
-[AppDomain]::CurrentDomain.GetAssemblies() | 
-    Where-Object { $_.FullName -like "Autopilot*" }
-```
-
-### Performance Not Improving
-1. Ensure Release build (not Debug)
-2. Check that C# code is actually being called
-3. Profile with `Measure-Command`
-4. Verify data conversion overhead
+For more troubleshooting, see **[TROUBLESHOOTING.md](../docs/dotnet/TROUBLESHOOTING.md)**.
 
 ## Contributing
 
