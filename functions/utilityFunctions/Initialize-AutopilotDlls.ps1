@@ -1,4 +1,4 @@
-function Initialize-AutopilotDlls
+function Initialize-AutopilotDlls()
 {
     <#
     .SYNOPSIS

@@ -167,22 +167,22 @@ jobs:
           Install-Module -Name ps2exe -Scope CurrentUser -Force -SkipPublisherCheck
           Install-Module -Name TrustedSigning -Scope CurrentUser -Force -SkipPublisherCheck
 
-      - name: Ensure bin directory exists
+      - name: Ensure hd directory exists
         shell: pwsh
         run: |
-          if (-not (Test-Path -Path .\bin)) { New-Item -Path .\bin -ItemType Directory }
+          if (-not (Test-Path -Path .\hd)) { New-Item -Path .\bin -ItemType Directory }
 
       - name: Build executable
         shell: pwsh
         run: |
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -SkipSigning
-          write-host "Build complete (release using target: production). Executable and lastrun.json are in the bin directory."
+          write-host "Build complete (release using target: production). Executable and lastrun.json are in the hd directory."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v3
         with:
           name: autopilot-build
-          path: bin
+          path: hd
 
   sign:
     name: Code Signing (Trusted Signing)
@@ -207,7 +207,7 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: autopilot-build
-          path: bin
+          path: hd
 
       - name: Check for signing secrets
         id: check_secrets
@@ -229,7 +229,7 @@ jobs:
           endpoint: https://eus.codesigning.azure.net/
           trusted-signing-account-name: zuhairmahd
           certificate-profile-name: Cert1
-          files-folder: ${{ github.workspace }}/bin
+          files-folder: ${{ github.workspace }}/hd
           files-folder-filter: exe,dll
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
@@ -249,8 +249,8 @@ jobs:
         with:
           name: signed-artifacts
           path: |
-            ./bin/main.exe
-            ./bin/lastrun.json
+            ./hd/main.exe
+            ./hd/lastrun.json
 
   release:
     name: Upload Release Assets
