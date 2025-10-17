@@ -309,8 +309,10 @@ else
     Write-Host 'Cannot find the functions folder. Exiting script.' -ForegroundColor Red
     exit 1
 }
-Write-Host "Starting script..."
+#endregion import functions.
 
+#region Initialize script parameters
+Write-Host "Starting script..."
 #initialize global variables
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
@@ -336,9 +338,6 @@ else
     Write-Verbose "[$scriptName] No performance DLLs loaded, using PowerShell fallback"
     Write-Host "Using PowerShell implementations (DLLs not found)" -ForegroundColor Yellow
 }
-#endregion import functions.
-
-#region Initialize script parameters
 if ($OverwriteLogs)
 {
     Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
