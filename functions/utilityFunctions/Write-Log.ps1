@@ -126,7 +126,7 @@ function Write-Log()
                 'Debug' { [Autopilot.LogCore.Logger+LogLevel]::Debug }
                 default { [Autopilot.LogCore.Logger+LogLevel]::Information }
             }
-            
+            Write-Verbose "[$functionName] Converted LogLevel '$LogLevel' to numeric level '$numericLevel'."            
             # Check minimum log level filtering
             if ($MinimumLogLevel)
             {
@@ -160,6 +160,7 @@ function Write-Log()
             }
             
             # Use high-performance C# logging
+            Write-Verbose "[$functionName] Writing log entry using LogCore DLL."
             # WriteLog signature: WriteLog(string module, string message, LogLevel level)
             $global:AutopilotLogger.WriteLog($Module, $Message, $numericLevel)
             
@@ -174,12 +175,13 @@ function Write-Log()
                     "Debug" { Write-Debug "[$Module] $Message" }
                     default { Write-Verbose "Logged: $Message" }
                 }
+                Write-Verbose "[$functionName] Logged LogCore.dll message to console."
             }
             
             # Return log entry if PassThru is specified
             if ($PassThru)
             {
-                Write-Verbose "[$functionName] Returning log entry object since Passthru is $passThru."
+                Write-Verbose "[$functionName] Returning LogCore.dll log entry object since Passthru is $passThru."
                 return [PSCustomObject]@{
                     Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
                     LogLevel  = $LogLevel

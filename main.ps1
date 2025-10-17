@@ -318,6 +318,16 @@ $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
 $Global:MinimumLogLevel = $LogLevel
+if ($OverwriteLogs)
+{
+    Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
+    Write-Log -LogFile $LogFile -StartLogging -OverwriteLog
+}
+else
+{
+    Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
+    Write-Log -LogFile $LogFile -StartLogging
+}
 
 # Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
 Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
@@ -338,16 +348,7 @@ else
     Write-Verbose "[$scriptName] No performance DLLs loaded, using PowerShell fallback"
     Write-Host "Using PowerShell implementations (DLLs not found)" -ForegroundColor Yellow
 }
-if ($OverwriteLogs)
-{
-    Write-Verbose "[$scriptName] Overwriting log file: $LogFile"
-    Write-Log -LogFile $LogFile -StartLogging -OverwriteLog
-}
-else
-{
-    Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
-    Write-Log -LogFile $LogFile -StartLogging
-}
+
 #If the scriptname is a Powershell, change the extension to an exe.
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
