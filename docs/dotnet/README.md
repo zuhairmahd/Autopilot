@@ -6,6 +6,8 @@
 
 This directory contains comprehensive documentation for the Autopilot C# DLL performance optimization system.
 
+**🎯 New to DLL Integration?** Start with **[C# Migration Master Plan](../CSHARP_MIGRATION_MASTER_PLAN.md)** for a complete overview of the migration strategy, current progress, and implementation roadmap.
+
 ## Documentation Structure
 
 ### 📚 Core Guides
@@ -22,6 +24,13 @@ This directory contains comprehensive documentation for the Autopilot C# DLL per
 |----------|---------|--------------|
 | **[NUGET_CONFIGURATION.md](NUGET_CONFIGURATION.md)** | NuGet package management | When dealing with dependencies or packages |
 | **[PS51_COMPATIBILITY.md](PS51_COMPATIBILITY.md)** | PowerShell 5.1 specifics | When working with PowerShell 5.1 |
+| **[LOGCORE_WRAPPER_FUNCTIONS.md](LOGCORE_WRAPPER_FUNCTIONS.md)** | LogCore wrapper functions | When using high-performance logging in PowerShell |
+
+### 🗺️ Planning & Strategy
+
+| Document | Purpose | When to Read |
+|----------|---------|--------------|
+| **[C# Migration Master Plan](../CSHARP_MIGRATION_MASTER_PLAN.md)** | Complete migration roadmap | For understanding overall strategy and next steps |
 
 ## Quick Navigation
 
@@ -47,6 +56,12 @@ This directory contains comprehensive documentation for the Autopilot C# DLL per
 
 **...see performance benchmarks**
 → Read [DLL_REFERENCE.md](DLL_REFERENCE.md) - Performance Benchmarks section
+
+**...use LogCore wrapper functions**
+→ Read [LOGCORE_WRAPPER_FUNCTIONS.md](LOGCORE_WRAPPER_FUNCTIONS.md)
+
+**...understand the migration strategy**
+→ Read [C# Migration Master Plan](../CSHARP_MIGRATION_MASTER_PLAN.md)
 
 **...add a new DLL project**
 → Read [BUILD_GUIDE.md](BUILD_GUIDE.md) - Adding New DLLs section

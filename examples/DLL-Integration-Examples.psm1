@@ -13,6 +13,7 @@ if (Test-Path "$dllPath/Autopilot.GraphCore.dll")
     Add-Type -Path "$dllPath/Autopilot.GraphCore.dll"
     Add-Type -Path "$dllPath/Autopilot.DeviceCore.dll"
     Add-Type -Path "$dllPath/Autopilot.CacheCore.dll"
+    Add-Type -Path "$dllPath/Autopilot.LogCore.dll"
     Write-Verbose "Loaded performance DLLs from $dllPath"
 }
 
@@ -23,13 +24,22 @@ if (-not $global:DirectoryObjectCache)
     Write-Verbose "Initialized DirectoryObjectCache"
 }
 
+# Initialize global logger (reusable across session)
+if (-not $global:AutopilotLogger)
+{
+    $logPath = Join-Path $env:TEMP "Autopilot-DLL-Examples.log"
+    $logLevel = [Autopilot.LogCore.Logger+LogLevel]::Information
+    $global:AutopilotLogger = [Autopilot.LogCore.Logger]::new($logPath, $logLevel, $true, 10, $false)
+    Write-Verbose "Initialized AutopilotLogger at $logPath"
+}
+
 <#
 .SYNOPSIS
     High-performance Graph API GET with automatic pagination
 .EXAMPLE
     $devices = Invoke-GraphGet -AccessToken $token -ResourcePath "deviceManagement/managedDevices"
 #>
-function Invoke-GraphGet
+function Invoke-GraphGet()
 {
     [CmdletBinding()]
     param(
@@ -76,7 +86,7 @@ function Invoke-GraphGet
 .EXAMPLE
     $filteredDevices = Invoke-DeviceFilter -Devices $devices -AllowedVendors @("Dell", "HP", "Lenovo")
 #>
-function Invoke-DeviceFilter
+function Invoke-DeviceFilter()
 {
     [CmdletBinding()]
     param(
@@ -128,7 +138,7 @@ function Invoke-DeviceFilter
 .EXAMPLE
     $user = Get-CachedDirectoryObject -AccessToken $token -ObjectType "User" -Identifier "john@contoso.com"
 #>
-function Get-CachedDirectoryObject
+function Get-CachedDirectoryObject()
 {
     [CmdletBinding()]
     param(
@@ -193,7 +203,7 @@ function Get-CachedDirectoryObject
 .EXAMPLE
     Get-CacheStats
 #>
-function Get-CacheStats
+function Get-CacheStats()
 {
     [CmdletBinding()]
     param()
@@ -216,10 +226,248 @@ function Get-CacheStats
     }
 }
 
+<#
+.SYNOPSIS
+    Write a log entry using high-performance C# logger (10-20x faster)
+.DESCRIPTION
+    Writes log entries to the global AutopilotLogger with CMTrace format support.
+    Much faster than PowerShell file operations.
+.PARAMETER Module
+    The module or component name generating the log entry
+.PARAMETER Message
+    The log message
+.PARAMETER Level
+    Log level: Information (default), Warning, Error, Verbose, Debug
+.EXAMPLE
+    Write-AutopilotLog -Module "GraphAPI" -Message "Fetched 150 devices" -Level Information
+.EXAMPLE
+    Write-AutopilotLog -Module "DeviceFilter" -Message "Vendor validation failed" -Level Error
+#>
+function Write-AutopilotLog()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Module,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+        
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("Information", "Warning", "Error", "Verbose", "Debug")]
+        [string]$Level = "Information"
+    )
+    
+    if (-not $global:AutopilotLogger)
+    {
+        Write-Warning "Logger not initialized. Call Initialize-AutopilotLogger first."
+        return
+    }
+    
+    try
+    {
+        # Convert string level to enum
+        $logLevel = [Autopilot.LogCore.Logger+LogLevel]::$Level
+        
+        # Use high-performance C# logger (10-20x faster than PowerShell)
+        $global:AutopilotLogger.WriteLog($Module, $Message, $logLevel)
+        
+        # Also output to verbose stream if appropriate
+        if ($Level -eq "Verbose" -or $Level -eq "Debug")
+        {
+            Write-Verbose "[$Module] $Message"
+        }
+    }
+    catch
+    {
+        Write-Error "Failed to write log: $($_.Exception.Message)"
+    }
+}
+
+<#
+.SYNOPSIS
+    Write a separator line to the log for visual organization
+.EXAMPLE
+    Write-AutopilotLogSeparator
+#>
+function Write-AutopilotLogSeparator()
+{
+    [CmdletBinding()]
+    param()
+    
+    if ($global:AutopilotLogger)
+    {
+        $global:AutopilotLogger.WriteSeparator()
+    }
+    else
+    {
+        Write-Warning "Logger not initialized"
+    }
+}
+
+<#
+.SYNOPSIS
+    Get logger statistics (total logs, performance metrics)
+.EXAMPLE
+    $stats = Get-LoggerStats
+    Write-Host "Total logs: $($stats.TotalLogs)"
+#>
+function Get-LoggerStats()
+{
+    [CmdletBinding()]
+    param()
+    
+    if ($global:AutopilotLogger)
+    {
+        $stats = $global:AutopilotLogger.GetStatistics()
+        
+        [PSCustomObject]@{
+            TotalLogs     = $stats.TotalLogs
+            ErrorLogs     = $stats.ErrorLogs
+            WarningLogs   = $stats.WarningLogs
+            InfoLogs      = $stats.InfoLogs
+            VerboseLogs   = $stats.VerboseLogs
+            DebugLogs     = $stats.DebugLogs
+            LogFilePath   = $stats.LogFilePath
+            CurrentSizeMB = [math]::Round($stats.CurrentSizeBytes / 1MB, 2)
+        }
+    }
+    else
+    {
+        Write-Warning "Logger not initialized"
+    }
+}
+
+<#
+.SYNOPSIS
+    Initialize a new logger with custom settings
+.DESCRIPTION
+    Creates a new AutopilotLogger instance with specified configuration.
+    If a global logger already exists, it will be shut down first.
+.PARAMETER LogPath
+    Full path to the log file
+.PARAMETER MinimumLevel
+    Minimum log level to write: Information (default), Warning, Error, Verbose, Debug
+.PARAMETER UseCMTraceFormat
+    Use CMTrace/Configuration Manager log format (default: $true)
+.PARAMETER MaxSizeMB
+    Maximum log file size before rotation (default: 10 MB)
+.PARAMETER EnableAsync
+    Enable asynchronous logging for better performance (default: $false)
+.EXAMPLE
+    Initialize-AutopilotLogger -LogPath "C:\Logs\Autopilot.log" -MinimumLevel "Verbose"
+.EXAMPLE
+    Initialize-AutopilotLogger -LogPath "C:\Logs\Debug.log" -MinimumLevel "Debug" -EnableAsync $true
+#>
+function Initialize-AutopilotLogger()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LogPath,
+        
+        [Parameter(Mandatory = $false)]
+        [ValidateSet("Information", "Warning", "Error", "Verbose", "Debug")]
+        [string]$MinimumLevel = "Information",
+        
+        [Parameter(Mandatory = $false)]
+        [bool]$UseCMTraceFormat = $true,
+        
+        [Parameter(Mandatory = $false)]
+        [int]$MaxSizeMB = 10,
+        
+        [Parameter(Mandatory = $false)]
+        [bool]$EnableAsync = $false
+    )
+    
+    try
+    {
+        # Shutdown existing logger if present
+        if ($global:AutopilotLogger)
+        {
+            Write-Verbose "Shutting down existing logger"
+            $global:AutopilotLogger.Shutdown()
+            $global:AutopilotLogger = $null
+        }
+        
+        # Create new logger
+        $logLevel = [Autopilot.LogCore.Logger+LogLevel]::$MinimumLevel
+        $global:AutopilotLogger = [Autopilot.LogCore.Logger]::new(
+            $LogPath,
+            $logLevel,
+            $UseCMTraceFormat,
+            $MaxSizeMB,
+            $EnableAsync
+        )
+        
+        Write-Verbose "Initialized AutopilotLogger at $LogPath (Level: $MinimumLevel, CMTrace: $UseCMTraceFormat, Async: $EnableAsync)"
+        
+        # Write initialization log
+        $global:AutopilotLogger.WriteLog(
+            "Logger",
+            "AutopilotLogger initialized (MinLevel: $MinimumLevel, CMTrace: $UseCMTraceFormat, MaxSize: ${MaxSizeMB}MB, Async: $EnableAsync)",
+            [Autopilot.LogCore.Logger+LogLevel]::Information
+        )
+        
+        return $true
+    }
+    catch
+    {
+        Write-Error "Failed to initialize logger: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+<#
+.SYNOPSIS
+    Shutdown the logger and flush any pending writes
+.DESCRIPTION
+    Gracefully shuts down the global AutopilotLogger, flushing any asynchronous
+    log entries and closing file handles.
+.PARAMETER TimeoutSeconds
+    Maximum time to wait for async queue to flush (default: 10 seconds)
+.EXAMPLE
+    Stop-AutopilotLogger
+.EXAMPLE
+    Stop-AutopilotLogger -TimeoutSeconds 30
+#>
+function Stop-AutopilotLogger()
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [int]$TimeoutSeconds = 10
+    )
+    
+    if ($global:AutopilotLogger)
+    {
+        try
+        {
+            Write-Verbose "Shutting down AutopilotLogger (timeout: ${TimeoutSeconds}s)"
+            $global:AutopilotLogger.Shutdown($TimeoutSeconds)
+            $global:AutopilotLogger = $null
+            Write-Verbose "Logger shutdown complete"
+        }
+        catch
+        {
+            Write-Error "Error during logger shutdown: $($_.Exception.Message)"
+        }
+    }
+    else
+    {
+        Write-Warning "No active logger to shutdown"
+    }
+}
+
 # Export functions
 Export-ModuleMember -Function @(
     'Invoke-GraphGet',
     'Invoke-DeviceFilter',
     'Get-CachedDirectoryObject',
-    'Get-CacheStats'
+    'Get-CacheStats',
+    'Write-AutopilotLog',
+    'Write-AutopilotLogSeparator',
+    'Get-LoggerStats',
+    'Initialize-AutopilotLogger',
+    'Stop-AutopilotLogger'
 )
