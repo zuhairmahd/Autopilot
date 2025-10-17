@@ -1069,9 +1069,18 @@ else
         $newSetting = @{
             migrateLegacyConfiguration = $settings.migrateLegacyConfiguration
         }
-    
+        # Check if resolution was not needed (all objects already have IDs or no objects exist)
+        if ($resolvedLegacyObjects.resolutionNeeded -eq $false)
+        {
+            Write-Verbose "[$scriptName] No legacy object resolution needed. All objects already resolved or no objects found."
+            write-log -logFile $logFile -module $scriptName -message "No legacy object resolution needed. Setting migrateLegacyConfiguration to false." -LogLevel "Information"
+            # Turn off the migration flag since no work is needed
+            $newSetting = @{
+                migrateLegacyConfiguration = $false
+            }
+        }
         # Check if user deferred the resolution
-        if ($resolvedLegacyObjects.userDeferred)
+        elseif ($resolvedLegacyObjects.userDeferred)
         {
             Write-Host "Legacy object resolution has been deferred." -ForegroundColor Yellow
             Write-Host "You will be prompted again the next time the script starts." -ForegroundColor Yellow
@@ -1127,11 +1136,15 @@ else
             {
                 Write-Host "Settings updated successfully." -ForegroundColor Green
                 write-log -logFile $logFile -module $scriptName -message "Settings updated successfully." -LogLevel "Information"
+                Write-Host "`nPress any key to continue"
+                $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
             }
             else
             {
                 Write-Host "Failed to update settings." -ForegroundColor Red
                 write-log -logFile $logFile -module $scriptName -message "Failed to update settings." -LogLevel "Error"
+                Write-Host "`nPress any key to continue"
+                $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
             }
         }
         else
@@ -1139,8 +1152,6 @@ else
             Write-Verbose "No changes made to migrateLegacyConfiguration setting."
             write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
         }
-        Write-Host "`nPress any key to continue"
-        $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
     }
 }
 #endregion initialization block with access token
