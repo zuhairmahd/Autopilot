@@ -22,6 +22,11 @@ TestResults/
 
 # PowerShell-specific files
 
+# NuGet packages
+.nuget/
+*.nupkg
+*.snupkg
+
 # PowerShell script logs
 *.log
 

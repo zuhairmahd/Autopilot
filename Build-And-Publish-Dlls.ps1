@@ -61,6 +61,25 @@ foreach ($framework in $frameworks)
 
 Write-Host "  [OK] Output directories ready`n" -ForegroundColor Green
 
+# Restore NuGet packages
+Write-Host "Restoring NuGet packages..." -ForegroundColor Yellow
+try
+{
+    $restoreOutput = dotnet restore "Autopilot.sln" --verbosity minimal 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        Write-Host "  [ERROR] NuGet restore failed" -ForegroundColor Red
+        Write-Host $restoreOutput -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  [OK] Packages restored`n" -ForegroundColor Green
+}
+catch
+{
+    Write-Host "  [ERROR] Failed to restore packages: $_" -ForegroundColor Red
+    exit 1
+}
+
 # Build and publish each project
 $successCount = 0
 $totalProjects = $projects.Count * $frameworks.Count

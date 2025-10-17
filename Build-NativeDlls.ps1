@@ -26,7 +26,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$functionName = $MyInvocation.MyCommand.Name
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  Autopilot C# DLL Build Script" -ForegroundColor Cyan
@@ -71,6 +70,25 @@ if ($Clean)
         Remove-Item "bin" -Recurse -Force
     }
     Write-Host "  [OK] Cleaned`n" -ForegroundColor Green
+}
+
+# Restore NuGet packages
+Write-Host "Restoring NuGet packages..." -ForegroundColor Yellow
+try
+{
+    $restoreOutput = dotnet restore "Autopilot.sln" --verbosity minimal 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        Write-Host "  [ERROR] NuGet restore failed" -ForegroundColor Red
+        Write-Host $restoreOutput -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  [OK] Packages restored`n" -ForegroundColor Green
+}
+catch
+{
+    Write-Host "  [ERROR] Failed to restore packages: $_" -ForegroundColor Red
+    exit 1
 }
 
 # Create output directory
