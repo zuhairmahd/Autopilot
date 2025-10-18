@@ -7,27 +7,30 @@ function getFileVersion()
 
     $functionName = $MyInvocation.MyCommand.Name
     $returnObject = @{}
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Executable File Name: $executableFileName" -LogLevel "Verbose"
+    
+    # NOTE: Reduced logging verbosity for PowerShell 5.1 compatibility
+    # Excessive Write-Log calls in deeply nested functions can cause stack overflow on PS 5.1
+    
     if (-not $executableFileName -or -not (Test-Path $executableFileName) -or $executableFileName -match '.ps1')
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Executable file name is not provided." -LogLevel "Error"
+        Write-Verbose "[$functionName] Executable file name is not provided or does not exist."
         return $null
     }
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Checking if the executable file exists in the current directory." -LogLevel "Verbose"
+    
     if (Test-Path $executableFileName -PathType Leaf -ErrorAction SilentlyContinue)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Found the executable file '$executableFileName'." -LogLevel "Verbose"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Getting the file version." -LogLevel "Verbose"
         $LocalVersion = (Get-Item $executableFileName).VersionInfo.ProductVersion
         $companyName = (Get-Item $executableFileName).VersionInfo.CompanyName
         $hash = (Get-FileHash -Path $executableFileName -Algorithm SHA256).Hash
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Local version extracted: $LocalVersion" -LogLevel "Verbose"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Company Name: $companyName" -LogLevel "Verbose"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "File Hash: $hash" -LogLevel "Verbose"
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Parsing the local version string to System.Version object." -LogLevel "Verbose"
+        
+        Write-Verbose "[$functionName] Version: $LocalVersion, Company: $companyName"
+        
+        # Only log the final result, not every intermediate step
         $localVersion = [System.Version]::Parse($LocalVersion)
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Parsed local version: $localVersion" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Returning local version: $localVersion" -LogLevel "Information"
+        
+        # TEMP: Comment out Write-Log to test if it's causing stack overflow on PS 5.1
+        # Write-Log -LogFile $LogFile -Module $functionName -Message "File version retrieved: $localVersion ($companyName)" -LogLevel "Information"
+        
         $returnObject = @{
             'major'       = $localVersion.Major
             'minor'       = $localVersion.Minor
@@ -41,7 +44,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Returning local vers
     }
     else
     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Executable file '$executableFileName' not found in the current directory." -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Executable file '$executableFileName' not found."
         return $null
     }
 }

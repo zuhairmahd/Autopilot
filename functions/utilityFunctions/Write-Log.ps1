@@ -73,6 +73,7 @@ function Write-Log()
     )
     
     $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Writing the following to $($logFile): $message"
     # Check if LogCore DLL is available for high-performance logging
     $useLogCore = $false
     if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.LogCoreLoaded -and -not ($StartLogging -or $FinishLogging))
@@ -197,6 +198,7 @@ function Write-Log()
         
         # PowerShell fallback implementation (original code continues below)
         # Use global minimum log level if not provided
+        Write-Verbose "[$functionName] Falling back to PowerShell logging in function $functionName."
         if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
         {
             $MinimumLogLevel = $Global:MinimumLogLevel

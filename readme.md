@@ -105,9 +105,13 @@ The application now includes optional C# DLLs for critical operations, deliverin
 ### Technical Requirements
 
 - **Operating System**: Windows 10/11 or Windows Server
-- **PowerShell**: Version 5.1 or later
+- **PowerShell**: **Version 7.0 or later** (PowerShell 5.1 not supported due to platform limitations - see [Known Issues](docs/KNOWN_ISSUES.md))
+  - Download PowerShell 7+: [https://aka.ms/powershell](https://aka.ms/powershell)
+  - Check your version: `$PSVersionTable.PSVersion`
 - **Privileges**: Administrator privileges (for some device operations)
 - **Network**: Connectivity to Microsoft Graph API endpoints
+
+> **⚠️ Important:** PowerShell 5.1 is not supported due to stack size limitations. The application will display a warning and may crash during initialization on PowerShell 5.1. Please upgrade to PowerShell 7+ for full functionality and stability.
 
 ### Azure Configuration Prerequisites
 
