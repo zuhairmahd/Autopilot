@@ -313,16 +313,6 @@ else
 #region Initialize script parameters
 Write-Host "Starting script..."
 
-# PowerShell version check and warning
-if ($PSVersionTable.PSVersion.Major -lt 7)
-{
-    Write-Host "WARNING: PowerShell 5.1 detected. This version has known limitations." -ForegroundColor Yellow
-    Write-Host "For best performance and stability, please upgrade to PowerShell 7 or later." -ForegroundColor Yellow
-    Write-Host "Download: https://aka.ms/powershell" -ForegroundColor Cyan
-    Write-Host ""
-    exit 1
-}
-
 #initialize global variables
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls

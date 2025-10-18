@@ -64,10 +64,9 @@ $projects | ForEach-Object {
 Write-Host ""
 
 # Define target frameworks for multi-target support
-$frameworks = @('netstandard2.0', 'net9.0')
+$frameworks = @('netstandard2.0')
 Write-Host "Target Frameworks: $($frameworks -join ', ')" -ForegroundColor Cyan
 Write-Host "  netstandard2.0 -> PowerShell 5.1 (.NET Framework 4.x)" -ForegroundColor Gray
-Write-Host "  net9.0 -> PowerShell 7+ (.NET 9.0)" -ForegroundColor Gray
 Write-Host ""
 
 # Clean if requested
