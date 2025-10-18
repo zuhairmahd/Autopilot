@@ -30,16 +30,14 @@ function Show-DllLoadStatus
     param(
         [Parameter(Mandatory = $true)]
         [hashtable]$DllStatus,
-        
         [Parameter(Mandatory = $false)]
         [switch]$ShowErrors,
-        
         [Parameter(Mandatory = $false)]
         [switch]$Quiet
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    
+    Write-Verbose "[$functionName] Displaying DLL load status"
     if (-not $Quiet)
     {
         Write-Host "`n=== C# DLL Load Status ===" -ForegroundColor Cyan
