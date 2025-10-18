@@ -341,7 +341,7 @@ else
 
 # Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
 Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
-$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release" -verbose 
+$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release"
 # Display DLL load status
 if ($global:AutopilotDllStatus.Success)
 {
