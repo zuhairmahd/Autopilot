@@ -192,7 +192,6 @@ if ($testMode -and $TestPassword)
     $script:UserEncryptionPassword = $TestPassword
     $global:UserEncryptionPassword = $TestPassword
 }
-
 $scriptName = $MyInvocation.MyCommand.Name
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
@@ -313,6 +312,18 @@ else
 
 #region Initialize script parameters
 Write-Host "Starting script..."
+
+# PowerShell version check and warning
+if ($PSVersionTable.PSVersion.Major -lt 7)
+{
+    Write-Host "WARNING: PowerShell 5.1 detected. This version has known limitations." -ForegroundColor Yellow
+    Write-Host "For best performance and stability, please upgrade to PowerShell 7 or later." -ForegroundColor Yellow
+    Write-Host "Download: https://aka.ms/powershell" -ForegroundColor Cyan
+    Write-Host ""
+    exit 1
+}
+
+#initialize global variables
 $global:maxJSONDepth = 20
 # Set global log level for all Write-Log calls
 $global:LogFile = $logFilePath
@@ -327,45 +338,68 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
+
+# Initialize C# DLLs for enhanced performance (optional, falls back to PowerShell if not available)
+Write-Verbose "[$scriptName] Initializing C# DLLs for performance optimization"
+$global:AutopilotDllStatus = Initialize-AutopilotDlls -DLLPath "$scriptPath\bin\Release" -verbose 
+# Display DLL load status
+if ($global:AutopilotDllStatus.Success)
+{
+    Write-Verbose "[$scriptName] All performance DLLs loaded successfully"
+    Write-Host "Performance DLLs loaded: $($global:AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Green
+}
+elseif ($global:AutopilotDllStatus.LoadedCount -gt 0)
+{
+    Write-Verbose "[$scriptName] Partial DLL load: $($global:AutopilotDllStatus.LoadedCount) of 3"
+    Write-Host "Performance DLLs partially loaded ($($global:AutopilotDllStatus.LoadedCount)/3): $($global:AutopilotDllStatus.LoadedAssemblies -join ', ')" -ForegroundColor Yellow
+}
+else
+{
+    Write-Verbose "[$scriptName] No performance DLLs loaded, using PowerShell fallback"
+    Write-Host "Using PowerShell implementations (DLLs not found)" -ForegroundColor Yellow
+}
+
 #If the scriptname is a Powershell, change the extension to an exe.
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
     Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
     $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
 }
 else
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
-    Write-Verbose "[$scriptName] Executable file not found: $scriptNameExe"
+    Write-Verbose "[$scriptName] Script file name is already an executable: $scriptName"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script file name is already an executable: $scriptName" -LogLevel "Warning"
     $scriptNameExe = $scriptName
 }
-if (Test-Path "$pwd\$scriptNameExe")
+
+if (Test-Path "$scriptPath\$scriptNameExe")
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
-    Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
+    Write-Verbose "[$scriptName] Found executable file: $scriptNameExe. Getting version."
+    Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe. Getting version." -logLevel "Verbose"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
 }
 else
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
     Write-Verbose "[$scriptName] Script file found: $scriptName"
+    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
 }
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
 Write-Verbose "[$scriptName] Initializing application configuration"
+Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
+    Write-Verbose "[$scriptName] All temporary files were cleaned."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
+Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
+Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
-
-write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
 Write-Verbose "[$scriptName] Checking for settings migration need."
+write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
 $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
-# $migrationCheck = Invoke-SettingsMigration -Force
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -1069,18 +1103,9 @@ else
         $newSetting = @{
             migrateLegacyConfiguration = $settings.migrateLegacyConfiguration
         }
-        # Check if resolution was not needed (all objects already have IDs or no objects exist)
-        if ($resolvedLegacyObjects.resolutionNeeded -eq $false)
-        {
-            Write-Verbose "[$scriptName] No legacy object resolution needed. All objects already resolved or no objects found."
-            write-log -logFile $logFile -module $scriptName -message "No legacy object resolution needed. Setting migrateLegacyConfiguration to false." -LogLevel "Information"
-            # Turn off the migration flag since no work is needed
-            $newSetting = @{
-                migrateLegacyConfiguration = $false
-            }
-        }
+    
         # Check if user deferred the resolution
-        elseif ($resolvedLegacyObjects.userDeferred)
+        if ($resolvedLegacyObjects.userDeferred)
         {
             Write-Host "Legacy object resolution has been deferred." -ForegroundColor Yellow
             Write-Host "You will be prompted again the next time the script starts." -ForegroundColor Yellow
@@ -1136,15 +1161,11 @@ else
             {
                 Write-Host "Settings updated successfully." -ForegroundColor Green
                 write-log -logFile $logFile -module $scriptName -message "Settings updated successfully." -LogLevel "Information"
-                Write-Host "`nPress any key to continue"
-                $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
             }
             else
             {
                 Write-Host "Failed to update settings." -ForegroundColor Red
                 write-log -logFile $logFile -module $scriptName -message "Failed to update settings." -LogLevel "Error"
-                Write-Host "`nPress any key to continue"
-                $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
             }
         }
         else
@@ -1152,6 +1173,8 @@ else
             Write-Verbose "No changes made to migrateLegacyConfiguration setting."
             write-log -logFile $logFile -module $scriptName -message "No changes made to migrateLegacyConfiguration setting." -LogLevel "Information"
         }
+        Write-Host "`nPress any key to continue"
+        $null = $Host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
     }
 }
 #endregion initialization block with access token
