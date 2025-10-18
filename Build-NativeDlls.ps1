@@ -63,9 +63,7 @@ $projects | ForEach-Object {
 }
 Write-Host ""
 
-# Define target frameworks for multi-target support
-$frameworks = @('netstandard2.0')
-Write-Host "Target Frameworks: $($frameworks -join ', ')" -ForegroundColor Cyan
+$framework = 'netstandard2.0'
 Write-Host "  netstandard2.0 -> PowerShell 5.1 (.NET Framework 4.x)" -ForegroundColor Gray
 Write-Host ""
 
@@ -73,10 +71,10 @@ Write-Host ""
 if ($Clean)
 {
     Write-Host "Cleaning build artifacts..." -ForegroundColor Yellow
-    Get-ChildItem -Path "src" -Include "bin", "obj" -Recurse -Directory | Remove-Item -Recurse -Force
+    Get-ChildItem -Path "src" -Include "bin", "obj" -Recurse -Directory | Remove-Item -Recurse -Force | Out-Null
     if (Test-Path "bin")
     {
-        Remove-Item "bin" -Recurse -Force
+        Remove-Item "bin" -Recurse -Force | Out-Null
     }
     Write-Host "  [OK] Cleaned" -ForegroundColor Green
     Write-Host ""
@@ -102,75 +100,61 @@ catch
     exit 1
 }
 
-# Create output directories for multi-target support
 $publishRoot = "bin\$Configuration"
-foreach ($framework in $frameworks)
-{
-    $frameworkPath = Join-Path $publishRoot $framework
-    New-Item -ItemType Directory -Path $frameworkPath -Force | Out-Null
-}
-
-# Publish each project for each target framework
 $buildSuccess = $true
 $builtDlls = @{}  # Dictionary: framework -> array of DLL paths
-$totalBuilds = $projects.Count * $frameworks.Count
+$totalBuilds = $projects.Count
 $successCount = 0
 
 foreach ($project in $projects)
 {
     $projectName = [System.IO.Path]::GetFileNameWithoutExtension($project.Name)
     
-    foreach ($framework in $frameworks)
+    Write-Host "Publishing $projectName ($framework)..." -ForegroundColor Cyan
+    #write-vverbose the parameters passed to dotnet publish.
+    Write-Host "  dotnet publish $($project.FullName) --configuration $Configuration --framework $framework --output $publishRoot" -ForegroundColor Gray
+    $publishArgs = @(
+        'publish'
+        $project.FullName
+        '--configuration', $Configuration
+        '--framework', $framework
+        '--output', $publishRoot
+        '--no-self-contained'
+        '/p:DebugType=portable'
+        '--nologo'
+    )
+    if ($VerbosePreference -eq 'Continue')
     {
-        $frameworkPath = Join-Path $publishRoot $framework
-        Write-Host "Publishing $projectName ($framework)..." -ForegroundColor Cyan
-        
-        $publishArgs = @(
-            'publish'
-            $project.FullName
-            '--configuration', $Configuration
-            '--framework', $framework
-            '--output', $frameworkPath
-            '--no-self-contained'
-            '/p:DebugType=portable'
-            '--nologo'
-        )
-        
+        $publishArgs += '--verbosity', 'detailed'
+    }
+    else
+    {
+        $publishArgs += '--verbosity', 'minimal'
+    }
+    $publishOutput = & dotnet @publishArgs 2>&1
+    if ($LASTEXITCODE -ne 0)
+    {
+        Write-Host "  [FAILED] Publish failed for $projectName ($framework)" -ForegroundColor Red
         if ($VerbosePreference -eq 'Continue')
         {
-            $publishArgs += '--verbosity', 'detailed'
+            Write-Host $publishOutput -ForegroundColor Red
         }
-        else
+        $buildSuccess = $false
+    }
+    else
+    {
+        $dllPath = Join-Path $publishRoot "$projectName.dll"
+        if (Test-Path $dllPath)
         {
-            $publishArgs += '--verbosity', 'minimal'
-        }
-        
-        $publishOutput = & dotnet @publishArgs 2>&1
-        
-        if ($LASTEXITCODE -ne 0)
-        {
-            Write-Host "  [FAILED] Publish failed for $projectName ($framework)" -ForegroundColor Red
-            if ($VerbosePreference -eq 'Continue')
-            {
-                Write-Host $publishOutput -ForegroundColor Red
-            }
-            $buildSuccess = $false
-        }
-        else
-        {
-            $dllPath = Join-Path $frameworkPath "$projectName.dll"
-            if (Test-Path $dllPath)
-            {
-                $dllSize = (Get-Item $dllPath).Length / 1KB
-                Write-Host "  [OK] $projectName.dll ($($dllSize.ToString('F1')) KB)" -ForegroundColor Green
+            $dllSize = (Get-Item $dllPath).Length / 1KB
+            Write-Host "  [OK] $projectName.dll ($($dllSize.ToString('F1')) KB)" -ForegroundColor Green
                 
-                if (-not $builtDlls.ContainsKey($framework))
-                {
-                    $builtDlls[$framework] = @()
-                }
-                $builtDlls[$framework] += $dllPath
-                $successCount++
+            if (-not $builtDlls.ContainsKey($framework))
+            {
+                $builtDlls[$framework] = @()
             }
+            $builtDlls[$framework] += $dllPath
+            $successCount++
         }
     }
     Write-Host ""
@@ -187,29 +171,23 @@ if ($buildSuccess -and $successCount -eq $totalBuilds)
     Write-Host "  Success: $successCount / $totalBuilds builds" -ForegroundColor Green
     Write-Host ""
     
-    foreach ($framework in $frameworks)
+    if ($builtDlls.ContainsKey($framework))
     {
-        if ($builtDlls.ContainsKey($framework))
-        {
-            $dllCount = $builtDlls[$framework].Count
-            $allDllCount = (Get-ChildItem "$publishRoot\$framework\*.dll" -ErrorAction SilentlyContinue).Count
-            Write-Host "$framework ($allDllCount DLL files total):" -ForegroundColor Cyan
-            $builtDlls[$framework] | ForEach-Object {
-                $fileName = Split-Path $_ -Leaf
-                Write-Host "  - $fileName" -ForegroundColor Gray
-            }
-            Write-Host ""
+        $allDllCount = (Get-ChildItem "$publishRoot\*.dll" -ErrorAction SilentlyContinue).Count
+        Write-Host "$framework ($allDllCount DLL files total):" -ForegroundColor Cyan
+        $builtDlls[$framework] | ForEach-Object {
+            $fileName = Split-Path $_ -Leaf
+            Write-Host "  - $fileName" -ForegroundColor Gray
         }
+        Write-Host ""
     }
     
-    Write-Host "Output Directories:" -ForegroundColor Yellow
-    Write-Host "  $publishRoot\netstandard2.0 (PowerShell 5.1)" -ForegroundColor Gray
-    Write-Host "  $publishRoot\net9.0 (PowerShell 7+)" -ForegroundColor Gray
+    Write-Host "Output Directory:" -ForegroundColor Yellow
+    Write-Host "  $publishRoot (PowerShell 5.1 - netstandard2.0)" -ForegroundColor Gray
     Write-Host ""
     
-    Write-Host "To use in PowerShell:" -ForegroundColor Yellow
+    Write-Host "To use in PowerShell 5.1:" -ForegroundColor Yellow
     Write-Host "  `$dllStatus = Initialize-AutopilotDlls -DLLPath '$publishRoot'" -ForegroundColor Gray
-    Write-Host "  # Automatically selects correct framework based on PS version" -ForegroundColor DarkGray
     Write-Host ""
     
     Write-Host "Example usage:" -ForegroundColor Yellow
