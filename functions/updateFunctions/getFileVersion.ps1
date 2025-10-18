@@ -7,30 +7,38 @@ function getFileVersion()
 
     $functionName = $MyInvocation.MyCommand.Name
     $returnObject = @{}
-    
-    # NOTE: Reduced logging verbosity for PowerShell 5.1 compatibility
-    # Excessive Write-Log calls in deeply nested functions can cause stack overflow on PS 5.1
-    
+    Write-Verbose "[$functionName] Getting file version for: $executableFileName"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Executable File Name: $executableFileName" -LogLevel "Verbose"
     if (-not $executableFileName -or -not (Test-Path $executableFileName) -or $executableFileName -match '.ps1')
     {
         Write-Verbose "[$functionName] Executable file name is not provided or does not exist."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Executable file name is not provided." -LogLevel "Error"
         return $null
     }
-    
+    Write-Verbose "[$functionName] Checking if the executable file exists in the current directory."
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Checking if the executable file exists in the current directory." -LogLevel "Verbose"
     if (Test-Path $executableFileName -PathType Leaf -ErrorAction SilentlyContinue)
     {
+        Write-Verbose "[$functionName] Found the executable file '$executableFileName'. Getting the file version."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Found the executable file '$executableFileName'." -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Getting the file version."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Getting the file version." -LogLevel "Verbose"
         $LocalVersion = (Get-Item $executableFileName).VersionInfo.ProductVersion
         $companyName = (Get-Item $executableFileName).VersionInfo.CompanyName
         $hash = (Get-FileHash -Path $executableFileName -Algorithm SHA256).Hash
-        
-        Write-Verbose "[$functionName] Version: $LocalVersion, Company: $companyName"
-        
-        # Only log the final result, not every intermediate step
+        Write-Verbose "[$functionName] Local version extracted: $LocalVersion"
+        Write-Verbose "[$functionName] Company Name: $companyName"
+        Write-Verbose "[$functionName] File Hash: $hash"
+        Write-Verbose "[$functionName] Parsing the local version string to System.Version object."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Local version extracted: $LocalVersion" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Company Name: $companyName" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "File Hash: $hash" -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Parsing the local version string to System.Version object." -LogLevel "Verbose"
         $localVersion = [System.Version]::Parse($LocalVersion)
-        
-        # TEMP: Comment out Write-Log to test if it's causing stack overflow on PS 5.1
-        # Write-Log -LogFile $LogFile -Module $functionName -Message "File version retrieved: $localVersion ($companyName)" -LogLevel "Information"
-        
+        Write-Verbose "[$functionName] Parsed local version: $localVersion"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Parsed local version: $localVersion" -LogLevel "Verbose"
+        Write-Verbose "[$functionName] Returning version information object."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Returning local version: $localVersion" -LogLevel "Information"
         $returnObject = @{
             'major'       = $localVersion.Major
             'minor'       = $localVersion.Minor
@@ -44,7 +52,8 @@ function getFileVersion()
     }
     else
     {
-        Write-Verbose "[$functionName] Executable file '$executableFileName' not found."
+        Write-Verbose "[$functionName] Executable file '$executableFileName' not found in the current directory."
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Executable file '$executableFileName' not found in the current directory." -LogLevel "Verbose"
         return $null
     }
 }
