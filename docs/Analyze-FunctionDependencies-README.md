@@ -1,18 +1,19 @@
-# Function Dependency Analyzer
+# Function Dependency Analyzer with Test Coverage
 
 ## Overview
 
-The `Analyze-FunctionDependencies.ps1` script is a powerful analysis tool that helps identify unused functions in the Autopilot project, enabling memory optimization and codebase cleanup.
+The `Analyze-FunctionDependencies.ps1` script is a powerful analysis tool that helps identify unused functions in the Autopilot project, assess test coverage, and enable memory optimization and codebase cleanup.
 
 ## Purpose
 
-As the codebase has grown to include **186 PowerShell files** with **254 function definitions**, some functions may no longer be needed. This script performs static code analysis to:
+As the codebase has grown to include **186 PowerShell files** with **254 function definitions**, some functions may no longer be needed. This script performs comprehensive static code analysis to:
 
 1. Discover all function definitions across the entire `functions/` directory
 2. Build a dependency graph showing which functions call other functions
-3. Trace usage starting from `main.ps1` and `test.ps1` entry points
-4. Identify functions that are defined but never called
-5. Generate a detailed CSV report for review
+3. Trace usage starting from `main.ps1` entry points
+4. **Scan Pester test files** (*.Tests.ps1) to identify functions with test coverage ✨ NEW
+5. Identify functions that are defined but never called
+6. Generate a detailed CSV report for review with test coverage information
 
 ## Usage
 
@@ -21,7 +22,7 @@ As the codebase has grown to include **186 PowerShell files** with **254 functio
 Run the script from the project root directory:
 
 ```powershell
-.\Analyze-FunctionDependencies.ps1
+.\tools\Analyze-FunctionDependencies.ps1
 ```
 
 This will generate a report file named `FunctionDependencyReport.csv` in the current directory.
@@ -30,13 +31,13 @@ This will generate a report file named `FunctionDependencyReport.csv` in the cur
 
 ```powershell
 # Specify custom output path
-.\Analyze-FunctionDependencies.ps1 -OutputPath "C:\Reports\MyReport.csv"
+.\tools\Analyze-FunctionDependencies.ps1 -OutputPath "C:\Reports\MyReport.csv"
 
 # Use verbose logging to see detailed analysis
-.\Analyze-FunctionDependencies.ps1 -Verbose
+.\tools\Analyze-FunctionDependencies.ps1 -Verbose
 
 # Specify custom paths
-.\Analyze-FunctionDependencies.ps1 -FunctionsFolder ".\functions" -MainScript ".\main.ps1" -TestScript ".\test.ps1"
+.\tools\Analyze-FunctionDependencies.ps1 -FunctionsFolder ".\functions" -MainScript ".\main.ps1" -TestsFolder ".\tests"
 ```
 
 ### Parameters
@@ -44,7 +45,7 @@ This will generate a report file named `FunctionDependencyReport.csv` in the cur
 - **`-OutputPath`**: Path where the CSV report will be saved (default: `.\FunctionDependencyReport.csv`)
 - **`-FunctionsFolder`**: Path to the functions folder (default: `.\functions`)
 - **`-MainScript`**: Path to the main entry point script (default: `.\main.ps1`)
-- **`-TestScript`**: Path to the test script (default: `.\test.ps1`)
+- **`-TestsFolder`**: Path to the tests folder containing Pester tests (default: `.\tests`) ✨ NEW
 - **`-Verbose`**: Show detailed progress information during analysis
 
 ## Understanding the Report
@@ -60,13 +61,16 @@ The generated CSV report contains the following columns:
 | **CallCount** | Number of other functions that call this function |
 | **CalledBy** | List of functions that call this function (semicolon-separated) |
 | **CallsOthers** | List of functions that this function calls (semicolon-separated) |
+| **FoundInTests** ✨ | "Yes" or "No" indicating if function is referenced in Pester tests |
+| **TestCount** ✨ | Number of test files that reference this function |
+| **TestDetails** ✨ | Details of tests (format: "TestFile \| Describe \| It") |
 
 ### Example Report Entry
 
 ```csv
-"FunctionName","IsUsed","Status","FilePath","CallCount","CalledBy","CallsOthers"
-"GetDeviceInfo","True","USED","./functions/deviceFunctions/GetDeviceInfo.ps1","15","ProcessDevice; ExportDeviceList","CallGraphAPI; Write-Log"
-"OldUnusedFunction","False","UNUSED","./functions/utilityFunctions/OldFunction.ps1","0","",""
+"FunctionName","IsUsed","Status","FilePath","CallCount","CalledBy","CallsOthers","FoundInTests","TestCount","TestDetails"
+"GetDeviceInfo","True","USED","./functions/deviceFunctions/GetDeviceInfo.ps1","15","ProcessDevice; ExportDeviceList","CallGraphAPI; Write-Log","Yes","1",".\tests\Unit\GetDeviceInfo.Tests.ps1 | Function: GetDeviceInfo | Multiple contexts"
+"OldUnusedFunction","False","UNUSED","./functions/utilityFunctions/OldFunction.ps1","0","","","No","0",""
 ```
 
 ## Current Analysis Results
@@ -74,9 +78,17 @@ The generated CSV report contains the following columns:
 As of the latest run:
 
 - **Total Functions Defined**: 254
-- **Used Functions**: 227
-- **Unused Functions**: 27
+- **Used Functions**: 227 (89.37%)
+- **Unused Functions**: 27 (10.63%)
+- **Functions with Test Coverage**: 89 (35.04%)
 - **Memory Optimization Potential**: ~10.63%
+
+### Test Coverage Breakdown
+
+- **Used functions WITH tests**: 87 (38.3% of used functions)
+- **Used functions WITHOUT tests**: 140 (61.7% need test coverage)
+- **Unused functions WITH tests**: 2 (orphaned tests - review needed)
+- **Unused functions WITHOUT tests**: 25 (safe removal candidates)
 
 ### Common Unused Function Categories
 
@@ -84,6 +96,7 @@ As of the latest run:
 2. **Utility functions** that were created for specific use cases but never integrated
 3. **Experimental features** that didn't make it to production
 4. **Deprecated authentication methods** (e.g., older token retrieval patterns)
+5. **Functions with orphaned tests** that have test coverage but are no longer called
 
 ## How It Works
 
@@ -113,12 +126,28 @@ For each file, the script identifies function calls using multiple regex pattern
 
 ### 3. Usage Tracing
 
-Starting from entry points (`main.ps1` and `test.ps1`), the script recursively marks functions as "used" by:
+Starting from entry points (`main.ps1`), the script recursively marks functions as "used" by:
 
-1. Finding all functions called directly in main.ps1 and test.ps1
+1. Finding all functions called directly in main.ps1
 2. For each called function, finding all functions it calls
 3. Recursively repeating step 2 until no new functions are found
 4. Any function not marked as "used" is considered unused
+
+### 4. Test Coverage Analysis ✨ NEW
+
+The script scans all Pester test files (`*.Tests.ps1`) in the tests folder to:
+
+1. Extract `Describe` block names to capture test context
+2. Extract `It` block names to capture specific test scenarios
+3. Search for function name references as whole words (using `\b` word boundaries)
+4. Associate found functions with their test file, Describe, and It contexts
+5. Track functions with test coverage vs. those without
+
+This helps identify:
+- **Used functions without tests**: High-priority candidates for adding test coverage
+- **Unused functions with tests**: "Orphaned" tests that may indicate refactored code
+- **Functions with multiple test files**: Well-tested critical functions
+- **Overall test coverage percentage**: Project health metric
 
 ### 4. Report Generation
 
@@ -156,6 +185,53 @@ Before removing functions marked as "unused":
 3. **Review function purpose**: Some functions may be intentionally kept for future use or backward compatibility
 4. **Test thoroughly**: After removing functions, run the full test suite to ensure nothing breaks
 
+## Querying Test Coverage Data ✨ NEW
+
+### Find High-Priority Testing Targets
+
+Identify frequently-used functions without test coverage:
+
+```powershell
+$report = Import-Csv .\FunctionDependencyReport.csv
+$needTests = $report | 
+    Where-Object { $_.IsUsed -eq 'True' -and $_.FoundInTests -eq 'No' } |
+    Sort-Object {[int]$_.CallCount} -Descending |
+    Select-Object -First 20
+$needTests | Format-Table FunctionName, CallCount, FilePath -AutoSize
+```
+
+### Find Orphaned Tests
+
+Identify tests for functions that are no longer being called:
+
+```powershell
+$report = Import-Csv .\FunctionDependencyReport.csv
+$orphaned = $report | 
+    Where-Object { $_.IsUsed -eq 'False' -and $_.FoundInTests -eq 'Yes' }
+$orphaned | Format-List FunctionName, FilePath, TestDetails
+```
+
+### Find Safe Removal Candidates
+
+Find unused functions with no test coverage (safest to remove):
+
+```powershell
+$report = Import-Csv .\FunctionDependencyReport.csv
+$safeToRemove = $report | 
+    Where-Object { $_.IsUsed -eq 'False' -and $_.FoundInTests -eq 'No' }
+$safeToRemove | Format-Table FunctionName, FilePath -AutoSize
+```
+
+### Calculate Test Coverage Metrics
+
+```powershell
+$report = Import-Csv .\FunctionDependencyReport.csv
+$totalUsed = @($report | Where-Object { $_.IsUsed -eq 'True' }).Count
+$usedWithTests = @($report | Where-Object { $_.IsUsed -eq 'True' -and $_.FoundInTests -eq 'Yes' }).Count
+$coveragePercent = [math]::Round(($usedWithTests / $totalUsed) * 100, 2)
+Write-Host "Test coverage for used functions: $usedWithTests/$totalUsed ($coveragePercent%)"
+```
+
 ## Integration with Development Workflow
 
 ### Recommended Usage
@@ -164,6 +240,7 @@ Before removing functions marked as "unused":
 2. **Code Review**: Include the report in pull requests that add new functions
 3. **Cleanup Sprints**: Use the report to plan technical debt reduction sprints
 4. **Documentation**: Update function documentation to note deprecation before removal
+5. **Test Coverage Goals**: Track test coverage percentage over time, targeting 50%+ for used functions
 
 ### Automated Checks
 

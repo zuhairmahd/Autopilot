@@ -9,13 +9,15 @@
     2. Building a complete dependency graph showing which functions call which other functions
     3. Tracing actual usage starting from main.ps1 and test.ps1 entry points
     4. Recursively identifying all functions that are used (directly or indirectly)
-    5. Generating a detailed CSV report listing all functions with their usage status
+    5. Scanning Pester test files to identify which functions have test coverage
+    6. Generating a detailed CSV report listing all functions with their usage status and test coverage
     
     The analysis helps identify functions that are defined but never called, enabling:
     - Memory optimization by removing unused code
     - Codebase cleanup and maintenance
     - Dependency understanding and visualization
     - Technical debt identification
+    - Test coverage assessment
     
     The script uses advanced regex patterns to detect various PowerShell calling conventions including:
     - Direct function calls (FunctionName -Parameter)
@@ -29,7 +31,7 @@
 
 .PARAMETER OutputPath
     Path where the CSV report will be saved. Default: ".\FunctionDependencyReport.csv"
-    The report includes: FunctionName, IsUsed, Status, FilePath, CallCount, CalledBy, CallsOthers
+    The report includes: FunctionName, IsUsed, Status, FilePath, CallCount, CalledBy, CallsOthers, FoundInTests, TestCount, TestDetails
 
 .PARAMETER FunctionsFolder
     Path to the functions folder. Default: ".\functions"
@@ -37,8 +39,8 @@
 .PARAMETER MainScript
     Path to the main entry point script. Default: ".\main.ps1"
 
-.PARAMETER TestScript
-    Path to the test script. Default: ".\test.ps1"
+.PARAMETER TestsFolder
+    Path to the tests folder containing Pester tests. Default: ".\tests"
 
 .PARAMETER Verbose
     Show detailed progress information during analysis, including file-by-file processing.
@@ -86,6 +88,9 @@
     - CallCount: Number of functions that call this function
     - CalledBy: Semicolon-separated list of calling functions
     - CallsOthers: Semicolon-separated list of functions this function calls
+    - FoundInTests: "Yes" or "No" indicating if function is referenced in Pester tests
+    - TestCount: Number of test files that reference this function
+    - TestDetails: Details of tests (format: "TestFile | Describe | It ;; TestFile | Describe | It")
     
     Console output includes:
     - Progress bars during processing
@@ -125,7 +130,7 @@ param(
     [string]$OutputPath = ".\FunctionDependencyReport.csv",
     [string]$FunctionsFolder = ".\functions",
     [string]$MainScript = ".\main.ps1",
-    [string]$TestScript = ".\test.ps1"
+    [string]$TestsFolder = ".\tests"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -135,6 +140,7 @@ $script:AllDefinedFunctions = @{}      # Hash: FunctionName -> FilePath
 $script:FunctionCalls = @{}            # Hash: FunctionName -> @(CalledFunctions)
 $script:UsedFunctions = [System.Collections.Generic.HashSet[string]]::new()
 $script:ScannedFiles = [System.Collections.Generic.HashSet[string]]::new()
+$script:TestReferences = @{}           # Hash: FunctionName -> @([PSCustomObject]@{TestFile, Context, Describe})
 
 #region Helper Functions
 function Find-FolderPath()
@@ -327,6 +333,113 @@ function Get-FunctionCalls()
     return $calls
 }
 
+function Find-PesterTestReferences()
+{
+    <#
+    .SYNOPSIS
+        Scans Pester test files for function references and tracks which tests mention each function.
+    .DESCRIPTION
+        Searches for function names in Pester test files and captures:
+        - The test file name
+        - The Describe block context
+        - The It block context (if available)
+        This helps identify which functions have test coverage.
+    #>
+    param(
+        [string]$TestsFolder
+    )
+    
+    Write-Host "`nScanning Pester tests for function references..." -ForegroundColor Cyan
+    
+    if (-not (Test-Path $TestsFolder))
+    {
+        Write-Warning "Tests folder not found: $TestsFolder"
+        return
+    }
+    
+    # Get all test files (*.Tests.ps1 pattern)
+    $testFiles = Get-ChildItem -Path $TestsFolder -Filter "*.Tests.ps1" -Recurse -File -ErrorAction SilentlyContinue
+    
+    if ($testFiles.Count -eq 0)
+    {
+        Write-Warning "No Pester test files found in: $TestsFolder"
+        return
+    }
+    
+    $totalFiles = $testFiles.Count
+    $currentFile = 0
+    
+    foreach ($testFile in $testFiles)
+    {
+        $currentFile++
+        $percentComplete = [int](($currentFile / $totalFiles) * 100)
+        Write-Progress-Custom -Activity "Scanning Pester Tests" -Status "Processing $($testFile.Name) ($currentFile/$totalFiles)" -PercentComplete $percentComplete
+        
+        try
+        {
+            $content = Get-Content -Path $testFile.FullName -Raw -ErrorAction Stop
+            $relativePath = $testFile.FullName -replace [regex]::Escape((Get-Location).Path), '.'
+            
+            # Extract Describe blocks with their names
+            $describePattern = '(?m)^\s*Describe\s+[''"]([^''"]+)[''"]'
+            $describeMatches = [regex]::Matches($content, $describePattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $describeContext = if ($describeMatches.Count -gt 0) { $describeMatches[0].Groups[1].Value } else { "Unknown" }
+            
+            # Extract It blocks to get more context
+            $itPattern = '(?m)^\s*It\s+[''"]([^''"]+)[''"]'
+            $itMatches = [regex]::Matches($content, $itPattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $itContexts = @()
+            foreach ($itMatch in $itMatches)
+            {
+                $itContexts += $itMatch.Groups[1].Value
+            }
+            
+            # Check for each defined function if it's mentioned in this test file
+            foreach ($funcName in $script:AllDefinedFunctions.Keys)
+            {
+                # Look for the function name as a whole word (not part of another word)
+                $pattern = "\b$([regex]::Escape($funcName))\b"
+                if ($content -match $pattern)
+                {
+                    if (-not $script:TestReferences.ContainsKey($funcName))
+                    {
+                        $script:TestReferences[$funcName] = @()
+                    }
+                    
+                    # Find which It block(s) contain this function reference
+                    $relevantItContexts = @()
+                    foreach ($itContext in $itContexts)
+                    {
+                        # Simple heuristic: if the It context mentions the function or appears near it
+                        if ($itContext -match $pattern -or $content -match "It\s+[''`"]$([regex]::Escape($itContext))[''`"][^}]*\b$([regex]::Escape($funcName))\b")
+                        {
+                            $relevantItContexts += $itContext
+                        }
+                    }
+                    
+                    $testRef = [PSCustomObject]@{
+                        TestFile   = $relativePath
+                        Describe   = $describeContext
+                        ItContexts = if ($relevantItContexts.Count -gt 0) { $relevantItContexts -join '; ' } else { 'Multiple contexts' }
+                    }
+                    
+                    $script:TestReferences[$funcName] += $testRef
+                    Write-Verbose "  Found $funcName in test: $($testFile.Name) / $describeContext"
+                }
+            }
+        }
+        catch
+        {
+            Write-Warning "Failed to scan test file ${testFile}: $_"
+        }
+    }
+    
+    Write-Progress -Activity "Scanning Pester Tests" -Completed
+    
+    $functionsWithTests = $script:TestReferences.Keys.Count
+    Write-Host "  Found $functionsWithTests functions referenced in tests" -ForegroundColor Green
+}
+
 function Find-AllDefinedFunctions()
 {
     <#
@@ -433,7 +546,7 @@ function Build-DependencyGraph()
         }
         
         # Also track calls from the main script body (not inside functions)
-        if ($file.FullName -eq (Resolve-Path $MainScript).Path -or $file.FullName -eq (Resolve-Path $TestScript).Path)
+        if ($file.FullName -eq (Resolve-Path $MainScript).Path)
         {
             $scriptBodyKey = "__SCRIPT_BODY__$($file.Name)"
             if (-not $script:FunctionCalls.ContainsKey($scriptBodyKey))
@@ -559,6 +672,22 @@ function Export-Report()
             }
         }
         
+        # Check if function is referenced in tests
+        $foundInTests = "No"
+        $testDetails = ""
+        $testCount = 0
+        if ($script:TestReferences.ContainsKey($func))
+        {
+            $foundInTests = "Yes"
+            $testCount = $script:TestReferences[$func].Count
+            $testDetailsList = @()
+            foreach ($testRef in $script:TestReferences[$func])
+            {
+                $testDetailsList += "$($testRef.TestFile) | $($testRef.Describe) | $($testRef.ItContexts)"
+            }
+            $testDetails = $testDetailsList -join ' ;; '
+        }
+        
         $report += [PSCustomObject]@{
             FunctionName = $func
             IsUsed       = $isUsed
@@ -567,6 +696,9 @@ function Export-Report()
             CallCount    = $callCount
             CalledBy     = ($calledBy | Sort-Object) -join '; '
             CallsOthers  = if ($script:FunctionCalls.ContainsKey($func)) { ($script:FunctionCalls[$func] | Sort-Object) -join '; ' } else { '' }
+            FoundInTests = $foundInTests
+            TestCount    = $testCount
+            TestDetails  = $testDetails
         }
     }
     
@@ -577,11 +709,14 @@ function Export-Report()
     $usedCount = ($report | Where-Object { $_.IsUsed }).Count
     $unusedCount = ($report | Where-Object { -not $_.IsUsed }).Count
     $totalCount = $report.Count
+    $testedCount = ($report | Where-Object { $_.FoundInTests -eq "Yes" }).Count
+    $testCoveragePercent = if ($totalCount -gt 0) { [math]::Round(($testedCount / $totalCount) * 100, 2) } else { 0 }
     
     Write-Host "`n=== SUMMARY ===" -ForegroundColor Cyan
     Write-Host "Total functions defined: $totalCount" -ForegroundColor White
     Write-Host "Used functions: $usedCount" -ForegroundColor Green
     Write-Host "Unused functions: $unusedCount" -ForegroundColor Yellow
+    Write-Host "Functions with test coverage: $testedCount ($testCoveragePercent%)" -ForegroundColor Cyan
     Write-Host "Memory optimization potential: $([math]::Round(($unusedCount/$totalCount)*100, 2))%" -ForegroundColor Magenta
     Write-Host "`nReport saved to: $OutputPath" -ForegroundColor Green
     
@@ -592,7 +727,8 @@ function Export-Report()
         Write-Host "`nTop unused functions:" -ForegroundColor Yellow
         foreach ($item in $unused)
         {
-            Write-Host "  - $($item.FunctionName) ($($item.FilePath))" -ForegroundColor Gray
+            $testIndicator = if ($item.FoundInTests -eq "Yes") { " [HAS TESTS]" } else { "" }
+            Write-Host "  - $($item.FunctionName) ($($item.FilePath))$testIndicator" -ForegroundColor Gray
         }
         if ($unusedCount -gt 10)
         {
@@ -603,7 +739,6 @@ function Export-Report()
 #endregion
 
 #region Main Execution
-
 Write-Host "=== Autopilot Function Dependency Analyzer ===" -ForegroundColor Cyan
 Write-Host ""
 
@@ -640,6 +775,23 @@ if (-not (Test-Path $MainScript))
     }
 }
 Write-Host "Using main script: $MainScript" -ForegroundColor Green
+if (-not (Test-Path $TestsFolder))
+{
+    Write-Host "Looking for tests folder starting at $TestsFolder" -ForegroundColor Yellow
+    $foundTestsFolder = Find-FolderPath -Path $TestsFolder -FolderName "tests"
+    if ($foundTestsFolder)
+    {
+        Write-Host "Tests folder found at: $foundTestsFolder" -ForegroundColor Green
+        $TestsFolder = $foundTestsFolder
+    }
+    else
+    {
+        Write-Error "Tests folder not found starting from: $TestsFolder"
+        exit 1
+    }
+}
+Write-Host "Using tests folder: $TestsFolder" -ForegroundColor Green
+
 # Step 1: Discover all defined functions
 Find-AllDefinedFunctions -FolderPath $FunctionsFolder
 
@@ -649,7 +801,10 @@ Build-DependencyGraph -FolderPath $FunctionsFolder -MainScript $MainScript
 # Step 3: Find used functions
 Find-UsedFunctions
 
-# Step 4: Generate report
+# Step 4: Scan Pester tests for function references
+Find-PesterTestReferences -TestsFolder $TestsFolder
+
+# Step 5: Generate report
 Export-Report -OutputPath $OutputPath
 
 Write-Host "`nAnalysis complete!" -ForegroundColor Green
