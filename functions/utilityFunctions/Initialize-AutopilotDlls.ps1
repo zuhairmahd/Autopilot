@@ -51,39 +51,60 @@ function Initialize-AutopilotDlls()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Initializing Autopilot C# DLLs"
-    
-    # Detect PowerShell version and select appropriate target framework
-    $psVersion = $PSVersionTable.PSVersion.Major
-    $targetFramework = if ($psVersion -ge 7)
+    $frameworkPath = $DLLPath
+
+    # New: detect best framework subfolder under the provided DLLPath
+    $tfmPattern = '^net(standard\d\.\d|[0-9]+(\.[0-9]+)?)$'
+    $leaf = Split-Path -Path $frameworkPath -Leaf
+    if ($leaf -notmatch $tfmPattern)
     {
-        "net9.0"  # PowerShell 7+ uses .NET 9.0
+        $candidateTfms = @()
+        if ($PSVersionTable.PSVersion.Major -lt 7)
+        {
+            $candidateTfms += @('netstandard2.0', 'net48', 'net472')
+        }
+        else
+        {
+            $candidateTfms += @('net9.0', 'net8.0', 'net7.0', 'net6.0', 'netstandard2.1', 'netstandard2.0')
+        }
+        $selectedPath = $null
+        foreach ($tfm in $candidateTfms)
+        {
+            $p = Join-Path $DLLPath $tfm
+            if (Test-Path $p) { $selectedPath = $p; break }
+            $pub = Join-Path $p 'publish'
+            if (Test-Path $pub) { $selectedPath = $pub; break }
+        }
+        if (-not $selectedPath)
+        {
+            $child = Get-ChildItem -Path $DLLPath -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^net' } | Select-Object -First 1
+            if ($child) { $selectedPath = $child.FullName }
+        }
+        if ($selectedPath)
+        {
+            Write-Verbose "[$functionName] Detected framework folder: $selectedPath"
+            $frameworkPath = $selectedPath
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No framework folder detected under $DLLPath; will search base path"
+        }
     }
-    else
-    {
-        "netstandard2.0"  # PowerShell 5.1 uses .NET Framework 4.x
-    }
-    
-    # Adjust DLL path for multi-targeting
-    $frameworkPath = Join-Path $DLLPath $targetFramework
-    
-    Write-Verbose "[$functionName] PowerShell Version: $($PSVersionTable.PSVersion)"
-    Write-Verbose "[$functionName] Target Framework: $targetFramework"
+
     Write-Verbose "[$functionName] Looking for DLLs in: $frameworkPath"
     
     # Initialize result with diagnostic information
     $result = @{
-        Success           = $false
-        GraphCoreLoaded   = $false
-        DeviceCoreLoaded  = $false
-        CacheCoreLoaded   = $false
-        LogCoreLoaded     = $false
-        ConfigCoreLoaded  = $false
-        LoadedCount       = 0
-        Errors            = @()
-        DllPath           = $frameworkPath
-        TargetFramework   = $targetFramework
-        PowerShellVersion = $PSVersionTable.PSVersion.ToString()
-        LoadedAssemblies  = @()
+        Success          = $false
+        GraphCoreLoaded  = $false
+        DeviceCoreLoaded = $false
+        CacheCoreLoaded  = $false
+        ConfigCoreLoaded = $false
+        LoadedCount      = 0
+        Errors           = @()
+        DllPath          = $frameworkPath
+        LoadedAssemblies = @()
     }
     
     Write-Verbose "[$functionName] Looking for DLLs in: $frameworkPath"
@@ -146,20 +167,12 @@ function Initialize-AutopilotDlls()
     Write-Verbose "[$functionName] Registered AssemblyResolve handler for dependency loading"
     
     # Try to load each DLL
-    # Skip LogCore on PowerShell 5.1 due to stack overflow issues
     $dlls = @(
         @{ Name = "Autopilot.GraphCore"; Flag = "GraphCoreLoaded" }
         @{ Name = "Autopilot.DeviceCore"; Flag = "DeviceCoreLoaded" }
-        @{ Name = "Autopilot.CacheCore"; Flag = "CacheCoreLoaded" }
+        @{ Name = "Autopilot.CacheCore"; Flag = "CacheCoreLoaded"  }
         @{ Name = "Autopilot.ConfigCore"; Flag = "ConfigCoreLoaded" }
     )
-    
-    # Only load LogCore on PowerShell 7+
-    if ($PSVersionTable.PSVersion.Major -ge 7)
-    {
-        $dlls += @{ Name = "Autopilot.LogCore"; Flag = "LogCoreLoaded" }
-    }
-    
     foreach ($dll in $dlls)
     {
         $dllFile = Join-Path $frameworkPath "$($dll.Name).dll"
@@ -250,14 +263,14 @@ function Initialize-AutopilotDlls()
     
     # Calculate final statistics
     $result.LoadedCount = ($result.LoadedAssemblies).Count
-    $result.Success = ($result.LoadedCount -eq 5)
+    $result.Success = ($result.LoadedCount -eq $dlls.Count)
     
     # Cache the result globally
     $global:AutopilotDllsLoaded = $true
     $global:AutopilotDllStatus = $result
     
     # Log summary
-    Write-Verbose "[$functionName] Loaded $($result.LoadedCount) of 5 DLLs successfully"
+    Write-Verbose "[$functionName] Loaded $($result.LoadedCount) of $($dlls.Count) DLLs successfully"
     
     if ($result.Success)
     {
@@ -278,12 +291,12 @@ function Initialize-AutopilotDlls()
     }
     
     $status = if ($result.Success) { "All loaded" } 
-    elseif ($result.LoadedCount -gt 0) { "Partial ($($result.LoadedCount)/5)" }
+    elseif ($result.LoadedCount -gt 0) { "Partial ($($result.LoadedCount)/$($dlls.Count))" }
     else { "None loaded" }
     
     if (Get-Command Write-Log -ErrorAction SilentlyContinue)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "C# DLLs initialized: $status - GraphCore=$($result.GraphCoreLoaded), DeviceCore=$($result.DeviceCoreLoaded), CacheCore=$($result.CacheCoreLoaded), LogCore=$($result.LogCoreLoaded), ConfigCore=$($result.ConfigCoreLoaded)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "C# DLLs initialized: $status - GraphCore=$($result.GraphCoreLoaded), DeviceCore=$($result.DeviceCoreLoaded), CacheCore=$($result.CacheCoreLoaded), ConfigCore=$($result.ConfigCoreLoaded)" -LogLevel "Information"
     }
     
     $global:AutopilotDllStatus = $result
