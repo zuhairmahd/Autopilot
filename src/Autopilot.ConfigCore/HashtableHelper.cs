@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Autopilot.ConfigCore
 {
@@ -11,7 +12,8 @@ namespace Autopilot.ConfigCore
     public static class HashtableHelper
     {
         /// <summary>
-        /// Deep clones a hashtable and all nested hashtables/arrays.
+        /// Deep clones a hashtable and all nested hashtables/arrays iteratively.
+        /// Avoids stack overflow on deeply nested structures by using an explicit work stack.
         /// 5-10x faster than PowerShell's PSSerializer approach.
         /// </summary>
         /// <param name="source">Hashtable to clone</param>
@@ -21,65 +23,216 @@ namespace Autopilot.ConfigCore
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
 
-            var result = new Hashtable(source.Count, StringComparer.OrdinalIgnoreCase);
+            var rootClone = new Hashtable(source.Count, StringComparer.OrdinalIgnoreCase);
 
+            // Work item: (sourceObject, targetContainer, targetKey, targetIndex)
+            // For hashtables: targetKey is set, targetIndex is -1
+            // For arrays: targetKey is null, targetIndex is set
+            var workStack = new Stack<(object source, object target, object? key, int index)>();
+
+            // Create all root-level entries first
             foreach (DictionaryEntry entry in source)
             {
-                result[entry.Key] = CloneValue(entry.Value);
+                var value = entry.Value;
+
+                if (value == null || value is string || value.GetType().IsValueType)
+                {
+                    // Simple values - copy directly
+                    rootClone[entry.Key] = value;
+                }
+                else if (value is Hashtable nestedHash)
+                {
+                    // Create empty hashtable and queue for population
+                    var clonedHash = new Hashtable(nestedHash.Count, StringComparer.OrdinalIgnoreCase);
+                    rootClone[entry.Key] = clonedHash;
+                    workStack.Push((nestedHash, clonedHash, null, -1));
+                }
+                else if (value is Array arr)
+                {
+                    // Create empty array and queue for population
+                    var elementType = arr.GetType().GetElementType();
+                    var clonedArray = Array.CreateInstance(elementType!, arr.Length);
+                    rootClone[entry.Key] = clonedArray;
+
+                    // Queue each array element
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        workStack.Push((arr, clonedArray, null, i));
+                    }
+                }
+                else if (value is IList list)
+                {
+                    // Create empty list and queue for population
+                    var clonedList = new ArrayList(list.Count);
+                    rootClone[entry.Key] = clonedList;
+
+                    // Pre-populate with nulls, then queue for filling
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        clonedList.Add(null);
+                        workStack.Push((list, clonedList, null, i));
+                    }
+                }
+                else
+                {
+                    // Other types - copy reference
+                    rootClone[entry.Key] = value;
+                }
             }
 
-            return result;
+            // Process the work stack
+            while (workStack.Count > 0)
+            {
+                var (sourceObj, targetObj, key, index) = workStack.Pop();
+
+                // Get the value to process
+                object? value = null;
+                if (sourceObj is Hashtable hashSource)
+                {
+                    // Processing a hashtable - populate its entries
+                    var hashTarget = (Hashtable)targetObj;
+
+                    foreach (DictionaryEntry entry in hashSource)
+                    {
+                        var entryValue = entry.Value;
+
+                        if (entryValue == null || entryValue is string || entryValue.GetType().IsValueType)
+                        {
+                            hashTarget[entry.Key] = entryValue;
+                        }
+                        else if (entryValue is Hashtable nestedHash)
+                        {
+                            var clonedHash = new Hashtable(nestedHash.Count, StringComparer.OrdinalIgnoreCase);
+                            hashTarget[entry.Key] = clonedHash;
+                            workStack.Push((nestedHash, clonedHash, null, -1));
+                        }
+                        else if (entryValue is Array arr)
+                        {
+                            var elementType = arr.GetType().GetElementType();
+                            var clonedArray = Array.CreateInstance(elementType!, arr.Length);
+                            hashTarget[entry.Key] = clonedArray;
+
+                            for (int i = 0; i < arr.Length; i++)
+                            {
+                                workStack.Push((arr, clonedArray, null, i));
+                            }
+                        }
+                        else if (entryValue is IList list)
+                        {
+                            var clonedList = new ArrayList(list.Count);
+                            hashTarget[entry.Key] = clonedList;
+
+                            for (int i = 0; i < list.Count; i++)
+                            {
+                                clonedList.Add(null);
+                                workStack.Push((list, clonedList, null, i));
+                            }
+                        }
+                        else
+                        {
+                            hashTarget[entry.Key] = entryValue;
+                        }
+                    }
+                    continue;
+                }
+                else if (sourceObj is Array arraySource)
+                {
+                    value = arraySource.GetValue(index);
+                }
+                else if (sourceObj is IList listSource)
+                {
+                    value = listSource[index];
+                }
+
+                // Clone the value and assign to target
+                if (value == null || value is string || value.GetType().IsValueType)
+                {
+                    if (targetObj is Array arrayTarget)
+                        arrayTarget.SetValue(value, index);
+                    else if (targetObj is IList listTarget)
+                        listTarget[index] = value;
+                }
+                else if (value is Hashtable nestedHash)
+                {
+                    var clonedHash = new Hashtable(nestedHash.Count, StringComparer.OrdinalIgnoreCase);
+
+                    if (targetObj is Array arrayTarget)
+                        arrayTarget.SetValue(clonedHash, index);
+                    else if (targetObj is IList listTarget)
+                        listTarget[index] = clonedHash;
+
+                    workStack.Push((nestedHash, clonedHash, null, -1));
+                }
+                else if (value is Array arr)
+                {
+                    var elementType = arr.GetType().GetElementType();
+                    var clonedArray = Array.CreateInstance(elementType!, arr.Length);
+
+                    if (targetObj is Array arrayTarget)
+                        arrayTarget.SetValue(clonedArray, index);
+                    else if (targetObj is IList listTarget)
+                        listTarget[index] = clonedArray;
+
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        workStack.Push((arr, clonedArray, null, i));
+                    }
+                }
+                else if (value is IList list)
+                {
+                    var clonedList = new ArrayList(list.Count);
+
+                    if (targetObj is Array arrayTarget)
+                        arrayTarget.SetValue(clonedList, index);
+                    else if (targetObj is IList listTarget)
+                        listTarget[index] = clonedList;
+
+                    for (int i = 0; i < list.Count; i++)
+                    {
+                        clonedList.Add(null);
+                        workStack.Push((list, clonedList, null, i));
+                    }
+                }
+                else
+                {
+                    // Other types
+                    if (targetObj is Array arrayTarget)
+                        arrayTarget.SetValue(value, index);
+                    else if (targetObj is IList listTarget)
+                        listTarget[index] = value;
+                }
+            }
+
+            return rootClone;
         }
 
         /// <summary>
-        /// Recursively clone a value (handles nested hashtables and arrays).
+        /// Clone a single value (used internally by older code, redirects to DeepClone for hashtables).
+        /// For simple values, returns as-is. For complex structures, creates shallow copy.
         /// </summary>
         private static object? CloneValue(object? value)
         {
             if (value == null)
                 return null;
 
-            // Clone nested hashtables
+            // Simple values (strings, numbers, etc.) can be returned directly
+            if (value is string || value.GetType().IsValueType)
+                return value;
+
+            // Clone nested hashtables using the iterative DeepClone
             if (value is Hashtable hashtable)
                 return DeepClone(hashtable);
 
-            // Clone arrays
-            if (value is Array array)
-            {
-                var elementType = array.GetType().GetElementType();
-                var clonedArray = Array.CreateInstance(elementType!, array.Length);
-
-                for (int i = 0; i < array.Length; i++)
-                {
-                    clonedArray.SetValue(CloneValue(array.GetValue(i)), i);
-                }
-
-                return clonedArray;
-            }
-
-            // Clone lists
-            if (value is IList list)
-            {
-                var clonedList = new ArrayList(list.Count);
-                foreach (var item in list)
-                {
-                    clonedList.Add(CloneValue(item));
-                }
-                return clonedList;
-            }
-
-            // Value types and strings are immutable
+            // For other types, return as-is (arrays/lists handled by DeepClone)
             return value;
-        }
-
-        /// <summary>
-        /// Merges two hashtables with configurable conflict resolution.
-        /// 10x faster than PowerShell foreach loops with nested operations.
-        /// </summary>
-        /// <param name="target">Base hashtable (Local settings)</param>
-        /// <param name="source">Source hashtable to merge (Global settings)</param>
-        /// <param name="conflictResolution">How to handle conflicts: "Local" (keep target) or "Global" (use source)</param>
-        /// <returns>Merged hashtable</returns>
+        }        /// <summary>
+                 /// Merges two hashtables with configurable conflict resolution.
+                 /// 10x faster than PowerShell foreach loops with nested operations.
+                 /// </summary>
+                 /// <param name="target">Base hashtable (Local settings)</param>
+                 /// <param name="source">Source hashtable to merge (Global settings)</param>
+                 /// <param name="conflictResolution">How to handle conflicts: "Local" (keep target) or "Global" (use source)</param>
+                 /// <returns>Merged hashtable</returns>
         public static Hashtable MergeHashtables(
             Hashtable target,
             Hashtable source,
@@ -141,7 +294,8 @@ namespace Autopilot.ConfigCore
         }
 
         /// <summary>
-        /// Recursive helper for flattening nested hashtables.
+        /// Iterative helper for flattening nested hashtables.
+        /// Prevents stack overflow by avoiding recursion for deeply nested structures.
         /// </summary>
         private static void FlattenRecursive(
             Hashtable source,
@@ -149,21 +303,30 @@ namespace Autopilot.ConfigCore
             string separator,
             Hashtable result)
         {
-            foreach (DictionaryEntry entry in source)
-            {
-                string key = string.IsNullOrEmpty(prefix)
-                    ? entry.Key.ToString()!
-                    : $"{prefix}{separator}{entry.Key}";
+            // Use explicit stack to avoid recursion
+            var workStack = new Stack<(Hashtable Table, string Prefix)>();
+            workStack.Push((source, prefix));
 
-                if (entry.Value is Hashtable nested)
+            while (workStack.Count > 0)
+            {
+                var (currentTable, currentPrefix) = workStack.Pop();
+
+                foreach (DictionaryEntry entry in currentTable)
                 {
-                    // Recursively flatten nested hashtables
-                    FlattenRecursive(nested, key, separator, result);
-                }
-                else
-                {
-                    // Add leaf value
-                    result[key] = entry.Value;
+                    string key = string.IsNullOrEmpty(currentPrefix)
+                        ? entry.Key.ToString()!
+                        : $"{currentPrefix}{separator}{entry.Key}";
+
+                    if (entry.Value is Hashtable nested)
+                    {
+                        // Queue nested hashtable for processing
+                        workStack.Push((nested, key));
+                    }
+                    else
+                    {
+                        // Add leaf value
+                        result[key] = entry.Value;
+                    }
                 }
             }
         }

@@ -85,134 +85,218 @@ function ConvertFrom-JsonToHashtable()
         }
     }
     
-    # Handle hashtables and dictionaries
-    if ($JsonObject -is [hashtable] -or $JsonObject -is [System.Collections.IDictionary])
+    # Iterative implementation using work stack to avoid stack overflow
+    # Work item format: @{Object=$obj; Prefix=$prefix; TargetHash=$hash; TargetKey=$key}
+    $workStack = New-Object 'System.Collections.Generic.Stack[object]'
+    $rootHash = @{}
+    
+    # Push initial work item
+    $workStack.Push(@{
+            Object     = $JsonObject
+            Prefix     = $Prefix
+            TargetHash = $rootHash
+            TargetKey  = $null
+        })
+    
+    Write-Verbose "[$functionName] Starting iterative conversion (Flatten: $Flatten)"
+    
+    while ($workStack.Count -gt 0)
     {
-        Write-Verbose "[$functionName] Detected hashtable/dictionary"
-        Write-Log -logFile $logFile -Module $functionName -Message "Detected hashtable/dictionary"
-        $hashtable = @{}
-        foreach ($key in $JsonObject.Keys)
+        $work = $workStack.Pop()
+        $obj = $work.Object
+        $currentPrefix = $work.Prefix
+        $targetHash = $work.TargetHash
+        $targetKey = $work.TargetKey
+        
+        # Handle hashtables and dictionaries
+        if ($obj -is [hashtable] -or $obj -is [System.Collections.IDictionary])
         {
-            $fullKey = if ($Flatten -and $Prefix)
-            {
-                "$Prefix.$key" 
-            }
-            else
-            {
-                $key 
-            }
-            $value = $JsonObject[$key]
+            Write-Verbose "[$functionName] Processing hashtable/dictionary with $($obj.Keys.Count) keys"
             
-            if ($Flatten -and (($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
-                    ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0)))
+            if ($targetKey)
             {
-                Write-Verbose "[$functionName] Found nested object at key: $fullKey, flattening"
-                $nestedFlat = ConvertFrom-JsonToHashtable -JsonObject $value -Flatten -Prefix $fullKey
-                foreach ($nestedKey in $nestedFlat.Keys)
+                # Create new hashtable for nested structure
+                $newHash = @{}
+                $targetHash[$targetKey] = $newHash
+                $targetHash = $newHash
+            }
+            
+            # Process all keys - push them onto stack in reverse order to maintain order
+            $keys = @($obj.Keys)
+            for ($i = $keys.Count - 1; $i -ge 0; $i--)
+            {
+                $key = $keys[$i]
+                $value = $obj[$key]
+                
+                $fullKey = if ($Flatten -and $currentPrefix)
                 {
-                    $hashtable[$nestedKey] = $nestedFlat[$nestedKey]
+                    "$currentPrefix.$key"
                 }
-            }
-            elseif (-not $Flatten -and (($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
-                    ($value -is [PSCustomObject])))
-            {
-                # Preserve structure - recursively convert but don't flatten
-                Write-Verbose "[$functionName] Recursively converting nested object: $key"
-                $hashtable[$key] = ConvertFrom-JsonToHashtable -JsonObject $value
-            }
-            else
-            {
-                Write-Verbose "[$functionName] Adding $(if ($Flatten) {'flat'} else {'structured'}) key: $fullKey"
-                $hashtable[$fullKey] = $value
-            }
-        }
-        return $hashtable
-    }
-    elseif ($JsonObject -is [PSCustomObject])
-    {
-        Write-Verbose "[$functionName] Detected PSCustomObject"
-        Write-Log -logFile $logFile -Module $functionName -Message "Detected PSCustomObject"
-        Write-Verbose "[$functionName] Converting properties to hashtable"
-        Write-Log -logFile $logFile -Module $functionName -Message "Converting properties to hashtable"
-        $hashtable = @{}
-        $JsonObject.PSObject.Properties | ForEach-Object {
-            $fullKey = if ($Flatten -and $Prefix)
-            {
-                "$Prefix.$($_.Name)" 
-            }
-            else
-            {
-                $_.Name 
-            }
-            
-            if ($_.Value -is [PSCustomObject])
-            {
-                if ($Flatten)
+                else
                 {
-                    # Flatten nested PSCustomObjects
-                    Write-Verbose "[$functionName] Flattening nested PSCustomObject: $fullKey"
-                    Write-Log -logFile $logFile -Module $functionName -Message "Flattening nested PSCustomObject: $fullKey"
-                    $nestedFlat = ConvertFrom-JsonToHashtable -JsonObject $_.Value -Flatten -Prefix $fullKey
-                    foreach ($nestedKey in $nestedFlat.Keys)
+                    $key
+                }
+                
+                $isNested = ($value -is [hashtable]) -or ($value -is [System.Collections.IDictionary]) -or 
+                ($value -is [PSCustomObject] -and $value.PSObject.Properties.Count -gt 0)
+                
+                if ($isNested)
+                {
+                    if ($Flatten)
                     {
-                        $hashtable[$nestedKey] = $nestedFlat[$nestedKey]
+                        # Flatten mode: push with extended prefix
+                        $workStack.Push(@{
+                                Object     = $value
+                                Prefix     = $fullKey
+                                TargetHash = $targetHash
+                                TargetKey  = $null
+                            })
+                    }
+                    else
+                    {
+                        # Structured mode: push with target key for nesting
+                        $workStack.Push(@{
+                                Object     = $value
+                                Prefix     = $currentPrefix
+                                TargetHash = $targetHash
+                                TargetKey  = $key
+                            })
                     }
                 }
                 else
                 {
-                    # Recursively convert nested PSCustomObjects while preserving structure
-                    Write-Verbose "[$functionName] Recursively converting nested PSCustomObject: $($_.Name)"
-                    Write-Log -logFile $logFile -Module $functionName -Message "Recursively converting nested PSCustomObject: $($_.Name)"
-                    $hashtable[$_.Name] = ConvertFrom-JsonToHashtable -JsonObject $_.Value
+                    # Simple value - add directly
+                    $targetHash[$fullKey] = $value
                 }
             }
-            elseif ($_.Value -is [System.Array])
+        }
+        elseif ($obj -is [PSCustomObject])
+        {
+            Write-Verbose "[$functionName] Processing PSCustomObject with $($obj.PSObject.Properties.Count) properties"
+            
+            if ($targetKey)
             {
-                # Handle arrays - check if they contain PSCustomObjects
-                Write-Verbose "[$functionName] Converting array property: $($_.Name)"
-                Write-Log -logFile $logFile -Module $functionName -Message "Converting array property: $($_.Name)"
-                $convertedArray = @()
-                foreach ($item in $_.Value)
+                # Create new hashtable for nested structure
+                $newHash = @{}
+                $targetHash[$targetKey] = $newHash
+                $targetHash = $newHash
+            }
+            
+            # Process all properties - push them onto stack in reverse order
+            $properties = @($obj.PSObject.Properties)
+            for ($i = $properties.Count - 1; $i -ge 0; $i--)
+            {
+                $prop = $properties[$i]
+                $propName = $prop.Name
+                $propValue = $prop.Value
+                
+                $fullKey = if ($Flatten -and $currentPrefix)
                 {
-                    if ($item -is [PSCustomObject])
+                    "$currentPrefix.$propName"
+                }
+                else
+                {
+                    $propName
+                }
+                
+                if ($propValue -is [PSCustomObject])
+                {
+                    if ($Flatten)
                     {
-                        Write-Verbose "[$functionName] Recursively converting nested PSCustomObject in array: $($_.Name)"
-                        Write-Log -logFile $logFile -Module $functionName -Message "Recursively converting nested PSCustomObject in array: $($_.Name)"
-                        $convertedArray += ConvertFrom-JsonToHashtable -JsonObject $item -Flatten:$Flatten -Prefix $Prefix
+                        # Flatten mode: push with extended prefix
+                        $workStack.Push(@{
+                                Object     = $propValue
+                                Prefix     = $fullKey
+                                TargetHash = $targetHash
+                                TargetKey  = $null
+                            })
                     }
                     else
                     {
-                        # Preserve non-PSCustomObject items as-is
-                        Write-Verbose "[$functionName] Preserving non-PSCustomObject item in array: $($_.Name)"
-                        Write-Log -logFile $logFile -Module $functionName -Message "Preserving non-PSCustomObject item in array: $($_.Name)"
-                        $convertedArray += $item
+                        # Structured mode: push with target key
+                        $workStack.Push(@{
+                                Object     = $propValue
+                                Prefix     = $currentPrefix
+                                TargetHash = $targetHash
+                                TargetKey  = $propName
+                            })
                     }
                 }
-                $hashtable[$fullKey] = $convertedArray
+                elseif ($propValue -is [System.Array])
+                {
+                    # Handle arrays - convert PSCustomObjects within
+                    Write-Verbose "[$functionName] Converting array property: $propName"
+                    $convertedArray = @()
+                    foreach ($item in $propValue)
+                    {
+                        if ($item -is [PSCustomObject])
+                        {
+                            # For array items, create a temporary conversion
+                            # Use a simple recursive call here as arrays are typically shallow
+                            $itemStack = New-Object 'System.Collections.Generic.Stack[object]'
+                            $itemHash = @{}
+                            $itemStack.Push(@{
+                                    Object     = $item
+                                    Prefix     = ''
+                                    TargetHash = $itemHash
+                                    TargetKey  = $null
+                                })
+                            
+                            while ($itemStack.Count -gt 0)
+                            {
+                                $itemWork = $itemStack.Pop()
+                                if ($itemWork.Object -is [PSCustomObject])
+                                {
+                                    $itemWork.Object.PSObject.Properties | ForEach-Object {
+                                        if ($_.Value -is [PSCustomObject])
+                                        {
+                                            $nestedHash = @{}
+                                            $itemWork.TargetHash[$_.Name] = $nestedHash
+                                            $itemStack.Push(@{
+                                                    Object     = $_.Value
+                                                    Prefix     = ''
+                                                    TargetHash = $nestedHash
+                                                    TargetKey  = $null
+                                                })
+                                        }
+                                        else
+                                        {
+                                            $itemWork.TargetHash[$_.Name] = $_.Value
+                                        }
+                                    }
+                                }
+                            }
+                            $convertedArray += $itemHash
+                        }
+                        else
+                        {
+                            $convertedArray += $item
+                        }
+                    }
+                    $targetHash[$fullKey] = $convertedArray
+                }
+                else
+                {
+                    # Simple value
+                    $targetHash[$fullKey] = $propValue
+                }
             }
-            else
-            {
-                $hashtable[$fullKey] = $_.Value
-            }
-        }
-        return $hashtable
-    }
-    else
-    {
-        # If it's a simple value and we're flattening with a prefix, return as hashtable
-        if ($Flatten -and $Prefix)
-        {
-            Write-Verbose "[$functionName] Creating flat hashtable for simple value with prefix: $Prefix"
-            $flatHash = @{}
-            $flatHash[$Prefix] = $JsonObject
-            return $flatHash
         }
         else
         {
-            Write-Verbose "[$functionName] Input is not a PSCustomObject or hashtable, returning original object"
-            Write-Log -logFile $logFile -Module $functionName -Message "Input is not a PSCustomObject or hashtable, returning original object"
-            return $JsonObject
+            # Simple value
+            if ($Flatten -and $currentPrefix)
+            {
+                $targetHash[$currentPrefix] = $obj
+            }
+            else
+            {
+                # Return original object if not a complex type
+                return $obj
+            }
         }
     }
+    
+    return $rootHash
 }
 

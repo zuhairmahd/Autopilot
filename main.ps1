@@ -349,47 +349,63 @@ else
     Write-Host "Using PowerShell implementations (DLLs not found)" -ForegroundColor Yellow
 }
 
+Write-Host "DEBUG A: Proceeding to version check..." -ForegroundColor Cyan
+
 #If the scriptname is a Powershell, change the extension to an exe.
+Write-Host "DEBUG B: Checking script name..." -ForegroundColor Cyan
 if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
 {
+    Write-Host "DEBUG C: Script is .ps1, converting to .exe..." -ForegroundColor Cyan
     Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
     Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
     $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
 }
 else
 {
+    Write-Host "DEBUG D: Script name already executable..." -ForegroundColor Cyan
     Write-Verbose "[$scriptName] Script file name is already an executable: $scriptName"
     Write-Log -logFile $LogFile -module $scriptName -Message "Script file name is already an executable: $scriptName" -LogLevel "Warning"
     $scriptNameExe = $scriptName
 }
 
+Write-Host "DEBUG E: Checking if file exists..." -ForegroundColor Cyan
 if (Test-Path "$scriptPath\$scriptNameExe")
 {
+    Write-Host "DEBUG F: File exists, getting version..." -ForegroundColor Cyan
     Write-Verbose "[$scriptName] Found executable file: $scriptNameExe. Getting version."
     Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe. Getting version." -logLevel "Verbose"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+    Write-Host "DEBUG G: Got version!" -ForegroundColor Cyan
 }
 else
 {
+    Write-Host "DEBUG H: File not found, using script name..." -ForegroundColor Cyan
     Write-Verbose "[$scriptName] Script file found: $scriptName"
     Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
     $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+    Write-Host "DEBUG I: Got version!" -ForegroundColor Cyan
 }
+
+Write-Host "DEBUG J: About to initialize application configuration..." -ForegroundColor Cyan
 Write-Verbose "[$scriptName] Initializing application configuration"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
+Write-Host "DEBUG: About to cleanup temp files..." -ForegroundColor Cyan
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
     Write-Verbose "[$scriptName] All temporary files were cleaned."
     Write-Log -LogFile $LogFile -Module "$scriptName" -Message "All temporary files were cleaned." -LogLevel "Information"
 }
+Write-Host "DEBUG: Temp files cleaned, checking migration..." -ForegroundColor Cyan
 Write-Verbose "[$scriptName] Total temporary files found: $($filesCleaned.RemovedFilesCount)"
 Write-Verbose "[$scriptName] Total temporary files removed: $($filesCleaned.RemovedFilesCount)"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 Write-Verbose "[$scriptName] Checking for settings migration need."
 write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
+Write-Host "DEBUG: About to invoke settings migration..." -ForegroundColor Cyan
 $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
+Write-Host "DEBUG: Settings migration complete!" -ForegroundColor Cyan
 write-log -logFile $logFile -module $scriptName -message "Migration needed: $($migrationCheck.migrationNeeded), Success: $($migrationCheck.success)" -LogLevel "Information"
 if ($migrationCheck.success -and $migrationCheck.migrationNeeded)
 {
@@ -412,7 +428,9 @@ else
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
 }
 
+Write-Host "DEBUG: About to get app metadata..." -ForegroundColor Cyan
 $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
+Write-Host "DEBUG: Got app metadata, checking version..." -ForegroundColor Cyan
 # Prioritize version from the domain settings file obtained via the Get-AppMetaData function
 if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
 {
@@ -420,8 +438,10 @@ if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaD
     $version.companyName = $appMetaData.companyName
     Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
 }
+Write-Host "DEBUG: Checking ShowVersion flag..." -ForegroundColor Cyan
 if ($ShowVersion)
 {
+    Write-Host "DEBUG: ShowVersion is TRUE, displaying version..." -ForegroundColor Cyan
     Write-Verbose "[$scriptName] Version: $version"
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
     Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan

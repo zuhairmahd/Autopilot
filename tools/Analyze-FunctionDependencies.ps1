@@ -136,7 +136,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Script-level variables
-$script:AllDefinedFunctions = @{}      # Hash: FunctionName -> FilePath
+$script:AllDefinedFunctions = @{}      # Hash: FunctionName -> @{FilePath, IsNested, NestingDepth, ParentFunction, IsPrivateMarker}
 $script:FunctionCalls = @{}            # Hash: FunctionName -> @(CalledFunctions)
 $script:UsedFunctions = [System.Collections.Generic.HashSet[string]]::new()
 $script:ScannedFiles = [System.Collections.Generic.HashSet[string]]::new()
@@ -233,7 +233,14 @@ function Get-FunctionDefinitions()
 {
     <#
     .SYNOPSIS
-        Extracts function definitions from a PowerShell file.
+        Extracts function definitions from a PowerShell file with nesting detection.
+    .DESCRIPTION
+        Returns an array of hashtables containing:
+        - Name: Function name
+        - IsNested: Boolean indicating if function is nested (private helper)
+        - NestingDepth: Brace depth where function is defined (0 = top-level)
+        - ParentFunction: Name of parent function if nested, otherwise $null
+        - IsPrivateMarker: Boolean indicating if PRIVATE HELPER FUNCTION comment found
     #>
     param(
         [string]$FilePath
@@ -246,17 +253,77 @@ function Get-FunctionDefinitions()
     try
     {
         $content = Get-Content -Path $FilePath -Raw -ErrorAction Stop
+        $lines = $content -split "`r?`n"
         
-        # Match function definitions: function FunctionName { ... }
-        # Also match: function Script:FunctionName, function Global:FunctionName
-        $pattern = '(?m)^\s*function\s+(?:script:|global:)?([\w-]+)\s*(?:\([^\)]*\))?\s*\{'
-        $regexMatches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        $braceDepth = 0
+        $currentTopLevelFunction = $null
+        $lineNumber = 0
+        $previousLines = @("", "", "")  # Track last 3 lines for comment detection
         
-        foreach ($match in $regexMatches)
+        foreach ($line in $lines)
         {
-            $functionName = $match.Groups[1].Value
-            $functions += $functionName
-            Write-Verbose "  Found function: $functionName"
+            $lineNumber++
+            
+            # Track brace depth (simplified - doesn't handle strings perfectly, but good enough)
+            $openBraces = ([regex]::Matches($line, '\{') | Measure-Object).Count
+            $closeBraces = ([regex]::Matches($line, '\}') | Measure-Object).Count
+            
+            # Check for function definition
+            if ($line -match '^\s*function\s+(?:script:|global:)?([\w-]+)\s*(?:\([^\)]*\))?\s*\{?')
+            {
+                $functionName = $matches[1]
+                $isNested = $braceDepth -gt 0
+                $nestingDepth = $braceDepth
+                
+                # Check if previous 5 lines contain the PRIVATE HELPER FUNCTION marker
+                $isPrivateMarker = $false
+                $checkLines = $previousLines + @($line)
+                foreach ($checkLine in $checkLines[-5..-1])
+                {
+                    if ($checkLine -match '#\s*PRIVATE\s+HELPER\s+FUNCTION')
+                    {
+                        $isPrivateMarker = $true
+                        Write-Verbose "  Found PRIVATE HELPER FUNCTION marker for: $functionName"
+                        break
+                    }
+                }
+                
+                $functionInfo = @{
+                    Name            = $functionName
+                    IsNested        = $isNested
+                    NestingDepth    = $nestingDepth
+                    ParentFunction  = if ($isNested) { $currentTopLevelFunction } else { $null }
+                    IsPrivateMarker = $isPrivateMarker
+                    LineNumber      = $lineNumber
+                }
+                
+                $functions += $functionInfo
+                
+                $scope = if ($isNested) { "PRIVATE" } else { "PUBLIC" }
+                $markerInfo = if ($isPrivateMarker) { " [MARKED]" } else { "" }
+                Write-Verbose "  Found function: $functionName [$scope, Depth=$nestingDepth]$markerInfo"
+                
+                # Track top-level function for nesting detection
+                if (-not $isNested)
+                {
+                    $currentTopLevelFunction = $functionName
+                }
+            }
+            
+            # Update brace depth AFTER processing function definition
+            # (in case function definition includes opening brace on same line)
+            $braceDepth += $openBraces
+            $braceDepth -= $closeBraces
+            $braceDepth = [Math]::Max(0, $braceDepth)  # Prevent negative depth
+            
+            # When we close back to depth 0, clear the top-level function
+            if ($braceDepth -eq 0)
+            {
+                $currentTopLevelFunction = $null
+            }
+            
+            # Update previous lines buffer
+            $previousLines = @($previousLines[1], $previousLines[2], $line)
         }
     }
     catch
@@ -450,7 +517,7 @@ function Find-AllDefinedFunctions()
 {
     <#
     .SYNOPSIS
-        Discovers all function definitions in the functions folder.
+        Discovers all function definitions in the functions folder with nesting metadata.
     #>
     param(
         [string]$FolderPath
@@ -461,6 +528,8 @@ function Find-AllDefinedFunctions()
     $allFiles = Get-ChildItem -Path $FolderPath -Filter "*.ps1" -Recurse -File -ErrorAction SilentlyContinue
     $totalFiles = $allFiles.Count
     $currentFile = 0
+    $privateCount = 0
+    $publicCount = 0
     
     foreach ($file in $allFiles)
     {
@@ -468,23 +537,44 @@ function Find-AllDefinedFunctions()
         $percentComplete = [int](($currentFile / $totalFiles) * 100)
         Write-Progress-Custom -Activity "Discovering Functions" -Status "Processing $($file.Name) ($currentFile/$totalFiles)" -PercentComplete $percentComplete
         
-        $functions = Get-FunctionDefinitions -FilePath $file.FullName
+        $functionInfos = Get-FunctionDefinitions -FilePath $file.FullName
         
-        foreach ($func in $functions)
+        foreach ($funcInfo in $functionInfos)
         {
-            if (-not $script:AllDefinedFunctions.ContainsKey($func))
+            $funcName = $funcInfo.Name
+            
+            if (-not $script:AllDefinedFunctions.ContainsKey($funcName))
             {
-                $script:AllDefinedFunctions[$func] = $file.FullName
+                $script:AllDefinedFunctions[$funcName] = @{
+                    FilePath        = $file.FullName
+                    IsNested        = $funcInfo.IsNested
+                    NestingDepth    = $funcInfo.NestingDepth
+                    ParentFunction  = $funcInfo.ParentFunction
+                    IsPrivateMarker = $funcInfo.IsPrivateMarker
+                    LineNumber      = $funcInfo.LineNumber
+                }
+                
+                if ($funcInfo.IsNested -or $funcInfo.IsPrivateMarker)
+                {
+                    $privateCount++
+                }
+                else
+                {
+                    $publicCount++
+                }
             }
             else
             {
-                Write-Verbose "Duplicate function found: $func in $($file.FullName) (already defined in $($script:AllDefinedFunctions[$func]))"
+                $existingPath = $script:AllDefinedFunctions[$funcName].FilePath
+                Write-Verbose "Duplicate function found: $funcName in $($file.FullName) (already defined in $existingPath)"
             }
         }
     }
     
     Write-Progress -Activity "Discovering Functions" -Completed
     Write-Host "  Found $($script:AllDefinedFunctions.Count) unique function definitions" -ForegroundColor Green
+    Write-Host "    Public functions: $publicCount" -ForegroundColor Cyan
+    Write-Host "    Private (nested) functions: $privateCount" -ForegroundColor Cyan
 }
 
 function Build-DependencyGraph()
@@ -528,25 +618,57 @@ function Build-DependencyGraph()
         # Get all function calls in this file (entire file, not just inside functions)
         $calls = Get-FunctionCalls -FilePath $file.FullName
         
-        # If this file defines functions, track what each function might call
-        # Since we can't easily determine which calls are inside which function,
-        # we assume all calls in a file could be made by any function in that file
+        # Track what each defined function calls
+        # For private/nested functions: only track calls within their scope (parent file)
+        # For public functions: calls tracked from anywhere (current implementation)
         if ($definedInFile.Count -gt 0)
         {
-            foreach ($func in $definedInFile)
+            foreach ($funcInfo in $definedInFile)
             {
-                if (-not $script:FunctionCalls.ContainsKey($func))
+                $funcName = $funcInfo.Name
+                
+                if (-not $script:FunctionCalls.ContainsKey($funcName))
                 {
-                    $script:FunctionCalls[$func] = [System.Collections.Generic.HashSet[string]]::new()
+                    $script:FunctionCalls[$funcName] = [System.Collections.Generic.HashSet[string]]::new()
                 }
                 
+                # For all functions, track what they call within their definition file
                 foreach ($call in $calls)
                 {
                     # Only track calls to functions we've defined (not built-in cmdlets)
-                    if ($script:AllDefinedFunctions.ContainsKey($call) -and $call -ne $func)
+                    if ($script:AllDefinedFunctions.ContainsKey($call) -and $call -ne $funcName)
                     {
-                        [void]$script:FunctionCalls[$func].Add($call)
+                        [void]$script:FunctionCalls[$funcName].Add($call)
                     }
+                }
+            }
+        }
+        
+        # Track which functions are called BY this file
+        # This marks functions as "used" - scope-aware logic applied here:
+        # - Private functions are only marked as used if called from their parent file
+        # - Public functions are marked as used if called from any file
+        foreach ($call in $calls)
+        {
+            if ($script:AllDefinedFunctions.ContainsKey($call))
+            {
+                $calledFuncMetadata = $script:AllDefinedFunctions[$call]
+                $isPrivate = $calledFuncMetadata.IsNested -or $calledFuncMetadata.IsPrivateMarker
+                
+                if ($isPrivate)
+                {
+                    # Private function: only mark as used if called from same file where it's defined
+                    $definitionFile = $calledFuncMetadata.FilePath
+                    if ($file.FullName -eq $definitionFile)
+                    {
+                        [void]$script:UsedFunctions.Add($call)
+                        Write-Verbose "  Private function '$call' used in its definition file: $($file.Name)"
+                    }
+                }
+                else
+                {
+                    # Public function: mark as used from any file
+                    [void]$script:UsedFunctions.Add($call)
                 }
             }
         }
@@ -659,8 +781,13 @@ function Export-Report()
     foreach ($func in $script:AllDefinedFunctions.Keys | Sort-Object)
     {
         $isUsed = $script:UsedFunctions.Contains($func)
-        $filePath = $script:AllDefinedFunctions[$func]
+        $funcMetadata = $script:AllDefinedFunctions[$func]
+        $filePath = $funcMetadata.FilePath
         $relativePath = $filePath -replace [regex]::Escape((Get-Location).Path), '.'
+        
+        # Determine scope
+        $scope = if ($funcMetadata.IsNested -or $funcMetadata.IsPrivateMarker) { "Private" } else { "Public" }
+        $parentFunc = if ($funcMetadata.ParentFunction) { $funcMetadata.ParentFunction } else { "" }
         
         $callCount = 0
         $calledBy = @()
@@ -695,16 +822,20 @@ function Export-Report()
         }
         
         $report += [PSCustomObject]@{
-            FunctionName = $func
-            IsUsed       = $isUsed
-            Status       = if ($isUsed) { "USED" } else { "UNUSED" }
-            FilePath     = $relativePath
-            CallCount    = $callCount
-            CalledBy     = ($calledBy | Sort-Object) -join '; '
-            CallsOthers  = if ($script:FunctionCalls.ContainsKey($func)) { ($script:FunctionCalls[$func] | Sort-Object) -join '; ' } else { '' }
-            FoundInTests = $foundInTests
-            TestCount    = $testCount
-            TestDetails  = $testDetails
+            FunctionName   = $func
+            Scope          = $scope
+            IsUsed         = $isUsed
+            Status         = if ($isUsed) { "USED" } else { if ($scope -eq "Private") { "PRIVATE" } else { "UNUSED" } }
+            FilePath       = $relativePath
+            ParentFunction = $parentFunc
+            NestingDepth   = $funcMetadata.NestingDepth
+            LineNumber     = $funcMetadata.LineNumber
+            CallCount      = $callCount
+            CalledBy       = ($calledBy | Sort-Object) -join '; '
+            CallsOthers    = if ($script:FunctionCalls.ContainsKey($func)) { ($script:FunctionCalls[$func] | Sort-Object) -join '; ' } else { '' }
+            FoundInTests   = $foundInTests
+            TestCount      = $testCount
+            TestDetails    = $testDetails
         }
     }
     
@@ -718,28 +849,52 @@ function Export-Report()
     $testedCount = ($report | Where-Object { $_.FoundInTests -eq "Yes" }).Count
     $testCoveragePercent = if ($totalCount -gt 0) { [math]::Round(($testedCount / $totalCount) * 100, 2) } else { 0 }
     
+    # Calculate public vs private breakdowns
+    $publicCount = ($report | Where-Object { $_.Scope -eq "Public" }).Count
+    $privateCount = ($report | Where-Object { $_.Scope -eq "Private" }).Count
+    $publicUsedCount = ($report | Where-Object { $_.Scope -eq "Public" -and $_.IsUsed }).Count
+    $publicUnusedCount = ($report | Where-Object { $_.Scope -eq "Public" -and -not $_.IsUsed }).Count
+    $privateUsedCount = ($report | Where-Object { $_.Scope -eq "Private" -and $_.IsUsed }).Count
+    $privateUnusedCount = ($report | Where-Object { $_.Scope -eq "Private" -and -not $_.IsUsed }).Count
+    
     Write-Host "`n=== SUMMARY ===" -ForegroundColor Cyan
     Write-Host "Total functions defined: $totalCount" -ForegroundColor White
+    Write-Host "  Public: $publicCount" -ForegroundColor Gray
+    Write-Host "  Private (nested): $privateCount" -ForegroundColor Gray
+    Write-Host ""
     Write-Host "Used functions: $usedCount" -ForegroundColor Green
+    Write-Host "  Public used: $publicUsedCount" -ForegroundColor Gray
+    Write-Host "  Private used: $privateUsedCount" -ForegroundColor Gray
+    Write-Host ""
     Write-Host "Unused functions: $unusedCount" -ForegroundColor Yellow
+    Write-Host "  Public unused: $publicUnusedCount" -ForegroundColor Gray
+    Write-Host "  Private unused (may be encapsulation): $privateUnusedCount" -ForegroundColor Gray
+    Write-Host ""
     Write-Host "Functions with test coverage: $testedCount ($testCoveragePercent%)" -ForegroundColor Cyan
-    Write-Host "Memory optimization potential: $([math]::Round(($unusedCount/$totalCount)*100, 2))%" -ForegroundColor Magenta
+    Write-Host "Memory optimization potential (public only): $([math]::Round(($publicUnusedCount/$publicCount)*100, 2))%" -ForegroundColor Magenta
     Write-Host "`nReport saved to: $OutputPath" -ForegroundColor Green
     
-    # Show top 10 unused functions
-    $unused = $report | Where-Object { -not $_.IsUsed } | Select-Object -First 10
-    if ($unused.Count -gt 0)
+    # Show top 10 unused PUBLIC functions (exclude private to reduce noise)
+    $unusedPublic = $report | Where-Object { -not $_.IsUsed -and $_.Scope -eq "Public" } | Select-Object -First 10
+    if ($unusedPublic.Count -gt 0)
     {
-        Write-Host "`nTop unused functions:" -ForegroundColor Yellow
-        foreach ($item in $unused)
+        Write-Host "`nTop unused PUBLIC functions:" -ForegroundColor Yellow
+        foreach ($item in $unusedPublic)
         {
             $testIndicator = if ($item.FoundInTests -eq "Yes") { " [HAS TESTS]" } else { "" }
             Write-Host "  - $($item.FunctionName) ($($item.FilePath))$testIndicator" -ForegroundColor Gray
         }
-        if ($unusedCount -gt 10)
+        if ($publicUnusedCount -gt 10)
         {
-            Write-Host "  ... and $($unusedCount - 10) more (see CSV for full list)" -ForegroundColor Gray
+            Write-Host "  ... and $($publicUnusedCount - 10) more (see CSV for full list)" -ForegroundColor Gray
         }
+    }
+    
+    # Note about private functions
+    if ($privateUnusedCount -gt 0)
+    {
+        Write-Host "`nNote: $privateUnusedCount private (nested) functions marked unused." -ForegroundColor DarkGray
+        Write-Host "      These may be legitimate encapsulation patterns. Check CSV for details." -ForegroundColor DarkGray
     }
 }
 #endregion
