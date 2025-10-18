@@ -9,6 +9,62 @@ Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirr
 ## Coding Style & Naming Conventions
 Stick to four-space indentation, ~120-character lines, and approved PowerShell verb-noun PascalCase (`Get-DeviceProfileStatus`). Variables use camelCase, constants use ALL_CAPS, and every public function needs comment-based help plus `$functionName = $MyInvocation.MyCommand.Name` for logging context. Favor `try/catch`, `Write-Verbose`, and the shared `Write-Log` helper; avoid 5.1-incompatible constructs such as ordered hashtables or string interpolation. **Do not use Unicode characters** (checkmarks, arrows, emoji, etc.) as PowerShell 5.1 console output may not render them correctly—stick to ASCII characters only. For newlines in `Write-Host` statements, use separate `Write-Host` calls instead of `\n` escape sequences. No automated formatter runs here—the style guidance and reviewers are the guardrails.
 
+## Private (Nested) Helper Functions
+Functions defined within other functions are **private helpers**, scoped only to the parent function. This pattern provides encapsulation and prevents namespace pollution while keeping related code together.
+
+### Standard Pattern
+All nested helper functions must use this three-line comment header:
+```powershell
+# PRIVATE HELPER FUNCTION - Called within ParentFunctionName at line ~XXX
+# Brief description of what this helper does
+# Suppression: Not flagged as unused (nested function used by parent)
+function Private-HelperName()
+{
+    # implementation
+}
+```
+
+### Real Examples
+```powershell
+# From HasScope.ps1
+function HasScope() {
+    # ... main logic ...
+    
+    # PRIVATE HELPER FUNCTION - Called within HasScope at line ~255
+    # Checks if a required scope is satisfied by any authorized scope
+    # Suppression: Not flagged as unused (nested function used by parent)
+    function Test-ScopeAuthorization() {
+        param([string]$RequiredScope, [string[]]$AuthorizedScopes, [hashtable]$ScopeHierarchy)
+        # ... implementation ...
+    }
+    
+    # Use the helper
+    $result = Test-ScopeAuthorization -RequiredScope $scope -AuthorizedScopes $authScopes
+}
+```
+
+### Benefits
+- **Encapsulation**: Helper logic stays with the function that uses it, improving cohesion
+- **No namespace pollution**: Private functions don't clutter the global scope or module exports
+- **Clear intent**: Obvious that helper is single-purpose and tightly coupled to parent
+- **Better analysis**: The standardized comment pattern helps dependency analysis tools correctly identify usage
+- **Maintainability**: Changes to helpers stay localized; easier to understand function structure
+
+### When to Use
+- Helper is only needed by one parent function
+- Helper logic is tightly coupled to parent's workflow
+- Helper doesn't need to be tested independently (tested through parent)
+- Extracting to separate file would create excessive file count
+
+### Detection by Tools
+The `Analyze-FunctionDependencies.ps1` tool recognizes the pattern `# PRIVATE HELPER FUNCTION` and:
+- Marks these functions as "Private" in the analysis report
+- Only searches for calls within the same file (not globally)
+- Excludes them from "unused function" warnings
+- Tracks parent-child relationships
+
+See [`docs/PRIVATE_FUNCTION_DETECTION_PLAN.md`](docs/PRIVATE_FUNCTION_DETECTION_PLAN.md) for complete technical details.
+
 ## Testing Guidelines
 
 **⚠️ IMPORTANT:** For detailed test writing and migration guidance, see **[`tests/AGENTS.md`](tests/AGENTS.md)** (AI-optimized step-by-step instructions) and **[`docs/PESTER_MIGRATION_README.md`](docs/PESTER_MIGRATION_README.md)** (complete migration documentation hub).

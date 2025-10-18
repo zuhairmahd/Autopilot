@@ -361,6 +361,9 @@ function Show-SettingsViewer()
     }
 }
 
+# PRIVATE HELPER FUNCTION - Called within Show-SettingsViewer at line ~251
+# Displays setting information in the viewer with formatting
+# Suppression: Not flagged as unused (nested function used by parent)
 function Display-SettingInfoForViewer()
 {
     <#

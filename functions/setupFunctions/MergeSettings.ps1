@@ -99,7 +99,9 @@ function MergeSettings()
         Write-Verbose "[$functionName] ConfigCore not available, using PowerShell implementation"
     }
     
-    # Function to detect if settings structure requires flattening
+    # PRIVATE HELPER FUNCTION - Called within MergeSettings at lines ~150-151
+    # Detects if settings structure requires flattening for optimal performance
+    # Suppression: Not flagged as unused (nested function used by parent)
     function Test-RequiresFlattening($object)
     {
         if ($object -is [hashtable])
@@ -185,7 +187,9 @@ function MergeSettings()
         Write-Verbose "[$functionName] Global settings converted to $($processGlobal.Count) properties"
     }
     
-    # Normalize all keys to simple format (remove any prefixes) - only if flattening was used
+    # PRIVATE HELPER FUNCTION - Called within MergeSettings at lines ~207, 215
+    # Normalizes keys by removing prefixes - only used when flattening is needed
+    # Suppression: Not flagged as unused (nested function used by parent)
     function Get-SimpleKey($key)
     {
         if ($key.Contains('.'))

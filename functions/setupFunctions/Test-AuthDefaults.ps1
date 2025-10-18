@@ -38,7 +38,9 @@ function Test-AuthDefaults()
         [switch]$Silent
     )
     
-    # Helper function to safely log messages
+    # PRIVATE HELPER FUNCTION - Called within Test-AuthDefaults (multiple times throughout function)
+    # Safely logs messages when Write-SafeLog may not be available
+    # Suppression: Not flagged as unused (nested function used by parent)
     function Write-SafeLogFallback
     {
         param($Message, $Level)
