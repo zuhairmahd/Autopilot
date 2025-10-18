@@ -41,6 +41,8 @@ TestResults/
 
 # Misc. files.
 *.csv
+*.xls
+*.xlsx
 *.xml
 *.backup.*
 config.json
