@@ -1,14 +1,35 @@
 <#
 .SYNOPSIS
-    Analyzes function dependencies in the Autopilot project and identifies unused functions.
+    Analyzes function dependencies in the Autopilot project and identifies unused functions for memory optimization.
 
 .DESCRIPTION
-    This script traverses main.ps1 and all function files to build a dependency graph.
-    It identifies which functions are actually used (directly or indirectly) and which
-    functions are defined but never called, helping to optimize memory usage.
+    This script performs comprehensive static code analysis to help optimize the Autopilot codebase by:
+    
+    1. Discovering all 254+ function definitions across 186+ PowerShell files in the functions/ directory
+    2. Building a complete dependency graph showing which functions call which other functions
+    3. Tracing actual usage starting from main.ps1 and test.ps1 entry points
+    4. Recursively identifying all functions that are used (directly or indirectly)
+    5. Generating a detailed CSV report listing all functions with their usage status
+    
+    The analysis helps identify functions that are defined but never called, enabling:
+    - Memory optimization by removing unused code
+    - Codebase cleanup and maintenance
+    - Dependency understanding and visualization
+    - Technical debt identification
+    
+    The script uses advanced regex patterns to detect various PowerShell calling conventions including:
+    - Direct function calls (FunctionName -Parameter)
+    - Variable assignments ($var = FunctionName)
+    - Return statements (return FunctionName @params)
+    - Pipeline operations (| FunctionName)
+    - Call operators (& FunctionName)
+    - Dot sourcing (. FunctionName)
+    
+    **Current Results**: ~10.63% memory optimization potential (27 unused functions out of 254 total)
 
 .PARAMETER OutputPath
     Path where the CSV report will be saved. Default: ".\FunctionDependencyReport.csv"
+    The report includes: FunctionName, IsUsed, Status, FilePath, CallCount, CalledBy, CallsOthers
 
 .PARAMETER FunctionsFolder
     Path to the functions folder. Default: ".\functions"
@@ -16,21 +37,87 @@
 .PARAMETER MainScript
     Path to the main entry point script. Default: ".\main.ps1"
 
+.PARAMETER TestScript
+    Path to the test script. Default: ".\test.ps1"
+
 .PARAMETER Verbose
-    Show detailed progress information during analysis.
+    Show detailed progress information during analysis, including file-by-file processing.
 
 .EXAMPLE
     .\Analyze-FunctionDependencies.ps1
-    Analyzes dependencies using default paths and generates report.
+    
+    Analyzes dependencies using default paths and generates FunctionDependencyReport.csv in the current directory.
+    Output includes summary statistics and top 10 unused functions.
 
 .EXAMPLE
-    .\Analyze-FunctionDependencies.ps1 -OutputPath "C:\Reports\dependencies.csv" -Verbose
-    Analyzes with custom output path and verbose logging.
+    .\Analyze-FunctionDependencies.ps1 -Verbose
+    
+    Runs analysis with detailed logging showing each file being processed and each function being discovered.
+
+.EXAMPLE
+    .\Analyze-FunctionDependencies.ps1 -OutputPath "C:\Reports\dependencies-$(Get-Date -Format 'yyyyMMdd').csv"
+    
+    Generates a timestamped report in a custom location.
+
+.EXAMPLE
+    .\Analyze-FunctionDependencies.ps1 -OutputPath "report.csv"
+    $report = Import-Csv "report.csv"
+    $unused = $report | Where-Object { $_.Status -eq "UNUSED" }
+    $unused | Format-Table FunctionName, FilePath
+    
+    Generates report and then displays only unused functions in a formatted table.
+
+.EXAMPLE
+    # Integrate into CI/CD pipeline
+    .\Analyze-FunctionDependencies.ps1 -OutputPath "analysis.csv"
+    $unused = (Import-Csv "analysis.csv" | Where-Object { $_.Status -eq "UNUSED" }).Count
+    if ($unused -gt 50) {
+        Write-Warning "High number of unused functions detected: $unused"
+    }
+    
+    Automated check that warns if unused function count exceeds threshold.
+
+.OUTPUTS
+    CSV file containing:
+    - FunctionName: Name of each discovered function
+    - IsUsed: Boolean (True/False) indicating if function is called
+    - Status: Human-readable status ("USED" or "UNUSED")
+    - FilePath: Relative path to file containing the function
+    - CallCount: Number of functions that call this function
+    - CalledBy: Semicolon-separated list of calling functions
+    - CallsOthers: Semicolon-separated list of functions this function calls
+    
+    Console output includes:
+    - Progress bars during processing
+    - Summary statistics (total, used, unused counts)
+    - Memory optimization potential percentage
+    - Top 10 unused functions for quick review
 
 .NOTES
-    Author: Autopilot Memory Optimization
+    Author: Autopilot Project Team
     Version: 1.0.0
+    Last Updated: October 2025
     Requires: PowerShell 5.1 or later
+    
+    For detailed documentation, see: Analyze-FunctionDependencies-README.md
+    
+    Known Limitations:
+    - Dynamic function calls (using Invoke-Expression or call operators with variables) may not be detected
+    - Functions called from external scripts not included in analysis will appear as unused
+    - Conditionally loaded functions may be marked as unused if conditions aren't in main.ps1/test.ps1
+    
+    Best Practices:
+    - Run this script regularly (monthly or after major refactoring)
+    - Manually verify unused functions before removing them
+    - Search for string references to function names to catch dynamic calls
+    - Review function documentation and purpose before deletion
+    - Run full test suite after removing any functions
+    
+.LINK
+    Project Repository: https://github.com/zuhairmahd/autopilot
+    
+.LINK
+    Analyze-FunctionDependencies-README.md
 #>
 
 [CmdletBinding()]
