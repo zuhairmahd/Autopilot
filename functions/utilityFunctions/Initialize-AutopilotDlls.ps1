@@ -5,7 +5,7 @@ function Initialize-AutopilotDlls()
         Loads Autopilot C# DLLs with fallback to PowerShell implementation.
     
     .DESCRIPTION
-        Attempts to load compiled C# DLLs (GraphCore, DeviceCore, CacheCore) for performance.
+        Attempts to load compiled C# DLLs (GraphCore, DeviceCore, CacheCore, LogCore, ConfigCore) for performance.
         If DLLs are missing or fail to load, sets flags to use PowerShell fallback implementations.
         Should be called once during application initialization.
     
@@ -15,7 +15,9 @@ function Initialize-AutopilotDlls()
         - GraphCoreLoaded: $true if Autopilot.GraphCore.dll loaded
         - DeviceCoreLoaded: $true if Autopilot.DeviceCore.dll loaded
         - CacheCoreLoaded: $true if Autopilot.CacheCore.dll loaded
-        - LoadedCount: Number of DLLs successfully loaded (0-3)
+        - LogCoreLoaded: $true if Autopilot.LogCore.dll loaded
+        - ConfigCoreLoaded: $true if Autopilot.ConfigCore.dll loaded
+        - LoadedCount: Number of DLLs successfully loaded (0-5)
         - Errors: Array of error details for failed loads
         - DllPath: The path that was searched
         - LoadedAssemblies: Array of successfully loaded assembly names
@@ -75,6 +77,7 @@ function Initialize-AutopilotDlls()
         DeviceCoreLoaded  = $false
         CacheCoreLoaded   = $false
         LogCoreLoaded     = $false
+        ConfigCoreLoaded  = $false
         LoadedCount       = 0
         Errors            = @()
         DllPath           = $frameworkPath
@@ -148,6 +151,7 @@ function Initialize-AutopilotDlls()
         @{ Name = "Autopilot.DeviceCore"; Flag = "DeviceCoreLoaded" }
         @{ Name = "Autopilot.CacheCore"; Flag = "CacheCoreLoaded" }
         @{ Name = "Autopilot.LogCore"; Flag = "LogCoreLoaded" }
+        @{ Name = "Autopilot.ConfigCore"; Flag = "ConfigCoreLoaded" }
     )
     
     foreach ($dll in $dlls)
@@ -240,14 +244,14 @@ function Initialize-AutopilotDlls()
     
     # Calculate final statistics
     $result.LoadedCount = ($result.LoadedAssemblies).Count
-    $result.Success = ($result.LoadedCount -eq 4)
+    $result.Success = ($result.LoadedCount -eq 5)
     
     # Cache the result globally
     $global:AutopilotDllsLoaded = $true
     $global:AutopilotDllStatus = $result
     
     # Log summary
-    Write-Verbose "[$functionName] Loaded $($result.LoadedCount) of 4 DLLs successfully"
+    Write-Verbose "[$functionName] Loaded $($result.LoadedCount) of 5 DLLs successfully"
     
     if ($result.Success)
     {
@@ -268,12 +272,12 @@ function Initialize-AutopilotDlls()
     }
     
     $status = if ($result.Success) { "All loaded" } 
-    elseif ($result.LoadedCount -gt 0) { "Partial ($($result.LoadedCount)/4)" }
+    elseif ($result.LoadedCount -gt 0) { "Partial ($($result.LoadedCount)/5)" }
     else { "None loaded" }
     
     if (Get-Command Write-Log -ErrorAction SilentlyContinue)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "C# DLLs initialized: $status - GraphCore=$($result.GraphCoreLoaded), DeviceCore=$($result.DeviceCoreLoaded), CacheCore=$($result.CacheCoreLoaded), LogCore=$($result.LogCoreLoaded)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "C# DLLs initialized: $status - GraphCore=$($result.GraphCoreLoaded), DeviceCore=$($result.DeviceCoreLoaded), CacheCore=$($result.CacheCoreLoaded), LogCore=$($result.LogCoreLoaded), ConfigCore=$($result.ConfigCoreLoaded)" -LogLevel "Information"
     }
     
     $global:AutopilotDllStatus = $result

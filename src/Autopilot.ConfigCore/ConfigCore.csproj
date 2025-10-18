@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net9.0</TargetFrameworks>
+    <RootNamespace>Autopilot.ConfigCore</RootNamespace>
+    <AssemblyName>Autopilot.ConfigCore</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <Version>1.0.0</Version>
+    <Authors>Autopilot Team</Authors>
+    <Description>Configuration management utilities for Autopilot - hashtable operations, JSON parsing, file watching, and validation</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.0" />
+    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference CacheCore for configuration caching integration -->
+    <ProjectReference Include="..\Autopilot.CacheCore\CacheCore.csproj" />
+  </ItemGroup>
+
+</Project>

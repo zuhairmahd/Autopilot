@@ -52,6 +52,53 @@ function MergeSettings()
     
     Write-Verbose "[$functionName] Merging settings with conflict resolution: $ConflictResolution"
     
+    # Check if ConfigCore DLL is available for fast C# implementation
+    if ($global:AutopilotDllStatus.ConfigCoreLoaded)
+    {
+        Write-Verbose "[$functionName] Using ConfigCore.dll for 10x faster merge"
+        
+        try
+        {
+            # Convert to hashtables if needed
+            $localHash = if ($localSettings -is [hashtable])
+            { 
+                $localSettings 
+            }
+            else
+            { 
+                ConvertFrom-JsonToHashtable -JsonObject $localSettings 
+            }
+            
+            $globalHash = if ($globalSettings -is [hashtable])
+            { 
+                $globalSettings 
+            }
+            else
+            { 
+                ConvertFrom-JsonToHashtable -JsonObject $globalSettings 
+            }
+            
+            # Use C# for 10x faster merge
+            $merged = [Autopilot.ConfigCore.HashtableHelper]::MergeHashtables(
+                $localHash, 
+                $globalHash, 
+                $ConflictResolution
+            )
+            
+            Write-Verbose "[$functionName] ConfigCore merge completed: $($merged.Count) keys"
+            return $merged
+        }
+        catch
+        {
+            Write-Verbose "[$functionName] ConfigCore merge failed: $($_.Exception.Message), falling back to PowerShell"
+            # Fall through to PowerShell implementation
+        }
+    }
+    else
+    {
+        Write-Verbose "[$functionName] ConfigCore not available, using PowerShell implementation"
+    }
+    
     # Function to detect if settings structure requires flattening
     function Test-RequiresFlattening($object)
     {

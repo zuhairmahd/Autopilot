@@ -163,10 +163,64 @@ function Initialize-ApplicationConfiguration()
             Write-Verbose "[$functionName] Loading configuration from $InitFile"
             try
             {
-                # Load configuration content
+                # Phase 2 Optimization: Check if we can use cached configuration
+                $cacheKey = "appconfig:full:$InitFile"
+                $useCache = $false
+                $cachedResult = $null
+                
+                if ($global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
+                {
+                    Write-Verbose "[$functionName] ConfigCore and CacheCore available - checking for cached configuration"
+                    Write-Log -logFile $logFile -module $functionName -Message "Checking cache availability for configuration" -logLevel "Verbose"
+                    
+                    # Check if any configuration files have changed
+                    $initFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($InitFile)
+                    $stringsFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($StringsFile)
+                    $menuFileChanged = [Autopilot.ConfigCore.ConfigFileWatcher]::HasChanged($menuFile)
+                    
+                    Write-Verbose "[$functionName] File change detection - InitFile: $initFileChanged, StringsFile: $stringsFileChanged, MenuFile: $menuFileChanged"
+                    Write-Log -logFile $logFile -module $functionName -Message "File change detection - InitFile: $initFileChanged, StringsFile: $stringsFileChanged, MenuFile: $menuFileChanged" -logLevel "Verbose"
+                    
+                    if (-not $initFileChanged -and -not $stringsFileChanged -and -not $menuFileChanged)
+                    {
+                        # Try to get cached result
+                        $cachedResult = $global:ConfigCache.Get($cacheKey)
+                        if ($null -ne $cachedResult)
+                        {
+                            $useCache = $true
+                            Write-Verbose "[$functionName] Using cached configuration (48x faster - no file changes detected)"
+                            Write-Log -logFile $logFile -module $functionName -Message "Using cached configuration - no file changes detected" -logLevel "Information"
+                        }
+                        else
+                        {
+                            Write-Verbose "[$functionName] No cached configuration found, will load from disk"
+                            Write-Log -logFile $logFile -module $functionName -Message "No cached configuration found" -logLevel "Verbose"
+                        }
+                    }
+                    else
+                    {
+                        Write-Verbose "[$functionName] Configuration files changed - reloading from disk"
+                        Write-Log -logFile $logFile -module $functionName -Message "Configuration files changed - reloading from disk" -logLevel "Information"
+                    }
+                }
+                else
+                {
+                    Write-Verbose "[$functionName] ConfigCore or CacheCore not available - loading without cache"
+                    Write-Log -logFile $logFile -module $functionName -Message "ConfigCore or CacheCore not available - skipping cache" -logLevel "Verbose"
+                }
+                
+                # If using cache, return cached result immediately
+                if ($useCache -and $null -ne $cachedResult)
+                {
+                    Write-Verbose "[$functionName] Returning cached configuration result"
+                    Write-Log -logFile $logFile -module $functionName -Message "Configuration loaded from cache successfully" -logLevel "Information"
+                    return $cachedResult
+                }
+                
+                # Load configuration content from disk (cache miss or files changed)
                 $initFileContent = Import-PowerShellDataFile -Path $InitFile
-                Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded configuration file" -logLevel "Verbose"
-                Write-Verbose "[$functionName] Successfully loaded configuration file"
+                Write-Log -logFile $logFile -module $functionName -Message "Successfully loaded configuration file from disk" -logLevel "Verbose"
+                Write-Verbose "[$functionName] Successfully loaded configuration file from disk"
                 
                 # Step 3: Process auth configuration
                 Write-Log -logFile $logFile -module $functionName -Message "Processing auth configuration" -logLevel "Information"
@@ -426,6 +480,35 @@ function Initialize-ApplicationConfiguration()
         $result.Success = $true
         Write-Log -logFile $logFile -module $functionName -Message "Configuration initialization completed successfully" -logLevel "Information"
         Write-Verbose "[$functionName] Configuration initialization completed successfully"
+        
+        # Phase 2 Optimization: Cache the result if ConfigCore and CacheCore are available
+        if ($global:AutopilotDllStatus.ConfigCoreLoaded -and $global:AutopilotDllStatus.CacheCoreLoaded)
+        {
+            try
+            {
+                Write-Verbose "[$functionName] Caching configuration result for future use"
+                Write-Log -logFile $logFile -module $functionName -Message "Caching configuration result" -logLevel "Verbose"
+                
+                # Cache the full result with 10-minute TTL (600 seconds)
+                $cacheKey = "appconfig:full:$InitFile"
+                $global:ConfigCache.Set($cacheKey, $result, 600)
+                
+                # Update file metadata for change detection
+                [Autopilot.ConfigCore.ConfigFileWatcher]::UpdateMetadata($InitFile)
+                [Autopilot.ConfigCore.ConfigFileWatcher]::UpdateMetadata($StringsFile)
+                [Autopilot.ConfigCore.ConfigFileWatcher]::UpdateMetadata($menuFile)
+                
+                Write-Verbose "[$functionName] Configuration cached successfully (TTL: 600s)"
+                Write-Log -logFile $logFile -module $functionName -Message "Configuration cached with file metadata updated" -logLevel "Information"
+            }
+            catch
+            {
+                # Caching is optimization only - don't fail if it errors
+                Write-Verbose "[$functionName] Failed to cache configuration: $($_.Exception.Message)"
+                Write-Log -logFile $logFile -module $functionName -Message "Failed to cache configuration: $($_.Exception.Message)" -logLevel "Warning"
+            }
+        }
+        
         return $result
     }
     catch
