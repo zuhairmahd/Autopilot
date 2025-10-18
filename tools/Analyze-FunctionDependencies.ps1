@@ -297,7 +297,13 @@ function Get-FunctionCalls()
             'return\s+(\b[A-Z][\w-]*)\s*(?:@|-)?([\w]+)?',          # return FunctionName @params or -param
             '\|\s*(\b[A-Z][\w-]*)\s*(?:-[\w]+)?',                   # | FunctionName -param (pipeline)
             '&\s+(\b[A-Z][\w-]*)\s*(?:-[\w]+)?',                    # & FunctionName -param (call operator)
-            '\.\s+(\b[A-Z][\w-]*)\s*(?:-[\w]+)?'                    # . FunctionName -param (dot source)
+            '\.\s+(\b[A-Z][\w-]*)\s*(?:-[\w]+)?',                   # . FunctionName -param (dot source)
+            '\(\s*(\b[A-Z][\w-]*)\s*(?:\)|-)',                      # (FunctionName) or (FunctionName -param - in conditionals/expressions
+            'if\s+\([^)]*\b(\b[A-Z][\w-]*)\s*(?:\(|\))',            # if (...FunctionName(...) or if (...FunctionName) - conditional calls
+            'elseif\s+\([^)]*\b(\b[A-Z][\w-]*)\s*(?:\(|\))',        # elseif (...FunctionName(...) - conditional calls
+            'while\s+\([^)]*\b(\b[A-Z][\w-]*)\s*(?:\(|\))',         # while (...FunctionName(...) - loop conditional calls
+            '-not\s+\(?\s*(\b[A-Z][\w-]*)\s*(?:\(|\))',             # -not (FunctionName) or -not FunctionName - negation
+            '!\s*\(?\s*(\b[A-Z][\w-]*)\s*(?:\(|\))'                 # !(FunctionName) or !FunctionName - negation (alternative syntax)
         )
         
         foreach ($pattern in $patterns)
