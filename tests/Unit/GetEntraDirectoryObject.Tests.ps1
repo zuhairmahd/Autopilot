@@ -59,7 +59,7 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         
         if (Test-Path $global:LogFile)
         {
-            Remove-Item $global:LogFile -Force -ErrorAction SilentlyContinue
+            Remove-Item $global:LogFile -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     

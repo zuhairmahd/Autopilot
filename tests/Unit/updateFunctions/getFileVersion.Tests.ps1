@@ -241,7 +241,7 @@ Describe "Function: getFileVersion" -Tags 'Unit', 'UpdateFunctions' {
         # Clean up TestDrive to prevent GUID folder remnants
         if (Test-Path "TestDrive:\")
         {
-            Get-ChildItem "TestDrive:\" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+            Get-ChildItem "TestDrive:\" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
 }

@@ -35,7 +35,7 @@ Describe "Comprehensive Autopilot Device Import Tests" -Tags 'Comprehensive', 'A
         # Cleanup test environment
         if ($script:TestContext -and $script:TestContext.TestFolder)
         {
-            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     

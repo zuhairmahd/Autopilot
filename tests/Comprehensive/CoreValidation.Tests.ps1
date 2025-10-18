@@ -37,7 +37,7 @@ Describe "Core Validation - Comprehensive Authentication and Settings Tests" -Ta
         # Cleanup test environment
         if ($script:TestContext -and $script:TestContext.TestFolder)
         {
-            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     

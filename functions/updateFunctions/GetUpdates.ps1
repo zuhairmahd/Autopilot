@@ -150,7 +150,7 @@ function GetUpdates()
         if (Test-Path $tempUpdateFile)
         {
             Write-Verbose "[$functionName] Temp update file $tempUpdateFile exists. Removing it."
-            Remove-Item -Path $tempUpdateFile -Force
+            Remove-Item -Path $tempUpdateFile -Force | Out-Null
         }
         Write-Verbose "[$functionName] Getting remote file from $executableUpdateURL"
         $response = DownloadRemoteFile -url $executableUpdateURL -outputFile $tempUpdateFile
@@ -213,7 +213,7 @@ function GetUpdates()
                 {
                     Write-Verbose "[$functionName] Old backup file $executableFileName.old already exists. Removing it."
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removing old backup file $executableFileName.old" -LogLevel "Information"
-                    Remove-Item -Path "$executableFileName.old" -Force
+                    Remove-Item -Path "$executableFileName.old" -Force | Out-Null
                     Write-Verbose "[$functionName] Old backup file removed."
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Old backup file $executableFileName.old removed" -LogLevel "Information"
                 }
@@ -249,7 +249,7 @@ function GetUpdates()
                     Write-Verbose "[$functionName] Renamed $backupFileName to $executableFileName"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Renamed $backupFileName to $executableFileName" -LogLevel "Error"
                     Write-Host "The update has been rolled back to the previous version." -ForegroundColor Green
-                    Remove-Item -Path "$executableFileName.tmp" -Force
+                    Remove-Item -Path "$executableFileName.tmp" -Force | Out-Null
                     Write-Verbose "[$functionName] Removed temporary file $executableFileName.tmp"
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed temporary file $executableFileName.tmp" -LogLevel "Error"
                     Write-Host "Please try the update again later." -ForegroundColor Yellow
@@ -258,14 +258,14 @@ function GetUpdates()
                 if (Test-Path $tempUpdateFile)
                 {
                     Write-Verbose "[$functionName] Removing temporary update file $tempUpdateFile"
-                    Remove-Item -Path $tempUpdateFile -Force
+                    Remove-Item -Path $tempUpdateFile -Force | Out-Null
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed temporary update file $tempUpdateFile" -LogLevel "Error"
                 }
                 #same for the backup file.
                 if (Test-Path $backupFile)
                 {
                     Write-Verbose "[$functionName] Removing backup file $backupFile"
-                    Remove-Item -Path $backupFile -Force
+                    Remove-Item -Path $backupFile -Force | Out-Null
                     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Removed backup file $backupFile" -LogLevel "Error"
                 }
                 return $false

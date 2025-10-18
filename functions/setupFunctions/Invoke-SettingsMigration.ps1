@@ -202,7 +202,7 @@ function Invoke-SettingsMigration()
             {
                 try
                 {
-                    Remove-Item -Path $jsonFile -Force -ErrorAction SilentlyContinue
+                    Remove-Item -Path $jsonFile -Force -ErrorAction SilentlyContinue | Out-Null
                     $returnObject.removedFileCount++
                     Write-Verbose "[$functionName] Removed: $jsonFile"
                 }

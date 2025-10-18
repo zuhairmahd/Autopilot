@@ -121,7 +121,7 @@ try
     # Pester 5 sometimes leaves these behind in the working directory
     Get-ChildItem -Directory | Where-Object { 
         $_.Name -match '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' 
-    } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
     
     $endTime = Get-Date
     $duration = $endTime - $startTime

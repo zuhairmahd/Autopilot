@@ -43,7 +43,7 @@ Describe "Comprehensive Device Lookup and Reporting Tests" -Tags 'Comprehensive'
         # Cleanup test environment
         if ($script:TestContext -and $script:TestContext.TestFolder)
         {
-            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     
