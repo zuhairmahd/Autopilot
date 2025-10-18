@@ -52,7 +52,46 @@ function Initialize-AutopilotDlls()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Initializing Autopilot C# DLLs"
     $frameworkPath = $DLLPath
-    
+
+    # New: detect best framework subfolder under the provided DLLPath
+    $tfmPattern = '^net(standard\d\.\d|[0-9]+(\.[0-9]+)?)$'
+    $leaf = Split-Path -Path $frameworkPath -Leaf
+    if ($leaf -notmatch $tfmPattern)
+    {
+        $candidateTfms = @()
+        if ($PSVersionTable.PSVersion.Major -lt 7)
+        {
+            $candidateTfms += @('netstandard2.0', 'net48', 'net472')
+        }
+        else
+        {
+            $candidateTfms += @('net9.0', 'net8.0', 'net7.0', 'net6.0', 'netstandard2.1', 'netstandard2.0')
+        }
+        $selectedPath = $null
+        foreach ($tfm in $candidateTfms)
+        {
+            $p = Join-Path $DLLPath $tfm
+            if (Test-Path $p) { $selectedPath = $p; break }
+            $pub = Join-Path $p 'publish'
+            if (Test-Path $pub) { $selectedPath = $pub; break }
+        }
+        if (-not $selectedPath)
+        {
+            $child = Get-ChildItem -Path $DLLPath -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^net' } | Select-Object -First 1
+            if ($child) { $selectedPath = $child.FullName }
+        }
+        if ($selectedPath)
+        {
+            Write-Verbose "[$functionName] Detected framework folder: $selectedPath"
+            $frameworkPath = $selectedPath
+        }
+        else
+        {
+            Write-Verbose "[$functionName] No framework folder detected under $DLLPath; will search base path"
+        }
+    }
+
     Write-Verbose "[$functionName] Looking for DLLs in: $frameworkPath"
     
     # Initialize result with diagnostic information
@@ -131,7 +170,7 @@ function Initialize-AutopilotDlls()
     $dlls = @(
         @{ Name = "Autopilot.GraphCore"; Flag = "GraphCoreLoaded" }
         @{ Name = "Autopilot.DeviceCore"; Flag = "DeviceCoreLoaded" }
-        @{ Name = "Autopilot.CacheCore"; Flag = "CacheCoreLoaded" }
+        @{ Name = "Autopilot.CacheCore"; Flag = "CacheCoreLoaded"  }
         @{ Name = "Autopilot.ConfigCore"; Flag = "ConfigCoreLoaded" }
     )
     foreach ($dll in $dlls)
@@ -231,7 +270,7 @@ function Initialize-AutopilotDlls()
     $global:AutopilotDllStatus = $result
     
     # Log summary
-    Write-Verbose "[$functionName] Loaded $($result.LoadedCount) of 5 DLLs successfully"
+    Write-Verbose "[$functionName] Loaded $($result.LoadedCount) of $($dlls.Count) DLLs successfully"
     
     if ($result.Success)
     {
@@ -252,12 +291,12 @@ function Initialize-AutopilotDlls()
     }
     
     $status = if ($result.Success) { "All loaded" } 
-    elseif ($result.LoadedCount -gt 0) { "Partial ($($result.LoadedCount)/5)" }
+    elseif ($result.LoadedCount -gt 0) { "Partial ($($result.LoadedCount)/$($dlls.Count))" }
     else { "None loaded" }
     
     if (Get-Command Write-Log -ErrorAction SilentlyContinue)
     {
-        Write-Log -LogFile $LogFile -Module $functionName -Message "C# DLLs initialized: $status - GraphCore=$($result.GraphCoreLoaded), DeviceCore=$($result.DeviceCoreLoaded), CacheCore=$($result.CacheCoreLoaded), LogCore=$($result.LogCoreLoaded), ConfigCore=$($result.ConfigCoreLoaded)" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "C# DLLs initialized: $status - GraphCore=$($result.GraphCoreLoaded), DeviceCore=$($result.DeviceCoreLoaded), CacheCore=$($result.CacheCoreLoaded), ConfigCore=$($result.ConfigCoreLoaded)" -LogLevel "Information"
     }
     
     $global:AutopilotDllStatus = $result
