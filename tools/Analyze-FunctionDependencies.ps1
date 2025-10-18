@@ -137,8 +137,83 @@ $script:UsedFunctions = [System.Collections.Generic.HashSet[string]]::new()
 $script:ScannedFiles = [System.Collections.Generic.HashSet[string]]::new()
 
 #region Helper Functions
+function Find-FolderPath()
+{
+    <#
+    .SYNOPSIS
+        Searches upward from the given path for a folder with the specified name.
+    .PARAMETER Path
+        The starting path to begin searching from.
+    .PARAMETER FolderName
+        The name of the folder to search for.
+    .OUTPUTS
+        Returns the full path to the folder if found, otherwise $null.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$FolderName
+    )
+    $functionName = $MyInvocation.MyCommand.Name
+    #write verbose log of received parameters
+    Write-Verbose "[$functionName] Find-FolderPath called with Path: $Path, FolderName: $FolderName"
+    try
+    {
+        $currentPath = (Resolve-Path -Path $Path).Path
+        Write-Verbose "[$functionName] Current path resolved to: $currentPath"
 
-function Write-Progress-Custom
+        # 1. Search children (recursively) of the starting path
+        Write-Verbose "[$functionName] Searching children of $currentPath for folder named $FolderName"
+        $childMatch = Get-ChildItem -Path $currentPath -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+        Write-Verbose "[$functionName] Checking child match: $($childMatch.FullName)"
+        if ($childMatch)
+        {
+            Write-Verbose "[$functionName] Found folder in children: $($childMatch.FullName)"
+            return $childMatch.FullName
+        }
+        # Also check if the starting path itself matches
+        if ((Split-Path -Path $currentPath -Leaf) -ieq $FolderName)
+        {
+            Write-Verbose "[$functionName] Starting path itself matches: $currentPath"
+            return $currentPath
+        }
+
+        # 2. Search up the parent chain, at each level search its children for the folder
+        while ($currentPath)
+        {
+            $parent = Split-Path -Path $currentPath -Parent
+            if ($parent -eq $currentPath -or [string]::IsNullOrEmpty($parent))
+            {
+                break
+            } # Reached root
+            Write-Verbose "[$functionName] Searching children of parent: $parent for folder named $FolderName"
+            $siblingMatch = Get-ChildItem -Path $parent -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -ieq $FolderName } | Select-Object -First 1
+            if ($siblingMatch)
+            {
+                Write-Verbose "[$functionName] Found folder in parent: $($siblingMatch.FullName)"
+                return $siblingMatch.FullName
+            }
+            # Also check if the parent itself matches
+            if ((Split-Path -Path $parent -Leaf) -ieq $FolderName)
+            {
+                Write-Verbose "[$functionName] Parent itself matches: $parent"
+                return $parent
+            }
+            $currentPath = $parent
+        }
+        Write-Verbose "[$functionName] No folder found with name $FolderName in children or parent hierarchy."
+        return $null
+    }
+    catch
+    {
+        Write-Error "[$functionName] Error occurred while searching for folder: $_"
+        return $null
+    }
+}
+
+function Write-Progress-Custom()
 {
     param(
         [string]$Activity,
@@ -148,7 +223,7 @@ function Write-Progress-Custom
     Write-Progress -Activity $Activity -Status $Status -PercentComplete $PercentComplete
 }
 
-function Get-FunctionDefinitions
+function Get-FunctionDefinitions()
 {
     <#
     .SYNOPSIS
@@ -169,9 +244,9 @@ function Get-FunctionDefinitions
         # Match function definitions: function FunctionName { ... }
         # Also match: function Script:FunctionName, function Global:FunctionName
         $pattern = '(?m)^\s*function\s+(?:script:|global:)?([\w-]+)\s*(?:\([^\)]*\))?\s*\{'
-        $matches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        $regexMatches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
         
-        foreach ($match in $matches)
+        foreach ($match in $regexMatches)
         {
             $functionName = $match.Groups[1].Value
             $functions += $functionName
@@ -186,7 +261,7 @@ function Get-FunctionDefinitions
     return $functions
 }
 
-function Get-FunctionCalls
+function Get-FunctionCalls()
 {
     <#
     .SYNOPSIS
@@ -221,9 +296,9 @@ function Get-FunctionCalls
         
         foreach ($pattern in $patterns)
         {
-            $matches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $regexMatches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
             
-            foreach ($match in $matches)
+            foreach ($match in $regexMatches)
             {
                 # Get the function name from the first non-empty capture group
                 $functionName = $null
@@ -252,7 +327,7 @@ function Get-FunctionCalls
     return $calls
 }
 
-function Find-AllDefinedFunctions
+function Find-AllDefinedFunctions()
 {
     <#
     .SYNOPSIS
@@ -293,28 +368,33 @@ function Find-AllDefinedFunctions
     Write-Host "  Found $($script:AllDefinedFunctions.Count) unique function definitions" -ForegroundColor Green
 }
 
-function Build-DependencyGraph
+function Build-DependencyGraph()
 {
     <#
     .SYNOPSIS
         Builds a dependency graph by analyzing function calls in all files.
     #>
-    param()
+    param(
+        [string]$FolderPath,
+        [string]$MainScript
+    )
     
+    $functionsFolder = $FolderPath
+    Write-Host "Functions folder: $functionsFolder"
+    Write-Host "Main script: $MainScript"
+    Write-Host ""
     Write-Host "`nBuilding dependency graph..." -ForegroundColor Cyan
     
     $allFiles = @()
     $allFiles += Get-ChildItem -Path $FunctionsFolder -Filter "*.ps1" -Recurse -File -ErrorAction SilentlyContinue
+    Write-Host "Number of function files: $($allFiles.Count)"
     if (Test-Path $MainScript)
     {
+        Write-Host "Including main script in analysis: $MainScript"
         $allFiles += Get-Item $MainScript
     }
-    if (Test-Path $TestScript)
-    {
-        $allFiles += Get-Item $TestScript
-    }
-    
     $totalFiles = $allFiles.Count
+    Write-Host "Total files to analyze: $totalFiles"
     $currentFile = 0
     
     foreach ($file in $allFiles)
@@ -375,7 +455,7 @@ function Build-DependencyGraph
     Write-Host "  Analyzed $totalFiles files" -ForegroundColor Green
 }
 
-function Mark-UsedFunctions
+function Select-UsedFunctions()
 {
     <#
     .SYNOPSIS
@@ -408,12 +488,12 @@ function Mark-UsedFunctions
     {
         foreach ($calledFunc in $script:FunctionCalls[$FunctionName])
         {
-            Mark-UsedFunctions -FunctionName $calledFunc -Depth ($Depth + 1)
+            Select-UsedFunctions -FunctionName $calledFunc -Depth ($Depth + 1)
         }
     }
 }
 
-function Find-UsedFunctions
+function Find-UsedFunctions()
 {
     <#
     .SYNOPSIS
@@ -425,8 +505,7 @@ function Find-UsedFunctions
     
     # Start from main.ps1 and test.ps1 script bodies
     $entryPoints = @(
-        "__SCRIPT_BODY__main.ps1",
-        "__SCRIPT_BODY__test.ps1"
+        "__SCRIPT_BODY__main.ps1"
     )
     
     foreach ($entryPoint in $entryPoints)
@@ -436,7 +515,7 @@ function Find-UsedFunctions
             Write-Verbose "Starting from entry point: $entryPoint"
             foreach ($func in $script:FunctionCalls[$entryPoint])
             {
-                Mark-UsedFunctions -FunctionName $func
+                Select-UsedFunctions -FunctionName $func
             }
         }
     }
@@ -444,7 +523,7 @@ function Find-UsedFunctions
     Write-Host "  Identified $($script:UsedFunctions.Count) used functions" -ForegroundColor Green
 }
 
-function Generate-Report
+function Export-Report()
 {
     <#
     .SYNOPSIS
@@ -481,13 +560,13 @@ function Generate-Report
         }
         
         $report += [PSCustomObject]@{
-            FunctionName    = $func
-            IsUsed          = $isUsed
-            Status          = if ($isUsed) { "USED" } else { "UNUSED" }
-            FilePath        = $relativePath
-            CallCount       = $callCount
-            CalledBy        = ($calledBy | Sort-Object) -join '; '
-            CallsOthers     = if ($script:FunctionCalls.ContainsKey($func)) { ($script:FunctionCalls[$func] | Sort-Object) -join '; ' } else { '' }
+            FunctionName = $func
+            IsUsed       = $isUsed
+            Status       = if ($isUsed) { "USED" } else { "UNUSED" }
+            FilePath     = $relativePath
+            CallCount    = $callCount
+            CalledBy     = ($calledBy | Sort-Object) -join '; '
+            CallsOthers  = if ($script:FunctionCalls.ContainsKey($func)) { ($script:FunctionCalls[$func] | Sort-Object) -join '; ' } else { '' }
         }
     }
     
@@ -521,7 +600,6 @@ function Generate-Report
         }
     }
 }
-
 #endregion
 
 #region Main Execution
@@ -532,27 +610,47 @@ Write-Host ""
 # Validate input paths
 if (-not (Test-Path $FunctionsFolder))
 {
-    Write-Error "Functions folder not found: $FunctionsFolder"
-    exit 1
+    Write-Host "Looking for functions folder starting at $FunctionsFolder" -ForegroundColor Yellow
+    $foundFolder = Find-FolderPath -Path $FunctionsFolder -FolderName "functions"
+    if ($foundFolder)
+    {
+        Write-Host "Functions folder found at: $foundFolder" -ForegroundColor Green
+        $FunctionsFolder = $foundFolder
+    }
+    else
+    {
+        Write-Error "Functions folder not found starting from: $FunctionsFolder"
+        exit 1
+    }
 }
-
+Write-Host "Using functions folder: $FunctionsFolder" -ForegroundColor Green
 if (-not (Test-Path $MainScript))
 {
-    Write-Error "Main script not found: $MainScript"
-    exit 1
+    Write-Host "Looking for the main script in the parent of $FunctionsFolder" -ForegroundColor Yellow
+    $parentDir = Split-Path $FunctionsFolder -Parent
+    $foundScript = if (Test-Path (Join-Path $parentDir "main.ps1")) { Join-Path $parentDir "main.ps1" } else { $null }
+    if ($foundScript)
+    {
+        Write-Host "Main script found at: $foundScript" -ForegroundColor Green
+        $MainScript = $foundScript
+    }
+    else
+    {
+        Write-Error "Main script not found starting from: $parentDir"
+    }
 }
-
+Write-Host "Using main script: $MainScript" -ForegroundColor Green
 # Step 1: Discover all defined functions
 Find-AllDefinedFunctions -FolderPath $FunctionsFolder
 
 # Step 2: Build dependency graph
-Build-DependencyGraph
+Build-DependencyGraph -FolderPath $FunctionsFolder -MainScript $MainScript
 
 # Step 3: Find used functions
 Find-UsedFunctions
 
 # Step 4: Generate report
-Generate-Report -OutputPath $OutputPath
+Export-Report -OutputPath $OutputPath
 
 Write-Host "`nAnalysis complete!" -ForegroundColor Green
 

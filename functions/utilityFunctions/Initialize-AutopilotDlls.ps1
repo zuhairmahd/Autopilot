@@ -51,39 +51,21 @@ function Initialize-AutopilotDlls()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Initializing Autopilot C# DLLs"
+    $frameworkPath = $DLLPath
     
-    # Detect PowerShell version and select appropriate target framework
-    $psVersion = $PSVersionTable.PSVersion.Major
-    $targetFramework = if ($psVersion -ge 7)
-    {
-        "net9.0"  # PowerShell 7+ uses .NET 9.0
-    }
-    else
-    {
-        "netstandard2.0"  # PowerShell 5.1 uses .NET Framework 4.x
-    }
-    
-    # Adjust DLL path for multi-targeting
-    $frameworkPath = Join-Path $DLLPath $targetFramework
-    
-    Write-Verbose "[$functionName] PowerShell Version: $($PSVersionTable.PSVersion)"
-    Write-Verbose "[$functionName] Target Framework: $targetFramework"
     Write-Verbose "[$functionName] Looking for DLLs in: $frameworkPath"
     
     # Initialize result with diagnostic information
     $result = @{
-        Success           = $false
-        GraphCoreLoaded   = $false
-        DeviceCoreLoaded  = $false
-        CacheCoreLoaded   = $false
-        LogCoreLoaded     = $false
-        ConfigCoreLoaded  = $false
-        LoadedCount       = 0
-        Errors            = @()
-        DllPath           = $frameworkPath
-        TargetFramework   = $targetFramework
-        PowerShellVersion = $PSVersionTable.PSVersion.ToString()
-        LoadedAssemblies  = @()
+        Success          = $false
+        GraphCoreLoaded  = $false
+        DeviceCoreLoaded = $false
+        CacheCoreLoaded  = $false
+        ConfigCoreLoaded = $false
+        LoadedCount      = 0
+        Errors           = @()
+        DllPath          = $frameworkPath
+        LoadedAssemblies = @()
     }
     
     Write-Verbose "[$functionName] Looking for DLLs in: $frameworkPath"
@@ -146,20 +128,12 @@ function Initialize-AutopilotDlls()
     Write-Verbose "[$functionName] Registered AssemblyResolve handler for dependency loading"
     
     # Try to load each DLL
-    # Skip LogCore on PowerShell 5.1 due to stack overflow issues
     $dlls = @(
         @{ Name = "Autopilot.GraphCore"; Flag = "GraphCoreLoaded" }
         @{ Name = "Autopilot.DeviceCore"; Flag = "DeviceCoreLoaded" }
         @{ Name = "Autopilot.CacheCore"; Flag = "CacheCoreLoaded" }
         @{ Name = "Autopilot.ConfigCore"; Flag = "ConfigCoreLoaded" }
     )
-    
-    # Only load LogCore on PowerShell 7+
-    if ($PSVersionTable.PSVersion.Major -ge 7)
-    {
-        $dlls += @{ Name = "Autopilot.LogCore"; Flag = "LogCoreLoaded" }
-    }
-    
     foreach ($dll in $dlls)
     {
         $dllFile = Join-Path $frameworkPath "$($dll.Name).dll"
@@ -250,7 +224,7 @@ function Initialize-AutopilotDlls()
     
     # Calculate final statistics
     $result.LoadedCount = ($result.LoadedAssemblies).Count
-    $result.Success = ($result.LoadedCount -eq 5)
+    $result.Success = ($result.LoadedCount -eq $dlls.Count)
     
     # Cache the result globally
     $global:AutopilotDllsLoaded = $true

@@ -19,7 +19,6 @@ function Write-Log()
         Modified to integrate LogCore DLL functionality directly.
         When LogCore.dll is loaded, provides 10-20x performance improvement.
     #>
-    [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true, ParameterSetName = 'Normal')]
         [string]$Message,
@@ -74,129 +73,8 @@ function Write-Log()
     
     $functionName = $MyInvocation.MyCommand.Name
     Write-Verbose "[$functionName] Writing the following to $($logFile): $message"
-    # Check if LogCore DLL is available for high-performance logging
-    $useLogCore = $false
-    if ($global:AutopilotDllStatus -and $global:AutopilotDllStatus.LogCoreLoaded -and -not ($StartLogging -or $FinishLogging))
-    {
-        $useLogCore = $true
-        Write-Verbose "[$functionName] Using LogCore DLL for logging in function $functionName."
-    }
-    
     try
     {
-        # If using LogCore DLL for normal logging
-        if ($useLogCore)
-        {
-            # Initialize global logger if not already done
-            Write-Verbose "[$functionName] Initializing AutopilotLogger in function $functionName."
-            if (-not $global:AutopilotLogger)
-            {
-                # Logger constructor: (logFilePath, minimumLogLevel, useCMTraceFormat, maxLogSizeMB, enableAsync)
-                # Use Information as default minimum level, sync logging (false for async)
-                $minimumLevel = [Autopilot.LogCore.Logger+LogLevel]::Information
-                if ($MinimumLogLevel)
-                {
-                    $minimumLevel = switch ($MinimumLogLevel)
-                    {
-                        'Error' { [Autopilot.LogCore.Logger+LogLevel]::Error }
-                        'Warning' { [Autopilot.LogCore.Logger+LogLevel]::Warning }
-                        'Information' { [Autopilot.LogCore.Logger+LogLevel]::Information }
-                        'Verbose' { [Autopilot.LogCore.Logger+LogLevel]::Verbose }
-                        'Debug' { [Autopilot.LogCore.Logger+LogLevel]::Debug }
-                        default { [Autopilot.LogCore.Logger+LogLevel]::Information }
-                    }
-                }
-                
-                $global:AutopilotLogger = New-Object Autopilot.LogCore.Logger(
-                    $LogFile,
-                    $minimumLevel,
-                    $CMTraceFormat.IsPresent,
-                    $MaxLogSizeMB,
-                    $false  # enableAsync = false (use sync logging)
-                )
-                Write-Verbose "[$functionName] AutopilotLogger initialized."
-            }
-            
-            # Convert LogLevel string to numeric for LogCore
-            $numericLevel = switch ($LogLevel)
-            {
-                'Error' { [Autopilot.LogCore.Logger+LogLevel]::Error }
-                'Warning' { [Autopilot.LogCore.Logger+LogLevel]::Warning }
-                'Information' { [Autopilot.LogCore.Logger+LogLevel]::Information }
-                'Verbose' { [Autopilot.LogCore.Logger+LogLevel]::Verbose }
-                'Debug' { [Autopilot.LogCore.Logger+LogLevel]::Debug }
-                default { [Autopilot.LogCore.Logger+LogLevel]::Information }
-            }
-            Write-Verbose "[$functionName] Converted LogLevel '$LogLevel' to numeric level '$numericLevel'."            
-            # Check minimum log level filtering
-            if ($MinimumLogLevel)
-            {
-                $logLevelHierarchy = @{
-                    'Error'       = 1
-                    'Warning'     = 2
-                    'Information' = 3
-                    'Verbose'     = 4
-                    'Debug'       = 5
-                }
-                
-                $currentLogLevelValue = $logLevelHierarchy[$LogLevel]
-                $minimumLogLevelValue = $logLevelHierarchy[$MinimumLogLevel]
-                Write-Verbose "[$functionName] Current log level value: $currentLogLevelValue, Minimum log level value: $minimumLogLevelValue."
-                if ($currentLogLevelValue -gt $minimumLogLevelValue)
-                {
-                    # Skip logging but still write to console if requested
-                    Write-Verbose "[$functionName] Skipping log entry due to minimum log level filtering."
-                    if ($WriteToConsole)
-                    {
-                        switch ($LogLevel)
-                        {
-                            "Error" { Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue }
-                            "Warning" { Write-Warning "[$Module] $Message" }
-                            "Verbose" { Write-Verbose "[$Module] $Message" }
-                            "Debug" { Write-Debug "[$Module] $Message" }
-                        }
-                    }
-                    return
-                }
-            }
-            
-            # Use high-performance C# logging
-            Write-Verbose "[$functionName] Writing log entry using LogCore DLL."
-            # WriteLog signature: WriteLog(string module, string message, LogLevel level)
-            $global:AutopilotLogger.WriteLog($Module, $Message, $numericLevel)
-            
-            # Write to console if requested
-            if ($WriteToConsole)
-            {
-                switch ($LogLevel)
-                {
-                    "Error" { Write-Error "[$Module] $Message" -ErrorAction SilentlyContinue }
-                    "Warning" { Write-Warning "[$Module] $Message" }
-                    "Verbose" { Write-Verbose "[$Module] $Message" }
-                    "Debug" { Write-Debug "[$Module] $Message" }
-                    default { Write-Verbose "Logged: $Message" }
-                }
-                Write-Verbose "[$functionName] Logged LogCore.dll message to console."
-            }
-            
-            # Return log entry if PassThru is specified
-            if ($PassThru)
-            {
-                Write-Verbose "[$functionName] Returning LogCore.dll log entry object since Passthru is $passThru."
-                return [PSCustomObject]@{
-                    Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-                    LogLevel  = $LogLevel
-                    Module    = $Module
-                    Message   = $Message
-                    LogFile   = $LogFile
-                    UsedDLL   = $true
-                }
-            }
-            
-            return
-        }
-        
-        # PowerShell fallback implementation (original code continues below)
         # Use global minimum log level if not provided
         Write-Verbose "[$functionName] Falling back to PowerShell logging in function $functionName."
         if (-not $MinimumLogLevel -and $Global:MinimumLogLevel)
