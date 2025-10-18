@@ -66,7 +66,7 @@ function Setup-TemporaryEncryption()
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleaning up temporary file: $tempFile" -LogLevel "Debug"
             if (Test-Path $tempFile)
             {
-                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | Out-Null
                 Write-Verbose "[$functionName] Removed temporary file: $tempFile"
                 Write-Log -LogFile $LogFile -Module $functionName -Message "Removed temporary file: $tempFile" -LogLevel "Debug"
             }

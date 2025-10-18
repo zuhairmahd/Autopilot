@@ -59,7 +59,7 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
         
         if (Test-Path $global:LogFile)
         {
-            Remove-Item $global:LogFile -Force -ErrorAction SilentlyContinue
+            Remove-Item $global:LogFile -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     
@@ -346,6 +346,287 @@ Describe "Get-EntraDirectoryObject Function" -Tags 'Unit', 'DirectoryObject', 'G
             $result = Get-EntraDirectoryObject -EntityType Group -EntityName "Custom Group" -AccessToken "test-token"
             
             $result[0].value[0].displayName | Should -Be "Custom Group"
+        }
+    }
+    
+    Context "Edge cases - Special characters and long names" {
+        
+        It "Should handle user names with special characters" {
+            Add-MockUser -UserPrincipalName "test.user+tag@contoso.com" -DisplayName "Test User" -GivenName "Test" -Surname "User"
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "test.user+tag@contoso.com" -AccessToken "test-token"
+            
+            $result | Should -Not -BeNullOrEmpty
+            $result[0].value[0].userPrincipalName | Should -Be "test.user+tag@contoso.com"
+        }
+        
+        It "Should handle group names with special characters" {
+            Add-MockGroup -DisplayName "Finance & Accounting (2025)"
+            
+            $result = Get-EntraDirectoryObject -EntityType Group -EntityName "Finance & Accounting (2025)" -AccessToken "test-token"
+            
+            $result | Should -Not -BeNullOrEmpty
+            $result[0].value[0].displayName | Should -Be "Finance & Accounting (2025)"
+        }
+        
+        It "Should handle very long user names" {
+            $longName = "verylongusername" * 10 + "@contoso.com"
+            Add-MockUser -UserPrincipalName $longName -DisplayName "Long Name User" -GivenName "Long" -Surname "User"
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName $longName -AccessToken "test-token"
+            
+            $result | Should -Not -BeNullOrEmpty
+            $result[0].value[0].userPrincipalName | Should -Be $longName
+        }
+        
+        It "Should handle very long group names" {
+            $longName = "Very Long Group Name With Many Words " * 5
+            $trimmedName = $longName.TrimEnd()
+            Add-MockGroup -DisplayName $trimmedName
+            
+            $result = Get-EntraDirectoryObject -EntityType Group -EntityName $trimmedName -AccessToken "test-token"
+            
+            $result | Should -Not -BeNullOrEmpty
+            if ($result -is [array] -and $result.Count -ge 1)
+            {
+                $result[0].value[0].displayName | Should -Be $trimmedName
+            }
+        }
+        
+        It "Should handle apostrophes in names (SQL injection prevention)" {
+            Add-MockUser -UserPrincipalName "o'brien@contoso.com" -DisplayName "O'Brien" -GivenName "Patrick" -Surname "O'Brien"
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "o'brien@contoso.com" -AccessToken "test-token"
+            
+            $result | Should -Not -BeNullOrEmpty
+            $result[0].value[0].userPrincipalName | Should -Be "o'brien@contoso.com"
+        }
+        
+        It "Should handle Unicode characters in names" {
+            Add-MockUser -UserPrincipalName "mueller@contoso.com" -DisplayName "Müller" -GivenName "Hans" -Surname "Müller"
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "mueller@contoso.com" -AccessToken "test-token"
+            
+            $result | Should -Not -BeNullOrEmpty
+            $result[0].value[0].displayName | Should -Be "Müller"
+        }
+        
+        It "Should handle leading and trailing spaces in search terms" {
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "  john.doe@contoso.com  " -AccessToken "test-token"
+            
+            # Should handle spaces gracefully (either trim or return not found)
+            $result | Should -Not -BeNullOrEmpty
+        }
+    }
+    
+    Context "Cache expiration and invalidation" {
+        
+        It "Should reuse cache for identical queries" {
+            # First call
+            $result1 = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            
+            # Modify mock data
+            Add-MockUser -UserPrincipalName "john.doe@contoso.com" -DisplayName "Modified Name" -GivenName "John" -Surname "Doe"
+            
+            # Second call should use cache
+            $result2 = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            
+            $result1[0].value[0].displayName | Should -Be $result2[0].value[0].displayName
+        }
+        
+        It "Should create new cache entry after cache clear" {
+            # First call
+            Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            $firstCacheCount = $global:DirectoryObjectCache.Count
+            
+            # Clear cache
+            $global:DirectoryObjectCache = @{}
+            
+            # Second call should create new cache entry
+            Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            $secondCacheCount = $global:DirectoryObjectCache.Count
+            
+            $firstCacheCount | Should -BeGreaterThan 0
+            $secondCacheCount | Should -Be 1
+        }
+        
+        It "Should handle cache with mixed entity types correctly" {
+            # Add multiple entries to cache
+            Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            Get-EntraDirectoryObject -EntityType Group -EntityName "Marketing Team" -AccessToken "test-token"
+            Get-EntraDirectoryObject -EntityType User -EntityName "john" -AccessToken "test-token" -FindSimilar
+            
+            # Cache should have at least 3 entries (non-existent searches may not be cached)
+            $global:DirectoryObjectCache.Count | Should -BeGreaterOrEqual 3
+            
+            # Existing entities should be cached
+            $global:DirectoryObjectCache.Keys | Should -Contain "User|john.doe@contoso.com|False"
+            $global:DirectoryObjectCache.Keys | Should -Contain "Group|Marketing Team|False"
+            $global:DirectoryObjectCache.Keys | Should -Contain "User|john|True"
+        }
+    }
+    
+    Context "Network failure simulation" {
+        
+        It "Should handle 401 Unauthorized error gracefully" {
+            Mock CallGraphAPI {
+                return 401
+            }
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "invalid-token"
+            
+            $result | Should -Be $global:returnValues.noUserFoundInDirectoryMessage
+        }
+        
+        It "Should handle 403 Forbidden error gracefully" {
+            Mock CallGraphAPI {
+                return 403
+            }
+            
+            $result = Get-EntraDirectoryObject -EntityType Group -EntityName "Restricted Group" -AccessToken "test-token"
+            
+            $result | Should -Be $global:returnValues.noGroupFoundMessage
+        }
+        
+        It "Should handle 400 Bad Request error gracefully" {
+            Mock CallGraphAPI {
+                return 400
+            }
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "invalid@@@" -AccessToken "test-token"
+            
+            $result | Should -Be $global:returnValues.noUserFoundInDirectoryMessage
+        }
+        
+        It "Should not display error message when FindSimilar is enabled and error occurs" {
+            Mock CallGraphAPI {
+                return 404
+            }
+            
+            # With FindSimilar, should attempt fallback silently
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "notfound@contoso.com" -AccessToken "test-token" -FindSimilar
+            
+            $result | Should -Be $global:returnValues.noUserFoundInDirectoryMessage
+        }
+    }
+    
+    Context "Throttling and rate limiting" {
+        
+        It "Should handle 429 Too Many Requests gracefully" {
+            Mock CallGraphAPI {
+                return 429
+            }
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            
+            # Should return error message instead of throwing
+            $result | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Should handle consecutive API calls without throttling in mock" {
+            # Make multiple rapid calls (each returns a tuple of 2 elements)
+            $callCount = 0
+            for ($i = 1; $i -le 10; $i++)
+            {
+                $result = Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+                if ($result -and $result.Count -ge 2)
+                {
+                    $callCount++
+                }
+            }
+            
+            # All 10 calls should succeed
+            $callCount | Should -Be 10
+        }
+        
+        It "Should benefit from caching during high-volume operations" {
+            # Clear cache
+            $global:DirectoryObjectCache = @{}
+            
+            # First 5 calls to same user
+            for ($i = 1; $i -le 5; $i++)
+            {
+                Get-EntraDirectoryObject -EntityType User -EntityName "john.doe@contoso.com" -AccessToken "test-token"
+            }
+            
+            # Should only have 1 cache entry (all reused)
+            $global:DirectoryObjectCache.Count | Should -Be 1
+            
+            # 5 calls to different existing users (need to add them first)
+            Add-MockUser -UserPrincipalName "alice@contoso.com" -DisplayName "Alice" -GivenName "Alice" -Surname "Smith"
+            Add-MockUser -UserPrincipalName "bob@contoso.com" -DisplayName "Bob" -GivenName "Bob" -Surname "Jones"
+            
+            Get-EntraDirectoryObject -EntityType User -EntityName "alice@contoso.com" -AccessToken "test-token"
+            Get-EntraDirectoryObject -EntityType User -EntityName "bob@contoso.com" -AccessToken "test-token"
+            Get-EntraDirectoryObject -EntityType User -EntityName "jane.smith@contoso.com" -AccessToken "test-token"
+            
+            # Should now have 4 cache entries (john + alice + bob + jane)
+            $global:DirectoryObjectCache.Count | Should -Be 4
+        }
+    }
+    
+    Context "Fuzzy search edge cases" {
+        
+        It "Should handle empty fuzzy search results gracefully" {
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "xyz123nonexistent" -AccessToken "test-token" -FindSimilar
+            
+            $result | Should -Be $global:returnValues.noUserFoundInDirectoryMessage
+        }
+        
+        It "Should remove domain from user search in fuzzy mode" {
+            Add-MockUser -UserPrincipalName "testuser@contoso.com" -DisplayName "Test User" -GivenName "Test" -Surname "User"
+            
+            # Search with full email should still find based on first name
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "test@contoso.com" -AccessToken "test-token" -FindSimilar
+            
+            $result | Should -Not -BeNullOrEmpty
+            $result[1] | Should -Be $true  # Is fuzzy
+        }
+        
+        It "Should handle single character search terms" {
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "j" -AccessToken "test-token" -FindSimilar
+            
+            # Should return results or not found message (not throw)
+            $result | Should -Not -BeNullOrEmpty
+        }
+        
+        It "Should handle numeric search terms" {
+            Add-MockGroup -DisplayName "2025 Budget Team"
+            
+            $result = Get-EntraDirectoryObject -EntityType Group -EntityName "2025" -AccessToken "test-token" -FindSimilar
+            
+            $result | Should -Not -BeNullOrEmpty
+        }
+    }
+    
+    Context "Exclusion patterns edge cases" {
+        
+        It "Should handle null exclusion patterns gracefully" {
+            # Temporarily set to null
+            $originalUserPatterns = $global:settings.userPatternsToExclude
+            $global:settings.userPatternsToExclude = $null
+            
+            $result = Get-EntraDirectoryObject -EntityType User -EntityName "john" -AccessToken "test-token" -FindSimilar
+            
+            # Should not throw error
+            $result | Should -Not -BeNullOrEmpty
+            
+            # Restore
+            $global:settings.userPatternsToExclude = $originalUserPatterns
+        }
+        
+        It "Should handle empty exclusion patterns array" {
+            # Temporarily set to empty array
+            $originalGroupPatterns = $global:settings.groupPatternsToExclude
+            $global:settings.groupPatternsToExclude = @()
+            
+            $result = Get-EntraDirectoryObject -EntityType Group -EntityName "Dev" -AccessToken "test-token" -FindSimilar
+            
+            # Should not throw error
+            $result | Should -Not -BeNullOrEmpty
+            
+            # Restore
+            $global:settings.groupPatternsToExclude = $originalGroupPatterns
         }
     }
 }

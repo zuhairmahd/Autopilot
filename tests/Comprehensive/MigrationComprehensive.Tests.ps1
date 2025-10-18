@@ -34,7 +34,7 @@ Describe "Comprehensive Configuration Migration Tests" -Tags 'Comprehensive', 'M
         # Cleanup test environment
         if ($script:TestContext -and $script:TestContext.TestFolder)
         {
-            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     

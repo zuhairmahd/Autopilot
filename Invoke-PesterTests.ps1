@@ -27,16 +27,30 @@
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -ShowMissedCommands
 #>
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Default')]
 param(
     [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
     [string]$TestType = 'All',
     [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
     [string]$OutputVerbosity = 'Normal',
     [string]$TestFile,
+    [Parameter(ParameterSetName = 'Default')]
+    [Parameter(ParameterSetName = 'CodeCoverage')]
     [switch]$EnableCodeCoverage,
+    [Parameter(ParameterSetName = 'CodeCoverage', Mandatory = $false)]
+    [ValidateScript({
+            if ($_ -and -not $EnableCodeCoverage)
+            {
+                throw "-ShowCodeCoverageDetails requires -EnableCodeCoverage to be specified"
+            }
+            return $true
+        })]
     [switch]$ShowCodeCoverageDetails,
+    [Parameter(ParameterSetName = 'Default')]
+    [Parameter(ParameterSetName = 'CodeCoverage')]
     [switch]$CI,
+    [Parameter(ParameterSetName = 'Default')]
+    [Parameter(ParameterSetName = 'CodeCoverage')]
     [string[]]$Tags = @()
 )
 
@@ -84,8 +98,11 @@ if ($Tags.Count -gt 0)
 # Display configuration
 Write-Host "`nTest Configuration:" -ForegroundColor Cyan
 Write-Host "  Test Type: $TestType" -ForegroundColor White
-Write-Host "  Test Path ($($config.Run.Path.DESCRIPTION)): $($config.Run.Path.Value)" -ForegroundColor White
-Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
+Write-Host "  Test Path: $($config.Run.Path.Value)" -ForegroundColor White
+if ($EnableCodeCoverage -or $OutputVerbosity -eq 'Detailed')
+{
+    Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
+}
 if ($Tags.Count -gt 0)
 {
     Write-Host "  Tags: $($Tags -join ', ')" -ForegroundColor White
@@ -99,6 +116,12 @@ Write-Host "Starting Pester tests..." -ForegroundColor Cyan
 try
 {
     $result = Invoke-Pester -Configuration $config
+    
+    # Clean up any leftover Pester TestDrive GUID folders
+    # Pester 5 sometimes leaves these behind in the working directory
+    Get-ChildItem -Directory | Where-Object { 
+        $_.Name -match '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' 
+    } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
     
     $endTime = Get-Date
     $duration = $endTime - $startTime

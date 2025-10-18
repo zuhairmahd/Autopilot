@@ -44,7 +44,7 @@ function Get-DecryptedConfigValue()
         
         if ($decryptResult.Success)
         {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully decrypted configuration for property access" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully decrypted configuration for property access" -LogLevel "Information"
             $config = ConvertFrom-Json $decryptResult.Content
             
             # Navigate the property path
@@ -61,12 +61,12 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully decrypt
                 }
                 else
                 {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Property path '$PropertyPath' not found in configuration" -LogLevel "Verbose"
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Property path '$PropertyPath' not found in configuration" -LogLevel "Verbose"
                     return $null
                 }
             }
             
-Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully retrieved configuration value for path: $PropertyPath" -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully retrieved configuration value for path: $PropertyPath" -LogLevel "Information"
             return $current
         }
         else
@@ -81,7 +81,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Successfully retriev
         # Clean up temporary file
         if (Test-Path $tempFile)
         {
-            Remove-Item $tempFile -Force
+            Remove-Item $tempFile -Force | Out-Null
             Write-Log -LogFile $LogFile -Module $functionName -Message "Cleaned up temporary file" -LogLevel "Debug"
         }
     }

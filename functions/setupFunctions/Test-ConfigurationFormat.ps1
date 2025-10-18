@@ -1,5 +1,6 @@
-function Test-ConfigurationFormat() {
-<#
+function Test-ConfigurationFormat()
+{
+    <#
 .SYNOPSIS
     Detects and validates configuration file formats (.json, .psd1).
 
@@ -49,19 +50,21 @@ function Test-ConfigurationFormat() {
     
     # Initialize result object
     $result = @{
-        FilePath = $FilePath
-        Exists = $false
-        Format = 'Unknown'
-        IsValid = $false
-        FileSize = 0
-        LastModified = $null
-        ErrorMessage = $null
+        FilePath          = $FilePath
+        Exists            = $false
+        Format            = 'Unknown'
+        IsValid           = $false
+        FileSize          = 0
+        LastModified      = $null
+        ErrorMessage      = $null
         CompatibilityInfo = @{}
     }
     
-    try {
+    try
+    {
         # Check if file exists
-        if (-not (Test-Path $FilePath)) {
+        if (-not (Test-Path $FilePath))
+        {
             $result.ErrorMessage = "File not found"
             Write-Verbose "[$functionName] File not found: $FilePath"
             if ($ReturnDetails) { return $result } else { return $result.Format }
@@ -75,71 +78,85 @@ function Test-ConfigurationFormat() {
         # Determine format based on extension and content
         $extension = [System.IO.Path]::GetExtension($FilePath).ToLower()
         
-        switch ($extension) {
-            '.json' {
+        switch ($extension)
+        {
+            '.json'
+            {
                 Write-Verbose "[$functionName] Detected JSON extension"
                 $result.Format = 'JSON'
                 
                 # Validate JSON syntax
-                try {
+                try
+                {
                     $content = Get-Content -Path $FilePath -Raw -ErrorAction Stop
                     $testLoad = $content | ConvertFrom-Json -ErrorAction Stop
                     $result.IsValid = $true
                     Write-Verbose "[$functionName] JSON syntax validation successful"
                 }
-                catch {
+                catch
+                {
                     $result.ErrorMessage = "Invalid JSON syntax: $($_.Exception.Message)"
                     Write-Verbose "[$functionName] JSON validation failed: $($_.Exception.Message)"
                 }
             }
             
-            '.psd1' {
+            '.psd1'
+            {
                 Write-Verbose "[$functionName] Detected PSD1 extension"
                 $result.Format = 'PSD1'
                 
                 # Validate PSD1 syntax
-                try {
+                try
+                {
                     $testLoad = Import-PowerShellDataFile -Path $FilePath -ErrorAction Stop
                     $result.IsValid = $true
                     Write-Verbose "[$functionName] PSD1 syntax validation successful"
                 }
-                catch {
+                catch
+                {
                     $result.ErrorMessage = "Invalid PSD1 syntax: $($_.Exception.Message)"
                     Write-Verbose "[$functionName] PSD1 validation failed: $($_.Exception.Message)"
                 }
             }
             
-            default {
+            default
+            {
                 Write-Verbose "[$functionName] Unknown extension: $extension"
                 # Try to detect format by content
-                try {
+                try
+                {
                     $content = Get-Content -Path $FilePath -Raw -ErrorAction Stop
                     
                     # Test JSON first
-                    try {
+                    try
+                    {
                         $testJson = $content | ConvertFrom-Json -ErrorAction Stop
                         $result.Format = 'JSON'
                         $result.IsValid = $true
                         Write-Verbose "[$functionName] Content detected as JSON"
                     }
-                    catch {
+                    catch
+                    {
                         # Test PSD1
-                        try {
+                        try
+                        {
                             $tempFile = [System.IO.Path]::GetTempFileName() + '.psd1'
                             $content | Set-Content -Path $tempFile
                             $testPsd1 = Import-PowerShellDataFile -Path $tempFile -ErrorAction Stop
-                            Remove-Item -Path $tempFile -Force
+                            Remove-Item -Path $tempFile -Force | Out-Null
                             $result.Format = 'PSD1'
                             $result.IsValid = $true
                             Write-Verbose "[$functionName] Content detected as PSD1"
                         }
-                        catch {
+                        catch
+                        {
                             $result.ErrorMessage = "Unable to determine format from content"
                             Write-Verbose "[$functionName] Unable to determine format from content"
                         }
                     }
                 }
-                catch {
+                catch
+                {
                     $result.ErrorMessage = "Unable to read file content: $($_.Exception.Message)"
                     Write-Verbose "[$functionName] Unable to read file: $($_.Exception.Message)"
                 }
@@ -147,24 +164,28 @@ function Test-ConfigurationFormat() {
         }
         
         # Perform compatibility checks if requested
-        if ($CheckCompatibility -and $result.IsValid) {
+        if ($CheckCompatibility -and $result.IsValid)
+        {
             Write-Verbose "[$functionName] Performing compatibility checks"
             
             $result.CompatibilityInfo = @{
-                PowerShell51Compatible = $true
-                PowerShell7Compatible = $true
+                PowerShell51Compatible  = $true
+                PowerShell7Compatible   = $true
                 CrossPlatformCompatible = $false
-                HumanReadable = $false
-                ToolingSupport = @()
+                HumanReadable           = $false
+                ToolingSupport          = @()
             }
             
-            switch ($result.Format) {
-                'JSON' {
+            switch ($result.Format)
+            {
+                'JSON'
+                {
                     $result.CompatibilityInfo.CrossPlatformCompatible = $true
                     $result.CompatibilityInfo.HumanReadable = $true
                     $result.CompatibilityInfo.ToolingSupport = @('VS Code', 'Notepad++', 'Web browsers', 'Most editors')
                 }
-                'PSD1' {
+                'PSD1'
+                {
                     $result.CompatibilityInfo.CrossPlatformCompatible = $false
                     $result.CompatibilityInfo.HumanReadable = $true
                     $result.CompatibilityInfo.ToolingSupport = @('PowerShell ISE', 'VS Code', 'PowerShell-aware editors')
@@ -174,19 +195,26 @@ function Test-ConfigurationFormat() {
         
         Write-Verbose "[$functionName] Analysis completed for: $FilePath (Format: $($result.Format), Valid: $($result.IsValid))"
         
-        if ($ReturnDetails) {
+        if ($ReturnDetails)
+        {
             return $result
-        } else {
+        }
+        else
+        {
             return $result.Format
         }
     }
-    catch {
+    catch
+    {
         $result.ErrorMessage = $_.Exception.Message
         Write-Error "[$functionName] Analysis failed: $($_.Exception.Message)"
         
-        if ($ReturnDetails) {
+        if ($ReturnDetails)
+        {
             return $result
-        } else {
+        }
+        else
+        {
             return 'Unknown'
         }
     }

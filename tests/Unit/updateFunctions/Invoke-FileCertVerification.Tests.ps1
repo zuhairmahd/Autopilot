@@ -345,4 +345,12 @@ Describe "Function: Invoke-FileCertVerification" -Tags 'Unit', 'UpdateFunctions'
             Should -Invoke Write-Output -ParameterFilter { $InputObject -match "Certificate issuer" }
         }
     }
+    
+    AfterAll {
+        # Clean up TestDrive to prevent GUID folder remnants
+        if (Test-Path "TestDrive:\")
+        {
+            Get-ChildItem "TestDrive:\" -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+    }
 }

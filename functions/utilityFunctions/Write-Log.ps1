@@ -92,7 +92,7 @@ function Write-Log()
             
             if ($OverwriteLog)
             {
-                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue | Out-Null
             }   
             
             # Check for log rotation if file exists and is too large

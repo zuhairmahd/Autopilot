@@ -35,7 +35,7 @@ Describe "Function: Clear-SecureMemory" -Tags 'Unit', 'EncryptionFunctions' {
         # Cleanup test environment
         if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder))
         {
-            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     

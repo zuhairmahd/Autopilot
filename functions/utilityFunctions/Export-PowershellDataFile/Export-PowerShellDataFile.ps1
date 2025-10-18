@@ -158,12 +158,12 @@ function Export-PowerShellDataFile ()
                 $tempFile = [System.IO.Path]::GetTempFileName()
                 $psd1Content | Set-Content -Path $tempFile -Encoding UTF8
                 $testLoad = Import-PowerShellDataFile -Path $tempFile
-                Remove-Item -Path $tempFile -Force
+                Remove-Item -Path $tempFile -Force | Out-Null
                 Write-Verbose "[$functionName] PSD1 validation successful"
             }
             catch
             {
-                if (Test-Path $tempFile) { Remove-Item -Path $tempFile -Force }
+                if (Test-Path $tempFile) { Remove-Item -Path $tempFile -Force | Out-Null }
                 throw "PSD1 validation failed: $($_.Exception.Message)"
             }
         }
