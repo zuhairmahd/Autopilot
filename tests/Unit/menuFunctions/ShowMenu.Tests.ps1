@@ -43,6 +43,8 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
         . "$script:RepoRoot/functions/menuFunctions/Create-MenuBanner.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Test-MenuItemIncluded.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Get-EffectiveAppModes.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Get-CachedMenuConfiguration.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Get-ConfigurationData.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
         
         # Load the function under test

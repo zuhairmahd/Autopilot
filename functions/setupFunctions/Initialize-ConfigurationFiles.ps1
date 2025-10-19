@@ -10,11 +10,30 @@ function Initialize-ConfigurationFiles()
         [string]$StringsFile = "$pwd\strings.psd1",
         [string]$MenuFile = "$pwd\menu.psd1",
         [string]$Domain,
-        [switch]$domainOnly
+        [switch]$domainOnly,
+        [string]$ConfigurationPath
     )
     
     $functionName = $MyInvocation.MyCommand.Name
-    $domainFileName = "$Domain.psd1"
+    
+    # Calculate configuration path from InitFile if not provided
+    if (-not $ConfigurationPath)
+    {
+        if (Test-Path $InitFile)
+        {
+            $ConfigurationPath = Split-Path -Parent $InitFile
+        }
+        elseif ([System.IO.Path]::IsPathRooted($InitFile))
+        {
+            $ConfigurationPath = Split-Path -Parent $InitFile
+        }
+        else
+        {
+            $ConfigurationPath = Split-Path -Parent (Join-Path $pwd $InitFile)
+        }
+    }
+    
+    $domainFileName = Join-Path $ConfigurationPath "$Domain.psd1"
     $result = @{ Success = $false; ErrorMessage = "" }
     
     try
@@ -118,7 +137,7 @@ function Initialize-ConfigurationFiles()
             try
             {
                 # Get default domain and save as PSD1
-                $defaultDomain = Get-ApplicationDefaults -DefaultType "Domain"
+                $defaultDomain = Get-ApplicationDefaults -DefaultType "Domain" -DomainName $Domain
                 $defaultDomain | Export-PowerShellDataFile -Path $domainFileName -validate -Force
                 Write-Verbose "[$functionName] Created domain.psd1 with defaults"
             }
