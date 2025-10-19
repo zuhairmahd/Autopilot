@@ -454,7 +454,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             Mock Write-Verbose { }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
-                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com" -Verbose
+                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
             $result | Should -Not -BeNullOrEmpty
             # Verbose logging happens, but count varies by implementation
