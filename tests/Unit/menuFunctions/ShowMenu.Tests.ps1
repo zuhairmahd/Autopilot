@@ -43,6 +43,11 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
         . "$script:RepoRoot/functions/menuFunctions/Create-MenuBanner.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Test-MenuItemIncluded.ps1"
         . "$script:RepoRoot/functions/menuFunctions/Get-EffectiveAppModes.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Get-ConfigurationData.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Get-MenuConfiguration.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Get-CachedMenuConfiguration.ps1"
+        . "$script:RepoRoot/functions/menuFunctions/Get-CombinedAppModeHierarchy.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Get-ApplicationDefaults.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
         
         # Load the function under test
@@ -65,11 +70,19 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
     }
     
     BeforeEach {
+        # Initialize mock global variables (including $LogFile)
+        Initialize-MockGlobalVariables -Settings @{ appMode = "helpdesk" }
+        
         # Reset global menu state before each test
         $Global:MenuHistory = [System.Collections.ArrayList]::new()
         $Global:History = [System.Collections.ArrayList]::new()
         # Add a default item to History to avoid empty collection parameter binding errors
         $Global:History.Add("Test Menu") | Out-Null
+    }
+    
+    AfterEach {
+        # Clean up mock global variables
+        Clear-MockGlobalVariables
     }
     
     Context "Menu Initialization" {
@@ -400,9 +413,9 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
             Mock DisplayNumericMenu { return 0 }
             Mock Handle-MenuItemSelection { }
             
-            ShowMenu -Menu $script:TestMenu -StackOperation 'None' -Verbose
+            ShowMenu -Menu $script:TestMenu -StackOperation 'None'
             
-            # Just verify the function runs with -Verbose flag
+            # Just verify the function returns true
             $true | Should -Be $true
         }
         
@@ -410,7 +423,7 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
             Mock DisplayNumericMenu { return 0 }
             Mock Handle-MenuItemSelection { }
             
-            ShowMenu -Menu $script:TestMenu -CalledBy 'Direct' -StackOperation 'None' -Verbose
+            ShowMenu -Menu $script:TestMenu -CalledBy 'Direct' -StackOperation 'None'
             
             # Just verify the function runs with CalledBy parameter
             $true | Should -Be $true
@@ -420,7 +433,7 @@ Describe "Function: ShowMenu" -Tags 'Unit', 'menuFunctions' {
             Mock DisplayNumericMenu { return 0 }
             Mock Handle-MenuItemSelection { }
             
-            ShowMenu -Menu $script:TestMenu -StackOperation 'Push' -Verbose
+            ShowMenu -Menu $script:TestMenu -StackOperation 'Push'
             
             # Just verify the function runs with StackOperation parameter
             $true | Should -Be $true

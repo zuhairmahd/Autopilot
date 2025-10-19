@@ -7,7 +7,8 @@ function Initialize-RequiredScopes()
     [CmdletBinding()]
     param(
         $InitFileContent,
-        [string]$Domain
+        [string]$Domain,
+        [string]$ConfigurationPath = $pwd
     )
     
     $functionName = $MyInvocation.MyCommand.Name
@@ -33,7 +34,7 @@ function Initialize-RequiredScopes()
     
     # Load from separate domain file
     Write-Verbose "[$functionName] Loading additional scopes from separate domain file for: $Domain"
-    $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -ConfigurationPath $pwd
+    $domainConfig = Get-DomainConfigurationFromFiles -DomainName $Domain -ConfigurationPath $ConfigurationPath
     if ($domainConfig -and $domainConfig.additionalScopes)
     {
         $additionalScopes = $domainConfig.additionalScopes

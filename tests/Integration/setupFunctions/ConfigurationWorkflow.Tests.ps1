@@ -58,6 +58,18 @@ Describe "Integration: Configuration Workflow" -Tags 'Integration', 'setupFuncti
     AfterEach {
         # Cleanup temp folder
         Remove-TestEnvironment -TestContext $script:TestContext
+        
+        # Clean up any domain configuration files created in project root during tests
+        # These should be created in temp folder, but clean up just in case
+        $domainFiles = @('contoso.com.psd1', 'test.com.psd1', 'domain1.com.psd1', 'domain2.com.psd1')
+        foreach ($file in $domainFiles)
+        {
+            $fullPath = Join-Path $PSScriptRoot "../../../$file"
+            if (Test-Path $fullPath)
+            {
+                Remove-Item $fullPath -Force -ErrorAction SilentlyContinue
+            }
+        }
     }
     
     Context "Complete Initialization Workflow" {
