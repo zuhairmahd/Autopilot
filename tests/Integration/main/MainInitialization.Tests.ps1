@@ -167,7 +167,10 @@ Describe "Main Initialization - Application Startup" -Tags 'Integration', 'Main'
             
             $result = Test-Find-FolderPath -Path $testPath -FolderName 'functions'
             $result | Should -Not -BeNullOrEmpty
-            $result | Should -Be $functionsPath
+            # Normalize both paths using Resolve-Path to handle 8.3 short filenames on Windows
+            $normalizedResult = if (Test-Path $result) { (Resolve-Path -Path $result).Path } else { $result }
+            $normalizedExpected = if (Test-Path $functionsPath) { (Resolve-Path -Path $functionsPath).Path } else { $functionsPath }
+            $normalizedResult | Should -Be $normalizedExpected
         }
     }
     
@@ -201,8 +204,8 @@ Describe "Main Initialization - Application Startup" -Tags 'Integration', 'Main'
         It "Should initialize logging with default log file path" {
             $defaultLogPath = Join-Path $script:TestRoot "Logs\Autopilot.log"
             
-            # Validate default path construction
-            $defaultLogPath | Should -Match 'Logs\\Autopilot\.log$'
+            # Validate default path construction (cross-platform: handles both / and \ separators)
+            $defaultLogPath | Should -Match 'Logs[/\\]Autopilot\.log$'
         }
         
         It "Should support custom log file path via parameter" {
