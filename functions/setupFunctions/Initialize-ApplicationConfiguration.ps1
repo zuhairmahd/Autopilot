@@ -136,7 +136,20 @@ function Initialize-ApplicationConfiguration()
         # Step 1: Ensure configuration files exist with defaults
         Write-Log -logFile $logFile -module $functionName -Message "Ensuring configuration files exist with defaults" -logLevel "Information"
         Write-Verbose "[$functionName] Ensuring configuration files exist with defaults"
-        $configResult = Initialize-ConfigurationFiles -InitFile $InitFile -StringsFile $StringsFile -menuFile $menuFile -Domain $Domain
+        # Calculate configuration path early for passing to Initialize-ConfigurationFiles
+        $configurationPath = if (Test-Path $InitFile)
+        {
+            Split-Path -Parent $InitFile
+        }
+        elseif ([System.IO.Path]::IsPathRooted($InitFile))
+        {
+            Split-Path -Parent $InitFile
+        }
+        else
+        {
+            Split-Path -Parent (Join-Path $pwd $InitFile)
+        }
+        $configResult = Initialize-ConfigurationFiles -InitFile $InitFile -StringsFile $StringsFile -menuFile $menuFile -Domain $Domain -ConfigurationPath $configurationPath
         if (-not $configResult.Success)
         {
             $result.ErrorMessage = $configResult.ErrorMessage
@@ -187,7 +200,6 @@ function Initialize-ApplicationConfiguration()
                 # Step 5: Process domain-specific settings
                 Write-Log -logFile $logFile -module $functionName -Message "Processing domain-specific settings for: $Domain" -logLevel "Information"
                 Write-Verbose "[$functionName] Processing domain-specific settings for: $Domain"
-                $configurationPath = Split-Path -Parent $InitFile
                 $localResult = Initialize-LocalSettings -InitFileContent $initFileContent -Domain $Domain -BoundParameters $BoundParameters -GlobalSettings $result.GlobalSettings -ConfigurationPath $configurationPath
                 $result.LocalSettings = $localResult.LocalSettings
                 Write-Log -logFile $logFile -module $functionName -Message "Domain-specific settings processed (Changed: $($localResult.Changed))" -logLevel "Verbose"
@@ -289,7 +301,7 @@ function Initialize-ApplicationConfiguration()
                 # Step 7: Process and merge scopes
                 Write-Log -logFile $logFile -module $functionName -Message "Processing and merging required scopes" -logLevel "Information"
                 Write-Verbose "[$functionName] Processing and merging required scopes"
-                $scopeResult = Initialize-RequiredScopes -InitFileContent $initFileContent -Domain $Domain
+                $scopeResult = Initialize-RequiredScopes -InitFileContent $initFileContent -Domain $Domain -ConfigurationPath $configurationPath
                 $result.RequiredScopes = $scopeResult.RequiredScopes
                 Write-Log -logFile $logFile -module $functionName -Message "Merged $($result.RequiredScopes.Count) unique scopes" -logLevel "Verbose"
                 Write-Verbose "[$functionName] Merged $($result.RequiredScopes.Count) unique scopes"
@@ -379,6 +391,7 @@ function Initialize-ApplicationConfiguration()
             }
             catch
             {
+                $result.Success = $false
                 $result.ErrorMessage = "Error loading configuration from $InitFile`: $($_.Exception.Message)"
                 Write-Log -logFile $logFile -module $functionName -Message $result.ErrorMessage -logLevel "Error"
                 Write-Verbose "[$functionName] $($result.ErrorMessage)"
@@ -430,6 +443,7 @@ function Initialize-ApplicationConfiguration()
     }
     catch
     {
+        $result.Success = $false
         $result.ErrorMessage = "Unexpected error during configuration initialization: $($_.Exception.Message)"
         Write-Log -logFile $logFile -module $functionName -Message $result.ErrorMessage -logLevel "Error"
         Write-Verbose "[$functionName] $($result.ErrorMessage)"

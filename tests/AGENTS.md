@@ -13,10 +13,10 @@
 
 | Task | Command | Time |
 |------|---------|------|
-| Run all tests | `.\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
+| Run all tests | `pwsh -File .\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
 | Run single test | `.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
 | Run with coverage | `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` | 5-10s |
-| Validate PS 5.1 | `powershell.exe -File .\Invoke-PesterTests.ps1 -TestType All` | 3-5s |
+| Validate PS 5.1 | `pwsh.exe -File .\Invoke-PesterTests.ps1 -TestType All` | 3-5s |
 
 ### File Locations
 

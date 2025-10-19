@@ -35,6 +35,8 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         . "$script:RepoRoot/functions/utilityFunctions/Export-PowershellDataFile/ConvertTo-HashtableFromPSCustomObject.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Get-ConfigurationData.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-ConfigurationFiles.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/Get-DomainConfigurationFromFiles.ps1"
+        . "$script:RepoRoot/functions/setupFunctions/FirstRunWizardFunctions/Merge-ConfigurationDefaults.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-AuthConfiguration.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-GlobalSettings.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Initialize-LocalSettings.ps1"
@@ -59,9 +61,15 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         $script:SettingsFile = Join-Path $script:TestFolder "test-settings.psd1"
         $script:StringsFile = Join-Path $script:TestFolder "test-strings.psd1"
         $script:MenuFile = Join-Path $script:TestFolder "test-menu.psd1"
+        
+        # Initialize global variables (including $logFile)
+        Initialize-MockGlobalVariables -LogFile (Join-Path $script:TestFolder "test.log")
     }
     
     AfterEach {
+        # Cleanup global variables
+        Clear-MockGlobalVariables
+        
         # Cleanup temp folder
         Remove-TestEnvironment -TestContext $script:TestContext
     }
@@ -328,7 +336,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
     
     Context "Error Handling" {
         It "Should return Success=$false when settings file is invalid" {
-            Mock Get-ConfigurationData { throw "Invalid configuration file" }
+            Mock Import-PowerShellDataFile { throw "Invalid configuration file" }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -338,7 +346,12 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
         }
         
         It "Should return error message when initialization fails" {
-            Mock Get-ConfigurationData { throw "Test error message" }
+            # Create actual settings file so Test-Path succeeds
+            "@{ auth = @{}; globalSettings = @{}; localSettings = @{} }" | Out-File -FilePath $script:SettingsFile -Force
+            # Mock file initialization to succeed
+            Mock Initialize-ConfigurationFiles { return @{ Success = $true } }
+            # Mock file loading to fail
+            Mock Import-PowerShellDataFile { throw "Test error message" }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
                 -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
@@ -441,7 +454,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             Mock Write-Verbose { }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
-                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com" -Verbose
+                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
             $result | Should -Not -BeNullOrEmpty
             # Verbose logging happens, but count varies by implementation
@@ -458,7 +471,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             Mock Write-Verbose { } -ParameterFilter { $Message -match "InitFile|StringsFile|MenuFile" }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
-                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com" -Verbose
+                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
             $result | Should -Not -BeNullOrEmpty
             # File path logging varies by implementation
