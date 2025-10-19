@@ -471,7 +471,7 @@ Describe "Function: Initialize-ApplicationConfiguration" -Tags 'Unit', 'setupFun
             Mock Write-Verbose { } -ParameterFilter { $Message -match "InitFile|StringsFile|MenuFile" }
             
             $result = Initialize-ApplicationConfiguration -InitFile $script:SettingsFile `
-                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com" -Verbose
+                -StringsFile $script:StringsFile -menuFile $script:MenuFile -Domain "contoso.com"
             
             $result | Should -Not -BeNullOrEmpty
             # File path logging varies by implementation
