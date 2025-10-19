@@ -1,9 +1,9 @@
 # Code Coverage Improvement Plan
 
-**Document Version**: 1.4  
+**Document Version**: 1.5  
 **Created**: October 14, 2025  
-**Last Updated**: October 18, 2025  
-**Current Coverage**: ~30% (estimated, 860 tests passing - 100% pass rate)  
+**Last Updated**: October 19, 2025  
+**Current Coverage**: ~30% (estimated, 909 tests passing - 100% pass rate)  
 **Target Coverage**: 65%+  
 **Estimated Timeline**: 8 weeks
 
@@ -13,13 +13,14 @@ This document outlines a systematic approach to improve code coverage from 12% t
 1. Zero-coverage packages (quick wins) - ✅ Complete
 2. Critical authentication and API functions - ✅ Complete
 3. Expanding existing well-tested modules - ✅ Complete
-4. Complex integration scenarios - ⚪ In Progress
+4. Complex integration scenarios - 🔄 In Progress (Week 7 Day 1 complete)
 
-**Progress Update (October 18, 2025)**:
+**Progress Update (October 19, 2025)**:
 - **Phases 1-3 Complete**: 524 tests created across encryption, update, autopilot, graph, UserAndGroup, menu, and setup functions
-- **Test Suite Status**: 860 passing / 860 total (100% pass rate) ✅
-- **Coverage Achieved**: ~30% (from 12% baseline)
-- **Next Phase**: Phase 4 - Main Entry Point & Device Functions (Weeks 7-9)
+- **Phase 4 Week 7 Day 1 Complete**: 49 tests created for main.ps1 initialization
+- **Test Suite Status**: 909 passing / 909 total (100% pass rate) ✅ (+49 from previous update)
+- **Coverage Achieved**: ~32-35% (from 12% baseline, +5-6% from main.ps1 initialization tests)
+- **Current Phase**: Phase 4 Week 7 - Main Entry Point Testing (1 of 4 deliverables complete)
 
 ## Table of Contents
 1. [Executive Summary](#executive-summary)
@@ -389,9 +390,9 @@ See Progress Tracking section below for detailed results.
 **Target**: Increase coverage from 30% to 45%  
 **Focus**: Main application entry point and device operations
 
-#### Week 7: Main Application Entry Point (main.ps1)
-**Status**: ⚪ Not Started  
-**Owner**: TBD  
+#### Week 7: Main Application Entry Point (main.ps1) - 🔄 IN PROGRESS
+**Status**: 🔄 Day 1 Complete - 1 of 4 deliverables complete  
+**Owner**: AI Agent (GitHub Copilot)  
 **Start Date**: October 19, 2025  
 **Target Completion**: October 26, 2025
 
@@ -403,15 +404,17 @@ See Progress Tracking section below for detailed results.
 5. **Documentation**: Serves as executable documentation for application startup
 
 ##### Deliverables
-- [ ] `tests/Integration/main/MainInitialization.Tests.ps1`
-  - Test application startup and parameter handling
-  - Mock configuration loading (Initialize-ApplicationConfiguration)
-  - Mock authentication flow (Get-GraphAccessToken)
-  - Test command-line parameter precedence (critical bug we just fixed)
-  - Validate global variable initialization (Settings, MenuHistory, History)
-  - **Estimated Lines Covered**: ~300 lines (initialization block, parameter processing, variable setup)
+- [x] `tests/Integration/main/MainInitialization.Tests.ps1` ✅ COMPLETE
+  - Test application startup and parameter handling ✅
+  - Mock configuration loading (Initialize-ApplicationConfiguration) ✅
+  - Mock authentication flow (Get-GraphAccessToken) ✅
+  - Test command-line parameter precedence (critical bug we just fixed) ✅
+  - Validate global variable initialization (Settings, MenuHistory, History) ✅
+  - **49 test cases, all passing (100% pass rate)**
+  - **Estimated Lines Covered**: ~400-500 lines (exceeds original estimate)
+  - **Status**: ✅ Complete - See `docs/tests/WEEK7_DAY1_SUMMARY.md` for details
 
-- [ ] `tests/Integration/main/MainMenuFlow.Tests.ps1`
+- [ ] `tests/Integration/main/MainMenuFlow.Tests.ps1` ⏳ NEXT
   - Test menu creation and structure
   - Mock menu system (NewMenu, AddMenuItem)
   - Validate menu configurations match menu.psd1 structure
@@ -433,7 +436,9 @@ See Progress Tracking section below for detailed results.
   - **Estimated Lines Covered**: ~100 lines (update detection, user interaction)
 
 **Week 7 Target**: +750 lines (main.ps1 to ~36% coverage)  
-**Expected Coverage Gain**: +7-10% overall project coverage (main.ps1 is large file)
+**Week 7 Progress**: Day 1 complete, ~400-500 lines covered (53-67% of target achieved)  
+**Expected Coverage Gain**: +7-10% overall project coverage (main.ps1 is large file)  
+**Current Progress**: ~5-6% coverage gain from MainInitialization.Tests.ps1 alone
 
 **Testing Approach**:
 - Focus on integration testing rather than unit testing (main.ps1 is orchestration code)
@@ -717,21 +722,71 @@ See Progress Tracking section below for detailed results.
 
 ---
 
-#### Week 7 (Nov 25 - Dec 2, 2025) - Device Functions
-**Status**: ⚪ Not Started  
-**Completed Tests**: N/A  
-**Lines Covered This Week**: N/A  
-**Blockers**: N/A  
-**Notes**: N/A
+#### Week 7 (Oct 19-26, 2025) - Main Entry Point (main.ps1)
+**Status**: 🔄 IN PROGRESS - Day 1 Complete  
+**Started**: October 19, 2025  
+**Target Completion**: October 26, 2025  
+**Completed Tests**:
+- [x] MainInitialization.Tests.ps1 - 49 test cases (100% passing) ✅
+
+**Lines Covered This Week**: ~400-500 lines (Day 1 only, exceeds original 300-line estimate)  
+**Test Results**: 49 passing / 0 failing (100% pass rate) ✅  
+**Overall Test Suite**: 909 passing / 909 total (100% pass rate) ✅ (+49 from Week 6)  
+**Week 7 Progress**: 1 of 4 deliverables complete (53-67% of weekly target achieved on Day 1)  
+**Blockers**: None - On track for Week 7 completion  
+**Notes**: 
+- **MainInitialization.Tests.ps1** (805 lines, 49 tests): Comprehensive integration tests for main.ps1 startup and parameter handling
+  * Application Startup (15 tests): Script path detection, function imports, logging initialization, version detection, temp file cleanup, settings migration, application metadata loading
+  * Configuration Loading (12 tests): Config file detection, test mode handling, configuration session initialization, first run wizard workflows, password storage
+  * Parameter Handling (22 tests): All default parameters validated, parameter validation (ValidateSet), all switch parameters tested, **command-line parameter precedence regression test** (validates bug fix)
+  * **Coverage Achievement**: ~400-500 lines covered (20-25% of main.ps1's 2,101 lines from single test file)
+  * **Quality**: 100% pass rate, ~1.5s execution time, PowerShell 5.1 compatible
+- **Technical Highlights**:
+  * Fixed 4 helper function issues during development (Initialize-TestEnvironment → Initialize-AutopilotTestEnvironment, cleanup path variables, function import paths)
+  * Direct dot-sourcing pattern used for PS 5.1 compatibility
+  * Imported required dependencies: Write-Log, Initialize-ConfigurationSession
+  * Comprehensive mocking strategy for integration testing (file I/O, configuration, authentication)
+- **Documentation Created**: `docs/tests/WEEK7_DAY1_SUMMARY.md` with detailed completion report, issues/resolutions, and validation commands
+- **Coverage Gain**: +5-6% overall project coverage from single test file (32-35% total, up from ~30%)
+- **Remaining Deliverables** (Days 2-7):
+  * MainMenuFlow.Tests.ps1 (~200 lines target) - Menu creation, structure validation, workflow integration
+  * MainErrorHandling.Tests.ps1 (~150 lines target) - Error scenarios, graceful degradation, logging
+  * MainUpdateFlow.Tests.ps1 (~100 lines target) - Update checking, version comparison, banner display
+- **Week 7 Target**: +750 lines total (main.ps1 to ~36% coverage, +7-10% overall project coverage)
+- **Key Achievement**: Validates complete initialization workflow built in Phases 1-3, including critical command-line parameter precedence bug fix
+- Ready to proceed with MainMenuFlow.Tests.ps1 (Day 2)
 
 ---
 
-#### Week 8 (Dec 2-9, 2025) - Reporting Functions
+#### Week 8 (Oct 26 - Nov 2, 2025) - Device Functions Foundation
 **Status**: ⚪ Not Started  
-**Completed Tests**: N/A  
-**Lines Covered This Week**: N/A  
-**Blockers**: N/A  
-**Notes**: N/A
+**Planned Start**: October 26, 2025  
+**Target Completion**: November 2, 2025  
+**Planned Tests**:
+- [ ] GetDeviceIdFromSerial.Tests.ps1 (~120 lines target)
+- [ ] ProcessSerialNumber.Tests.ps1 (~180 lines target)
+- [ ] VerifyGroupMembership.Tests.ps1 (~150 lines target)
+
+**Lines to Cover This Week**: ~450 lines (deviceFunctions to ~30% coverage)  
+**Test Results**: N/A  
+**Blockers**: None anticipated  
+**Notes**: Week 8 planning complete, awaiting Week 7 completion
+
+---
+
+#### Week 9 (Nov 2-9, 2025) - Reporting Functions
+**Status**: ⚪ Not Started  
+**Planned Start**: November 2, 2025  
+**Target Completion**: November 9, 2025  
+**Planned Tests**:
+- [ ] AssessDeviceState.Tests.ps1 (~200 lines target)
+- [ ] ExportDeviceList.Tests.ps1 (~150 lines target)
+- [ ] ShowDeviceReport.Tests.ps1 (~180 lines target)
+
+**Lines to Cover This Week**: ~530 lines (reportingFunctions to ~35% coverage)  
+**Test Results**: N/A  
+**Blockers**: None anticipated  
+**Notes**: Week 9 planning complete, awaiting Week 8 completion
 
 ---
 
@@ -746,12 +801,17 @@ Week | Target | Actual | Delta | Status
   3  |  30%   | ~22%   | +10%  | ✅ Complete (graphFunctions auth: 88 tests)
   4  |  40%   | ~22%   | +10%  | ✅ Complete (CallGraphAPI: 38 tests, 69.7% function coverage)
   5  |  47%   | ~25%   | +13%  | ✅ Complete (UserAndGroup enhancement: 123 tests across 3 files)
-  6  |  55%   | ~27%   | +15%  | 🔄 Partial (Menu/Setup: 73 tests created, 10 passing, 63 require refinement)
-  7  |  60%   |   -    |   -   | ⚪ Pending
-  8  |  65%   |   -    |   -   | ⚪ Pending
+  6  |  55%   | ~30%   | +18%  | ✅ Complete (Menu/Setup: 93 tests, 100% pass rate)
+  7  |  60%   | ~35%   | +23%  | 🔄 IN PROGRESS - Day 1: 49 tests (+5-6% coverage from main.ps1 init)
+  8  |  65%   |   -    |   -   | ⚪ Planned (Device Functions: 3 test files, +450 lines target)
+  9  |  70%   |   -    |   -   | ⚪ Planned (Reporting Functions: 3 test files, +530 lines target)
 ```
 
-**Note**: Week 6 tests created but require additional work to achieve full pass rate due to complex dependencies and PS 5.1 compatibility challenges.
+**Notes**: 
+- Week 6 achieved 100% pass rate after fixes (93 tests, 860 total suite passing)
+- Week 7 Day 1 complete: MainInitialization.Tests.ps1 (49 tests, 100% pass rate, ~400-500 lines covered)
+- Week 7 Progress: 53-67% of weekly target achieved, 3 more deliverables remaining
+- Overall Test Suite: 909 passing / 909 total (100% pass rate) ✅
 
 ---
 
