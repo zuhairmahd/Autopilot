@@ -1,5 +1,8 @@
 # Test the fix for array unwrapping issue
-$domainConfig = Import-PowerShellDataFile -Path 'c:\Users\zuhai\code\Autopilot\arabictutor.com.psd1'
+param(
+    [string]$DomainConfigPath = ".\arabictutor.com.psd1"
+)
+$domainConfig = Import-PowerShellDataFile -Path $DomainConfigPath
 
 Write-Host "`n══ Testing ORIGINAL assignment (buggy) ══" -ForegroundColor Red
 $testVariable1 = if ($null -ne $domainConfig.autopilotProfilesToInclude)
