@@ -9,7 +9,7 @@
 #>
 
 param(
-    [string]$DomainConfigFile = "c:\Users\zuhai\code\Autopilot\arabictutor.com.psd1"
+    [string]$DomainConfigFile = ".\arabictutor.com.psd1"
 )
 
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
