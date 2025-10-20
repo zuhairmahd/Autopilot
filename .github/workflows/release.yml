@@ -177,9 +177,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    if:
-      github.event_name == 'release' && github.event.action == 'published'
-      # fail-fast is not valid at the job level; removed
+    if: github.event_name == 'release' && github.event.action == 'published'
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

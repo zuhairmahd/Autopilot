@@ -98,16 +98,7 @@ function Show-AutopilotProfilesEditor()
         
         # Get current Autopilot profile settings - preserve arrays even if empty
         # Force array type to prevent PowerShell from unwrapping single-element arrays
-        $currentAutopilotProfiles = @(if ($null -ne $domainConfig.autopilotProfilesToInclude) 
-            { 
-                $domainConfig.autopilotProfilesToInclude
-            } 
-            else 
-            { 
-                @() 
-            }
-        )
-        
+        $currentAutopilotProfiles = @($domainConfig.autopilotProfilesToInclude)
         Write-Log -LogFile $logFile -Module $functionName -Message "Domain '$DomainName' has $($currentAutopilotProfiles.Count) Autopilot profiles" -LogLevel "Information"
         Write-Verbose "[$functionName] Domain '$DomainName' has $($currentAutopilotProfiles.Count) Autopilot profiles"
         
