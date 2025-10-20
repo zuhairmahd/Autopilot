@@ -69,16 +69,6 @@ function Resolve-MigratedLegacyObjects()
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Starting legacy object resolution for domain: $domain" -LogLevel "Information"
     
-    # Calculate configuration path from SettingsFile
-    $configurationPath = if (Test-Path $SettingsFile)
-    {
-        Split-Path -Parent $SettingsFile
-    }
-    else
-    {
-        Split-Path -Parent (Join-Path $pwd $SettingsFile)
-    }
-    
     # Helper function to normalize array items to hashtable format
     function ConvertTo-NormalizedArray()
     {
