@@ -4,12 +4,23 @@
 .DESCRIPTION
     Runs Pester tests with standard configuration
     Supports filtering by test type, tags, and CI/CD integration
+    
+    When using -TestFile parameter, the script will:
+    - First attempt to resolve the exact path provided
+    - If not found, search the tests folder for an exact filename match
+    - If still not found, perform a fuzzy search and present similar files for selection
 .PARAMETER TestType
     Type of tests to run: Unit, Integration, Comprehensive, All
 .PARAMETER OutputVerbosity
     Level of output detail: None, Minimal, Normal, Detailed     
 .PARAMETER TestFile
-    Path to a single test file to run (overrides TestType)
+    Path or filename of a single test file to run (overrides TestType)
+    Can be:
+    - Full path: "c:\path\to\test.Tests.ps1"
+    - Relative path: "tests\Integration\SettingsFunctions.Tests.ps1"
+    - Just filename: "SettingsFunctions.Tests.ps1"
+    
+    If the file is not found, a fuzzy search will offer similar files for selection.
 .PARAMETER EnableCodeCoverage
     Enable code coverage analysis
 .PARAMETER ShowMissedCommands
@@ -20,12 +31,22 @@
     Filter tests by tags
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestType Unit
+    Runs all unit tests
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestFile "tests\Integration\SettingsFunctions.Tests.ps1"
+    Runs a specific test file using full relative path
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -TestFile "SettingsFunctions.Tests.ps1"
+    Runs a specific test file using just the filename (will search tests folder)
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -TestFile "Settings"
+    Searches for test files matching "Settings" and presents a selection menu
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -CI
+    Runs all tests with code coverage in CI mode
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -ShowMissedCommands
+    Runs tests with detailed code coverage information
 #>
 [CmdletBinding(DefaultParameterSetName = 'Default')]
 param(
@@ -66,6 +87,171 @@ Write-Host "=" * 63 -ForegroundColor Cyan
 # Get Pester configuration
 $config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI -OutputVerbosity $OutputVerbosity
 
+# Helper function for fuzzy string matching
+function Get-FuzzyMatchScore
+{
+    param(
+        [string]$SearchTerm,
+        [string]$Candidate
+    )
+    
+    $searchLower = $SearchTerm.ToLower()
+    $candidateLower = $Candidate.ToLower()
+    
+    # Exact match gets highest score
+    if ($candidateLower -eq $searchLower)
+    {
+        return 1000
+    }
+    
+    # Contains exact search term
+    if ($candidateLower.Contains($searchLower))
+    {
+        return 500 + (100 - $candidateLower.IndexOf($searchLower))
+    }
+    
+    # Calculate sequential character matching score
+    $score = 0
+    $searchChars = $searchLower.ToCharArray()
+    
+    # Sequential character matching
+    $lastIndex = -1
+    foreach ($char in $searchChars)
+    {
+        $index = $candidateLower.IndexOf($char, $lastIndex + 1)
+        if ($index -ge 0)
+        {
+            $score += 10
+            if ($index -eq $lastIndex + 1)
+            {
+                $score += 5  # Bonus for consecutive characters
+            }
+            $lastIndex = $index
+        }
+    }
+    
+    # Penalize length difference
+    $lengthDiff = [Math]::Abs($searchLower.Length - $candidateLower.Length)
+    $score -= $lengthDiff
+    
+    return $score
+}
+
+# Helper function to search for test files
+function Find-TestFile
+{
+    param(
+        [string]$FileName,
+        [string]$TestsPath
+    )
+    
+    Write-Host ""
+    Write-Host "Searching for test file in tests folder..." -ForegroundColor Yellow
+    
+    # Get all test files recursively
+    $allTestFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    
+    # Extract just the filename from the search term for exact matching
+    $searchFileName = Split-Path -Leaf $FileName
+    
+    # Try exact filename match first
+    $exactMatch = $allTestFiles | Where-Object { $_.Name -eq $searchFileName }
+    if ($exactMatch)
+    {
+        if ($exactMatch.Count -eq 1)
+        {
+            Write-Host "Found exact match: $($exactMatch.FullName)" -ForegroundColor Green
+            return $exactMatch.FullName
+        }
+        else
+        {
+            Write-Host "Found multiple exact matches:" -ForegroundColor Yellow
+            for ($i = 0; $i -lt $exactMatch.Count; $i++)
+            {
+                $relativePath = $exactMatch[$i].FullName.Replace($TestsPath, "tests")
+                Write-Host "  [$($i + 1)] $relativePath" -ForegroundColor White
+            }
+            
+            Write-Host ""
+            $choice = Read-Host "Select a file (1-$($exactMatch.Count)) or 'q' to quit"
+            
+            if ($choice -eq 'q')
+            {
+                return $null
+            }
+            
+            $index = [int]$choice - 1
+            if ($index -ge 0 -and $index -lt $exactMatch.Count)
+            {
+                return $exactMatch[$index].FullName
+            }
+            else
+            {
+                Write-Host "Invalid selection" -ForegroundColor Red
+                return $null
+            }
+        }
+    }
+    
+    # No exact match - perform fuzzy search
+    Write-Host "No exact match found. Searching for similar files..." -ForegroundColor Yellow
+    
+    $scoredFiles = $allTestFiles | ForEach-Object {
+        $score = Get-FuzzyMatchScore -SearchTerm $searchFileName -Candidate $_.Name
+        [PSCustomObject]@{
+            File  = $_
+            Score = $score
+        }
+    } | Where-Object { $_.Score -gt 0 } | Sort-Object -Property Score -Descending | Select-Object -First 10
+    
+    if ($scoredFiles.Count -eq 0)
+    {
+        Write-Host "No similar test files found" -ForegroundColor Red
+        return $null
+    }
+    
+    Write-Host ""
+    Write-Host "Found $($scoredFiles.Count) similar test file(s):" -ForegroundColor Cyan
+    Write-Host ""
+    
+    for ($i = 0; $i -lt $scoredFiles.Count; $i++)
+    {
+        $file = $scoredFiles[$i].File
+        $relativePath = $file.FullName.Replace($TestsPath, "tests").TrimStart('\')
+        Write-Host "  [$($i + 1)] $relativePath" -ForegroundColor White
+    }
+    
+    Write-Host ""
+    Write-Host "  [q] Quit" -ForegroundColor Gray
+    Write-Host ""
+    
+    $choice = Read-Host "Select a file (1-$($scoredFiles.Count)) or 'q' to quit"
+    
+    if ($choice -eq 'q')
+    {
+        return $null
+    }
+    
+    try
+    {
+        $index = [int]$choice - 1
+        if ($index -ge 0 -and $index -lt $scoredFiles.Count)
+        {
+            return $scoredFiles[$index].File.FullName
+        }
+        else
+        {
+            Write-Host "Invalid selection" -ForegroundColor Red
+            return $null
+        }
+    }
+    catch
+    {
+        Write-Host "Invalid input" -ForegroundColor Red
+        return $null
+    }
+}
+
 # Override path if specific test file requested
 if ($TestFile)
 {
@@ -80,12 +266,28 @@ if ($TestFile)
     
     if (-not (Test-Path $resolvedPath))
     {
-        Write-Host "ERROR: Test file not found: $resolvedPath" -ForegroundColor Red
-        exit 1
+        Write-Host "Test file not found: $resolvedPath" -ForegroundColor Yellow
+        
+        # Try to find the file in the tests folder
+        $testsPath = Join-Path $PSScriptRoot "tests"
+        $foundPath = Find-TestFile -FileName $TestFile -TestsPath $testsPath
+        
+        if ($foundPath)
+        {
+            $resolvedPath = $foundPath
+            Write-Host ""
+            Write-Host "Using selected test file: $resolvedPath" -ForegroundColor Green
+        }
+        else
+        {
+            Write-Host ""
+            Write-Host "ERROR: Could not resolve test file" -ForegroundColor Red
+            exit 1
+        }
     }
     
     $config.Run.Path = $resolvedPath
-    Write-Host "`nRunning single test file: $TestFile" -ForegroundColor Yellow
+    Write-Host "`nRunning single test file: $(Split-Path -Leaf $resolvedPath)" -ForegroundColor Yellow
 }
 
 # Apply tag filter if specified
