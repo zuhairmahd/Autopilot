@@ -159,6 +159,7 @@ param(
     [switch]$showSettings,
     [switch]$OverwriteLogs,
     [switch]$SecureString,
+    [bool]$autoUpdate,
     [switch]$testMode,
     [string]$TestPassword,
     [switch]$ResetAuth,
@@ -327,33 +328,39 @@ else
     Write-Verbose "[$scriptName] Starting logging to file: $LogFile"
     Write-Log -LogFile $LogFile -StartLogging
 }
-#If the scriptname is a Powershell, change the extension to an exe.
-if ($scriptName -match '\.ps1$' -and $MyInvocation.MyCommand.CommandType -eq "ExternalScript")
+
+if ($testMode)
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script name ends with .ps1, changing to .exe for version check." -logLevel "Verbose"
-    Write-Verbose "[$scriptName] Script name ends with .ps1, changing to .exe for version check."
-    $scriptNameExe = $scriptName -replace '\.ps1$', '.exe'
+    Write-Verbose "[$scriptName] Test mode enabled: Initializing application metadata in silent mode"   
+    write-log -logFile $logFile -module $scriptName -message "Test mode enabled: Initializing application metadata in silent mode"
+    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath -Silent
 }
 else
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Executable file '$scriptNameExe' not found." -LogLevel "Warning"
-    Write-Verbose "[$scriptName] Executable file not found: $scriptNameExe"
-    $scriptNameExe = $scriptName
+    Write-Verbose "[$scriptName] Initializing application metadata"
+    write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
+    $global:appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
-if (Test-Path "$pwd\$scriptNameExe")
+$version = if ($null -ne $appMetaData.version)
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Found executable file: $scriptNameExe" -logLevel "Verbose"
-    Write-Verbose "[$scriptName] Found executable file: $scriptNameExe"
-    $version = GetFileVersion -executableFileName "$scriptPath\$scriptNameExe"
+    $appMetaData.version
 }
 else
 {
-    Write-Log -logFile $LogFile -module $scriptName -Message "Script file '$scriptName' found." -LogLevel "Verbose"
-    Write-Verbose "[$scriptName] Script file found: $scriptName"
-    $version = GetFileVersion -executableFileName "$scriptPath\$scriptName"
+    [System.Version]::new(0, 0, 0, 0)
 }
-Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Version: $($version | Out-String)" -LogLevel "Information"
-Write-Verbose "[$scriptName] Initializing application configuration"
+if ($ShowVersion)
+{
+    Write-Verbose "[$scriptName] Version: $version"
+    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
+    Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
+    Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
+    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
+    Write-Log -LogFile $LogFile -finishLogging
+    exit 0
+}
+
+#run cleanup of temp files from previous runs
 $filesCleaned = cleanupTempFiles
 if ($filesCleaned.AllRemoved)
 {
@@ -362,6 +369,7 @@ if ($filesCleaned.AllRemoved)
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files found: $($filesCleaned.RemovedFilesCount)" -LogLevel "Verbose"
 Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Total temporary files removed: $($filesCleaned.RemovedFilesCount)" -LogLevel "Information"
 
+#Check for settings migration
 write-log -logFile $logFile -module $scriptName -message "Checking for settings migration need." -LogLevel "Information"
 Write-Verbose "[$scriptName] Checking for settings migration need."
 $migrationCheck = Invoke-SettingsMigration -RemoveJsonFiles -Force
@@ -386,25 +394,6 @@ else
 {
     Write-Verbose "[$scriptName] No migration needed."
     Write-Log -LogFile $LogFile -Module $scriptName -Message "No migration needed." -LogLevel "Information" 
-}
-
-$appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile
-# Prioritize version from the domain settings file obtained via the Get-AppMetaData function
-if (-not ([string]::IsNullOrWhiteSpace($appMetaData.companyName)) -and $appMetaData.companyName -ne $version.companyName)
-{
-    Write-Log -LogFile $LogFile -Module $scriptName -Message "Company name mismatch: $($appMetaData.companyName) vs $($version.companyName)" -LogLevel "Warning"
-    $version.companyName = $appMetaData.companyName
-    Write-Verbose "[$scriptName] Updated company name: $($version.companyName)"
-}
-if ($ShowVersion)
-{
-    Write-Verbose "[$scriptName] Version: $version"
-    Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
-    Write-Host "Update branch: $($appMetaData.release)" -ForegroundColor Cyan
-    Write-Log -LogFile $LogFile -Module "$scriptName" -Message "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -LogLevel "Information"
-    Write-Log -LogFile $LogFile -finishLogging
-    exit 0
 }
 #endregion  Initialize script parameters
 
@@ -807,7 +796,7 @@ $script:DeviceEnrollmentCache = @{}
 
 #region banner
 Write-Host "Welcome to the Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))" -ForegroundColor Green
-Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
 if ($settings.showLicenseBanner)
 {
     Write-Host "==========================================================`n" -ForegroundColor White

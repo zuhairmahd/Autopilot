@@ -22,7 +22,7 @@ function Show-AboutApplication()
         $registeredAppName = "Unknown (failed to retrieve from Microsoft Graph)"
     }
     Write-Host "Intune Helpdesk Menu version $($version.major).$($version.minor).$($version.build) (build $($version.revision))"
-    Write-Host "Copyright (c) $((Get-Date).Year) $($version.companyName)" -ForegroundColor Cyan
+    Write-Host "Copyright (c) $((Get-Date).Year) $($appMetaData.companyName)" -ForegroundColor Cyan
     if ($updateAvailable.success -eq $true)
     {
         Write-Host "Last updated on $($updateAvailable.ReleaseDate | FormatDateWithTimeZone)"

@@ -27,7 +27,7 @@ function getFileVersion()
         Write-Log -LogFile $LogFile -Module $functionName -Message "Parsing the local version string to System.Version object." -LogLevel "Verbose"
         $localVersion = [System.Version]::Parse($LocalVersion)
         Write-Log -LogFile $LogFile -Module $functionName -Message "Parsed local version: $localVersion" -LogLevel "Verbose"
-Write-Log -LogFile $LogFile -Module $functionName -Message "Returning local version: $localVersion" -LogLevel "Information"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Returning local version: $localVersion" -LogLevel "Information"
         $returnObject = @{
             'major'       = $localVersion.Major
             'minor'       = $localVersion.Minor
@@ -41,7 +41,7 @@ Write-Log -LogFile $LogFile -Module $functionName -Message "Returning local vers
     }
     else
     {
-Write-Log -LogFile $LogFile -Module $functionName -Message "Executable file '$executableFileName' not found in the current directory." -LogLevel "Verbose"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Executable file '$executableFileName' not found in the current directory." -LogLevel "Verbose"
         return $null
     }
 }
