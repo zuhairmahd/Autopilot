@@ -4,7 +4,7 @@
 `main.ps1` bootstraps the app by dot-sourcing every module in `functions/`. Each subfolder (device, menu, graph, reporting, etc.) groups scripts by responsibility; keep modules self-contained and suited for PowerShell 5.1. Configuration defaults live in the root `.psd1` files (`settings.psd1`, `menu.psd1`, `strings.psd1`), while runtime secrets are generated under `.secrets/` and log output lands in `Logs/`. Tests, demos, and validation harnesses sit in `TestScripts/`, and deeper references live in `docs/`. Binary drops like `main.exe` are build outputs only.
 
 ## Build, Test, and Development Commands
-Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run `.\TestScripts\Test-Runner.ps1 -TestCategory core`; extend to `syntax`, `integration`, or `comprehensive` depending on scope. Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
+Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run `.\Invoke-PesterTests.ps1 -TestType Unit` (or substitute `syntax`, `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
 
 ## Coding Style & Naming Conventions
 Stick to four-space indentation, ~120-character lines, and approved PowerShell verb-noun PascalCase (`Get-DeviceProfileStatus`). Variables use camelCase, constants use ALL_CAPS, and every public function needs comment-based help plus `$functionName = $MyInvocation.MyCommand.Name` for logging context. Favor `try/catch`, `Write-Verbose`, and the shared `Write-Log` helper; avoid 5.1-incompatible constructs such as ordered hashtables or string interpolation. **Do not use Unicode characters** (checkmarks, arrows, emoji, etc.) as PowerShell 5.1 console output may not render them correctly—stick to ASCII characters only. For newlines in `Write-Host` statements, use separate `Write-Host` calls instead of `\n` escape sequences. No automated formatter runs here—the style guidance and reviewers are the guardrails.
@@ -16,10 +16,8 @@ Stick to four-space indentation, ~120-character lines, and approved PowerShell v
 The project uses **Pester v5** as the primary testing framework for new tests, while legacy tests are being gradually migrated (82% complete as of October 2025). Both frameworks coexist during the migration period.
 
 ### Quick Reference Commands
-- **Quick validation:** `.\Invoke-PesterTests.ps1 -TestType Unit` (runs fast Pester unit tests)
+- **Quick validation:** `pwsh -executionPolicy bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (runs fast Pester unit tests)
 - **Full Pester suite:** `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` (all Pester tests with coverage)
-- **Complete suite:** `.\Invoke-AllTests.ps1` (runs both Pester and remaining legacy tests)
-- **Legacy tests:** `.\TestScripts\Test-Runner.ps1 -TestCategory <category>` (for tests not yet migrated)
 
 ### Core Testing Principles
 - ✅ **Improve helpers first** - Enhance helper modules rather than creating workarounds in individual tests

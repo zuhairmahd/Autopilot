@@ -275,6 +275,7 @@ function GetUpdates()
         {
             Write-Host "Since this is a development run, no update will be downloaded."
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Development run - skipping update download." -LogLevel "Information"
+            $returnMessage = $returnValues.testUpdateMessage              
         }
     }
     else
