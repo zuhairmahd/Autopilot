@@ -225,7 +225,6 @@ function Show-AutopilotProfilesEditor()
                             # New hashtable format
                             Write-Verbose "[$functionName] Detected hashtable format for Autopilot profiles"
                             write-log -LogFile $logFile -Module $functionName -Message "Detected hashtable format for Autopilot profiles" -LogLevel "Information"           
-                            Write-Host "Detected hashtable"
                             foreach ($autopilotProfile in $currentAutopilotProfiles)
                             {
                                 Write-Host " - Name: $($autopilotProfile.name)" -ForegroundColor White
