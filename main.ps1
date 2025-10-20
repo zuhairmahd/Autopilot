@@ -339,7 +339,7 @@ else
 {
     Write-Verbose "[$scriptName] Initializing application metadata"
     write-log -logFile $logFile -module $scriptName -message "Initializing application metadata"
-    $global:appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
+    $appMetaData = Get-ApplicationMetaData -GlobalSettingsFile $InitFile -scriptName $scriptName -scriptPath $ScriptPath
 }
 $version = if ($null -ne $appMetaData.version)
 {
