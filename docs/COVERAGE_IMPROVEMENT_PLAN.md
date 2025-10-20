@@ -438,10 +438,12 @@ See Progress Tracking section below for detailed results.
   - Validate update prompts
   - **Estimated Lines Covered**: ~100 lines (update detection, user interaction)
 
-**Week 7 Target**: +750 lines (main.ps1 to ~36% coverage)  
-**Week 7 Progress**: Day 1 complete, ~400-500 lines covered (53-67% of target achieved)  
-**Expected Coverage Gain**: +7-10% overall project coverage (main.ps1 is large file)  
-**Current Progress**: ~5-6% coverage gain from MainInitialization.Tests.ps1 alone
+**Week 7 Target**: +850 lines (main.ps1 + editors to ~38% coverage)  
+**Week 7 Progress**: Day 1-2 complete, ~715 lines covered (84% of target achieved)  
+  - MainInitialization.Tests.ps1: ~400-500 lines ✅
+  - Show-EditorCommon.Tests.ps1: ~215 lines ✅  
+**Expected Coverage Gain**: +8-11% overall project coverage  
+**Current Progress**: ~6-7% coverage gain achieved
 
 **Testing Approach**:
 - Focus on integration testing rather than unit testing (main.ps1 is orchestration code)
@@ -449,22 +451,99 @@ See Progress Tracking section below for detailed results.
 - Use test mode where available ($testMode parameter)
 - Validate the complete initialization workflow built in Phases 1-3
 - Test the command-line override precedence bug fix end-to-end
+- For editors: Focus on array manipulation, format detection, and shared utilities
 
 **Success Criteria**:
-- All parameter combinations tested
-- Configuration loading workflow validated
-- Authentication flow mocked and verified
-- Menu structure matches configuration
-- Error paths tested and logged correctly
-- Command-line parameters override file settings (regression test for bug fix)
+- All parameter combinations tested ✅
+- Configuration loading workflow validated ✅
+- Authentication flow mocked and verified ✅
+- Menu structure matches configuration (pending)
+- Error paths tested and logged correctly (pending)
+- Command-line parameters override file settings (regression test for bug fix) ✅
+- Editor common functions fully tested ✅
 
-#### Week 8: Device Functions Foundation
+##### Editor Testing - Setup Functions (Days 2-3) - 🔄 IN PROGRESS
+**Status**: 🔄 Day 2 Complete - Show-EditorCommon.Tests.ps1 ✅  
+**Rationale**: Settings editors (Show-SettingsEditor, Show-GroupsEditor, Show-AutopilotProfilesEditor, Show-SettingsViewer) are critical UI components with ~2,100+ lines combined and minimal test coverage. Testing provides:
+1. **High-Value Coverage**: Editor functions represent significant LOC in setupFunctions
+2. **Bug Prevention**: Array unwrapping bug discovered and fixed during planning
+3. **Shared Infrastructure**: Show-EditorCommon is used by all editors
+4. **User-Facing**: These functions directly impact user experience
+
+**Deliverables**:
+- [x] `tests/Unit/setupFunctions/Show-EditorCommon.Tests.ps1` ✅ COMPLETE (Day 2)
+  - Test array format detection (Get-EditorArrayFormat) ✅
+  - Test array comparison logic (Compare-EditorArrayContents) ✅
+  - Test format conversion (Convert-StringArrayToHashTableArray) ✅
+  - Test duplicate detection (Test-ItemExists) ✅
+  - Test domain selection (Get-DomainForEditor) ✅
+  - Test basic validation (Update-DomainArraySetting) ✅
+  - **32 test cases, all passing (100% pass rate)**
+  - **Estimated Lines Covered**: ~215 lines of shared editor utilities
+  - **Bug Fixed**: Array unwrapping in Show-AutopilotProfilesEditor.ps1 (count showing 2 instead of 1)
+  - **Status**: ✅ Complete
+
+- [ ] `tests/Unit/setupFunctions/Show-AutopilotProfilesEditor.Tests.ps1` ⏳ PLANNED
+  - Test profile array input handling
+  - Test hashtable format detection
+  - Test array unwrapping fix (regression test)
+  - Mock Autopilot profile resolution
+  - Test duplicate prevention
+  - **Estimated Test Cases**: ~25-30 tests
+  - **Estimated Lines Covered**: ~180 lines
+
+- [ ] `tests/Unit/setupFunctions/Show-GroupsEditor.Tests.ps1` ⏳ PLANNED
+  - Test group array input (include/exclude)
+  - Test format conversions (string to hashtable)
+  - Mock group resolution workflows
+  - Test interactive selection flows
+  - Test duplicate prevention
+  - **Estimated Test Cases**: ~25-30 tests
+  - **Estimated Lines Covered**: ~180 lines
+
+- [ ] `tests/Unit/setupFunctions/Show-SettingsViewer.Tests.ps1` ⏳ PLANNED
+  - Test read-only display (Global/Domain/Auth)
+  - Test value formatting (Format-SettingValueForDisplay)
+  - Test description display
+  - Test nested settings handling
+  - **Estimated Test Cases**: ~15-20 tests
+  - **Estimated Lines Covered**: ~120 lines
+
+- [ ] `tests/Integration/SettingsFunctions.Tests.ps1` - Enhancement ⏳ PLANNED
+  - Add Auth settings array comparison edge cases
+  - Add nested setting update tests
+  - Add validation failure scenarios
+  - Add backup creation/restoration tests
+  - Add PSD1 structure validation
+  - Add error handling for missing parameters
+  - Add MergeSettings vs Replace mode tests
+  - **Estimated Additional Test Cases**: ~15-20 tests
+  - **Estimated Lines Covered**: ~100 lines (Update-Setting gaps)
+
+**Note**: Show-SettingsEditor.Tests.ps1 deferred to integration tests due to complexity (requires extensive mocking of user input, menu system, and multiple input type handlers). Integration tests will cover end-to-end workflows instead.
+
+#### Week 8: Settings Editors Integration & Device Functions
 **Status**: ⚪ Not Started  
 **Owner**: TBD  
 **Start Date**: October 26, 2025  
 **Target Completion**: November 2, 2025
 
+**Rationale**: Complete the settings editor testing with integration tests and begin device function coverage.
+
 ##### Deliverables
+
+**Settings Editors Integration** (Days 1-2):
+- [ ] `tests/Integration/SettingsEditors.Tests.ps1`
+  - Test end-to-end editor workflows
+  - Test domain creation → group editing → profile editing → settings viewing
+  - Test cross-editor state management
+  - Test persistence across editor sessions
+  - Mock Graph API for group/profile resolution
+  - Test array format migrations (string → hashtable)
+  - **Estimated Test Cases**: ~20-25 integration tests
+  - **Estimated Lines Covered**: ~200 lines (workflow integration)
+
+**Device Functions Foundation** (Days 3-5):
 - [ ] `tests/Unit/deviceFunctions/GetDeviceIdFromSerial.Tests.ps1`
   - Mock Graph API device queries
   - Test serial number formats
@@ -483,7 +562,14 @@ See Progress Tracking section below for detailed results.
   - Test cache usage
   - **Estimated Lines Covered**: ~150 lines
 
-**Week 8 Target**: +450 lines (deviceFunctions to ~30% coverage)
+**Week 8 Target**: +650 lines (editors integration + deviceFunctions foundation)  
+**Expected Coverage Gain**: +6-8% overall project coverage
+
+**Editor Testing Summary (Week 7-8 Combined)**:
+- **Total Editor Lines Covered**: ~895 lines across 5 files
+- **Total Editor Tests**: ~130-145 test cases
+- **Packages Improved**: setupFunctions (from ~18% to ~35%+ estimated)
+- **Critical Bugs Fixed**: Array unwrapping in Show-AutopilotProfilesEditor.ps1
 
 #### Week 9: Reporting Functions
 **Status**: ⚪ Not Started  
