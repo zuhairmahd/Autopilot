@@ -132,7 +132,7 @@ function Get-ApplicationMetaData()
             Write-Log -logFile $logFile -module $functionName -Message "lastrun.json found. Attempting to read version from it."
             try
             {
-                $lastrunData = Get-Content "$pwd\lastrun.json" | ConvertFrom-Json
+                $lastrunData = Get-Content "$scriptPath\lastrun.json" | ConvertFrom-Json
                 if ($lastrunData.version)
                 {
                     $fileVersionInfo = @{
