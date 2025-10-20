@@ -19,8 +19,10 @@
     - Full path: "c:\path\to\test.Tests.ps1"
     - Relative path: "tests\Integration\SettingsFunctions.Tests.ps1"
     - Just filename: "SettingsFunctions.Tests.ps1"
+    - "Interactive" for interactive file browser: -TestFile "Interactive"
     
     If the file is not found, a fuzzy search will offer similar files for selection.
+    Use "Interactive" to browse and select multiple test files interactively.
 .PARAMETER EnableCodeCoverage
     Enable code coverage analysis
 .PARAMETER ShowMissedCommands
@@ -28,10 +30,22 @@
 .PARAMETER CI
     Run in CI/CD mode with NUnit XML output
 .PARAMETER Tags
-    Filter tests by tags
+    Filter tests by tags. Can be:
+    - Specific tags: -Tags "Unit", "Integration"
+    - "Interactive" for interactive selection: -Tags "Interactive"
+    - Omit parameter to run all tests
+    
+    When -Tags "Interactive" is used, an interactive menu will display all available tags
+    from test files, allowing multiple selection.
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestType Unit
     Runs all unit tests
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -Tags "Unit", "Fast"
+    Runs only tests tagged with 'Unit' and 'Fast'
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -Tags "Interactive"
+    Shows interactive tag selection menu for choosing multiple tags
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestFile "tests\Integration\SettingsFunctions.Tests.ps1"
     Runs a specific test file using full relative path
@@ -41,6 +55,9 @@
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -TestFile "Settings"
     Searches for test files matching "Settings" and presents a selection menu
+.EXAMPLE
+    .\Invoke-PesterTests.ps1 -TestFile "Interactive"
+    Shows interactive menu to browse and select multiple test files to run
 .EXAMPLE
     .\Invoke-PesterTests.ps1 -EnableCodeCoverage -CI
     Runs all tests with code coverage in CI mode
@@ -76,7 +93,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
+$strings = @('User canceled', 'No files found')
 # Import configuration
 . "$PSScriptRoot\PesterConfiguration.ps1"
 
@@ -87,108 +104,117 @@ Write-Host "=" * 63 -ForegroundColor Cyan
 # Get Pester configuration
 $config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI -OutputVerbosity $OutputVerbosity
 
-# Helper function for fuzzy string matching
-function Get-FuzzyMatchScore
-{
-    param(
-        [string]$SearchTerm,
-        [string]$Candidate
-    )
-    
-    $searchLower = $SearchTerm.ToLower()
-    $candidateLower = $Candidate.ToLower()
-    
-    # Exact match gets highest score
-    if ($candidateLower -eq $searchLower)
-    {
-        return 1000
-    }
-    
-    # Contains exact search term
-    if ($candidateLower.Contains($searchLower))
-    {
-        return 500 + (100 - $candidateLower.IndexOf($searchLower))
-    }
-    
-    # Calculate sequential character matching score
-    $score = 0
-    $searchChars = $searchLower.ToCharArray()
-    
-    # Sequential character matching
-    $lastIndex = -1
-    foreach ($char in $searchChars)
-    {
-        $index = $candidateLower.IndexOf($char, $lastIndex + 1)
-        if ($index -ge 0)
-        {
-            $score += 10
-            if ($index -eq $lastIndex + 1)
-            {
-                $score += 5  # Bonus for consecutive characters
-            }
-            $lastIndex = $index
-        }
-    }
-    
-    # Penalize length difference
-    $lengthDiff = [Math]::Abs($searchLower.Length - $candidateLower.Length)
-    $score -= $lengthDiff
-    
-    return $score
-}
+#region Helper functions
 
-# Helper function to search for test files
-function Find-TestFile
+function Find-FileWithFuzzySearch()
 {
+    [CmdletBinding()]
     param(
         [string]$FileName,
-        [string]$TestsPath
+        [string]$Path,
+        [int]$matchesToReturn = 10,
+        [int]$minimScore = 100,
+        [switch]$AllowMultiple
     )
+
+    # Helper function for fuzzy string matching
+    function Get-FuzzyMatchScore()
+    {
+        [CmdletBinding()]
+        param(
+            [string]$SearchTerm,
+            [string]$Candidate
+        )
+        $functionName = $MyInvocation.MyCommand.Name
+        Write-Verbose "[$functionName] Calculating fuzzy match score between '$SearchTerm' and '$Candidate'."
+        $searchLower = $SearchTerm.ToLower()
+        $candidateLower = $Candidate.ToLower()
+        Write-Verbose "[$functionName] Lowercase SearchTerm: '$searchLower', Candidate: '$candidateLower'."
+        # Exact match gets highest score
+        if ($candidateLower -eq $searchLower)
+        {
+            Write-Verbose "[$functionName] Exact match found."
+            return 1000
+        }
     
+        # Contains exact search term
+        if ($candidateLower.Contains($searchLower))
+        {
+            Write-Verbose "[$functionName] Candidate contains search term."
+            return 500 + (100 - $candidateLower.IndexOf($searchLower))
+        }
+    
+        # Calculate sequential character matching score
+        Write-Verbose "[$functionName] Calculating sequential character matching score."
+        $score = 0
+        $searchChars = $searchLower.ToCharArray()
+        Write-Verbose "[$functionName] Search characters: $($searchChars -join ', ')."
+        # Sequential character matching
+        $lastIndex = -1
+        foreach ($char in $searchChars)
+        {
+            $index = $candidateLower.IndexOf($char, $lastIndex + 1)
+            Write-Verbose "[$functionName] Searching for character '$char' starting at index $($lastIndex + 1): found at index $index." 
+            if ($index -ge 0)
+            {
+                $score += 10
+                Write-Verbose "[$functionName] Found character '$char' at index $index."
+                if ($index -eq $lastIndex + 1)
+                {
+                    $score += 5  # Bonus for consecutive characters
+                    Write-Verbose "[$functionName] Found consecutive character '$char' at index $index."
+                }
+                $lastIndex = $index
+            }
+        }
+    
+        # Penalize length difference
+        $lengthDiff = [Math]::Abs($searchLower.Length - $candidateLower.Length)
+        $score -= $lengthDiff
+        Write-Verbose "[$functionName] Length difference: $lengthDiff, final score: $score."    
+        return $score
+    }
+    
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Searching for test file '$FileName' in path '$Path'.  If not found, up to $matchesToReturn similar files with a minimum score of $minimScore will be presented."
     Write-Host ""
     Write-Host "Searching for test file in tests folder..." -ForegroundColor Yellow
     
     # Get all test files recursively
     $allTestFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
-    
+    Write-Verbose "[$functionName] Found $($allTestFiles.Count) test files in path '$Path'."
     # Extract just the filename from the search term for exact matching
     $searchFileName = Split-Path -Leaf $FileName
     
     # Try exact filename match first
     $exactMatch = $allTestFiles | Where-Object { $_.Name -eq $searchFileName }
+    Write-Verbose "[$functionName] Found $($exactMatch.Count) exact matches for '$searchFileName'."
     if ($exactMatch)
     {
-        if ($exactMatch.Count -eq 1)
+        if ($exactMatch.Count -eq 1 -and -not $AllowMultiple)
         {
             Write-Host "Found exact match: $($exactMatch.FullName)" -ForegroundColor Green
             return $exactMatch.FullName
         }
         else
         {
-            Write-Host "Found multiple exact matches:" -ForegroundColor Yellow
-            for ($i = 0; $i -lt $exactMatch.Count; $i++)
+            Write-Host "Found $($exactMatch.Count) exact match$(if ($exactMatch.Count -ne 1) {'es'}):" -ForegroundColor Yellow
+            
+            $selectedFiles = Select-TestFiles -Files $exactMatch -TestsPath $TestsPath -AllowMultiple:$AllowMultiple
+            
+            if ($selectedFiles.Count -eq 0)
             {
-                $relativePath = $exactMatch[$i].FullName.Replace($TestsPath, "tests")
-                Write-Host "  [$($i + 1)] $relativePath" -ForegroundColor White
+                Write-Verbose "[$functionName] User chose to quit."
+                return 'User canceled'
             }
             
-            Write-Host ""
-            $choice = Read-Host "Select a file (1-$($exactMatch.Count)) or 'q' to quit"
-            
-            if ($choice -eq 'q')
+            if ($AllowMultiple)
             {
-                return $null
-            }
-            
-            $index = [int]$choice - 1
-            if ($index -ge 0 -and $index -lt $exactMatch.Count)
-            {
-                return $exactMatch[$index].FullName
+                return $selectedFiles
             }
             else
             {
-                Write-Host "Invalid selection" -ForegroundColor Red
-                return $null
+                return $selectedFiles[0]
             }
         }
     }
@@ -202,59 +228,333 @@ function Find-TestFile
             File  = $_
             Score = $score
         }
-    } | Where-Object { $_.Score -gt 0 } | Sort-Object -Property Score -Descending | Select-Object -First 10
+    } | Where-Object { $_.Score -gt $minimScore } | Sort-Object -Property Score -Descending | Select-Object -First $matchesToReturn
+    Write-Verbose "[$functionName] Found $($scoredFiles.Count) similar files for '$searchFileName' after fuzzy matching."
     
     if ($scoredFiles.Count -eq 0)
     {
         Write-Host "No similar test files found" -ForegroundColor Red
-        return $null
+        return 'No files found'
     }
     
     Write-Host ""
     Write-Host "Found $($scoredFiles.Count) similar test file(s):" -ForegroundColor Cyan
-    Write-Host ""
     
-    for ($i = 0; $i -lt $scoredFiles.Count; $i++)
+    $files = $scoredFiles | ForEach-Object { $_.File }
+    $selectedFiles = Select-TestFiles -Files $files -TestsPath $TestsPath -AllowMultiple:$AllowMultiple
+    
+    if ($selectedFiles.Count -eq 0)
     {
-        $file = $scoredFiles[$i].File
-        $relativePath = $file.FullName.Replace($TestsPath, "tests").TrimStart('\')
-        Write-Host "  [$($i + 1)] $relativePath" -ForegroundColor White
+        Write-Verbose "[$functionName] User chose to quit."
+        return 'User canceled'
     }
     
-    Write-Host ""
-    Write-Host "  [q] Quit" -ForegroundColor Gray
-    Write-Host ""
-    
-    $choice = Read-Host "Select a file (1-$($scoredFiles.Count)) or 'q' to quit"
-    
-    if ($choice -eq 'q')
+    if ($AllowMultiple)
     {
-        return $null
+        return $selectedFiles
     }
-    
-    try
+    else
     {
-        $index = [int]$choice - 1
-        if ($index -ge 0 -and $index -lt $scoredFiles.Count)
-        {
-            return $scoredFiles[$index].File.FullName
-        }
-        else
-        {
-            Write-Host "Invalid selection" -ForegroundColor Red
-            return $null
-        }
-    }
-    catch
-    {
-        Write-Host "Invalid input" -ForegroundColor Red
-        return $null
+        return $selectedFiles[0]
     }
 }
 
-# Override path if specific test file requested
-if ($TestFile)
+# Generic helper function for interactive selection from a list
+function Select-ItemsFromList()
 {
+    param(
+        [Parameter(Mandatory)]
+        [array]$Items,
+        [Parameter(Mandatory)]
+        [string]$Title,
+        [Parameter(Mandatory)]
+        [scriptblock]$DisplayFormat,
+        [switch]$AllowMultiple,
+        [string]$PromptText = "Enter selection"
+    )
+    
+    if ($Items.Count -eq 0)
+    {
+        Write-Host "No items available for selection" -ForegroundColor Yellow
+        return @()
+    }
+    
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  $Title" -ForegroundColor Cyan
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    for ($i = 0; $i -lt $Items.Count; $i++)
+    {
+        $displayText = & $DisplayFormat $Items[$i]
+        Write-Host "  [$($i + 1)] $displayText" -ForegroundColor White
+    }
+    
+    Write-Host ""
+    if ($AllowMultiple)
+    {
+        Write-Host "  [a] Select All" -ForegroundColor Green
+    }
+    Write-Host "  [q] Quit" -ForegroundColor Gray
+    Write-Host ""
+    
+    if ($AllowMultiple)
+    {
+        Write-Host "$PromptText (comma-separated, e.g., 1,3,5) or 'a' for all:" -ForegroundColor Cyan
+    }
+    else
+    {
+        Write-Host "${PromptText}:" -ForegroundColor Cyan
+    }
+    
+    $validSelection = $false
+    $selectedItems = @()
+    
+    while (-not $validSelection)
+    {
+        $choice = Read-Host "Selection"
+        
+        # Handle quit
+        if ($choice -eq 'q')
+        {
+            Write-Host "Selection canceled" -ForegroundColor Yellow
+            return @()
+        }
+        
+        # Handle select all (only if allowed)
+        if ($AllowMultiple -and $choice -eq 'a')
+        {
+            Write-Host ""
+            Write-Host "Selected all $($Items.Count) items" -ForegroundColor Green
+            return $Items
+        }
+        
+        # Parse selection(s)
+        $selectedItems = @()
+        $hasErrors = $false
+        
+        $numbers = if ($AllowMultiple)
+        {
+            $choice -split ',' | ForEach-Object { $_.Trim() }
+        }
+        else
+        {
+            @($choice.Trim())
+        }
+        
+        foreach ($num in $numbers)
+        {
+            try
+            {
+                $index = [int]$num - 1
+                if ($index -ge 0 -and $index -lt $Items.Count)
+                {
+                    $selectedItems += $Items[$index]
+                }
+                else
+                {
+                    Write-Host "Invalid selection: $num (out of range 1-$($Items.Count))" -ForegroundColor Red
+                    $hasErrors = $true
+                }
+            }
+            catch
+            {
+                Write-Host "Invalid input: '$num' (not a number)" -ForegroundColor Red
+                $hasErrors = $true
+            }
+        }
+        
+        # Check if we got valid selections
+        if ($selectedItems.Count -gt 0)
+        {
+            Write-Host ""
+            Write-Host "Selected $($selectedItems.Count) item(s)" -ForegroundColor Green
+            $validSelection = $true
+        }
+        elseif (-not $hasErrors)
+        {
+            # Empty input - reprompt
+            Write-Host "No selection entered. Please try again or enter 'q' to quit." -ForegroundColor Yellow
+        }
+        else
+        {
+            # Had errors but no valid selections
+            Write-Host "No valid items selected. Please try again or enter 'q' to quit." -ForegroundColor Yellow
+        }
+    }
+    
+    return $selectedItems
+}
+
+# Helper function to extract all tags from test files
+function Get-AvailableTags()
+{
+    param(
+        [string]$TestsPath
+    )
+    
+    Write-Host "Scanning test files for available tags..." -ForegroundColor Yellow
+    
+    $allTags = @{}
+    $testFiles = Get-ChildItem -Path $TestsPath -Filter "*.Tests.ps1" -Recurse -File
+    
+    foreach ($file in $testFiles)
+    {
+        $content = Get-Content -Path $file.FullName -Raw
+        # Match Describe blocks with -Tags parameter
+        $tagMatches = [regex]::Matches($content, "Describe\s+[^-]+-Tags\s+([^{]+)")
+        
+        foreach ($match in $tagMatches)
+        {
+            $tagsString = $match.Groups[1].Value
+            # Extract individual tags (handle both 'tag' and "tag" format)
+            $individualTags = [regex]::Matches($tagsString, "['`"]([^'`"]+)['`"]")
+            
+            foreach ($tagMatch in $individualTags)
+            {
+                $tag = $tagMatch.Groups[1].Value.Trim()
+                if (-not [string]::IsNullOrWhiteSpace($tag))
+                {
+                    if ($allTags.ContainsKey($tag))
+                    {
+                        $allTags[$tag]++
+                    }
+                    else
+                    {
+                        $allTags[$tag] = 1
+                    }
+                }
+            }
+        }
+    }
+    
+    # Return sorted tags with their counts
+    return $allTags.GetEnumerator() | Sort-Object -Property Name
+}
+
+# Helper function for tag selection menu
+function Select-Tags()
+{
+    param(
+        [string]$TestsPath
+    )
+    
+    $availableTags = Get-AvailableTags -TestsPath $TestsPath
+    
+    if ($availableTags.Count -eq 0)
+    {
+        Write-Host "No tags found in test files" -ForegroundColor Yellow
+        return @()
+    }
+    
+    $tagList = @($availableTags)
+    
+    $selectedTags = Select-ItemsFromList `
+        -Items $tagList `
+        -Title "Available Test Tags" `
+        -DisplayFormat { param($tag) "$($tag.Name) ($($tag.Value) test(s))" } `
+        -AllowMultiple `
+        -PromptText "Enter tag numbers"
+    
+    if ($selectedTags.Count -gt 0)
+    {
+        $tagNames = $selectedTags | ForEach-Object { $_.Name }
+        Write-Host "Selected tags: $($tagNames -join ', ')" -ForegroundColor Green
+        return $tagNames
+    }
+    
+    return @()
+}
+
+# Helper function for test file selection menu
+function Select-TestFiles()
+{
+    param(
+        [Parameter(Mandatory)]
+        [array]$Files,
+        [string]$TestsPath,
+        [switch]$AllowMultiple
+    )
+    if ($Files.Count -eq 0)
+    {
+        Write-Host "No test files available for selection" -ForegroundColor Yellow
+        return @()
+    }
+    
+    $selectedFiles = Select-ItemsFromList `
+        -Items $Files `
+        -Title "Available Test Files" `
+        -DisplayFormat { 
+        param($file) 
+        if ($TestsPath)
+        {
+            $file.FullName.Replace($TestsPath, "tests").TrimStart('\')
+        }
+        else
+        {
+            $file.FullName
+        }
+    } `
+        -AllowMultiple:$AllowMultiple `
+        -PromptText "Enter file number$(if ($AllowMultiple) {'s'})"
+    
+    if ($selectedFiles.Count -gt 0)
+    {
+        return $selectedFiles | ForEach-Object { $_.FullName }
+    }
+    
+    return @()
+}
+#endregion
+
+# Check if -Tags was passed with "Interactive" value (interactive mode)
+if ($PSBoundParameters.ContainsKey('Tags') -and $Tags.Count -eq 1 -and $Tags[0] -eq "Interactive")
+{
+    # User passed -Tags "Interactive", show interactive selection
+    $testsPath = Join-Path $PSScriptRoot "tests"
+    $Tags = Select-Tags -TestsPath $testsPath
+    
+    if ($Tags.Count -eq 0)
+    {
+        Write-Host ""
+        Write-Host "No tags selected. Running all tests." -ForegroundColor Yellow
+        $Tags = @()
+    }
+}
+
+# Check if -TestFile was passed with "Interactive" value (interactive file selection mode)
+if ($PSBoundParameters.ContainsKey('TestFile') -and $TestFile -eq "Interactive")
+{
+    # User passed -TestFile "Interactive", show interactive file selection
+    Write-Host ""
+    Write-Host "Loading test files..." -ForegroundColor Yellow
+    $testsPath = Join-Path $PSScriptRoot "tests"
+    $allTestFiles = Get-ChildItem -Path $testsPath -Filter "*.Tests.ps1" -Recurse -File
+    
+    if ($allTestFiles.Count -eq 0)
+    {
+        Write-Host "No test files found in tests folder" -ForegroundColor Red
+        exit 1
+    }
+    
+    $selectedFiles = Select-TestFiles -Files $allTestFiles -TestsPath $testsPath -AllowMultiple
+    
+    if ($selectedFiles.Count -eq 0)
+    {
+        Write-Host ""
+        Write-Host "No files selected. Exiting." -ForegroundColor Yellow
+        exit 0
+    }
+    
+    # Update config to run selected files
+    $config.Run.Path = $selectedFiles
+    Write-Host ""
+    Write-Host "Selected $($selectedFiles.Count) test file(s) to run" -ForegroundColor Green
+}
+elseif ($PSBoundParameters.ContainsKey('TestFile') -and -not [string]::IsNullOrWhiteSpace($TestFile))
+{
+    # User specified a test file path or search term
     $resolvedPath = if ([System.IO.Path]::IsPathRooted($TestFile))
     {
         $TestFile
@@ -270,14 +570,40 @@ if ($TestFile)
         
         # Try to find the file in the tests folder
         $testsPath = Join-Path $PSScriptRoot "tests"
-        $foundPath = Find-TestFile -FileName $TestFile -TestsPath $testsPath
+        $foundPath = Find-FileWithFuzzySearch -FileName $TestFile -Path $testsPath -AllowMultiple
         
-        if ($foundPath)
+        if ($foundPath -notin $strings)
         {
-            $resolvedPath = $foundPath
-            Write-Host ""
-            Write-Host "Using selected test file: $resolvedPath" -ForegroundColor Green
+            # Check if multiple files were returned
+            if ($foundPath -is [array])
+            {
+                Write-Host ""
+                Write-Host "Using $($foundPath.Count) selected test file(s)" -ForegroundColor Green
+                $config.Run.Path = $foundPath
+            }
+            else
+            {
+                $resolvedPath = $foundPath
+                Write-Host ""
+                Write-Host "Using selected test file: $resolvedPath" -ForegroundColor Green
+                $config.Run.Path = $resolvedPath
+            }
         }
+        elseif ($foundPath -in $strings)
+        {
+            if ($foundPath -eq 'User canceled')
+            {
+                Write-Host ""
+                Write-Host "Operation canceled by user." -ForegroundColor Red
+                exit 1
+            }
+            elseif ($foundPath -eq 'No files found')
+            {
+                Write-Host ""
+                Write-Host "ERROR: No matching test files found." -ForegroundColor Red
+                exit 1
+            }
+        }   
         else
         {
             Write-Host ""
@@ -285,9 +611,11 @@ if ($TestFile)
             exit 1
         }
     }
-    
-    $config.Run.Path = $resolvedPath
-    Write-Host "`nRunning single test file: $(Split-Path -Leaf $resolvedPath)" -ForegroundColor Yellow
+    else
+    {
+        $config.Run.Path = $resolvedPath
+        Write-Host "`nRunning single test file: $(Split-Path -Leaf $resolvedPath)" -ForegroundColor Yellow
+    }
 }
 
 # Apply tag filter if specified
@@ -296,11 +624,25 @@ if ($Tags.Count -gt 0)
     $config.Filter.Tag = $Tags
 }
 
-
 # Display configuration
 Write-Host "`nTest Configuration:" -ForegroundColor Cyan
 Write-Host "  Test Type: $TestType" -ForegroundColor White
-Write-Host "  Test Path: $($config.Run.Path.Value)" -ForegroundColor White
+
+# Handle display of test paths (single or multiple)
+$testPaths = $config.Run.Path.Value
+if ($testPaths -is [array] -and $testPaths.Count -gt 1)
+{
+    Write-Host "  Test Files: $($testPaths.Count) files selected" -ForegroundColor White
+    foreach ($path in $testPaths)
+    {
+        Write-Host "    - $(Split-Path -Leaf $path)" -ForegroundColor Gray
+    }
+}
+else
+{
+    Write-Host "  Test Path: $testPaths" -ForegroundColor White
+}
+
 if ($EnableCodeCoverage -or $OutputVerbosity -eq 'Detailed')
 {
     Write-Host "  Code Coverage: $($config.CodeCoverage.Enabled)" -ForegroundColor White
