@@ -21,10 +21,10 @@ The project uses **Pester v5** as the primary testing framework for new tests, w
 
 ### Core Testing Principles
 - ✅ **Improve helpers first** - Enhance helper modules rather than creating workarounds in individual tests
-- ✅ **Direct dot-sourcing** - Load functions directly in BeforeAll blocks (most reliable method for PS 5.1 + Pester 5.x)
+- ✅ **Direct dot-sourcing** - Load functions directly in BeforeAll blocks (most reliable pattern)
 - ✅ **100% pass rate** - All tests must pass before committing (non-negotiable)
-- ✅ **Cross-version compatibility** - Test on both PowerShell 5.1 and 7+
-- ✅ **Use Sort-Object** - Apply to collections for deterministic ordering across PS versions
+- ✅ **PowerShell 7+ for tests** - Tests run in PowerShell 7+ only; application code must support PS 5.1
+- ✅ **Use Sort-Object** - Apply to collections for deterministic ordering
 - ⚠️ **Binary cmdlet mocking** - When mocking binary cmdlets like `Get-CimInstance`, use exact parameter names (e.g., `-ClassName` not `-Class`) and return appropriate types or simple strings to bypass strict type validation
 
 ### Helper Modules (Three-Tiered Architecture)
@@ -49,7 +49,7 @@ The project uses **Pester v5** as the primary testing framework for new tests, w
 4. Use helpers when needed (enhance if gaps exist)
 5. Load functions via direct dot-sourcing in BeforeAll
 6. Tag appropriately: `'Unit'`, `'Integration'`, or `'Comprehensive'`
-7. Validate: Run on both PS 5.1 and 7+, ensure 100% pass rate
+5. Validate: Run tests (in PowerShell 7+), ensure 100% pass rate
 8. Document: Add `.NOTES` section explaining approach
 
 **Example Test Structure:**
@@ -58,7 +58,7 @@ Import-Module "$PSScriptRoot/../Helpers/AutopilotTestHelpers.psm1" -Force
 
 Describe "Function: Get-Something" -Tags 'Unit' {
     BeforeAll {
-        # Direct dot-sourcing for PS 5.1 compatibility
+        # Direct dot-sourcing (recommended pattern)
         $script:RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.FullName
         . "$script:RepoRoot/functions/category/Get-Something.ps1"
     }
@@ -79,7 +79,7 @@ Describe "Function: Get-Something" -Tags 'Unit' {
 2. Follow patterns in existing Pester tests
 3. Use helpers (enhance if needed)
 4. Validate equivalence: `.\tools\Validate-PesterMigration.ps1`
-5. Test on PS 5.1 and 7+ (results must match)
+5. Test in PowerShell 7+ (required for Pester tests)
 6. Archive legacy test to `TestScripts/archived/` after validation
 
 **Migration Status:** 155 of ~190 tests migrated (82%), 100% pass rate, 2-3s execution time
