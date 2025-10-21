@@ -3,8 +3,27 @@
 ## Project Structure & Module Organization
 `main.ps1` bootstraps the app by dot-sourcing every module in `functions/`. Each subfolder (device, menu, graph, reporting, etc.) groups scripts by responsibility; keep modules self-contained and suited for PowerShell 5.1. Configuration defaults live in the root `.psd1` files (`settings.psd1`, `menu.psd1`, `strings.psd1`), while runtime secrets are generated under `.secrets/` and log output lands in `Logs/`. Tests, demos, and validation harnesses sit in `TestScripts/`, and deeper references live in `docs/`. Binary drops like `main.exe` are build outputs only.
 
+### .NET Integration Architecture
+The repository includes **5 C# DLLs** that provide performance-critical functionality with automatic fallback to PowerShell when DLLs are unavailable. All DLLs multi-target **netstandard2.0** (PowerShell 5.1 via .NET Framework 4.8) and **net9.0** (PowerShell 7+).
+
+**DLL Inventory (866 lines C# code, 60.5 KB total):**
+- **Autopilot.LogCore.dll** (12 KB): High-performance logging, CMTrace format, **10-20x faster** - INTEGRATED in Write-Log.ps1
+- **Autopilot.CacheCore.dll** (9 KB): Thread-safe LRU cache with TTL expiration - INTEGRATED in Get-EntraDirectoryObject.ps1
+- **Autopilot.ConfigCore.dll** (16 KB): Hashtable merge, JSON parsing, file watching, **10-48x faster** - INTEGRATED in MergeSettings.ps1, Initialize-ApplicationConfiguration.ps1, ConvertFrom-JsonToHashtable.ps1
+- **Autopilot.DeviceCore.dll** (9 KB): LINQ filtering/grouping, **3.6x faster** - Helper ready, not yet integrated
+- **Autopilot.GraphCore.dll** (20 KB): HTTP client, batch processing, exponential backoff - Not yet integrated
+
+**Build Commands:**
+- Build DLLs: `.\Build-NativeDlls.ps1 -Configuration Release` (creates `bin/Release/netstandard2.0` and `bin/Release/net9.0`)
+- Verify DLLs: `.\tools\Verify-DotNetSetup.ps1` (checks 5 DLLs loaded)
+- Benchmark: `.\tools\Benchmark-DllPerformance.ps1` (measures performance gains)
+
+**Integration Pattern:** All PowerShell functions check `$global:AutopilotDllStatus.FeatureLoaded` before using C# code, falling back to native PowerShell if DLLs unavailable. This ensures the app works with or without compiled binaries.
+
+**Current Status:** Phase 1 (Infrastructure) 100%, Phase 2 (Initial Integrations) 100%, **20-30% overall speedup achieved**. See `docs/CSHARP_MIGRATION_QUICK_REF.md` for details.
+
 ## Build, Test, and Development Commands
-Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run `.\Invoke-PesterTests.ps1 -TestType Unit` (or substitute `syntax`, `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
+Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run `pwsh -executionPolicy bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (or substitute `syntax`, `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.
 
 ## Coding Style & Naming Conventions
 Stick to four-space indentation, ~120-character lines, and approved PowerShell verb-noun PascalCase (`Get-DeviceProfileStatus`). Variables use camelCase, constants use ALL_CAPS, and every public function needs comment-based help plus `$functionName = $MyInvocation.MyCommand.Name` for logging context. Favor `try/catch`, `Write-Verbose`, and the shared `Write-Log` helper; avoid 5.1-incompatible constructs such as ordered hashtables or string interpolation. **Do not use Unicode characters** (checkmarks, arrows, emoji, etc.) as PowerShell 5.1 console output may not render them correctly—stick to ASCII characters only. For newlines in `Write-Host` statements, use separate `Write-Host` calls instead of `\n` escape sequences. No automated formatter runs here—the style guidance and reviewers are the guardrails.

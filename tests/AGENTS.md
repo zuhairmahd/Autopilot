@@ -14,7 +14,7 @@
 | Task | Command | Time |
 |------|---------|------|
 | Run all tests | `pwsh -File .\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
-| Run single test | `.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
+| Run single test | `pwsh -executionPolicy bypass -File .\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
 | Run with coverage | `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` | 5-10s |
 
 **Note:** Tests run in PowerShell 7+ only. The application itself must support PowerShell 5.1, but Pester tests do not.
