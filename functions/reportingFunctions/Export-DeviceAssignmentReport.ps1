@@ -38,43 +38,8 @@ function Export-DeviceAssignmentReport()
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "WARNING: No managed devices retrieved from API!" -LogLevel "Warning"
         Write-Verbose "[    $functionName] WARNING: No managed devices retrieved!"
     }
-    
-    # === DIAGNOSTIC OUTPUT - Show actual API data structure ===
-    Write-Host "`n========== DIAGNOSTIC OUTPUT ==========" -ForegroundColor Cyan
-    Write-Host "Total Autopilot Devices: $($autopilotDevices.value.Count)" -ForegroundColor Yellow
-    Write-Host "Total Managed Devices: $($managedDevices.value.Count)" -ForegroundColor Yellow
-    
-    Write-Host "`n--- First 3 Autopilot Devices (with property analysis) ---" -ForegroundColor Magenta
-    $autopilotDevices.value | Select-Object -First 3 | ForEach-Object {
-        Write-Host "  Serial: $($_.serialNumber)" -ForegroundColor White
-        Write-Host "    Model: $($_.model)" -ForegroundColor Gray
-        Write-Host "    Manufacturer: $($_.manufacturer)" -ForegroundColor Gray
-        Write-Host "    userPrincipalName: '$($_.userPrincipalName)' (Length: $($_.userPrincipalName.Length), IsNull: $($null -eq $_.userPrincipalName), IsEmpty: $([string]::IsNullOrWhiteSpace($_.userPrincipalName)))" -ForegroundColor $(if ([string]::IsNullOrWhiteSpace($_.userPrincipalName)) { "Red" } else { "Green" })
-        Write-Host ""
-    }
-    
-    Write-Host "`n--- First 3 Managed Devices (with property analysis) ---" -ForegroundColor Magenta
-    $managedDevices.value | Select-Object -First 3 | ForEach-Object {
-        Write-Host "  Serial: $($_.serialNumber)" -ForegroundColor White
-        Write-Host "    DeviceName: $($_.deviceName)" -ForegroundColor Gray
-        Write-Host "    userPrincipalName: '$($_.userPrincipalName)' (Length: $($_.userPrincipalName.Length), IsNull: $($null -eq $_.userPrincipalName), IsEmpty: $([string]::IsNullOrWhiteSpace($_.userPrincipalName)))" -ForegroundColor $(if ([string]::IsNullOrWhiteSpace($_.userPrincipalName)) { "Red" } else { "Green" })
-        Write-Host "    userDisplayName: '$($_.userDisplayName)' (Length: $($_.userDisplayName.Length), IsNull: $($null -eq $_.userDisplayName), IsEmpty: $([string]::IsNullOrWhiteSpace($_.userDisplayName)))" -ForegroundColor $(if ([string]::IsNullOrWhiteSpace($_.userDisplayName)) { "Red" } else { "Green" })
-        Write-Host ""
-    }
-    
-    Write-Host "`n--- Assignment Analysis (Managed Devices) ---" -ForegroundColor Magenta
-    $withBothUser = ($managedDevices.value | Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) -and -not [string]::IsNullOrWhiteSpace($_.userDisplayName) }).Count
-    $withUserPrincipalOnly = ($managedDevices.value | Where-Object { -not [string]::IsNullOrWhiteSpace($_.userPrincipalName) -and [string]::IsNullOrWhiteSpace($_.userDisplayName) }).Count
-    $withDisplayNameOnly = ($managedDevices.value | Where-Object { [string]::IsNullOrWhiteSpace($_.userPrincipalName) -and -not [string]::IsNullOrWhiteSpace($_.userDisplayName) }).Count
-    $withNeither = ($managedDevices.value | Where-Object { [string]::IsNullOrWhiteSpace($_.userPrincipalName) -and [string]::IsNullOrWhiteSpace($_.userDisplayName) }).Count
-    
-    Write-Host "  Both userPrincipalName AND userDisplayName: $withBothUser" -ForegroundColor $(if ($withBothUser -gt 0) { "Green" } else { "Red" })
-    Write-Host "  Only userPrincipalName: $withUserPrincipalOnly" -ForegroundColor Yellow
-    Write-Host "  Only userDisplayName: $withDisplayNameOnly" -ForegroundColor Yellow
-    Write-Host "  Neither (unassigned): $withNeither" -ForegroundColor Cyan
-    Write-Host "========== END DIAGNOSTIC ==========`n" -ForegroundColor Cyan
     #endregion
-
+    
     switch ($reportType)
     {
         'Assigned'
