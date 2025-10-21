@@ -20,7 +20,7 @@ The repository includes **5 C# DLLs** that provide performance-critical function
 
 **Integration Pattern:** All PowerShell functions check `$global:AutopilotDllStatus.FeatureLoaded` before using C# code, falling back to native PowerShell if DLLs unavailable. This ensures the app works with or without compiled binaries.
 
-**Current Status:** Phase 1 (Infrastructure) 100%, Phase 2 (Initial Integrations) 100%, **20-30% overall speedup achieved**. See `docs/CSHARP_MIGRATION_QUICK_REF.md` for details.
+**Current Status:** Phase 1 (Infrastructure) 100%, Phase 2 (Initial Integrations) 100%, **20-30% overall speedup achieved**. See `docs/DOTNET_MIGRATION_PLAN.md` for comprehensive implementation plan and roadmap.
 
 ## Build, Test, and Development Commands
 Launch the interactive tool with `.\main.ps1 -Verbose -LogLevel "Debug"` to mirror developer telemetry. Use `.\test.ps1` for lightweight module import checks, then run `pwsh -executionPolicy bypass -File .\Invoke-PesterTests.ps1 -TestType Unit` (or substitute `syntax`, `integration`, or `comprehensive` as needed). Create signed builds with `.\CreateRelease.ps1 -Stage Build` (pair with `-WhatIf` for rehearsal). Tail `Logs\Autopilot.log` to watch Graph and menu activity while iterating.

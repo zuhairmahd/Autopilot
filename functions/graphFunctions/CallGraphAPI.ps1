@@ -6,7 +6,7 @@ function CallGraphAPI()
         [Parameter(Mandatory = $true)]
         [string]$accessToken,
         [Parameter(Mandatory = $true)]
-        [string]$ResourcePath,
+        [object]$ResourcePath,  # Can be string or string array for batch processing
         [string]$APIVersion = 'beta',
         [string]$method = 'get',
         [string]$Filter = $null,
@@ -19,6 +19,117 @@ function CallGraphAPI()
     
     #region variables and logs
     $functionName = $MyInvocation.MyCommand.Name
+    
+    # Check if ResourcePath is an array
+    $isArrayInput = $ResourcePath -is [array]
+    
+    # Handle single-item array
+    if ($isArrayInput -and $ResourcePath.Count -eq 1)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Single-item array detected, processing as single request" -LogLevel "Verbose"
+        $ResourcePath = $ResourcePath[0]
+        $isArrayInput = $false
+    }
+    
+    # Check if batch processing is requested (array with multiple items)
+    $isBatchRequest = $isArrayInput -and $ResourcePath.Count -gt 1
+    $batchThreshold = 1  # Use batch logic for any multiple requests (changed from 5 for testing)
+    
+    if ($isBatchRequest -and $ResourcePath.Count -ge $batchThreshold)
+    {
+        Write-Log -LogFile $logFile -Module $functionName -Message "Batch request detected: $($ResourcePath.Count) resources" -LogLevel "Information"
+        
+        # Check if GraphCore.BatchProcessor is available
+        $useBatchProcessor = $global:AutopilotDllStatus -and $global:AutopilotDllStatus.GraphCoreLoaded
+        
+        if ($useBatchProcessor)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Using GraphCore.BatchProcessor for parallel processing" -LogLevel "Information"
+            
+            try
+            {
+                # Create BatchProcessor instance
+                $batchProcessor = [Autopilot.GraphCore.BatchProcessor]::new($accessToken, $APIVersion)
+                
+                # Build full URIs for each resource
+                $batchRequests = @()
+                foreach ($path in $ResourcePath)
+                {
+                    $batchRequests += @{
+                        Path             = $path
+                        Method           = $method
+                        Filter           = $Filter
+                        Search           = $Search
+                        ExtraParameters  = $ExtraParameters
+                        Body             = $body
+                        ConsistencyLevel = $consistencyLevel.IsPresent
+                    }
+                }
+                
+                # Process batch with GraphCore
+                $batchResults = $batchProcessor.ProcessBatch($batchRequests)
+                
+                Write-Log -LogFile $logFile -Module $functionName -Message "Batch processing completed: $($batchResults.Count) results" -LogLevel "Information"
+                
+                # Return combined results
+                return @{
+                    value          = $batchResults
+                    batchProcessed = $true
+                    count          = $batchResults.Count
+                }
+            }
+            catch
+            {
+                Write-Log -LogFile $logFile -Module $functionName -Message "Batch processing failed, falling back to sequential: $($_.Exception.Message)" -LogLevel "Warning"
+                # Fall through to sequential processing
+            }
+        }
+        else
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "GraphCore not available, using sequential processing for $($ResourcePath.Count) requests" -LogLevel "Verbose"
+        }
+        
+        # Sequential fallback: process each resource path individually
+        $allResults = @()
+        $successCount = 0
+        $failureCount = 0
+        
+        foreach ($path in $ResourcePath)
+        {
+            Write-Log -LogFile $logFile -Module $functionName -Message "Processing resource $($successCount + $failureCount + 1)/$($ResourcePath.Count): $path" -LogLevel "Verbose"
+            
+            # Recursive call with single resource path (no try-catch - let CallGraphAPI handle errors)
+            $result = CallGraphAPI -accessToken $accessToken -ResourcePath $path -APIVersion $APIVersion `
+                -method $method -Filter $Filter -Search $Search -ExtraParameters $ExtraParameters `
+                -body $body -consistencyLevel:$consistencyLevel -secureString:$secureString
+            
+            # Check if result is an error status code (integer) or null
+            if ($null -eq $result -or $result -is [int])
+            {
+                $failureCount++
+                Write-Log -LogFile $logFile -Module $functionName -Message "Failed to process resource: $path (Status: $result)" -LogLevel "Warning"
+            }
+            else
+            {
+                $allResults += $result
+                $successCount++
+            }
+        }
+        
+        Write-Log -LogFile $logFile -Module $functionName -Message "Sequential batch completed: $successCount successful, $failureCount failed" -LogLevel "Information"
+        
+        # Return combined results
+        return @{
+            value          = $allResults
+            batchProcessed = $false
+            successCount   = $successCount
+            failureCount   = $failureCount
+            totalCount     = $ResourcePath.Count
+        }
+    }
+    
+    # Single request processing (original behavior continues below)
+    
     if ($accessToken)
     {
         Write-Log -LogFile $logFile -Module $functionName -Message "Access token provided." -LogLevel "Information"

@@ -6,7 +6,7 @@
 
 This directory contains comprehensive documentation for the Autopilot C# DLL performance optimization system.
 
-**🎯 New to DLL Integration?** Start with **[C# Migration Master Plan](../CSHARP_MIGRATION_MASTER_PLAN.md)** for a complete overview of the migration strategy, current progress, and implementation roadmap.
+**🎯 New to DLL Integration?** Start with **[.NET Migration Plan](../DOTNET_MIGRATION_PLAN.md)** for a complete overview of the migration strategy, current progress, and implementation roadmap.
 
 ## Documentation Structure
 
@@ -30,7 +30,8 @@ This directory contains comprehensive documentation for the Autopilot C# DLL per
 
 | Document | Purpose | When to Read |
 |----------|---------|--------------|
-| **[C# Migration Master Plan](../CSHARP_MIGRATION_MASTER_PLAN.md)** | Complete migration roadmap | For understanding overall strategy and next steps |
+| **[.NET Migration Plan](../DOTNET_MIGRATION_PLAN.md)** | Complete migration roadmap | For understanding overall strategy and next steps |
+| **[Archived Migration Docs](../archive/dotnet-migration/README.md)** | Historical documentation | For reference to original planning documents |
 
 ## Quick Navigation
 
