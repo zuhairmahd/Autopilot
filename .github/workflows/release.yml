@@ -67,7 +67,7 @@ jobs:
   test-integration:
     name: Integration Tests (pwsh on Windows)
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: test-unit
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
@@ -170,7 +170,7 @@ jobs:
       - name: Ensure hd directory exists
         shell: pwsh
         run: |
-          if (-not (Test-Path -Path .\hd)) { New-Item -Path .\bin -ItemType Directory }
+          if (-not (Test-Path -Path .\hd)) { New-Item -Path .\hd -ItemType Directory }
 
       - name: Build executable
         shell: pwsh
@@ -189,9 +189,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     needs: build
-    if:
-      github.event_name == 'release' && github.event.action == 'published'
-      # fail-fast is not valid at the job level; removed
+    if: github.event_name == 'release' && github.event.action == 'published'
     env:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -238,10 +236,10 @@ jobs:
       - name: update hash
         shell: pwsh
         run: |
-          Copy-Item -Path .\bin\main.exe -Destination .\main.exe -Force 
-          Write-Host "Copied .\bin\main.exe to .\main.exe."
-          Copy-Item -Path .\bin\lastrun.json -Destination .\lastrun.json -Force
-          write-host "Copied .\bin\lastrun.json to .\lastrun.json." 
+          Copy-Item -Path .\hd\main.exe -Destination .\main.exe -Force 
+          Write-Host "Copied .\hd\main.exe to .\main.exe."
+          Copy-Item -Path .\hd\lastrun.json -Destination .\lastrun.json -Force
+          write-host "Copied .\hd\lastrun.json to .\lastrun.json."
           .\CreateRelease.ps1 -TargetsFile .\targets.psd1 -TargetName production -Overwrite -updateHash
 
       - name: Upload signed artifacts

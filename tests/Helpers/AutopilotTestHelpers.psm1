@@ -254,7 +254,7 @@ function Remove-TestEnvironment
     
     if (Test-Path $TestContext.TestFolder)
     {
-        Remove-Item -Path $TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
     }
 }
 

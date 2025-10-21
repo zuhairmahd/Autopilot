@@ -36,7 +36,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
         # Cleanup test environment
         if ($script:TestContext -and (Test-Path $script:TestContext.TestFolder))
         {
-            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path $script:TestContext.TestFolder -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
         }
     }
     
@@ -52,7 +52,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
         AfterEach {
             if (Test-Path $script:EncryptedFile)
             {
-                Remove-Item -Path $script:EncryptedFile -Force
+                Remove-Item -Path $script:EncryptedFile -Force | Out-Null
             }
         }
         
@@ -93,7 +93,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
         AfterEach {
             if (Test-Path $script:JsonFile)
             {
-                Remove-Item -Path $script:JsonFile -Force
+                Remove-Item -Path $script:JsonFile -Force | Out-Null
             }
         }
         
@@ -165,7 +165,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
             $result = Test-FileEncryptionStatus -FilePath $emptyFile
             
             $result.IsValidFile | Should -Be $true
-            Remove-Item -Path $emptyFile -Force
+            Remove-Item -Path $emptyFile -Force | Out-Null
         }
         
         It "Should handle file with only whitespace" {
@@ -175,7 +175,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
             $result = Test-FileEncryptionStatus -FilePath $whitespaceFile
             
             $result.IsValidFile | Should -Be $true
-            Remove-Item -Path $whitespaceFile -Force
+            Remove-Item -Path $whitespaceFile -Force | Out-Null
         }
         
         It "Should handle file with invalid JSON but not Base64" {
@@ -186,7 +186,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
             
             $result.IsValidFile | Should -Be $true
             $result.IsEncrypted | Should -Be $false
-            Remove-Item -Path $invalidFile -Force
+            Remove-Item -Path $invalidFile -Force | Out-Null
         }
     }
     
@@ -199,7 +199,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
             $result = Test-FileEncryptionStatus -FilePath $mixedFile
             
             $result.IsEncrypted | Should -Be $false
-            Remove-Item -Path $mixedFile -Force
+            Remove-Item -Path $mixedFile -Force | Out-Null
         }
         
         It "Should handle very large files efficiently" {
@@ -220,7 +220,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
             
             $result.IsValidFile | Should -Be $true
             $result.IsEncrypted | Should -Be $false
-            Remove-Item -Path $largeFile -Force
+            Remove-Item -Path $largeFile -Force | Out-Null
         }
         
         It "Should handle file paths with special characters" {
@@ -233,7 +233,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
             $result = Test-FileEncryptionStatus -FilePath $specialFile
             
             $result.IsValidFile | Should -Be $true
-            Remove-Item -Path $specialFolder -Recurse -Force
+            Remove-Item -Path $specialFolder -Recurse -Force | Out-Null
         }
     }
     
@@ -247,7 +247,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
         AfterEach {
             if (Test-Path $script:TestFile)
             {
-                Remove-Item -Path $script:TestFile -Force
+                Remove-Item -Path $script:TestFile -Force | Out-Null
             }
         }
         
@@ -283,7 +283,7 @@ Describe "Function: Test-FileEncryptionStatus" -Tags 'Unit', 'EncryptionFunction
         AfterEach {
             if (Test-Path $script:TestFile)
             {
-                Remove-Item -Path $script:TestFile -Force
+                Remove-Item -Path $script:TestFile -Force | Out-Null
             }
         }
         

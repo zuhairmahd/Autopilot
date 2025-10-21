@@ -239,8 +239,7 @@ function Write-Log()
             
             if ($OverwriteLog)
             {
-                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue
-                Write-Verbose "[$functionName] Overwritten existing log file: $LogFile."
+                Remove-Item -Path $LogFile -Force -ErrorAction SilentlyContinue | Out-Null
             }   
             
             # Check for log rotation if file exists and is too large
@@ -368,18 +367,15 @@ function Write-Log()
             if ($IsWindows -or ($null -eq $IsWindows -and $env:OS -eq "Windows_NT"))
             {
                 $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-                Write-Verbose "[$functionName] Detected Windows context: $Context."
             }
             else
             {
                 $Context = $env:USER
-                Write-Verbose "[$functionName] Detected non-Windows context: $Context."
             }
         }
         catch 
         {
             $Context = "Unknown"
-            Write-Verbose "[$functionName] Failed to detect context, set to Unknown."
         }
         if ($CMTraceFormat)
         {
@@ -463,7 +459,7 @@ function Write-Log()
             {
                 if ($WriteToConsole)
                 {
-                    Write-Verbose "[$functionName] Logged: $logEntry" 
+                    Write-Verbose "Logged: $logEntry" 
                 }
             }
         }

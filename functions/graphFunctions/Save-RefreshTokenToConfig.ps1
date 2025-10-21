@@ -53,7 +53,7 @@ function Save-RefreshTokenToConfig()
         {
             if (Test-Path $tempFile)
             {
-                Remove-Item $tempFile -Force
+                Remove-Item $tempFile -Force | Out-Null
             }
         }
     }
@@ -195,7 +195,7 @@ function Save-RefreshTokenToConfig()
         {
             if (Test-Path $tempFile)
             {
-                Remove-Item $tempFile -Force
+                Remove-Item $tempFile -Force | Out-Null
             }
         }
     }
@@ -239,7 +239,7 @@ function Save-RefreshTokenToConfig()
             {
                 if (Test-Path $tempFile)
                 {
-                    Remove-Item $tempFile -Force
+                    Remove-Item $tempFile -Force | Out-Null
                 }
             }
         }

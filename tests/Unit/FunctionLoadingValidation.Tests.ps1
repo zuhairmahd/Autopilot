@@ -72,7 +72,7 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
             # Clean up
             if (Test-Path $testLogFile)
             {
-                Remove-Item $testLogFile -Force -ErrorAction SilentlyContinue
+                Remove-Item $testLogFile -Force -ErrorAction SilentlyContinue | Out-Null
             }
         }
     }
@@ -95,7 +95,7 @@ Describe "Function Loading Validation" -Tags 'Unit', 'FunctionLoading', 'Fast' {
             $createdFile = "$tempConfigPath.psd1"
             if (Test-Path $createdFile)
             {
-                Remove-Item $createdFile -Force -ErrorAction SilentlyContinue
+                Remove-Item $createdFile -Force -ErrorAction SilentlyContinue | Out-Null
             }
         }
     }

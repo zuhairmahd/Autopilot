@@ -34,6 +34,8 @@ function Resolve-MigratedLegacyObjects()
         System.Collections.Hashtable
         Returns a detailed status object with the following keys:
         - success: Overall success status (boolean)
+        - resolutionNeeded: Whether any objects needed ID resolution (boolean)
+        - userDeferred: Whether user chose to defer resolution (boolean, only present when deferred)
         - autopilotProfiles: Hashtable with detailed statistics for Autopilot profiles
         - groupsToInclude: Hashtable with detailed statistics for GroupsToInclude
         - groupsToExclude: Hashtable with detailed statistics for GroupsToExclude
@@ -66,98 +68,6 @@ function Resolve-MigratedLegacyObjects()
 
     $functionName = $MyInvocation.MyCommand.Name
     Write-Log -LogFile $logFile -Module $functionName -Message "Starting legacy object resolution for domain: $domain" -LogLevel "Information"
-    
-    # Display introduction message to user
-    Write-Host ""
-    Write-Host "========================================================================================================" -ForegroundColor Cyan
-    Write-Host "  Legacy Configuration Migration - Object Resolution" -ForegroundColor Yellow
-    Write-Host "========================================================================================================" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "Your configuration has been migrated from JSON to the new PSD1 format." -ForegroundColor White
-    Write-Host ""
-    Write-Host "Purpose:" -ForegroundColor Cyan
-    Write-Host "  This process will resolve Microsoft Graph IDs for Autopilot profiles and group names" -ForegroundColor White
-    Write-Host "  that were migrated from your legacy configuration. IDs are required for the" -ForegroundColor White
-    Write-Host "  application to function correctly with the new configuration format." -ForegroundColor White
-    Write-Host ""
-    Write-Host "What to expect:" -ForegroundColor Cyan
-    Write-Host "  - Autopilot profiles will be matched against your tenant" -ForegroundColor White
-    Write-Host "  - Include/Exclude groups will be matched against Entra ID" -ForegroundColor White
-    Write-Host "  - Exact matches will be resolved automatically (silent mode)" -ForegroundColor White
-    Write-Host "  - Multiple matches may require your selection" -ForegroundColor White
-    Write-Host "  - Results will be saved to your domain configuration file" -ForegroundColor White
-    Write-Host ""
-    Write-Host "This is typically a one-time process after migration." -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "========================================================================================================" -ForegroundColor Cyan
-    Write-Host ""
-    
-    # Prompt user to continue or defer
-    $userChoice = Read-Host "Do you want to proceed with object resolution now? (yes/no)"
-    while ($userChoice -notin @('yes', 'no', 'y', 'n'))
-    {
-        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Yellow
-        [console]::beep()
-        $userChoice = Read-Host "Do you want to proceed with object resolution now? (yes/no)"
-    }
-    
-    if ($userChoice -in @('no', 'n'))
-    {
-        Write-Host ""
-        Write-Host "Object resolution deferred. You will be prompted again on next startup." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Log -LogFile $logFile -Module $functionName -Message "User deferred legacy object resolution" -LogLevel "Information"
-        
-        # Return object indicating user deferred
-        return @{
-            success           = $false
-            userDeferred      = $true
-            autopilotProfiles = @{
-                totalProcessed      = 0
-                resolvedCount       = 0
-                savedWithoutIdCount = 0
-                skippedCount        = 0
-                alreadyHadIdCount   = 0
-                resolvedItems       = @()
-                savedWithoutIdItems = @()
-                skippedItems        = @()
-                alreadyHadIdItems   = @()
-            }
-            groupsToInclude   = @{
-                totalProcessed      = 0
-                resolvedCount       = 0
-                savedWithoutIdCount = 0
-                skippedCount        = 0
-                alreadyHadIdCount   = 0
-                resolvedItems       = @()
-                savedWithoutIdItems = @()
-                skippedItems        = @()
-                alreadyHadIdItems   = @()
-            }
-            groupsToExclude   = @{
-                totalProcessed      = 0
-                resolvedCount       = 0
-                savedWithoutIdCount = 0
-                skippedCount        = 0
-                alreadyHadIdCount   = 0
-                resolvedItems       = @()
-                savedWithoutIdItems = @()
-                skippedItems        = @()
-                alreadyHadIdItems   = @()
-            }
-            totalProcessed    = 0
-            totalResolved     = 0
-            totalAlreadyHadId = 0
-            totalSkipped      = 0
-            savedToConfig     = $false
-            configSaveSuccess = $false
-            errorMessages     = @()
-        }
-    }
-    
-    Write-Host "Proceeding with object resolution..." -ForegroundColor Green
-    Write-Host ""
-    Write-Log -LogFile $logFile -Module $functionName -Message "User confirmed proceeding with legacy object resolution" -LogLevel "Information"
     
     # Helper function to normalize array items to hashtable format
     function ConvertTo-NormalizedArray()
@@ -260,9 +170,253 @@ function Resolve-MigratedLegacyObjects()
         Write-Log -LogFile $logFile -Module $functionName -Message "Extracted $($groupsToExclude.Count) group(s) to exclude from settings" -LogLevel "Verbose"
     }
     
+    # Check if there are any objects that need ID resolution
+    $objectsNeedingResolution = 0
+    $objectsWithIds = 0
+    
+    foreach ($profile in $autopilotProfiles)
+    {
+        if ($null -eq $profile.id -or [string]::IsNullOrWhiteSpace($profile.id))
+        {
+            $objectsNeedingResolution++
+        }
+        else
+        {
+            $objectsWithIds++
+        }
+    }
+    
+    foreach ($group in $groupsToInclude)
+    {
+        if ($null -eq $group.id -or [string]::IsNullOrWhiteSpace($group.id))
+        {
+            $objectsNeedingResolution++
+        }
+        else
+        {
+            $objectsWithIds++
+        }
+    }
+    
+    foreach ($group in $groupsToExclude)
+    {
+        if ($null -eq $group.id -or [string]::IsNullOrWhiteSpace($group.id))
+        {
+            $objectsNeedingResolution++
+        }
+        else
+        {
+            $objectsWithIds++
+        }
+    }
+    
+    $totalObjects = $autopilotProfiles.Count + $groupsToInclude.Count + $groupsToExclude.Count
+    
+    # If no objects exist or all objects already have IDs, return early
+    if ($totalObjects -eq 0)
+    {
+        Write-Verbose "[$functionName] No legacy objects found in settings, skipping resolution"
+        Write-Log -LogFile $logFile -Module $functionName -Message "No legacy objects found in settings, skipping resolution" -LogLevel "Information"
+        
+        return @{
+            success           = $true
+            resolutionNeeded  = $false
+            autopilotProfiles = @{
+                totalProcessed      = 0
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = 0
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = @()
+            }
+            groupsToInclude   = @{
+                totalProcessed      = 0
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = 0
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = @()
+            }
+            groupsToExclude   = @{
+                totalProcessed      = 0
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = 0
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = @()
+            }
+            totalProcessed    = 0
+            totalResolved     = 0
+            totalAlreadyHadId = 0
+            totalSkipped      = 0
+            savedToConfig     = $false
+            configSaveSuccess = $false
+            errorMessages     = @()
+        }
+    }
+    
+    if ($objectsNeedingResolution -eq 0)
+    {
+        Write-Verbose "[$functionName] All $totalObjects legacy object(s) already have IDs, skipping resolution"
+        Write-Log -LogFile $logFile -Module $functionName -Message "All $totalObjects legacy object(s) already have IDs, skipping resolution" -LogLevel "Information"
+        
+        return @{
+            success           = $true
+            resolutionNeeded  = $false
+            autopilotProfiles = @{
+                totalProcessed      = $autopilotProfiles.Count
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = $autopilotProfiles.Count
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = $autopilotProfiles
+            }
+            groupsToInclude   = @{
+                totalProcessed      = $groupsToInclude.Count
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = $groupsToInclude.Count
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = $groupsToInclude
+            }
+            groupsToExclude   = @{
+                totalProcessed      = $groupsToExclude.Count
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = $groupsToExclude.Count
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = $groupsToExclude
+            }
+            totalProcessed    = $totalObjects
+            totalResolved     = 0
+            totalAlreadyHadId = $objectsWithIds
+            totalSkipped      = 0
+            savedToConfig     = $false
+            configSaveSuccess = $false
+            errorMessages     = @()
+        }
+    }
+    
+    # Objects need resolution - display introduction message to user
+    Write-Host ""
+    Write-Host "========================================================================================================" -ForegroundColor Cyan
+    Write-Host "  Legacy Configuration Migration - Object Resolution" -ForegroundColor Yellow
+    Write-Host "========================================================================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Your configuration has been migrated from JSON to the new PSD1 format." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Purpose:" -ForegroundColor Cyan
+    Write-Host "  This process will resolve Microsoft Graph IDs for Autopilot profiles and group names" -ForegroundColor White
+    Write-Host "  that were migrated from your legacy configuration. IDs are required for the" -ForegroundColor White
+    Write-Host "  application to function correctly with the new configuration format." -ForegroundColor White
+    Write-Host ""
+    Write-Host "What to expect:" -ForegroundColor Cyan
+    Write-Host "  - Autopilot profiles will be matched against your tenant" -ForegroundColor White
+    Write-Host "  - Include/Exclude groups will be matched against Entra ID" -ForegroundColor White
+    Write-Host "  - Exact matches will be resolved automatically (silent mode)" -ForegroundColor White
+    Write-Host "  - Multiple matches may require your selection" -ForegroundColor White
+    Write-Host "  - Results will be saved to your domain configuration file" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Summary:" -ForegroundColor Cyan
+    Write-Host "  - Total objects found: $totalObjects" -ForegroundColor White
+    Write-Host "  - Objects needing resolution: $objectsNeedingResolution" -ForegroundColor Yellow
+    Write-Host "  - Objects already resolved: $objectsWithIds" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "This is typically a one-time process after migration." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "========================================================================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Prompt user to continue or defer
+    $userChoice = Read-Host "Do you want to proceed with object resolution now? (yes/no)"
+    while ($userChoice -notin @('yes', 'no', 'y', 'n'))
+    {
+        Write-Host "Invalid choice. Please enter 'yes' or 'no'." -ForegroundColor Yellow
+        [console]::beep()
+        $userChoice = Read-Host "Do you want to proceed with object resolution now? (yes/no)"
+    }
+    
+    if ($userChoice -in @('no', 'n'))
+    {
+        Write-Host ""
+        Write-Host "Object resolution deferred. You will be prompted again on next startup." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Log -LogFile $logFile -Module $functionName -Message "User deferred legacy object resolution" -LogLevel "Information"
+        
+        # Return object indicating user deferred
+        return @{
+            success           = $false
+            userDeferred      = $true
+            resolutionNeeded  = $true
+            autopilotProfiles = @{
+                totalProcessed      = 0
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = 0
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = @()
+            }
+            groupsToInclude   = @{
+                totalProcessed      = 0
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = 0
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = @()
+            }
+            groupsToExclude   = @{
+                totalProcessed      = 0
+                resolvedCount       = 0
+                savedWithoutIdCount = 0
+                skippedCount        = 0
+                alreadyHadIdCount   = 0
+                resolvedItems       = @()
+                savedWithoutIdItems = @()
+                skippedItems        = @()
+                alreadyHadIdItems   = @()
+            }
+            totalProcessed    = 0
+            totalResolved     = 0
+            totalAlreadyHadId = 0
+            totalSkipped      = 0
+            savedToConfig     = $false
+            configSaveSuccess = $false
+            errorMessages     = @()
+        }
+    }
+    
+    Write-Host "Proceeding with object resolution..." -ForegroundColor Green
+    Write-Host ""
+    Write-Log -LogFile $logFile -Module $functionName -Message "User confirmed proceeding with legacy object resolution" -LogLevel "Information"
+    
     # Initialize return object with comprehensive tracking for each object type
     $returnObject = @{
         success           = $false
+        resolutionNeeded  = $true
         autopilotProfiles = @{
             totalProcessed      = 0
             resolvedCount       = 0

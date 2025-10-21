@@ -46,7 +46,7 @@ function cleanupTempFiles()
                 {
                     Write-Verbose "[$functionName] Removing existing file in TEMP: $($backupFile.Name)"
                 }
-                Remove-Item -Path "$env:TEMP\$($backupFile.Name)" -Force -ErrorAction SilentlyContinue
+                Remove-Item -Path "$env:TEMP\$($backupFile.Name)" -Force -ErrorAction SilentlyContinue | Out-Null
             }
             try
             {

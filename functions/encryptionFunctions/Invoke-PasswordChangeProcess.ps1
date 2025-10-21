@@ -110,7 +110,7 @@ function Invoke-PasswordChangeProcess()
             # Clean up temp file
             if (Test-Path $tempFile)
             {
-                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue | Out-Null
             }
         }
         
@@ -160,7 +160,7 @@ function Invoke-PasswordChangeProcess()
         # Remove backup file if everything succeeded
         if (Test-Path $backupPath)
         {
-            Remove-Item $backupPath -Force -ErrorAction SilentlyContinue
+            Remove-Item $backupPath -Force -ErrorAction SilentlyContinue | Out-Null
             Write-Log -LogFile $LogFile -Module $functionName -Message "Backup file cleaned up" -LogLevel "Debug"
         }
         if (-not ($setInitialPassword))

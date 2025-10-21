@@ -157,7 +157,7 @@ function Load-EncryptedConfigFile()
                 Clear-SecureMemory -ClearScriptVariables
                 try 
                 {
-                    Remove-Item -Path $ConfigFile -Force -ErrorAction SilentlyContinue
+                    Remove-Item -Path $ConfigFile -Force -ErrorAction SilentlyContinue | Out-Null
                     Write-Log -LogFile $LogFile -Module $functionName -Message "Removed configuration file after decryption failure" -LogLevel "Warning"
                     Write-Verbose "[$functionName] Removed configuration file after decryption failure"
                     $result.ErrorMessage += "`n Removed configuration file due to invalid password attempts. `n Contact your administrator for assistance."
