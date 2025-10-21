@@ -15,7 +15,8 @@ function Get-AutopilotPesterConfiguration
         [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
         [string]$OutputVerbosity = 'Normal',
         [switch]$EnableCodeCoverage,
-        [switch]$CI
+        [switch]$CI,
+        [switch]$Exclude
     )
     
     $config = New-PesterConfiguration
@@ -23,30 +24,59 @@ function Get-AutopilotPesterConfiguration
     # Output configuration
     $config.Output.Verbosity = $OutputVerbosity
     
-    # Test discovery
-    switch ($TestType)
+    # Test discovery - handle exclusion mode
+    if ($Exclude -and $TestType -ne 'All')
     {
-        'Unit'
+        # Exclusion mode: run everything EXCEPT the specified type
+        switch ($TestType)
         {
-            $config.Run.Path = '.\tests\Unit'
-            $config.Filter.Tag = 'Unit'
+            'Unit'
+            {
+                $config.Run.Path = @('.\tests\Integration', '.\tests\Comprehensive')
+                $config.Filter.Tag = @('Integration', 'Comprehensive')
+            }
+            'Integration'
+            {
+                $config.Run.Path = @('.\tests\Unit', '.\tests\Comprehensive')
+                $config.Filter.Tag = @('Unit', 'Comprehensive')
+            }
+            'Comprehensive'
+            {
+                $config.Run.Path = @('.\tests\Unit', '.\tests\Integration')
+                $config.Filter.Tag = @('Unit', 'Integration')
+            }
         }
-        'Integration'
+        # Note: -TestType All with -Exclude is not meaningful, so it's ignored
+        # and behaves the same as -TestType All without -Exclude
+    }
+    elseif ($TestType -ne 'All')
+    {
+        # Normal inclusion mode
+        switch ($TestType)
         {
-            $config.Run.Path = '.\tests\Integration'
-            $config.Filter.Tag = 'Integration'
+            'Unit'
+            {
+                $config.Run.Path = '.\tests\Unit'
+                $config.Filter.Tag = 'Unit'
+            }
+            'Integration'
+            {
+                $config.Run.Path = '.\tests\Integration'
+                $config.Filter.Tag = 'Integration'
+            }
+            'Comprehensive'
+            {
+                $config.Run.Path = '.\tests\Comprehensive'
+                $config.Filter.Tag = 'Comprehensive'
+            }
         }
-        'Comprehensive'
-        {
-            $config.Run.Path = '.\tests\Comprehensive'
-            $config.Filter.Tag = 'Comprehensive'
-        }
-        'All'
-        {
-            $config.Run.Path = '.\tests'
-            # Exclude template and helper files from test execution
-            $config.Run.ExcludePath = @('*Template.Tests.ps1', '*Helpers*')
-        }
+    }
+    else
+    {
+        # Run all tests
+        $config.Run.Path = '.\tests'
+        # Exclude template and helper files from test execution
+        $config.Run.ExcludePath = @('*Template.Tests.ps1', '*Helpers*')
     }
     
     # Test execution
