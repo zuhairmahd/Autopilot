@@ -105,7 +105,6 @@ Write-Host "=" * 63 -ForegroundColor Cyan
 $config = Get-AutopilotPesterConfiguration -TestType $TestType -EnableCodeCoverage:$EnableCodeCoverage -CI:$CI -OutputVerbosity $OutputVerbosity
 
 #region Helper functions
-
 function Find-FileWithFuzzySearch()
 {
     [CmdletBinding()]
@@ -241,7 +240,7 @@ function Find-FileWithFuzzySearch()
     Write-Host "Found $($scoredFiles.Count) similar test file(s):" -ForegroundColor Cyan
     
     $files = $scoredFiles | ForEach-Object { $_.File }
-    $selectedFiles = Select-TestFiles -Files $files -TestsPath $TestsPath -AllowMultiple:$AllowMultiple
+    $selectedFiles = Select-TestFiles -Files $files -TestsPath $Path -AllowMultiple:$AllowMultiple
     
     if ($selectedFiles.Count -eq 0)
     {
@@ -262,6 +261,7 @@ function Find-FileWithFuzzySearch()
 # Generic helper function for interactive selection from a list
 function Select-ItemsFromList()
 {
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [array]$Items,
@@ -273,6 +273,8 @@ function Select-ItemsFromList()
         [string]$PromptText = "Enter selection"
     )
     
+    $functionName = $MyInvocation.MyCommand.Name
+    Write-Verbose "[$functionName] Starting interactive selection. Title: '$Title', AllowMultiple: $AllowMultiple."
     if ($Items.Count -eq 0)
     {
         Write-Host "No items available for selection" -ForegroundColor Yellow
@@ -281,27 +283,27 @@ function Select-ItemsFromList()
     
     Write-Host ""
     Write-Host "===============================================================" -ForegroundColor Cyan
-    Write-Host "  $Title" -ForegroundColor Cyan
+    Write-Host " $Title" -ForegroundColor Cyan
     Write-Host "===============================================================" -ForegroundColor Cyan
     Write-Host ""
     
     for ($i = 0; $i -lt $Items.Count; $i++)
     {
         $displayText = & $DisplayFormat $Items[$i]
-        Write-Host "  [$($i + 1)] $displayText" -ForegroundColor White
+        Write-Host " [$($i + 1)] $displayText" -ForegroundColor White
     }
     
     Write-Host ""
     if ($AllowMultiple)
     {
-        Write-Host "  [a] Select All" -ForegroundColor Green
+        Write-Host "[a] Select All" -ForegroundColor Green
     }
-    Write-Host "  [q] Quit" -ForegroundColor Gray
+    Write-Host "[q] or [0] to Quit" -ForegroundColor Gray
     Write-Host ""
     
     if ($AllowMultiple)
     {
-        Write-Host "$PromptText (comma-separated, e.g., 1,3,5) or 'a' for all:" -ForegroundColor Cyan
+        Write-Host "$PromptText (comma-separated, e.g., 1, 3, 5) or 'a' for all:" -ForegroundColor Cyan
     }
     else
     {
@@ -316,18 +318,25 @@ function Select-ItemsFromList()
         $choice = Read-Host "Selection"
         
         # Handle quit
-        if ($choice -eq 'q')
+        if ($choice -eq 'q' -or $choice -eq 'Q' -or $choice -eq '0')
         {
             Write-Host "Selection canceled" -ForegroundColor Yellow
             return @()
         }
         
         # Handle select all (only if allowed)
-        if ($AllowMultiple -and $choice -eq 'a')
+        if ($AllowMultiple -and ($choice -eq 'a' -or $choice -eq 'A'))
         {
             Write-Host ""
             Write-Host "Selected all $($Items.Count) items" -ForegroundColor Green
             return $Items
+        }
+        
+        # Check for empty input
+        if ([string]::IsNullOrWhiteSpace($choice))
+        {
+            Write-Host "No selection entered. Please enter a number or 'q' to quit. (Invalid attempts: $invalidAttemptCount/$maxInvalidAttempts)" -ForegroundColor Yellow
+            continue
         }
         
         # Parse selection(s)
@@ -372,16 +381,6 @@ function Select-ItemsFromList()
             Write-Host "Selected $($selectedItems.Count) item(s)" -ForegroundColor Green
             $validSelection = $true
         }
-        elseif (-not $hasErrors)
-        {
-            # Empty input - reprompt
-            Write-Host "No selection entered. Please try again or enter 'q' to quit." -ForegroundColor Yellow
-        }
-        else
-        {
-            # Had errors but no valid selections
-            Write-Host "No valid items selected. Please try again or enter 'q' to quit." -ForegroundColor Yellow
-        }
     }
     
     return $selectedItems
@@ -403,7 +402,7 @@ function Get-AvailableTags()
     {
         $content = Get-Content -Path $file.FullName -Raw
         # Match Describe blocks with -Tags parameter
-        $tagMatches = [regex]::Matches($content, "Describe\s+[^-]+-Tags\s+([^{]+)")
+        $tagMatches = [regex]::Matches($content, "Describe\s+[^-]+-Tags\s+([^ {]+)")
         
         foreach ($match in $tagMatches)
         {
@@ -664,7 +663,7 @@ try
     # Clean up any leftover Pester TestDrive GUID folders
     # Pester 5 sometimes leaves these behind in the working directory
     Get-ChildItem -Directory | Where-Object { 
-        $_.Name -match '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$' 
+        $_.Name -match '^[a-f0-9] {8}-[a-f0-9] {4}-[a-f0-9] {4}-[a-f0-9] {4}-[a-f0-9] {12}$' 
     } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
     
     $endTime = Get-Date

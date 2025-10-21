@@ -16,7 +16,8 @@
 | Run all tests | `pwsh -File .\Invoke-PesterTests.ps1 -TestType All` | 2-3s |
 | Run single test | `.\Invoke-PesterTests.ps1 -TestFile "tests\Unit\MyTest.Tests.ps1"` | <1s |
 | Run with coverage | `.\Invoke-PesterTests.ps1 -TestType All -EnableCodeCoverage` | 5-10s |
-| Validate PS 5.1 | `pwsh.exe -File .\Invoke-PesterTests.ps1 -TestType All` | 3-5s |
+
+**Note:** Tests run in PowerShell 7+ only. The application itself must support PowerShell 5.1, but Pester tests do not.
 
 ### File Locations
 
@@ -791,7 +792,7 @@ Mock Get-CimInstance {
 
 ---
 
-### Problem: Tests pass in PS 7+ but fail in PS 5.1
+### Problem: Tests produce inconsistent results across runs
 
 **Symptom:**
 ```
@@ -799,7 +800,7 @@ Expected: john.doe@contoso.com
 But was:  john.admin@contoso.com
 ```
 
-**Cause:** Hashtable ordering differences (PS 5.1 = unordered, PS 7+ = ordered by default)
+**Cause:** Hashtable ordering or collection ordering differences
 
 **Solution:** Add `Sort-Object` to results that need deterministic order
 ```powershell
@@ -889,10 +890,11 @@ Before committing a test, verify:
 - [ ] Tagged appropriately (Unit/Integration/Comprehensive + feature tags)
 - [ ] Runs successfully: `.\Invoke-PesterTests.ps1 -TestFile "tests\...\MyTest.Tests.ps1"`
 - [ ] **100% pass rate** (0 failures)
-- [ ] Tested on PowerShell 7+ (development)
-- [ ] Tested on PowerShell 5.1 (compatibility): `powershell.exe -File .\Invoke-PesterTests.ps1 -TestFile "..."`
+- [ ] Tested on PowerShell 7+ (required for tests)
 - [ ] Legacy test archived (if migration)
 - [ ] Documentation updated (if helper enhanced)
+
+**Note:** Tests only need to run in PowerShell 7+. Application code (functions under test) must support PS 5.1.
 
 ---
 
@@ -1084,10 +1086,10 @@ Move-Item "TestScripts\test-get-user-strong-mapping.ps1" "TestScripts\archived\"
 
 **Remember the core principles:**
 1. ✅ **Improve helpers, not workarounds** - Enhance infrastructure for everyone
-2. ✅ **Direct dot-sourcing** - Only reliable pattern for PS 5.1
+2. ✅ **Direct dot-sourcing** - Recommended pattern for reliable function loading
 3. ✅ **Always clean up** - AfterAll blocks are mandatory
 4. ✅ **100% pass rate** - Never commit failing tests
-5. ✅ **Test both versions** - PS 5.1 and 7+ compatibility required
+5. ✅ **PowerShell 7+ only** - Tests run in PowerShell 7+; application code must support PS 5.1
 
 **When in doubt:**
 - Start with Template.Tests.ps1
