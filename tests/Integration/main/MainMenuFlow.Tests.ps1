@@ -41,8 +41,9 @@ Describe "Main: Menu Creation and Structure" -Tags 'Integration', 'Main' {
         . "$script:RepoRoot/functions/menuFunctions/Get-AppModeHierarchy.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Get-ApplicationDefaults.ps1"
         . "$script:RepoRoot/functions/setupFunctions/Get-ConfigurationData.ps1"
-        . "$script:RepoRoot/functions/setupFunctions/Export-PowerShellDataFile.ps1"
         . "$script:RepoRoot/functions/utilityFunctions/Write-Log.ps1"
+        
+        # Export-PowerShellDataFile is built-in cmdlet in PowerShell 7+ (no file to load)
         
         # Initialize log file (required for Write-Log)
         $script:logFile = Join-Path $TestDrive "test.log"

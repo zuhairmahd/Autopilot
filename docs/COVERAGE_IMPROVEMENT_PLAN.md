@@ -841,16 +841,17 @@ See Progress Tracking section below for detailed results.
 - [x] Show-GroupsEditor.Tests.ps1 - 34 test cases (100% passing) ✅
 - [x] Show-SettingsViewer.Tests.ps1 - 37 test cases (100% passing) ✅
 
-**Lines Covered This Week**: ~1,160 lines (136% of 850-line target) ✅  
+**Lines Covered This Week**: ~1,609 lines (189% of 850-line target) ✅  
   - MainInitialization: ~400-500 lines
   - Show-EditorCommon: ~215 lines
   - Show-AutopilotProfilesEditor: ~200 lines (utility functions)
   - Show-GroupsEditor: ~130 lines (utility functions)
   - Show-SettingsViewer: ~115 lines (Format-SettingValueForDisplay, Get-SettingDescription, Display-* functions)
+  - MainMenuFlow: ~449 lines (menu creation, configuration, workflows)
 
-**Test Results**: 162 passing / 0 failing (100% pass rate) ✅  
-**Overall Test Suite**: 1,020+ passing / 1,020+ total (100% pass rate) ✅  
-**Week 7 Progress**: 5 of 7 deliverables complete (71% complete)  
+**Test Results**: 197 passing / 0 failing (100% pass rate) ✅  
+**Overall Test Suite**: 1,055+ passing / 1,055+ total (100% pass rate) ✅  
+**Week 7 Progress**: 6 of 7 deliverables complete (86% complete)  
 **Performance**: ~40% faster main.ps1 execution vs Day 1  
 **Blockers**: None - Significantly ahead of schedule  
 
@@ -860,7 +861,13 @@ See Progress Tracking section below for detailed results.
 - **Day 3 (Oct 20)**: Created Show-EditorCommon.Tests.ps1 (32 tests) and Show-AutopilotProfilesEditor.Tests.ps1 (32 tests)
 - **Day 4 (Oct 20)**: Created Show-GroupsEditor.Tests.ps1 (34 tests)
 - **Day 5 (Oct 20)**: Created Show-SettingsViewer.Tests.ps1 (37 tests)
-- **Day 6 (Oct 20)**: Created MainMenuFlow.Tests.ps1 (26 tests passing, 9 skipped with documentation)
+- **Day 6 (Oct 20)**: Created MainMenuFlow.Tests.ps1 (35 tests, all passing - bug investigation complete) ✅
+  * **Investigation**: Analyzed 9 initially failing configuration-based tests
+  * **Hypothesis**: Tests might reveal bug in Get-CachedMenuConfiguration or menu system
+  * **Root Cause**: Missing Get-EffectiveAppModes.ps1 and Get-AppModeHierarchy.ps1 dependencies
+  * **Resolution**: Added missing dependencies to BeforeAll block
+  * **Result**: All 35 tests passing - NO BUG EXISTS in menu system
+  * **Key Learning**: main.ps1 works in production because ALL functions pre-loaded; tests need explicit dependencies
 
 **Day 5 Achievements**:
 - **Show-SettingsViewer.Tests.ps1 (400 lines, 37 tests)**:
@@ -922,11 +929,23 @@ See Progress Tracking section below for detailed results.
 - **Applies To**: Both autopilot profiles and groups (validated in both test files)
 
 **Pending Deliverables** (Week 7):
-- [x] MainMenuFlow.Tests.ps1 (419 lines, 26 tests passing, 9 tests skipped with documentation) ✅
+- [x] MainMenuFlow.Tests.ps1 (449 lines, 35 tests passing - ALL TESTS PASSING!) ✅
 - [ ] MainErrorHandling.Tests.ps1 (~150 lines, error scenarios)
 - [ ] MainUpdateFlow.Tests.ps1 (~100 lines, update checking)
 
-**Progress**: Week 7 target exceeded (1,579/850 lines = 186%) with 6/7 deliverables complete ✅
+**Progress**: Week 7 target exceeded (1,609/850 lines = 189%) with 6/7 deliverables complete ✅
+
+**Critical Investigation Result** (Day 6):
+- **Issue**: 9 configuration-based menu tests initially skipped due to suspected complex dependencies
+- **Hypothesis**: Tests might reveal bug in Get-CachedMenuConfiguration or menu system
+- **Investigation**: Analyzed main.ps1 loading pattern (lines 300-308) - recursively loads ALL functions
+- **Root Cause**: Tests missing Get-EffectiveAppModes.ps1 and Get-AppModeHierarchy.ps1 dependencies
+  * FilterMenuItemsByAppMode (line 66) → Get-EffectiveAppModes (when no mode provided)
+  * FilterMenuItemsByAppMode (line 91) → Get-MultipleAppModeHierarchy (from Get-AppModeHierarchy.ps1)
+  * Exception caught in NewMenu try block, fell through to misleading error at line 210
+- **Resolution**: Added missing dependencies to BeforeAll block
+- **Result**: All 35 tests passing - NO BUG EXISTS in menu system ✅
+- **Key Learning**: main.ps1 works in production because ALL functions pre-loaded; tests need explicit dependencies for isolation
 
 **Test Consolidations**:
 - Application Metadata: 6 → 4 tests

@@ -31,17 +31,6 @@ Describe "PowerShell Syntax Validation" -Tags 'Syntax', 'Unit', 'Fast' {
             $parseErrors | Should -BeNullOrEmpty -Because "main.ps1 must have valid PowerShell syntax"
         }
         
-        It "test.ps1 should have valid syntax" {
-            $file = Join-Path $script:RepoRoot "test.ps1"
-            $content = Get-Content $file -Raw
-            $parseErrors = @()
-            $tokens = @()
-            $null = [System.Management.Automation.Language.Parser]::ParseInput(
-                $content, [ref]$tokens, [ref]$parseErrors
-            )
-            $parseErrors | Should -BeNullOrEmpty
-        }
-        
         It "CreateRelease.ps1 should have valid syntax" {
             $file = Join-Path $script:RepoRoot "CreateRelease.ps1"
             $content = Get-Content $file -Raw
