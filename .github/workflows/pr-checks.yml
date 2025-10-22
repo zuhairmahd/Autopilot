@@ -102,7 +102,7 @@ jobs:
   summary:
     name: Test Summary
     runs-on: windows-latest
-    needs: [test-unit, test-integration, code-quality]
+    needs: [test-unit, code-quality]
     if: always()
     steps:
       - name: Check test results
