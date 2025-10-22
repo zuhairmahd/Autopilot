@@ -823,6 +823,17 @@ function Get-ApplicationDefaults()
                             'admin',
                             'advanced'
                         )
+                    },
+                    @{
+                        menuName              = 'deviceReportsMenu'
+                        description           = 'Device assignment reports menu'
+                        name                  = 'Device Assignment Reports'
+                        blockType             = 'menu'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
                     }
                 )
                 type                  = 'static'
@@ -834,6 +845,58 @@ function Get-ApplicationDefaults()
                     'registration'
                 )
             }
+            deviceReportsMenu         = @{
+                Title                 = 'Device Reports Menu'
+                Description           = 'Select the type of device report you would like to generate'
+                items                 = @(
+                    @{
+                        description           = 'Generate a report of assigned Windows devices'
+                        name                  = 'Assigned Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'Generate a report of unassigned Windows devices'
+                        name                  = 'Unassigned Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'Generate a report of Windows devices pre-provisioned with Autopilot'
+                        name                  = 'Pre-provisioned Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'Generate a report of all Windows devices with their assignment'
+                        name                  = 'All Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            }               
             serialNumberMenu          = @{
                 Title                 = 'Lookup by Serial Number'
                 Description           = 'How would you like to enter the serial number?'
