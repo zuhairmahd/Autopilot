@@ -596,10 +596,10 @@ do
     Write-Host "Choose 3 to export pre-provisioned device report"
     Write-Host "Choose 4 to export all devices with their assignment status"
     Write-Host "Choose 5 to quit"
-    $choice = Read-Host "Enter your choice (1-4)"
+    $choice = Read-Host "Enter your choice (1-5)"
     while ($choice -notin '1', '2', '3', '4', '5')
     {
-        Write-Host "Invalid choice. Please enter a number between 1 and 4."
+        Write-Host "Invalid choice. Please enter a number between 1 and 5."
         #beep
         [console]::beep(1000, 300)
         $choice = Read-Host "Enter your choice (1-5)"
