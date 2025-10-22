@@ -757,6 +757,17 @@ function Get-ApplicationDefaults()
                 Description           = 'Choose what you would like to export'
                 items                 = @(
                     @{
+                        menuName              = 'deviceReportsMenu'
+                        description           = 'Export various device assignment reports'
+                        name                  = 'Export Device Assignment Reports'
+                        blockType             = 'menu'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
                         description           = 'Export Autopilot devices to a CSV file'
                         name                  = 'Export Autopilot Devices'
                         type                  = 'action'
@@ -834,6 +845,58 @@ function Get-ApplicationDefaults()
                     'registration'
                 )
             }
+            deviceReportsMenu         = @{
+                Title                 = 'Device Reports Menu'
+                Description           = 'Select the type of device report you would like to export'
+                items                 = @(
+                    @{
+                        description           = 'Generate a report of assigned Windows devices'
+                        name                  = 'Assigned Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'Generate a report of unassigned Windows devices'
+                        name                  = 'Unassigned Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'Generate a report of Windows devices pre-provisioned with Autopilot'
+                        name                  = 'Pre-provisioned Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
+                        description           = 'Generate a report of all Windows devices with their assignment'
+                        name                  = 'All Windows Devices'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    }
+                )
+                type                  = 'static'
+                includeInDisplayModes = @(
+                    'full',
+                    'admin',
+                    'advanced'
+                )
+            }               
             serialNumberMenu          = @{
                 Title                 = 'Lookup by Serial Number'
                 Description           = 'How would you like to enter the serial number?'

@@ -1169,9 +1169,11 @@ $settingsMenu = NewMenu -MenuName "settingsMenu"
 $autopilotMenu = NewMenu -MenuName "autopilotMenu"
 $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
+$deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
 #endregion Create menus
 
 #region export menu
+$exportMenu = addMenuItem -menu $exportMenu -name 'Export Device Assignment Reports' -SubMenu $deviceReportsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
@@ -1249,6 +1251,57 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
     }
 }
 #endregion export menu
+
+#region device reports menu
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
+    Write-Host "Exporting assigned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Assigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }           
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
+    Write-Host "Exporting unassigned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Unassigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }               
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
+    Write-Host "Exporting pre-provisioned device report..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "Pre-provisioned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }                                       
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
+    Write-Host "Exporting all devices with their assignment status..."
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
+    {
+        Write-Host "All devices report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.deviceCount) devices." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
+    }                           
+}
+#endregion device reports menu
 
 #region serial number menu
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number" -Action {
@@ -1687,7 +1740,7 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
 #endregion Environment menu
 
 #region Settings menu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
