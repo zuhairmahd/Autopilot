@@ -1298,6 +1298,7 @@ $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Dev
     }
     else
     {
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }                           
 }
 #endregion device reports menu
