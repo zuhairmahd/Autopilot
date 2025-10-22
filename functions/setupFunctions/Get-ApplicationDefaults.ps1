@@ -757,6 +757,17 @@ function Get-ApplicationDefaults()
                 Description           = 'Choose what you would like to export'
                 items                 = @(
                     @{
+                        menuName              = 'deviceReportsMenu'
+                        description           = 'Export various device assignment reports'
+                        name                  = 'Export Device Assignment Reports'
+                        blockType             = 'menu'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced'
+                        )
+                    },
+                    @{
                         description           = 'Export Autopilot devices to a CSV file'
                         name                  = 'Export Autopilot Devices'
                         type                  = 'action'
@@ -823,17 +834,6 @@ function Get-ApplicationDefaults()
                             'admin',
                             'advanced'
                         )
-                    },
-                    @{
-                        menuName              = 'deviceReportsMenu'
-                        description           = 'Device assignment reports menu'
-                        name                  = 'Device Assignment Reports'
-                        blockType             = 'menu'
-                        includeInDisplayModes = @(
-                            'full',
-                            'admin',
-                            'advanced'
-                        )
                     }
                 )
                 type                  = 'static'
@@ -847,7 +847,7 @@ function Get-ApplicationDefaults()
             }
             deviceReportsMenu         = @{
                 Title                 = 'Device Reports Menu'
-                Description           = 'Select the type of device report you would like to generate'
+                Description           = 'Select the type of device report you would like to export'
                 items                 = @(
                     @{
                         description           = 'Generate a report of assigned Windows devices'

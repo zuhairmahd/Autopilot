@@ -193,7 +193,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         It "Should return only devices with BOTH userPrincipalName AND userDisplayName populated" {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
             
-            $result | Should -Be $true
+            $result.success | Should -Be $true
+            $result.ReportType | Should -Be 'Assigned'
+            $result.deviceCount | Should -Be 2
             
             # Read the generated CSV
             $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Assigned-*.csv" | Select-Object -First 1
@@ -229,7 +231,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         It "Should return devices with EITHER userPrincipalName OR userDisplayName missing/empty" {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Unassigned'
             
-            $result | Should -Be $true
+            $result.success | Should -Be $true
+            $result.ReportType | Should -Be 'Unassigned'
+            $result.deviceCount | Should -BeGreaterThan 0
             
             $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Unassigned-*.csv" | Select-Object -First 1
             $csvFile | Should -Not -BeNullOrEmpty
@@ -272,7 +276,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         It "Should return only devices with enrollmentState='enrolled' AND no user assignment" {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Preprovisioned'
             
-            $result | Should -Be $true
+            $result.success | Should -Be $true
+            $result.ReportType | Should -Be 'Preprovisioned'
+            $result.deviceCount | Should -BeGreaterThan 0
             
             $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Preprovisioned-*.csv" | Select-Object -First 1
             $csvFile | Should -Not -BeNullOrEmpty
@@ -310,7 +316,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         It "Should return all autopilot devices" {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
             
-            $result | Should -Be $true
+            $result.success | Should -Be $true
+            $result.ReportType | Should -Be 'All'
+            $result.deviceCount | Should -Be 5
             
             $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "All-*.csv" | Select-Object -First 1
             $csvFile | Should -Not -BeNullOrEmpty
@@ -386,6 +394,11 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
     
     Context "Error Handling and Robustness" {
         
+        BeforeEach {
+            # Clear cache before each test to ensure clean state
+            $script:DeviceDataCache = $null
+        }
+        
         It "Should handle empty result set gracefully" {
             # Mock to return empty data
             Mock CallGraphApi {
@@ -394,7 +407,9 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
             
-            $result | Should -Be $true
+            $result.success | Should -Be $true
+            $result.deviceCount | Should -Be 0
+            $result.message | Should -Match "No devices found"
             
             # Should create file with headers
             $csvFile = Get-ChildItem -Path $script:TestOutputPath.FullName -Filter "Assigned-*.csv" | Select-Object -First 1
@@ -404,8 +419,8 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
         It "Should return success status when export completes" {
             $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
             
-            $result | Should -Be $true
-            $result | Should -BeOfType [bool]
+            $result.success | Should -Be $true
+            $result | Should -BeOfType [hashtable]
         }
         
         It "Should create output file with timestamp in filename" {
@@ -463,6 +478,79 @@ Describe "Function: Export-DeviceAssignmentReport" -Tags 'Unit' {
             $device.DeviceName | Should -Be 'TEST-LAPTOP-001'
             $device.UserPrincipalName | Should -Be 'john.doe@contoso.com'
             $device.UserDisplayName | Should -Be 'John Doe'
+        }
+    }
+    
+    Context "Return Object Structure and Properties" {
+        
+        BeforeEach {
+            # Clear cache before each test to ensure clean state
+            $script:DeviceDataCache = $null
+        }
+        
+        It "Should return a hashtable with all required properties" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
+            
+            $result | Should -BeOfType [hashtable]
+            $result.Keys | Should -Contain 'ReportType'
+            $result.Keys | Should -Contain 'OutputFile'
+            $result.Keys | Should -Contain 'deviceCount'
+            $result.Keys | Should -Contain 'success'
+            $result.Keys | Should -Contain 'message'
+        }
+        
+        It "Should set ReportType correctly" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+            
+            $result.ReportType | Should -Be 'Assigned'
+        }
+        
+        It "Should include the output file path" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Unassigned'
+            
+            $result.OutputFile | Should -Not -BeNullOrEmpty
+            $result.OutputFile | Should -Match 'Unassigned-DeviceList-\d{8}-\d{6}\.csv'
+            Test-Path $result.OutputFile | Should -Be $true
+        }
+        
+        It "Should return correct device count for each report type" {
+            $assignedResult = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+            $unassignedResult = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Unassigned'
+            $allResult = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
+            
+            $assignedResult.deviceCount | Should -Be 2
+            $unassignedResult.deviceCount | Should -BeGreaterThan 0
+            $allResult.deviceCount | Should -Be 5
+        }
+        
+        It "Should set success to true when export completes" {
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'All'
+            
+            $result.success | Should -Be $true
+        }
+        
+        It "Should populate message when no devices found" {
+            # Clear cache first to ensure empty mock is used
+            $script:DeviceDataCache = $null
+            
+            Mock CallGraphApi {
+                return @{ value = @() }
+            }
+            
+            $result = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+            
+            $result.success | Should -Be $true
+            $result.deviceCount | Should -Be 0
+            $result.message | Should -Not -BeNullOrEmpty
+            $result.message | Should -Match "No devices found"
+        }
+        
+        It "Should return different device counts for different report types" {
+            $assigned = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Assigned'
+            $unassigned = Export-DeviceAssignmentReport -AccessToken 'mock-token' -outputPath $script:TestOutputPath.FullName -reportType 'Unassigned'
+            
+            $assigned.deviceCount | Should -Not -Be $unassigned.deviceCount
+            $assigned.deviceCount + $unassigned.deviceCount | Should -BeLessOrEqual 5  # Total in mock data
         }
     }
 }

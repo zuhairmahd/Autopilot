@@ -20,7 +20,13 @@ function Export-DeviceAssignmentReport()
     $currentDateTime = (Get-Date -Format "yyyyMMdd-HHmmss")
     $outputFile = "$outputPath\$reportType-DeviceList-$currentDateTime.csv"
     $CSVObject = [System.Collections.ArrayList]@()
-    $success = $false
+    $returnObject = @{
+        ReportType  = $reportType
+        OutputFile  = $outputFile
+        deviceCount = $null
+        success     = $false
+        message     = ''
+    }
     #endregion
 
     #region Fetch device data using Get-DeviceData
@@ -92,7 +98,7 @@ function Export-DeviceAssignmentReport()
                     }
                 }
             }
-            
+            $returnObject.deviceCount = $assignedCount
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed $processedCount autopilot devices, found $assignedCount assigned devices." -LogLevel "Information"
             Write-Verbose "[    $functionName] Processed $processedCount autopilot devices, found $assignedCount assigned devices."
         }
@@ -171,7 +177,7 @@ function Export-DeviceAssignmentReport()
                     }
                 }
             }
-            
+            $returnObject.deviceCount = $unassignedCount
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed $processedCount autopilot devices, found $unassignedCount unassigned devices." -LogLevel "Information"
             Write-Verbose "[    $functionName] Processed $processedCount autopilot devices, found $unassignedCount unassigned devices."
         }
@@ -225,7 +231,7 @@ function Export-DeviceAssignmentReport()
                     }
                 }
             }
-            
+            $returnObject.deviceCount = $preprovisionedCount
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Processed $processedCount enrolled autopilot devices, found $preprovisionedCount preprovisioned devices." -LogLevel "Information"
             Write-Verbose "[    $functionName] Processed $processedCount enrolled autopilot devices, found $preprovisionedCount preprovisioned devices."
         }
@@ -295,7 +301,7 @@ function Export-DeviceAssignmentReport()
                     }
                 }
             }
-            
+            $returnObject.deviceCount = $autopilotDevices.value.Count
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exported $($autopilotDevices.value.Count) autopilot devices ($matchedCount matched with managed devices, $unmatchedCount unmatched)." -LogLevel "Information"
             Write-Verbose "[    $functionName] Exported $($autopilotDevices.value.Count) autopilot devices ($matchedCount matched, $unmatchedCount unmatched)."
         }
@@ -308,6 +314,8 @@ function Export-DeviceAssignmentReport()
         {
             Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found matching report type '$reportType'. Generated empty report." -LogLevel "Warning"
             Write-Verbose "[    $functionName] No devices found matching report type '$reportType'."
+            $returnObject.message = "No devices found matching report type '$reportType'."
+            
             # Create empty file with headers for consistency
             $emptyObject = [PSCustomObject]@{
                 SerialNumber         = ''
@@ -329,13 +337,11 @@ function Export-DeviceAssignmentReport()
                 UserId               = ''
             }
             $emptyObject | Export-Csv -Path $outputFile -NoTypeInformation
-            $success = $true
-            return $success
+            $returnObject.success = $true
         }
         
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Exporting $($CSVObject.Count) devices to report." -LogLevel "Information"
         Write-Verbose "[    $functionName] Exporting $($CSVObject.Count) devices to report."
-        
         if ($fileMode -eq 'Append' -and (Test-Path -Path $outputFile))
         {
             $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Append
@@ -346,13 +352,16 @@ function Export-DeviceAssignmentReport()
         }
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Device assignment report exported to $outputFile ($($CSVObject.Count) devices)" -LogLevel "Information"
         Write-Verbose "[    $functionName] Device assignment report exported to $outputFile ($($CSVObject.Count) devices)"
-        $success = $true
+        $returnObject.success = $true
     }
     catch
     {
         Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to export device assignment report to $outputFile. Error: $_" -LogLevel "Error"
         Write-Verbose "[    $functionName] Failed to export device assignment report to $outputFile. Error: $_"
-        $success = $false
-    }                                       
-    return $success
+        $returnObject.success = $false  
+    }
+
+    Write-Verbose "[    $functionName] Export-DeviceAssignmentReport completed successfully. Returning $returnObject."
+    return $returnObject
 }
+

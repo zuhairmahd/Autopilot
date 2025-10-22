@@ -1173,6 +1173,7 @@ $deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
 #endregion Create menus
 
 #region export menu
+$exportMenu = addMenuItem -menu $exportMenu -name 'Export Device Assignment Reports' -SubMenu $deviceReportsMenu
 $exportMenu = AddMenuItem -menu $exportMenu -name "Export Autopilot Devices" -Action {
     $exported, $outputFile = ExportDeviceList -AccessToken $AccessToken -outputPath $scriptPath -deviceType 'autopilot'
     if ($exported)
@@ -1254,46 +1255,49 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
 #region device reports menu
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
     Write-Host "Exporting assigned device report..."
-    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite' -RefreshCache)
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
     {
-        Write-Host "Assigned device report exported successfully." -ForegroundColor Green
+        Write-Host "Assigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.count) devices." -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export assigned device report." -ForegroundColor Red
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }           
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
     Write-Host "Exporting unassigned device report..."
-    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite' -RefreshCache)
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
     {
-        Write-Host "Unassigned device report exported successfully." -ForegroundColor Green
+        Write-Host "Unassigned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.count) devices." -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export unassigned device report." -ForegroundColor Red
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }               
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
     Write-Host "Exporting pre-provisioned device report..."
-    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite' -RefreshCache)
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
     {
-        Write-Host "Pre-provisioned device report exported successfully." -ForegroundColor Green
+        Write-Host "Pre-provisioned device report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.count) devices." -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export pre-provisioned device report." -ForegroundColor Red
+        Write-Host $exportedDeviceAssignment.message -ForegroundColor Red
     }                                       
 }
 $deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
     Write-Host "Exporting all devices with their assignment status..."
-    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite' -RefreshCache)
+    $exportedDeviceAssignment = Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite'
+    if ($exportedDeviceAssignment.success)
     {
-        Write-Host "All devices report exported successfully." -ForegroundColor Green
+        Write-Host "All devices report exported successfully to $($exportedDeviceAssignment.outputFile) with $($exportedDeviceAssignment.count) devices." -ForegroundColor Green
     }
     else
     {
-        Write-Host "Failed to export all devices report." -ForegroundColor Red
     }                           
 }
 #endregion device reports menu
@@ -1735,7 +1739,7 @@ $inclusionExclusionMenu = AddMenuItem -menu $inclusionExclusionMenu -Name "Chang
 #endregion Environment menu
 
 #region Settings menu
-$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment Settings" -subMenu $environmentMenu
+$settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change environment settings" -subMenu $environmentMenu
 $settingsMenu = AddMenuItem -menu $settingsMenu -Name "Change Entra Credentials" -Action {
     Write-Host "This will change the authentication information used by the script and will allow you to set a new password."
     $choice = Read-Host "Are you sure you want to change the authentication information? (yes/no)"
