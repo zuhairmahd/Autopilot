@@ -1169,6 +1169,7 @@ $settingsMenu = NewMenu -MenuName "settingsMenu"
 $autopilotMenu = NewMenu -MenuName "autopilotMenu"
 $environmentMenu = NewMenu -MenuName "environmentMenu"
 $inclusionExclusionMenu = NewMenu -MenuName "inclusionExclusionMenu"
+$deviceReportsMenu = NewMenu -MenuName "deviceReportsMenu"
 #endregion Create menus
 
 #region export menu
@@ -1249,6 +1250,53 @@ $exportMenu = AddMenuItem -menu $exportMenu -name "Export Application Assignment
     }
 }
 #endregion export menu
+
+#region device reports menu
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Assigned Windows Devices" -Action {
+    Write-Host "Exporting assigned device report..."
+    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Assigned' -fileMode 'Overwrite' -RefreshCache)
+    {
+        Write-Host "Assigned device report exported successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export assigned device report." -ForegroundColor Red
+    }           
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Unassigned Windows Devices" -Action {
+    Write-Host "Exporting unassigned device report..."
+    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'Unassigned' -fileMode 'Overwrite' -RefreshCache)
+    {
+        Write-Host "Unassigned device report exported successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export unassigned device report." -ForegroundColor Red
+    }               
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "Pre-provisioned Windows Devices" -Action {
+    Write-Host "Exporting pre-provisioned device report..."
+    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite' -RefreshCache)
+    {
+        Write-Host "Pre-provisioned device report exported successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export pre-provisioned device report." -ForegroundColor Red
+    }                                       
+}
+$deviceReportsMenu = AddMenuItem -menu $deviceReportsMenu -name "All Windows Devices" -Action {
+    Write-Host "Exporting all devices with their assignment status..."
+    if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite' -RefreshCache)
+    {
+        Write-Host "All devices report exported successfully." -ForegroundColor Green
+    }
+    else
+    {
+        Write-Host "Failed to export all devices report." -ForegroundColor Red
+    }                           
+}
+#endregion device reports menu
 
 #region serial number menu
 $serialNumberMenu = AddMenuItem -Menu $serialNumberMenu -Name "Enter a serial number" -Action {

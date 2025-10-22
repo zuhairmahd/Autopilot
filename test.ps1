@@ -634,7 +634,6 @@ do
         '3'
         {
             Write-Host "Exporting pre-provisioned device report..."
-        
             if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'PreProvisioned' -fileMode 'Overwrite' -RefreshCache)
             {
                 Write-Host "Pre-provisioned device report exported successfully." -ForegroundColor Green
@@ -647,7 +646,6 @@ do
         '4'
         {
             Write-Host "Exporting all devices with their assignment status..."
-
             if (Export-DeviceAssignmentReport -accessToken $accessToken -outputPath "$scriptPath" -reportType 'All' -fileMode 'Overwrite' -RefreshCache)
             {
                 Write-Host "All devices report exported successfully." -ForegroundColor Green
