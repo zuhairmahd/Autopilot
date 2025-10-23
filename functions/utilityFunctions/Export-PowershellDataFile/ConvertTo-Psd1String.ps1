@@ -86,6 +86,12 @@ function ConvertTo-Psd1String()
                     Write-Verbose "[$functionName] Processing nested $($item.GetType().Name) in single-item array"
                     $result += (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 1))
                 }
+                elseif ($item -is [PSCustomObject])
+                {
+                    Write-Verbose "[$functionName] Processing PSCustomObject in single-item array - converting to hashtable first"
+                    $itemAsHashtable = ConvertTo-HashtableFromPSCustomObject -InputObject $item
+                    $result += (ConvertTo-Psd1String -Configuration $itemAsHashtable -IndentLevel ($IndentLevel + 1))
+                }
                 elseif ($item -is [string])
                 {
                     Write-Verbose "[$functionName] Processing string in single-item array: $item"
@@ -123,6 +129,12 @@ function ConvertTo-Psd1String()
                     {
                         Write-Verbose "[$functionName] Processing nested $($item.GetType().Name) in array"
                         $result += (ConvertTo-Psd1String -Configuration $item -IndentLevel ($IndentLevel + 2))
+                    }
+                    elseif ($item -is [PSCustomObject])
+                    {
+                        Write-Verbose "[$functionName] Processing PSCustomObject in array - converting to hashtable first"
+                        $itemAsHashtable = ConvertTo-HashtableFromPSCustomObject -InputObject $item
+                        $result += (ConvertTo-Psd1String -Configuration $itemAsHashtable -IndentLevel ($IndentLevel + 2))
                     }
                     elseif ($item -is [string])
                     {
