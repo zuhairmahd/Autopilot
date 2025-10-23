@@ -14,7 +14,7 @@ function ConvertTo-Psd1String()
     $indent = "    " * $IndentLevel
     $childIndent = "    " * ($IndentLevel + 1)
     $result = "@{`n"
-    Write-Verbose "[$functionName] Starting conversion of $($Configuration |Out-String) to PSD1 string with indent level $IndentLevel and child indent '$childIndent'           "
+    Write-Verbose "[$functionName] Starting conversion of $($Configuration |Out-String) to PSD1 string with indent level $IndentLevel and child indent '$childIndent'"
     write-log -logFile $logFile -module $functionName -message "Starting conversion of configuration to PSD1 string with indent level $IndentLevel, child indent '$childIndent'"
     # Validate input type
     if (-not ($Configuration -is [hashtable] -or $Configuration -is [System.Collections.Specialized.OrderedDictionary]))
