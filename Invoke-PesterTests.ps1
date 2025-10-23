@@ -89,7 +89,7 @@ param(
     [ValidateSet('Unit', 'Integration', 'Comprehensive', 'All')]
     [string]$TestType = 'All',
     [ValidateSet('None', 'Minimal', 'Normal', 'Detailed')]
-    [string]$OutputVerbosity = 'Detailed',
+    [string]$OutputVerbosity = 'Normal',
     [string]$TestFile,
     [Parameter(ParameterSetName = 'Default')]
     [Parameter(ParameterSetName = 'CodeCoverage')]

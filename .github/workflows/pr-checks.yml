@@ -48,7 +48,7 @@ jobs:
       - name: Run Unit Tests with Code Coverage
         shell: pwsh
         run: |
-          .\Invoke-PesterTests.ps1 -TestType Unit -EnableCodeCoverage -CI
+          .\Invoke-PesterTests.ps1 -TestType Unit -EnableCodeCoverage -CI -OutputVerbosity Detailed
 
       - name: Upload unit test results
         if: always()
