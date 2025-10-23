@@ -24,7 +24,7 @@ function ConvertTo-Psd1String()
         throw "Configuration must be a hashtable or ordered dictionary, got: $($Configuration.GetType().Name)"
     }
     
-    Write-Verbose "[$functionName] Converting $($Configuration.GetType().Name) to PSD1 string at indent level $IndentLevel, child indent '$childIndent'     "
+    Write-Verbose "[$functionName] Converting $($Configuration.GetType().Name) to PSD1 string at indent level $IndentLevel, child indent '$childIndent'"
     Write-Verbose "[$functionName] Configuration object $($Configuration |Out-String) with keys:"
     $Configuration.Keys | ForEach-Object { Write-Verbose "[$functionName] Key: $_" }
     # Handle empty hashtables
