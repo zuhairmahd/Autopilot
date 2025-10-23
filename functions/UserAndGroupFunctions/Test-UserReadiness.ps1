@@ -49,16 +49,12 @@ function Test-UserReadiness()
     param(
         [Parameter(Mandatory = $true)]
         [string]$UserName,
-        
         [Parameter(Mandatory = $true)]
         [string]$AccessToken,
-        
         [Parameter()]
         $GroupsToInclude,
-        
         [Parameter()]
         $GroupsToExclude,
-        
         [Parameter(Mandatory = $true)]
         [hashtable]$Settings
     )
