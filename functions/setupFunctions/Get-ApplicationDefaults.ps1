@@ -118,6 +118,7 @@ function Get-ApplicationDefaults()
             checkStrongMapping           = $false
             strongMappingOptional        = $true
             maxGroupMatchDisplay         = 10
+            maxMenuItemsPerPage          = 15
             release                      = "auto"
             repoInfo                     = @{
                 repoName      = "Autopilot"
@@ -154,6 +155,7 @@ function Get-ApplicationDefaults()
             timeInSeconds                   = 60
             maxUserMatchDisplay             = 20
             maxGroupMatchDisplay            = 20
+            maxMenuItemsPerPage             = 20
             release                         = "master"
             repoInfo                        = @{
                 repoName      = "Autopilot"

@@ -233,14 +233,22 @@ function ShowDeviceReport()
         }
     }
     
+    # Build title string to avoid nested quote issues
+    $reportTitle = "Device Report"
+    if ($DeviceName)
+    {
+        $reportTitle += " - $DeviceName"
+    }
+    elseif ($SerialNumber)
+    {
+        $reportTitle += " - $SerialNumber"
+    }
+    
     $pagingResult = Show-PagedContent `
         -Content $reportItems `
         -PageSize 15 `
-        -DisplayScriptBlock {
-        param($item)
-        Write-Host "$($item.Property): $($item.Value)"
-    } `
-        -Title "Device Report$(if ($DeviceName) { " - $DeviceName" } elseif ($SerialNumber) { " - $SerialNumber" } else { "" })" `
+        -DisplayScriptBlock { param($item); Write-Host "$($item.Property): $($item.Value)" } `
+        -Title $reportTitle `
         -ShowPageInfo $true
     
     Write-Log -LogFile $LogFile -Module "$functionName" -Message "Show-PagedContent completed with result: $pagingResult" -LogLevel "Verbose"

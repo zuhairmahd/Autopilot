@@ -229,10 +229,7 @@ function Show-SettingsViewer()
         $pagingResult = Show-PagedContent `
             -Content $flattenedSettings `
             -PageSize 10 `
-            -DisplayScriptBlock {
-            param($settingInfo)
-            Show-SettingInfoForViewer -SettingInfo $settingInfo
-        } `
+            -DisplayScriptBlock { param($settingInfo); Show-SettingInfoForViewer -SettingInfo $settingInfo } `
             -Title $viewerTitle `
             -ShowPageInfo $true `
             -Silent:$Silent

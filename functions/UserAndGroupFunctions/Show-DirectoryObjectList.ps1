@@ -131,13 +131,6 @@ function Show-DirectoryObjectList()
         }
     }
     
-    # Handle multiple items - truncate if needed
-    if ($EntityList.Count -gt $MaxDisplay)
-    {
-        Write-Verbose "[$functionName] $EntityType list has more than $MaxDisplay items, truncating to $MaxDisplay"
-        $EntityList = $EntityList | Select-Object -First $MaxDisplay
-    }
-    
     # Create selection menu
     $menuName = if ($EntityType -eq "User")
     {

@@ -7,7 +7,8 @@ function DisplayNumericMenu()
         [string]$banner = "Please press the number of your choice and press enter.",
         [string]$Prompt = "Please select an option",
         $errorMessage = "Invalid selection. Please try again.",
-        [switch]$RequireEnter
+        [switch]$RequireEnter,
+        [int]$MaxItemsPerPage = 0
     )
     #region Print a verbose message with received parameters
     $functionName = $MyInvocation.MyCommand.Name
@@ -24,122 +25,250 @@ function DisplayNumericMenu()
         Write-Log -LogFile $LogFile -Module $functionName -Message "No menu items available to display." -LogLevel "Warning"
         return $returnValues.NoMenusConfigured
     }
-    # Display the menu options
-    Write-Host $banner -ForegroundColor Green
-    for ($i = 0; $i -lt $choices.Count; $i++)
-    {
-        Write-Host "$($i + 1). $($choices[$i])" -ForegroundColor White
-    }
-    Write-Host "0. Exit" -ForegroundColor White
     
-    # Prepare valid key options (numeric keys)
-    $validKeys = @()
-    for ($i = 0; $i -le $choices.Count; $i++)
+    # Get max items per page from settings if not explicitly provided
+    if ($MaxItemsPerPage -le 0)
     {
-        $validKeys += $i.ToString()
-    }
-    
-    # Add mnemonic keys based on available choices (easter egg functionality)
-    $mnemonicKeys = @()
-    if ($choices -contains "Back")
-    {
-        $mnemonicKeys += "b"
-        Write-Verbose "[$functionName] Added mnemonic key 'b' for Back navigation"
-    }
-    if ($choices -contains "Main Menu")
-    {
-        $mnemonicKeys += "m"
-        Write-Verbose "[$functionName] Added mnemonic key 'm' for Main Menu navigation"
-    }
-    # Always allow q and e for exit
-    $mnemonicKeys += @("q", "e")
-    Write-Verbose "[$functionName] Added mnemonic keys 'q' and 'e' for Exit"
-    
-    $allValidKeys = $validKeys + $mnemonicKeys
-    Write-Verbose "[$functionName] Valid keys: $($allValidKeys -join ', ')"
-    Write-Verbose "[$functionName] Mnemonic keys: $($mnemonicKeys -join ', ')"
-    Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', '), Mnemonic keys: $($mnemonicKeys -join ', ')" -LogLevel "Debug"
-    
-    if ($RequireEnter)
-    {
-        # Original behavior with ReadLine
-        Write-Verbose "[$functionName] Using ReadLine for input (requires Enter key)..."
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Using ReadLine for input (requires Enter key)" -LogLevel "Debug"
-        Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
-        $selection = $host.UI.ReadLine()
-        Write-Verbose "[$functionName] User input received: '$selection'"
-        Start-Sleep -Milliseconds 600
-        # Clean input
-        $selection = $selection.Trim().ToLower()
-        Write-Verbose "[$functionName] Raw user input received after cleanup: '$selection'"
-    }
-    else
-    {
-        # New behavior with immediate keystroke capture
-        Write-Verbose "[$functionName] Waiting for keystroke input (no Enter required)..."
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Waiting for keystroke input (no Enter required)" -LogLevel "Debug"
-        Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
-        $keyInfo = $null
-        $selection = $null
-        # Keep reading keys until a valid one is pressed
-        do
+        $MaxItemsPerPage = if ($settings -and $settings.maxMenuItemsPerPage)
         {
-            Write-Verbose "[$functionName] Waiting for key press..."
-            try
-            {
-                $keyInfo = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
-                $selection = $keyInfo.Character.ToString().ToLower()
-                Write-Verbose "[$functionName] Key pressed: '$selection' (Character code: $([int]$keyInfo.Character))"
-                $keyCode = [int]$keyInfo.VirtualKeyCode
-                Write-Verbose "[$functionName] Key pressed virtual code: '$selection' (Character code: $([int]$keyInfo.Character), VK: $keyCode)"
-                # Handle special case for numpad keys which might have different character codes
-                if ($keyCode -ge 96 -and $keyCode -le 105)
-                {
-                    # Convert numpad key codes (96-105) to numbers (0-9)
-                    Write-Verbose "[$functionName] Detected numpad key press."
-                    $selection = ($keyCode - 96).ToString()
-                    Write-Verbose "[$functionName] Converted numpad key to: $selection"
-                }
-            }
-            catch
-            {
-                Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Verbose"
-                $selection = $null
-            }
-        } until ($allValidKeys -contains $selection)
-        
-        # Echo the selection so user can see what was chosen
-        Write-Host $selection -ForegroundColor Green
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
-    }
-    
-    # Validate the selection and handle mnemonic keys
-    while ($selection -notin $allValidKeys)
-    {
-        # Check if it's a valid numeric selection
-        if ($selection -match '^\d+$' -and [int]$selection -ge 0 -and [int]$selection -le $choices.Count)
-        {
-            break
-        }
-        
-        Write-Host $errorMessage -ForegroundColor Red
-        Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid selection: '$selection'" -LogLevel "Warning"
-        [console]::beep(1000, 500)
-        
-        if ($RequireEnter)
-        {
-            # Re-prompt with ReadLine
-            $selection = Read-Host -Prompt $Prompt
-            $selection = $selection.Trim().ToLower()
+            $settings.maxMenuItemsPerPage
         }
         else
         {
-            # Re-prompt
-            $selection = $null
-            $keyInfo = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
-            $selection = [string]$keyInfo.Character.ToString().ToLower()
+            15  # Default if settings not available
         }
     }
+    Write-Verbose "[$functionName] Max items per page: $MaxItemsPerPage"
+    Write-Log -LogFile $LogFile -Module $functionName -Message "Using max items per page: $MaxItemsPerPage" -LogLevel "Debug"
+    
+    # Check if paging is needed
+    $needsPaging = $choices.Count -gt $MaxItemsPerPage
+    $currentPage = 1
+    $totalPages = [Math]::Ceiling($choices.Count / $MaxItemsPerPage)
+    
+    if ($needsPaging)
+    {
+        Write-Verbose "[$functionName] Paging enabled: $($choices.Count) items across $totalPages pages"
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Menu paging enabled: $($choices.Count) items, $totalPages pages" -LogLevel "Debug"
+    }
+    # Main menu display loop (supports paging)
+    do
+    {
+        # Calculate items for current page
+        $startIndex = ($currentPage - 1) * $MaxItemsPerPage
+        $endIndex = [Math]::Min($startIndex + $MaxItemsPerPage, $choices.Count) - 1
+        $pageChoices = $choices[$startIndex..$endIndex]
+        
+        # Display page header if paging is active
+        if ($needsPaging)
+        {
+            Write-Host "`n=== Page $currentPage of $totalPages ===" -ForegroundColor Cyan
+            Write-Host "Showing items $($startIndex + 1) - $($endIndex + 1) of $($choices.Count)" -ForegroundColor Gray
+            Write-Host ""
+        }
+        
+        # Display the menu options for current page
+        Write-Host $banner -ForegroundColor Green
+        for ($i = 0; $i -lt $pageChoices.Count; $i++)
+        {
+            $globalIndex = $startIndex + $i + 1
+            Write-Host "$globalIndex. $($pageChoices[$i])" -ForegroundColor White
+        }
+        Write-Host "0. Exit" -ForegroundColor White
+        
+        # Add paging navigation options if needed
+        if ($needsPaging)
+        {
+            Write-Host "" -ForegroundColor White
+            Write-Host "Navigation: " -NoNewline -ForegroundColor Yellow
+            if ($currentPage -lt $totalPages)
+            {
+                Write-Host "[N]ext page | " -NoNewline -ForegroundColor Yellow
+            }
+            if ($currentPage -gt 1)
+            {
+                Write-Host "[P]revious page | " -NoNewline -ForegroundColor Yellow
+            }
+            Write-Host "[1-$totalPages] Jump to page" -ForegroundColor Yellow
+        }
+    
+        # Prepare valid key options (numeric keys) - all items remain valid regardless of page
+        $validKeys = @()
+        for ($i = 0; $i -le $choices.Count; $i++)
+        {
+            $validKeys += $i.ToString()
+        }
+        
+        # Add paging navigation keys
+        $pagingKeys = @()
+        if ($needsPaging)
+        {
+            if ($currentPage -lt $totalPages)
+            {
+                $pagingKeys += "n"
+            }
+            if ($currentPage -gt 1)
+            {
+                $pagingKeys += "p"
+            }
+            # Allow page number jumps
+            for ($p = 1; $p -le $totalPages; $p++)
+            {
+                if ($p -ne $currentPage)
+                {
+                    $pagingKeys += "page$p"
+                }
+            }
+        }
+    
+        # Add mnemonic keys based on available choices (easter egg functionality)
+        $mnemonicKeys = @()
+        if ($choices -contains "Back")
+        {
+            $mnemonicKeys += "b"
+            Write-Verbose "[$functionName] Added mnemonic key 'b' for Back navigation"
+        }
+        if ($choices -contains "Main Menu")
+        {
+            $mnemonicKeys += "m"
+            Write-Verbose "[$functionName] Added mnemonic key 'm' for Main Menu navigation"
+        }
+        # Always allow q and e for exit
+        $mnemonicKeys += @("q", "e")
+        Write-Verbose "[$functionName] Added mnemonic keys 'q' and 'e' for Exit"
+        
+        $allValidKeys = $validKeys + $mnemonicKeys + $pagingKeys
+        Write-Verbose "[$functionName] Valid keys: $($allValidKeys -join ', ')"
+        Write-Verbose "[$functionName] Mnemonic keys: $($mnemonicKeys -join ', ')"
+        if ($needsPaging)
+        {
+            Write-Verbose "[$functionName] Paging keys: $($pagingKeys -join ', ')"
+        }
+        Write-Log -LogFile $LogFile -Module $functionName -Message "Valid menu options: $($validKeys -join ', '), Mnemonic keys: $($mnemonicKeys -join ', ')" -LogLevel "Debug"
+        
+        # Handle paging navigation
+        $pageNavigationOccurred = $false
+        
+        if ($RequireEnter)
+        {
+            # Original behavior with ReadLine
+            Write-Verbose "[$functionName] Using ReadLine for input (requires Enter key)..."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Using ReadLine for input (requires Enter key)" -LogLevel "Debug"
+            Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
+            $selection = $host.UI.ReadLine()
+            Write-Verbose "[$functionName] User input received: '$selection'"
+            Start-Sleep -Milliseconds 600
+            # Clean input
+            $selection = $selection.Trim().ToLower()
+            Write-Verbose "[$functionName] Raw user input received after cleanup: '$selection'"
+        }
+        else
+        {
+            # New behavior with immediate keystroke capture
+            Write-Verbose "[$functionName] Waiting for keystroke input (no Enter required)..."
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Waiting for keystroke input (no Enter required)" -LogLevel "Debug"
+            Write-Host "$Prompt " -NoNewline -ForegroundColor Yellow
+            $keyInfo = $null
+            $selection = $null
+            # Keep reading keys until a valid one is pressed
+            do
+            {
+                Write-Verbose "[$functionName] Waiting for key press..."
+                try
+                {
+                    $keyInfo = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
+                    $selection = $keyInfo.Character.ToString().ToLower()
+                    Write-Verbose "[$functionName] Key pressed: '$selection' (Character code: $([int]$keyInfo.Character))"
+                    $keyCode = [int]$keyInfo.VirtualKeyCode
+                    Write-Verbose "[$functionName] Key pressed virtual code: '$selection' (Character code: $([int]$keyInfo.Character), VK: $keyCode)"
+                    # Handle special case for numpad keys which might have different character codes
+                    if ($keyCode -ge 96 -and $keyCode -le 105)
+                    {
+                        # Convert numpad key codes (96-105) to numbers (0-9)
+                        Write-Verbose "[$functionName] Detected numpad key press."
+                        $selection = ($keyCode - 96).ToString()
+                        Write-Verbose "[$functionName] Converted numpad key to: $selection"
+                    }
+                }
+                catch
+                {
+                    Write-Log -LogFile $LogFile -Module $functionName -Message "Error reading key: $_" -LogLevel "Verbose"
+                    $selection = $null
+                }
+            } until ($allValidKeys -contains $selection)
+        
+            # Echo the selection so user can see what was chosen
+            Write-Host $selection -ForegroundColor Green
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Valid key pressed: '$selection'" -LogLevel "Debug"
+        }
+    
+        # Handle paging navigation first
+        if ($needsPaging)
+        {
+            if ($selection -eq "n" -and $currentPage -lt $totalPages)
+            {
+                Write-Verbose "[$functionName] Navigating to next page"
+                $currentPage++
+                $pageNavigationOccurred = $true
+            }
+            elseif ($selection -eq "p" -and $currentPage -gt 1)
+            {
+                Write-Verbose "[$functionName] Navigating to previous page"
+                $currentPage--
+                $pageNavigationOccurred = $true
+            }
+            elseif ($selection -match '^\d+$')
+            {
+                $pageNum = [int]$selection
+                if ($pageNum -ge 1 -and $pageNum -le $totalPages -and $pageNum -ne $currentPage)
+                {
+                    Write-Verbose "[$functionName] Jumping to page $pageNum"
+                    $currentPage = $pageNum
+                    $pageNavigationOccurred = $true
+                }
+            }
+        }
+        
+        # If page navigation occurred, continue to next iteration
+        if ($pageNavigationOccurred)
+        {
+            continue
+        }
+        
+        # Validate the selection and handle mnemonic keys
+        while ($selection -notin $allValidKeys)
+        {
+            # Check if it's a valid numeric selection
+            if ($selection -match '^\d+$' -and [int]$selection -ge 0 -and [int]$selection -le $choices.Count)
+            {
+                break
+            }
+            
+            Write-Host $errorMessage -ForegroundColor Red
+            Write-Log -LogFile $LogFile -Module $functionName -Message "Invalid selection: '$selection'" -LogLevel "Warning"
+            [console]::beep(1000, 500)
+            
+            if ($RequireEnter)
+            {
+                # Re-prompt with ReadLine
+                $selection = Read-Host -Prompt $Prompt
+                $selection = $selection.Trim().ToLower()
+            }
+            else
+            {
+                # Re-prompt
+                $selection = $null
+                $keyInfo = $host.UI.RawUI.ReadKey("NoEcho, IncludeKeyDown")
+                $selection = [string]$keyInfo.Character.ToString().ToLower()
+            }
+        }
+        # Break out of paging loop if a valid menu selection was made
+        if (-not $pageNavigationOccurred)
+        {
+            break
+        }
+    } while ($needsPaging)  # End of paging loop
+    
     # Handle mnemonic keys first
     if ($selection -eq "b" -and $choices -contains "Back")
     {
