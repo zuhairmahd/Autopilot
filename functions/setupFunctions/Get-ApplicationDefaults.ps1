@@ -1276,9 +1276,21 @@ function Get-ApplicationDefaults()
                 )
             }
             reportExportMenu          = @{
-                Title                 = 'Report Export Menu'
-                Description           = 'Select the format to which you would like to export the report'
+                Title                 = 'Device Health Menu'
+                Description           = 'Select whether you want to display or export the device health report'
                 items                 = @(
+                    @{
+                        Description           = 'Display the report on screen'
+                        name                  = 'Display on Screen'
+                        blockType             = 'action'
+                        includeInDisplayModes = @(
+                            'full',
+                            'admin',
+                            'advanced',
+                            'helpdesk',
+                            'registration'
+                        )
+                    },
                     @{
                         Description           = 'Export the report in HTML format'
                         name                  = 'Export to HTML'
