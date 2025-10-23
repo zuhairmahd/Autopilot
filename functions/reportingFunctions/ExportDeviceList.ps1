@@ -141,13 +141,12 @@ function ExportDeviceList()
         $CSVObject.Add($exportObject) | Out-Null
     }
     #endregion    
-
-    if ($CSVObject.Count -gt 0)
+    
+    try
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
-        #Check if the file exists and ask if the user wants to overwrite.
-        if (Test-Path $outputFile)
+        if ($CSVObject.Count -gt 0)
         {
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "exporting $($CSVObject.Count) $deviceType devices to $outputFile." -LogLevel "Information"
             if ($fileMode -eq 'Append')
             {
                 Write-Log -LogFile $LogFile -Module "$functionName" -Message "Appending to existing file $outputFile." -LogLevel "Information"
@@ -161,24 +160,16 @@ function ExportDeviceList()
         }
         else
         {
-            Write-Log -LogFile $LogFile -Module "$functionName" -Message "Creating new file $outputFile." -LogLevel "Information"
+            Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
         }
-        $CSVObject | Export-Csv -Path $outputFile -NoTypeInformation -Force -Encoding UTF8 -Delimiter ','
-    }
-    else
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "No devices found for export." -LogLevel "Verbose"
-    }
-    #check if the csv file exists.
-    if (Test-Path $outputFile)
-    {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "CSV file $outputFile created successfully." -LogLevel "Information"
+        write-log -logFile $LogFile -Module "$functionName" -Message "Device list export completed successfully." -LogLevel "Information"
         $success = $true
     }
-    else
+    catch
     {
-        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Failed to create CSV file $outputFile." -LogLevel "Error"
         $success = $false
+        Write-Log -LogFile $LogFile -Module "$functionName" -Message "Error occurred while exporting device list: $_" -LogLevel "Error"
     }
+    
     return $success, $outputFile
 }
